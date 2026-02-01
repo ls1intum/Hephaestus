@@ -93,7 +93,6 @@ export default function Footer({ className, buildInfo }: FooterProps) {
 								<Tooltip>
 									<TooltipTrigger
 										render={
-											// biome-ignore lint/a11y/useAnchorContent: aria-label provided
 											<a
 												href={`https://github.com/ls1intum/Hephaestus/tree/${buildInfo.branch}`}
 												target="_blank"
@@ -114,7 +113,6 @@ export default function Footer({ className, buildInfo }: FooterProps) {
 								<Tooltip>
 									<TooltipTrigger
 										render={
-											// biome-ignore lint/a11y/useAnchorContent: aria-label provided
 											<a
 												href={`https://github.com/ls1intum/Hephaestus/commit/${buildInfo.commit}`}
 												target="_blank"

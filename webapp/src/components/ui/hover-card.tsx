@@ -1,51 +1,43 @@
-import { PreviewCard as HoverCardPrimitive } from "@base-ui/react/preview-card";
-import type * as React from "react";
+import { PreviewCard as PreviewCardPrimitive } from "@base-ui/react/preview-card";
 
 import { cn } from "@/lib/utils";
 
-function HoverCard({ ...props }: React.ComponentProps<typeof HoverCardPrimitive.Root>) {
-	return <HoverCardPrimitive.Root data-slot="hover-card" {...props} />;
+function HoverCard({ ...props }: PreviewCardPrimitive.Root.Props) {
+	return <PreviewCardPrimitive.Root data-slot="hover-card" {...props} />;
 }
 
-function HoverCardTrigger({ ...props }: React.ComponentProps<typeof HoverCardPrimitive.Trigger>) {
-	return <HoverCardPrimitive.Trigger data-slot="hover-card-trigger" {...props} />;
+function HoverCardTrigger({ ...props }: PreviewCardPrimitive.Trigger.Props) {
+	return <PreviewCardPrimitive.Trigger data-slot="hover-card-trigger" {...props} />;
 }
 
 function HoverCardContent({
 	className,
-	align = "center",
-	alignOffset = 4,
 	side = "bottom",
 	sideOffset = 4,
-	children,
+	align = "center",
+	alignOffset = 4,
 	...props
-}: React.ComponentProps<typeof HoverCardPrimitive.Popup> & {
-	align?: "start" | "center" | "end";
-	alignOffset?: number;
-	side?: "top" | "right" | "bottom" | "left";
-	sideOffset?: number;
-}) {
+}: PreviewCardPrimitive.Popup.Props &
+	Pick<PreviewCardPrimitive.Positioner.Props, "align" | "alignOffset" | "side" | "sideOffset">) {
 	return (
-		<HoverCardPrimitive.Portal data-slot="hover-card-portal">
-			<HoverCardPrimitive.Positioner
+		<PreviewCardPrimitive.Portal data-slot="hover-card-portal">
+			<PreviewCardPrimitive.Positioner
 				align={align}
 				alignOffset={alignOffset}
 				side={side}
 				sideOffset={sideOffset}
 				className="isolate z-50"
 			>
-				<HoverCardPrimitive.Popup
+				<PreviewCardPrimitive.Popup
 					data-slot="hover-card-content"
 					className={cn(
-						"bg-popover text-popover-foreground data-[open]:animate-in data-[closed]:animate-out data-[closed]:fade-out-0 data-[open]:fade-in-0 data-[closed]:zoom-out-95 data-[open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-50 w-64 origin-(--transform-origin) rounded-md border p-4 shadow-md outline-hidden",
+						"data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 ring-foreground/10 bg-popover text-popover-foreground w-64 rounded-lg p-4 text-sm shadow-md ring-1 duration-100 data-[side=inline-start]:slide-in-from-right-2 data-[side=inline-end]:slide-in-from-left-2 z-50 origin-(--transform-origin) outline-hidden",
 						className,
 					)}
 					{...props}
-				>
-					{children}
-				</HoverCardPrimitive.Popup>
-			</HoverCardPrimitive.Positioner>
-		</HoverCardPrimitive.Portal>
+				/>
+			</PreviewCardPrimitive.Positioner>
+		</PreviewCardPrimitive.Portal>
 	);
 }
 

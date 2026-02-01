@@ -17,11 +17,13 @@ export function NavContextHeader({
 }) {
 	return (
 		<>
-			<SidebarMenuButton asChild>
-				<Link to="/w/$workspaceSlug" params={{ workspaceSlug }} className="font-semibold">
-					<ChevronLeft className="h-4 w-4" />
-					{title}
-				</Link>
+			<SidebarMenuButton
+				render={
+					<Link to="/w/$workspaceSlug" params={{ workspaceSlug }} className="font-semibold" />
+				}
+			>
+				<ChevronLeft className="h-4 w-4" />
+				{title}
 			</SidebarMenuButton>
 			{children && <SidebarSeparator />}
 			{children}

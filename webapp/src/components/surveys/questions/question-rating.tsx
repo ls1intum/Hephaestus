@@ -60,9 +60,9 @@ export function QuestionRating({
 
 	const ratings = Array.from({ length: ratingScale }, (_, index) => index + 1);
 
-	const handleNumericChange = (nextValue: string | string[]) => {
-		// For single selection, we receive a string; for multiple, an array
-		const value = Array.isArray(nextValue) ? nextValue[0] : nextValue;
+	const handleNumericChange = (nextValue: readonly string[]) => {
+		// Base UI ToggleGroup uses array-based API - take the last selected value
+		const value = nextValue[nextValue.length - 1];
 		if (!value) {
 			return;
 		}
@@ -125,7 +125,7 @@ export function QuestionRating({
 				) : (
 					<div className="mx-auto mt-3 space-y-2">
 						<ToggleGroup
-							value={numericValue !== null ? String(numericValue) : undefined}
+							value={numericValue !== null ? [String(numericValue)] : []}
 							onValueChange={handleNumericChange}
 							variant="outline"
 							size="sm"

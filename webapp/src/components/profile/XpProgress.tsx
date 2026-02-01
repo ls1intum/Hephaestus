@@ -1,6 +1,7 @@
+import { Progress as ProgressPrimitive } from "@base-ui/react/progress";
 import { ClockIcon } from "@primer/octicons-react";
-import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
+import { ProgressTrack, ProgressIndicator } from "@/components/ui/progress";
 
 export interface XpProgressProps {
 	/** XP earned within the current level */
@@ -43,11 +44,11 @@ export function XpProgress({
 					{/* Subtle gloss effect */}
 					<div className="absolute inset-0 z-10 bg-gradient-to-b from-white/10 to-transparent pointer-events-none rounded-full" />
 
-					<Progress
-						className="h-full w-full rounded-full bg-transparent"
-						indicatorClassName="bg-gradient-to-r from-primary/90 to-primary rounded-full transition-all duration-500"
-						value={percentage}
-					/>
+					<ProgressPrimitive.Root className="h-full w-full" value={percentage}>
+						<ProgressTrack className="h-full w-full rounded-full bg-transparent">
+							<ProgressIndicator className="bg-gradient-to-r from-primary/90 to-primary rounded-full transition-all duration-500" />
+						</ProgressTrack>
+					</ProgressPrimitive.Root>
 				</div>
 
 				{/* Contributing since (optional) */}

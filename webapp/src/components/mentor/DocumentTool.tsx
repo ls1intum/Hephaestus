@@ -89,7 +89,7 @@ export function DocumentTool({
 		>
 			<div className="text-muted-foreground">{icon}</div>
 			<div className="text-left flex-1">{displayText}</div>
-			{isLoading && <Spinner size="sm" />}
+			{isLoading && <Spinner />}
 		</button>
 	);
 }

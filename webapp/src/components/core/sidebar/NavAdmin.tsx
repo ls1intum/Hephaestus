@@ -14,27 +14,30 @@ export function NavAdmin({ workspaceSlug }: { workspaceSlug: string }) {
 			<SidebarGroupLabel>Administration</SidebarGroupLabel>
 			<SidebarMenu>
 				<SidebarMenuItem>
-					<SidebarMenuButton asChild tooltip="Manage workspace">
-						<Link to="/w/$workspaceSlug/admin/settings" params={{ workspaceSlug }}>
-							<Settings2 />
-							<span>Manage workspace</span>
-						</Link>
+					<SidebarMenuButton
+						tooltip="Manage workspace"
+						render={<Link to="/w/$workspaceSlug/admin/settings" params={{ workspaceSlug }} />}
+					>
+						<Settings2 />
+						<span>Manage workspace</span>
 					</SidebarMenuButton>
 				</SidebarMenuItem>
 				<SidebarMenuItem>
-					<SidebarMenuButton asChild tooltip="Manage members">
-						<Link to="/w/$workspaceSlug/admin/members" params={{ workspaceSlug }}>
-							<BookUser />
-							<span>Manage members</span>
-						</Link>
+					<SidebarMenuButton
+						tooltip="Manage members"
+						render={<Link to="/w/$workspaceSlug/admin/members" params={{ workspaceSlug }} />}
+					>
+						<BookUser />
+						<span>Manage members</span>
 					</SidebarMenuButton>
 				</SidebarMenuItem>
 				<SidebarMenuItem>
-					<SidebarMenuButton asChild tooltip="Manage teams">
-						<Link to="/w/$workspaceSlug/admin/teams" params={{ workspaceSlug }}>
-							<Users />
-							<span>Manage teams</span>
-						</Link>
+					<SidebarMenuButton
+						tooltip="Manage teams"
+						render={<Link to="/w/$workspaceSlug/admin/teams" params={{ workspaceSlug }} />}
+					>
+						<Users />
+						<span>Manage teams</span>
 					</SidebarMenuButton>
 				</SidebarMenuItem>
 			</SidebarMenu>

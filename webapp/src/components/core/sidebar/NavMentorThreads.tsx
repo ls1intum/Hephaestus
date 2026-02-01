@@ -99,13 +99,16 @@ function ThreadGroup({
 
 						return (
 							<SidebarMenuItem key={thread.id}>
-								<SidebarMenuButton asChild isActive={isActive}>
-									<Link
-										to="/w/$workspaceSlug/mentor/$threadId"
-										params={{ workspaceSlug, threadId: thread.id }}
-									>
-										{thread.title}
-									</Link>
+								<SidebarMenuButton
+									isActive={isActive}
+									render={
+										<Link
+											to="/w/$workspaceSlug/mentor/$threadId"
+											params={{ workspaceSlug, threadId: thread.id }}
+										/>
+									}
+								>
+									{thread.title}
 								</SidebarMenuButton>
 							</SidebarMenuItem>
 						);

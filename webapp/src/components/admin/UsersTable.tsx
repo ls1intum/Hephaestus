@@ -11,13 +11,14 @@ import {
 	type VisibilityState,
 } from "@tanstack/react-table";
 import { ArrowUpDown, ChevronDown, Filter, Search, Users } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { TeamInfo } from "@/api/types.gen";
 import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
 	DropdownMenuCheckboxItem,
 	DropdownMenuContent,
+	DropdownMenuGroup,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -61,47 +62,62 @@ export function UsersTable({ users, teams, isLoading = false }: UsersTableProps)
 	const [globalFilter, setGlobalFilter] = useState("");
 	const [teamFilter, setTeamFilter] = useState<string>("all");
 
-	// React Compiler handles memoization automatically - no useMemo needed
-	const columns: ColumnDef<ExtendedUserTeams>[] = [
-		{
-			accessorKey: "user.name",
-			header: ({ column }) => {
-				return (
-					<Button
-						variant="ghost"
-						onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-						className="h-auto p-0 font-semibold"
-					>
-						Name
-						<ArrowUpDown className="ml-2 h-4 w-4" />
-					</Button>
-				);
+	// IMPORTANT: TanStack Table requires stable references for columns to prevent infinite re-renders
+	// See: https://tanstack.com/table/v8/docs/faq#why-is-my-component-rerendering-infinitely
+	const columns = useMemo<ColumnDef<ExtendedUserTeams>[]>(
+		() => [
+			{
+				accessorKey: "user.name",
+				header: ({ column }) => {
+					return (
+						<Button
+							variant="ghost"
+							onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+							className="h-auto p-0 font-semibold"
+						>
+							Name
+							<ArrowUpDown className="ml-2 h-4 w-4" />
+						</Button>
+					);
+				},
+				cell: ({ row }) => <div className="font-medium">{row.original.user.name}</div>,
 			},
-			cell: ({ row }) => <div className="font-medium">{row.original.user.name}</div>,
-		},
-		{
-			accessorKey: "user.login",
-			header: ({ column }) => {
-				return (
-					<Button
-						variant="ghost"
-						onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-						className="h-auto p-0 font-semibold"
-					>
-						Username
-						<ArrowUpDown className="ml-2 h-4 w-4" />
-					</Button>
-				);
+			{
+				accessorKey: "user.login",
+				header: ({ column }) => {
+					return (
+						<Button
+							variant="ghost"
+							onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+							className="h-auto p-0 font-semibold"
+						>
+							Username
+							<ArrowUpDown className="ml-2 h-4 w-4" />
+						</Button>
+					);
+				},
+				cell: ({ row }) => <div className="text-muted-foreground">{row.original.user.login}</div>,
 			},
-			cell: ({ row }) => <div className="text-muted-foreground">{row.original.user.login}</div>,
-		},
-	];
+		],
+		[],
+	);
 
-	// React Compiler handles memoization automatically
-	const filteredData = users.filter((user) => {
-		if (teamFilter === "all") return true;
-		return user.teams?.some((team) => team.id.toString() === teamFilter) || false;
-	});
+	// IMPORTANT: TanStack Table requires stable references for data to prevent infinite re-renders
+	// See: https://tanstack.com/table/v8/docs/guide/data
+	const filteredData = useMemo(
+		() =>
+			users.filter((user) => {
+				if (teamFilter === "all") return true;
+				return user.teams?.some((team) => team.id.toString() === teamFilter) || false;
+			}),
+		[users, teamFilter],
+	);
+
+	// Memoize sorted teams to avoid creating new array on every render
+	const sortedTeams = useMemo(
+		() => [...teams].sort((a, b) => a.name.localeCompare(b.name)),
+		[teams],
+	);
 
 	const table = useReactTable({
 		data: filteredData,
@@ -165,7 +181,7 @@ export function UsersTable({ users, teams, isLoading = false }: UsersTableProps)
 							className="pl-9 w-full sm:w-[300px]"
 						/>
 					</div>
-					<Select value={teamFilter} onValueChange={setTeamFilter}>
+					<Select value={teamFilter} onValueChange={(value) => value && setTeamFilter(value)}>
 						<SelectTrigger className="w-full sm:w-[200px]">
 							<Filter className="mr-2 h-4 w-4" />
 							<SelectValue placeholder="Filter by team" />
@@ -177,15 +193,13 @@ export function UsersTable({ users, teams, isLoading = false }: UsersTableProps)
 									<span>All teams</span>
 								</div>
 							</SelectItem>
-							{[...teams]
-								.sort((a, b) => a.name.localeCompare(b.name))
-								.map((team) => (
-									<SelectItem key={team.id} value={team.id.toString()}>
-										<div className="flex items-center space-x-2">
-											<span>{team.name}</span>
-										</div>
-									</SelectItem>
-								))}
+							{sortedTeams.map((team) => (
+								<SelectItem key={team.id} value={team.id.toString()}>
+									<div className="flex items-center space-x-2">
+										<span>{team.name}</span>
+									</div>
+								</SelectItem>
+							))}
 						</SelectContent>
 					</Select>
 				</div>
@@ -207,21 +221,23 @@ export function UsersTable({ users, teams, isLoading = false }: UsersTableProps)
 							Columns <ChevronDown className="ml-2 h-4 w-4" />
 						</DropdownMenuTrigger>
 						<DropdownMenuContent align="end">
-							{table
-								.getAllColumns()
-								.filter((column) => column.getCanHide())
-								.map((column) => {
-									return (
-										<DropdownMenuCheckboxItem
-											key={column.id}
-											className="capitalize"
-											checked={column.getIsVisible()}
-											onCheckedChange={(value) => column.toggleVisibility(!!value)}
-										>
-											{column.id}
-										</DropdownMenuCheckboxItem>
-									);
-								})}
+							<DropdownMenuGroup>
+								{table
+									.getAllColumns()
+									.filter((column) => column.getCanHide())
+									.map((column) => {
+										return (
+											<DropdownMenuCheckboxItem
+												key={column.id}
+												className="capitalize"
+												checked={column.getIsVisible()}
+												onCheckedChange={(value) => column.toggleVisibility(!!value)}
+											>
+												{column.id}
+											</DropdownMenuCheckboxItem>
+										);
+									})}
+							</DropdownMenuGroup>
 						</DropdownMenuContent>
 					</DropdownMenu>
 				</div>

@@ -156,7 +156,10 @@ export function BadPracticeCard({
 										Feedback
 									</Label>
 									<div className="col-span-3">
-										<Select onValueChange={(value) => setFeedbackType(value)} value={feedbackType}>
+										<Select
+											onValueChange={(value) => value && setFeedbackType(value)}
+											value={feedbackType}
+										>
 											<SelectTrigger id="feedback-type" className="w-full">
 												<SelectValue placeholder="Select the type of feedback" />
 											</SelectTrigger>

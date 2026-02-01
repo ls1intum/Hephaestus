@@ -239,7 +239,7 @@ export function TimeframeFilter({
 	return (
 		<div className="space-y-1.5">
 			<Label htmlFor="timeframe">Timeframe</Label>
-			<Select value={selectedPreset} onValueChange={handlePresetChange}>
+			<Select value={selectedPreset} onValueChange={(value) => value && handlePresetChange(value)}>
 				<SelectTrigger id="timeframe" className="w-full">
 					<div className="flex items-center gap-2">
 						<PresetIcon preset={selectedPreset} className="text-muted-foreground" />

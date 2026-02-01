@@ -169,7 +169,7 @@ export function ProfileTimeframePicker({
 
 	return (
 		<div className="flex flex-wrap items-center gap-2">
-			<Select value={selectedPreset} onValueChange={handlePresetChange}>
+			<Select value={selectedPreset} onValueChange={(value) => value && handlePresetChange(value)}>
 				<SelectTrigger className="w-auto min-w-[260px]">
 					<div className="flex items-center gap-2">
 						<PresetIcon preset={selectedPreset} className="text-muted-foreground" />
