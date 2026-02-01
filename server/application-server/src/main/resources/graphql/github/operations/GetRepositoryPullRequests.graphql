@@ -23,6 +23,7 @@ query GetRepositoryPullRequests(
             }
             totalCount
             nodes {
+                __typename
                 id
                 fullDatabaseId
                 number

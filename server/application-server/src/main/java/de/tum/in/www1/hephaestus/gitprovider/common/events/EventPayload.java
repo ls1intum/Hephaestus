@@ -5,6 +5,8 @@ import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
 import de.tum.in.www1.hephaestus.gitprovider.issuetype.IssueType;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.Milestone;
+import de.tum.in.www1.hephaestus.gitprovider.project.Project;
+import de.tum.in.www1.hephaestus.gitprovider.project.ProjectItem;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
@@ -324,6 +326,68 @@ public final class EventPayload {
     public record UserData(@NonNull Long id, @NonNull String login, @Nullable String name, @Nullable String avatarUrl) {
         public static UserData from(User user) {
             return new UserData(user.getId(), user.getLogin(), user.getName(), user.getAvatarUrl());
+        }
+    }
+
+    // ========================================================================
+    // Project Event Payload (GitHub Projects V2)
+    // ========================================================================
+
+    /**
+     * Immutable snapshot of a Project for event handling.
+     */
+    public record ProjectData(
+        @NonNull Long id,
+        int number,
+        @NonNull String title,
+        @Nullable String shortDescription,
+        boolean closed,
+        boolean isPublic,
+        @NonNull String url,
+        @NonNull Project.OwnerType ownerType,
+        @NonNull Long ownerId,
+        @Nullable Long creatorId
+    ) {
+        public static ProjectData from(Project project) {
+            return new ProjectData(
+                project.getId(),
+                project.getNumber(),
+                project.getTitle() != null ? project.getTitle() : "Untitled",
+                project.getShortDescription(),
+                project.isClosed(),
+                project.isPublic(),
+                project.getUrl() != null ? project.getUrl() : "",
+                project.getOwnerType(),
+                project.getOwnerId(),
+                project.getCreator() != null ? project.getCreator().getId() : null
+            );
+        }
+    }
+
+    // ========================================================================
+    // Project Item Event Payload (GitHub Projects V2)
+    // ========================================================================
+
+    /**
+     * Immutable snapshot of a ProjectItem for event handling.
+     */
+    public record ProjectItemData(
+        @NonNull Long id,
+        @NonNull String nodeId,
+        @NonNull Long projectId,
+        @NonNull ProjectItem.ContentType contentType,
+        @Nullable Long issueId,
+        boolean archived
+    ) {
+        public static ProjectItemData from(ProjectItem item) {
+            return new ProjectItemData(
+                item.getId(),
+                item.getNodeId() != null ? item.getNodeId() : "",
+                item.getProject().getId(),
+                item.getContentType(),
+                item.getIssue() != null ? item.getIssue().getId() : null,
+                item.isArchived()
+            );
         }
     }
 }

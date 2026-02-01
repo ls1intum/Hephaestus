@@ -3,9 +3,15 @@ package de.tum.in.www1.hephaestus.config;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.config.jackson.GitHubActorMixin;
+import de.tum.in.www1.hephaestus.config.jackson.GitHubProjectV2FieldConfigurationMixin;
+import de.tum.in.www1.hephaestus.config.jackson.GitHubProjectV2ItemContentMixin;
+import de.tum.in.www1.hephaestus.config.jackson.GitHubProjectV2ItemFieldValueMixin;
 import de.tum.in.www1.hephaestus.config.jackson.GitHubRepositoryOwnerMixin;
 import de.tum.in.www1.hephaestus.config.jackson.GitHubRequestedReviewerMixin;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHActor;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2FieldConfiguration;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2ItemContent;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2ItemFieldValue;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHRepositoryOwner;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHRequestedReviewer;
 import io.micrometer.core.instrument.Gauge;
@@ -111,7 +117,10 @@ public class GitHubGraphQlConfig {
             .configure(DeserializationFeature.USE_LONG_FOR_INTS, true)
             .addMixIn(GHActor.class, GitHubActorMixin.class)
             .addMixIn(GHRequestedReviewer.class, GitHubRequestedReviewerMixin.class)
-            .addMixIn(GHRepositoryOwner.class, GitHubRepositoryOwnerMixin.class);
+            .addMixIn(GHRepositoryOwner.class, GitHubRepositoryOwnerMixin.class)
+            .addMixIn(GHProjectV2FieldConfiguration.class, GitHubProjectV2FieldConfigurationMixin.class)
+            .addMixIn(GHProjectV2ItemContent.class, GitHubProjectV2ItemContentMixin.class)
+            .addMixIn(GHProjectV2ItemFieldValue.class, GitHubProjectV2ItemFieldValueMixin.class);
 
         ExchangeStrategies strategies = ExchangeStrategies.builder()
             .codecs(config -> {

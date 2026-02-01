@@ -18,6 +18,7 @@ query GetRepositoryIssues($owner: String!, $name: String!, $first: Int!, $after:
             }
             totalCount
             nodes {
+                __typename
                 id
                 fullDatabaseId
                 number
