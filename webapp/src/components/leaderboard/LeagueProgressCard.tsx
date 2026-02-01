@@ -1,8 +1,8 @@
 import { Progress as ProgressPrimitive } from "@base-ui/react/progress";
 import { Info, Star } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { ProgressTrack, ProgressIndicator } from "@/components/ui/progress";
+import { ProgressIndicator, ProgressTrack } from "@/components/ui/progress";
+import { cn } from "@/lib/utils";
 import { LeagueIcon } from "./LeagueIcon";
 import { getLeagueFromPoints } from "./utils";
 
