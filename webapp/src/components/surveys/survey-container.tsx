@@ -205,7 +205,7 @@ export function SurveyContainer({
 					</span>
 					<span>{Math.round(progress)}% complete</span>
 				</div>
-				<Progress value={progress} className="h-1.5" />
+				<Progress value={progress} trackClassName="h-1.5" />
 			</div>
 
 			<div className="flex-1 overflow-y-auto px-4 pb-4 sm:px-6 sm:pb-6">

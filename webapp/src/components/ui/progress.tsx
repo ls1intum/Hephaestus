@@ -2,17 +2,31 @@ import { Progress as ProgressPrimitive } from "@base-ui/react/progress";
 
 import { cn } from "@/lib/utils";
 
-function Progress({ className, children, value, ...props }: ProgressPrimitive.Root.Props) {
+interface ProgressProps extends ProgressPrimitive.Root.Props {
+	/** Additional classes for the track element */
+	trackClassName?: string;
+	/** Additional classes for the indicator element */
+	indicatorClassName?: string;
+}
+
+function Progress({
+	className,
+	children,
+	value,
+	trackClassName,
+	indicatorClassName,
+	...props
+}: ProgressProps) {
 	return (
 		<ProgressPrimitive.Root
 			value={value}
 			data-slot="progress"
-			className={cn("flex flex-wrap gap-3", className)}
+			className={cn("flex w-full flex-wrap gap-3", className)}
 			{...props}
 		>
 			{children}
-			<ProgressTrack>
-				<ProgressIndicator />
+			<ProgressTrack className={trackClassName}>
+				<ProgressIndicator className={indicatorClassName} />
 			</ProgressTrack>
 		</ProgressPrimitive.Root>
 	);
