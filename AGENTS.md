@@ -142,7 +142,7 @@ bd sync               # Force sync with JSONL
 ## 2. Toolchain & environment prerequisites
 
 - **Node.js**: Use the exact version from `.node-version` (currently 22.10.0). Stick with npm—the repo maintains `package-lock.json` and uses npm workspaces. The intelligence-service and webhook-ingest are TypeScript services that use npm.
-- **Java**: JDK 21 (see `pom.xml`). Maven wrapper is checked in; **always run builds through `./mvnw`** to ensure consistent Maven versions.
+- **Java**: JDK 21 (see `pom.xml`). Run builds with `mvn` from `server/application-server/`.
 - **Docker & Docker Compose**: Required for database helper scripts (`scripts/db-utils.sh`) and for spinning up Postgres/Keycloak/NATS locally.
 - **Databases**: Default PostgreSQL DSN is `postgresql://root:root@localhost:5432/hephaestus`. The database helpers spin this up for you via Docker.
 - **Environment variables**: When generating intelligence service OpenAPI specs locally, set `MODEL_NAME=fake:model` and `DETECTION_MODEL_NAME=fake:model` (the service settings expect a provider-qualified model name).
@@ -178,7 +178,7 @@ Run the relevant commands locally before opening a PR:
 | Webapp tests | `npm run test:webapp` |
 | Webapp typecheck | `npm run typecheck:webapp` |
 | Webapp Storybook | `npm -w webapp run build-storybook` |
-| Application-server tests | **Three test tiers:** <br>• `./mvnw test` runs unit tests (`@Tag("unit")`) <br>• `./mvnw verify` runs unit + integration tests (`@Tag("integration")`) <br>• `./mvnw test -Plive-tests` runs live GitHub API tests (`@Tag("live")`) <br><br>Live tests require GitHub App credentials configured in `application-live-local.yml` (gitignored). The Maven profile is the single guard—tests only run when explicitly activated. |
+| Application-server tests | **Three test tiers:** <br>• `mvn test` runs unit tests (`@Tag("unit")`) <br>• `mvn verify` runs unit + integration tests (`@Tag("integration")`) <br>• `mvn test -Plive-tests` runs live GitHub API tests (`@Tag("live")`) <br><br>Live tests require GitHub App credentials configured in `application-live-local.yml` (gitignored). The Maven profile is the single guard—tests only run when explicitly activated. |
 
 **Script naming conventions:**
 
@@ -198,7 +198,7 @@ We rely heavily on generated artifacts. Never hand-edit these directories—rege
 
 | Artifact | Source command |
 | --- | --- |
-| `server/application-server/openapi.yaml` | `npm run generate:api:application-server:specs` (runs `./mvnw verify -DskipTests=true -Dapp.profiles=specs`). |
+| `server/application-server/openapi.yaml` | `npm run generate:api:application-server:specs` (runs `mvn verify -DskipTests=true -Dapp.profiles=specs`). |
 | `webapp/src/api/**/*`, `webapp/src/api/@tanstack/react-query.gen.ts`, `webapp/src/api/client.gen.ts`, `webapp/src/api/types.gen.ts` | `npm run generate:api:application-server:client` (wraps `npm -w webapp run openapi-ts`). |
 | `server/application-server/src/main/java/de/tum/in/www1/hephaestus/intelligenceservice/**` | `npm run generate:api:intelligence-service:client` (OpenAPI Generator CLI). |
 | `server/intelligence-service/openapi.yaml` | `npm run generate:api:intelligence-service:specs` (runs `npm -w server/intelligence-service run openapi:export`). |

@@ -66,11 +66,9 @@ preinstall: |
     echo "ℹ️ No .beads/issues.jsonl found, skipping bd init (not a beads-enabled project)"
   fi
   
-  # Verify Maven wrapper is executable
-  echo "✅ Verifying Maven wrapper..."
-  chmod +x server/application-server/mvnw
-  cd server/application-server && ./mvnw --version
-  cd ../..
+  # Verify Maven is available
+  echo "✅ Verifying Maven..."
+  mvn --version || apt-get install -y maven && mvn --version
   
   echo "✅ Environment setup complete!"
 

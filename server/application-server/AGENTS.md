@@ -6,17 +6,17 @@ Spring Boot 3.5 backend providing the REST API for Hephaestus.
 
 | Task | Command |
 |------|---------|
-| Run locally | `./mvnw spring-boot:run` |
-| Unit tests | `./mvnw test` |
-| Integration tests | `./mvnw verify` |
-| Live GitHub tests | `./mvnw test -Plive-tests` |
+| Run locally | `mvn spring-boot:run` |
+| Unit tests | `mvn test` |
+| Integration tests | `mvn verify` |
+| Live GitHub tests | `mvn test -Plive-tests` |
 | Format | `npm run format:java` |
 | Generate OpenAPI | `npm run generate:api:application-server:specs` |
 
 ## Boundaries
 
 ### Always
-- Run `./mvnw test` before committing
+- Run `mvn test` before committing
 - Use constructor injection (via `@RequiredArgsConstructor`)
 - Return `ResponseEntity` with proper status codes
 - Tag tests appropriately (`@Tag("unit")`, etc.)
@@ -111,9 +111,9 @@ public record UserDTO(
 
 | Tag | Purpose | Base Class | Command |
 |-----|---------|------------|---------|
-| `@Tag("unit")` | Fast, no Spring context | `BaseUnitTest` | `./mvnw test` |
-| `@Tag("integration")` | Full Spring Boot + Testcontainers | `BaseIntegrationTest` | `./mvnw verify` |
-| `@Tag("live")` | Real GitHub API calls | - | `./mvnw test -Plive-tests` |
+| `@Tag("unit")` | Fast, no Spring context | `BaseUnitTest` | `mvn test` |
+| `@Tag("integration")` | Full Spring Boot + Testcontainers | `BaseIntegrationTest` | `mvn verify` |
+| `@Tag("live")` | Real GitHub API calls | - | `mvn test -Plive-tests` |
 
 ### Test Structure (AAA Pattern)
 
