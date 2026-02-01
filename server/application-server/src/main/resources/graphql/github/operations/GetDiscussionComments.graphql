@@ -1,0 +1,125 @@
+# GraphQL query for fetching additional discussion comments (pagination)
+# Used when a discussion has more than 10 comments
+
+query GetDiscussionComments($owner: String!, $name: String!, $discussionNumber: Int!, $first: Int!, $after: String) {
+    rateLimit {
+        cost
+        limit
+        remaining
+        resetAt
+    }
+    repository(owner: $owner, name: $name) {
+        discussion(number: $discussionNumber) {
+            id
+            comments(first: $first, after: $after) {
+                totalCount
+                pageInfo {
+                    hasNextPage
+                    endCursor
+                }
+                nodes {
+                    id
+                    databaseId
+                    body
+                    url
+                    createdAt
+                    updatedAt
+                    isAnswer
+                    isMinimized
+                    minimizedReason
+                    authorAssociation
+
+                    # Comment author
+                    author {
+                        __typename
+                        ... on User {
+                            id
+                            databaseId
+                            login
+                            avatarUrl
+                            name
+                            email
+                            createdAt
+                            updatedAt
+                        }
+                        ... on Bot {
+                            id
+                            databaseId
+                            login
+                            avatarUrl
+                        }
+                        ... on Mannequin {
+                            id
+                            databaseId
+                            login
+                            avatarUrl
+                        }
+                        ... on Organization {
+                            id
+                            databaseId
+                            login
+                            avatarUrl
+                        }
+                    }
+
+                    # Reply to (for threading)
+                    replyTo {
+                        id
+                    }
+
+                    # Replies to this comment
+                    replies(first: 10) {
+                        totalCount
+                        pageInfo {
+                            hasNextPage
+                            endCursor
+                        }
+                        nodes {
+                            id
+                            databaseId
+                            body
+                            url
+                            createdAt
+                            updatedAt
+                            isMinimized
+                            minimizedReason
+                            authorAssociation
+
+                            author {
+                                __typename
+                                ... on User {
+                                    id
+                                    databaseId
+                                    login
+                                    avatarUrl
+                                    name
+                                    email
+                                    createdAt
+                                    updatedAt
+                                }
+                                ... on Bot {
+                                    id
+                                    databaseId
+                                    login
+                                    avatarUrl
+                                }
+                                ... on Mannequin {
+                                    id
+                                    databaseId
+                                    login
+                                    avatarUrl
+                                }
+                                ... on Organization {
+                                    id
+                                    databaseId
+                                    login
+                                    avatarUrl
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

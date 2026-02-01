@@ -1,0 +1,40 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                   http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+    =======================================================================================
+    Discussion Sync Cursor Migration
+    =======================================================================================
+
+    Adds discussion_sync_cursor column to repository_to_monitor table.
+    This allows discussion sync to persist pagination cursor for resumable sync operations.
+
+    See: GitHubDiscussionSyncService cursor persistence feature
+    =======================================================================================
+    -->
+
+    <changeSet id="1771000000000-1-add-discussion-sync-cursor" author="GitHubDiscussionFeature">
+        <comment>Add discussion_sync_cursor column to repository_to_monitor for resumable discussion sync</comment>
+        <addColumn tableName="repository_to_monitor">
+            <column name="discussion_sync_cursor" type="VARCHAR(255)"/>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="1771000000000-2-add-discussion-answer-unique-constraint" author="GitHubDiscussionFeature">
+        <comment>Add unique constraint on answer_comment_id for @OneToOne relationship</comment>
+        <addUniqueConstraint tableName="discussion"
+                             columnNames="answer_comment_id"
+                             constraintName="uk_discussion_answer_comment_id"/>
+    </changeSet>
+
+    <changeSet id="1771000000000-3-make-discussion-comment-body-nullable" author="GitHubDiscussionFeature">
+        <comment>Allow discussion comment body to be nullable (e.g., for minimized or deleted comments)</comment>
+        <dropNotNullConstraint tableName="discussion_comment"
+                               columnName="body"
+                               columnDataType="clob"/>
+    </changeSet>
+
+</databaseChangeLog>
