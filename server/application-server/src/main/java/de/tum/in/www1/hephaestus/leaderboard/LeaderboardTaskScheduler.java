@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.annotation.Profile;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -22,6 +23,7 @@ import org.springframework.stereotype.Component;
  */
 @Order(value = Ordered.LOWEST_PRECEDENCE)
 @Component
+@Profile("!test")
 public class LeaderboardTaskScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(LeaderboardTaskScheduler.class);
