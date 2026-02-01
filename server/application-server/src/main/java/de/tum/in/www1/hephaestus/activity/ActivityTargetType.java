@@ -60,7 +60,12 @@ public enum ActivityTargetType {
     /**
      * Target is a project item (an issue, PR, or draft item within a project).
      */
-    PROJECT_ITEM("project_item");
+    PROJECT_ITEM("project_item"),
+
+    /**
+     * Target is a project status update (progress tracking posts).
+     */
+    PROJECT_STATUS_UPDATE("project_status_update");
 
     private final String value;
 

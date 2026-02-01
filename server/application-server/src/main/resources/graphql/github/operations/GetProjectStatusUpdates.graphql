@@ -1,0 +1,63 @@
+# GraphQL query for fetching project status updates
+# Status updates track project health with ON_TRACK, AT_RISK, OFF_TRACK statuses
+
+query GetProjectStatusUpdates($nodeId: ID!, $first: Int!, $after: String) {
+    rateLimit {
+        cost
+        limit
+        remaining
+        resetAt
+    }
+    node(id: $nodeId) {
+        ... on ProjectV2 {
+            id
+            statusUpdates(first: $first, after: $after, orderBy: {field: CREATED_AT, direction: DESC}) {
+                pageInfo {
+                    hasNextPage
+                    endCursor
+                }
+                totalCount
+                nodes {
+                    __typename
+                    id
+                    fullDatabaseId
+                    body
+                    bodyHTML
+                    startDate
+                    targetDate
+                    status
+                    createdAt
+                    updatedAt
+                    creator {
+                        __typename
+                        ... on User {
+                            id
+                            databaseId
+                            login
+                            avatarUrl
+                            name
+                        }
+                        ... on Bot {
+                            id
+                            databaseId
+                            login
+                            avatarUrl
+                        }
+                        ... on Mannequin {
+                            id
+                            databaseId
+                            login
+                            avatarUrl
+                        }
+                        ... on Organization {
+                            id
+                            databaseId
+                            login
+                            avatarUrl
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

@@ -211,4 +211,61 @@
         </createIndex>
     </changeSet>
 
+    <!-- Project Status Update table -->
+    <changeSet id="1769933043000-5" author="hephaestus">
+        <createTable tableName="project_status_update">
+            <column name="id" type="BIGINT">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="node_id" type="VARCHAR(64)"/>
+            <column name="project_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="body" type="TEXT"/>
+            <column name="start_date" type="DATE"/>
+            <column name="target_date" type="DATE"/>
+            <column name="status" type="VARCHAR(32)"/>
+            <column name="creator_id" type="BIGINT"/>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"/>
+        </createTable>
+
+        <addUniqueConstraint
+            tableName="project_status_update"
+            columnNames="node_id"
+            constraintName="uk_project_status_update_node_id"/>
+
+        <createIndex tableName="project_status_update" indexName="idx_project_status_update_project_id">
+            <column name="project_id"/>
+        </createIndex>
+
+        <createIndex tableName="project_status_update" indexName="idx_project_status_update_created_at">
+            <column name="project_id"/>
+            <column name="created_at" descending="true"/>
+        </createIndex>
+
+        <addForeignKeyConstraint
+            baseTableName="project_status_update"
+            baseColumnNames="project_id"
+            referencedTableName="project"
+            referencedColumnNames="id"
+            constraintName="fk_project_status_update_project"
+            onDelete="CASCADE"/>
+
+        <addForeignKeyConstraint
+            baseTableName="project_status_update"
+            baseColumnNames="creator_id"
+            referencedTableName="user"
+            referencedColumnNames="id"
+            constraintName="fk_project_status_update_creator"
+            onDelete="SET NULL"/>
+    </changeSet>
+
+    <!-- Add missing indexes for better query performance -->
+    <changeSet id="1769933043000-6" author="hephaestus">
+        <createIndex tableName="project" indexName="idx_project_node_id">
+            <column name="node_id"/>
+        </createIndex>
+    </changeSet>
+
 </databaseChangeLog>

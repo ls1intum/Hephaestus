@@ -158,6 +158,13 @@ public class Project extends BaseGitServiceEntity {
     @ToString.Exclude
     private Set<ProjectField> fields = new HashSet<>();
 
+    /**
+     * Status updates for this project.
+     */
+    @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true)
+    @ToString.Exclude
+    private Set<ProjectStatusUpdate> statusUpdates = new HashSet<>();
+
     // ==================== Bidirectional Relationship Helpers ====================
 
     /**
@@ -205,6 +212,30 @@ public class Project extends BaseGitServiceEntity {
         if (field != null) {
             this.fields.remove(field);
             field.setProject(null);
+        }
+    }
+
+    /**
+     * Adds a status update to this project and maintains bidirectional consistency.
+     *
+     * @param statusUpdate the status update to add
+     */
+    public void addStatusUpdate(ProjectStatusUpdate statusUpdate) {
+        if (statusUpdate != null) {
+            this.statusUpdates.add(statusUpdate);
+            statusUpdate.setProject(this);
+        }
+    }
+
+    /**
+     * Removes a status update from this project and maintains bidirectional consistency.
+     *
+     * @param statusUpdate the status update to remove
+     */
+    public void removeStatusUpdate(ProjectStatusUpdate statusUpdate) {
+        if (statusUpdate != null) {
+            this.statusUpdates.remove(statusUpdate);
+            statusUpdate.setProject(null);
         }
     }
 }

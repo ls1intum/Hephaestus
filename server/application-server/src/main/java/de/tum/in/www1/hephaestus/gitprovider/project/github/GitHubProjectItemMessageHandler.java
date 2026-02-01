@@ -130,31 +130,25 @@ public class GitHubProjectItemMessageHandler extends GitHubMessageHandler<GitHub
     /**
      * Finds the project associated with an item event.
      * <p>
-     * The webhook payload structure varies by action. We try to find the project
-     * using available information.
+     * The webhook payload includes project_node_id which we use to look up the project.
      */
     private Project findProjectForItem(GitHubProjectItemEventDTO event) {
-        // For now, we need to get the project from the item's existing record
-        // or from the changes field if available
-        // This is a limitation of the webhook payload - it doesn't always include project info
-
-        // If the item already exists in our database, we can get the project from it
         var itemDto = event.item();
-        if (itemDto != null && itemDto.getDatabaseId() != null) {
-            // Look up the project from the existing item
-            // This works for updates but not for new items
-            // For new items, we'd need additional context from the webhook payload
-
-            // Since webhook payloads for projects_v2_item don't consistently include
-            // project information, we may need to fetch it via GraphQL or
-            // wait for a full project sync to link items properly.
-
-            log.trace("Looking up project for item: itemId={}", itemDto.getDatabaseId());
+        if (itemDto == null) {
+            return null;
         }
 
-        // For MVP, we'll rely on GraphQL sync to establish item-project relationships
-        // Webhook processing can update existing items but may not create new ones
-        // without additional project context.
-        return null;
+        // Extract project_node_id from the webhook payload
+        String projectNodeId = itemDto.projectNodeId();
+        if (projectNodeId == null || projectNodeId.isBlank()) {
+            log.debug(
+                "Cannot find project for item: reason=missingProjectNodeId, itemNodeId={}",
+                sanitizeForLog(itemDto.nodeId())
+            );
+            return null;
+        }
+
+        // Look up the project by its GraphQL node ID
+        return projectRepository.findByNodeId(projectNodeId).orElse(null);
     }
 }

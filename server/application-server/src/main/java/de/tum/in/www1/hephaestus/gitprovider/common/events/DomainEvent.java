@@ -58,7 +58,8 @@ public final class DomainEvent {
             ReviewThreadEvent,
             TeamEvent,
             ProjectEvent,
-            ProjectItemEvent {}
+            ProjectItemEvent,
+            ProjectStatusUpdateEvent {}
 
     /** Events that carry context information. */
     public interface ContextualEvent {
@@ -456,6 +457,41 @@ public final class DomainEvent {
         @Override
         public EventPayload.ProjectItemData item() {
             return null; // Entity no longer exists
+        }
+    }
+
+    // ========================================================================
+    // Project Status Update Events
+    // ========================================================================
+
+    public sealed interface ProjectStatusUpdateEvent
+        extends Event, ContextualEvent
+        permits ProjectStatusUpdateCreated, ProjectStatusUpdateUpdated, ProjectStatusUpdateDeleted
+    {
+        EventPayload.ProjectStatusUpdateData statusUpdate();
+        Long projectId();
+    }
+
+    public record ProjectStatusUpdateCreated(
+        EventPayload.ProjectStatusUpdateData statusUpdate,
+        Long projectId,
+        EventContext context
+    ) implements ProjectStatusUpdateEvent {}
+
+    public record ProjectStatusUpdateUpdated(
+        EventPayload.ProjectStatusUpdateData statusUpdate,
+        Long projectId,
+        EventContext context
+    ) implements ProjectStatusUpdateEvent {}
+
+    public record ProjectStatusUpdateDeleted(
+        Long statusUpdateId,
+        Long projectId,
+        EventContext context
+    ) implements ProjectStatusUpdateEvent {
+        @Override
+        public EventPayload.ProjectStatusUpdateData statusUpdate() {
+            return null;
         }
     }
 }

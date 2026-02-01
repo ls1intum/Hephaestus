@@ -34,6 +34,11 @@ query GetProjectItems($nodeId: ID!, $first: Int!, $after: String) {
                             fullDatabaseId
                             number
                             title
+                            state
+                            stateReason
+                            author {
+                                login
+                            }
                             repository {
                                 id
                                 databaseId
@@ -45,6 +50,10 @@ query GetProjectItems($nodeId: ID!, $first: Int!, $after: String) {
                             fullDatabaseId
                             number
                             title
+                            state
+                            author {
+                                login
+                            }
                             repository {
                                 id
                                 databaseId
@@ -93,6 +102,8 @@ query GetProjectItems($nodeId: ID!, $first: Int!, $after: String) {
                             }
                             ... on ProjectV2ItemFieldSingleSelectValue {
                                 optionId
+                                name
+                                color
                                 field {
                                     ... on ProjectV2SingleSelectField {
                                         id
@@ -102,8 +113,123 @@ query GetProjectItems($nodeId: ID!, $first: Int!, $after: String) {
                             }
                             ... on ProjectV2ItemFieldIterationValue {
                                 iterationId
+                                title
+                                startDate
+                                duration
                                 field {
                                     ... on ProjectV2IterationField {
+                                        id
+                                        name
+                                    }
+                                }
+                            }
+                            ... on ProjectV2ItemFieldLabelValue {
+                                labels(first: 10) {
+                                    nodes {
+                                        id
+                                        name
+                                        color
+                                    }
+                                }
+                                field {
+                                    ... on ProjectV2Field {
+                                        id
+                                        name
+                                    }
+                                }
+                            }
+                            ... on ProjectV2ItemFieldMilestoneValue {
+                                milestone {
+                                    id
+                                    number
+                                    title
+                                    dueOn
+                                    state
+                                }
+                                field {
+                                    ... on ProjectV2Field {
+                                        id
+                                        name
+                                    }
+                                }
+                            }
+                            ... on ProjectV2ItemFieldUserValue {
+                                users(first: 10) {
+                                    nodes {
+                                        id
+                                        databaseId
+                                        login
+                                        avatarUrl
+                                    }
+                                }
+                                field {
+                                    ... on ProjectV2Field {
+                                        id
+                                        name
+                                    }
+                                }
+                            }
+                            ... on ProjectV2ItemFieldRepositoryValue {
+                                repository {
+                                    id
+                                    databaseId
+                                    nameWithOwner
+                                }
+                                field {
+                                    ... on ProjectV2Field {
+                                        id
+                                        name
+                                    }
+                                }
+                            }
+                            ... on ProjectV2ItemFieldPullRequestValue {
+                                pullRequests(first: 5) {
+                                    nodes {
+                                        id
+                                        number
+                                        title
+                                        state
+                                    }
+                                }
+                                field {
+                                    ... on ProjectV2Field {
+                                        id
+                                        name
+                                    }
+                                }
+                            }
+                            ... on ProjectV2ItemFieldReviewerValue {
+                                reviewers(first: 10) {
+                                    nodes {
+                                        __typename
+                                        ... on User {
+                                            id
+                                            databaseId
+                                            login
+                                            avatarUrl
+                                        }
+                                        ... on Team {
+                                            id
+                                            databaseId
+                                            name
+                                            slug
+                                        }
+                                        ... on Bot {
+                                            id
+                                            databaseId
+                                            login
+                                            avatarUrl
+                                        }
+                                        ... on Mannequin {
+                                            id
+                                            databaseId
+                                            login
+                                            avatarUrl
+                                        }
+                                    }
+                                }
+                                field {
+                                    ... on ProjectV2Field {
                                         id
                                         name
                                     }
