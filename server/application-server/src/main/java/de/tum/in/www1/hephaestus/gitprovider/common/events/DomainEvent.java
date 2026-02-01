@@ -56,7 +56,9 @@ public final class DomainEvent {
             ReviewEvent,
             ReviewCommentEvent,
             ReviewThreadEvent,
-            TeamEvent {}
+            TeamEvent,
+            ProjectEvent,
+            ProjectItemEvent {}
 
     /** Events that carry context information. */
     public interface ContextualEvent {
@@ -373,6 +375,87 @@ public final class DomainEvent {
         @Override
         public Long teamId() {
             return teamId;
+        }
+    }
+
+    // ========================================================================
+    // Project Events (GitHub Projects V2)
+    // ========================================================================
+
+    /** All project-related events. */
+    public sealed interface ProjectEvent
+        extends Event, ContextualEvent
+        permits ProjectCreated, ProjectUpdated, ProjectClosed, ProjectReopened, ProjectDeleted
+    {
+        @Nullable
+        EventPayload.ProjectData project();
+    }
+
+    public record ProjectCreated(EventPayload.ProjectData project, EventContext context) implements ProjectEvent {}
+
+    public record ProjectUpdated(
+        EventPayload.ProjectData project,
+        Set<String> changedFields,
+        EventContext context
+    ) implements ProjectEvent {}
+
+    public record ProjectClosed(EventPayload.ProjectData project, EventContext context) implements ProjectEvent {}
+
+    public record ProjectReopened(EventPayload.ProjectData project, EventContext context) implements ProjectEvent {}
+
+    /** Deleted event - entity no longer exists, only ID and title available. */
+    public record ProjectDeleted(Long projectId, String projectTitle, EventContext context) implements ProjectEvent {
+        @Override
+        public EventPayload.ProjectData project() {
+            return null; // Entity no longer exists
+        }
+    }
+
+    // ========================================================================
+    // Project Item Events (GitHub Projects V2)
+    // ========================================================================
+
+    /** All project item-related events. */
+    public sealed interface ProjectItemEvent
+        extends Event, ContextualEvent
+        permits ProjectItemCreated, ProjectItemUpdated, ProjectItemArchived, ProjectItemRestored, ProjectItemDeleted
+    {
+        @Nullable
+        EventPayload.ProjectItemData item();
+
+        Long projectId();
+    }
+
+    public record ProjectItemCreated(
+        EventPayload.ProjectItemData item,
+        Long projectId,
+        EventContext context
+    ) implements ProjectItemEvent {}
+
+    public record ProjectItemUpdated(
+        EventPayload.ProjectItemData item,
+        Long projectId,
+        Set<String> changedFields,
+        EventContext context
+    ) implements ProjectItemEvent {}
+
+    public record ProjectItemArchived(
+        EventPayload.ProjectItemData item,
+        Long projectId,
+        EventContext context
+    ) implements ProjectItemEvent {}
+
+    public record ProjectItemRestored(
+        EventPayload.ProjectItemData item,
+        Long projectId,
+        EventContext context
+    ) implements ProjectItemEvent {}
+
+    /** Deleted event - entity no longer exists, only ID available. */
+    public record ProjectItemDeleted(Long itemId, Long projectId, EventContext context) implements ProjectItemEvent {
+        @Override
+        public EventPayload.ProjectItemData item() {
+            return null; // Entity no longer exists
         }
     }
 }

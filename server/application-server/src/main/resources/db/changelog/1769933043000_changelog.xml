@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
+
+    <!-- ================================================================== -->
+    <!-- GitHub Projects V2 Support                                         -->
+    <!-- ================================================================== -->
+
+    <!-- Project table - GitHub Projects V2 -->
+    <changeSet id="1769933043000-1-create-project" author="claude">
+        <createTable tableName="project">
+            <column name="id" type="BIGINT">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="project_pkey"/>
+            </column>
+            <column name="node_id" type="VARCHAR(64)"/>
+            <column name="owner_type" type="VARCHAR(32)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="owner_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="number" type="INTEGER">
+                <constraints nullable="false"/>
+            </column>
+            <column name="title" type="VARCHAR(256)"/>
+            <column name="short_description" type="TEXT"/>
+            <column name="url" type="VARCHAR(512)"/>
+            <column name="closed" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="closed_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="is_public" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="creator_id" type="BIGINT"/>
+            <column name="last_sync_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <!-- Sync resumability fields -->
+            <column name="item_sync_cursor" type="VARCHAR(256)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="items_synced_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"/>
+        </createTable>
+
+        <addUniqueConstraint
+                tableName="project"
+                columnNames="owner_type, owner_id, number"
+                constraintName="uk_project_owner_number"/>
+
+        <addForeignKeyConstraint
+                baseTableName="project"
+                baseColumnNames="creator_id"
+                referencedTableName="user"
+                referencedColumnNames="id"
+                constraintName="fk_project_creator"
+                onDelete="SET NULL"/>
+
+        <createIndex tableName="project" indexName="idx_project_owner">
+            <column name="owner_type"/>
+            <column name="owner_id"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- Project Field table - Custom fields configuration -->
+    <changeSet id="1769933043000-2-create-project-field" author="claude">
+        <createTable tableName="project_field">
+            <column name="id" type="VARCHAR(64)">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="project_field_pkey"/>
+            </column>
+            <column name="project_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="name" type="VARCHAR(256)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="data_type" type="VARCHAR(32)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="options" type="JSONB"/>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"/>
+        </createTable>
+
+        <addUniqueConstraint
+                tableName="project_field"
+                columnNames="project_id, name"
+                constraintName="uk_project_field_project_name"/>
+
+        <addForeignKeyConstraint
+                baseTableName="project_field"
+                baseColumnNames="project_id"
+                referencedTableName="project"
+                referencedColumnNames="id"
+                constraintName="fk_project_field_project"
+                onDelete="CASCADE"/>
+
+        <createIndex tableName="project_field" indexName="idx_project_field_project_id">
+            <column name="project_id"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- Project Item table - Items in a project (Issue, PR, or Draft) -->
+    <changeSet id="1769933043000-3-create-project-item" author="claude">
+        <createTable tableName="project_item">
+            <column name="id" type="BIGINT">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="project_item_pkey"/>
+            </column>
+            <column name="node_id" type="VARCHAR(64)"/>
+            <column name="project_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="content_type" type="VARCHAR(32)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="issue_id" type="BIGINT"/>
+            <column name="draft_title" type="VARCHAR(1024)"/>
+            <column name="draft_body" type="TEXT"/>
+            <column name="archived" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"/>
+        </createTable>
+
+        <addUniqueConstraint
+                tableName="project_item"
+                columnNames="project_id, node_id"
+                constraintName="uk_project_item_project_nodeid"/>
+
+        <addForeignKeyConstraint
+                baseTableName="project_item"
+                baseColumnNames="project_id"
+                referencedTableName="project"
+                referencedColumnNames="id"
+                constraintName="fk_project_item_project"
+                onDelete="CASCADE"/>
+
+        <addForeignKeyConstraint
+                baseTableName="project_item"
+                baseColumnNames="issue_id"
+                referencedTableName="issue"
+                referencedColumnNames="id"
+                constraintName="fk_project_item_issue"
+                onDelete="CASCADE"/>
+
+        <createIndex tableName="project_item" indexName="idx_project_item_project_id">
+            <column name="project_id"/>
+        </createIndex>
+
+        <createIndex tableName="project_item" indexName="idx_project_item_issue_id">
+            <column name="issue_id"/>
+        </createIndex>
+
+        <createIndex tableName="project_item" indexName="idx_project_item_project_archived">
+            <column name="project_id"/>
+            <column name="archived"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- Project Field Value table - Field values for items -->
+    <changeSet id="1769933043000-4-create-project-field-value" author="claude">
+        <createTable tableName="project_field_value">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="project_field_value_pkey"/>
+            </column>
+            <column name="item_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="field_id" type="VARCHAR(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="text_value" type="TEXT"/>
+            <column name="number_value" type="DOUBLE PRECISION"/>
+            <column name="date_value" type="DATE"/>
+            <column name="single_select_option_id" type="VARCHAR(64)"/>
+            <column name="iteration_id" type="VARCHAR(64)"/>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"/>
+        </createTable>
+
+        <addUniqueConstraint
+                tableName="project_field_value"
+                columnNames="item_id, field_id"
+                constraintName="uk_project_field_value_item_field"/>
+
+        <addForeignKeyConstraint
+                baseTableName="project_field_value"
+                baseColumnNames="item_id"
+                referencedTableName="project_item"
+                referencedColumnNames="id"
+                constraintName="fk_project_field_value_item"
+                onDelete="CASCADE"/>
+
+        <addForeignKeyConstraint
+                baseTableName="project_field_value"
+                baseColumnNames="field_id"
+                referencedTableName="project_field"
+                referencedColumnNames="id"
+                constraintName="fk_project_field_value_field"
+                onDelete="CASCADE"/>
+
+        <createIndex tableName="project_field_value" indexName="idx_project_field_value_item_id">
+            <column name="item_id"/>
+        </createIndex>
+
+        <createIndex tableName="project_field_value" indexName="idx_project_field_value_field_id">
+            <column name="field_id"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

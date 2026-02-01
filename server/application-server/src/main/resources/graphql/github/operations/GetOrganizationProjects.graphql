@@ -1,0 +1,50 @@
+# GraphQL query for fetching organization projects (GitHub Projects V2)
+# Used by GraphQL-based sync services
+
+query GetOrganizationProjects($login: String!, $first: Int!, $after: String) {
+    rateLimit {
+        cost
+        limit
+        remaining
+        resetAt
+    }
+    organization(login: $login) {
+        projectsV2(first: $first, after: $after, orderBy: {field: UPDATED_AT, direction: DESC}) {
+            pageInfo {
+                hasNextPage
+                endCursor
+            }
+            totalCount
+            nodes {
+                __typename
+                id
+                fullDatabaseId
+                number
+                title
+                shortDescription
+                url
+                closed
+                closedAt
+                public
+                createdAt
+                updatedAt
+                creator {
+                    __typename
+                    login
+                    ... on User {
+                        id
+                        databaseId
+                        avatarUrl
+                        name
+                        email
+                    }
+                    ... on Bot {
+                        id
+                        databaseId
+                        avatarUrl
+                    }
+                }
+            }
+        }
+    }
+}

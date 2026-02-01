@@ -1,0 +1,118 @@
+# GraphQL query for fetching project items with field values
+# Used by GraphQL-based sync services
+
+query GetProjectItems($nodeId: ID!, $first: Int!, $after: String) {
+    rateLimit {
+        cost
+        limit
+        remaining
+        resetAt
+    }
+    node(id: $nodeId) {
+        ... on ProjectV2 {
+            id
+            fullDatabaseId
+            number
+            items(first: $first, after: $after) {
+                pageInfo {
+                    hasNextPage
+                    endCursor
+                }
+                totalCount
+                nodes {
+                    __typename
+                    id
+                    fullDatabaseId
+                    type
+                    isArchived
+                    createdAt
+                    updatedAt
+                    content {
+                        __typename
+                        ... on Issue {
+                            id
+                            fullDatabaseId
+                            number
+                            title
+                            repository {
+                                id
+                                databaseId
+                                nameWithOwner
+                            }
+                        }
+                        ... on PullRequest {
+                            id
+                            fullDatabaseId
+                            number
+                            title
+                            repository {
+                                id
+                                databaseId
+                                nameWithOwner
+                            }
+                        }
+                        ... on DraftIssue {
+                            id
+                            title
+                            body
+                        }
+                    }
+                    fieldValues(first: 20) {
+                        pageInfo {
+                            hasNextPage
+                            endCursor
+                        }
+                        nodes {
+                            __typename
+                            ... on ProjectV2ItemFieldTextValue {
+                                text
+                                field {
+                                    ... on ProjectV2Field {
+                                        id
+                                        name
+                                    }
+                                }
+                            }
+                            ... on ProjectV2ItemFieldNumberValue {
+                                number
+                                field {
+                                    ... on ProjectV2Field {
+                                        id
+                                        name
+                                    }
+                                }
+                            }
+                            ... on ProjectV2ItemFieldDateValue {
+                                date
+                                field {
+                                    ... on ProjectV2Field {
+                                        id
+                                        name
+                                    }
+                                }
+                            }
+                            ... on ProjectV2ItemFieldSingleSelectValue {
+                                optionId
+                                field {
+                                    ... on ProjectV2SingleSelectField {
+                                        id
+                                        name
+                                    }
+                                }
+                            }
+                            ... on ProjectV2ItemFieldIterationValue {
+                                iterationId
+                                field {
+                                    ... on ProjectV2IterationField {
+                                        id
+                                        name
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

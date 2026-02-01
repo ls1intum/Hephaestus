@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.workspace.adapter;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncContextProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider;
+import de.tum.in.www1.hephaestus.gitprovider.project.ProjectRepository;
 import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.in.www1.hephaestus.workspace.SyncTargetFactory;
@@ -40,15 +41,18 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
 
     private final WorkspaceRepository workspaceRepository;
     private final RepositoryToMonitorRepository repositoryToMonitorRepository;
+    private final ProjectRepository projectRepository;
     private final WorkspaceScopeFilter workspaceScopeFilter;
 
     public WorkspaceSyncTargetProvider(
         WorkspaceRepository workspaceRepository,
         RepositoryToMonitorRepository repositoryToMonitorRepository,
+        ProjectRepository projectRepository,
         WorkspaceScopeFilter workspaceScopeFilter
     ) {
         this.workspaceRepository = workspaceRepository;
         this.repositoryToMonitorRepository = repositoryToMonitorRepository;
+        this.projectRepository = projectRepository;
         this.workspaceScopeFilter = workspaceScopeFilter;
     }
 
@@ -421,5 +425,60 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
             syncTargets,
             syncContext
         );
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // PROJECT ITEM SYNC STATE
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    @Override
+    @Transactional
+    public void updateProjectItemSyncCursor(Long projectId, String cursor) {
+        projectRepository
+            .findById(projectId)
+            .ifPresentOrElse(
+                project -> {
+                    project.setItemSyncCursor(cursor);
+                    projectRepository.save(project);
+                },
+                () ->
+                    // DEBUG: Expected if project was deleted during sync
+                    log.debug(
+                        "Skipped project item sync cursor update: reason=projectNotFound, projectId={}",
+                        projectId
+                    )
+            );
+    }
+
+    @Override
+    @Transactional
+    public void updateProjectItemsSyncedAt(Long projectId, Instant syncedAt) {
+        projectRepository
+            .findById(projectId)
+            .ifPresentOrElse(
+                project -> {
+                    project.setItemsSyncedAt(syncedAt);
+                    project.setItemSyncCursor(null); // Clear cursor on completion
+                    projectRepository.save(project);
+                },
+                () ->
+                    // DEBUG: Expected if project was deleted during sync
+                    log.debug(
+                        "Skipped project items sync timestamp update: reason=projectNotFound, projectId={}",
+                        projectId
+                    )
+            );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<String> getProjectItemSyncCursor(Long projectId) {
+        return projectRepository.findById(projectId).map(project -> project.getItemSyncCursor());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<Instant> getProjectItemsSyncedAt(Long projectId) {
+        return projectRepository.findById(projectId).map(project -> project.getItemsSyncedAt());
     }
 }
