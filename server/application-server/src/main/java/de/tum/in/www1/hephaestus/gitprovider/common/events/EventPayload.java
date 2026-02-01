@@ -7,6 +7,7 @@ import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.Milestone;
 import de.tum.in.www1.hephaestus.gitprovider.project.Project;
 import de.tum.in.www1.hephaestus.gitprovider.project.ProjectItem;
+import de.tum.in.www1.hephaestus.gitprovider.project.ProjectStatusUpdate;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
@@ -14,6 +15,7 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequest
 import de.tum.in.www1.hephaestus.gitprovider.team.Team;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -387,6 +389,37 @@ public final class EventPayload {
                 item.getContentType(),
                 item.getIssue() != null ? item.getIssue().getId() : null,
                 item.isArchived()
+            );
+        }
+    }
+
+    // ========================================================================
+    // Project Status Update Event Payload
+    // ========================================================================
+
+    /**
+     * Immutable snapshot of a ProjectStatusUpdate for event handling.
+     */
+    public record ProjectStatusUpdateData(
+        @NonNull Long id,
+        @NonNull String nodeId,
+        @NonNull Long projectId,
+        @Nullable String body,
+        @Nullable LocalDate startDate,
+        @Nullable LocalDate targetDate,
+        @Nullable ProjectStatusUpdate.Status status,
+        @Nullable Long creatorId
+    ) {
+        public static ProjectStatusUpdateData from(ProjectStatusUpdate update) {
+            return new ProjectStatusUpdateData(
+                update.getId(),
+                update.getNodeId() != null ? update.getNodeId() : "",
+                update.getProject().getId(),
+                update.getBody(),
+                update.getStartDate(),
+                update.getTargetDate(),
+                update.getStatus(),
+                update.getCreator() != null ? update.getCreator().getId() : null
             );
         }
     }

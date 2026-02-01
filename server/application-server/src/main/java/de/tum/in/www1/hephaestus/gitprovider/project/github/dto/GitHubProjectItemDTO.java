@@ -33,6 +33,7 @@ public record GitHubProjectItemDTO(
     @JsonProperty("id") Long id,
     @JsonProperty("database_id") Long databaseId,
     @JsonProperty("node_id") String nodeId,
+    @JsonProperty("project_node_id") String projectNodeId,
     @JsonProperty("content_type") String contentType,
     @JsonProperty("issue_id") Long issueId,
     @JsonProperty("issue_number") Integer issueNumber,
@@ -107,6 +108,7 @@ public record GitHubProjectItemDTO(
             null,
             toLong(item.getFullDatabaseId()),
             item.getId(),
+            null, // projectNodeId not available from GraphQL item query
             contentType,
             issueId,
             issueNumber,

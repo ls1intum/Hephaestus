@@ -19,6 +19,8 @@ import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2Fie
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2FieldConfigurationConnection;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2Item;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2ItemConnection;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2StatusUpdate;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2StatusUpdateConnection;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
 import de.tum.in.www1.hephaestus.gitprovider.project.Project;
@@ -27,10 +29,12 @@ import de.tum.in.www1.hephaestus.gitprovider.project.ProjectFieldRepository;
 import de.tum.in.www1.hephaestus.gitprovider.project.ProjectFieldValueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.project.ProjectItem;
 import de.tum.in.www1.hephaestus.gitprovider.project.ProjectRepository;
+import de.tum.in.www1.hephaestus.gitprovider.project.ProjectStatusUpdateRepository;
 import de.tum.in.www1.hephaestus.gitprovider.project.github.dto.GitHubProjectDTO;
 import de.tum.in.www1.hephaestus.gitprovider.project.github.dto.GitHubProjectFieldDTO;
 import de.tum.in.www1.hephaestus.gitprovider.project.github.dto.GitHubProjectFieldValueDTO;
 import de.tum.in.www1.hephaestus.gitprovider.project.github.dto.GitHubProjectItemDTO;
+import de.tum.in.www1.hephaestus.gitprovider.project.github.dto.GitHubProjectStatusUpdateDTO;
 import de.tum.in.www1.hephaestus.gitprovider.sync.SyncResult;
 import java.time.Duration;
 import java.time.Instant;
@@ -72,6 +76,7 @@ public class GitHubProjectSyncService {
     private static final String GET_ORGANIZATION_PROJECTS_DOCUMENT = "GetOrganizationProjects";
     private static final String GET_PROJECT_WITH_FIELDS_DOCUMENT = "GetProjectWithFields";
     private static final String GET_PROJECT_ITEMS_DOCUMENT = "GetProjectItems";
+    private static final String GET_PROJECT_STATUS_UPDATES_DOCUMENT = "GetProjectStatusUpdates";
 
     /** Maximum number of retry attempts for transient failures. */
     private static final int MAX_RETRY_ATTEMPTS = 3;
@@ -91,10 +96,12 @@ public class GitHubProjectSyncService {
     private final ProjectRepository projectRepository;
     private final ProjectFieldRepository projectFieldRepository;
     private final ProjectFieldValueRepository projectFieldValueRepository;
+    private final ProjectStatusUpdateRepository statusUpdateRepository;
     private final OrganizationRepository organizationRepository;
     private final GitHubGraphQlClientProvider graphQlClientProvider;
     private final GitHubProjectProcessor projectProcessor;
     private final GitHubProjectItemProcessor itemProcessor;
+    private final GitHubProjectStatusUpdateProcessor statusUpdateProcessor;
     private final BackfillStateProvider backfillStateProvider;
     private final TransactionTemplate transactionTemplate;
     private final GitHubSyncProperties syncProperties;
@@ -104,10 +111,12 @@ public class GitHubProjectSyncService {
         ProjectRepository projectRepository,
         ProjectFieldRepository projectFieldRepository,
         ProjectFieldValueRepository projectFieldValueRepository,
+        ProjectStatusUpdateRepository statusUpdateRepository,
         OrganizationRepository organizationRepository,
         GitHubGraphQlClientProvider graphQlClientProvider,
         GitHubProjectProcessor projectProcessor,
         GitHubProjectItemProcessor itemProcessor,
+        GitHubProjectStatusUpdateProcessor statusUpdateProcessor,
         BackfillStateProvider backfillStateProvider,
         TransactionTemplate transactionTemplate,
         GitHubSyncProperties syncProperties,
@@ -116,10 +125,12 @@ public class GitHubProjectSyncService {
         this.projectRepository = projectRepository;
         this.projectFieldRepository = projectFieldRepository;
         this.projectFieldValueRepository = projectFieldValueRepository;
+        this.statusUpdateRepository = statusUpdateRepository;
         this.organizationRepository = organizationRepository;
         this.graphQlClientProvider = graphQlClientProvider;
         this.projectProcessor = projectProcessor;
         this.itemProcessor = itemProcessor;
+        this.statusUpdateProcessor = statusUpdateProcessor;
         this.backfillStateProvider = backfillStateProvider;
         this.transactionTemplate = transactionTemplate;
         this.syncProperties = syncProperties;
@@ -441,6 +452,9 @@ public class GitHubProjectSyncService {
 
         // Sync fields first (separate phase)
         syncProjectFields(client, project, scopeId);
+
+        // Sync status updates (separate phase)
+        syncProjectStatusUpdates(client, project, scopeId);
 
         // Resume from cursor if present (via SPI for consistency)
         String cursor = backfillStateProvider.getProjectItemSyncCursor(projectId).orElse(null);
@@ -800,6 +814,153 @@ public class GitHubProjectSyncService {
             log.debug("Synced project fields: projectId={}", project.getId());
         } catch (Exception e) {
             log.warn("Failed to sync project fields: projectId={}, error={}", project.getId(), e.getMessage());
+        }
+    }
+
+    /**
+     * Synchronizes project status updates.
+     * <p>
+     * Status updates track project health with ON_TRACK, AT_RISK, OFF_TRACK statuses.
+     * Uses Mono.defer() with retry for transport error resilience.
+     *
+     * @param client  the GraphQL client
+     * @param project the project to sync status updates for
+     * @param scopeId the scope ID for rate limit tracking
+     */
+    private void syncProjectStatusUpdates(HttpGraphQlClient client, Project project, Long scopeId) {
+        String projectNodeId = project.getNodeId();
+        if (projectNodeId == null) {
+            return;
+        }
+
+        Long projectId = project.getId();
+
+        try {
+            List<String> syncedStatusUpdateNodeIds = new ArrayList<>();
+            String cursor = null;
+            boolean hasMore = true;
+            int pageCount = 0;
+
+            while (hasMore) {
+                pageCount++;
+                if (pageCount >= MAX_PAGINATION_PAGES) {
+                    log.warn(
+                        "Reached maximum pagination limit for status updates: projectId={}, limit={}",
+                        projectId,
+                        MAX_PAGINATION_PAGES
+                    );
+                    break;
+                }
+
+                final String currentCursor = cursor;
+
+                ClientGraphQlResponse graphQlResponse = Mono.defer(() ->
+                    client
+                        .documentName(GET_PROJECT_STATUS_UPDATES_DOCUMENT)
+                        .variable("nodeId", projectNodeId)
+                        .variable("first", LARGE_PAGE_SIZE)
+                        .variable("after", currentCursor)
+                        .execute()
+                )
+                    .retryWhen(
+                        Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                            .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                            .jitter(JITTER_FACTOR)
+                            .filter(this::isTransportError)
+                            .doBeforeRetry(signal ->
+                                log.warn(
+                                    "Retrying status updates sync after transport error: projectId={}, attempt={}, error={}",
+                                    projectId,
+                                    signal.totalRetries() + 1,
+                                    signal.failure().getMessage()
+                                )
+                            )
+                    )
+                    .block(syncProperties.graphqlTimeout());
+
+                if (graphQlResponse == null || !graphQlResponse.isValid()) {
+                    log.warn(
+                        "Received invalid GraphQL response for status updates: projectId={}, errors={}",
+                        projectId,
+                        graphQlResponse != null ? graphQlResponse.getErrors() : "null"
+                    );
+                    break;
+                }
+
+                graphQlClientProvider.trackRateLimit(scopeId, graphQlResponse);
+
+                if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
+                    log.warn("Aborting status updates sync due to critical rate limit: projectId={}", projectId);
+                    break;
+                }
+
+                GHProjectV2StatusUpdateConnection statusUpdatesConnection = graphQlResponse
+                    .field("node.statusUpdates")
+                    .toEntity(GHProjectV2StatusUpdateConnection.class);
+
+                if (
+                    statusUpdatesConnection == null ||
+                    statusUpdatesConnection.getNodes() == null ||
+                    statusUpdatesConnection.getNodes().isEmpty()
+                ) {
+                    break;
+                }
+
+                // Process this page of status updates in a transaction
+                transactionTemplate.executeWithoutResult(status -> {
+                    ProcessingContext context = ProcessingContext.forSync(scopeId, null);
+
+                    for (GHProjectV2StatusUpdate graphQlStatusUpdate : statusUpdatesConnection.getNodes()) {
+                        GitHubProjectStatusUpdateDTO dto = GitHubProjectStatusUpdateDTO.fromStatusUpdate(
+                            graphQlStatusUpdate
+                        );
+                        if (dto == null || dto.nodeId() == null) {
+                            continue;
+                        }
+
+                        syncedStatusUpdateNodeIds.add(dto.nodeId());
+                        statusUpdateProcessor.process(dto, project, context);
+                    }
+                });
+
+                var pageInfo = statusUpdatesConnection.getPageInfo();
+                hasMore = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
+                cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
+
+                // Apply pagination throttle
+                if (hasMore && !syncProperties.paginationThrottle().isZero()) {
+                    try {
+                        Thread.sleep(syncProperties.paginationThrottle().toMillis());
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        log.debug("Status updates sync interrupted during throttle: projectId={}", projectId);
+                        break;
+                    }
+                }
+            }
+
+            // Remove stale status updates only if we completed normally (no more pages)
+            if (!hasMore && !syncedStatusUpdateNodeIds.isEmpty()) {
+                transactionTemplate.executeWithoutResult(status -> {
+                    ProcessingContext context = ProcessingContext.forSync(scopeId, null);
+                    int removed = statusUpdateProcessor.removeStaleStatusUpdates(
+                        projectId,
+                        syncedStatusUpdateNodeIds,
+                        context
+                    );
+                    if (removed > 0) {
+                        log.debug("Removed stale status updates: projectId={}, count={}", projectId, removed);
+                    }
+                });
+            }
+
+            log.debug(
+                "Synced project status updates: projectId={}, count={}",
+                projectId,
+                syncedStatusUpdateNodeIds.size()
+            );
+        } catch (Exception e) {
+            log.warn("Failed to sync project status updates: projectId={}, error={}", projectId, e.getMessage());
         }
     }
 

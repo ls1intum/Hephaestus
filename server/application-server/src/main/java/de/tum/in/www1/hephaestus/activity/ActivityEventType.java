@@ -122,7 +122,17 @@ public enum ActivityEventType {
     /** Item restored - item unarchived back to active view */
     PROJECT_ITEM_RESTORED("project_item.restored"),
     /** Item deleted - item removed from project */
-    PROJECT_ITEM_DELETED("project_item.deleted");
+    PROJECT_ITEM_DELETED("project_item.deleted"),
+
+    // ========================================================================
+    // Project Status Update Events
+    // ========================================================================
+    /** Status update posted to project */
+    PROJECT_STATUS_UPDATE_CREATED("project_status_update.created"),
+    /** Status update edited */
+    PROJECT_STATUS_UPDATE_UPDATED("project_status_update.updated"),
+    /** Status update deleted */
+    PROJECT_STATUS_UPDATE_DELETED("project_status_update.deleted");
 
     private final String value;
 

@@ -1469,4 +1469,73 @@ public class ActivityEventListener {
         }
         return ActivityEventType.REVIEW_COMMENTED;
     }
+
+    // ========================================================================
+    // Project Status Update Events
+    // ========================================================================
+
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onProjectStatusUpdateCreated(DomainEvent.ProjectStatusUpdateCreated event) {
+        var data = event.statusUpdate();
+        if (!hasValidScopeId("Project status update created", data.id(), event.context().scopeId())) {
+            return;
+        }
+        Instant occurredAt = Instant.now();
+        safeRecord("project status update created", data.id(), () ->
+            activityEventService.record(
+                event.context().scopeId(),
+                ActivityEventType.PROJECT_STATUS_UPDATE_CREATED,
+                occurredAt,
+                getActorOrNull(data.creatorId()),
+                null, // Repository not directly available for org-level projects
+                ActivityTargetType.PROJECT_STATUS_UPDATE,
+                data.id(),
+                0.0 // Status updates are workflow tracking, no XP reward
+            )
+        );
+    }
+
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onProjectStatusUpdateUpdated(DomainEvent.ProjectStatusUpdateUpdated event) {
+        var data = event.statusUpdate();
+        if (!hasValidScopeId("Project status update updated", data.id(), event.context().scopeId())) {
+            return;
+        }
+        Instant occurredAt = Instant.now();
+        safeRecord("project status update updated", data.id(), () ->
+            activityEventService.record(
+                event.context().scopeId(),
+                ActivityEventType.PROJECT_STATUS_UPDATE_UPDATED,
+                occurredAt,
+                getActorOrNull(data.creatorId()),
+                null,
+                ActivityTargetType.PROJECT_STATUS_UPDATE,
+                data.id(),
+                0.0
+            )
+        );
+    }
+
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onProjectStatusUpdateDeleted(DomainEvent.ProjectStatusUpdateDeleted event) {
+        Long id = event.statusUpdateId();
+        if (!hasValidScopeId("Project status update deleted", id, event.context().scopeId())) {
+            return;
+        }
+        safeRecord("project status update deleted", id, () ->
+            activityEventService.recordDeleted(
+                event.context().scopeId(),
+                ActivityEventType.PROJECT_STATUS_UPDATE_DELETED,
+                Instant.now(),
+                ActivityTargetType.PROJECT_STATUS_UPDATE,
+                id
+            )
+        );
+    }
 }

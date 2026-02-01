@@ -28,6 +28,18 @@ query GetOrganizationProjects($login: String!, $first: Int!, $after: String) {
                 public
                 createdAt
                 updatedAt
+                owner {
+                    ... on Organization {
+                        id
+                        databaseId
+                        login
+                    }
+                    ... on User {
+                        id
+                        databaseId
+                        login
+                    }
+                }
                 creator {
                     __typename
                     login

@@ -604,4 +604,33 @@ public sealed interface GitHubEventAction {
             };
         }
     }
+
+    // ========== GitHub Projects V2 Status Update Events ==========
+
+    /**
+     * Actions for the projects_v2_status_update webhook event.
+     *
+     * @see GitHubEventType#PROJECTS_V2_STATUS_UPDATE
+     */
+    enum ProjectV2StatusUpdate implements GitHubEventAction {
+        CREATED,
+        EDITED,
+        DELETED,
+        UNKNOWN;
+
+        @Override
+        public String value() {
+            return name().toLowerCase();
+        }
+
+        public static ProjectV2StatusUpdate fromString(String action) {
+            if (action == null || action.isBlank()) return UNKNOWN;
+            return switch (action.toLowerCase()) {
+                case "created" -> CREATED;
+                case "edited" -> EDITED;
+                case "deleted" -> DELETED;
+                default -> UNKNOWN;
+            };
+        }
+    }
 }
