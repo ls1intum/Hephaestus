@@ -1,9 +1,62 @@
 import { Select as SelectPrimitive } from "@base-ui/react/select";
 import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react";
-import type * as React from "react";
+import * as React from "react";
 import { cn } from "@/lib/utils";
 
-const Select = SelectPrimitive.Root;
+type SelectItem = { value: string; label: React.ReactNode };
+
+interface SelectContextValue {
+	itemLabels: Map<string, React.ReactNode>;
+	registerItem: (value: string, label: React.ReactNode) => void;
+	unregisterItem: (value: string) => void;
+}
+
+const SelectContext = React.createContext<SelectContextValue | null>(null);
+
+function Select({
+	children,
+	items,
+	...props
+}: SelectPrimitive.Root.Props<string> & {
+	children?: React.ReactNode;
+	/** Pre-defined items for label lookup. Use this to show correct labels on initial render. */
+	items?: SelectItem[];
+}) {
+	// Use ref for immediate synchronous access to labels
+	const itemLabelsRef = React.useRef<Map<string, React.ReactNode>>(new Map());
+	// Use state to trigger re-renders when items register
+	const [, setVersion] = React.useState(0);
+
+	// Pre-populate from items prop if provided
+	if (items) {
+		for (const item of items) {
+			itemLabelsRef.current.set(item.value, item.label);
+		}
+	}
+
+	const contextValue = React.useMemo<SelectContextValue>(
+		() => ({
+			itemLabels: itemLabelsRef.current,
+			registerItem: (value, label) => {
+				itemLabelsRef.current.set(value, label);
+				setVersion((v) => v + 1);
+			},
+			unregisterItem: (value) => {
+				itemLabelsRef.current.delete(value);
+				setVersion((v) => v + 1);
+			},
+		}),
+		[],
+	);
+
+	return (
+		<SelectContext.Provider value={contextValue}>
+			<SelectPrimitive.Root data-slot="select" {...props}>
+				{children}
+			</SelectPrimitive.Root>
+		</SelectContext.Provider>
+	);
+}
 
 function SelectGroup({ className, ...props }: SelectPrimitive.Group.Props) {
 	return (
@@ -15,13 +68,26 @@ function SelectGroup({ className, ...props }: SelectPrimitive.Group.Props) {
 	);
 }
 
-function SelectValue({ className, ...props }: SelectPrimitive.Value.Props) {
+function SelectValue({
+	className,
+	placeholder,
+	...props
+}: SelectPrimitive.Value.Props & { placeholder?: React.ReactNode }) {
+	const context = React.useContext(SelectContext);
+
 	return (
 		<SelectPrimitive.Value
 			data-slot="select-value"
 			className={cn("flex flex-1 text-left", className)}
 			{...props}
-		/>
+		>
+			{(value) => {
+				if (value == null) {
+					return <span className="text-muted-foreground">{placeholder}</span>;
+				}
+				return context?.itemLabels.get(String(value)) ?? value;
+			}}
+		</SelectPrimitive.Value>
 	);
 }
 
@@ -103,10 +169,27 @@ function SelectLabel({ className, ...props }: SelectPrimitive.GroupLabel.Props) 
 	);
 }
 
-function SelectItem({ className, children, ...props }: SelectPrimitive.Item.Props) {
+function SelectItem({ className, children, value, ...props }: SelectPrimitive.Item.Props) {
+	const context = React.useContext(SelectContext);
+
+	// Register label synchronously during render for immediate availability
+	if (value != null && context) {
+		context.itemLabels.set(String(value), children);
+	}
+
+	// Cleanup on unmount
+	React.useEffect(() => {
+		return () => {
+			if (value != null && context) {
+				context.unregisterItem(String(value));
+			}
+		};
+	}, [value, context]);
+
 	return (
 		<SelectPrimitive.Item
 			data-slot="select-item"
+			value={value}
 			className={cn(
 				"focus:bg-accent focus:text-accent-foreground not-data-[variant=destructive]:focus:**:text-accent-foreground gap-2 rounded-sm py-1.5 pr-8 pl-2 text-sm [&_svg:not([class*='size-'])]:size-4 *:[span]:last:flex *:[span]:last:items-center *:[span]:last:gap-2 relative flex w-full cursor-default items-center outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
 				className,
