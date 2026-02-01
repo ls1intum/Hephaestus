@@ -2,13 +2,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
-	detectBadPracticesByUserMutation,
-	detectBadPracticesForPullRequestMutation,
-	getActivityByUserOptions,
-	getActivityByUserQueryKey,
+	detectForPullRequestMutation,
+	detectForUserMutation,
+	getBadPracticesForUserOptions,
+	getBadPracticesForUserQueryKey,
 	getUserProfileOptions,
-	provideFeedbackForBadPracticeMutation,
-	resolveBadPracticeMutation,
+	provideFeedbackMutation,
+	resolveMutation,
 } from "@/api/@tanstack/react-query.gen";
 import type { BadPracticeFeedback } from "@/api/types.gen";
 import { PracticesPage } from "@/components/practices/PracticesPage";
@@ -36,7 +36,7 @@ export function BestPracticesContainer() {
 
 	// Query for activity data
 	const activityQuery = useQuery({
-		...getActivityByUserOptions({
+		...getBadPracticesForUserOptions({
 			path: { workspaceSlug: slug, login: username },
 		}),
 		enabled: hasWorkspace && Boolean(username),
@@ -52,10 +52,10 @@ export function BestPracticesContainer() {
 
 	// Mutation for detecting bad practices
 	const detect = useMutation({
-		...detectBadPracticesByUserMutation(),
+		...detectForUserMutation(),
 		onSuccess: () => {
 			queryClient.invalidateQueries({
-				queryKey: getActivityByUserQueryKey({
+				queryKey: getBadPracticesForUserQueryKey({
 					path: { workspaceSlug: slug, login: username },
 				}),
 			});
@@ -69,10 +69,10 @@ export function BestPracticesContainer() {
 
 	// Mutation for resolving bad practices
 	const resolveBadPractice = useMutation({
-		...resolveBadPracticeMutation(),
+		...resolveMutation(),
 		onSuccess: () => {
 			queryClient.invalidateQueries({
-				queryKey: getActivityByUserQueryKey({
+				queryKey: getBadPracticesForUserQueryKey({
 					path: { workspaceSlug: slug, login: username },
 				}),
 			});
@@ -84,10 +84,10 @@ export function BestPracticesContainer() {
 
 	// Mutation for providing feedback on bad practices
 	const provideFeedbackForBadPractice = useMutation({
-		...provideFeedbackForBadPracticeMutation(),
+		...provideFeedbackMutation(),
 		onSuccess: () => {
 			queryClient.invalidateQueries({
-				queryKey: getActivityByUserQueryKey({
+				queryKey: getBadPracticesForUserQueryKey({
 					path: { workspaceSlug: slug, login: username },
 				}),
 			});
@@ -100,10 +100,10 @@ export function BestPracticesContainer() {
 
 	// Mutation for detecting bad practices for a specific pull request
 	const detectBadPracticesForPullRequest = useMutation({
-		...detectBadPracticesForPullRequestMutation(),
+		...detectForPullRequestMutation(),
 		onSuccess: () => {
 			queryClient.invalidateQueries({
-				queryKey: getActivityByUserQueryKey({
+				queryKey: getBadPracticesForUserQueryKey({
 					path: { workspaceSlug: slug, login: username },
 				}),
 			});
@@ -145,7 +145,7 @@ export function BestPracticesContainer() {
 			return;
 		}
 		resolveBadPractice.mutate({
-			path: { workspaceSlug: slug, badPracticeId },
+			path: { workspaceSlug: slug, id: badPracticeId },
 			query: { state: "FIXED" },
 		});
 	};
@@ -155,7 +155,7 @@ export function BestPracticesContainer() {
 			return;
 		}
 		resolveBadPractice.mutate({
-			path: { workspaceSlug: slug, badPracticeId },
+			path: { workspaceSlug: slug, id: badPracticeId },
 			query: { state: "WONT_FIX" },
 		});
 	};
@@ -165,20 +165,17 @@ export function BestPracticesContainer() {
 			return;
 		}
 		resolveBadPractice.mutate({
-			path: { workspaceSlug: slug, badPracticeId },
+			path: { workspaceSlug: slug, id: badPracticeId },
 			query: { state: "WRONG" },
 		});
 	};
 
-	const onProvideBadPracticeFeedback = (
-		badPracticeId: number,
-		feedback: BadPracticeFeedback,
-	) => {
+	const onProvideBadPracticeFeedback = (badPracticeId: number, feedback: BadPracticeFeedback) => {
 		if (!hasWorkspace) {
 			return;
 		}
 		provideFeedbackForBadPractice.mutate({
-			path: { workspaceSlug: slug, badPracticeId },
+			path: { workspaceSlug: slug, id: badPracticeId },
 			body: feedback,
 		});
 	};
@@ -187,9 +184,7 @@ export function BestPracticesContainer() {
 		<PracticesPage
 			activityData={activityQuery.data}
 			isLoading={activityQuery.isLoading}
-			isDetectingBadPractices={
-				detect.isPending || detectBadPracticesForPullRequest.isPending
-			}
+			isDetectingBadPractices={detect.isPending || detectBadPracticesForPullRequest.isPending}
 			username={username}
 			displayName={displayName}
 			currUserIsDashboardUser={currUserIsDashboardUser}

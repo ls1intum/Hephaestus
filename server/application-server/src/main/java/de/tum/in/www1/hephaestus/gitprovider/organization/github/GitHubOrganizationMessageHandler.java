@@ -1,72 +1,55 @@
 package de.tum.in.www1.hephaestus.gitprovider.organization.github;
 
+import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
+
+import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
-import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
-import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
-import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationService;
-import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationSyncService;
-import java.net.URL;
-import org.kohsuke.github.GHEvent;
-import org.kohsuke.github.GHEventPayloadOrganization;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.OrganizationMembershipListener;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.OrganizationMembershipListener.MembershipChangedEvent;
+import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationMemberRole;
+import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationMembershipRepository;
+import de.tum.in.www1.hephaestus.gitprovider.organization.github.dto.GitHubOrganizationEventDTO;
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserProcessor;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Handles GitHub Organization events.
+ * Handles GitHub organization webhook events.
  */
 @Component
-public class GitHubOrganizationMessageHandler extends GitHubMessageHandler<GHEventPayloadOrganization> {
+public class GitHubOrganizationMessageHandler extends GitHubMessageHandler<GitHubOrganizationEventDTO> {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubOrganizationMessageHandler.class);
+    private static final Logger log = LoggerFactory.getLogger(GitHubOrganizationMessageHandler.class);
 
-    private final OrganizationService organizationService;
-    private final OrganizationRepository organizationRepository;
-    private final OrganizationSyncService organizationSyncService;
+    private final GitHubOrganizationProcessor organizationProcessor;
+    private final GitHubUserProcessor userProcessor;
+    private final OrganizationMembershipRepository membershipRepository;
+    private final OrganizationMembershipListener membershipListener;
 
-    public GitHubOrganizationMessageHandler(
-        OrganizationService organizationService,
-        OrganizationRepository organizationRepository,
-        OrganizationSyncService organizationSyncService
+    GitHubOrganizationMessageHandler(
+        GitHubOrganizationProcessor organizationProcessor,
+        GitHubUserProcessor userProcessor,
+        OrganizationMembershipRepository membershipRepository,
+        OrganizationMembershipListener membershipListener,
+        NatsMessageDeserializer deserializer,
+        TransactionTemplate transactionTemplate
     ) {
-        super(GHEventPayloadOrganization.class);
-        this.organizationService = organizationService;
-        this.organizationRepository = organizationRepository;
-        this.organizationSyncService = organizationSyncService;
-    }
-
-    // Intentionally no @Override: GHEventPayloadOrganization originates from hub4j fork without bridged signature.
-    protected void handleEvent(GHEventPayloadOrganization payload) {
-        String action = payload.getAction() == null ? "" : payload.getAction();
-        if (payload.getOrganization() == null) {
-            logger.warn("organization event missing organization body (action={})", action);
-            return;
-        }
-
-        Organization organization = upsertOrganization(payload);
-
-        switch (action) {
-            case "member_added":
-                handleMemberAdded(payload, organization);
-                break;
-            case "member_removed":
-                handleMemberRemoved(payload, organization);
-                break;
-            case "member_invited":
-                logger.debug("Ignoring organization member_invited event for orgId={}", organization.getGithubId());
-                break;
-            case "renamed":
-                handleRename(payload, organization);
-                break;
-            default:
-                logger.debug("Unhandled organization action={} orgId={} (no-op)", action, organization.getGithubId());
-                break;
-        }
+        super(GitHubOrganizationEventDTO.class, deserializer, transactionTemplate);
+        this.organizationProcessor = organizationProcessor;
+        this.userProcessor = userProcessor;
+        this.membershipRepository = membershipRepository;
+        this.membershipListener = membershipListener;
     }
 
     @Override
-    protected GHEvent getHandlerEvent() {
-        return GHEvent.ORGANIZATION;
+    public GitHubEventType getEventType() {
+        return GitHubEventType.ORGANIZATION;
     }
 
     @Override
@@ -74,81 +57,85 @@ public class GitHubOrganizationMessageHandler extends GitHubMessageHandler<GHEve
         return GitHubMessageDomain.ORGANIZATION;
     }
 
-    private Organization upsertOrganization(GHEventPayloadOrganization payload) {
-        long githubId = payload.getOrganization().getId();
-        String login = payload.getOrganization().getLogin();
-        Organization organization = organizationService.upsertIdentity(githubId, login);
+    @Override
+    protected void handleEvent(GitHubOrganizationEventDTO event) {
+        var orgDto = event.organization();
 
-        String avatarUrl = payload.getOrganization().getAvatarUrl();
-        URL htmlUrl = payload.getOrganization().getHtmlUrl();
+        if (orgDto == null) {
+            log.warn("Received organization event with missing data: action={}", event.action());
+            return;
+        }
 
-        if (avatarUrl != null) {
-            if (!avatarUrl.equals(organization.getAvatarUrl())) {
-                organization.setAvatarUrl(avatarUrl);
+        log.info(
+            "Received organization event: action={}, orgId={}, orgLogin={}",
+            event.action(),
+            orgDto.id(),
+            sanitizeForLog(orgDto.login())
+        );
+
+        switch (event.actionType()) {
+            case GitHubEventAction.Organization.MEMBER_ADDED -> {
+                if (event.membership() != null && event.membership().user() != null) {
+                    var userDto = event.membership().user();
+                    User user = userProcessor.ensureExists(userDto);
+                    OrganizationMemberRole role = parseRole(event.membership().role());
+                    membershipRepository.upsertMembership(orgDto.id(), user.getId(), role);
+                    log.info(
+                        "Added member to organization: orgId={}, orgLogin={}, userLogin={}, role={}",
+                        orgDto.id(),
+                        sanitizeForLog(orgDto.login()),
+                        sanitizeForLog(userDto.login()),
+                        role
+                    );
+
+                    // Notify listeners about membership change
+                    membershipListener.onMemberAdded(
+                        new MembershipChangedEvent(
+                            orgDto.id(),
+                            orgDto.login(),
+                            userDto.id(),
+                            userDto.login(),
+                            event.membership().role()
+                        )
+                    );
+                }
             }
-        }
-        if (htmlUrl != null) {
-            String html = htmlUrl.toString();
-            if (!html.equals(organization.getHtmlUrl())) {
-                organization.setHtmlUrl(html);
+            case GitHubEventAction.Organization.MEMBER_REMOVED -> {
+                if (event.membership() != null && event.membership().user() != null) {
+                    var userDto = event.membership().user();
+                    membershipRepository.deleteByOrganizationIdAndUserIdIn(orgDto.id(), List.of(userDto.id()));
+                    log.info(
+                        "Removed member from organization: orgId={}, orgLogin={}, userLogin={}",
+                        orgDto.id(),
+                        sanitizeForLog(orgDto.login()),
+                        sanitizeForLog(userDto.login())
+                    );
+
+                    // Notify listeners about membership change
+                    membershipListener.onMemberRemoved(
+                        new MembershipChangedEvent(orgDto.id(), orgDto.login(), userDto.id(), userDto.login(), null)
+                    );
+                }
             }
+            case GitHubEventAction.Organization.RENAMED -> organizationProcessor.rename(orgDto.id(), orgDto.login());
+            case GitHubEventAction.Organization.DELETED -> organizationProcessor.delete(orgDto.id());
+            default -> organizationProcessor.process(orgDto);
         }
-
-        return organizationRepository.save(organization);
     }
 
-    private void handleMemberAdded(GHEventPayloadOrganization payload, Organization organization) {
-        var membership = payload.getMembership();
-        if (membership == null || membership.getUser() == null) {
-            logger.warn("member_added without membership/user orgId={}", organization.getGithubId());
-            return;
+    /**
+     * Parses a role string from webhook events to the OrganizationMemberRole enum.
+     *
+     * @param roleString the role string from the webhook (e.g., "admin", "member")
+     * @return the corresponding OrganizationMemberRole, defaulting to MEMBER if unknown
+     */
+    private OrganizationMemberRole parseRole(String roleString) {
+        if (roleString == null) {
+            return OrganizationMemberRole.MEMBER;
         }
-
-        String role = organizationSyncService.upsertMemberFromEvent(
-            organization.getGithubId(),
-            membership.getUser(),
-            membership.getRole()
-        );
-        logger.info(
-            "Added organization member orgId={} userId={} role={}",
-            organization.getGithubId(),
-            membership.getUser().getId(),
-            role
-        );
-    }
-
-    private void handleMemberRemoved(GHEventPayloadOrganization payload, Organization organization) {
-        var membership = payload.getMembership();
-        if (membership == null || membership.getUser() == null) {
-            logger.warn("member_removed without membership/user orgId={}", organization.getGithubId());
-            return;
-        }
-
-        long userId = membership.getUser().getId();
-        organizationSyncService.removeMember(organization.getGithubId(), userId);
-        logger.info(
-            "Removed organization member orgId={} userId={} state={} role={}",
-            organization.getGithubId(),
-            userId,
-            membership.getState(),
-            membership.getRole()
-        );
-    }
-
-    private void handleRename(GHEventPayloadOrganization payload, Organization organization) {
-        var changes = payload.getChanges();
-        if (changes == null || changes.getLogin() == null) {
-            return;
-        }
-
-        String newLogin = payload.getOrganization().getLogin();
-        String oldLogin = changes.getLogin().getFrom();
-
-        if (newLogin != null && !newLogin.equalsIgnoreCase(organization.getLogin())) {
-            organization.setLogin(newLogin);
-            organizationRepository.save(organization);
-        }
-
-        logger.info("Renamed organization githubId={} from={} to={}", organization.getGithubId(), oldLogin, newLogin);
+        return switch (roleString.toUpperCase()) {
+            case "ADMIN" -> OrganizationMemberRole.ADMIN;
+            default -> OrganizationMemberRole.MEMBER;
+        };
     }
 }

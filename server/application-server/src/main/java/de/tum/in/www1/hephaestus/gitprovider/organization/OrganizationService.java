@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.gitprovider.organization;
 
-import java.util.Optional;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,39 +42,5 @@ public class OrganizationService {
             // Another thread saved the same org in parallel; reuse the persisted row
             return organizations.findByGithubId(githubId).orElseThrow(() -> ex); // rethrow if genuinely unavailable
         }
-    }
-
-    /**
-     * Ensure identity (githubId + login) and attach the installation in one call.
-     */
-    @Transactional
-    public Organization upsertIdentityAndAttachInstallation(long githubId, String login, long installationId) {
-        Organization organization = upsertIdentity(githubId, login);
-        Long current = organization.getInstallationId();
-
-        if (!Long.valueOf(installationId).equals(current)) {
-            organization.setInstallationId(installationId);
-            organization = organizations.save(organization);
-        }
-
-        return organization;
-    }
-
-    public Optional<Organization> getByInstallationId(Long installationId) {
-        return organizations.findByInstallationId(installationId);
-    }
-
-    /**
-     * Detach the organization from its installation (e.g., when installation is deleted).
-     * Sets installationId to null so the organization can be re-linked later if needed.
-     */
-    @Transactional
-    public void detachInstallation(long installationId) {
-        organizations
-            .findByInstallationId(installationId)
-            .ifPresent(organization -> {
-                organization.setInstallationId(null);
-                organizations.save(organization);
-            });
     }
 }

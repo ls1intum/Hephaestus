@@ -9,26 +9,16 @@ import {
 } from "@tanstack/react-router";
 import { Toaster } from "sonner";
 
-import {
-	getGroupedThreadsOptions,
-	getUserSettingsOptions,
-} from "@/api/@tanstack/react-query.gen";
+import { getGroupedThreadsOptions, getUserSettingsOptions } from "@/api/@tanstack/react-query.gen";
 import Footer from "@/components/core/Footer";
 import Header from "@/components/core/Header";
-import {
-	AppSidebar,
-	type SidebarContext,
-} from "@/components/core/sidebar/AppSidebar";
+import { AppSidebar, type SidebarContext } from "@/components/core/sidebar/AppSidebar";
 import { ArtifactOverlayContainer } from "@/components/mentor/ArtifactOverlayContainer";
 import { Chat } from "@/components/mentor/Chat";
 import { Copilot } from "@/components/mentor/Copilot";
 import { defaultPartRenderers } from "@/components/mentor/renderers";
 import { PostHogSurveyWidget } from "@/components/surveys/posthog-survey-widget";
-import {
-	SidebarInset,
-	SidebarProvider,
-	SidebarTrigger,
-} from "@/components/ui/sidebar";
+import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import environment from "@/environment";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { useWorkspaceAccess } from "@/hooks/use-workspace-access";
@@ -54,11 +44,8 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 			retry: 1,
 		});
 		const allowSurveys =
-			isPosthogEnabled &&
-			!userSettingsError &&
-			(userSettings?.participateInResearch ?? true);
-		const isMentorRoute =
-			pathname === "/mentor" || /^\/w\/[^/]+\/mentor/.test(pathname);
+			isPosthogEnabled && !userSettingsError && (userSettings?.participateInResearch ?? true);
+		const isMentorRoute = pathname === "/mentor" || /^\/w\/[^/]+\/mentor/.test(pathname);
 
 		// Exclude routes where Copilot should not appear
 		const isExcludedRoute =
@@ -70,10 +57,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 			pathname === "/privacy";
 
 		const showCopilot =
-			!isLoading &&
-			isAuthenticated &&
-			hasRole("mentor_access") &&
-			!isExcludedRoute;
+			!isLoading && isAuthenticated && hasRole("mentor_access") && !isExcludedRoute;
 
 		return (
 			<>
@@ -87,7 +71,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 							</main>
 							{!isMentorRoute && (
 								<div className="flex justify-end flex-col h-full">
-									<Footer />
+									<Footer buildInfo={environment.buildInfo} />
 								</div>
 							)}
 						</div>
@@ -95,9 +79,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 				</SidebarProvider>
 				<Toaster theme={theme} />
 				{showCopilot && <GlobalCopilot />}
-				{!isLoading && isAuthenticated && allowSurveys && (
-					<PostHogSurveyWidget />
-				)}
+				{!isLoading && isAuthenticated && allowSurveys && <PostHogSurveyWidget />}
 			</>
 		);
 	},
@@ -106,8 +88,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 		<div className="container py-16 flex flex-col items-center justify-center text-center">
 			<h2 className="text-3xl font-bold mb-4">Page Not Found</h2>
 			<p className="text-muted-foreground mb-8">
-				The page you're looking for doesn't exist or you don't have permission
-				to view it.
+				The page you're looking for doesn't exist or you don't have permission to view it.
 			</p>
 			<Link to="/" className="text-blue-500 hover:underline font-medium">
 				Return to Home
@@ -188,7 +169,6 @@ function GlobalCopilot() {
 				onAttachmentsChange={() => {}}
 				onCopy={handleCopy}
 				onVote={handleVote}
-				showSuggestedActions={true}
 				inputPlaceholder="Ask me anything..."
 				disableAttachments={true}
 				className="h-full max-h-none"
@@ -214,21 +194,20 @@ function GlobalCopilot() {
 
 function HeaderContainer() {
 	const { pathname } = useLocation();
-	const { isAuthenticated, isLoading, username, userProfile, login, logout } =
-		useAuth();
+	const { isAuthenticated, isLoading, username, userProfile, login, logout } = useAuth();
+	const { workspaceSlug } = useActiveWorkspaceSlug();
 
 	return (
 		<Header
 			sidebarTrigger={
-				!(pathname === "/landing" || !isAuthenticated) && (
-					<SidebarTrigger className="-ml-1" />
-				)
+				!(pathname === "/landing" || !isAuthenticated) && <SidebarTrigger className="-ml-1" />
 			}
 			version={environment.version}
 			isAuthenticated={isAuthenticated}
 			isLoading={isLoading}
 			name={userProfile && `${userProfile.firstName} ${userProfile.lastName}`}
 			username={username}
+			workspaceSlug={workspaceSlug}
 			onLogin={login}
 			onLogout={logout}
 		/>
@@ -243,14 +222,10 @@ function AppSidebarContainer() {
 	const { workspaceSlug, workspaces, selectWorkspace } = workspaceAccess;
 	const hasWorkspace = Boolean(workspaceSlug);
 	const workspaceList = Array.isArray(workspaces) ? workspaces : [];
-	const activeWorkspace = workspaceList.find(
-		(ws) => ws.workspaceSlug === workspaceSlug,
-	);
+	const activeWorkspace = workspaceList.find((ws) => ws.workspaceSlug === workspaceSlug);
 
 	const sidebarContext: SidebarContext =
-		pathname === "/mentor" || /^\/w\/[^/]+\/mentor/.test(pathname)
-			? "mentor"
-			: "main";
+		pathname === "/mentor" || /^\/w\/[^/]+\/mentor/.test(pathname) ? "mentor" : "main";
 
 	// Always call useQuery but only enable when in mentor context and authenticated
 	const {
@@ -294,16 +269,10 @@ function AppSidebarContainer() {
 			onWorkspaceChange={handleWorkspaceChange}
 			onAddWorkspace={handleAddWorkspace}
 			workspacesLoading={workspaceAccess.isLoading}
-			mentorThreadGroups={
-				sidebarContext === "mentor" ? threadGroups : undefined
-			}
-			mentorThreadsLoading={
-				sidebarContext === "mentor" ? mentorThreadsLoading : undefined
-			}
+			mentorThreadGroups={sidebarContext === "mentor" ? threadGroups : undefined}
+			mentorThreadsLoading={sidebarContext === "mentor" ? mentorThreadsLoading : undefined}
 			mentorThreadsError={
-				sidebarContext === "mentor" && mentorThreadsError
-					? "Failed to load threads"
-					: undefined
+				sidebarContext === "mentor" && mentorThreadsError ? "Failed to load threads" : undefined
 			}
 		/>
 	);

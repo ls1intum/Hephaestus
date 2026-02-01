@@ -28,7 +28,7 @@ jobs:
       new_version: ${{ steps.release.outputs.new_release_version }}
       released: ${{ steps.release.outputs.new_release_published }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
           token: ${{ secrets.GH_PAT }}
@@ -62,14 +62,14 @@ jobs:
           echo "- **Staging**: Deploying automatically" >> $GITHUB_STEP_SUMMARY
           echo "- **Production**: Waiting for approval" >> $GITHUB_STEP_SUMMARY
 
-  # Staging deploys immediately (no approval required)
+  # Retag Docker images with semantic version
   tag-images:
     needs: release
     if: needs.release.outputs.released == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -84,7 +84,7 @@ jobs:
           for img in "${IMAGES[@]}"; do
             FULL_IMAGE="ghcr.io/ls1intum/hephaestus/$img"
             echo "Checking for $FULL_IMAGE:$SHA..."
-            
+
             # Retry up to 24 times (2 minutes) with 5s interval
             RETRIES=24
             COUNT=0
@@ -97,11 +97,12 @@ jobs:
               echo "Image not found yet. Retrying in 5s... ($COUNT/$RETRIES)"
               sleep 5
             done
-            
+
             echo "Retagging $FULL_IMAGE:$SHA → $FULL_IMAGE:$VERSION"
             docker buildx imagetools create -t "$FULL_IMAGE:$VERSION" "$FULL_IMAGE:$SHA"
           done
 
+  # Deploy to staging automatically after images are tagged
   deploy-staging:
     needs: [release, tag-images]
     if: needs.release.outputs.released == 'true'
@@ -113,17 +114,14 @@ jobs:
       deploy-proxy: false
     secrets: inherit
 
-  # Production requires manual approval via GitHub Environment
+  # Trigger production deployment (approval happens in deploy-prod.yml)
   deploy-production:
     needs: [release, deploy-staging]
     if: needs.release.outputs.released == 'true'
     runs-on: ubuntu-latest
-    environment:
-      name: production
-      url: https://hephaestus.cit.tum.de
     steps:
       - name: Trigger Production Deploy
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         with:
           github-token: ${{ secrets.GH_PAT }}
           script: |
@@ -143,6 +141,8 @@ jobs:
 
       - name: Summary
         run: |
-          echo "## 🚀 Production Deployment Approved" >> $GITHUB_STEP_SUMMARY
+          echo "## 🚀 Production Deployment Triggered" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "Version **v${{ needs.release.outputs.new_version }}** deployment to production has been triggered." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "⏳ Waiting for approval in the [Deploy to Production](https://github.com/${{ github.repository }}/actions/workflows/deploy-prod.yml) workflow." >> $GITHUB_STEP_SUMMARY

@@ -21,7 +21,8 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
  * This configuration allows fetching JWKS keys from an internal URL while still validating
  * the issuer claim against the public URL.
  *
- * <p>When {@code keycloak.jwk-set-uri} is set to a non-empty value, this decoder is activated. It:
+ * <p>When {@code hephaestus.keycloak.jwk-set-uri} is set to a non-empty value, this decoder
+ * is activated. It:
  * <ul>
  *   <li>Fetches signing keys from the internal JWKS endpoint (container-to-container)</li>
  *   <li>Validates the issuer claim against the public URL (matches token's iss claim)</li>
@@ -43,18 +44,18 @@ public class JwtDecoderConfig {
      * <p>This decoder fetches keys from the internal Keycloak URL (e.g., http://keycloak:8080)
      * but validates the issuer claim against the public URL (e.g., https://example.com/keycloak).
      *
-     * @param jwkSetUri  internal URL for fetching JWKS (e.g., http://keycloak:8080/realms/X/protocol/openid-connect/certs)
-     * @param issuerUri  public URL for issuer validation (e.g., https://example.com/keycloak/realms/X)
+     * @param keycloakProperties Keycloak configuration properties
+     * @param issuerUri          public URL for issuer validation (e.g., https://example.com/keycloak/realms/X)
      * @return configured JWT decoder
      */
     @Bean
-    @ConditionalOnExpression("!'${keycloak.jwk-set-uri:}'.isEmpty()")
+    @ConditionalOnExpression("!'${hephaestus.keycloak.jwk-set-uri:}'.isEmpty()")
     JwtDecoder jwtDecoder(
-        @Value("${keycloak.jwk-set-uri}") String jwkSetUri,
+        KeycloakProperties keycloakProperties,
         @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}") String issuerUri
     ) {
         // Build decoder that fetches keys from internal URL
-        NimbusJwtDecoder jwtDecoder = NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();
+        NimbusJwtDecoder jwtDecoder = NimbusJwtDecoder.withJwkSetUri(keycloakProperties.effectiveJwkSetUri()).build();
 
         // Configure validators to check issuer against public URL
         OAuth2TokenValidator<Jwt> issuerValidator = new JwtIssuerValidator(issuerUri);

@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { fn } from "@storybook/test";
 import { useEffect, useState } from "react";
+import { fn } from "storybook/test";
 import { TextEditor } from "./TextEditor";
 
 /**
@@ -20,16 +20,11 @@ const meta = {
 			description: "Whether this is the current/latest version",
 			control: "boolean",
 		},
-		currentVersionIndex: {
-			description: "Index of the current version being displayed",
-			control: "number",
-		},
 	},
 	args: {
 		onSaveContent: fn(),
 		status: "idle",
 		isCurrentVersion: true,
-		currentVersionIndex: 0,
 	},
 } satisfies Meta<typeof TextEditor>;
 
@@ -50,8 +45,7 @@ export const Empty: Story = {
  */
 export const BasicText: Story = {
 	args: {
-		content:
-			"Welcome to the text editor! Start typing to see the rich text features in action.",
+		content: "Welcome to the text editor! Start typing to see the rich text features in action.",
 	},
 };
 
@@ -138,7 +132,6 @@ We will continue to expand this document with more detailed information as it be
 export const PreviousVersion: Story = {
 	args: {
 		isCurrentVersion: false,
-		currentVersionIndex: 2,
 		content: `# Document - Version 2
 
 This is an older version of the document.

@@ -1,12 +1,7 @@
 import { Copy, PencilIcon, ThumbsDown, ThumbsUp } from "lucide-react";
 import type { ChatMessageVote } from "@/api/types.gen";
 import { Button } from "@/components/ui/button";
-import {
-	Tooltip,
-	TooltipContent,
-	TooltipProvider,
-	TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 interface MessageActionsProps {
@@ -82,21 +77,14 @@ export function MessageActions({
 							<Copy />
 						</Button>
 					</TooltipTrigger>
-					<TooltipContent side={isAssistantMessage ? "top" : "bottom"}>
-						Copy
-					</TooltipContent>
+					<TooltipContent side={isAssistantMessage ? "top" : "bottom"}>Copy</TooltipContent>
 				</Tooltip>
 
 				{/* Edit button for user messages only */}
 				{isUserMessage && onEdit && (
 					<Tooltip>
 						<TooltipTrigger asChild>
-							<Button
-								className={buttonClasses}
-								variant="ghost"
-								size="icon"
-								onClick={onEdit}
-							>
+							<Button className={buttonClasses} variant="ghost" size="icon" onClick={onEdit}>
 								<PencilIcon size={14} />
 							</Button>
 						</TooltipTrigger>
@@ -114,8 +102,7 @@ export function MessageActions({
 									className={cn(
 										"touch:w-10 size-8 text-muted-foreground hover:text-github-success-foreground hover:bg-github-success-foreground/10",
 										{
-											"text-github-success-foreground":
-												vote?.isUpvoted === true,
+											"text-github-success-foreground": vote?.isUpvoted === true,
 											"opacity-50 hover:opacity-100": vote?.isUpvoted === false,
 										},
 									)}
@@ -136,8 +123,7 @@ export function MessageActions({
 									className={cn(
 										"touch:w-10 size-8 text-muted-foreground hover:text-github-danger-foreground hover:bg-github-danger-foreground/10",
 										{
-											"text-github-danger-foreground":
-												vote?.isUpvoted === false,
+											"text-github-danger-foreground": vote?.isUpvoted === false,
 											"opacity-50 hover:opacity-100": vote?.isUpvoted === true,
 										},
 									)}

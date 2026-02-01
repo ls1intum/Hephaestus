@@ -38,9 +38,7 @@ const getEmojiForRating = (rating: number, scale: number) => {
 
 	const ratio = (rating - 1) / (scale - 1);
 	const emojiIndex = Math.round(ratio * (EMOJI_RATINGS.length - 1));
-	return EMOJI_RATINGS[
-		Math.min(EMOJI_RATINGS.length - 1, Math.max(0, emojiIndex))
-	];
+	return EMOJI_RATINGS[Math.min(EMOJI_RATINGS.length - 1, Math.max(0, emojiIndex))];
 };
 
 export function QuestionRating({
@@ -130,7 +128,7 @@ export function QuestionRating({
 							onValueChange={handleNumericChange}
 							variant="outline"
 							size="sm"
-							className="flex flex-wrap"
+							className="flex flex-nowrap"
 						>
 							{ratings.map((rating) => (
 								<ToggleGroupItem

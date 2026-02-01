@@ -86,8 +86,7 @@ export function ArtifactShell({
 	const { width: windowWidth, height: windowHeight } = useWindowSize();
 
 	// Scroll management for the chat sidebar
-	const { containerRef, endRef, isAtBottom, scrollToBottom } =
-		useScrollToBottom();
+	const { containerRef, endRef, isAtBottom, scrollToBottom } = useScrollToBottom();
 
 	return (
 		<AnimatePresence mode="wait">
@@ -218,9 +217,7 @@ export function ArtifactShell({
 										x: 400,
 										y: 0,
 										height: windowHeight,
-										width: windowWidth
-											? windowWidth - 400
-											: "calc(100dvw-400px)",
+										width: windowWidth ? windowWidth - 400 : "calc(100dvw-400px)",
 										borderRadius: 0,
 										transition: {
 											delay: 0,
@@ -247,28 +244,19 @@ export function ArtifactShell({
 								<div className="flex flex-col">
 									<div className="font-medium">{overlay.title}</div>
 									{headerMeta?.isSaving ? (
-										<div className="text-sm text-muted-foreground">
-											Saving changes...
-										</div>
+										<div className="text-sm text-muted-foreground">Saving changes...</div>
 									) : headerMeta?.subtitle ? (
-										<div className="text-sm text-muted-foreground">
-											{headerMeta.subtitle}
-										</div>
+										<div className="text-sm text-muted-foreground">{headerMeta.subtitle}</div>
 									) : (
 										<Skeleton className="w-32 h-3 mt-2" />
 									)}
 								</div>
 							</div>
 
-							<ArtifactActions
-								actions={actions}
-								isStreaming={overlay.status === "streaming"}
-							/>
+							<ArtifactActions actions={actions} isStreaming={overlay.status === "streaming"} />
 						</div>
 
-						<div className="flex-1 min-h-0 h-full overflow-hidden">
-							{children}
-						</div>
+						<div className="flex-1 min-h-0 h-full overflow-hidden">{children}</div>
 
 						<AnimatePresence>{footer}</AnimatePresence>
 					</motion.div>

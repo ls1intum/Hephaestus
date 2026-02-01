@@ -1,12 +1,12 @@
 import { XCircleIcon } from "lucide-react";
-import type { UserProfile } from "@/api/types.gen";
+import type { Profile } from "@/api/types.gen";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import type { LeaderboardSchedule } from "@/lib/timeframe";
 import { ProfileContent } from "./ProfileContent";
 import { ProfileHeader } from "./ProfileHeader";
 
 interface ProfileProps {
-	profileData?: UserProfile;
+	profileData?: Profile;
 	isLoading: boolean;
 	error: boolean;
 	username: string;
@@ -37,9 +37,7 @@ export function ProfilePage({
 				<Alert variant="destructive" className="max-w-xl">
 					<XCircleIcon className="h-4 w-4" />
 					<AlertTitle>Something went wrong...</AlertTitle>
-					<AlertDescription>
-						User couldn't be loaded. Please try again later.
-					</AlertDescription>
+					<AlertDescription>User couldn't be loaded. Please try again later.</AlertDescription>
 				</Alert>
 			</div>
 		);
@@ -52,6 +50,7 @@ export function ProfilePage({
 				firstContribution={profileData?.firstContribution}
 				contributedRepositories={profileData?.contributedRepositories}
 				leaguePoints={profileData?.userInfo?.leaguePoints}
+				userXpRecord={profileData?.xpRecord}
 				isLoading={isLoading}
 			/>
 			<ProfileContent

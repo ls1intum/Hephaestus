@@ -66,47 +66,56 @@ public class PullRequestReview {
     @ToString.Exclude
     private Set<PullRequestReviewComment> comments = new HashSet<>();
 
+    // ==================== Bidirectional Relationship Helpers ====================
+
+    /**
+     * Adds a comment to this review and maintains bidirectional consistency.
+     *
+     * @param comment the comment to add
+     */
+    public void addComment(PullRequestReviewComment comment) {
+        if (comment != null) {
+            this.comments.add(comment);
+            comment.setReview(this);
+        }
+    }
+
+    /**
+     * Removes a comment from this review and maintains bidirectional consistency.
+     * <p>
+     * CRITICAL: This method must be called BEFORE deleting the comment entity
+     * when orphanRemoval=true to avoid TransientObjectException.
+     *
+     * @param comment the comment to remove
+     */
+    public void removeComment(PullRequestReviewComment comment) {
+        if (comment != null) {
+            this.comments.remove(comment);
+            comment.setReview(null);
+        }
+    }
+
+    /**
+     * Review state. Maps directly to GitHub GraphQL PullRequestReviewState enum.
+     * <p>
+     * Note: The {@code isDismissed} field provides additional context for dismissed
+     * reviews while preserving the original review state (e.g., an APPROVED review
+     * that was later dismissed).
+     *
+     * @see <a href="https://docs.github.com/en/graphql/reference/enums#pullrequestreviewstate">GitHub PullRequestReviewState</a>
+     */
     public enum State {
+        /** Review with comments only, no approval/rejection. */
         COMMENTED,
+        /** Review approving the changes. */
         APPROVED,
+        /** Review requesting changes before merge. */
         CHANGES_REQUESTED,
+        /** Review is pending and not yet submitted (only visible to the author). */
+        PENDING,
+        /** Review was dismissed by a maintainer. */
+        DISMISSED,
+        /** Unknown or unmapped state (fallback for forward compatibility). */
         UNKNOWN,
     }
-    /*
-     * Supported webhook fields/relationships (GHEventPayload.PullRequestReview, REST `pull_request_review` payload):
-     * Fields:
-     * - review.id → entity primary key
-     * - review.body → `body`
-     * - review.state → `state`
-     * - review.state == "dismissed" → `isDismissed`
-     * - review.html_url → `htmlUrl`
-     * - review.submitted_at → `submittedAt`
-     * - review.commit_id → `commitId`
-     * Relationships:
-     * - review.user → `author`
-     * - pull_request → `pullRequest`
-     * - review.comments[*] → persisted indirectly via pull_request_review_comment events (`comments` association)
-     *
-     * Ignored although hub4j 2.0-rc.5 exposes them without extra REST calls:
-     * Fields:
-     * - review.node_id (GHObject#getNodeId())
-     * - review.pull_request_url / review._links.*
-     * Relationships:
-     * - Embedded avatar/profile fields on review.user (handled by dedicated user sync)
-     *
-     * Missing from hub4j 2.0-rc.5 (present in GitHub REST/GraphQL payloads):
-     * Fields:
-     * - review.body_html / review.body_text (REST)
-     * - review.author_association (REST `pull_request_review.author_association`)
-     * - review.dismissed_at & review.dismissal_message (REST `dismissed_at`, `dismissal_message`)
-     * - GraphQL PullRequestReview.lastEditedAt, editor, bodyVersion, includesCreatedEdit, reactionGroups, viewerDidAuthor
-     * Relationships:
-     * - review.dismissed_by (REST `dismissed_by`, GraphQL `dismissedBy`)
-     * - review.commit (GraphQL `commit` connection)
-     *
-     * Requires additional REST/GraphQL fetch (explicitly out of scope here):
-     * - Calling `GHPullRequestReview#listReviewComments()` / `GET /repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}/comments`
-     *   to hydrate inline review comments (handled by separate webhook events).
-     * - `GET /repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}` to retrieve dismissal metadata (`dismissed_by`, `dismissed_at`).
-     */
 }

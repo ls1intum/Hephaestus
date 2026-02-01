@@ -1,10 +1,7 @@
 import { Separator } from "@/components/ui/separator";
 import { isPosthogEnabled } from "@/integrations/posthog/config";
 import { AccountSection, type AccountSectionProps } from "./AccountSection";
-import {
-	NotificationsSection,
-	type NotificationsSectionProps,
-} from "./NotificationsSection";
+import { NotificationsSection, type NotificationsSectionProps } from "./NotificationsSection";
 import {
 	ResearchParticipationSection,
 	type ResearchParticipationSectionProps,
@@ -39,8 +36,7 @@ export function SettingsPage({
 	accountProps,
 	isLoading = false,
 }: SettingsPageProps) {
-	const { isLoading: notificationsLoading = false, ...notificationsRest } =
-		notificationsProps;
+	const { isLoading: notificationsLoading = false, ...notificationsRest } = notificationsProps;
 	const { isLoading: researchLoading = false, ...researchRest } = researchProps;
 	const { isLoading: accountLoading = false, ...accountRest } = accountProps;
 
@@ -60,18 +56,12 @@ export function SettingsPage({
 
 			<Separator />
 
-			<NotificationsSection
-				{...notificationsRest}
-				isLoading={notificationsPending}
-			/>
+			<NotificationsSection {...notificationsRest} isLoading={notificationsPending} />
 
 			{showResearchSection && (
 				<>
 					<Separator />
-					<ResearchParticipationSection
-						{...researchRest}
-						isLoading={researchPending}
-					/>
+					<ResearchParticipationSection {...researchRest} isLoading={researchPending} />
 				</>
 			)}
 

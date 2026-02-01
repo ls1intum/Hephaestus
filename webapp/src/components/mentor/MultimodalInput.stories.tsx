@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { fn } from "@storybook/test";
+import { fn } from "storybook/test";
 import { MultimodalInput } from "./MultimodalInput";
 
 /**
@@ -40,11 +40,6 @@ const meta = {
 			description: "Placeholder text for textarea",
 			control: "text",
 		},
-		showSuggestedActions: {
-			description:
-				"Whether to show suggested actions (requires onSuggestedAction handler, disabled in readonly mode)",
-			control: "boolean",
-		},
 		initialInput: {
 			description: "Initial input value",
 			control: "text",
@@ -67,7 +62,6 @@ const meta = {
 		onSubmit: fn(),
 		// Suggested actions send immediately via onSubmit; no handler required
 		placeholder: "Send a message...",
-		showSuggestedActions: true, // Explicitly enable suggested actions
 		initialInput: "",
 		readonly: false,
 		disableAttachments: false,
@@ -85,18 +79,9 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * Default empty state with suggested actions visible.
+ * Default empty state.
  */
 export const Default: Story = {};
-
-/**
- * Explicitly showing suggested actions with clear action handler.
- */
-export const WithSuggestedActions: Story = {
-	args: {
-		showSuggestedActions: true,
-	},
-};
 
 /**
  * Input with some initial text.
@@ -146,22 +131,12 @@ export const CustomPlaceholder: Story = {
 };
 
 /**
- * Disabled suggested actions.
- */
-export const NoSuggestedActions: Story = {
-	args: {
-		showSuggestedActions: false,
-	},
-};
-
-/**
- * Readonly input state - suggested actions are automatically disabled.
+ * Readonly input state.
  */
 export const ReadonlyInput: Story = {
 	args: {
 		readonly: true,
 		initialInput: "This input is readonly",
-		showSuggestedActions: true, // This will be ignored due to readonly
 	},
 };
 

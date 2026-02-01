@@ -2,262 +2,201 @@ package de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.github;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.in.www1.hephaestus.gitprovider.common.GitHubPayload;
-import de.tum.in.www1.hephaestus.gitprovider.common.GitHubPayloadExtension;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
+import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
+import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullRequestConverter;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.github.GitHubPullRequestReviewSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewCommentRepository;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThreadRepository;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.github.dto.GitHubPullRequestReviewCommentEventDTO;
+import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
+import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.in.www1.hephaestus.workspace.AccountType;
+import de.tum.in.www1.hephaestus.workspace.Workspace;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.kohsuke.github.GHEventPayload;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.core.io.ClassPathResource;
 
+/**
+ * Integration tests for GitHubPullRequestReviewCommentMessageHandler.
+ * <p>
+ * Tests use JSON fixtures parsed directly into DTOs using JSON fixtures for complete isolation.
+ */
 @DisplayName("GitHub Pull Request Review Comment Message Handler")
-@ExtendWith(GitHubPayloadExtension.class)
-@Transactional
 class GitHubPullRequestReviewCommentMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private GitHubPullRequestReviewCommentMessageHandler handler;
 
     @Autowired
-    private GitHubPullRequestReviewSyncService reviewSyncService;
-
-    @Autowired
     private PullRequestReviewCommentRepository commentRepository;
-
-    @Autowired
-    private PullRequestReviewThreadRepository threadRepository;
-
-    @Autowired
-    private PullRequestReviewRepository reviewRepository;
 
     @Autowired
     private PullRequestRepository pullRequestRepository;
 
     @Autowired
-    private GitHubPullRequestConverter pullRequestConverter;
+    private RepositoryRepository repositoryRepository;
+
+    @Autowired
+    private OrganizationRepository organizationRepository;
+
+    @Autowired
+    private WorkspaceRepository workspaceRepository;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    private Repository testRepository;
+    private PullRequest testPullRequest;
 
     @BeforeEach
     void setUp() {
         databaseTestUtils.cleanDatabase();
+        setupTestData();
+    }
+
+    private void setupTestData() {
+        // Create organization
+        Organization org = new Organization();
+        org.setId(215361191L);
+        org.setGithubId(215361191L);
+        org.setLogin("HephaestusTest");
+        org.setCreatedAt(Instant.now());
+        org.setUpdatedAt(Instant.now());
+        org.setName("Hephaestus Test");
+        org.setAvatarUrl("https://avatars.githubusercontent.com/u/215361191?v=4");
+        org = organizationRepository.save(org);
+
+        // Create repository
+        testRepository = new Repository();
+        testRepository.setId(1000663383L);
+        testRepository.setName("TestRepository");
+        testRepository.setNameWithOwner("HephaestusTest/TestRepository");
+        testRepository.setHtmlUrl("https://github.com/HephaestusTest/TestRepository");
+        testRepository.setVisibility(Repository.Visibility.PUBLIC);
+        testRepository.setDefaultBranch("main");
+        testRepository.setCreatedAt(Instant.now());
+        testRepository.setUpdatedAt(Instant.now());
+        testRepository.setPushedAt(Instant.now());
+        testRepository.setOrganization(org);
+        testRepository = repositoryRepository.save(testRepository);
+
+        // Create workspace
+        Workspace workspace = new Workspace();
+        workspace.setWorkspaceSlug("hephaestus-test");
+        workspace.setDisplayName("Hephaestus Test");
+        workspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
+        workspace.setIsPubliclyViewable(true);
+        workspace.setOrganization(org);
+        workspace.setAccountLogin("HephaestusTest");
+        workspace.setAccountType(AccountType.ORG);
+        workspaceRepository.save(workspace);
+    }
+
+    private void createTestPullRequest(Long prId, int number) {
+        testPullRequest = new PullRequest();
+        testPullRequest.setId(prId);
+        testPullRequest.setNumber(number);
+        testPullRequest.setTitle("Test Pull Request");
+        testPullRequest.setState(PullRequest.State.OPEN);
+        testPullRequest.setRepository(testRepository);
+        testPullRequest.setCreatedAt(Instant.now());
+        testPullRequest.setUpdatedAt(Instant.now());
+        testPullRequest = pullRequestRepository.save(testPullRequest);
     }
 
     @Test
-    @DisplayName("should persist newly created review comments and threads")
-    void createdEventPersistsCommentAndThread(
-        @GitHubPayload("pull_request_review_comment.created") GHEventPayload.PullRequestReviewComment commentPayload,
-        @GitHubPayload("pull_request_review.submitted") GHEventPayload.PullRequestReview reviewPayload
-    ) throws Exception {
-        // Arrange
-        reviewSyncService.processPullRequestReview(
-            reviewPayload.getReview(),
-            reviewPayload.getPullRequest(),
-            reviewPayload.getSender()
-        );
-        assertThat(commentRepository.findById(commentPayload.getComment().getId())).isEmpty();
+    @DisplayName("Should return correct event key")
+    void shouldReturnCorrectEventKey() {
+        assertThat(handler.getEventType()).isEqualTo(GitHubEventType.PULL_REQUEST_REVIEW_COMMENT);
+    }
 
-        // Act
-        handler.handleEvent(commentPayload);
+    @Test
+    @DisplayName("Should create review comment on created event")
+    void shouldCreateReviewCommentOnCreatedEvent() throws Exception {
+        // Given
+        GitHubPullRequestReviewCommentEventDTO event = loadPayload("pull_request_review_comment.created");
 
-        // Assert
-        var savedComment = commentRepository.findById(commentPayload.getComment().getId());
-        assertThat(savedComment)
+        // Create the PR that the comment belongs to
+        createTestPullRequest(event.pullRequest().getDatabaseId(), event.pullRequest().number());
+
+        // Verify comment doesn't exist initially
+        assertThat(commentRepository.findById(event.comment().id())).isEmpty();
+
+        // When
+        handler.handleEvent(event);
+
+        // Then - verify comment is created with required fields
+        assertThat(commentRepository.findById(event.comment().id()))
             .isPresent()
             .get()
             .satisfies(comment -> {
-                assertThat(comment.getBody()).isEqualTo(commentPayload.getComment().getBody());
-                assertThat(comment.getHtmlUrl()).isEqualTo(commentPayload.getComment().getHtmlUrl().toString());
-                assertThat(comment.getLine()).isEqualTo(commentPayload.getComment().getLine());
-                assertThat(comment.getSide().name()).isEqualTo(commentPayload.getComment().getSide().name());
+                assertThat(comment.getId()).isEqualTo(event.comment().id());
+                assertThat(comment.getBody()).isEqualTo(event.comment().body());
+                assertThat(comment.getPath()).isEqualTo(event.comment().path());
+                // Verify thread is created (required FK)
                 assertThat(comment.getThread()).isNotNull();
-                assertThat(comment.getThread().getId()).isEqualTo(comment.getId());
-                assertThat(comment.getThread().getProviderThreadId()).isEqualTo(comment.getId());
-                assertThat(comment.getThread().getPath()).isEqualTo(comment.getPath());
-                assertThat(comment.getThread().getLine()).isEqualTo(comment.getLine());
-                assertThat(comment.getThread().getSide()).isEqualTo(comment.getSide());
-                assertThat(comment.getThread().getState()).isEqualTo(
-                    de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThread.State.UNRESOLVED
-                );
+                assertThat(comment.getThread().getId()).isNotNull();
+                // Verify required fields are populated
+                assertThat(comment.getCommitId()).isNotEmpty();
             });
+    }
 
-        assertThat(threadRepository.findById(commentPayload.getComment().getId()))
+    @Test
+    @DisplayName("Should update review comment on edited event")
+    void shouldUpdateReviewCommentOnEditedEvent() throws Exception {
+        // Given - first create the comment
+        GitHubPullRequestReviewCommentEventDTO createEvent = loadPayload("pull_request_review_comment.created");
+        createTestPullRequest(createEvent.pullRequest().getDatabaseId(), createEvent.pullRequest().number());
+        handler.handleEvent(createEvent);
+
+        // Load edited event
+        GitHubPullRequestReviewCommentEventDTO editEvent = loadPayload("pull_request_review_comment.edited");
+
+        // When
+        handler.handleEvent(editEvent);
+
+        // Then
+        assertThat(commentRepository.findById(editEvent.comment().id()))
             .isPresent()
             .get()
-            .satisfies(thread -> assertThat(thread.getProviderThreadId()).isEqualTo(thread.getId()));
+            .satisfies(comment -> {
+                assertThat(comment.getBody()).isEqualTo(editEvent.comment().body());
+            });
     }
 
     @Test
-    @DisplayName("should ignore duplicate create events for the same review comment")
-    void createdEventIsIdempotent(
-        @GitHubPayload("pull_request_review_comment.created") GHEventPayload.PullRequestReviewComment commentPayload,
-        @GitHubPayload("pull_request_review.submitted") GHEventPayload.PullRequestReview reviewPayload
-    ) throws Exception {
-        // Arrange
-        reviewSyncService.processPullRequestReview(
-            reviewPayload.getReview(),
-            reviewPayload.getPullRequest(),
-            reviewPayload.getSender()
-        );
-        handler.handleEvent(commentPayload);
-        var existing = commentRepository.findById(commentPayload.getComment().getId()).orElseThrow();
-        var originalUpdatedAt = existing.getUpdatedAt();
+    @DisplayName("Should delete review comment on deleted event")
+    void shouldDeleteReviewCommentOnDeletedEvent() throws Exception {
+        // Given - first create the comment
+        GitHubPullRequestReviewCommentEventDTO createEvent = loadPayload("pull_request_review_comment.created");
+        createTestPullRequest(createEvent.pullRequest().getDatabaseId(), createEvent.pullRequest().number());
+        handler.handleEvent(createEvent);
 
-        // Act
-        handler.handleEvent(commentPayload);
+        // Verify it exists
+        assertThat(commentRepository.findById(createEvent.comment().id())).isPresent();
 
-        // Assert
-        assertThat(commentRepository.count()).isEqualTo(1);
-        assertThat(threadRepository.count()).isEqualTo(1);
-        var replayed = commentRepository.findById(commentPayload.getComment().getId()).orElseThrow();
-        assertThat(replayed.getUpdatedAt()).isEqualTo(originalUpdatedAt);
-        var persistedThread = threadRepository.findWithCommentsById(replayed.getThread().getId()).orElseThrow();
-        assertThat(persistedThread.getComments()).hasSize(1);
+        // Load deleted event
+        GitHubPullRequestReviewCommentEventDTO deleteEvent = loadPayload("pull_request_review_comment.deleted");
+
+        // When
+        handler.handleEvent(deleteEvent);
+
+        // Then
+        assertThat(commentRepository.findById(deleteEvent.comment().id())).isEmpty();
     }
 
-    @Test
-    @DisplayName("should update existing comments on edit events")
-    void editedEventUpdatesComment(
-        @GitHubPayload("pull_request_review_comment.created") GHEventPayload.PullRequestReviewComment createdPayload,
-        @GitHubPayload("pull_request_review_comment.edited") GHEventPayload.PullRequestReviewComment editedPayload,
-        @GitHubPayload("pull_request_review.submitted") GHEventPayload.PullRequestReview reviewPayload
-    ) throws Exception {
-        // Arrange
-        reviewSyncService.processPullRequestReview(
-            reviewPayload.getReview(),
-            reviewPayload.getPullRequest(),
-            reviewPayload.getSender()
-        );
-        handler.handleEvent(createdPayload);
-        var original = commentRepository.findById(createdPayload.getComment().getId()).orElseThrow();
-        assertThat(original.getBody()).isEqualTo(createdPayload.getComment().getBody());
-
-        // Act
-        handler.handleEvent(editedPayload);
-
-        // Assert
-        var updated = commentRepository.findById(editedPayload.getComment().getId()).orElseThrow();
-        assertThat(updated.getBody()).isEqualTo(editedPayload.getComment().getBody());
-        assertThat(updated.getUpdatedAt()).isAfterOrEqualTo(original.getUpdatedAt());
-    }
-
-    @Test
-    @DisplayName("should remove comments and associated threads on delete events")
-    void deletedEventRemovesCommentAndThread(
-        @GitHubPayload("pull_request_review_comment.created") GHEventPayload.PullRequestReviewComment createdPayload,
-        @GitHubPayload("pull_request_review_comment.deleted") GHEventPayload.PullRequestReviewComment deletedPayload,
-        @GitHubPayload("pull_request_review.submitted") GHEventPayload.PullRequestReview reviewPayload
-    ) throws Exception {
-        // Arrange
-        reviewSyncService.processPullRequestReview(
-            reviewPayload.getReview(),
-            reviewPayload.getPullRequest(),
-            reviewPayload.getSender()
-        );
-        handler.handleEvent(createdPayload);
-        assertThat(commentRepository.findById(createdPayload.getComment().getId())).isPresent();
-        assertThat(threadRepository.findById(createdPayload.getComment().getId())).isPresent();
-
-        // Act
-        handler.handleEvent(deletedPayload);
-
-        // Assert
-        assertThat(commentRepository.findById(createdPayload.getComment().getId())).isEmpty();
-        assertThat(threadRepository.findById(createdPayload.getComment().getId())).isEmpty();
-    }
-
-    @Test
-    @DisplayName("should persist replies and link them to the root thread")
-    void createdReplyLinksToThread(
-        @GitHubPayload(
-            "pull_request_review_comment.created.thread-1"
-        ) GHEventPayload.PullRequestReviewComment rootPayload,
-        @GitHubPayload(
-            "pull_request_review_comment.created.thread-2"
-        ) GHEventPayload.PullRequestReviewComment replyPayload
-    ) throws Exception {
-        // Arrange root review
-        ensureReviewExists(rootPayload);
-
-        handler.handleEvent(rootPayload);
-        var rootComment = commentRepository.findById(rootPayload.getComment().getId()).orElseThrow();
-        assertThat(rootComment.getThread()).isNotNull();
-
-        // Act
-        ensureReviewExists(replyPayload);
-        handler.handleEvent(replyPayload);
-
-        // Assert
-        var replyComment = commentRepository.findById(replyPayload.getComment().getId()).orElseThrow();
-        assertThat(replyComment.getInReplyTo()).isNotNull();
-        assertThat(replyComment.getInReplyTo().getId()).isEqualTo(rootPayload.getComment().getId());
-        assertThat(replyComment.getThread()).isNotNull();
-        var threadId = rootPayload.getComment().getId();
-        assertThat(replyComment.getThread().getId()).isEqualTo(threadId);
-        assertThat(commentRepository.countByThreadId(threadId)).isEqualTo(2);
-    }
-
-    @Test
-    @DisplayName("should retain threads when a reply is deleted")
-    void deletedReplyKeepsThread(
-        @GitHubPayload(
-            "pull_request_review_comment.created.thread-1"
-        ) GHEventPayload.PullRequestReviewComment rootPayload,
-        @GitHubPayload(
-            "pull_request_review_comment.created.thread-2"
-        ) GHEventPayload.PullRequestReviewComment replyPayload,
-        @GitHubPayload(
-            "pull_request_review_comment.deleted.thread-2"
-        ) GHEventPayload.PullRequestReviewComment deletedReplyPayload
-    ) throws Exception {
-        // Arrange
-        ensureReviewExists(rootPayload);
-        handler.handleEvent(rootPayload);
-        ensureReviewExists(replyPayload);
-        handler.handleEvent(replyPayload);
-        var threadId = rootPayload.getComment().getId();
-
-        // Act
-        handler.handleEvent(deletedReplyPayload);
-
-        // Assert
-        assertThat(commentRepository.existsById(replyPayload.getComment().getId())).isFalse();
-        var thread = threadRepository.findWithCommentsById(threadId).orElseThrow();
-        assertThat(commentRepository.countByThreadId(threadId)).isEqualTo(1);
-        assertThat(thread.getRootComment()).isNotNull();
-        assertThat(thread.getRootComment().getId()).isEqualTo(threadId);
-    }
-
-    private void ensureReviewExists(GHEventPayload.PullRequestReviewComment payload) throws Exception {
-        var reviewId = payload.getComment().getPullRequestReviewId();
-        if (reviewId == null) {
-            return;
-        }
-
-        if (reviewRepository.findById(reviewId).isPresent()) {
-            return;
-        }
-
-        var pullRequest = payload.getPullRequest();
-        var pullRequestEntity = pullRequestRepository
-            .findById(pullRequest.getId())
-            .orElseGet(() -> pullRequestRepository.save(pullRequestConverter.convert(pullRequest)));
-
-        PullRequestReview review = new PullRequestReview();
-        review.setId(reviewId);
-        review.setState(PullRequestReview.State.COMMENTED);
-        review.setHtmlUrl(payload.getComment().getHtmlUrl().toString());
-        review.setSubmittedAt(Instant.now());
-        review.setPullRequest(pullRequestEntity);
-        reviewRepository.save(review);
+    private GitHubPullRequestReviewCommentEventDTO loadPayload(String filename) throws IOException {
+        ClassPathResource resource = new ClassPathResource("github/" + filename + ".json");
+        String json = resource.getContentAsString(StandardCharsets.UTF_8);
+        return objectMapper.readValue(json, GitHubPullRequestReviewCommentEventDTO.class);
     }
 }

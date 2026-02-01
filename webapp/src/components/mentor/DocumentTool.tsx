@@ -12,9 +12,7 @@ const getActionText = (
 		case "update":
 			return tense === "present" ? "Updating" : "Updated";
 		case "request-suggestions":
-			return tense === "present"
-				? "Adding suggestions"
-				: "Added suggestions to";
+			return tense === "present" ? "Adding suggestions" : "Added suggestions to";
 		default:
 			return null;
 	}

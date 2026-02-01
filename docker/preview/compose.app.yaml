@@ -26,14 +26,14 @@
 # Coolify Auto-Generated Variables:
 #   - SERVICE_FQDN_WEBAPP: Domain for webapp (host only, no scheme)
 #   - SERVICE_URL_WEBAPP: Full URL for webapp (with https://)
-#   - SERVICE_FQDN_APPLICATION_SERVER: Domain for API (host only)  
+#   - SERVICE_FQDN_APPLICATION_SERVER: Domain for API (host only)
 #   - SERVICE_URL_APPLICATION_SERVER: Full URL for API (with https://)
 #   - SERVICE_NAME_<SERVICE>: Container name (e.g., postgres-wg44k0c-pr-557)
 #   - COOLIFY_CONTAINER_NAME: Unique container identifier
 #
 # Connects to shared infrastructure services (from compose.shared-infra.yaml):
 #   - nats-server: Message queue
-#   - keycloak: Authentication  
+#   - keycloak: Authentication
 #   - postfix: Email relay
 #
 # =============================================================================
@@ -41,12 +41,13 @@
 services:
   # ---------------------------------------------------------------------------
   # PostgreSQL - Per-PR database (isolated data per preview)
-  # 
+  #
   # SEEDING HACK: Uses init container to populate via psql commands
   # after postgres starts, rather than relying on /docker-entrypoint-initdb.d
   # ---------------------------------------------------------------------------
   postgres:
     image: postgres:17-alpine
+    hostname: postgres
     restart: unless-stopped
     environment:
       POSTGRES_DB: hephaestus
@@ -67,7 +68,7 @@ services:
 
   # ---------------------------------------------------------------------------
   # Seed Loader - Restores database from external named volume
-  # 
+  #
   # Loads SQL dump from `hephaestus-seed` external named volume.
   # This volume is created/managed on the HOST and shared across deployments.
   # Uses standard psql restore - no security issues.
@@ -181,36 +182,32 @@ services:
     build:
       context: ./server/intelligence-service
       dockerfile: Dockerfile
+    hostname: intelligence-service
     restart: unless-stopped
     environment:
-      # Database - Coolify provides SERVICE_NAME_POSTGRES with the correct container name
-      DATABASE_URL: postgresql://${SERVICE_NAME_POSTGRES:-postgres}:5432/hephaestus
-      DATABASE_USERNAME: hephaestus
-      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-hephaestus-preview}
+      NODE_ENV: production
+      PORT: 8000
+      LOG_LEVEL: info
+      DATABASE_URL: postgresql://hephaestus:${POSTGRES_PASSWORD:-hephaestus-preview}@postgres:5432/hephaestus
       # AI Models
       MODEL_NAME: ${MODEL_NAME:?Required}
       DETECTION_MODEL_NAME: ${DETECTION_MODEL_NAME:?Required}
       # OpenAI
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      OPENAI_API_VERSION: ${OPENAI_API_VERSION:-}
       # Azure OpenAI
-      AZURE_OPENAI_ENDPOINT: ${AZURE_OPENAI_ENDPOINT:-}
-      AZURE_OPENAI_API_KEY: ${AZURE_OPENAI_API_KEY:-}
-      # Ollama
-      OLLAMA_HOST: ${OLLAMA_HOST:-}
-      OLLAMA_BASIC_AUTH_USERNAME: ${OLLAMA_BASIC_AUTH_USERNAME:-}
-      OLLAMA_BASIC_AUTH_PASSWORD: ${OLLAMA_BASIC_AUTH_PASSWORD:-}
+      AZURE_RESOURCE_NAME: ${AZURE_RESOURCE_NAME:-}
+      AZURE_API_KEY: ${AZURE_API_KEY:-}
       # Observability (optional)
       LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
       LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
-      LANGFUSE_HOST: ${LANGFUSE_HOST:-}
+      LANGFUSE_BASE_URL: ${LANGFUSE_BASE_URL:-}
     depends_on:
       postgres:
         condition: service_healthy
       seed-loader:
         condition: service_completed_successfully
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:5000/health"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8000/health"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -230,17 +227,16 @@ services:
     build:
       context: ./server/application-server
       dockerfile: Dockerfile
+    hostname: application-server
     restart: unless-stopped
     environment:
       SPRING_PROFILES_ACTIVE: prod
       # URL - Coolify provides SERVICE_FQDN_WEBAPP
       APPLICATION_HOST_URL: https://${SERVICE_FQDN_WEBAPP}
-      # Database - Coolify provides SERVICE_NAME_POSTGRES with the correct container name
-      DATABASE_URL: postgresql://${SERVICE_NAME_POSTGRES:-postgres}:5432/hephaestus
+      DATABASE_URL: postgresql://postgres:5432/hephaestus
       DATABASE_USERNAME: hephaestus
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-hephaestus-preview}
-      # Internal service - Coolify provides SERVICE_NAME_INTELLIGENCE_SERVICE
-      INTELLIGENCE_SERVICE_URL: http://${SERVICE_NAME_INTELLIGENCE_SERVICE:-intelligence-service}:5000
+      INTELLIGENCE_SERVICE_URL: http://intelligence-service:8000
       # Shared infrastructure (must match shared-infra service names with UUID suffix)
       # When "Connect to Predefined Network" is enabled, use the full container names
       NATS_SERVER: nats://nats-server:4222
@@ -250,8 +246,8 @@ services:
       # Public URL for issuer validation (must match token's iss claim)
       KEYCLOAK_URL: https://${PREVIEW_DOMAIN:?Required}/keycloak
       KEYCLOAK_REALM: hephaestus
-      # Internal base URL (includes /keycloak) for container-to-container JWKS fetches
-      KEYCLOAK_INTERNAL_URL: http://keycloak:8080/keycloak
+      # Internal URL for direct container-to-container JWKS fetches (no /keycloak - Keycloak serves at root)
+      KEYCLOAK_INTERNAL_URL: http://keycloak:8080
       KEYCLOAK_CLIENT_ID: hephaestus-confidential
       KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_HEPHAESTUS_CONFIDENTIAL_CLIENT_SECRET:?Required}
       # Shared Postfix
@@ -272,7 +268,7 @@ services:
       SENTRY_DSN: ${SENTRY_DSN:-}
       LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
       LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
-      LANGFUSE_HOST: ${LANGFUSE_HOST:-}
+      LANGFUSE_BASE_URL: ${LANGFUSE_BASE_URL:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -281,7 +277,14 @@ services:
       seed-loader:
         condition: service_completed_successfully
     healthcheck:
-      test: ["CMD", "wget", "--spider", "--quiet", "http://127.0.0.1:8080/actuator/health"]
+      test:
+        [
+          "CMD",
+          "wget",
+          "--spider",
+          "--quiet",
+          "http://127.0.0.1:8080/actuator/health",
+        ]
       interval: 10s
       timeout: 10s
       retries: 20
@@ -298,12 +301,19 @@ services:
   # ---------------------------------------------------------------------------
   webapp:
     build:
-      context: ./webapp
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: webapp/Dockerfile
+      args:
+        COOLIFY_BRANCH: ${COOLIFY_BRANCH:-}
+        SOURCE_COMMIT: ${SOURCE_COMMIT:-}
+    hostname: webapp
     restart: unless-stopped
     environment:
+      APPLICATION_VERSION: preview
       # Coolify provides SERVICE_FQDN_WEBAPP automatically
       APPLICATION_CLIENT_URL: https://${SERVICE_FQDN_WEBAPP}
+      GIT_BRANCH: ${COOLIFY_BRANCH:-}
+      GIT_COMMIT: ${SOURCE_COMMIT:-}
       # Coolify provides SERVICE_FQDN_APPLICATION_SERVER (e.g., {{pr_id}}.api.example.com)
       APPLICATION_SERVER_URL: https://${SERVICE_FQDN_APPLICATION_SERVER}
       # Shared Keycloak

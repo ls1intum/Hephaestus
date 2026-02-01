@@ -1,5 +1,5 @@
 import { GitPullRequest, InfoIcon } from "lucide-react";
-import type { Activity, BadPracticeFeedback } from "@/api/types.gen";
+import type { BadPracticeFeedback, UserPractices } from "@/api/types.gen";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ActivitySummaryCard } from "./ActivitySummaryCard";
 import { BadPracticeLegendCard } from "./BadPracticeLegendCard";
@@ -7,7 +7,7 @@ import { PullRequestBadPracticeCard } from "./PullRequestBadPracticeCard";
 import { filterGoodAndBadPractices } from "./utils";
 
 interface PracticesPageProps {
-	activityData?: Activity;
+	activityData?: UserPractices;
 	isLoading: boolean;
 	isDetectingBadPractices: boolean;
 	username: string; // GitHub login name
@@ -18,10 +18,7 @@ interface PracticesPageProps {
 	onResolveBadPracticeAsFixed?: (badPracticeId: number) => void;
 	onResolveBadPracticeAsWontFix?: (badPracticeId: number) => void;
 	onResolveBadPracticeAsWrong?: (badPracticeId: number) => void;
-	onProvideBadPracticeFeedback?: (
-		badPracticeId: number,
-		feedback: BadPracticeFeedback,
-	) => void;
+	onProvideBadPracticeFeedback?: (badPracticeId: number, feedback: BadPracticeFeedback) => void;
 }
 
 export function PracticesPage({
@@ -41,8 +38,7 @@ export function PracticesPage({
 	// Calculate statistics
 	const pullRequests = activityData?.pullRequests || [];
 	const allBadPractices = pullRequests.flatMap((pr) => pr.badPractices);
-	const { goodPractices, badPractices } =
-		filterGoodAndBadPractices(allBadPractices);
+	const { goodPractices, badPractices } = filterGoodAndBadPractices(allBadPractices);
 
 	const numberOfPullRequests = pullRequests.length;
 	const numberOfGoodPractices = goodPractices.length;
@@ -52,8 +48,7 @@ export function PracticesPage({
 		<div className="flex flex-col items-center">
 			<div className="w-full">
 				<h1 className="text-3xl font-bold mb-4">
-					{currUserIsDashboardUser ? "Your" : `${displayName || username}'s`}{" "}
-					Practices Dashboard
+					{currUserIsDashboardUser ? "Your" : `${displayName || username}'s`} Practices Dashboard
 				</h1>
 				<div className="grid grid-cols-1 xl:grid-cols-4 gap-y-4 xl:gap-4">
 					{/* Left Column - Summary & Controls */}
@@ -77,19 +72,15 @@ export function PracticesPage({
 						<div className="flex items-center gap-2 text-sm bg-muted/50 p-2.5 rounded-md">
 							<InfoIcon className="h-4 w-4 text-blue-500 flex-shrink-0" />
 							<p className="text-muted-foreground">
-								Hephaestus can make mistakes. Help us improve by flagging
-								anything that doesn't look right!
+								Hephaestus can make mistakes. Help us improve by flagging anything that doesn't look
+								right!
 							</p>
 						</div>
 						<div className="flex flex-col gap-4">
 							{isLoading ? (
 								// Loading states
 								Array.from({ length: 2 }).map((_, idx) => (
-									<PullRequestBadPracticeCard
-										key={`skeleton-${idx}`}
-										id={idx}
-										isLoading={true}
-									/>
+									<PullRequestBadPracticeCard key={`skeleton-${idx}`} id={idx} isLoading={true} />
 								))
 							) : pullRequests.length > 0 ? (
 								pullRequests.map((pullRequest) => (
@@ -113,9 +104,7 @@ export function PracticesPage({
 										currUserIsDashboardUser={currUserIsDashboardUser}
 										onDetectBadPractices={onDetectBadPracticesForPullRequest}
 										onResolveBadPracticeAsFixed={onResolveBadPracticeAsFixed}
-										onResolveBadPracticeAsWontFix={
-											onResolveBadPracticeAsWontFix
-										}
+										onResolveBadPracticeAsWontFix={onResolveBadPracticeAsWontFix}
 										onResolveBadPracticeAsWrong={onResolveBadPracticeAsWrong}
 										onProvideBadPracticeFeedback={onProvideBadPracticeFeedback}
 									/>

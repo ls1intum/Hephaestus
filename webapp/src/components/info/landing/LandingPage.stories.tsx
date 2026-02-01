@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { fn } from "@storybook/test";
+import { fn } from "storybook/test";
 import { LandingPage } from "./LandingPage";
 
 /**
@@ -21,8 +21,7 @@ const meta = {
 	},
 	argTypes: {
 		onSignIn: {
-			description:
-				"Callback function triggered when the sign-in button is clicked",
+			description: "Callback function triggered when the sign-in button is clicked",
 			action: "signed in",
 		},
 		onGoToDashboard: {

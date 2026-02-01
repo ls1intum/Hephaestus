@@ -18,6 +18,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
@@ -25,10 +26,35 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.hibernate.annotations.BatchSize;
 import org.springframework.lang.NonNull;
 
+/**
+ * Represents a Git repository from a provider (e.g., GitHub).
+ * <p>
+ * Repositories are the organizational unit containing issues, pull requests, labels,
+ * and milestones. They may belong to an {@link Organization} or be user-owned.
+ * <p>
+ * <b>Relationship Summary:</b>
+ * <ul>
+ *   <li>{@link #organization} – Parent organization (null for user-owned repos)</li>
+ *   <li>{@link #issues} – All issues and PRs in this repository</li>
+ *   <li>{@link #labels} – Labels available for categorization</li>
+ *   <li>{@link #milestones} – Milestones for release planning</li>
+ *   <li>{@link #collaborators} – Users with direct repository access</li>
+ *   <li>{@link #teamRepoPermissions} – Team-level access permissions</li>
+ * </ul>
+ * <p>
+ * <b>Sync Targets:</b> Repositories become sync targets when added to a scope.
+ * The sync engine uses the {@code nameWithOwner} field to identify repositories.
+ *
+ * @see de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncTarget
+ */
 @Entity
-@Table(name = "repository")
+@Table(
+    name = "repository",
+    uniqueConstraints = { @UniqueConstraint(name = "uq_repository_name_with_owner", columnNames = "name_with_owner") }
+)
 @Getter
 @Setter
 @NoArgsConstructor
@@ -54,10 +80,6 @@ public class Repository extends BaseGitServiceEntity {
     @Column(columnDefinition = "TEXT")
     private String description;
 
-    // External URL, can vary widely
-    @Column(length = 1024)
-    private String homepage;
-
     @NonNull
     private Instant pushedAt;
 
@@ -70,21 +92,21 @@ public class Repository extends BaseGitServiceEntity {
     @Enumerated(EnumType.STRING)
     private Repository.Visibility visibility;
 
-    private int stargazersCount;
-
-    private int watchersCount;
-
     @NonNull
     private String defaultBranch;
 
-    private boolean hasIssues;
-
-    private boolean hasProjects;
-
-    private boolean hasWiki;
+    /**
+     * Timestamp of the last successful sync for this repository from the Git provider.
+     * <p>
+     * This is ETL infrastructure used by the sync engine to track when this repository
+     * was last synchronized via GraphQL. Used to implement sync cooldown logic
+     * and detect stale data.
+     */
+    private Instant lastSyncAt;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "organization_id", foreignKey = @ForeignKey(name = "fk_repository_organization"))
+    @ToString.Exclude
     private Organization organization;
 
     @OneToMany(mappedBy = "repository", cascade = CascadeType.REMOVE, orphanRemoval = true)
@@ -92,6 +114,7 @@ public class Repository extends BaseGitServiceEntity {
     private Set<Issue> issues = new HashSet<>();
 
     @OneToMany(mappedBy = "repository", cascade = CascadeType.REMOVE, orphanRemoval = true)
+    @BatchSize(size = 50) // Batch fetch labels to avoid Cartesian product in team queries
     @ToString.Exclude
     private Set<Label> labels = new HashSet<>();
 
@@ -99,7 +122,7 @@ public class Repository extends BaseGitServiceEntity {
     @ToString.Exclude
     private Set<Milestone> milestones = new HashSet<>();
 
-    @OneToMany(mappedBy = "repository", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "repository", cascade = CascadeType.REMOVE, orphanRemoval = true)
     @ToString.Exclude
     private Set<TeamRepositoryPermission> teamRepoPermissions = new HashSet<>();
 
@@ -113,24 +136,21 @@ public class Repository extends BaseGitServiceEntity {
         INTERNAL,
         UNKNOWN,
     }
+
     /*
-     * Webhook coverage (repository & member events → repository):
-     * Supported (webhook, no extra fetch):
-     * - repository.id/full_name/name/html_url/private/visibility/description/homepage.
-     * - repository.pushed_at/default_branch/stargazers_count/watchers_count.
-     * - repository.archived/disabled/has_issues/has_projects/has_wiki.
-     * - repository.owner (type=Organization) → linked via organization relation when payload.owner.type == "Organization".
-     * - Relationships populated by dedicated handlers: collaborators (RepositoryCollaborator) and teamRepoPermissions.
-     * Ignored although hub4j exposes them from payloads:
-     * - repository.has_discussions/has_downloads/has_pages/topics/size/fork/forks_count/open_issues_count/subscribers_count/network_count.
-     *   Reason: cached telemetry not needed for ETL downstream consumers.
-     * - repository.allow_* merge toggles, template_repository, parent/source fork lineage (handled separately if required).
-     * - repository.owner when type == "User" (we scope ETL to organization-owned workspaces).
-     * Desired but missing in hub4j/github-api 2.0-rc.5 (available via REST/GraphQL):
-     * - REST GET /repos/{owner}/{repo} → security_and_analysis, custom_properties, rulesets[].
-     * - GraphQL Repository.rulesets, Repository.codeScanningAlerts, Repository.latestRelease, Repository.branchProtectionRules.
-     * Requires extra fetch (out-of-scope for now):
-     * - GET /repos/{owner}/{repo}/topics, /languages, /collaborators/{username}/permission for fine-grained permissions.
-     * - GraphQL Repository.vulnerabilityAlerts / Dependabot data, releases & deployments collections.
+     * Field coverage notes (GitHub API → entity mapping):
+     *
+     * Supported fields synced from GitHub GraphQL API:
+     * - id/databaseId, name, nameWithOwner, url, description
+     * - pushedAt, defaultBranchRef, visibility, isArchived, isDisabled, isPrivate
+     * - owner (Organization or User) → linked via organization relation
+     *
+     * Fields available in GraphQL but intentionally NOT synced:
+     * - homepageUrl, stargazerCount, forkCount, watchers
+     * - hasIssuesEnabled, hasProjectsEnabled, hasWikiEnabled
+     * - hasDiscussionsEnabled, hasSponsorshipsEnabled
+     * - hasVulnerabilityAlertsEnabled (requires admin access)
+     * - isFork, isTemplate, isMirror (not needed for ETL consumers)
+     * - licenseInfo, primaryLanguage (out of scope for current use cases)
      */
 }

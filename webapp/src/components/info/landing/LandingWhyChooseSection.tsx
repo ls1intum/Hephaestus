@@ -34,9 +34,8 @@ export function LandingWhyChooseSection({
 							Why Choose Hephaestus?
 						</h2>
 						<p className="text-lg text-muted-foreground">
-							Named after the Greek god of craftsmen, Hephaestus combines
-							creativity with technical expertise to build better team habits
-							through process-aware, AI-guided mentoring.
+							Named after the Greek god of craftsmen, Hephaestus combines creativity with technical
+							expertise to build better team habits through process-aware, AI-guided mentoring.
 						</p>
 
 						<ul className="grid gap-4 mt-4">

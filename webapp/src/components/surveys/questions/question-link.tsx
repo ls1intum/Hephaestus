@@ -69,9 +69,7 @@ export function QuestionLink({
 					{buttonText ?? "Open link"}
 					<ExternalLink className="ml-2 h-4 w-4" aria-hidden="true" />
 				</Button>
-				{wasClicked && (
-					<FieldDescription>Thanks for checking this out!</FieldDescription>
-				)}
+				{wasClicked && <FieldDescription>Thanks for checking this out!</FieldDescription>}
 				{error && <FieldError>{error}</FieldError>}
 			</FieldContent>
 		</Field>

@@ -1,103 +1,98 @@
 package de.tum.in.www1.hephaestus.gitprovider.installation.github;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
-import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
-import de.tum.in.www1.hephaestus.workspace.WorkspaceService;
-import java.util.Locale;
-import org.kohsuke.github.GHEvent;
-import org.kohsuke.github.GHEventPayload;
-import org.kohsuke.github.GHRepositorySelection;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.ProvisioningListener;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.ProvisioningListener.RepositorySnapshot;
+import de.tum.in.www1.hephaestus.gitprovider.installation.github.dto.GitHubInstallationRepositoriesEventDTO;
+import de.tum.in.www1.hephaestus.gitprovider.repository.github.dto.GitHubRepositoryRefDTO;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Handles GitHub App installation_repositories events (repositories added or removed from an installation).
+ * Handles GitHub installation_repositories webhook events.
+ * <p>
+ * When repositories are added or removed from a GitHub App installation,
+ * this handler notifies the consuming module via SPI to update monitored repositories.
  */
 @Component
 public class GitHubInstallationRepositoriesMessageHandler
-    extends GitHubMessageHandler<GHEventPayload.InstallationRepositories> {
+    extends GitHubMessageHandler<GitHubInstallationRepositoriesEventDTO>
+{
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubInstallationRepositoriesMessageHandler.class);
+    private static final Logger log = LoggerFactory.getLogger(GitHubInstallationRepositoriesMessageHandler.class);
 
-    private final GitHubRepositorySyncService repositorySyncService;
-    private final WorkspaceService workspaceService;
+    private final ProvisioningListener provisioningListener;
 
-    public GitHubInstallationRepositoriesMessageHandler(
-        GitHubRepositorySyncService repositorySyncService,
-        @Lazy WorkspaceService workspaceService
+    GitHubInstallationRepositoriesMessageHandler(
+        NatsMessageDeserializer deserializer,
+        ProvisioningListener provisioningListener,
+        TransactionTemplate transactionTemplate
     ) {
-        super(GHEventPayload.InstallationRepositories.class);
-        this.repositorySyncService = repositorySyncService;
-        this.workspaceService = workspaceService;
+        super(GitHubInstallationRepositoriesEventDTO.class, deserializer, transactionTemplate);
+        this.provisioningListener = provisioningListener;
     }
 
     @Override
-    protected void handleEvent(GHEventPayload.InstallationRepositories payload) {
-        var action = payload.getAction();
-        var installation = payload.getInstallation();
-        var added = payload.getRepositoriesAdded();
-        var removed = payload.getRepositoriesRemoved();
-        var selection = parseSelection(payload.getRepositorySelection());
+    public GitHubEventType getEventType() {
+        return GitHubEventType.INSTALLATION_REPOSITORIES;
+    }
 
-        logger.info(
-            "Received installation_repositories event: action={}, appId={}, added={}, removed={}",
-            action,
-            installation != null ? installation.getAppId() : null,
-            added != null ? added.size() : 0,
-            removed != null ? removed.size() : 0
+    @Override
+    public GitHubMessageDomain getDomain() {
+        return GitHubMessageDomain.INSTALLATION;
+    }
+
+    @Override
+    protected void handleEvent(GitHubInstallationRepositoriesEventDTO event) {
+        var installation = event.installation();
+
+        if (installation == null) {
+            log.warn("Received installation_repositories event with missing data: action={}", event.action());
+            return;
+        }
+
+        List<GitHubRepositoryRefDTO> added = event.repositoriesAdded() != null ? event.repositoriesAdded() : List.of();
+        List<GitHubRepositoryRefDTO> removed =
+            event.repositoriesRemoved() != null ? event.repositoriesRemoved() : List.of();
+
+        log.info(
+            "Received installation_repositories event: action={}, installationId={}, addedCount={}, removedCount={}",
+            event.action(),
+            installation.id(),
+            added.size(),
+            removed.size()
         );
 
-        Long installationId = installation != null ? installation.getId() : null;
+        long installationId = installation.id();
 
-        // Upsert any added repositories
-        if (added != null && !added.isEmpty()) {
-            added.forEach(r -> {
-                if (r.getFullName() != null && !r.getFullName().isBlank()) {
-                    repositorySyncService.upsertFromInstallationPayload(
-                        r.getId(),
-                        r.getFullName(),
-                        r.getName(),
-                        r.isPrivate()
-                    );
-                    if (installationId != null) {
-                        workspaceService.ensureRepositoryMonitorForInstallation(installationId, r.getFullName());
-                    }
-                }
-            });
+        // Notify consuming module via SPI for added repositories
+        if (!added.isEmpty()) {
+            List<RepositorySnapshot> addedSnapshots = added
+                .stream()
+                .map(ref -> new RepositorySnapshot(ref.id(), ref.fullName(), ref.name(), ref.isPrivate()))
+                .toList();
+            provisioningListener.onRepositoriesAdded(installationId, addedSnapshots);
+            log.info(
+                "Added repositories to installation: installationId={}, repoCount={}",
+                installationId,
+                addedSnapshots.size()
+            );
         }
 
-        // Delete any removed repositories
-        if (removed != null && !removed.isEmpty()) {
-            var ids = removed.stream().map(r -> r.getId()).toList();
-            repositorySyncService.deleteRepositoriesByIds(ids);
-            if (installationId != null) {
-                removed.forEach(r ->
-                    workspaceService.removeRepositoryMonitorForInstallation(installationId, r.getFullName())
-                );
-            }
-        }
-
-        if (installationId != null && selection == GHRepositorySelection.ALL && (added == null || added.isEmpty())) {
-            workspaceService.ensureAllInstallationRepositoriesCovered(installationId);
-        }
-    }
-
-    @Override
-    protected GHEvent getHandlerEvent() {
-        return GHEvent.INSTALLATION_REPOSITORIES;
-    }
-
-    private GHRepositorySelection parseSelection(String value) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        try {
-            return GHRepositorySelection.valueOf(value.toUpperCase(Locale.ENGLISH));
-        } catch (IllegalArgumentException ex) {
-            logger.warn("Unsupported repository_selection '{}' in installation_repositories payload", value);
-            return null;
+        // Notify consuming module via SPI for removed repositories
+        if (!removed.isEmpty()) {
+            List<String> removedNames = removed.stream().map(GitHubRepositoryRefDTO::fullName).toList();
+            provisioningListener.onRepositoriesRemoved(installationId, removedNames);
+            log.info(
+                "Removed repositories from installation: installationId={}, repoCount={}",
+                installationId,
+                removedNames.size()
+            );
         }
     }
 }

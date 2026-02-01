@@ -31,31 +31,11 @@ preinstall: |
   export PATH=$JAVA_HOME/bin:$PATH
   java -version
   
-  # Install Python 3.13
-  echo "🐍 Installing Python 3.13..."
-  apt-get install -y software-properties-common
-  add-apt-repository -y ppa:deadsnakes/ppa
-  apt-get update
-  apt-get install -y python3.13 python3.13-venv python3.13-dev python3-pip
-  update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.13 1
-  python3 --version
-  
-  # Install Poetry 2.x for Python dependency management
-  echo "📝 Installing Poetry 2.x..."
-  if ! command -v poetry &> /dev/null; then
-    curl -sSL https://install.python-poetry.org | POETRY_VERSION=2.0.0 python3 -
-    echo 'export PATH="/root/.local/bin:$PATH"' >> ~/.bashrc
-  else
-    echo "Poetry already installed: $(poetry --version)"
-  fi
-  export PATH="/root/.local/bin:$PATH"
-  poetry --version
-  
   # Verify Docker is available (usually pre-installed in GitHub environments)
   echo "🐳 Checking Docker availability..."
   docker --version || echo "⚠️ Docker not available, some database operations may fail"
   
-  # Install project npm dependencies
+  # Install project npm dependencies (includes all workspaces: webapp, intelligence-service, webhook-ingest)
   echo "📦 Installing npm dependencies..."
   # Always remove node_modules to ensure a clean install
   if [ -d "node_modules" ]; then
@@ -64,19 +44,31 @@ preinstall: |
   fi
   npm ci --prefer-offline --no-audit
   
-  # Bootstrap Python environments for intelligence-service and webhook-ingest
-  echo "🔧 Bootstrapping Python environments..."
-  if command -v poetry &> /dev/null; then
-    npm run bootstrap:py || echo "⚠️ Poetry bootstrap failed, may need Python 3.13"
+  # Install Beads CLI for AI agent issue tracking
+  echo "📋 Installing Beads CLI (bd)..."
+  npm install -g @beads/bd
+  # The @beads/bd postinstall script skips binary download when CI=true
+  # Run postinstall manually without CI flag to download the native binary
+  BD_POSTINSTALL_SCRIPT="$(npm root -g)/@beads/bd/scripts/postinstall.js"
+  if [ -f "$BD_POSTINSTALL_SCRIPT" ]; then
+    CI="" node "$BD_POSTINSTALL_SCRIPT"
+    bd --version
   else
-    echo "⚠️ Poetry not available, skipping Python bootstrap"
+    echo "⚠️ Beads postinstall script not found at $BD_POSTINSTALL_SCRIPT"
+    echo "⚠️ bd commands may not work properly"
   fi
   
-  # Verify Maven wrapper is executable
-  echo "✅ Verifying Maven wrapper..."
-  chmod +x server/application-server/mvnw
-  cd server/application-server && ./mvnw --version
-  cd ../..
+  # Initialize beads database from JSONL if present (required for fresh clones)
+  echo "📋 Initializing Beads database..."
+  if [ -f ".beads/issues.jsonl" ]; then
+    bd init || echo "⚠️ Beads init failed, bd commands may require manual 'bd init'"
+  else
+    echo "ℹ️ No .beads/issues.jsonl found, skipping bd init (not a beads-enabled project)"
+  fi
+  
+  # Verify Maven is available
+  echo "✅ Verifying Maven..."
+  mvn --version || apt-get install -y maven && mvn --version
   
   echo "✅ Environment setup complete!"
 
@@ -94,5 +86,5 @@ environment:
   MODEL_NAME: fake:model
   DETECTION_MODEL_NAME: fake:model
   
-  # Add Java 21 and Poetry to PATH
-  PATH: /usr/lib/jvm/temurin-21-jdk-amd64/bin:/root/.local/bin:$PATH
+  # Add Java 21 to PATH
+  PATH: /usr/lib/jvm/temurin-21-jdk-amd64/bin:$PATH

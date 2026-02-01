@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { fn } from "@storybook/test";
+import { fn } from "storybook/test";
 import { SuggestedActions } from "./SuggestedActions";
 
 /**
@@ -15,8 +15,7 @@ const meta = {
 	tags: ["autodocs"],
 	argTypes: {
 		onAction: {
-			description:
-				"Callback function triggered when a suggested action is clicked",
+			description: "Callback function triggered when a suggested action is clicked",
 			control: false,
 		},
 	},

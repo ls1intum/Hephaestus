@@ -12,13 +12,16 @@ import org.springframework.beans.factory.annotation.Autowired;
 /**
  * Shared helpers for workspace-focused integration tests.
  */
-abstract class AbstractWorkspaceIntegrationTest extends BaseIntegrationTest {
+public abstract class AbstractWorkspaceIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     protected UserRepository userRepository;
 
     @Autowired
     protected WorkspaceService workspaceService;
+
+    @Autowired
+    protected WorkspaceInstallationService workspaceInstallationService;
 
     @Autowired
     protected WorkspaceMembershipService workspaceMembershipService;

@@ -1,4 +1,4 @@
-name: Docker Build
+name: Docker
 
 on:
   workflow_call:
@@ -8,44 +8,38 @@ on:
         required: false
         type: string
         default: "false"
+      # Path-based change detection for selective Docker builds
+      # These are pre-computed by the caller (cicd.yml) to include CI config fallback
+      webapp_changed:
+        description: "Whether webapp files changed (or should build for other reasons)"
+        required: false
+        type: string
+        default: "true"
+      application_server_changed:
+        description: "Whether application-server files changed (or should build for other reasons)"
+        required: false
+        type: string
+        default: "true"
+      intelligence_service_changed:
+        description: "Whether intelligence-service files changed (or should build for other reasons)"
+        required: false
+        type: string
+        default: "true"
+      webhook_ingest_changed:
+        description: "Whether webhook-ingest files changed (or should build for other reasons)"
+        required: false
+        type: string
+        default: "true"
 
 jobs:
-  docker-build:
-    name: "${{ matrix.component.name }}-build"
-    if: inputs.should_skip != 'true'
-    strategy:
-      fail-fast: false
-      matrix:
-        component:
-          - name: "webapp"
-            image-name: "ls1intum/hephaestus/webapp"
-            docker-file: "./webapp/Dockerfile"
-            docker-context: "./webapp"
-            title: "Hephaestus Webapp"
-            description: "Web client for Hephaestus"
-          - name: "application-server"
-            image-name: "ls1intum/hephaestus/application-server"
-            docker-file: "./server/application-server/Dockerfile"
-            docker-context: "./server/application-server"
-            title: "Hephaestus Application Server"
-            description: "Spring Boot server for Hephaestus"
-          - name: "intelligence-service"
-            image-name: "ls1intum/hephaestus/intelligence-service"
-            docker-file: "./server/intelligence-service/Dockerfile"
-            docker-context: "./server/intelligence-service"
-            title: "Hephaestus Intelligence Service"
-            description: "FastAPI-based AI service for Hephaestus"
-          - name: "webhook-ingest"
-            image-name: "ls1intum/hephaestus/webhook-ingest"
-            docker-file: "./server/webhook-ingest/Dockerfile"
-            docker-context: "./server/webhook-ingest"
-            title: "Hephaestus Webhook Ingest"
-            description: "Python-based webhook processor for Hephaestus"
-    uses: ls1intum/.github/.github/workflows/build-and-push-docker-image.yml@main
+  webapp-build:
+    name: "Webapp"
+    if: inputs.should_skip != 'true' && inputs.webapp_changed == 'true'
+    uses: ./.github/workflows/reusable-docker-build.yml
     with:
-      image-name: "${{ matrix.component.image-name }}"
-      docker-file: "${{ matrix.component.docker-file }}"
-      docker-context: "${{ matrix.component.docker-context }}"
+      image-name: "ls1intum/hephaestus/webapp"
+      docker-file: "./webapp/Dockerfile"
+      docker-context: "."
       registry: "ghcr.io"
       tags: |
         ${{ github.ref_name }}
@@ -53,9 +47,71 @@ jobs:
         ci-${{ github.run_number }}
         ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'latest' }}
       labels: |
-        org.opencontainers.image.title=${{ matrix.component.title }}
-        org.opencontainers.image.description=${{ matrix.component.description }}
+        org.opencontainers.image.title=Hephaestus Webapp
+        org.opencontainers.image.description=Web client for Hephaestus
         org.opencontainers.image.vendor=AET TUM
         org.opencontainers.image.licenses=MIT
-        hephaestus.component=${{ matrix.component.name }}
-    secrets: inherit
+        hephaestus.component=webapp
+
+  application-server-build:
+    name: "App Server"
+    if: inputs.should_skip != 'true' && inputs.application_server_changed == 'true'
+    uses: ./.github/workflows/reusable-docker-build.yml
+    with:
+      image-name: "ls1intum/hephaestus/application-server"
+      docker-file: "./server/application-server/Dockerfile"
+      docker-context: "./server/application-server"
+      registry: "ghcr.io"
+      tags: |
+        ${{ github.ref_name }}
+        ${{ github.sha }}
+        ci-${{ github.run_number }}
+        ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'latest' }}
+      labels: |
+        org.opencontainers.image.title=Hephaestus Application Server
+        org.opencontainers.image.description=Spring Boot server for Hephaestus
+        org.opencontainers.image.vendor=AET TUM
+        org.opencontainers.image.licenses=MIT
+        hephaestus.component=application-server
+
+  intelligence-service-build:
+    name: "Intelligence"
+    if: inputs.should_skip != 'true' && inputs.intelligence_service_changed == 'true'
+    uses: ./.github/workflows/reusable-docker-build.yml
+    with:
+      image-name: "ls1intum/hephaestus/intelligence-service"
+      docker-file: "./server/intelligence-service/Dockerfile"
+      docker-context: "./server/intelligence-service"
+      registry: "ghcr.io"
+      tags: |
+        ${{ github.ref_name }}
+        ${{ github.sha }}
+        ci-${{ github.run_number }}
+        ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'latest' }}
+      labels: |
+        org.opencontainers.image.title=Hephaestus Intelligence Service
+        org.opencontainers.image.description=Node/Hono-based AI service for Hephaestus (AI SDK v6)
+        org.opencontainers.image.vendor=AET TUM
+        org.opencontainers.image.licenses=MIT
+        hephaestus.component=intelligence-service
+
+  webhook-ingest-build:
+    name: "Webhook"
+    if: inputs.should_skip != 'true' && inputs.webhook_ingest_changed == 'true'
+    uses: ./.github/workflows/reusable-docker-build.yml
+    with:
+      image-name: "ls1intum/hephaestus/webhook-ingest"
+      docker-file: "./server/webhook-ingest/Dockerfile"
+      docker-context: "./server/webhook-ingest"
+      registry: "ghcr.io"
+      tags: |
+        ${{ github.ref_name }}
+        ${{ github.sha }}
+        ci-${{ github.run_number }}
+        ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'latest' }}
+      labels: |
+        org.opencontainers.image.title=Hephaestus Webhook Ingest
+        org.opencontainers.image.description=Hono/TypeScript-based webhook processor for Hephaestus
+        org.opencontainers.image.vendor=AET TUM
+        org.opencontainers.image.licenses=MIT
+        hephaestus.component=webhook-ingest

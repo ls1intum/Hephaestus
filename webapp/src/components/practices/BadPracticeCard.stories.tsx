@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { fn } from "@storybook/test";
+import { fn } from "storybook/test";
 import { BadPracticeCard } from "./BadPracticeCard";
 
 /**
@@ -143,6 +143,21 @@ export const WithResolutionControls: Story = {
 		title: "Avoid using any type",
 		description: "Using the any type defeats the purpose of TypeScript.",
 		state: "NORMAL_ISSUE",
+		currUserIsDashboardUser: true,
+	},
+};
+
+/**
+ * Demonstrates that resolved items (FIXED state) do NOT show the Resolve button,
+ * even when the user is a dashboard user. This is the key behavior that prevents
+ * showing resolution options for already-resolved practices.
+ */
+export const ResolvedWithDashboardUser: Story = {
+	args: {
+		id: 9,
+		title: "Previously flagged issue",
+		description: "This issue was already resolved as fixed.",
+		state: "FIXED",
 		currUserIsDashboardUser: true,
 	},
 };

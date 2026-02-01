@@ -20,5 +20,4 @@ import org.springframework.security.access.prepost.PreAuthorize;
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 @PreAuthorize("@workspaceSecure.isOwner()")
-public @interface RequireWorkspaceOwner {
-}
+public @interface RequireWorkspaceOwner {}

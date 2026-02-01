@@ -39,14 +39,46 @@ We use automated semantic pull request validation to ensure consistent and meani
 <type>[optional scope]: <description>
 ```
 
+### Release Behavior (Important)
+
+We use **Semantic Release** to automatically version and release our application based on commit messages.
+
+**❌ Will NOT Trigger Release** (Scope Overrides):
+
+| Pattern | Example | Why |
+|---------|---------|-----|
+| `*(ci):` | `fix(ci): update workflow` | CI/GitHub Actions only |
+| `*(config):` | `chore(config): update renovate.json` | **TOOLING only** (see warning below) |
+| `*(deps-dev):` | `chore(deps-dev): update test lib` | Dev dependencies only |
+| `*(scripts):` | `fix(scripts): fix build script` | Build/dev scripts only |
+| `*(no-release):`| `feat(no-release): internal feature` | Explicit opt-out |
+
+> ⚠️ **`config` scope warning:** Only use for tooling config files like `.prettierrc`, `renovate.json`, `eslint.config.js`. Do NOT use for:
+> - Runtime config (`application.yml`) → use `server`
+> - Dockerfiles → use service scope (`webapp`, `server`, etc.)
+> - Production compose files → use `docker`
+
+**✅ WILL Trigger Release**:
+
+| Type | Version | Example |
+|------|---------|---------|
+| `feat:` | **Minor** | `feat(webapp): add dark mode` |
+| `fix:` | **Patch** | `fix(api): handle null response` |
+| `perf:` | **Patch** | `perf: optimize query` |
+| `revert:` | **Patch** | `revert: undo change` |
+| `!:` | **Major** | `feat!: new api structure` |
+
+**❌ Will NOT Trigger Release** (Type-Based):
+`docs:`, `style:`, `refactor:`, `test:`, `build:`, `chore:`, `ci:`
+
 ### Allowed Types
 
-- `fix`: A bug fix
-- `feat`: A new feature
+- `fix`: A bug fix (triggers patch release)
+- `feat`: A new feature (triggers minor release)
 - `docs`: Documentation only changes
-- `style`: Changes that do not affect the meaning of the code (white-space, formatting, missing semi-colons, etc.)
+- `style`: Changes that do not affect the meaning of the code
 - `refactor`: A code change that neither fixes a bug nor adds a feature
-- `perf`: A code change that improves performance
+- `perf`: A code change that improves performance (triggers patch release)
 - `test`: Adding missing tests or correcting existing tests
 - `build`: Changes that affect the build system or external dependencies
 - `ci`: Changes to our CI configuration files and scripts
@@ -59,26 +91,34 @@ We use automated semantic pull request validation to ensure consistent and meani
 
 - `webapp`: React frontend
 - `server`: Java application server
-- `ai`: Python intelligence service
+- `ai`: TypeScript intelligence service
 - `webhooks`: Webhook ingestion service
 - `docs`: Documentation
 
-**Infrastructure scopes**:
+**Infrastructure scopes that WILL trigger releases** (affect runtime):
+
+- `deps`: Production dependencies (security patches, bug fixes)
+- `security`: Security fixes are critical
+- `db`: Database migrations affect runtime
+
+**Infrastructure scopes that will NOT trigger releases**:
 
 - `ci`: CI/CD workflows
-- `deps`: Dependencies
-- `docker`: Container configuration
-- `db`: Database/Liquibase changes
+- `config`: Tooling configuration (renovate, eslint, tsconfig, etc.)
+- `deps-dev`: Dev dependencies only
+- `docker`: Container dev configuration
+- `scripts`: Helper scripts
+- `no-release`: Explicit release prevention
 
 **Feature scopes** (domain-specific):
 
+- `gitprovider`: Git integration module
 - `leaderboard`: Leaderboard and rankings
 - `mentor`: AI mentor (Heph)
-- `profile`: User profiles
-- `workspace`: Workspace management
-- `teams`: Team competitions
-- `github`: GitHub integration
 - `notifications`: Email/notification system
+- `profile`: User profiles
+- `teams`: Team competitions
+- `workspace`: Workspace management
 
 ### Examples
 
@@ -90,8 +130,10 @@ We use automated semantic pull request validation to ensure consistent and meani
 - `feat(server): add user profile endpoint`
 - `docs: update installation instructions`
 - `refactor(ai): improve code analysis performance`
-- `chore(deps): update dependencies to latest versions`
-- `fix(db): add missing index for performance`
+- `fix(deps): update vulnerable dependency` (triggers patch release)
+- `fix(security): patch authentication bypass` (triggers patch release)
+- `fix(db): add missing index for performance` (triggers patch release)
+- `chore(deps-dev): update test dependencies` (no release)
 
 **Draft Pull Requests:**
 

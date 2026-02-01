@@ -33,22 +33,16 @@ export function NotificationsSection({
 				<h2 id="notifications-heading" className="text-xl font-semibold">
 					Notifications
 				</h2>
-				<p className="text-sm text-muted-foreground">
-					Configure how you receive updates
-				</p>
+				<p className="text-sm text-muted-foreground">Configure how you receive updates</p>
 			</div>
 
 			<div className="flex items-start justify-between gap-6 py-4">
 				<div className="space-y-1 flex-1">
-					<Label
-						htmlFor="email-notifications"
-						className="text-base font-medium cursor-pointer"
-					>
+					<Label htmlFor="email-notifications" className="text-base font-medium cursor-pointer">
 						Email notifications
 					</Label>
 					<p className="text-sm text-muted-foreground leading-relaxed">
-						Receive email notifications for newly detected bad practices and
-						reminders.
+						Receive email notifications for newly detected bad practices and reminders.
 					</p>
 				</div>
 				<Switch

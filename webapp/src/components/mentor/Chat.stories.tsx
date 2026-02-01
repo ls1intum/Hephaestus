@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { fn } from "@storybook/test";
+import { fn } from "storybook/test";
 import type { ChatMessageVote } from "@/api/types.gen";
 import type { ChatMessage } from "@/lib/types";
 import { Chat } from "./Chat";
@@ -23,28 +23,12 @@ const meta = {
 	component: Chat,
 	parameters: {
 		layout: "fullscreen",
-		docs: {
-			description: {
-				component:
-					"Primary conversational interface for AI-powered interactions with support for artifacts, attachments, and real-time streaming.",
-			},
-		},
-	},
-	tags: ["autodocs"],
-	argTypes: {
-		id: {
-			description:
-				"Unique identifier for the chat session, used for persistence and analytics",
-			control: "text",
-		},
 		messages: {
-			description:
-				"Chronologically ordered array of chat messages with full conversation history",
+			description: "Chronologically ordered array of chat messages with full conversation history",
 			control: "object",
 		},
 		votes: {
-			description:
-				"User feedback votes associated with specific messages for quality improvement",
+			description: "User feedback votes associated with specific messages for quality improvement",
 			control: "object",
 		},
 		status: {
@@ -53,27 +37,19 @@ const meta = {
 			options: ["submitted", "streaming", "ready", "error"],
 		},
 		readonly: {
-			description:
-				"Disables input interface for viewing historical conversations",
+			description: "Disables input interface for viewing historical conversations",
 			control: "boolean",
 		},
 		attachments: {
-			description:
-				"Currently attached files awaiting submission with the next message",
+			description: "Currently attached files awaiting submission with the next message",
 			control: "object",
-		},
-		showSuggestedActions: {
-			description:
-				"Displays contextual suggested actions to guide user interaction",
-			control: "boolean",
 		},
 		inputPlaceholder: {
 			description: "Instructional text displayed in the message input field",
 			control: "text",
 		},
 		disableAttachments: {
-			description:
-				"Removes file attachment functionality for security-restricted environments",
+			description: "Removes file attachment functionality for security-restricted environments",
 			control: "boolean",
 		},
 	},
@@ -87,12 +63,7 @@ const meta = {
 		attachments: [],
 		// Event handlers with realistic implementations for demo purposes
 		onMessageSubmit: fn((data: { text: string; attachments: unknown[] }) =>
-			console.log(
-				"Message submitted:",
-				data.text,
-				"with attachments:",
-				data.attachments,
-			),
+			console.log("Message submitted:", data.text, "with attachments:", data.attachments),
 		),
 		onStop: fn(() => console.log("Streaming stopped by user")),
 		onFileUpload: fn(async (files: File[]) => {
@@ -113,7 +84,6 @@ const meta = {
 			console.log("Vote cast:", messageId, isUpvoted ? "upvote" : "downvote"),
 		),
 		scrollToBottom: fn(() => console.log("Scroll to bottom triggered")),
-		showSuggestedActions: true,
 		inputPlaceholder: "Ask me anything...",
 		disableAttachments: false,
 	},
@@ -377,14 +347,20 @@ const CONVERSATION_VOTES: ChatMessageVote[] = [
 	{
 		messageId: "msg-2",
 		isUpvoted: true,
+		createdAt: new Date(),
+		updatedAt: new Date(),
 	},
 	{
 		messageId: "msg-6",
 		isUpvoted: true,
+		createdAt: new Date(),
+		updatedAt: new Date(),
 	},
 	{
 		messageId: "msg-8",
 		isUpvoted: true,
+		createdAt: new Date(),
+		updatedAt: new Date(),
 	},
 ];
 
@@ -511,5 +487,20 @@ export const SecureMode: Story = {
 		messages: CONVERSATION_MESSAGES.slice(0, 4),
 		disableAttachments: true,
 		inputPlaceholder: "Send a message (file attachments disabled)...",
+	},
+};
+
+/**
+ * Error state when AI response fails.
+ *
+ * Demonstrates the error UI with a retry button. When an error occurs during
+ * message generation, users see a friendly error message and can click "Try again"
+ * to retry the last message.
+ */
+export const ErrorState: Story = {
+	args: {
+		messages: CONVERSATION_MESSAGES.slice(0, 3),
+		status: "error",
+		onReload: fn(() => console.log("Retry triggered")),
 	},
 };

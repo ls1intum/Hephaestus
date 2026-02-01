@@ -1,17 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { fn } from "@storybook/test";
 import { useState } from "react";
-import {
-	DEFAULT_SCHEDULE,
-	formatDateRangeForApi,
-	getDateRangeForPreset,
-} from "@/lib/timeframe";
+import { fn } from "storybook/test";
+import { DEFAULT_SCHEDULE, formatDateRangeForApi, getDateRangeForPreset } from "@/lib/timeframe";
 import { TimeframeFilter } from "./TimeframeFilter";
 
 // Calculate default dates using the shared timeframe utilities
 const defaultRange = getDateRangeForPreset("this-week", DEFAULT_SCHEDULE);
-const { after: defaultAfter, before: defaultBefore } =
-	formatDateRangeForApi(defaultRange);
+const { after: defaultAfter, before: defaultBefore } = formatDateRangeForApi(defaultRange);
 
 /**
  * TimeframeFilter is the timeframe selector for the leaderboard page.
@@ -48,8 +43,7 @@ const meta = {
 			control: "object",
 		},
 		openEndedPresets: {
-			description:
-				'When true, presets like "this week" emit only afterDate (open-ended)',
+			description: 'When true, presets like "this week" emit only afterDate (open-ended)',
 			control: "boolean",
 		},
 		enableAllActivityOption: {
@@ -189,12 +183,8 @@ export const OpenEndedMode: Story = {
  */
 export const Interactive: Story = {
 	render: (props) => {
-		const [afterDate, setAfterDate] = useState<string | undefined>(
-			props.initialAfterDate,
-		);
-		const [beforeDate, setBeforeDate] = useState<string | undefined>(
-			props.initialBeforeDate,
-		);
+		const [afterDate, setAfterDate] = useState<string | undefined>(props.initialAfterDate);
+		const [beforeDate, setBeforeDate] = useState<string | undefined>(props.initialBeforeDate);
 		const [timeframe, setTimeframe] = useState<string | undefined>();
 
 		return (

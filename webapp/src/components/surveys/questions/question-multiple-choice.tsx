@@ -26,8 +26,7 @@ type QuestionMultipleChoiceQuestion = Pick<
 	| "hasOpenChoice"
 >;
 
-export interface QuestionMultipleChoiceProps
-	extends QuestionMultipleChoiceQuestion {
+export interface QuestionMultipleChoiceProps extends QuestionMultipleChoiceQuestion {
 	value: SurveyResponse;
 	onChange: (value: string[]) => void;
 	error?: string;
@@ -49,15 +48,11 @@ export function QuestionMultipleChoice({
 	const groupId = `survey-question-${id}`;
 	const hasCustomOption = hasOpenChoice && choices.length > 0;
 	const baseChoices = hasCustomOption ? choices.slice(0, -1) : choices;
-	const openChoiceLabel = hasCustomOption
-		? choices[choices.length - 1]
-		: undefined;
+	const openChoiceLabel = hasCustomOption ? choices[choices.length - 1] : undefined;
 	const derivedCustomValue = hasCustomOption
 		? selectedValues.find((candidate) => !baseChoices.includes(candidate))
 		: undefined;
-	const [customSelected, setCustomSelected] = useState(
-		Boolean(derivedCustomValue),
-	);
+	const [customSelected, setCustomSelected] = useState(Boolean(derivedCustomValue));
 	const [customValue, setCustomValue] = useState(derivedCustomValue ?? "");
 
 	useEffect(() => {
@@ -84,9 +79,7 @@ export function QuestionMultipleChoice({
 		}
 	}, [customSelected, customValue, derivedCustomValue, hasCustomOption]);
 
-	const baseSelections = selectedValues.filter((choice) =>
-		baseChoices.includes(choice),
-	);
+	const baseSelections = selectedValues.filter((choice) => baseChoices.includes(choice));
 
 	const toggleChoice = (choice: string, checked: boolean | string) => {
 		const isChecked = checked === true || checked === "indeterminate";
@@ -169,9 +162,7 @@ export function QuestionMultipleChoice({
 										<Textarea
 											id={textAreaId}
 											value={customValue}
-											onChange={(event) =>
-												handleCustomValueChange(event.target.value)
-											}
+											onChange={(event) => handleCustomValueChange(event.target.value)}
 											onFocus={() => setCustomSelected(true)}
 											placeholder="Share your answer"
 											className="mt-2 min-h-[32px] bg-background/90"

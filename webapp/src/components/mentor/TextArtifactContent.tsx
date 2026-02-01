@@ -7,7 +7,6 @@ export interface TextArtifactContentProps {
 	mode: "edit" | "diff";
 	status: "streaming" | "idle";
 	isCurrentVersion: boolean;
-	currentVersionIndex: number;
 	onSaveContent: (updatedContent: string, debounce: boolean) => void;
 	isLoading?: boolean;
 }
@@ -17,7 +16,6 @@ export function TextArtifactContent({
 	mode,
 	status,
 	isCurrentVersion,
-	currentVersionIndex,
 	onSaveContent,
 	isLoading = false,
 }: TextArtifactContentProps) {
@@ -58,7 +56,6 @@ export function TextArtifactContent({
 				<TextEditor
 					content={content}
 					isCurrentVersion={isCurrentVersion}
-					currentVersionIndex={currentVersionIndex}
 					status={status}
 					onSaveContent={onSaveContent}
 				/>

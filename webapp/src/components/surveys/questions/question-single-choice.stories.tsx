@@ -2,7 +2,7 @@
  * Single choice survey question used for mutually exclusive answers with optional open response.
  */
 import type { Meta, StoryObj } from "@storybook/react";
-import { fn } from "@storybook/test";
+import { fn } from "storybook/test";
 import { QuestionSingleChoice } from "./question-single-choice";
 
 const meta = {

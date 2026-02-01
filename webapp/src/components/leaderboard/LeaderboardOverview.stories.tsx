@@ -14,8 +14,7 @@ const meta = {
 	},
 	argTypes: {
 		leaderboardEntry: {
-			description:
-				"Current user's leaderboard entry with rank, score and details",
+			description: "Current user's leaderboard entry with rank, score and details",
 			control: "object",
 		},
 		leaguePoints: {
@@ -23,8 +22,7 @@ const meta = {
 			control: "number",
 		},
 		leaderboardEnd: {
-			description:
-				"ISO date string for when the current leaderboard period ends",
+			description: "ISO date string for when the current leaderboard period ends",
 			control: "text",
 		},
 		leaguePointsChange: {

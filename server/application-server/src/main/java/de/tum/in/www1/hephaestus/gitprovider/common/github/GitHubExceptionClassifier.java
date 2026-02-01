@@ -1,0 +1,599 @@
+package de.tum.in.www1.hephaestus.gitprovider.common.github;
+
+import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationSuspendedException;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import java.io.IOException;
+import java.net.ConnectException;
+import java.net.SocketException;
+import java.net.SocketTimeoutException;
+import java.net.UnknownHostException;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeoutException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.graphql.ResponseError;
+import org.springframework.graphql.client.ClientGraphQlResponse;
+import org.springframework.lang.Nullable;
+import org.springframework.stereotype.Component;
+import org.springframework.web.reactive.function.client.WebClientRequestException;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
+
+/**
+ * Classifies GitHub API exceptions into actionable categories for retry decisions.
+ * <p>
+ * This classifier enables smart retry behavior by differentiating between:
+ * <ul>
+ *   <li><b>RETRYABLE</b>: Transient failures (timeouts, network errors, 5xx) - retry with backoff</li>
+ *   <li><b>RATE_LIMITED</b>: Rate limit exceeded (429, 403 with rate limit) - wait for reset then retry</li>
+ *   <li><b>NOT_FOUND</b>: Resource deleted (404, GraphQL NOT_FOUND) - log and skip</li>
+ *   <li><b>AUTH_ERROR</b>: Authentication/authorization failure (401, 403) - abort sync</li>
+ *   <li><b>CLIENT_ERROR</b>: Bad request (400, 422) - abort sync, fix request</li>
+ *   <li><b>UNKNOWN</b>: Unclassified exceptions - default handling</li>
+ * </ul>
+ * <p>
+ * Thread-safe: This class is stateless except for metrics counters.
+ *
+ * <p>Usage example:
+ * <pre>{@code
+ * try {
+ *     fetchFromGitHub();
+ * } catch (Exception e) {
+ *     Category category = exceptionClassifier.classify(e);
+ *     switch (category) {
+ *         case RETRYABLE -> retryWithBackoff(attempt);
+ *         case RATE_LIMITED -> waitForRateLimit(e);
+ *         case NOT_FOUND -> handleResourceDeleted();
+ *         case AUTH_ERROR, CLIENT_ERROR -> abortSync();
+ *         default -> handleUnknown(e);
+ *     }
+ * }
+ * }</pre>
+ *
+ * @see ExponentialBackoff
+ * @see de.tum.in.www1.hephaestus.gitprovider.common.spi.RateLimitTracker
+ */
+@Component
+public class GitHubExceptionClassifier {
+
+    private static final Logger log = LoggerFactory.getLogger(GitHubExceptionClassifier.class);
+
+    /**
+     * Error categories for GitHub API exceptions.
+     */
+    public enum Category {
+        /**
+         * Transient failures that should be retried with exponential backoff.
+         * Includes: timeouts, network errors, 500, 502, 503, 504.
+         */
+        RETRYABLE,
+
+        /**
+         * Rate limit exceeded - wait for reset time, then retry.
+         * Includes: 429 Too Many Requests, 403 with rate limit headers.
+         */
+        RATE_LIMITED,
+
+        /**
+         * Resource not found - resource may have been deleted on GitHub.
+         * Includes: 404 Not Found, GraphQL NOT_FOUND errors.
+         */
+        NOT_FOUND,
+
+        /**
+         * Authentication or authorization error - sync should be aborted.
+         * Includes: 401 Unauthorized, 403 Forbidden (non-rate-limit).
+         */
+        AUTH_ERROR,
+
+        /**
+         * Client error - bad request that won't succeed on retry.
+         * Includes: 400 Bad Request, 422 Unprocessable Entity.
+         */
+        CLIENT_ERROR,
+
+        /**
+         * Unclassified exception - requires investigation.
+         */
+        UNKNOWN,
+    }
+
+    /**
+     * Result of exception classification including optional rate limit reset time.
+     */
+    public record ClassificationResult(
+        Category category,
+        @Nullable Instant rateLimitResetAt,
+        @Nullable Duration suggestedWait,
+        String message
+    ) {
+        public static ClassificationResult of(Category category, String message) {
+            return new ClassificationResult(category, null, null, message);
+        }
+
+        public static ClassificationResult rateLimited(Instant resetAt, String message) {
+            Duration wait = Duration.between(Instant.now(), resetAt);
+            if (wait.isNegative()) {
+                wait = Duration.ofSeconds(60); // Default wait if reset time is in the past
+            }
+            return new ClassificationResult(Category.RATE_LIMITED, resetAt, wait, message);
+        }
+
+        public static ClassificationResult rateLimited(Duration suggestedWait, String message) {
+            return new ClassificationResult(
+                Category.RATE_LIMITED,
+                Instant.now().plus(suggestedWait),
+                suggestedWait,
+                message
+            );
+        }
+    }
+
+    private final Counter retryableCounter;
+    private final Counter rateLimitedCounter;
+    private final Counter notFoundCounter;
+    private final Counter authErrorCounter;
+    private final Counter clientErrorCounter;
+    private final Counter unknownCounter;
+
+    public GitHubExceptionClassifier(MeterRegistry meterRegistry) {
+        // Register counters for each error category
+        this.retryableCounter = Counter.builder("github.sync.errors.total")
+            .description("Total GitHub sync errors by category")
+            .tag("category", "retryable")
+            .register(meterRegistry);
+
+        this.rateLimitedCounter = Counter.builder("github.sync.errors.total")
+            .description("Total GitHub sync errors by category")
+            .tag("category", "rate_limited")
+            .register(meterRegistry);
+
+        this.notFoundCounter = Counter.builder("github.sync.errors.total")
+            .description("Total GitHub sync errors by category")
+            .tag("category", "not_found")
+            .register(meterRegistry);
+
+        this.authErrorCounter = Counter.builder("github.sync.errors.total")
+            .description("Total GitHub sync errors by category")
+            .tag("category", "auth_error")
+            .register(meterRegistry);
+
+        this.clientErrorCounter = Counter.builder("github.sync.errors.total")
+            .description("Total GitHub sync errors by category")
+            .tag("category", "client_error")
+            .register(meterRegistry);
+
+        this.unknownCounter = Counter.builder("github.sync.errors.total")
+            .description("Total GitHub sync errors by category")
+            .tag("category", "unknown")
+            .register(meterRegistry);
+    }
+
+    /**
+     * Classifies an exception and returns the category.
+     * Also increments the appropriate metrics counter.
+     *
+     * @param e the exception to classify
+     * @return the error category
+     */
+    public Category classify(Throwable e) {
+        return classifyWithDetails(e).category();
+    }
+
+    /**
+     * Classifies an exception with full details including rate limit reset time.
+     * Also increments the appropriate metrics counter.
+     *
+     * @param e the exception to classify
+     * @return classification result with category and additional details
+     */
+    public ClassificationResult classifyWithDetails(Throwable e) {
+        ClassificationResult result = doClassify(e);
+        incrementCounter(result.category());
+
+        if (log.isDebugEnabled()) {
+            log.debug(
+                "Classified exception: category={}, type={}, message={}",
+                result.category(),
+                e != null ? e.getClass().getSimpleName() : "null",
+                result.message()
+            );
+        }
+
+        return result;
+    }
+
+    /**
+     * Checks if an exception is retryable (either RETRYABLE or RATE_LIMITED).
+     *
+     * @param e the exception to check
+     * @return true if the operation should be retried
+     */
+    public boolean isRetryable(Throwable e) {
+        Category category = classify(e);
+        return category == Category.RETRYABLE || category == Category.RATE_LIMITED;
+    }
+
+    /**
+     * Classifies a GraphQL response for error handling.
+     * Checks for NOT_FOUND errors in the response errors.
+     *
+     * @param response the GraphQL response to check
+     * @return classification result, or null if no errors
+     */
+    @Nullable
+    public ClassificationResult classifyGraphQlResponse(@Nullable ClientGraphQlResponse response) {
+        if (response == null || response.getErrors() == null || response.getErrors().isEmpty()) {
+            return null;
+        }
+
+        List<ResponseError> errors = response.getErrors();
+
+        // Check for specific error types
+        for (ResponseError error : errors) {
+            Map<String, Object> extensions = error.getExtensions();
+            if (extensions == null) {
+                continue;
+            }
+
+            Object errorType = extensions.get("type");
+            if (errorType == null) {
+                continue;
+            }
+
+            String type = errorType.toString();
+            switch (type) {
+                case "NOT_FOUND" -> {
+                    notFoundCounter.increment();
+                    return ClassificationResult.of(Category.NOT_FOUND, "GraphQL NOT_FOUND: " + error.getMessage());
+                }
+                case "FORBIDDEN" -> {
+                    // Check if it's a rate limit error
+                    String message = error.getMessage();
+                    if (message != null && message.toLowerCase().contains("rate limit")) {
+                        rateLimitedCounter.increment();
+                        return ClassificationResult.rateLimited(
+                            Duration.ofMinutes(1),
+                            "GraphQL rate limit: " + message
+                        );
+                    }
+                    authErrorCounter.increment();
+                    return ClassificationResult.of(Category.AUTH_ERROR, "GraphQL FORBIDDEN: " + message);
+                }
+                case "UNAUTHORIZED" -> {
+                    authErrorCounter.increment();
+                    return ClassificationResult.of(Category.AUTH_ERROR, "GraphQL UNAUTHORIZED: " + error.getMessage());
+                }
+                default -> {
+                    // Continue checking other errors
+                }
+            }
+        }
+
+        // Default for unrecognized errors
+        unknownCounter.increment();
+        return ClassificationResult.of(Category.UNKNOWN, "Unclassified GraphQL error: " + errors.get(0).getMessage());
+    }
+
+    /**
+     * Internal classification logic without metric updates.
+     */
+    private ClassificationResult doClassify(Throwable e) {
+        if (e == null) {
+            return ClassificationResult.of(Category.UNKNOWN, "Null exception");
+        }
+
+        // Unwrap common wrapper exceptions
+        Throwable cause = e;
+        if (
+            e.getCause() != null &&
+            (e instanceof RuntimeException ||
+                e.getClass().getName().contains("CompletionException") ||
+                e.getClass().getName().contains("ExecutionException"))
+        ) {
+            cause = e.getCause();
+        }
+
+        // Suspended installation - this is an auth error, not retryable
+        if (cause instanceof InstallationSuspendedException suspended) {
+            return ClassificationResult.of(
+                Category.AUTH_ERROR,
+                "Installation " + suspended.getInstallationId() + " is suspended"
+            );
+        }
+
+        // Database deadlocks are transient and should be retried with backoff
+        // These occur when multiple threads try to upsert the same user concurrently
+        if (isDeadlockException(cause)) {
+            return ClassificationResult.of(
+                Category.RETRYABLE,
+                "Database deadlock detected - will retry: " + cause.getMessage()
+            );
+        }
+
+        // Check for WebClient response exceptions (HTTP errors)
+        if (cause instanceof WebClientResponseException responseException) {
+            return classifyHttpStatus(responseException);
+        }
+
+        // Check for WebClient request exceptions (network errors before response)
+        if (cause instanceof WebClientRequestException) {
+            return classifyNetworkException(cause.getCause() != null ? cause.getCause() : cause);
+        }
+
+        // Check for timeout exceptions
+        if (isTimeoutException(cause)) {
+            return ClassificationResult.of(Category.RETRYABLE, "Timeout: " + cause.getMessage());
+        }
+
+        // Check for network/IO exceptions
+        if (isNetworkException(cause)) {
+            return classifyNetworkException(cause);
+        }
+
+        // Check for IOException (may indicate network issues)
+        if (cause instanceof IOException) {
+            return ClassificationResult.of(Category.RETRYABLE, "IO error: " + cause.getMessage());
+        }
+
+        // Check for suspended in message (legacy IllegalStateException)
+        String message = cause.getMessage();
+        if (message != null && message.toLowerCase().contains("suspended")) {
+            return ClassificationResult.of(Category.AUTH_ERROR, "Installation suspended: " + message);
+        }
+
+        // Check for FieldAccessException from Spring GraphQL - extract error type from message
+        if (cause.getClass().getSimpleName().equals("FieldAccessException") && message != null) {
+            // GraphQL NOT_FOUND errors (e.g., "Could not resolve to a Repository")
+            if (message.contains("NOT_FOUND") || message.contains("Could not resolve")) {
+                return ClassificationResult.of(Category.NOT_FOUND, "GraphQL resource not found: " + message);
+            }
+            // GraphQL FORBIDDEN errors
+            if (message.contains("FORBIDDEN") || message.contains("forbidden")) {
+                return ClassificationResult.of(Category.AUTH_ERROR, "GraphQL forbidden: " + message);
+            }
+        }
+
+        // Default: unknown
+        return ClassificationResult.of(
+            Category.UNKNOWN,
+            "Unclassified: " + cause.getClass().getSimpleName() + " - " + cause.getMessage()
+        );
+    }
+
+    /**
+     * Classifies based on HTTP status code from WebClientResponseException.
+     */
+    private ClassificationResult classifyHttpStatus(WebClientResponseException e) {
+        int status = e.getStatusCode().value();
+        String message = "HTTP " + status + ": " + e.getMessage();
+
+        // 4xx Client Errors
+        if (status == 400) {
+            return ClassificationResult.of(Category.CLIENT_ERROR, message);
+        }
+        if (status == 401) {
+            return ClassificationResult.of(Category.AUTH_ERROR, message);
+        }
+        if (status == 403) {
+            // Check for rate limit
+            if (isRateLimitResponse(e)) {
+                Instant resetAt = extractRateLimitReset(e);
+                if (resetAt != null) {
+                    return ClassificationResult.rateLimited(resetAt, message);
+                }
+                return ClassificationResult.rateLimited(Duration.ofMinutes(1), message);
+            }
+            return ClassificationResult.of(Category.AUTH_ERROR, message);
+        }
+        if (status == 404) {
+            return ClassificationResult.of(Category.NOT_FOUND, message);
+        }
+        if (status == 422) {
+            return ClassificationResult.of(Category.CLIENT_ERROR, message);
+        }
+        if (status == 429) {
+            Instant resetAt = extractRateLimitReset(e);
+            if (resetAt != null) {
+                return ClassificationResult.rateLimited(resetAt, message);
+            }
+            // Default wait for 429 without reset header
+            return ClassificationResult.rateLimited(Duration.ofMinutes(1), message);
+        }
+
+        // 5xx Server Errors - all retryable
+        if (status >= 500 && status < 600) {
+            return ClassificationResult.of(Category.RETRYABLE, message);
+        }
+
+        // Other 4xx errors
+        if (status >= 400 && status < 500) {
+            return ClassificationResult.of(Category.CLIENT_ERROR, message);
+        }
+
+        return ClassificationResult.of(Category.UNKNOWN, message);
+    }
+
+    /**
+     * Classifies network-level exceptions.
+     */
+    private ClassificationResult classifyNetworkException(Throwable e) {
+        String message = "Network error: " + e.getClass().getSimpleName() + " - " + e.getMessage();
+        return ClassificationResult.of(Category.RETRYABLE, message);
+    }
+
+    /**
+     * Checks if the exception indicates a database deadlock.
+     * <p>
+     * Database deadlocks are transient failures that occur when:
+     * <ul>
+     *   <li>Multiple threads try to INSERT/UPDATE the same rows in different order</li>
+     *   <li>PostgreSQL detects a lock cycle and aborts one transaction</li>
+     * </ul>
+     * <p>
+     * Common in sync operations when parallel threads process shared entities (e.g., users).
+     * These should always be retried since the deadlock is resolved by PostgreSQL.
+     */
+    private boolean isDeadlockException(Throwable e) {
+        // Walk the cause chain to find deadlock indicators
+        Throwable current = e;
+        while (current != null) {
+            String className = current.getClass().getName();
+            String message = current.getMessage();
+
+            // Spring/Hibernate deadlock exceptions
+            if (
+                className.contains("CannotAcquireLockException") ||
+                className.contains("LockAcquisitionException") ||
+                className.contains("DeadlockLoserDataAccessException")
+            ) {
+                return true;
+            }
+
+            // PostgreSQL deadlock SQLState 40P01
+            if (className.contains("SQLException") || className.contains("PSQLException")) {
+                if (message != null && (message.contains("deadlock detected") || message.contains("40P01"))) {
+                    return true;
+                }
+            }
+
+            // Check message for deadlock indicators
+            if (message != null && message.toLowerCase().contains("deadlock")) {
+                return true;
+            }
+
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    /**
+     * Checks if the exception indicates a timeout.
+     */
+    private boolean isTimeoutException(Throwable e) {
+        if (e instanceof TimeoutException || e instanceof SocketTimeoutException) {
+            return true;
+        }
+        // Check for reactor/netty timeout exceptions
+        String className = e.getClass().getName();
+        return (
+            className.contains("TimeoutException") ||
+            className.contains("ReadTimeoutException") ||
+            className.contains("WriteTimeoutException")
+        );
+    }
+
+    /**
+     * Checks if the exception indicates a network error.
+     * <p>
+     * Includes transport-level errors that occur during response streaming:
+     * <ul>
+     *   <li>PrematureCloseException: Connection closed mid-response (GitHub infra issues)</li>
+     *   <li>Connection reset/abort errors</li>
+     *   <li>Standard socket exceptions</li>
+     * </ul>
+     */
+    private boolean isNetworkException(Throwable e) {
+        if (e instanceof ConnectException || e instanceof SocketException || e instanceof UnknownHostException) {
+            return true;
+        }
+
+        String className = e.getClass().getName();
+
+        // Check for reactor-netty transport errors (PrematureCloseException, etc.)
+        if (
+            className.contains("PrematureCloseException") ||
+            className.contains("AbortedException") ||
+            className.contains("ConnectionException") ||
+            className.contains("ConnectionReset")
+        ) {
+            return true;
+        }
+
+        // Check for Spring GraphQL transport exceptions
+        if (className.contains("GraphQlTransportException")) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Checks if a 403 response is due to rate limiting.
+     */
+    private boolean isRateLimitResponse(WebClientResponseException e) {
+        // Check for rate limit headers
+        List<String> rateLimitRemaining = e.getHeaders().get("X-RateLimit-Remaining");
+        if (rateLimitRemaining != null && !rateLimitRemaining.isEmpty()) {
+            try {
+                int remaining = Integer.parseInt(rateLimitRemaining.get(0));
+                if (remaining == 0) {
+                    return true;
+                }
+            } catch (NumberFormatException ignored) {
+                // Continue with other checks
+            }
+        }
+
+        // Check response body for rate limit message
+        String body = e.getResponseBodyAsString();
+        if (body != null) {
+            String lowerBody = body.toLowerCase();
+            return (
+                lowerBody.contains("rate limit") ||
+                lowerBody.contains("ratelimit") ||
+                lowerBody.contains("abuse") ||
+                lowerBody.contains("secondary rate")
+            );
+        }
+
+        return false;
+    }
+
+    /**
+     * Extracts rate limit reset time from response headers.
+     */
+    @Nullable
+    private Instant extractRateLimitReset(WebClientResponseException e) {
+        // Try X-RateLimit-Reset header (Unix timestamp)
+        List<String> resetHeader = e.getHeaders().get("X-RateLimit-Reset");
+        if (resetHeader != null && !resetHeader.isEmpty()) {
+            try {
+                long epochSeconds = Long.parseLong(resetHeader.get(0));
+                return Instant.ofEpochSecond(epochSeconds);
+            } catch (NumberFormatException ignored) {
+                // Fall through to other methods
+            }
+        }
+
+        // Try Retry-After header (seconds to wait)
+        List<String> retryAfter = e.getHeaders().get("Retry-After");
+        if (retryAfter != null && !retryAfter.isEmpty()) {
+            try {
+                long seconds = Long.parseLong(retryAfter.get(0));
+                return Instant.now().plusSeconds(seconds);
+            } catch (NumberFormatException ignored) {
+                // Retry-After might be a date, but we'll ignore that for simplicity
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Increments the counter for the given category.
+     */
+    private void incrementCounter(Category category) {
+        switch (category) {
+            case RETRYABLE -> retryableCounter.increment();
+            case RATE_LIMITED -> rateLimitedCounter.increment();
+            case NOT_FOUND -> notFoundCounter.increment();
+            case AUTH_ERROR -> authErrorCounter.increment();
+            case CLIENT_ERROR -> clientErrorCounter.increment();
+            case UNKNOWN -> unknownCounter.increment();
+        }
+    }
+}

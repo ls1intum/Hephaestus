@@ -19,11 +19,7 @@ interface ContributorCardProps {
  * ContributorCard component for displaying individual contributor information
  * with avatar, name, and GitHub profile link.
  */
-export function ContributorCard({
-	contributor,
-	size = "md",
-	className,
-}: ContributorCardProps) {
+export function ContributorCard({ contributor, size = "md", className }: ContributorCardProps) {
 	const isSmall = size === "sm";
 
 	return (
@@ -39,13 +35,8 @@ export function ContributorCard({
 			title={`${contributor.name} (@${contributor.login})`}
 		>
 			<Avatar className={isSmall ? "size-12" : "size-16"}>
-				<AvatarImage
-					src={contributor.avatarUrl}
-					alt={`${contributor.login}'s avatar`}
-				/>
-				<AvatarFallback>
-					{contributor.login.slice(0, 2).toUpperCase()}
-				</AvatarFallback>
+				<AvatarImage src={contributor.avatarUrl} alt={`${contributor.login}'s avatar`} />
+				<AvatarFallback>{contributor.login.slice(0, 2).toUpperCase()}</AvatarFallback>
 			</Avatar>
 			<div className="flex flex-col items-center min-w-0 w-full space-y-0.5">
 				<div

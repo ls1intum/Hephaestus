@@ -4,7 +4,6 @@ on:
   workflow_dispatch:
   push:
     branches: ["main"]
-  merge_group:
   pull_request:
     branches: ["**"]
 
@@ -13,73 +12,338 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  pre-job:
+  detect-changes:
+    name: "Detect changes"
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+      contents: read
     outputs:
+      webapp: ${{ steps.filter.outputs.webapp }}
+      application-server: ${{ steps.filter.outputs.application-server }}
+      intelligence-service: ${{ steps.filter.outputs.intelligence-service }}
+      webhook-ingest: ${{ steps.filter.outputs.webhook-ingest }}
+      docs: ${{ steps.filter.outputs.docs }}
+      ci-config: ${{ steps.filter.outputs.ci-config }}
+      any-code: ${{ steps.filter.outputs.webapp == 'true' || steps.filter.outputs.application-server == 'true' || steps.filter.outputs.intelligence-service == 'true' || steps.filter.outputs.webhook-ingest == 'true' }}
       should_skip: ${{ steps.skip_check.outputs.should_skip }}
-    timeout-minutes: 15
+    timeout-minutes: 5
     steps:
-      - id: skip_check
-        uses: fkirc/skip-duplicate-actions@v5
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
-          do_not_skip: '["workflow_dispatch"]'
+          fetch-depth: 0
 
-  # Code quality and style checks
-  quality-gates:
-    uses: ./.github/workflows/ci-quality-gates.yml
-    needs: [pre-job]
-    if: needs.pre-job.outputs.should_skip != 'true'
-    secrets: inherit
-    with:
-      should_skip: ${{ needs.pre-job.outputs.should_skip }}
+      - id: skip_check
+        uses: fkirc/skip-duplicate-actions@f75f66ce1886f00957d99748a42c724f4330bdcf # v5
+        with:
+          do_not_skip: '["workflow_dispatch", "push", "merge_group"]'
 
-  # Security vulnerability scanning
-  security-scan:
-    uses: ./.github/workflows/ci-security-scan.yml
-    needs: [pre-job]
-    if: needs.pre-job.outputs.should_skip != 'true'
-    secrets: inherit
-    with:
-      should_skip: ${{ needs.pre-job.outputs.should_skip }}
+      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
+        id: filter
+        with:
+          filters: |
+            webapp:
+              - 'webapp/**'
+              - 'package.json'
+              - 'package-lock.json'
+              - '.node-version'
+            application-server:
+              - 'server/application-server/**'
+              - 'scripts/db-utils.sh'
+            intelligence-service:
+              - 'server/intelligence-service/**'
+              - 'scripts/install-platform-binaries.mjs'
+              - 'scripts/generate-mermaid-erd.ts'
+              - 'scripts/postprocess-openapi-java.ts'
+              - 'package.json'
+              - 'package-lock.json'
+            webhook-ingest:
+              - 'server/webhook-ingest/**'
+              - 'package.json'
+              - 'package-lock.json'
+            docs:
+              - 'docs/**'
+            ci-config:
+              - '.github/workflows/**'
+              - '.github/actions/**'
 
-  # Comprehensive test execution
-  test-suite:
-    uses: ./.github/workflows/ci-tests.yml
-    needs: [pre-job]
-    if: needs.pre-job.outputs.should_skip != 'true'
-    secrets: inherit
-    with:
-      should_skip: ${{ needs.pre-job.outputs.should_skip }}
-
-  # Build Docker images and push to registry
-  docker-build:
-    uses: ./.github/workflows/ci-docker-build.yml
-    needs: [pre-job]
-    if: needs.pre-job.outputs.should_skip != 'true'
-    secrets: inherit
-    with:
-      should_skip: ${{ needs.pre-job.outputs.should_skip }}
-
-  # Final: Aggregated success gate for branch protection
-  all-ci-passed:
+  # Post preview links immediately (no waiting for other jobs)
+  preview-links:
+    name: "Preview / Coolify"
     runs-on: ubuntu-latest
-    needs:
-      [
-        quality-gates,
-        security-scan,
-        test-suite,
-        docker-build,
-      ]
+    if: github.event_name == 'pull_request'
+    permissions:
+      statuses: write
+    timeout-minutes: 1
+    steps:
+      - name: Post Coolify preview link
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          script: |
+            const sha = context.payload.pull_request.head.sha;
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: sha,
+              state: 'success',
+              target_url: 'https://coolify.hephaestus.aet.cit.tum.de/project/lc8sows0ok8g880sg4o4o84w/environment/ek8o8800g4wks84c8w8wcckc/application/wg44k0ccsoscsgcco8swc4ks/preview-deployments',
+              description: 'Click Details to view Coolify preview deployments',
+              context: 'Preview / Coolify'
+            });
+
+  Quality:
+    uses: ./.github/workflows/ci-quality-gates.yml
+    needs: [detect-changes]
+    if: |
+      needs.detect-changes.outputs.should_skip != 'true' && (
+        needs.detect-changes.outputs.any-code == 'true' ||
+        needs.detect-changes.outputs.ci-config == 'true' ||
+        github.event_name != 'pull_request'
+      )
+    secrets: inherit
+    with:
+      should_skip: ${{ needs.detect-changes.outputs.should_skip }}
+      webapp_changed: ${{ (needs.detect-changes.outputs.webapp == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      application_server_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      intelligence_service_changed: ${{ (needs.detect-changes.outputs.intelligence-service == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      webhook_ingest_changed: ${{ (needs.detect-changes.outputs.webhook-ingest == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+
+  Security:
+    uses: ./.github/workflows/ci-security-scan.yml
+    needs: [detect-changes]
+    if: |
+      needs.detect-changes.outputs.should_skip != 'true' && (
+        needs.detect-changes.outputs.any-code == 'true' ||
+        needs.detect-changes.outputs.ci-config == 'true' ||
+        github.event_name != 'pull_request'
+      )
+    secrets: inherit
+    with:
+      should_skip: ${{ needs.detect-changes.outputs.should_skip }}
+
+  Test:
+    uses: ./.github/workflows/ci-tests.yml
+    needs: [detect-changes]
+    if: |
+      needs.detect-changes.outputs.should_skip != 'true' && (
+        needs.detect-changes.outputs.any-code == 'true' ||
+        needs.detect-changes.outputs.ci-config == 'true' ||
+        github.event_name != 'pull_request'
+      )
+    secrets: inherit
+    with:
+      should_skip: ${{ needs.detect-changes.outputs.should_skip }}
+      webapp_changed: ${{ (needs.detect-changes.outputs.webapp == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      application_server_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      intelligence_service_changed: ${{ (needs.detect-changes.outputs.intelligence-service == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      webhook_ingest_changed: ${{ (needs.detect-changes.outputs.webhook-ingest == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+
+  Docker:
+    uses: ./.github/workflows/ci-docker-build.yml
+    needs: [detect-changes]
+    if: |
+      needs.detect-changes.outputs.should_skip != 'true' && (
+        needs.detect-changes.outputs.any-code == 'true' ||
+        needs.detect-changes.outputs.ci-config == 'true' ||
+        github.event_name != 'pull_request'
+      )
+    secrets: inherit
+    with:
+      should_skip: ${{ needs.detect-changes.outputs.should_skip }}
+      webapp_changed: ${{ (needs.detect-changes.outputs.webapp == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      application_server_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      intelligence_service_changed: ${{ (needs.detect-changes.outputs.intelligence-service == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      webhook_ingest_changed: ${{ (needs.detect-changes.outputs.webhook-ingest == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+
+  all-ci-passed:
+    name: "CI Status Gate"
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      statuses: write
+    needs: [detect-changes, Quality, Security, Test, Docker]
     if: always()
     steps:
-      - name: Check all jobs passed
+      - name: Generate workflow timeline
+        uses: Kesin11/actions-timeline@7c7e0821d38f27460f4a71ef874a1c8cf23602e4 # v2
+        with:
+          show-waiting-runner: true
+
+      - name: Evaluate CI results
+        id: evaluate
         run: |
+          echo "detect-changes: ${{ needs.detect-changes.result }}"
+          echo "Quality:        ${{ needs.Quality.result }}"
+          echo "Security:       ${{ needs.Security.result }}"
+          echo "Test:           ${{ needs.Test.result }}"
+          echo "Docker:         ${{ needs.Docker.result }}"
+
           if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" ]]; then
-            echo "❌ One or more CI jobs failed"
+            echo "status=failure" >> $GITHUB_OUTPUT
             exit 1
-          elif [[ "${{ contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
-            echo "⚠️ One or more CI jobs were cancelled"
-            exit 1
-          else
-            echo "✅ All CI jobs passed successfully"
           fi
+
+          if [[ "${{ contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
+            echo "status=cancelled" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+          echo "status=success" >> $GITHUB_OUTPUT
+
+      - name: Generate CI Summary
+        if: always()
+        run: |
+          # Header
+          echo "## 🔍 CI Pipeline Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Overall status
+          if [[ "${{ steps.evaluate.outputs.status }}" == "success" ]]; then
+            echo "✅ **All checks passed!**" >> $GITHUB_STEP_SUMMARY
+          elif [[ "${{ steps.evaluate.outputs.status }}" == "failure" ]]; then
+            echo "❌ **Some checks failed.** See details below." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ **CI was cancelled or encountered an issue.**" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Workflow results table
+          echo "### Workflow Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Workflow | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|--------|" >> $GITHUB_STEP_SUMMARY
+
+          # Map result to emoji
+          result_to_emoji() {
+            case "$1" in
+              success) echo "✅ Passed" ;;
+              failure) echo "❌ Failed" ;;
+              skipped) echo "⏭️ Skipped" ;;
+              cancelled) echo "🚫 Cancelled" ;;
+              *) echo "❓ Unknown" ;;
+            esac
+          }
+
+          echo "| Quality | $(result_to_emoji '${{ needs.Quality.result }}') |" >> $GITHUB_STEP_SUMMARY
+          echo "| Test | $(result_to_emoji '${{ needs.Test.result }}') |" >> $GITHUB_STEP_SUMMARY
+          echo "| Security | $(result_to_emoji '${{ needs.Security.result }}') |" >> $GITHUB_STEP_SUMMARY
+          echo "| Docker | $(result_to_emoji '${{ needs.Docker.result }}') |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Path filtering info
+          echo "### 📁 Components Changed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Component | Changed |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|---------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Webapp | ${{ needs.detect-changes.outputs.webapp == 'true' && '✅ Yes' || '➖ No' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Application Server | ${{ needs.detect-changes.outputs.application-server == 'true' && '✅ Yes' || '➖ No' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Intelligence Service | ${{ needs.detect-changes.outputs.intelligence-service == 'true' && '✅ Yes' || '➖ No' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Webhook Ingest | ${{ needs.detect-changes.outputs.webhook-ingest == 'true' && '✅ Yes' || '➖ No' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| CI Config | ${{ needs.detect-changes.outputs.ci-config == 'true' && '⚙️ Yes' || '➖ No' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Tips section for failures - specific to what failed
+          if [[ "${{ steps.evaluate.outputs.status }}" == "failure" ]]; then
+            echo "### 💡 Troubleshooting Guide" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            # Quality failures
+            if [[ "${{ needs.Quality.result }}" == "failure" ]]; then
+              echo "<details><summary><b>❌ Quality Failed</b></summary>" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "| Issue | Fix Command |" >> $GITHUB_STEP_SUMMARY
+              echo "|-------|-------------|" >> $GITHUB_STEP_SUMMARY
+              echo "| Formatting errors | \`npm run format\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| TypeScript errors | \`npm run typecheck:webapp\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Biome lint errors | \`npm run lint:fix\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Java formatting | \`npm run format:java\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| OpenAPI out of sync | \`npm run generate:api\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Database schema drift | \`npm run db:draft-changelog\` |" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "</details>" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+            fi
+
+            # Test failures
+            if [[ "${{ needs.Test.result }}" == "failure" ]]; then
+              echo "<details><summary><b>❌ Tests Failed</b></summary>" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "| Test Suite | Run Locally |" >> $GITHUB_STEP_SUMMARY
+              echo "|------------|-------------|" >> $GITHUB_STEP_SUMMARY
+              echo "| Webapp unit | \`npm run test:webapp\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Webapp Storybook | \`npm -w webapp run test:storybook\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Application server | \`cd server/application-server && ./mvnw test\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Intelligence service | \`npm -w server/intelligence-service run test\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Webhook ingest | \`npm -w server/webhook-ingest run test\` |" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**Tip:** Check the **Test Results** tab above for specific failures." >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "</details>" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+            fi
+
+            # Docker failures
+            if [[ "${{ needs.Docker.result }}" == "failure" ]]; then
+              echo "<details><summary><b>❌ Docker Failed</b></summary>" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "Common causes:" >> $GITHUB_STEP_SUMMARY
+              echo "- Build errors in the application code" >> $GITHUB_STEP_SUMMARY
+              echo "- Missing dependencies" >> $GITHUB_STEP_SUMMARY
+              echo "- Dockerfile syntax errors" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "Test locally: \`docker build -f <component>/Dockerfile .\`" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "</details>" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+            fi
+
+            # Security failures
+            if [[ "${{ needs.Security.result }}" == "failure" ]]; then
+              echo "<details><summary><b>❌ Security Failed</b></summary>" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "Check the **Security** tab for details on vulnerabilities." >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "</details>" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+            fi
+
+            echo "---" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Quick fix:** Run \`npm run format && npm run check\` before pushing." >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Performance note for successful runs
+          if [[ "${{ steps.evaluate.outputs.status }}" == "success" ]]; then
+            echo "### ⚡ Performance" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            SKIPPED_COUNT=0
+            [[ "${{ needs.Quality.result }}" == "skipped" ]] && SKIPPED_COUNT=$((SKIPPED_COUNT + 1)) || true
+            [[ "${{ needs.Test.result }}" == "skipped" ]] && SKIPPED_COUNT=$((SKIPPED_COUNT + 1)) || true
+            [[ "${{ needs.Security.result }}" == "skipped" ]] && SKIPPED_COUNT=$((SKIPPED_COUNT + 1)) || true
+            [[ "${{ needs.Docker.result }}" == "skipped" ]] && SKIPPED_COUNT=$((SKIPPED_COUNT + 1)) || true
+            if [[ $SKIPPED_COUNT -gt 0 ]]; then
+              echo "🚀 **Path-based filtering saved time!** $SKIPPED_COUNT workflow(s) skipped because no relevant files changed." >> $GITHUB_STEP_SUMMARY
+            else
+              echo "All workflows ran (CI config or main branch push)." >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "*Generated by CI Status Gate • [View workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})*" >> $GITHUB_STEP_SUMMARY
+
+      - name: Create commit status
+        if: always()
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          script: |
+            const sha = context.payload.pull_request?.head?.sha || context.sha;
+            const state = '${{ steps.evaluate.outputs.status }}' || 'failure';
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: sha,
+              state: state,
+              description: state === 'success' ? 'All CI checks passed' : 'One or more CI checks failed',
+              context: 'All CI Passed'
+            });

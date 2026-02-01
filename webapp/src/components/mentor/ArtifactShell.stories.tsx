@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { fn } from "@storybook/test";
+import { fn } from "storybook/test";
 import { ArtifactShell, type ArtifactShellProps } from "./ArtifactShell";
 import { TextArtifactContent } from "./TextArtifactContent";
 
@@ -59,7 +59,6 @@ export const Default: Story = {
 					mode="edit"
 					status="idle"
 					isCurrentVersion={true}
-					currentVersionIndex={0}
 					onSaveContent={fn()}
 					isLoading={false}
 				/>
@@ -82,7 +81,6 @@ export const Streaming: Story = {
 					mode="edit"
 					status="streaming"
 					isCurrentVersion={true}
-					currentVersionIndex={2}
 					onSaveContent={fn()}
 					isLoading={false}
 				/>

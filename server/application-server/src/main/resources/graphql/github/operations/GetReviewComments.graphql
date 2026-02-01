@@ -1,0 +1,86 @@
+# GraphQL query for fetching paginated review comments for a specific review
+# Used to handle nested pagination when a review has more than 100 comments
+# Uses fullDatabaseId for comments (BigInt) since databaseId (Int) can overflow.
+# User/Bot still use databaseId as fullDatabaseId is not available on Actor types.
+
+query GetReviewComments($reviewId: ID!, $first: Int!, $after: String) {
+    rateLimit {
+        cost
+        limit
+        remaining
+        resetAt
+    }
+    node(id: $reviewId) {
+        ... on PullRequestReview {
+            id
+            comments(first: $first, after: $after) {
+                totalCount
+                pageInfo {
+                    hasNextPage
+                    endCursor
+                }
+                nodes {
+                    id
+                    fullDatabaseId
+                    body
+                    path
+                    line
+                    originalLine
+                    startLine
+                    originalStartLine
+                    diffHunk
+                    createdAt
+                    updatedAt
+                    state
+                    url
+                    authorAssociation
+
+                    # Comment author
+                    author {
+                        __typename
+                        ... on User {
+                            id
+                            databaseId
+                            login
+                            avatarUrl
+                            name
+                            email
+                            createdAt
+                            updatedAt
+                        }
+                        ... on Bot {
+                            id
+                            databaseId
+                            login
+                            avatarUrl
+                        }
+                        ... on Mannequin {
+                            id
+                            databaseId
+                            login
+                            avatarUrl
+                        }
+                        ... on Organization {
+                            id
+                            databaseId
+                            login
+                            avatarUrl
+                        }
+                    }
+
+                    # Reply to (for threading)
+                    replyTo {
+                        id
+                        fullDatabaseId
+                    }
+
+                    # Associated review
+                    pullRequestReview {
+                        id
+                        fullDatabaseId
+                    }
+                }
+            }
+        }
+    }
+}

@@ -2,12 +2,15 @@
 TITLE FORMAT (required):
   <type>(<scope>): <description>
 
-  Types: feat | fix | docs | refactor | test | chore | ci | perf | revert
-  Scopes: webapp | server | ai | webhooks | docs | ci | deps | docker | db
-          leaderboard | mentor | profile | workspace | teams | github | notifications
+  Types: feat | fix | docs | refactor | test | ci | perf | revert
+  Scopes (Service): webapp | server | ai | webhooks | docs
+  Scopes (Infra - NO RELEASE): ci | config | deps | deps-dev | docker | scripts | security | db | no-release
+  Scopes (Feature): gitprovider | leaderboard | mentor | notifications | profile | teams | workspace
+
   Breaking: Add ! before colon (feat!: or feat(scope)!:)
 
   ✓ Good: feat(leaderboard): add weekly ranking filter
+  ✓ Good (No Release): fix(ci): update workflow configuration
   ✗ Bad:  Added weekly ranking filter to leaderboard
 
 BEFORE PUSHING:
@@ -19,7 +22,7 @@ AFTER API CHANGES:
 AFTER DATABASE/ENTITY CHANGES:
   npm run db:draft-changelog          # Generate Liquibase migration
   npm run db:generate-erd-docs        # Update ERD documentation  
-  npm run db:generate-models:intelligence-service  # Sync SQLAlchemy models
+  npm run db:generate-models:intelligence-service  # Sync Drizzle schema
 -->
 
 ## Description

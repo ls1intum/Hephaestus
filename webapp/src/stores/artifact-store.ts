@@ -21,11 +21,7 @@ interface ArtifactStoreState {
 	/** Id of the currently visible artifact (if any) */
 	visibleArtifactId: string | null;
 	/** Open (or create) an artifact and make it the only visible one */
-	openArtifact: (
-		artifactId: string,
-		boundingBox: DOMRect,
-		title?: string,
-	) => void;
+	openArtifact: (artifactId: string, boundingBox: DOMRect, title?: string) => void;
 	/** Close the currently visible artifact */
 	closeArtifact: () => void;
 	/** Clear only the visible id (used after exit animation) */
@@ -87,8 +83,7 @@ export const useArtifactStore = create<ArtifactStoreState>((set, get) => ({
 				visibleArtifactId: id,
 			};
 		}),
-	clearVisibleArtifact: () =>
-		set((state) => ({ ...state, visibleArtifactId: null })),
+	clearVisibleArtifact: () => set((state) => ({ ...state, visibleArtifactId: null })),
 	removeArtifact: (artifactId) =>
 		set((state) => {
 			const next = { ...state.artifacts };

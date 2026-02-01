@@ -12,20 +12,32 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.MapsId;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 import java.io.Serializable;
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.springframework.data.domain.Persistable;
 
+/**
+ * Represents a user's membership in a team with a specific role.
+ * <p>
+ * Uses a composite key (teamId, userId) via {@link EmbeddedId}.
+ * <p>
+ * IMPORTANT: This entity implements {@link Persistable} to correctly handle
+ * the new vs. existing entity detection for JPA's save operation. Without this,
+ * JPA sees the pre-set composite ID and assumes the entity exists, triggering
+ * a merge operation that fails with EntityNotFoundException.
+ */
 @Entity
 @Table(name = "team_membership")
 @Getter
 @Setter
 @NoArgsConstructor
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
-public class TeamMembership {
+public class TeamMembership implements Persistable<TeamMembership.Id> {
 
     @EmbeddedId
     @EqualsAndHashCode.Include
@@ -43,12 +55,44 @@ public class TeamMembership {
     @Enumerated(EnumType.STRING)
     private Role role;
 
+    /**
+     * Tracks whether this entity is new (not yet persisted).
+     * Used by {@link #isNew()} to help JPA decide between persist vs merge.
+     */
+    @Transient
+    private boolean isNew = true;
+
     public TeamMembership(Team team, User user, Role role) {
         this.team = team;
         this.user = user;
         this.role = role;
         this.id.setTeamId(team.getId());
         this.id.setUserId(user.getId());
+        this.isNew = true;
+    }
+
+    /**
+     * Returns whether this entity is new (not yet persisted).
+     * <p>
+     * This is CRITICAL for entities with assigned/composite IDs. Without this,
+     * Spring Data JPA's save() method calls merge() for entities with non-null IDs,
+     * which fails with EntityNotFoundException if the entity doesn't exist yet.
+     *
+     * @return true if this is a new entity that needs to be persisted
+     */
+    @Override
+    public boolean isNew() {
+        return isNew;
+    }
+
+    /**
+     * Marks this entity as persisted (not new).
+     * Called after the entity is loaded from the database.
+     */
+    @jakarta.persistence.PostLoad
+    @jakarta.persistence.PostPersist
+    void markNotNew() {
+        this.isNew = false;
     }
 
     public enum Role {
@@ -68,19 +112,3 @@ public class TeamMembership {
         private Long userId;
     }
 }
-/*
- * Webhook coverage (membership event → team members):
- * Supported (webhook, no extra fetch):
- * - membership.member.login/id/avatar_url ⇒ persisted in User and associated via this join entity.
- * - membership.team.id/name/html_url/privacy ⇒ persisted in Team and referenced here.
- * - membership.action added/removed ⇒ inserts or deletes TeamMembership rows (role defaults to MEMBER; webhook omits role).
- * Ignored although hub4j exposes:
- * - payload.scope (always "team") and payload.organization.login ⇒ redundant with Team.organization.
- * - member.site_admin/type ⇒ not required for role resolution.
- * Desired but missing in hub4j/github-api 2.0-rc.5 (available via REST/GraphQL):
- * - REST membership.member_role / GraphQL TeamMemberRole (maintainer vs member distinction).
- * - REST membership.state / GraphQL TeamMemberEdge.state (pending vs active).
- * Requires extra fetch (out-of-scope for now):
- * - GET /orgs/{org}/teams/{team_slug}/memberships/{username} for inviter, last_modified_at, SSO metadata.
- * - GET /orgs/{org}/outside_collaborators to reconcile outside contributor access.
- */

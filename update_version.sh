@@ -12,8 +12,7 @@ set -euo pipefail
 #   - root package-lock.json (top-level version)
 #   - Java source: server/application-server/src/main/java/de/tum/in/www1/hephaestus/OpenAPIConfiguration.java
 #   - YAML config: server/application-server/src/main/resources/application.yml
-#   - Python projects: server/intelligence-service/pyproject.toml & server/webhook-ingest/pyproject.toml
-#   - Python app: server/intelligence-service/app/main.py
+#   - server/intelligence-service/openapi.yaml
 #   - Maven POM: server/application-server/pom.xml (preserving -SNAPSHOT)
 #   - OpenAPI docs: server/application-server/openapi.yaml & server/intelligence-service/openapi.yaml
 #   - All files containing "The version of the OpenAPI document:" (only in these directories):
@@ -74,7 +73,9 @@ elif [[ "$PARAM" == "major" || "$PARAM" == "minor" || "$PARAM" == "patch" ]]; th
         exit 1
     fi
 
-    NEW_VERSION=$(increment_version "$CURRENT_VERSION" "$INCREMENT_TYPE")
+    # Strip pre-release/build metadata from current version for arithmetic ops
+    BASE_VERSION=$(echo "$CURRENT_VERSION" | sed -E 's/^([0-9]+\.[0-9]+\.[0-9]+).*$/\1/')
+    NEW_VERSION=$(increment_version "$BASE_VERSION" "$INCREMENT_TYPE")
     echo "Updating version from $CURRENT_VERSION to $NEW_VERSION..."
 else
     echo "Error: Invalid argument. Use one of [major, minor, patch] or provide a semantic version (e.g., 1.2.3, 1.0.0-alpha.1, 2.0.0-beta.1)."
@@ -154,19 +155,17 @@ if [[ -f server/application-server/src/main/resources/application.yml ]]; then
     sed_inplace "s#(version: *\")[0-9]+(\.[0-9]+){2}(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?\"#\1${NEW_VERSION}\"#" server/application-server/src/main/resources/application.yml
 fi
 
-# Update server/intelligence-service/pyproject.toml
-if [[ -f server/intelligence-service/pyproject.toml ]]; then
-    sed_inplace "s#(version *= *\")[0-9]+(\.[0-9]+){2}(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?\"#\1${NEW_VERSION}\"#" server/intelligence-service/pyproject.toml
-fi
-
-# Update server/webhook-ingest/pyproject.toml
-if [[ -f server/webhook-ingest/pyproject.toml ]]; then
-    sed_inplace "s#(version *= *\")[0-9]+(\.[0-9]+){2}(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?\"#\1${NEW_VERSION}\"#" server/webhook-ingest/pyproject.toml
-fi
-
-# Update server/intelligence-service/app/main.py (if it exists)
-if [[ -f server/intelligence-service/app/main.py ]]; then
-    sed_inplace "s#(version *= *\")[0-9]+(\.[0-9]+){2}(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?\"#\1${NEW_VERSION}\"#" server/intelligence-service/app/main.py
+# Update server/webhook-ingest/package.json
+if [[ -f server/webhook-ingest/package.json ]]; then
+    awk -v old_version="$CURRENT_VERSION" -v new_version="$NEW_VERSION" '
+        BEGIN {found_name = 0}
+        /"name": "webhook-ingest"/ {found_name = 1}
+        found_name && /"version":/ {
+            sub("\"version\": \"" old_version "\"", "\"version\": \"" new_version "\"")
+            found_name = 0
+        }
+        {print}
+    ' server/webhook-ingest/package.json > server/webhook-ingest/package.json.tmp && mv server/webhook-ingest/package.json.tmp server/webhook-ingest/package.json
 fi
 
 # Update Maven POM (only update the project version for hephaestus) (if it exists)
@@ -187,6 +186,17 @@ fi
 # Update server/intelligence-service/openapi.yaml (non-quoted version) (if it exists)
 if [[ -f server/intelligence-service/openapi.yaml ]]; then
     sed_inplace "s#(version:[[:space:]]*)[0-9]+(\.[0-9]+){2}(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?#\1${NEW_VERSION}#" server/intelligence-service/openapi.yaml
+    sed_inplace "s#(version:[[:space:]]*)\"[^\"]*\"#\\1\"${NEW_VERSION}\"#" server/intelligence-service/openapi.yaml || true
+fi
+
+# Update TypeScript sources that define the OpenAPI doc version
+if [[ -f server/intelligence-service/src/openapi.ts ]]; then
+    sed_inplace "s#(version:[[:space:]]*)\"[^\"]*\"#\\1\"${NEW_VERSION}\"#" server/intelligence-service/src/openapi.ts || true
+    sed_inplace "s#(version:[[:space:]]*)'[^']*'#\\1'${NEW_VERSION}'#" server/intelligence-service/src/openapi.ts || true
+fi
+if [[ -f server/intelligence-service/scripts/export-openapi.ts ]]; then
+    sed_inplace "s#(version:[[:space:]]*)\"[^\"]*\"#\\1\"${NEW_VERSION}\"#" server/intelligence-service/scripts/export-openapi.ts || true
+    sed_inplace "s#(version:[[:space:]]*)'[^']*'#\\1'${NEW_VERSION}'#" server/intelligence-service/scripts/export-openapi.ts || true
 fi
 
 # Update all files containing "The version of the OpenAPI document:" to use the new version,

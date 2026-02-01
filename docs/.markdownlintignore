@@ -1,0 +1,12 @@
+# Dependencies
+node_modules/
+
+# Build output
+build/
+.docusaurus/
+
+# Auto-generated files
+*.gen.md
+
+# Changelog (often has different formatting)
+CHANGELOG.md

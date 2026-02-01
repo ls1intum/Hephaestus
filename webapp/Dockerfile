@@ -1,43 +1,55 @@
-# Stage 1: Build the React application
-FROM node:22-alpine AS build
+# syntax=docker/dockerfile:1.4
 
+# Stage 1: Build
+FROM node:22-alpine AS build
 WORKDIR /app
 
-# Copy and install dependencies early to leverage Docker layer caching
-COPY package.json package-lock.json* /app/
+# Copy package.json for dependency installation
+COPY webapp/package.json /app/
 
-RUN npm ci
+# Install dependencies with BuildKit cache mount for npm
+# Note: Using npm install instead of npm ci because this is a workspace package
+# and the package-lock.json is at the monorepo root, not in this folder
+RUN --mount=type=cache,target=/root/.npm \
+    npm install --ignore-scripts --prefer-offline
 
-# Copy the rest of the application code
-COPY ./ /app/
+# Copy the webapp application code
+COPY webapp/ /app/
 
-# Build the React application using the production build script
-# This runs copy-env-prod.js first to use the production environment config
-RUN npm run build:prod
+# Copy intelligence-service shared types (required for @intelligence-service/* imports)
+COPY server/intelligence-service/src/mentor/ /server/intelligence-service/src/mentor/
+COPY server/intelligence-service/src/shared/ /server/intelligence-service/src/shared/
 
-# Stage 2: Serve the app with Nginx
+# Create a symlink so the shared code can resolve node_modules from webapp's dependencies
+# This is needed because imports like 'uuid' and 'ai' in the shared code need to resolve
+# to the webapp's node_modules since we don't install intelligence-service deps in Docker
+RUN ln -s /app/node_modules /server/intelligence-service/node_modules
+
+# Build the React application
+RUN npm run build
+
+# Stage 2: Serve
 FROM nginx:stable-alpine
 
-# Install necessary packages and explicitly update libxml2 for security fixes
-RUN apk update && \
-    apk upgrade && \
-    apk add --no-cache bash grep sed perl libxml2>=2.13.4-r6 && \
+# Bake git metadata into the image using build arguments provided by Coolify
+ARG COOLIFY_BRANCH
+ARG SOURCE_COMMIT
+# Use distinct names to avoid runtime overrides by Coolify
+ENV BUILD_GIT_BRANCH=$COOLIFY_BRANCH
+ENV BUILD_GIT_COMMIT=$SOURCE_COMMIT
+
+RUN apk update && apk upgrade && \
+    apk add --no-cache bash sed grep && \
     rm -rf /var/cache/apk/*
 
-# Copy built React app from the build stage 
 COPY --from=build /app/dist /usr/share/nginx/html
+COPY webapp/docker/entrypoint.sh /entrypoint.sh
+COPY webapp/docker/nginx.conf /etc/nginx/conf.d/default.conf
 
-# Copy the substitution script into the image
-COPY substitute_env_variables.sh /usr/local/bin/
+# Copy TypeScript source for entrypoint.sh to extract env var names (single source of truth)
+COPY webapp/src/environment/index.ts /app/src/environment/index.ts
 
-# Make the substitution script executable
-RUN chmod +x /usr/local/bin/substitute_env_variables.sh
+RUN chmod +x /entrypoint.sh
 
-# Copy custom Nginx configuration
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-
-# Expose port 80
 EXPOSE 80
-
-# Set the substitution script to run before starting Nginx
-ENTRYPOINT ["/bin/bash", "-c", "/usr/local/bin/substitute_env_variables.sh && exec nginx -g 'daemon off;'"]
+ENTRYPOINT ["/bin/bash", "-c", "/entrypoint.sh && exec nginx -g 'daemon off;'"]

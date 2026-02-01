@@ -27,28 +27,89 @@
 	],
 	"settings": {
 		"java.compile.nullAnalysis.mode": "automatic",
-		"python.terminal.activateEnvironment": true,
-		"python.terminal.activateEnvInCurrentTerminal": true,
-		"python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
 		"java.configuration.updateBuildConfiguration": "automatic",
 		"java.completion.importOrder": [
 			"#"
 		],
 		"java.debug.settings.onBuildFailureProceed": true,
+		"java.import.exclusions": [
+			"**/node_modules/**",
+			"**/.metadata/**",
+			"**/archetype-resources/**",
+			"**/META-INF/maven/**",
+			"**/target/**"
+		],
+		"files.exclude": {
+			"**/target": true
+		},
+		"scm.defaultViewMode": "tree",
+		"diffEditor.renderSideBySide": false,
+		"github.copilot.chat.summarizeAgentConversationHistory.enabled": false,
+		"github.copilot.chat.languageContext.fix.typescript.enabled": true,
+		"github.copilot.chat.languageContext.inline.typescript.enabled": true,
+		"github.copilot.chat.languageContext.typescript.enabled": true,
+		"chat.agent.maxRequests": 1000,
+		"files.associations": {
+			"*.graphql": "graphql",
+			"*.graphqls": "graphql"
+		},
+		"[java]": {
+			"editor.defaultFormatter": "esbenp.prettier-vscode",
+			"editor.formatOnSave": true
+		},
+		"[typescript]": {
+			"editor.defaultFormatter": "biomejs.biome",
+			"editor.formatOnSave": true
+		},
+		"[typescriptreact]": {
+			"editor.defaultFormatter": "biomejs.biome",
+			"editor.formatOnSave": true
+		},
+		"[javascript]": {
+			"editor.defaultFormatter": "biomejs.biome",
+			"editor.formatOnSave": true
+		},
+		"[javascriptreact]": {
+			"editor.defaultFormatter": "biomejs.biome",
+			"editor.formatOnSave": true
+		},
+		"[json]": {
+			"editor.defaultFormatter": "biomejs.biome",
+			"editor.formatOnSave": true
+		},
+		"[jsonc]": {
+			"editor.defaultFormatter": "biomejs.biome",
+			"editor.formatOnSave": true
+		},
+		"[graphql]": {
+			"editor.formatOnSave": true,
+			"editor.tabSize": 2
+		},
+		"editor.codeActionsOnSave": {
+			"source.organizeImports.biome": "explicit"
+		},
+		"yaml.validate": true,
+		"yaml.schemas": {
+			"https://json.schemastore.org/liquibase-3.2.json": "**/db/changelog/*.yaml"
+		}
 	},
 	"extensions": {
 		"recommendations": [
+			"biomejs.biome",
+			"esbenp.prettier-vscode",
+			"editorconfig.editorconfig",
+			"github.copilot",
+			"github.copilot-chat",
 			"vscjava.vscode-java-pack",
 			"redhat.java",
 			"vscjava.vscode-maven",
-			"ms-python.python",
 			"bradlc.vscode-tailwindcss",
-			"dbaeumer.vscode-eslint",
 			"github.vscode-pull-request-github",
 			"davidanson.vscode-markdownlint",
 			"streetsidesoftware.code-spell-checker",
-			"njpwerner.autodocstring",
-			"formulahendry.auto-rename-tag"
+			"formulahendry.auto-rename-tag",
+			"GraphQL.vscode-graphql",
+			"GraphQL.vscode-graphql-syntax"
 		]
-	},
+	}
 }

@@ -1,5 +1,172 @@
 # Changelog
 
+## [0.14.0](https://github.com/ls1intum/Hephaestus/compare/v0.13.8...v0.14.0) (2026-01-31)
+
+### 🚀 Features
+
+* **profile:** xp profile ui and backend total user xp aggregation ([#660](https://github.com/ls1intum/Hephaestus/issues/660)) ([2ba8d98](https://github.com/ls1intum/Hephaestus/commit/2ba8d98649dcf5c428aafa5675b7a4490578de98))
+
+## [0.13.8](https://github.com/ls1intum/Hephaestus/compare/v0.13.7...v0.13.8) (2026-01-31)
+
+### 🐛 Bug Fixes
+
+* **server:** accept hour-only schedule time format for backward compatibility ([#682](https://github.com/ls1intum/Hephaestus/issues/682)) ([64b62ea](https://github.com/ls1intum/Hephaestus/commit/64b62ea4427ce203ca48178d96a1a078a7663bff))
+
+### ♻️ Code Refactoring
+
+* **server:** consolidate @Value annotations into type-safe ConfigurationProperties ([#679](https://github.com/ls1intum/Hephaestus/issues/679)) ([cdcabda](https://github.com/ls1intum/Hephaestus/commit/cdcabda76dfb6cb67e9f256a18486d4fb77350d6))
+
+## [0.13.7](https://github.com/ls1intum/Hephaestus/compare/v0.13.6...v0.13.7) (2026-01-31)
+
+### 🐛 Bug Fixes
+
+* **server:** use consistent APPLICATION_HOST_URL env var for CORS ([#677](https://github.com/ls1intum/Hephaestus/issues/677)) ([a90e4f0](https://github.com/ls1intum/Hephaestus/commit/a90e4f06e9e5e99af70c32d5de12f34daaa7deb3))
+
+### ⚡ Performance Improvements
+
+* add BuildKit cache mounts to all Dockerfiles ([#676](https://github.com/ls1intum/Hephaestus/issues/676)) ([6a74892](https://github.com/ls1intum/Hephaestus/commit/6a748929fa21b51bb1ecf260673dc8a8b96e1ecb))
+
+## [0.13.6](https://github.com/ls1intum/Hephaestus/compare/v0.13.5...v0.13.6) (2026-01-31)
+
+### 🐛 Bug Fixes
+
+* **server:** permit OPTIONS requests for CORS preflight ([#673](https://github.com/ls1intum/Hephaestus/issues/673)) ([8057dfe](https://github.com/ls1intum/Hephaestus/commit/8057dfe6e63271caaa191a09c2f65ebad96ef276))
+
+## [0.13.5](https://github.com/ls1intum/Hephaestus/compare/v0.13.4...v0.13.5) (2026-01-31)
+
+### 🐛 Bug Fixes
+
+* **server:** add cors config to production profile ([#670](https://github.com/ls1intum/Hephaestus/issues/670)) ([a163588](https://github.com/ls1intum/Hephaestus/commit/a1635887ebea61f8ccccc24c17988b1f285e8f1f))
+
+## [0.13.4](https://github.com/ls1intum/Hephaestus/compare/v0.13.3...v0.13.4) (2026-01-31)
+
+### 🐛 Bug Fixes
+
+* **server:** use internal url for keycloak admin client ([#668](https://github.com/ls1intum/Hephaestus/issues/668)) ([35a4869](https://github.com/ls1intum/Hephaestus/commit/35a4869f15c4ff27d6b54356fcad01bcf2146d10))
+
+## [0.13.3](https://github.com/ls1intum/Hephaestus/compare/v0.13.2...v0.13.3) (2026-01-31)
+
+### 🐛 Bug Fixes
+
+* **server:** improve database cleanup retry logic for flaky tests ([#666](https://github.com/ls1intum/Hephaestus/issues/666)) ([5ca8804](https://github.com/ls1intum/Hephaestus/commit/5ca880487d6c24a062354b585c663e2b0a0986f9))
+* **config:** resolve prettier and biome formatter conflicts in ide ([#665](https://github.com/ls1intum/Hephaestus/issues/665)) ([ddfd9bd](https://github.com/ls1intum/Hephaestus/commit/ddfd9bd76251af320a9a9afaccef36e131018080))
+
+## [0.13.2](https://github.com/ls1intum/Hephaestus/compare/v0.13.1...v0.13.2) (2026-01-30)
+
+### 🐛 Bug Fixes
+
+* allow deps, security, db, docker scopes to trigger releases ([#663](https://github.com/ls1intum/Hephaestus/issues/663)) ([485ccab](https://github.com/ls1intum/Hephaestus/commit/485ccab23e0d2605bbc085bc9b36269c722ea602))
+* **security:** allow unauthenticated access to actuator health and info endpoints ([#662](https://github.com/ls1intum/Hephaestus/issues/662)) ([a35cf94](https://github.com/ls1intum/Hephaestus/commit/a35cf94ef6561fcfd1ae4e45a76abd5f6fd26d7e))
+
+## [0.13.1](https://github.com/ls1intum/Hephaestus/compare/v0.13.0...v0.13.1) (2026-01-30)
+
+### 🐛 Bug Fixes
+
+* **gitprovider:** atomic upsert for activity events, issues, pull requests, labels, and milestones ([#659](https://github.com/ls1intum/Hephaestus/issues/659)) ([0f616a9](https://github.com/ls1intum/Hephaestus/commit/0f616a9fcf523bdb3e2465e17ead4d5cc90edea4))
+
+## [0.13.0](https://github.com/ls1intum/Hephaestus/compare/v0.12.4...v0.13.0) (2026-01-28)
+
+### 🐛 Bug Fixes
+
+* **ci:** use TUM Docker mirror (standard ls1intum approach) ([f01f49b](https://github.com/ls1intum/Hephaestus/commit/f01f49bae669ac28b91a10cd9d5e01c85a80636e))
+
+### 🚀 Features
+
+* remove hub4j dependency and refactor GitHub sync infrastructure ([4bce1ee](https://github.com/ls1intum/Hephaestus/commit/4bce1ee4418c7b6d1c60dd31475e671030421a91))
+
+## [0.12.4](https://github.com/ls1intum/Hephaestus/compare/v0.12.3...v0.12.4) (2025-12-31)
+
+### 🐛 Bug Fixes
+
+* **webapp:** hide resolve button for already-resolved bad practices ([#628](https://github.com/ls1intum/Hephaestus/issues/628)) ([e044486](https://github.com/ls1intum/Hephaestus/commit/e044486f5152eddd84093fce6957ffb98d87cf5d))
+* **webapp:** preserve survey on navigation and fix clear show signal ([#607](https://github.com/ls1intum/Hephaestus/issues/607)) ([1a1c7b8](https://github.com/ls1intum/Hephaestus/commit/1a1c7b8bf20c4f446932c54b8e8f4fa68b9888f8))
+
+## [0.12.3](https://github.com/ls1intum/Hephaestus/compare/v0.12.2...v0.12.3) (2025-12-28)
+
+### 🐛 Bug Fixes
+
+* **webhooks:** correct entrypoint path in dockerfile ([#624](https://github.com/ls1intum/Hephaestus/issues/624)) ([c458f3d](https://github.com/ls1intum/Hephaestus/commit/c458f3d615226c176cf5bf69fff76508cd5c3f0f))
+
+## [0.12.2](https://github.com/ls1intum/Hephaestus/compare/v0.12.1...v0.12.2) (2025-12-27)
+
+### 🐛 Bug Fixes
+
+* **webapp:** content-hashed runtime config with nginx best practices ([#622](https://github.com/ls1intum/Hephaestus/issues/622)) ([7f402e5](https://github.com/ls1intum/Hephaestus/commit/7f402e56e131c9305773e80943d41072cf407183))
+
+## [0.12.1](https://github.com/ls1intum/Hephaestus/compare/v0.12.0...v0.12.1) (2025-12-23)
+
+### 🐛 Bug Fixes
+
+* trigger patch release ([7d29081](https://github.com/ls1intum/Hephaestus/commit/7d2908120935bab94b11c03759609beba5fb8eed))
+
+## [0.12.0](https://github.com/ls1intum/Hephaestus/compare/v0.11.1...v0.12.0) (2025-12-16)
+
+### 🐛 Bug Fixes
+
+* **webapp:** only show deployment time in preview environments ([#604](https://github.com/ls1intum/Hephaestus/issues/604)) ([67182c1](https://github.com/ls1intum/Hephaestus/commit/67182c18b012ea4eafdd0a420b41ff425b6c5b79))
+
+### 🚀 Features
+
+* **webapp:** add survey notification button with morph animation ([#603](https://github.com/ls1intum/Hephaestus/issues/603)) ([d6d993f](https://github.com/ls1intum/Hephaestus/commit/d6d993f64d74559f7b4dc0605fc176bd13f79ff9))
+
+## [0.11.1](https://github.com/ls1intum/Hephaestus/compare/v0.11.0...v0.11.1) (2025-12-16)
+
+### 🐛 Bug Fixes
+
+* **ci:** fix copilot-environment.yml bd installation for CI environments ([#598](https://github.com/ls1intum/Hephaestus/issues/598)) ([8dd7cf8](https://github.com/ls1intum/Hephaestus/commit/8dd7cf8dfeb8699a82f144f7d015e4f07ce018d8))
+* **docs:** invert docs navbar logo for dark mode visibility ([#597](https://github.com/ls1intum/Hephaestus/issues/597)) ([f205124](https://github.com/ls1intum/Hephaestus/commit/f20512421ba5dc88924ca98a49b5550f4298da87))
+* replace unset WEB_ENV placeholders with empty strings to prevent production footer leak ([#600](https://github.com/ls1intum/Hephaestus/issues/600)) ([81fc4be](https://github.com/ls1intum/Hephaestus/commit/81fc4be46a329fb544da40ede930492144b19070))
+
+## [0.11.0](https://github.com/ls1intum/Hephaestus/compare/v0.10.10...v0.11.0) (2025-12-15)
+
+### 🚀 Features
+
+* **docs:** add ai agent workflows and beads integration ([#589](https://github.com/ls1intum/Hephaestus/issues/589)) ([61d09ef](https://github.com/ls1intum/Hephaestus/commit/61d09efcbd5dc245d7b5458cd5e8d0d09527520b))
+
+## [0.10.10](https://github.com/ls1intum/Hephaestus/compare/v0.10.9...v0.10.10) (2025-12-14)
+
+### 🐛 Bug Fixes
+
+* **webapp:** display a thank you screen upon survey completion ([#587](https://github.com/ls1intum/Hephaestus/issues/587)) ([e417711](https://github.com/ls1intum/Hephaestus/commit/e41771112560a61b7609ec6d2a3c4267b8591bf3))
+
+## [0.10.9](https://github.com/ls1intum/Hephaestus/compare/v0.10.8...v0.10.9) (2025-12-14)
+
+### 🐛 Bug Fixes
+
+* **docs:** configure dynamic base url for surge.sh previews ([#585](https://github.com/ls1intum/Hephaestus/issues/585)) ([8767566](https://github.com/ls1intum/Hephaestus/commit/876756656d8b98c3f59b447206091217c9e60044))
+
+## [0.10.8](https://github.com/ls1intum/Hephaestus/compare/v0.10.7...v0.10.8) (2025-12-14)
+
+### 🐛 Bug Fixes
+
+* **ci:** remove redundant production approval gate ([ccc4541](https://github.com/ls1intum/Hephaestus/commit/ccc45416759d39d3822ad9e20b1e0f8d8ca048fd))
+* **ci:** strictly enforce commit scopes and refine release overrides ([41de9cb](https://github.com/ls1intum/Hephaestus/commit/41de9cbb0cebcb7097978652bd69437b6efdb99b))
+
+## [0.10.7](https://github.com/ls1intum/Hephaestus/compare/v0.10.6...v0.10.7) (2025-12-14)
+
+### 🐛 Bug Fixes
+
+* release management and improve header and footer ([ec46a44](https://github.com/ls1intum/Hephaestus/commit/ec46a44ff226d0f562b732c8852c90ff7c1ceedc))
+
+### 📚 Documentation
+
+* **ci:** overhaul documentation system, strict validation & perf upgrade ([deb760f](https://github.com/ls1intum/Hephaestus/commit/deb760fcfbf962d06b611869dd66d8c09d8dbabc))
+* **ci:** overhaul documentation system, strict validation & perf upgrade ([9abec47](https://github.com/ls1intum/Hephaestus/commit/9abec47f7710a12d45e117a5160cac5f753c65f8))
+
+### 🛠 Build System
+
+* **deps:** resolve mermaid theme peer dependency conflict ([02fb7b4](https://github.com/ls1intum/Hephaestus/commit/02fb7b46f011e63ddb2043a44e5660db77fb3718))
+
+## [0.10.6](https://github.com/ls1intum/Hephaestus/compare/v0.10.5...v0.10.6) (2025-12-14)
+
+### 🐛 Bug Fixes
+
+* ignore self-assigned copilot reviews ([#576](https://github.com/ls1intum/Hephaestus/issues/576)) ([8d99fbd](https://github.com/ls1intum/Hephaestus/commit/8d99fbd9f5d250e18f35b0fe69caf3ba24d008bd))
+
+### ♻️ Code Refactoring
+
+* separate Keycloak relative paths ([#579](https://github.com/ls1intum/Hephaestus/issues/579)) ([4e63ce4](https://github.com/ls1intum/Hephaestus/commit/4e63ce4dd34080b9814fd32ac86183f3f1cedb31))
+
 ## [0.10.6-rc.2](https://github.com/ls1intum/Hephaestus/compare/v0.10.6-rc.1...v0.10.6-rc.2) (2025-12-09)
 
 ## [0.10.6-rc.1](https://github.com/ls1intum/Hephaestus/compare/v0.10.5...v0.10.6-rc.1) (2025-12-09)

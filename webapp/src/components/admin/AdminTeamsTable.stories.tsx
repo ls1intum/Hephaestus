@@ -1,6 +1,6 @@
 // Cleaned up duplicate content; single coherent story below
 import type { Meta, StoryObj } from "@storybook/react";
-import { fn } from "@storybook/test";
+import { fn } from "storybook/test";
 import type { TeamInfo } from "@/api/types.gen";
 import { AdminTeamsTable } from "./AdminTeamsTable";
 
@@ -42,7 +42,7 @@ const teams: TeamInfo[] = [
 		description: "",
 		htmlUrl: "https://github.com/orgs/org/teams/frontend",
 		organization: "org",
-		privacy: "CLOSED",
+		privacy: "SECRET",
 		membershipCount: 2,
 		repoPermissionCount: 2,
 		hidden: false,
@@ -71,7 +71,7 @@ const teams: TeamInfo[] = [
 		description: "",
 		htmlUrl: "https://github.com/orgs/org/teams/backend",
 		organization: "org",
-		privacy: "CLOSED",
+		privacy: "SECRET",
 		membershipCount: 1,
 		repoPermissionCount: 2,
 		hidden: false,
@@ -94,7 +94,7 @@ const teams: TeamInfo[] = [
 		description: "",
 		htmlUrl: "https://github.com/orgs/org/teams/qa",
 		organization: "org",
-		privacy: "CLOSED",
+		privacy: "SECRET",
 		membershipCount: 0,
 		repoPermissionCount: 1,
 		hidden: true,

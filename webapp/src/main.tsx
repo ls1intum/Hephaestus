@@ -76,12 +76,7 @@ declare module "@tanstack/react-router" {
 
 function WrappedRouterProvider() {
 	const auth = useAuth();
-	return (
-		<RouterProvider
-			router={router}
-			context={{ ...TanstackQuery.getContext(), auth }}
-		/>
-	);
+	return <RouterProvider router={router} context={{ ...TanstackQuery.getContext(), auth }} />;
 }
 
 // Render the app

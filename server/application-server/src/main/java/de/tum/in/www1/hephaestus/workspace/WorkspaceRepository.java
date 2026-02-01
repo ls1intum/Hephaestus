@@ -1,6 +1,6 @@
 package de.tum.in.www1.hephaestus.workspace;
 
-import jakarta.validation.constraints.NotNull;
+import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -11,6 +11,7 @@ import org.springframework.stereotype.Repository;
  * Provides methods for finding workspaces by various identifiers.
  */
 @Repository
+@WorkspaceAgnostic("Workspace is the tenant root - queries manage workspaces themselves")
 public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
     Optional<Workspace> findByInstallationId(Long installationId);
     Optional<Workspace> findByRepositoriesToMonitor_NameWithOwner(String nameWithOwner);
@@ -19,10 +20,11 @@ public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
     Optional<Workspace> findByWorkspaceSlug(String workspaceSlug);
     boolean existsByWorkspaceSlug(String workspaceSlug);
 
-    @NotNull
-    List<Workspace> findAll();
-
     List<Workspace> findByStatusNot(Workspace.WorkspaceStatus status);
 
     List<Workspace> findByStatusNotAndIsPubliclyViewableTrue(Workspace.WorkspaceStatus status);
+
+    List<Workspace> findByStatus(Workspace.WorkspaceStatus status);
+
+    List<Workspace> findByStatusAndIsPubliclyViewableTrue(Workspace.WorkspaceStatus status);
 }

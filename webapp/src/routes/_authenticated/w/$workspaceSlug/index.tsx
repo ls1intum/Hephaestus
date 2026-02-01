@@ -1,17 +1,13 @@
-import { useQuery } from "@tanstack/react-query";
-import {
-	createFileRoute,
-	retainSearchParams,
-	useNavigate,
-} from "@tanstack/react-router";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { createFileRoute, retainSearchParams, useNavigate } from "@tanstack/react-router";
 import { zodValidator } from "@tanstack/zod-adapter";
 import { formatISO } from "date-fns";
 import { useEffect } from "react";
 import { z } from "zod";
 import {
+	computeUserLeagueStatsMutation,
 	getAllTeamsOptions,
 	getLeaderboardOptions,
-	getUserLeagueStatsOptions,
 	getUserProfileOptions,
 	getWorkspaceOptions,
 } from "@/api/@tanstack/react-query.gen";
@@ -38,23 +34,22 @@ const leaderboardSearchSchema = z.object({
 	mode: z.enum(["INDIVIDUAL", "TEAM"]).default("INDIVIDUAL"),
 });
 
+type LeaderboardSearchParams = z.infer<typeof leaderboardSearchSchema>;
+
 // Export route with search param validation
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/")({
 	component: LeaderboardContainer,
 	validateSearch: zodValidator(leaderboardSearchSchema),
 	// Configure search middleware to retain params when navigating
 	search: {
-		middlewares: [
-			retainSearchParams(["team", "sort", "after", "before", "mode"]),
-		],
+		middlewares: [retainSearchParams(["team", "sort", "after", "before", "mode"])],
 	},
 });
 
 function LeaderboardContainer() {
 	// Get the current user from auth context
 	const { username } = useAuth();
-	const { workspaceSlug, isLoading: isWorkspaceLoading } =
-		useActiveWorkspaceSlug();
+	const { workspaceSlug, isLoading: isWorkspaceLoading } = useActiveWorkspaceSlug();
 	const slug = workspaceSlug ?? "";
 	const hasWorkspace = Boolean(workspaceSlug);
 	const showNoWorkspace = !isWorkspaceLoading && !hasWorkspace;
@@ -183,14 +178,11 @@ function LeaderboardContainer() {
 	};
 
 	// Valid selectable values are the full visible paths
-	const teamLabelsById = teamsList.reduce<Record<number, string>>(
-		(acc, team) => {
-			const label = makeLabel(team);
-			acc[team.id] = label.length > 0 ? label : team.name;
-			return acc;
-		},
-		{},
-	);
+	const teamLabelsById = teamsList.reduce<Record<number, string>>((acc, team) => {
+		const label = makeLabel(team);
+		acc[team.id] = label.length > 0 ? label : team.name;
+		return acc;
+	}, {});
 
 	const visibleTeamEntries = teamsList
 		.filter((t) => !t.hidden)
@@ -206,7 +198,7 @@ function LeaderboardContainer() {
 	useEffect(() => {
 		if (team && team !== "all" && !visibleTeams.includes(team)) {
 			navigate({
-				search: (prev) => ({
+				search: (prev: LeaderboardSearchParams) => ({
 					...prev,
 					team: "all",
 				}),
@@ -217,7 +209,7 @@ function LeaderboardContainer() {
 	useEffect(() => {
 		if (mode === "TEAM" && team !== "all") {
 			navigate({
-				search: (prev) => ({
+				search: (prev: LeaderboardSearchParams) => ({
 					...prev,
 					team: "all",
 				}),
@@ -228,7 +220,7 @@ function LeaderboardContainer() {
 	useEffect(() => {
 		if (mode === "TEAM" && sort !== "SCORE") {
 			navigate({
-				search: (prev) => ({
+				search: (prev: LeaderboardSearchParams) => ({
 					...prev,
 					sort: "SCORE" as LeaderboardSortType,
 				}),
@@ -244,34 +236,23 @@ function LeaderboardContainer() {
 
 	const leaderboardEnd = formatISO(endDate);
 
-	// Query for league points change data if we have a current user entry
-	const leagueStatsQuery = useQuery({
-		...getUserLeagueStatsOptions({
-			path: { workspaceSlug: slug },
-			query: {
-				login: username || "",
-			},
-			body: currentUserEntry || {
-				rank: 0,
-				score: 0,
-				user: {
-					id: 0,
-					name: "",
-					login: username || "",
-					avatarUrl: "",
-					htmlUrl: "",
-				},
-				reviewedPullRequests: [],
-				numberOfReviewedPRs: 0,
-				numberOfApprovals: 0,
-				numberOfChangeRequests: 0,
-				numberOfComments: 0,
-				numberOfUnknowns: 0,
-				numberOfCodeComments: 0,
-			},
+	// Mutation for league points change data (POST endpoint used to compute stats)
+	const leagueStatsMutation = useMutation({
+		...computeUserLeagueStatsMutation({
+			path: { workspaceSlug: slug, login: username || "" },
 		}),
-		enabled: hasWorkspace && Boolean(username && currentUserEntry),
 	});
+
+	// Trigger the mutation when we have a current user entry
+	// biome-ignore lint/correctness/useExhaustiveDependencies: mutate is stable from react-query
+	useEffect(() => {
+		if (hasWorkspace && username && currentUserEntry) {
+			leagueStatsMutation.mutate({
+				path: { workspaceSlug: slug, login: username },
+				body: currentUserEntry,
+			});
+		}
+	}, [hasWorkspace, username, currentUserEntry, slug]);
 
 	if (showNoWorkspace) {
 		return <NoWorkspace />;
@@ -280,7 +261,7 @@ function LeaderboardContainer() {
 	// Handle team filter changes
 	const handleTeamChange = (team: string) => {
 		navigate({
-			search: (prev) => ({
+			search: (prev: LeaderboardSearchParams) => ({
 				...prev,
 				team,
 			}),
@@ -290,7 +271,7 @@ function LeaderboardContainer() {
 	// Handle sort changes with the correct type
 	const handleSortChange = (sort: LeaderboardSortType) => {
 		navigate({
-			search: (prev) => ({
+			search: (prev: LeaderboardSearchParams) => ({
 				...prev,
 				sort,
 			}),
@@ -300,7 +281,7 @@ function LeaderboardContainer() {
 	// Handle timeframe changes - note we're not passing timeframe in URL anymore
 	const handleTimeframeChange = (afterDate: string, beforeDate?: string) => {
 		navigate({
-			search: (prev) => ({
+			search: (prev: LeaderboardSearchParams) => ({
 				...prev,
 				after: afterDate,
 				before: beforeDate,
@@ -319,7 +300,7 @@ function LeaderboardContainer() {
 
 	const handleModeChange = (newMode: "INDIVIDUAL" | "TEAM") => {
 		navigate({
-			search: (prev) => ({
+			search: (prev: LeaderboardSearchParams) => ({
 				...prev,
 				mode: newMode,
 				team: newMode === "TEAM" ? "all" : prev.team,
@@ -333,7 +314,7 @@ function LeaderboardContainer() {
 		if (!label) return;
 		// Expand the team path and navigate to INDIVIDUAL mode with that team filter
 		navigate({
-			search: (prev) => ({
+			search: (prev: LeaderboardSearchParams) => ({
 				...prev,
 				mode: "INDIVIDUAL",
 				sort: "SCORE",
@@ -353,7 +334,7 @@ function LeaderboardContainer() {
 			currentUser={userProfileQuery.data?.userInfo}
 			currentUserEntry={currentUserEntry}
 			leaguePoints={userProfileQuery.data?.userInfo?.leaguePoints}
-			leaguePointsChange={leagueStatsQuery.data?.leaguePointsChange}
+			leaguePointsChange={leagueStatsMutation.data?.leaguePointsChange}
 			teamOptions={teamOptions}
 			teamLabelsById={teamLabelsById}
 			selectedTeam={team}

@@ -25,8 +25,7 @@ type QuestionSingleChoiceQuestion = Pick<
 	| "hasOpenChoice"
 >;
 
-export interface QuestionSingleChoiceProps
-	extends QuestionSingleChoiceQuestion {
+export interface QuestionSingleChoiceProps extends QuestionSingleChoiceQuestion {
 	value: SurveyResponse;
 	onChange: (value: string) => void;
 	error?: string;
@@ -48,21 +47,14 @@ export function QuestionSingleChoice({
 	const groupId = `survey-question-${id}`;
 	const hasCustomOption = hasOpenChoice && choices.length > 0;
 	const baseChoices = hasCustomOption ? choices.slice(0, -1) : choices;
-	const openChoiceLabel = hasCustomOption
-		? choices[choices.length - 1]
-		: undefined;
+	const openChoiceLabel = hasCustomOption ? choices[choices.length - 1] : undefined;
 	const isKnownValue = stringValue !== "" && baseChoices.includes(stringValue);
 
 	const [customSelected, setCustomSelected] = useState(
-		() =>
-			hasCustomOption &&
-			stringValue !== "" &&
-			!baseChoices.includes(stringValue),
+		() => hasCustomOption && stringValue !== "" && !baseChoices.includes(stringValue),
 	);
 	const [customValue, setCustomValue] = useState(() =>
-		hasCustomOption && stringValue !== "" && !baseChoices.includes(stringValue)
-			? stringValue
-			: "",
+		hasCustomOption && stringValue !== "" && !baseChoices.includes(stringValue) ? stringValue : "",
 	);
 
 	const customRadioValue = "__custom__";
@@ -78,11 +70,8 @@ export function QuestionSingleChoice({
 			return;
 		}
 
-		const baseChoicesForEffect = hasCustomOption
-			? choices.slice(0, -1)
-			: choices;
-		const isCustomAnswer =
-			stringValue !== "" && !baseChoicesForEffect.includes(stringValue);
+		const baseChoicesForEffect = hasCustomOption ? choices.slice(0, -1) : choices;
+		const isCustomAnswer = stringValue !== "" && !baseChoicesForEffect.includes(stringValue);
 
 		if (isCustomAnswer) {
 			if (!customSelected) {
@@ -116,11 +105,7 @@ export function QuestionSingleChoice({
 		}
 	}, [choices, customSelected, customValue, hasCustomOption, stringValue]);
 
-	const radioGroupValue = customSelected
-		? customRadioValue
-		: isKnownValue
-			? stringValue
-			: "";
+	const radioGroupValue = customSelected ? customRadioValue : isKnownValue ? stringValue : "";
 
 	const handleSelection = (nextValue: string) => {
 		if (nextValue === customRadioValue) {
@@ -191,9 +176,7 @@ export function QuestionSingleChoice({
 										id={openChoiceInputId}
 										value={customValue}
 										onFocus={handleCustomFocus}
-										onChange={(event) =>
-											handleCustomValueChange(event.target.value)
-										}
+										onChange={(event) => handleCustomValueChange(event.target.value)}
 										placeholder="Share your answer"
 										className="mt-2 min-h-[32px] bg-background/90"
 									/>

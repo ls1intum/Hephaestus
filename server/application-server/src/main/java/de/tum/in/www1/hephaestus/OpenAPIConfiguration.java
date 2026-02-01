@@ -1,10 +1,15 @@
 package de.tum.in.www1.hephaestus;
 
 import io.swagger.v3.oas.annotations.OpenAPIDefinition;
+import io.swagger.v3.oas.annotations.enums.SecuritySchemeType;
 import io.swagger.v3.oas.annotations.info.Contact;
 import io.swagger.v3.oas.annotations.info.Info;
 import io.swagger.v3.oas.annotations.info.License;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.security.SecurityScheme;
 import io.swagger.v3.oas.annotations.servers.Server;
+import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.media.StringSchema;
 import io.swagger.v3.oas.models.parameters.Parameter;
@@ -13,7 +18,6 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -24,451 +28,433 @@ import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * OpenAPI configuration that:
+ * 1. Processes application-server DTOs (removes "DTO" suffix)
+ * 2. Imports tagged schemas and paths from intelligence-service
+ *
+ * Intelligence-service schemas/paths are included if they have:
+ *   x-hephaestus:
+ *     export: true
+ */
 @Configuration
 @OpenAPIDefinition(
     info = @Info(
         title = "Hephaestus API",
         description = "API documentation for the Hephaestus application server.",
-        version = "0.10.6-rc.2",
+        version = "0.14.0",
         contact = @Contact(name = "Felix T.J. Dietrich", email = "felixtj.dietrich@tum.de"),
         license = @License(name = "MIT License", url = "https://github.com/ls1intum/Hephaestus/blob/develop/LICENSE")
     ),
-    servers = { @Server(url = "/", description = "Default Server URL") }
+    servers = { @Server(url = "/", description = "Default Server URL") },
+    security = { @SecurityRequirement(name = "bearerAuth") }
+)
+@SecurityScheme(
+    name = "bearerAuth",
+    type = SecuritySchemeType.HTTP,
+    scheme = "bearer",
+    bearerFormat = "JWT",
+    description = "JWT authentication via Keycloak. Obtain a token from your Keycloak instance."
 )
 public class OpenAPIConfiguration {
 
-    private static final Logger logger = LoggerFactory.getLogger(OpenAPIConfiguration.class);
-    // Track names of models imported from intelligence-service to preserve refs
-    private Set<String> discoveredIntelligenceModelNames = new LinkedHashSet<>();
+    private static final Logger log = LoggerFactory.getLogger(OpenAPIConfiguration.class);
+    private static final String INTELLIGENCE_SERVICE_SPEC = "../intelligence-service/openapi.yaml";
+    private static final String WORKSPACE_PATH_PREFIX = "/workspaces/{workspaceSlug}";
 
-    /**
-     * Auto-discover intelligence service model names from the OpenAPI spec.
-     * This automatically includes all UI parts and tool input/output models, and data models.
-     *
-     * Heuristics used when explicit tags are missing:
-     * - Names ending with UIPart or Part (UI and Stream parts)
-     * - UIMessage and UIMessagePart
-     * - Names ending with Input or Output (tool I/O models)
-     * - Names ending with Data (streaming data models like Document*Data)
-     */
-    private Set<String> discoverIntelligenceServiceModels(Map<String, Schema<?>> allSchemas) {
-        Set<String> discoveredModels = new HashSet<>();
-
-        for (Map.Entry<String, Schema<?>> entry : allSchemas.entrySet()) {
-            String schemaName = entry.getKey();
-            Schema<?> schema = entry.getValue();
-
-            // Auto-discover UI parts (models ending with "UIPart" or "Part")
-            if (
-                schemaName.endsWith("UIPart") ||
-                schemaName.endsWith("Part") ||
-                schemaName.equals("UIMessage") ||
-                schemaName.equals("UIMessagePart")
-            ) {
-                discoveredModels.add(schemaName);
-                continue;
-            }
-
-            // Only include tool and data models if explicitly tagged via nested x-hephaestus
-            if (isToolModelByTag(schema) || isDataModelByTag(schema)) {
-                discoveredModels.add(schemaName);
-                continue;
-            }
-        }
-
-        logger.info(
-            "Auto-discovered {} intelligence service models: {}",
-            discoveredModels.size(),
-            discoveredModels.stream().sorted().collect(Collectors.joining(", "))
-        );
-
-        return discoveredModels;
-    }
-
-    /**
-     * Check if a schema is tagged as a tool model by the intelligence service.
-     * This is much cleaner than analyzing schema content.
-     */
-    private boolean isToolModelByTag(Schema<?> schema) {
-        if (schema == null || schema.getExtensions() == null) {
-            return false;
-        }
-        // Expected nested form only:
-        // x-hephaestus:
-        //   toolModel: true
-        Object hephaestus = schema.getExtensions().get("x-hephaestus");
-        if (hephaestus instanceof Map<?, ?> map) {
-            Object flag = map.get("toolModel");
-            if (flag instanceof Boolean b) return b;
-            if (flag instanceof String s) return Boolean.parseBoolean(s);
-        }
-        return false;
-    }
-
-    /**
-     * Check if a schema is tagged as a data model by the intelligence service.
-     */
-    private boolean isDataModelByTag(Schema<?> schema) {
-        if (schema == null || schema.getExtensions() == null) {
-            return false;
-        }
-        // Expected nested form only:
-        // x-hephaestus:
-        //   dataModel: true
-        Object hephaestus = schema.getExtensions().get("x-hephaestus");
-        if (hephaestus instanceof Map<?, ?> map) {
-            Object flag = map.get("dataModel");
-            if (flag instanceof Boolean b) return b;
-            if (flag instanceof String s) return Boolean.parseBoolean(s);
-        }
-        return false;
-    }
-
-    /**
-     * Check if a schema name represents an intelligence service model.
-     * This is used for preserving DTO suffixes in schema references.
-     */
-    private boolean isIntelligenceServiceModel(String schemaName) {
-        // Preserve refs only for models we explicitly imported from intelligence-service
-        return discoveredIntelligenceModelNames.contains(schemaName);
-    }
-
-    /**
-     * List of domain object names that should be included in the schema even though they don't end with DTO.
-     */
+    /** Domain objects to include even without DTO suffix */
     private static final List<String> ALLOWED_DOMAIN_OBJECTS = List.of("PageableObject", "SortObject");
 
     @Bean
     public OpenApiCustomizer schemaCustomizer() {
         return openApi -> {
-            var components = openApi.getComponents();
-
-            if (components != null && components.getSchemas() != null) {
-                // Create a new map to hold filtered schemas
-                @SuppressWarnings("rawtypes")
-                Map<String, Schema> filteredSchemas = new HashMap<>();
-
-                // Include schemas with DTO suffix and remove the suffix
-                var dtoSchemas = components
-                    .getSchemas()
-                    .entrySet()
-                    .stream()
-                    .filter(entry -> entry.getKey().endsWith("DTO"))
-                    .collect(
-                        Collectors.toMap(
-                            entry -> entry.getKey().substring(0, entry.getKey().length() - 3),
-                            entry -> {
-                                var schema = entry.getValue();
-                                schema.setName(entry.getKey().substring(0, entry.getKey().length() - 3));
-                                return schema;
-                            }
-                        )
-                    );
-
-                filteredSchemas.putAll(dtoSchemas);
-
-                // Include allowed domain objects (PageableObject, SortObject)
-                var allowedDomainObjects = components
-                    .getSchemas()
-                    .entrySet()
-                    .stream()
-                    .filter(entry -> ALLOWED_DOMAIN_OBJECTS.contains(entry.getKey()))
-                    .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-
-                filteredSchemas.putAll(allowedDomainObjects);
-
-                // Remove DTO suffix from attribute names in all schemas
-                filteredSchemas.forEach((key, value) -> {
-                    @SuppressWarnings({ "rawtypes", "unchecked" })
-                    Map<String, Schema> properties = value.getProperties();
-                    if (properties != null) {
-                        properties.forEach((propertyKey, propertyValue) -> {
-                            removeDTOSuffixesFromSchemaRecursively(propertyValue);
-                        });
-                    }
-                });
-
-                components.setSchemas(filteredSchemas);
-
-                // Load and add intelligence service schemas (UIMessage, UIMessagePart, etc.)
-                Map<String, Schema<?>> intelligenceSchemas = loadIntelligenceServiceUISchemas();
-                if (!intelligenceSchemas.isEmpty()) {
-                    filteredSchemas.putAll(intelligenceSchemas);
-                    logger.info("Added {} intelligence service schemas to OpenAPI spec", intelligenceSchemas.size());
-                }
-            } else {
-                logger.warn("Components or Schemas are null in OpenAPI configuration.");
-            }
-
-            var paths = openApi.getPaths();
-            if (paths != null) {
-                paths.forEach((path, pathItem) -> {
-                    logger.debug("Processing path: {}", path);
-                    pathItem
-                        .readOperations()
-                        .forEach(operation -> {
-                            // Remove DTO suffix from response schemas
-                            var responses = operation.getResponses();
-                            if (responses != null) {
-                                responses.forEach((responseCode, response) -> {
-                                    var content = response.getContent();
-                                    if (content != null) {
-                                        content.forEach((contentType, mediaType) -> {
-                                            if (mediaType != null && mediaType.getSchema() != null) {
-                                                removeDTOSuffixesFromSchemaRecursively(mediaType.getSchema());
-                                            } else {
-                                                logger.warn(
-                                                    "MediaType or Schema is null for content type: {}",
-                                                    contentType
-                                                );
-                                            }
-                                        });
-                                    } else {
-                                        logger.warn("Response with code {} has no content.", responseCode);
-                                    }
-                                });
-                            }
-                            if (operation.getRequestBody() != null) {
-                                var requestBodyContent = operation.getRequestBody().getContent();
-                                requestBodyContent.forEach((contentType, mediaType) -> {
-                                    removeDTOSuffixesFromSchemaRecursively(mediaType.getSchema());
-                                });
-                            }
-
-                            // Remove -controller suffix from tags
-                            if (operation.getTags() != null) {
-                                operation.setTags(
-                                    operation
-                                        .getTags()
-                                        .stream()
-                                        .filter(tag -> {
-                                            if (tag.length() > 11) {
-                                                return true;
-                                            } else {
-                                                logger.warn(
-                                                    "Tag '{}' is shorter than expected and cannot be trimmed.",
-                                                    tag
-                                                );
-                                                return false;
-                                            }
-                                        })
-                                        .map(tag -> tag.substring(0, tag.length() - 11))
-                                        .collect(Collectors.toList())
-                                );
-                            }
-                            if (operation.getParameters() != null && !operation.getParameters().isEmpty()) {
-                                var filteredParameters = operation
-                                    .getParameters()
-                                    .stream()
-                                    .filter(parameter -> !isWorkspaceContextParameter(parameter))
-                                    .collect(Collectors.toList());
-                                operation.setParameters(filteredParameters);
-                            }
-
-                            if (path.contains("{workspaceSlug}")) {
-                                ensureWorkspaceSlugParameter(operation);
-                            }
-                        });
-                });
-            } else {
-                logger.warn("Paths are null in OpenAPI configuration.");
-            }
+            processApplicationServerSchemas(openApi);
+            importIntelligenceServiceSpec(openApi);
+            processAllPaths(openApi);
         };
     }
 
-    private boolean isWorkspaceContextParameter(Parameter parameter) {
-        if (parameter == null) {
+    /**
+     * Process application-server schemas: include DTOs and remove suffix.
+     */
+    private void processApplicationServerSchemas(OpenAPI openApi) {
+        var components = openApi.getComponents();
+        if (components == null || components.getSchemas() == null) {
+            log.warn("No schemas found in application-server spec");
+            return;
+        }
+
+        @SuppressWarnings("rawtypes")
+        Map<String, Schema> filteredSchemas = new HashMap<>();
+
+        // Include DTOs with suffix removed
+        components
+            .getSchemas()
+            .entrySet()
+            .stream()
+            .filter(e -> e.getKey().endsWith("DTO"))
+            .forEach(e -> {
+                String nameWithoutDto = e.getKey().substring(0, e.getKey().length() - 3);
+                e.getValue().setName(nameWithoutDto);
+                filteredSchemas.put(nameWithoutDto, e.getValue());
+            });
+
+        // Include allowed domain objects
+        components
+            .getSchemas()
+            .entrySet()
+            .stream()
+            .filter(e -> ALLOWED_DOMAIN_OBJECTS.contains(e.getKey()))
+            .forEach(e -> filteredSchemas.put(e.getKey(), e.getValue()));
+
+        // Update $ref to remove DTO suffix
+        filteredSchemas.values().forEach(this::removeDtoSuffixFromRefs);
+
+        components.setSchemas(filteredSchemas);
+    }
+
+    /**
+     * Import schemas and paths from intelligence-service that are tagged for export.
+     */
+    @SuppressWarnings("unchecked")
+    private void importIntelligenceServiceSpec(OpenAPI openApi) {
+        File specFile = new File(INTELLIGENCE_SERVICE_SPEC);
+        if (!specFile.exists()) {
+            log.warn("Intelligence service spec not found at: {}", specFile.getAbsolutePath());
+            return;
+        }
+
+        OpenAPI intelligenceSpec = new OpenAPIV3Parser().read(specFile.getAbsolutePath());
+        if (intelligenceSpec == null) {
+            log.error("Failed to parse intelligence service spec");
+            return;
+        }
+
+        if (intelligenceSpec.getComponents() == null || intelligenceSpec.getComponents().getSchemas() == null) {
+            log.warn("No schemas found in intelligence-service spec");
+            return;
+        }
+
+        Map<String, Schema<?>> allIntelligenceSchemas = (Map<String, Schema<?>>) (Map<?, ?>) intelligenceSpec
+            .getComponents()
+            .getSchemas();
+
+        // Collect all schema names we need to import (from tagged schemas AND from path references)
+        Set<String> schemasToImport = new HashSet<>();
+
+        // 1. Find schemas explicitly tagged for export
+        for (var entry : allIntelligenceSchemas.entrySet()) {
+            if (isTaggedForExport(entry.getValue())) {
+                schemasToImport.add(entry.getKey());
+            }
+        }
+
+        // 2. Import tagged paths and collect all schemas they reference
+        int importedPaths = 0;
+        if (intelligenceSpec.getPaths() != null) {
+            for (var entry : intelligenceSpec.getPaths().entrySet()) {
+                String path = entry.getKey();
+                PathItem pathItem = entry.getValue();
+
+                boolean shouldExport = pathItem.readOperations().stream().anyMatch(this::isTaggedForExport);
+
+                if (shouldExport) {
+                    // Collect all schemas referenced by this path's operations
+                    for (var operation : pathItem.readOperations()) {
+                        collectSchemasFromOperation(operation, schemasToImport);
+                    }
+
+                    // Rewrite path to include workspace prefix
+                    String newPath = WORKSPACE_PATH_PREFIX + path;
+                    openApi.getPaths().addPathItem(newPath, pathItem);
+                    importedPaths++;
+                }
+            }
+        }
+
+        // 3. Recursively include all schemas referenced by the schemas we're importing
+        Set<String> visited = new HashSet<>();
+        for (String name : new HashSet<>(schemasToImport)) {
+            collectReferencedSchemas(name, allIntelligenceSchemas, schemasToImport, visited);
+        }
+
+        // 4. Add all collected schemas to openApi
+        var targetSchemas = openApi.getComponents().getSchemas();
+        for (String name : schemasToImport) {
+            Schema<?> schema = allIntelligenceSchemas.get(name);
+            if (schema != null) {
+                targetSchemas.put(name, schema);
+            }
+        }
+
+        log.info("Imported {} schemas from intelligence-service", schemasToImport.size());
+        log.info("Imported {} paths from intelligence-service", importedPaths);
+    }
+
+    /**
+     * Collect all schema names referenced in an operation's request/response bodies.
+     */
+    private void collectSchemasFromOperation(io.swagger.v3.oas.models.Operation operation, Set<String> out) {
+        if (operation == null) return;
+
+        // Collect from responses
+        if (operation.getResponses() != null) {
+            operation
+                .getResponses()
+                .forEach((code, response) -> {
+                    if (response.getContent() != null) {
+                        response
+                            .getContent()
+                            .forEach((type, media) -> {
+                                if (media.getSchema() != null) {
+                                    collectRefs(media.getSchema(), out);
+                                }
+                            });
+                    }
+                });
+        }
+
+        // Collect from request body
+        if (operation.getRequestBody() != null && operation.getRequestBody().getContent() != null) {
+            operation
+                .getRequestBody()
+                .getContent()
+                .forEach((type, media) -> {
+                    if (media.getSchema() != null) {
+                        collectRefs(media.getSchema(), out);
+                    }
+                });
+        }
+    }
+
+    /**
+     * Check if a schema or operation is tagged with x-hephaestus.export: true
+     */
+    private boolean isTaggedForExport(Object item) {
+        Map<String, Object> extensions = null;
+
+        if (item instanceof Schema<?> schema) {
+            extensions = schema.getExtensions();
+        } else if (item instanceof io.swagger.v3.oas.models.Operation op) {
+            extensions = op.getExtensions();
+        }
+
+        if (extensions == null) {
             return false;
         }
-        if ("workspaceContext".equals(parameter.getName())) {
-            return true;
+
+        Object hephaestus = extensions.get("x-hephaestus");
+        if (hephaestus instanceof Map<?, ?> map) {
+            Object export = map.get("export");
+            if (export instanceof Boolean b) return b;
+            if (export instanceof String s) return Boolean.parseBoolean(s);
         }
-        if (parameter.getSchema() != null && parameter.getSchema().get$ref() != null) {
-            return parameter.getSchema().get$ref().endsWith("/WorkspaceContext");
+
+        return false;
+    }
+
+    /**
+     * Recursively collect all schemas referenced by a given schema.
+     */
+    private void collectReferencedSchemas(
+        String name,
+        Map<String, Schema<?>> allSchemas,
+        Set<String> toImport,
+        Set<String> visited
+    ) {
+        if (name == null || visited.contains(name)) return;
+        visited.add(name);
+
+        Schema<?> schema = allSchemas.get(name);
+        if (schema == null) return;
+
+        Set<String> refs = new HashSet<>();
+        collectRefs(schema, refs);
+
+        for (String ref : refs) {
+            if (!toImport.contains(ref)) {
+                toImport.add(ref);
+                collectReferencedSchemas(ref, allSchemas, toImport, visited);
+            }
+        }
+    }
+
+    /**
+     * Collect $ref names from a schema.
+     */
+    @SuppressWarnings({ "rawtypes", "unchecked" })
+    private void collectRefs(Schema schema, Set<String> out) {
+        if (schema == null) return;
+
+        if (schema.get$ref() != null) {
+            String ref = schema.get$ref();
+            out.add(ref.substring(ref.lastIndexOf('/') + 1));
+        }
+
+        Map<String, Schema> props = schema.getProperties();
+        if (props != null) {
+            props.values().forEach(p -> collectRefs(p, out));
+        }
+
+        if (schema.getItems() != null) {
+            collectRefs(schema.getItems(), out);
+        }
+
+        if (schema.getAllOf() != null) {
+            schema.getAllOf().forEach(s -> collectRefs((Schema) s, out));
+        }
+        if (schema.getAnyOf() != null) {
+            schema.getAnyOf().forEach(s -> collectRefs((Schema) s, out));
+        }
+        if (schema.getOneOf() != null) {
+            schema.getOneOf().forEach(s -> collectRefs((Schema) s, out));
+        }
+    }
+
+    /**
+     * Process all paths: clean up tags, parameters, ensure workspaceSlug.
+     */
+    private void processAllPaths(OpenAPI openApi) {
+        var paths = openApi.getPaths();
+        if (paths == null) return;
+
+        paths.forEach((path, pathItem) -> {
+            pathItem
+                .readOperations()
+                .forEach(operation -> {
+                    // Remove DTO suffix from response/request schemas
+                    if (operation.getResponses() != null) {
+                        operation
+                            .getResponses()
+                            .forEach((code, response) -> {
+                                if (response.getContent() != null) {
+                                    response
+                                        .getContent()
+                                        .forEach((type, media) -> {
+                                            if (media.getSchema() != null) {
+                                                removeDtoSuffixFromRefs(media.getSchema());
+                                            }
+                                        });
+                                }
+                            });
+                    }
+
+                    if (operation.getRequestBody() != null && operation.getRequestBody().getContent() != null) {
+                        operation
+                            .getRequestBody()
+                            .getContent()
+                            .forEach((type, media) -> {
+                                if (media.getSchema() != null) {
+                                    removeDtoSuffixFromRefs(media.getSchema());
+                                }
+                            });
+                    }
+
+                    // Clean up controller suffix from tags
+                    if (operation.getTags() != null) {
+                        operation.setTags(
+                            operation
+                                .getTags()
+                                .stream()
+                                .map(tag -> tag.endsWith("-controller") ? tag.substring(0, tag.length() - 11) : tag)
+                                .collect(Collectors.toList())
+                        );
+                    }
+
+                    // Filter out WorkspaceContext parameter
+                    if (operation.getParameters() != null) {
+                        operation.setParameters(
+                            operation
+                                .getParameters()
+                                .stream()
+                                .filter(p -> !isWorkspaceContextParam(p))
+                                .collect(Collectors.toCollection(ArrayList::new))
+                        );
+                    }
+
+                    // Ensure workspaceSlug parameter for workspace paths
+                    if (path.contains("{workspaceSlug}")) {
+                        ensureWorkspaceSlugParam(operation);
+                    }
+                });
+        });
+
+        // Also normalize refs inside component schemas (not only request/response bodies)
+        if (openApi.getComponents() != null && openApi.getComponents().getSchemas() != null) {
+            openApi.getComponents().getSchemas().values().forEach(this::removeDtoSuffixFromRefs);
+        }
+    }
+
+    private boolean isWorkspaceContextParam(Parameter param) {
+        if (param == null) return false;
+        if ("workspaceContext".equals(param.getName())) return true;
+        if (param.getSchema() != null && param.getSchema().get$ref() != null) {
+            return param.getSchema().get$ref().endsWith("/WorkspaceContext");
         }
         return false;
     }
 
-    private void ensureWorkspaceSlugParameter(io.swagger.v3.oas.models.Operation operation) {
-        if (operation == null) {
-            return;
+    private void ensureWorkspaceSlugParam(io.swagger.v3.oas.models.Operation operation) {
+        var params = operation.getParameters();
+        if (params == null) {
+            params = new ArrayList<>();
+            operation.setParameters(params);
+        } else {
+            // `Stream#toList()` returns an unmodifiable list; also external sources may provide immutable lists.
+            // Ensure we can safely insert the workspaceSlug parameter.
+            params = new ArrayList<>(params);
+            operation.setParameters(params);
         }
 
-        var parameters = operation.getParameters();
-        if (parameters == null) {
-            parameters = new ArrayList<>();
-            operation.setParameters(parameters);
-        }
+        boolean exists = params.stream().anyMatch(p -> "workspaceSlug".equals(p.getName()) && "path".equals(p.getIn()));
 
-        boolean alreadyPresent = parameters
-            .stream()
-            .anyMatch(parameter -> "workspaceSlug".equals(parameter.getName()) && "path".equals(parameter.getIn()));
-
-        if (alreadyPresent) {
-            return;
-        }
-
-        Parameter slugParameter = new Parameter()
-            .name("workspaceSlug")
-            .in("path")
-            .required(true)
-            .description("Workspace slug")
-            .schema(new StringSchema().pattern("^[a-z0-9][a-z0-9-]{2,50}$"));
-
-        parameters.add(0, slugParameter);
-    }
-
-    /**
-     * Load schemas from the intelligence service OpenAPI spec.
-     * This includes UIMessage, UIMessagePart, and Stream* models.
-     */
-    private Map<String, Schema<?>> loadIntelligenceServiceUISchemas() {
-        Map<String, Schema<?>> intelligenceSchemas = new HashMap<>();
-
-        try {
-            // Path to the intelligence service OpenAPI spec
-            File intelligenceSpecFile = new File("../intelligence-service/openapi.yaml");
-
-            if (intelligenceSpecFile.exists()) {
-                var intelligenceOpenApi = new OpenAPIV3Parser().read(intelligenceSpecFile.getAbsolutePath());
-
-                if (
-                    intelligenceOpenApi != null &&
-                    intelligenceOpenApi.getComponents() != null &&
-                    intelligenceOpenApi.getComponents().getSchemas() != null
-                ) {
-                    @SuppressWarnings("unchecked")
-                    Map<String, Schema<?>> allSchemas = (Map<String, Schema<?>>) (Map<?, ?>) intelligenceOpenApi
-                        .getComponents()
-                        .getSchemas();
-
-                    // Auto-discover intelligence service models instead of hardcoding them
-                    Set<String> toInclude = discoverIntelligenceServiceModels(allSchemas);
-                    Set<String> visited = new HashSet<>();
-
-                    for (String name : new LinkedHashSet<>(toInclude)) {
-                        includeSchemaWithReferences(name, allSchemas, intelligenceSchemas, toInclude, visited);
-                    }
-
-                    logger.info(
-                        "Loaded {} schemas (including nested references) from intelligence service",
-                        intelligenceSchemas.size()
-                    );
-                } else {
-                    logger.warn("Could not load schemas from intelligence service OpenAPI spec");
-                }
-            } else {
-                logger.warn(
-                    "Intelligence service OpenAPI spec not found at: {}",
-                    intelligenceSpecFile.getAbsolutePath()
-                );
-            }
-        } catch (Exception e) {
-            logger.error("Error loading intelligence service schemas: {}", e.getMessage(), e);
-        }
-
-        return intelligenceSchemas;
-    }
-
-    /**
-     * Include a schema by name and all of its referenced component schemas recursively.
-     */
-    private void includeSchemaWithReferences(
-        String name,
-        Map<String, Schema<?>> allSchemas,
-        Map<String, Schema<?>> out,
-        Set<String> toInclude,
-        Set<String> visited
-    ) {
-        if (name == null || visited.contains(name)) {
-            return;
-        }
-        Schema<?> schema = allSchemas.get(name);
-        if (schema == null) {
-            return;
-        }
-        visited.add(name);
-        out.put(name, schema);
-        logger.debug("Loaded intelligence service schema: {}", name);
-
-        // Discover referenced component schema names and include them as well.
-        Set<String> refs = new HashSet<>();
-        collectRefs(schema, refs);
-        for (String refName : refs) {
-            if (!visited.contains(refName)) {
-                toInclude.add(refName);
-                includeSchemaWithReferences(refName, allSchemas, out, toInclude, visited);
-            }
+        if (!exists) {
+            params.add(
+                0,
+                new Parameter()
+                    .name("workspaceSlug")
+                    .in("path")
+                    .required(true)
+                    .description("Workspace slug")
+                    .schema(new StringSchema().pattern("^[a-z0-9][a-z0-9-]{2,50}$"))
+            );
         }
     }
 
-    /**
-     * Collect component schema names referenced via $ref recursively within the given schema.
-     */
     @SuppressWarnings({ "rawtypes", "unchecked" })
-    private void collectRefs(Schema schema, Set<String> out) {
-        if (schema == null) {
-            return;
-        }
-        // Direct $ref
-        if (schema.get$ref() != null) {
-            String ref = schema.get$ref();
-            String name = ref.substring(ref.lastIndexOf('/') + 1);
-            out.add(name);
-        }
-        // Properties
-        Map<String, Schema> props = (Map<String, Schema>) schema.getProperties();
-        if (props != null) {
-            for (Schema prop : props.values()) {
-                collectRefs(prop, out);
-            }
-        }
-        // Items (arrays)
-        if (schema.getItems() != null) {
-            collectRefs(schema.getItems(), out);
-        }
-        // Composed schemas: allOf, anyOf, oneOf
-        if (schema.getAllOf() != null) {
-            for (Object s : schema.getAllOf()) {
-                collectRefs((Schema) s, out);
-            }
-        }
-        if (schema.getAnyOf() != null) {
-            for (Object s : schema.getAnyOf()) {
-                collectRefs((Schema) s, out);
-            }
-        }
-        if (schema.getOneOf() != null) {
-            for (Object s : schema.getOneOf()) {
-                collectRefs((Schema) s, out);
-            }
-        }
-    }
-
-    private void removeDTOSuffixesFromSchemaRecursively(Schema<?> schema) {
-        if (schema == null) {
-            return;
-        }
+    private void removeDtoSuffixFromRefs(Schema schema) {
+        if (schema == null) return;
 
         if (schema.get$ref() != null && schema.get$ref().endsWith("DTO")) {
-            String originalRef = schema.get$ref();
-            String schemaName = originalRef.substring(originalRef.lastIndexOf("/") + 1);
+            schema.set$ref(schema.get$ref().substring(0, schema.get$ref().length() - 3));
+        }
 
-            // Check if this is an intelligence service model by checking naming patterns
-            String nameWithoutDTO = schemaName.substring(0, schemaName.length() - 3);
-            if (isIntelligenceServiceModel(nameWithoutDTO)) {
-                // Keep the original reference with DTO suffix for intelligence service models
-                logger.debug("Preserving intelligence service model reference: {}", originalRef);
-            } else {
-                // Remove DTO suffix for regular DTOs
-                String newRef = originalRef.substring(0, originalRef.length() - 3);
-                schema.set$ref(newRef);
-                logger.debug("Updated $ref from {} to {}", originalRef, newRef);
-            }
+        Map<String, Schema> props = schema.getProperties();
+        if (props != null) {
+            props.values().forEach(this::removeDtoSuffixFromRefs);
         }
 
         if (schema.getItems() != null) {
-            removeDTOSuffixesFromSchemaRecursively(schema.getItems());
+            removeDtoSuffixFromRefs(schema.getItems());
+        }
+
+        if (schema.getAllOf() != null) {
+            schema.getAllOf().forEach(s -> removeDtoSuffixFromRefs((Schema) s));
+        }
+        if (schema.getAnyOf() != null) {
+            schema.getAnyOf().forEach(s -> removeDtoSuffixFromRefs((Schema) s));
+        }
+        if (schema.getOneOf() != null) {
+            schema.getOneOf().forEach(s -> removeDtoSuffixFromRefs((Schema) s));
+        }
+
+        Object additional = schema.getAdditionalProperties();
+        if (additional instanceof Schema additionalSchema) {
+            removeDtoSuffixFromRefs(additionalSchema);
+        }
+
+        if (schema.getNot() != null) {
+            removeDtoSuffixFromRefs(schema.getNot());
         }
     }
 }

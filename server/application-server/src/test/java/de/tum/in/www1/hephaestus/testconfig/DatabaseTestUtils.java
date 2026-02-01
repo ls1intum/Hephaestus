@@ -7,6 +7,7 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -22,30 +23,117 @@ public class DatabaseTestUtils {
 
     private static final Set<String> IGNORED_TABLES = Set.of("databasechangelog", "databasechangeloglock");
 
+    /** Cached truncate statement to avoid schema metadata queries on every test. */
+    private static volatile String cachedTruncateStatement = null;
+
+    /** Maximum retries for transient errors during cleanup. */
+    private static final int MAX_RETRIES = 5;
+
+    /** Base delay in milliseconds between retries (doubles with each retry). */
+    private static final long RETRY_DELAY_MS = 100;
+
     /**
      * Truncates all tables in the test database.
      * Call in @BeforeEach to ensure clean state between individual tests.
+     * <p>
+     * Uses retry logic to handle transient deadlocks that can occur when
+     * async event handlers (e.g., ActivityEventService) are still writing
+     * when the next test tries to clean the database.
      */
     public void cleanDatabase() {
-        try {
-            entityManager.flush();
+        Exception lastException = null;
 
-            List<String> tableNames = fetchApplicationTables();
-            if (tableNames.isEmpty()) {
-                entityManager.clear();
-                return;
+        for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+            try {
+                // Execute in a new transaction so that failures don't pollute the calling transaction
+                doCleanDatabase();
+                return; // Success
+            } catch (Exception e) {
+                lastException = e;
+
+                // Check if this is a transient error that may resolve on retry
+                if (isTransientException(e) && attempt < MAX_RETRIES) {
+                    try {
+                        Thread.sleep(RETRY_DELAY_MS * (1L << (attempt - 1))); // Exponential backoff
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw new IllegalStateException("Interrupted during database cleanup retry", ie);
+                    }
+                } else {
+                    break; // Not a deadlock or max retries reached
+                }
             }
-
-            String joinedTables = tableNames.stream().map(this::quoteIdentifier).collect(Collectors.joining(", "));
-
-            entityManager
-                .createNativeQuery("TRUNCATE TABLE " + joinedTables + " RESTART IDENTITY CASCADE")
-                .executeUpdate();
-
-            entityManager.clear();
-        } catch (Exception e) {
-            throw new IllegalStateException("Failed to clean database for integration tests", e);
         }
+
+        throw new IllegalStateException("Failed to clean database for integration tests", lastException);
+    }
+
+    /**
+     * Performs the actual database cleanup in its own transaction.
+     * Uses REQUIRES_NEW to ensure a fresh transaction for each retry attempt.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void doCleanDatabase() {
+        entityManager.flush();
+
+        String truncateStatement = getTruncateStatement();
+        if (truncateStatement.isEmpty()) {
+            entityManager.clear();
+            return;
+        }
+
+        entityManager.createNativeQuery(truncateStatement).executeUpdate();
+        entityManager.clear();
+    }
+
+    /**
+     * Checks if the exception is a transient PostgreSQL error that may resolve on retry.
+     * Includes deadlocks, serialization failures, lock timeouts, and connection issues.
+     */
+    private boolean isTransientException(Exception e) {
+        Throwable current = e;
+        while (current != null) {
+            String message = current.getMessage();
+            if (message != null) {
+                String lowerMessage = message.toLowerCase(Locale.ROOT);
+                // PostgreSQL error codes and messages for transient failures
+                if (
+                    lowerMessage.contains("deadlock detected") || // Deadlock
+                    message.contains("40P01") || // Deadlock error code
+                    message.contains("40001") || // Serialization failure
+                    lowerMessage.contains("could not serialize access") ||
+                    lowerMessage.contains("lock timeout") ||
+                    lowerMessage.contains("canceling statement due to lock") ||
+                    lowerMessage.contains("connection is closed") ||
+                    lowerMessage.contains("connection reset") ||
+                    lowerMessage.contains("unable to acquire jdbc connection")
+                ) {
+                    return true;
+                }
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    private String getTruncateStatement() {
+        if (cachedTruncateStatement == null) {
+            synchronized (DatabaseTestUtils.class) {
+                if (cachedTruncateStatement == null) {
+                    List<String> tableNames = fetchApplicationTables();
+                    if (tableNames.isEmpty()) {
+                        cachedTruncateStatement = "";
+                    } else {
+                        String joinedTables = tableNames
+                            .stream()
+                            .map(this::quoteIdentifier)
+                            .collect(Collectors.joining(", "));
+                        cachedTruncateStatement = "TRUNCATE TABLE " + joinedTables + " RESTART IDENTITY CASCADE";
+                    }
+                }
+            }
+        }
+        return cachedTruncateStatement;
     }
 
     /**
@@ -67,8 +155,8 @@ public class DatabaseTestUtils {
         List<Object> tables = entityManager
             .createNativeQuery(
                 "SELECT table_name FROM information_schema.tables " +
-                "WHERE table_schema = 'public' AND table_type = 'BASE TABLE' " +
-                "AND table_name NOT LIKE 'pg_%' AND table_name NOT LIKE 'sql_%'"
+                    "WHERE table_schema = 'public' AND table_type = 'BASE TABLE' " +
+                    "AND table_name NOT LIKE 'pg_%' AND table_name NOT LIKE 'sql_%'"
             )
             .getResultList();
 

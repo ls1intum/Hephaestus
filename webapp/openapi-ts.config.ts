@@ -9,8 +9,18 @@ export default defineConfig({
     '@tanstack/react-query',
     {
       dates: true,
-      bigInt: false, 
+      bigInt: false,
       name: '@hey-api/transformers',
     }
   ],
+  // Exclude SSE endpoints - openapi-ts react-query plugin doesn't handle them correctly
+  // (tries to destructure 'data' from ServerSentEventsResult which has 'stream' instead)
+  // The mentor chat uses a custom transport in useMentorChat.ts
+  parser: {
+    filters: {
+      operations: {
+        exclude: ['POST /workspaces/{workspaceSlug}/mentor/chat']
+      }
+    }
+  }
 });

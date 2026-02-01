@@ -1,203 +1,787 @@
 package de.tum.in.www1.hephaestus.gitprovider.team.github;
 
+import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.LARGE_PAGE_SIZE;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.MAX_PAGINATION_PAGES;
+
+import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
+import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHRepositoryPermission;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHTeam;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHTeamConnection;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHTeamMemberConnection;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHTeamMemberEdge;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHTeamMemberRole;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHTeamPrivacy;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHTeamRepositoryConnection;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHTeamRepositoryEdge;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHUser;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.team.Team;
 import de.tum.in.www1.hephaestus.gitprovider.team.TeamRepository;
+import de.tum.in.www1.hephaestus.gitprovider.team.github.dto.GitHubTeamEventDTO;
 import de.tum.in.www1.hephaestus.gitprovider.team.membership.TeamMembership;
+import de.tum.in.www1.hephaestus.gitprovider.team.membership.TeamMembershipRepository;
 import de.tum.in.www1.hephaestus.gitprovider.team.permission.TeamRepositoryPermission;
-import de.tum.in.www1.hephaestus.gitprovider.user.User;
-import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
-import java.io.IOException;
+import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserProcessor;
+import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.kohsuke.github.GHOrganization;
-import org.kohsuke.github.GHRepository;
-import org.kohsuke.github.GHTeam;
-import org.kohsuke.github.GHUser;
-import org.kohsuke.github.GitHub;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Lazy;
+import org.springframework.graphql.client.ClientGraphQlResponse;
+import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Service for synchronizing GitHub teams via GraphQL API.
+ * <p>
+ * This service fetches teams for an organization via GraphQL and delegates to
+ * {@link GitHubTeamProcessor} for persistence, ensuring a single source of truth
+ * for team processing logic.
+ * <p>
+ * It also handles synchronization of team memberships by creating
+ * {@link TeamMembership} records for each member returned by the GraphQL query.
+ */
 @Service
 public class GitHubTeamSyncService {
 
-    private GitHubTeamSyncService self;
-
     private static final Logger log = LoggerFactory.getLogger(GitHubTeamSyncService.class);
+    private static final String GET_ORGANIZATION_TEAMS_DOCUMENT = "GetOrganizationTeams";
+    private static final String GET_TEAM_MEMBERS_DOCUMENT = "GetTeamMembers";
+    private static final String GET_TEAM_REPOSITORIES_DOCUMENT = "GetTeamRepositories";
 
     private final TeamRepository teamRepository;
-    private final UserRepository userRepository;
+    private final TeamMembershipRepository teamMembershipRepository;
     private final RepositoryRepository repositoryRepository;
-    private final GitHubTeamConverter teamConverter;
+    private final GitHubGraphQlClientProvider graphQlClientProvider;
+    private final GitHubTeamProcessor teamProcessor;
+    private final GitHubUserProcessor userProcessor;
+    private final GitHubSyncProperties syncProperties;
+    private final GitHubExceptionClassifier exceptionClassifier;
 
     public GitHubTeamSyncService(
         TeamRepository teamRepository,
-        UserRepository userRepository,
+        TeamMembershipRepository teamMembershipRepository,
         RepositoryRepository repositoryRepository,
-        GitHubTeamConverter teamConverter
+        GitHubGraphQlClientProvider graphQlClientProvider,
+        GitHubTeamProcessor teamProcessor,
+        GitHubUserProcessor userProcessor,
+        GitHubSyncProperties syncProperties,
+        GitHubExceptionClassifier exceptionClassifier
     ) {
         this.teamRepository = teamRepository;
-        this.userRepository = userRepository;
+        this.teamMembershipRepository = teamMembershipRepository;
         this.repositoryRepository = repositoryRepository;
-        this.teamConverter = teamConverter;
+        this.graphQlClientProvider = graphQlClientProvider;
+        this.teamProcessor = teamProcessor;
+        this.userProcessor = userProcessor;
+        this.syncProperties = syncProperties;
+        this.exceptionClassifier = exceptionClassifier;
     }
 
-    public void syncAndSaveTeams(GitHub gitHub, String orgName) throws IOException {
-        GHOrganization org = gitHub.getOrganization(orgName);
-        List<GHTeam> teams = org.listTeams().withPageSize(100).toList();
-
-        teams
-            .parallelStream()
-            .forEach(ghTeam -> {
-                // must call via the proxy (self) to trigger @Transactional on processTeam()
-                Team saved = self.processTeam(ghTeam);
-                if (saved == null) {
-                    log.warn("Skipped team {} with id {} due to an error", ghTeam.getName(), ghTeam.getId());
-                }
-            });
-        // parent relationships
-        teams.parallelStream().forEach(this::applyParentLinks);
-    }
-
+    /**
+     * Synchronizes all teams for an organization using GraphQL.
+     * <p>
+     * This method fetches all teams from the organization, processes them using
+     * {@link GitHubTeamProcessor}, and also synchronizes team memberships.
+     *
+     * @param scopeId       the scope ID for authentication
+     * @param organizationLogin the GitHub organization login to sync teams for
+     * @return number of teams synced
+     */
     @Transactional
-    public Team processTeam(GHTeam ghTeam) {
-        try {
-            Team team = teamRepository
-                .findById(ghTeam.getId())
-                .map(existing -> {
-                    teamConverter.update(ghTeam, existing);
-                    return existing;
-                })
-                .orElseGet(() -> teamConverter.convert(ghTeam));
-
-            syncMemberships(ghTeam, Objects.requireNonNull(team));
-            syncRepoPermissions(ghTeam, team);
-            Team saved = teamRepository.save(team);
-            log.info(
-                "Processed team={}, having {} members with {} repository permissions",
-                team.getName(),
-                team.getMemberships().size(),
-                team.getRepoPermissions().size()
-            );
-
-            return saved;
-        } catch (IOException e) {
-            log.error("Failed to process team {}: {}", ghTeam.getId(), e.getMessage());
-            return null;
+    public int syncTeamsForOrganization(Long scopeId, String organizationLogin) {
+        if (organizationLogin == null || organizationLogin.isBlank()) {
+            log.warn("Skipped team sync: reason=missingOrgLogin, scopeId={}", scopeId);
+            return 0;
         }
-    }
+        String safeOrgLogin = sanitizeForLog(organizationLogin);
 
-    private void applyParentLinks(GHTeam parent) {
+        HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
+        // Create processing context for sync operations (no repository for org-level teams)
+        ProcessingContext context = ProcessingContext.forSync(scopeId, null);
+
         try {
-            Long parentId = parent.getId();
+            Set<Long> syncedTeamIds = new HashSet<>();
+            int totalSynced = 0;
+            int totalPermissions = 0;
+            String cursor = null;
+            boolean hasNextPage = true;
+            int pageCount = 0;
+            boolean syncCompletedNormally = false;
 
-            for (GHTeam ghChild : parent.listChildTeams()) {
-                long childId = ghChild.getId();
+            while (hasNextPage) {
+                pageCount++;
+                if (pageCount >= MAX_PAGINATION_PAGES) {
+                    log.warn(
+                        "Reached maximum pagination limit for teams: orgLogin={}, limit={}",
+                        safeOrgLogin,
+                        MAX_PAGINATION_PAGES
+                    );
+                    break;
+                }
 
-                teamRepository
-                    .findById(childId)
-                    .ifPresent(child -> {
-                        if (!Objects.equals(child.getParentId(), parentId)) {
-                            child.setParentId(parentId);
-                            teamRepository.save(child);
-                            log.info("Linked parent team '{}' → child team '{}'", parent.getName(), child.getName());
-                        }
-                    });
+                ClientGraphQlResponse graphQlResponse = client
+                    .documentName(GET_ORGANIZATION_TEAMS_DOCUMENT)
+                    .variable("login", organizationLogin)
+                    .variable("first", LARGE_PAGE_SIZE)
+                    .variable("after", cursor)
+                    .execute()
+                    .block(syncProperties.graphqlTimeout());
+
+                if (graphQlResponse == null || !graphQlResponse.isValid()) {
+                    log.warn(
+                        "Received invalid GraphQL response: orgLogin={}, errors={}",
+                        safeOrgLogin,
+                        graphQlResponse != null ? graphQlResponse.getErrors() : "null"
+                    );
+                    break;
+                }
+
+                // Track rate limit from response
+                graphQlClientProvider.trackRateLimit(scopeId, graphQlResponse);
+
+                // Check if we should pause due to rate limiting
+                if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
+                    log.warn("Aborting team sync due to critical rate limit: orgLogin={}", safeOrgLogin);
+                    break;
+                }
+
+                GHTeamConnection response = graphQlResponse
+                    .field("organization.teams")
+                    .toEntity(GHTeamConnection.class);
+
+                if (response == null || response.getNodes() == null) {
+                    break;
+                }
+
+                for (var graphQlTeam : response.getNodes()) {
+                    Team team = processTeam(graphQlTeam, organizationLogin, context);
+                    if (team != null) {
+                        syncedTeamIds.add(team.getId());
+                        syncTeamMemberships(client, team, graphQlTeam, organizationLogin, scopeId);
+                        totalPermissions += syncTeamRepoPermissions(
+                            client,
+                            team,
+                            graphQlTeam,
+                            organizationLogin,
+                            scopeId
+                        );
+                        totalSynced++;
+                    }
+                }
+
+                var pageInfo = response.getPageInfo();
+                hasNextPage = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
+                cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
             }
+
+            // Mark sync as completed normally if we exhausted all pages
+            syncCompletedNormally = !hasNextPage;
+
+            // CRITICAL: Only remove stale teams if sync completed fully.
+            // If sync was aborted (rate limit, error, pagination limit), we don't have
+            // the complete list and would incorrectly delete valid teams.
+            if (syncCompletedNormally) {
+                removeDeletedTeams(organizationLogin, syncedTeamIds, context);
+            } else {
+                log.warn(
+                    "Skipped stale team removal: reason=incompleteSync, orgLogin={}, pagesProcessed={}",
+                    safeOrgLogin,
+                    pageCount
+                );
+            }
+
+            log.info(
+                "Completed team sync: orgLogin={}, teamCount={}, permissionCount={}, complete={}, scopeId={}",
+                safeOrgLogin,
+                totalSynced,
+                totalPermissions,
+                syncCompletedNormally,
+                scopeId
+            );
+            return totalSynced;
+        } catch (InstallationNotFoundException e) {
+            // Re-throw to abort the entire sync operation
+            throw e;
         } catch (Exception e) {
-            log.warn("Could not list child teams for {}: {}", parent.getName(), e.getMessage());
+            ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
+            switch (classification.category()) {
+                case RATE_LIMITED -> log.warn(
+                    "Rate limited during team sync: orgLogin={}, scopeId={}, message={}",
+                    safeOrgLogin,
+                    scopeId,
+                    classification.message()
+                );
+                case NOT_FOUND -> log.warn(
+                    "Resource not found during team sync: orgLogin={}, scopeId={}, message={}",
+                    safeOrgLogin,
+                    scopeId,
+                    classification.message()
+                );
+                case AUTH_ERROR -> {
+                    log.error(
+                        "Authentication error during team sync: orgLogin={}, scopeId={}, message={}",
+                        safeOrgLogin,
+                        scopeId,
+                        classification.message()
+                    );
+                    throw e;
+                }
+                case RETRYABLE -> log.warn(
+                    "Retryable error during team sync: orgLogin={}, scopeId={}, message={}",
+                    safeOrgLogin,
+                    scopeId,
+                    classification.message()
+                );
+                default -> log.error(
+                    "Unexpected error during team sync: orgLogin={}, scopeId={}, message={}",
+                    safeOrgLogin,
+                    scopeId,
+                    classification.message(),
+                    e
+                );
+            }
+            return 0;
         }
     }
 
-    private void syncMemberships(GHTeam ghTeam, Team team) throws IOException {
-        Set<Long> maintainerIds = ghTeam
-            .listMembers(GHTeam.Role.MAINTAINER)
-            .toList()
-            .stream()
-            .map(GHUser::getId)
-            .collect(Collectors.toSet());
+    /**
+     * Processes a single GraphQL team and persists it.
+     *
+     * @param graphQlTeam       the GraphQL team object
+     * @param organizationLogin the organization login
+     * @param context           the processing context
+     * @return the persisted Team entity, or null if processing failed
+     */
+    private Team processTeam(GHTeam graphQlTeam, String organizationLogin, ProcessingContext context) {
+        GitHubTeamEventDTO.GitHubTeamDTO dto = convertToDTO(graphQlTeam);
+        Team team = teamProcessor.process(dto, organizationLogin, context);
 
-        Set<Long> memberIds = ghTeam
-            .listMembers(GHTeam.Role.MEMBER)
-            .toList()
-            .stream()
-            .map(GHUser::getId)
-            .collect(Collectors.toSet());
+        if (team != null) {
+            // Update parent team reference if available
+            if (graphQlTeam.getParentTeam() != null && graphQlTeam.getParentTeam().getDatabaseId() != null) {
+                team.setParentId(graphQlTeam.getParentTeam().getDatabaseId().longValue());
+            }
+            // Update last synced timestamp
+            team.setLastSyncAt(Instant.now());
+            team = teamRepository.save(team);
+        }
 
-        Map<Long, TeamMembership> existing = team
+        return team;
+    }
+
+    /**
+     * Synchronizes team memberships from the GraphQL response.
+     * <p>
+     * For each member in the team's members connection, this method ensures the
+     * user exists and creates or updates a TeamMembership record with the correct role.
+     * If the team has more than 100 members, this method paginates through all members
+     * using the GetTeamMembers query.
+     *
+     * @param client          the GraphQL client for additional queries
+     * @param team            the Team entity
+     * @param graphQlTeam     the GraphQL team object containing members
+     * @param organizationLogin the organization login for pagination queries
+     */
+    private void syncTeamMemberships(
+        HttpGraphQlClient client,
+        Team team,
+        GHTeam graphQlTeam,
+        String organizationLogin,
+        Long scopeId
+    ) {
+        var membersConnection = graphQlTeam.getMembers();
+        if (membersConnection == null || membersConnection.getEdges() == null) {
+            return;
+        }
+
+        // Collect all member edges (with roles) - paginate if needed
+        List<GHTeamMemberEdge> allMemberEdges = new ArrayList<>(membersConnection.getEdges());
+        var membersPageInfo = membersConnection.getPageInfo();
+
+        if (membersPageInfo != null && Boolean.TRUE.equals(membersPageInfo.getHasNextPage())) {
+            log.debug(
+                "Fetching additional team members: teamSlug={}, totalCount={}",
+                sanitizeForLog(graphQlTeam.getSlug()),
+                membersConnection.getTotalCount()
+            );
+            List<GHTeamMemberEdge> additionalMemberEdges = fetchAllTeamMemberEdges(
+                client,
+                organizationLogin,
+                graphQlTeam.getSlug(),
+                membersPageInfo.getEndCursor(),
+                scopeId
+            );
+            allMemberEdges.addAll(additionalMemberEdges);
+        }
+
+        // Build existing memberships map for efficient lookup and role update
+        Map<Long, TeamMembership> existingMemberships = team
             .getMemberships()
             .stream()
             .collect(Collectors.toMap(tm -> tm.getUser().getId(), tm -> tm));
 
-        Set<Long> allIds = new HashSet<>();
-        allIds.addAll(memberIds);
-        allIds.addAll(maintainerIds);
+        Set<Long> syncedMemberIds = new HashSet<>();
 
-        for (Long id : allIds) {
-            if (!userRepository.existsById(id)) {
-                continue; //skip unknown users
+        for (var memberEdge : allMemberEdges) {
+            if (memberEdge == null || memberEdge.getNode() == null || memberEdge.getNode().getDatabaseId() == null) {
+                continue;
             }
-            TeamMembership teamMembership = existing.remove(id);
-            TeamMembership.Role newRole = maintainerIds.contains(id)
+
+            GHUser graphQlUser = memberEdge.getNode();
+            GHTeamMemberRole graphQlRole = memberEdge.getRole();
+
+            // Convert GraphQL role to TeamMembership.Role
+            TeamMembership.Role role = (graphQlRole == GHTeamMemberRole.MAINTAINER)
                 ? TeamMembership.Role.MAINTAINER
                 : TeamMembership.Role.MEMBER;
 
-            if (teamMembership != null) {
-                // update the role if promoted
-                if (teamMembership.getRole() != newRole) {
-                    teamMembership.setRole(newRole);
+            // Convert GraphQL User to GitHubUserDTO and ensure user exists
+            GitHubUserDTO userDTO = convertUserToDTO(graphQlUser);
+            de.tum.in.www1.hephaestus.gitprovider.user.User user = userProcessor.ensureExists(userDTO);
+
+            if (user != null) {
+                syncedMemberIds.add(user.getId());
+
+                TeamMembership existingMembership = existingMemberships.get(user.getId());
+                if (existingMembership != null) {
+                    // Update role if changed
+                    if (existingMembership.getRole() != role) {
+                        log.debug(
+                            "Updated team membership role: userLogin={}, teamName={}, oldRole={}, newRole={}",
+                            sanitizeForLog(user.getLogin()),
+                            sanitizeForLog(team.getName()),
+                            existingMembership.getRole(),
+                            role
+                        );
+                        existingMembership.setRole(role);
+                        teamMembershipRepository.save(existingMembership);
+                    }
+                } else {
+                    // Create new membership
+                    TeamMembership membership = new TeamMembership(team, user, role);
+                    teamMembershipRepository.save(membership);
+                    log.debug(
+                        "Created team membership: userLogin={}, teamName={}, role={}",
+                        sanitizeForLog(user.getLogin()),
+                        sanitizeForLog(team.getName()),
+                        role
+                    );
                 }
-            } else {
-                // fresh membership
-                User ref = userRepository.getReferenceById(id);
-                team.addMembership(new TeamMembership(team, ref, newRole));
             }
         }
 
-        // remove any memberships that no longer exist on GitHub
-        existing.values().forEach(team::removeMembership);
+        // Remove memberships for users no longer in the team
+        removeStaleTeamMemberships(team, syncedMemberIds);
     }
 
-    private void syncRepoPermissions(GHTeam ghTeam, Team team) {
-        Set<TeamRepositoryPermission> fresh = new HashSet<>();
-        for (GHRepository ghRepo : ghTeam.listRepositories()) {
-            long repoId = ghRepo.getId();
+    /**
+     * Synchronizes team repository permissions from the GraphQL response.
+     * <p>
+     * For each repository in the team's repositories connection, this method creates
+     * or updates TeamRepositoryPermission records with the correct permission level.
+     *
+     * @param client          the GraphQL client for additional queries
+     * @param team            the Team entity
+     * @param graphQlTeam     the GraphQL team object containing repositories
+     * @param organizationLogin the organization login for pagination queries
+     * @return number of permissions synced for monitored repositories
+     */
+    private int syncTeamRepoPermissions(
+        HttpGraphQlClient client,
+        Team team,
+        GHTeam graphQlTeam,
+        String organizationLogin,
+        Long scopeId
+    ) {
+        var reposConnection = graphQlTeam.getRepositories();
+        if (reposConnection == null || reposConnection.getEdges() == null) {
+            log.debug(
+                "No repositories connection for team: teamName={}, connection={}",
+                sanitizeForLog(team.getName()),
+                reposConnection == null ? "null" : "edges=null"
+            );
+            return 0;
+        }
 
-            // skip unknown repos
-            if (!repositoryRepository.existsById(repoId)) {
+        log.debug(
+            "Processing team repositories: teamName={}, totalCount={}, edgesCount={}",
+            sanitizeForLog(team.getName()),
+            reposConnection.getTotalCount(),
+            reposConnection.getEdges().size()
+        );
+
+        // Collect all repository edges - paginate if needed
+        List<GHTeamRepositoryEdge> allRepoEdges = new ArrayList<>(reposConnection.getEdges());
+        var reposPageInfo = reposConnection.getPageInfo();
+
+        if (reposPageInfo != null && Boolean.TRUE.equals(reposPageInfo.getHasNextPage())) {
+            log.debug(
+                "Fetching additional team repositories: teamSlug={}, totalCount={}",
+                sanitizeForLog(graphQlTeam.getSlug()),
+                reposConnection.getTotalCount()
+            );
+            List<GHTeamRepositoryEdge> additionalRepoEdges = fetchAllTeamRepositoryEdges(
+                client,
+                organizationLogin,
+                graphQlTeam.getSlug(),
+                reposPageInfo.getEndCursor(),
+                scopeId
+            );
+            allRepoEdges.addAll(additionalRepoEdges);
+        }
+
+        Set<TeamRepositoryPermission> freshPermissions = new HashSet<>();
+
+        for (var repoEdge : allRepoEdges) {
+            if (repoEdge == null || repoEdge.getNode() == null || repoEdge.getNode().getDatabaseId() == null) {
                 continue;
             }
-            Repository repoRef = repositoryRepository.getReferenceById(repoId);
-            boolean admin = ghRepo.hasAdminAccess();
-            boolean push = ghRepo.hasPushAccess();
-            TeamRepositoryPermission.PermissionLevel level = admin
-                ? TeamRepositoryPermission.PermissionLevel.ADMIN
-                : push ? TeamRepositoryPermission.PermissionLevel.WRITE : TeamRepositoryPermission.PermissionLevel.READ;
 
+            Long repoId = repoEdge.getNode().getDatabaseId().longValue();
+            String repoName = repoEdge.getNode().getNameWithOwner();
+
+            // Skip unknown repos (not monitored by this scope)
+            boolean exists = repositoryRepository.existsById(repoId);
+            if (!exists) {
+                log.trace(
+                    "Skipping unmonitored repository: teamName={}, repoId={}, repoName={}",
+                    sanitizeForLog(team.getName()),
+                    repoId,
+                    sanitizeForLog(repoName)
+                );
+                continue;
+            }
+            log.trace(
+                "Found monitored repository for team: teamName={}, repoId={}, repoName={}",
+                sanitizeForLog(team.getName()),
+                repoId,
+                sanitizeForLog(repoName)
+            );
+
+            Repository repoRef = repositoryRepository.getReferenceById(repoId);
+            TeamRepositoryPermission.PermissionLevel level = convertPermission(repoEdge.getPermission());
+
+            // Find existing permission or create new
             TeamRepositoryPermission permission = team
                 .getRepoPermissions()
                 .stream()
                 .filter(existing -> Objects.equals(existing.getRepository().getId(), repoId))
                 .findFirst()
                 .orElseGet(() -> new TeamRepositoryPermission(team, repoRef, level));
+
             permission.setPermission(level);
-            fresh.add(permission);
+            freshPermissions.add(permission);
         }
-        team.clearAndAddRepoPermissions(fresh);
+
+        // Save permissions via cascade
+        int existingCount = team.getRepoPermissions().size();
+        team.clearAndAddRepoPermissions(freshPermissions);
+        log.debug(
+            "Synced team repository permissions: teamName={}, existingCount={}, newCount={}",
+            sanitizeForLog(team.getName()),
+            existingCount,
+            freshPermissions.size()
+        );
+
+        // Explicitly save team to persist cascaded permissions
+        teamRepository.save(team);
+        return freshPermissions.size();
     }
 
-    @Autowired
-    @Lazy
-    public void setSelf(GitHubTeamSyncService self) {
-        this.self = self;
+    /**
+     * Converts GraphQL GHRepositoryPermission to TeamRepositoryPermission.PermissionLevel.
+     */
+    private TeamRepositoryPermission.PermissionLevel convertPermission(GHRepositoryPermission graphQlPermission) {
+        if (graphQlPermission == null) {
+            return TeamRepositoryPermission.PermissionLevel.READ;
+        }
+        return switch (graphQlPermission) {
+            case ADMIN -> TeamRepositoryPermission.PermissionLevel.ADMIN;
+            case MAINTAIN -> TeamRepositoryPermission.PermissionLevel.MAINTAIN;
+            case WRITE -> TeamRepositoryPermission.PermissionLevel.WRITE;
+            case TRIAGE -> TeamRepositoryPermission.PermissionLevel.TRIAGE;
+            case READ -> TeamRepositoryPermission.PermissionLevel.READ;
+        };
+    }
+
+    /**
+     * Fetches all remaining team member edges (with roles) using pagination.
+     *
+     * @param client            the GraphQL client
+     * @param organizationLogin the organization login
+     * @param teamSlug          the team slug
+     * @param startCursor       the cursor to start from
+     * @return list of all remaining member edges with roles
+     */
+    private List<GHTeamMemberEdge> fetchAllTeamMemberEdges(
+        HttpGraphQlClient client,
+        String organizationLogin,
+        String teamSlug,
+        String startCursor,
+        Long scopeId
+    ) {
+        List<GHTeamMemberEdge> allMemberEdges = new ArrayList<>();
+        String cursor = startCursor;
+        boolean hasNextPage = true;
+        int pageCount = 0;
+
+        while (hasNextPage) {
+            pageCount++;
+            if (pageCount >= MAX_PAGINATION_PAGES) {
+                log.warn(
+                    "Reached maximum pagination limit for team members: teamSlug={}, limit={}",
+                    teamSlug,
+                    MAX_PAGINATION_PAGES
+                );
+                break;
+            }
+
+            ClientGraphQlResponse graphQlResponse = client
+                .documentName(GET_TEAM_MEMBERS_DOCUMENT)
+                .variable("orgLogin", organizationLogin)
+                .variable("teamSlug", teamSlug)
+                .variable("first", LARGE_PAGE_SIZE)
+                .variable("after", cursor)
+                .execute()
+                .block(syncProperties.graphqlTimeout());
+
+            if (graphQlResponse == null || !graphQlResponse.isValid()) {
+                log.warn(
+                    "Received invalid GraphQL response for team members: teamSlug={}, errors={}",
+                    teamSlug,
+                    graphQlResponse != null ? graphQlResponse.getErrors() : "null"
+                );
+                break;
+            }
+
+            // Track rate limit from response
+            graphQlClientProvider.trackRateLimit(scopeId, graphQlResponse);
+
+            // Check if we should pause due to rate limiting
+            if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
+                log.warn("Aborting team members fetch due to critical rate limit: teamSlug={}", teamSlug);
+                break;
+            }
+
+            GHTeamMemberConnection response = graphQlResponse
+                .field("organization.team.members")
+                .toEntity(GHTeamMemberConnection.class);
+
+            if (response == null || response.getEdges() == null) {
+                break;
+            }
+
+            allMemberEdges.addAll(response.getEdges());
+
+            var pageInfo = response.getPageInfo();
+            hasNextPage = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
+            cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
+        }
+
+        return allMemberEdges;
+    }
+
+    /**
+     * Fetches all remaining team repository edges (with permissions) using pagination.
+     *
+     * @param client            the GraphQL client
+     * @param organizationLogin the organization login
+     * @param teamSlug          the team slug
+     * @param startCursor       the cursor to start from
+     * @return list of all remaining repository edges with permissions
+     */
+    private List<GHTeamRepositoryEdge> fetchAllTeamRepositoryEdges(
+        HttpGraphQlClient client,
+        String organizationLogin,
+        String teamSlug,
+        String startCursor,
+        Long scopeId
+    ) {
+        List<GHTeamRepositoryEdge> allEdges = new ArrayList<>();
+        String cursor = startCursor;
+        boolean hasNextPage = true;
+        int pageCount = 0;
+
+        while (hasNextPage) {
+            pageCount++;
+            if (pageCount >= MAX_PAGINATION_PAGES) {
+                log.warn(
+                    "Reached maximum pagination limit for team repositories: teamSlug={}, limit={}",
+                    teamSlug,
+                    MAX_PAGINATION_PAGES
+                );
+                break;
+            }
+
+            ClientGraphQlResponse graphQlResponse = client
+                .documentName(GET_TEAM_REPOSITORIES_DOCUMENT)
+                .variable("orgLogin", organizationLogin)
+                .variable("teamSlug", teamSlug)
+                .variable("first", LARGE_PAGE_SIZE)
+                .variable("after", cursor)
+                .execute()
+                .block(syncProperties.graphqlTimeout());
+
+            if (graphQlResponse == null || !graphQlResponse.isValid()) {
+                log.warn(
+                    "Received invalid GraphQL response for team repositories: teamSlug={}, errors={}",
+                    teamSlug,
+                    graphQlResponse != null ? graphQlResponse.getErrors() : "null"
+                );
+                break;
+            }
+
+            // Track rate limit from response
+            graphQlClientProvider.trackRateLimit(scopeId, graphQlResponse);
+
+            // Check if we should pause due to rate limiting
+            if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
+                log.warn("Aborting team repositories fetch due to critical rate limit: teamSlug={}", teamSlug);
+                break;
+            }
+
+            GHTeamRepositoryConnection response = graphQlResponse
+                .field("organization.team.repositories")
+                .toEntity(GHTeamRepositoryConnection.class);
+
+            if (response == null || response.getEdges() == null) {
+                break;
+            }
+
+            allEdges.addAll(response.getEdges());
+
+            var pageInfo = response.getPageInfo();
+            hasNextPage = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
+            cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
+        }
+
+        return allEdges;
+    }
+
+    /**
+     * Removes team memberships for users who are no longer members of the team.
+     *
+     * @param team            the Team entity
+     * @param syncedMemberIds the set of user IDs that are still members
+     */
+    private void removeStaleTeamMemberships(Team team, Set<Long> syncedMemberIds) {
+        Set<TeamMembership> currentMemberships = team.getMemberships();
+        int removed = 0;
+
+        for (TeamMembership membership : new HashSet<>(currentMemberships)) {
+            if (!syncedMemberIds.contains(membership.getUser().getId())) {
+                teamMembershipRepository.delete(membership);
+                team.removeMembership(membership);
+                removed++;
+            }
+        }
+
+        if (removed > 0) {
+            log.debug("Removed stale team memberships: teamName={}, membershipCount={}", team.getName(), removed);
+        }
+    }
+
+    /**
+     * Removes teams that no longer exist in the organization.
+     *
+     * @param organizationLogin the organization login
+     * @param syncedTeamIds     the set of team IDs that were synced
+     * @param context           the processing context
+     */
+    private void removeDeletedTeams(String organizationLogin, Set<Long> syncedTeamIds, ProcessingContext context) {
+        List<Team> existingTeams = teamRepository.findAllByOrganizationIgnoreCase(organizationLogin);
+        int removed = 0;
+
+        for (Team team : existingTeams) {
+            if (!syncedTeamIds.contains(team.getId())) {
+                teamProcessor.delete(team.getId(), context);
+                removed++;
+            }
+        }
+
+        if (removed > 0) {
+            log.info("Removed stale teams: orgLogin={}, teamCount={}", sanitizeForLog(organizationLogin), removed);
+        }
+    }
+
+    /**
+     * Converts a GraphQL Team to a GitHubTeamDTO.
+     *
+     * @param graphQlTeam the GraphQL team object
+     * @return the DTO for use with GitHubTeamProcessor
+     */
+    private GitHubTeamEventDTO.GitHubTeamDTO convertToDTO(GHTeam graphQlTeam) {
+        Long databaseId = graphQlTeam.getDatabaseId() != null ? graphQlTeam.getDatabaseId().longValue() : null;
+
+        String privacy = mapPrivacy(graphQlTeam.getPrivacy());
+        String htmlUrl = graphQlTeam.getUrl() != null ? graphQlTeam.getUrl().toString() : null;
+        Instant createdAt = graphQlTeam.getCreatedAt() != null ? graphQlTeam.getCreatedAt().toInstant() : null;
+        Instant updatedAt = graphQlTeam.getUpdatedAt() != null ? graphQlTeam.getUpdatedAt().toInstant() : null;
+
+        return new GitHubTeamEventDTO.GitHubTeamDTO(
+            databaseId,
+            graphQlTeam.getId(),
+            graphQlTeam.getName(),
+            graphQlTeam.getSlug(),
+            graphQlTeam.getDescription(),
+            privacy,
+            null, // permission - not available in team query
+            htmlUrl,
+            createdAt,
+            updatedAt
+        );
+    }
+
+    /**
+     * Converts a GraphQL User to a GitHubUserDTO.
+     *
+     * @param graphQlUser the GraphQL user object
+     * @return the DTO for use with GitHubUserProcessor
+     */
+    private GitHubUserDTO convertUserToDTO(GHUser graphQlUser) {
+        Long databaseId = graphQlUser.getDatabaseId() != null ? graphQlUser.getDatabaseId().longValue() : null;
+
+        String avatarUrl = graphQlUser.getAvatarUrl() != null ? graphQlUser.getAvatarUrl().toString() : null;
+
+        return new GitHubUserDTO(
+            databaseId,
+            databaseId,
+            graphQlUser.getLogin(),
+            avatarUrl,
+            null, // htmlUrl - not fetched in the query
+            graphQlUser.getName(),
+            null // email - not fetched in the query
+        );
+    }
+
+    /**
+     * Maps GraphQL GHTeamPrivacy enum to string for DTO.
+     *
+     * @param privacy the GraphQL GHTeamPrivacy enum value
+     * @return the privacy string, or null if privacy is null
+     */
+    private String mapPrivacy(GHTeamPrivacy privacy) {
+        if (privacy == null) {
+            return null;
+        }
+        return switch (privacy) {
+            case SECRET -> "secret";
+            case VISIBLE -> "visible";
+        };
     }
 }

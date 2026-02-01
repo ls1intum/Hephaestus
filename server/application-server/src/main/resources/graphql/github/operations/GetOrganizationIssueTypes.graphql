@@ -1,0 +1,30 @@
+# GraphQL operation for syncing issue types from a GitHub organization
+# Used by GitHubIssueTypeSyncService via documentName("GetOrganizationIssueTypes")
+#
+# Issue types are defined at the organization level and provide categorization
+# for issues (e.g., Bug, Feature, Task).
+
+query GetOrganizationIssueTypes($login: String!, $first: Int!, $after: String) {
+    rateLimit {
+        cost
+        limit
+        remaining
+        resetAt
+    }
+    organization(login: $login) {
+        issueTypes(first: $first, after: $after) {
+            pageInfo {
+                hasNextPage
+                endCursor
+            }
+            totalCount
+            nodes {
+                id
+                name
+                description
+                color
+                isEnabled
+            }
+        }
+    }
+}

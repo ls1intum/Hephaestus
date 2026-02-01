@@ -13,6 +13,7 @@ import de.tum.in.www1.hephaestus.workspace.dto.AssignRoleRequestDTO;
 import de.tum.in.www1.hephaestus.workspace.dto.WorkspaceMembershipDTO;
 import de.tum.in.www1.hephaestus.workspace.exception.InsufficientWorkspacePermissionsException;
 import de.tum.in.www1.hephaestus.workspace.exception.LastOwnerRemovalException;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -32,7 +33,6 @@ import org.springframework.web.bind.annotation.*;
 public class WorkspaceMembershipController {
 
     private final WorkspaceMembershipService workspaceMembershipService;
-    private final WorkspaceMembershipRepository workspaceMembershipRepository;
     private final UserRepository userRepository;
     private final WorkspaceAccessService accessService;
 
@@ -43,9 +43,10 @@ public class WorkspaceMembershipController {
      * @return the current user's membership details
      */
     @GetMapping("/me")
+    @SecurityRequirements
     public ResponseEntity<WorkspaceMembershipDTO> getCurrentUserMembership(WorkspaceContext context) {
         User currentUser = requireCurrentUser();
-        WorkspaceMembership membership = requireMembership(context.id(), currentUser.getId());
+        WorkspaceMembership membership = workspaceMembershipService.getMembership(context.id(), currentUser.getId());
         return ResponseEntity.ok(WorkspaceMembershipDTO.from(membership));
     }
 
@@ -59,6 +60,7 @@ public class WorkspaceMembershipController {
      * @return List of workspace memberships
      */
     @GetMapping
+    @SecurityRequirements
     public ResponseEntity<List<WorkspaceMembershipDTO>> listMembers(
         WorkspaceContext context,
         @RequestParam(defaultValue = "0") int page,
@@ -67,8 +69,8 @@ public class WorkspaceMembershipController {
         int pageSize = Math.min(size, 100);
         Pageable pageable = PageRequest.of(page, pageSize, Sort.by("createdAt").ascending());
 
-        List<WorkspaceMembershipDTO> memberships = workspaceMembershipRepository
-            .findAllByWorkspace_Id(context.id(), pageable)
+        List<WorkspaceMembershipDTO> memberships = workspaceMembershipService
+            .listMembers(context.id(), pageable)
             .map(WorkspaceMembershipDTO::from)
             .getContent();
 
@@ -84,6 +86,7 @@ public class WorkspaceMembershipController {
      * @return Workspace membership details
      */
     @GetMapping("/{userId}")
+    @SecurityRequirements
     public ResponseEntity<WorkspaceMembershipDTO> getMember(WorkspaceContext context, @PathVariable Long userId) {
         WorkspaceMembership membership = requireMembership(context.id(), userId);
         return ResponseEntity.ok(WorkspaceMembershipDTO.from(membership));
@@ -143,8 +146,8 @@ public class WorkspaceMembershipController {
     }
 
     private WorkspaceMembership requireMembership(Long workspaceId, Long userId) {
-        return workspaceMembershipRepository
-            .findByWorkspace_IdAndUser_Id(workspaceId, userId)
+        return workspaceMembershipService
+            .findMembership(workspaceId, userId)
             .orElseThrow(() -> new EntityNotFoundException("WorkspaceMembership", userId));
     }
 
@@ -158,14 +161,8 @@ public class WorkspaceMembershipController {
     }
 
     private void requireNotLastOwner(WorkspaceContext context, WorkspaceMembership membership) {
-        if (membership.getRole() == WorkspaceRole.OWNER) {
-            long ownerCount = workspaceMembershipRepository.countByWorkspace_IdAndRole(
-                context.id(),
-                WorkspaceRole.OWNER
-            );
-            if (ownerCount <= 1) {
-                throw new LastOwnerRemovalException(context.slug());
-            }
+        if (workspaceMembershipService.isLastOwner(context.id(), membership)) {
+            throw new LastOwnerRemovalException(context.slug());
         }
     }
 }

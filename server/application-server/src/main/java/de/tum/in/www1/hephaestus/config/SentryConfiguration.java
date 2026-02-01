@@ -2,10 +2,8 @@ package de.tum.in.www1.hephaestus.config;
 
 import io.sentry.Sentry;
 import jakarta.annotation.PostConstruct;
-import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
@@ -13,16 +11,21 @@ import org.springframework.core.env.Environment;
 @Configuration
 public class SentryConfiguration {
 
-    private static final Logger logger = LoggerFactory.getLogger(SentryConfiguration.class);
+    private static final Logger log = LoggerFactory.getLogger(SentryConfiguration.class);
 
-    @Autowired
-    private Environment environment;
+    private final Environment environment;
+    private final String hephaestusVersion;
+    private final SentryProperties sentryProperties;
 
-    @Value("${spring.application.version}")
-    private String hephaestusVersion;
-
-    @Value("${sentry.dsn}")
-    private Optional<String> sentryDsn;
+    public SentryConfiguration(
+        Environment environment,
+        @Value("${spring.application.version}") String hephaestusVersion,
+        SentryProperties sentryProperties
+    ) {
+        this.environment = environment;
+        this.hephaestusVersion = hephaestusVersion;
+        this.sentryProperties = sentryProperties;
+    }
 
     /**
      * Init sentry with the correct environment and version
@@ -30,17 +33,17 @@ public class SentryConfiguration {
     @PostConstruct
     public void init() {
         if (environment.matchesProfiles("specs")) {
-            logger.info("Sentry is disabled in specs profile");
+            log.info("Skipped Sentry initialization: reason=specs_profile");
             return;
         }
 
-        if (sentryDsn.isEmpty() || sentryDsn.get().isEmpty()) {
-            logger.info("Sentry is disabled: Provide a DSN to enable Sentry.");
+        if (!sentryProperties.isConfigured()) {
+            log.info("Skipped Sentry initialization: reason=missing_dsn");
             return;
         }
 
         try {
-            final String dsn = sentryDsn.get() + "?stacktrace.app.packages=de.tum.in.www1.hephaestus";
+            final String dsn = sentryProperties.dsn() + "?stacktrace.app.packages=de.tum.in.www1.hephaestus";
 
             Sentry.init(options -> {
                 options.setDsn(dsn);
@@ -50,9 +53,9 @@ public class SentryConfiguration {
                 options.setTracesSampleRate(getTracesSampleRate());
             });
 
-            logger.info("Sentry configuration was successful");
+            log.info("Initialized Sentry");
         } catch (Exception ex) {
-            logger.error("Sentry configuration was not successful due to exception!", ex);
+            log.error("Failed to initialize Sentry", ex);
         }
     }
 

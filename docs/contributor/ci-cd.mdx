@@ -16,20 +16,20 @@ graph TD
     PR[Pull Request] --> Review{Code Review}
     Review -->|Approved| Merge[Merge to main]
     Merge --> CI[CI/CD Pipeline]
-    
+
     subgraph CI/CD
     CI --> Q[Quality Gates]
     CI --> T[Tests]
     CI --> D[Docker Build]
     end
-    
+
     Q --> Pass{All Pass?}
     T --> Pass
     D --> Pass
-    
+
     Pass -->|Yes| SR[semantic-release]
     SR --> Tag[Create Tag v1.2.3]
-    
+
     Tag --> Staging[Deploy Staging]
     Staging --> Verify{Verify OK?}
     Verify -->|Approve| Prod[Deploy Production]
@@ -37,16 +37,16 @@ graph TD
 
 ## ⚡ Pipeline Timeline
 
-| Stage | Duration | Notes |
-| --- | --- | --- |
-| Quality gates | ~3 min | Parallel with tests |
-| Tests | ~3 min | Parallel with gates |
-| Docker builds | ~7 min | Uses layer caching |
-| semantic-release | ~1 min | Creates tag + changelog |
-| Staging deploy | ~2 min | Automatic |
-| **Your verification** | You decide | Check staging |
-| Production deploy | ~2 min | After approval |
-| **Total** | **~15 min + verification** | |
+| Stage                 | Duration                   | Notes                       |
+| --------------------- | -------------------------- | --------------------------- |
+| Quality gates         | ~3 min                     | Parallel with tests         |
+| Tests                 | ~3 min                     | Parallel with gates         |
+| Docker builds         | ~3 min (cached)            | Registry cache, ~7 min cold |
+| semantic-release      | ~1 min                     | Creates tag + changelog     |
+| Staging deploy        | ~2 min                     | Automatic                   |
+| **Your verification** | You decide                 | Check staging               |
+| Production deploy     | ~2 min                     | After approval              |
+| **Total**             | **~12 min + verification** | ~8 min with full cache hits |
 
 ## 🚀 Release Flow
 
@@ -65,27 +65,40 @@ Every merge to `main` with releasable changes (`feat:`, `fix:`, `perf:`, `revert
 
 Before any release, code must pass:
 
-| Gate | Tool | Purpose |
-| --- | --- | --- |
-| Database drift | Liquibase | JPA ↔ Schema sync |
-| OpenAPI sync | Diff check | Client ↔ Server sync |
-| Java formatting | Spotless | Code style |
-| TypeScript | Biome + tsc | Lint + typecheck |
-| Python | Black + Flake8 | Format + lint |
+| Gate            | Tool        | Purpose              |
+| --------------- | ----------- | -------------------- |
+| Database drift  | Liquibase   | JPA ↔ Schema sync    |
+| OpenAPI sync    | Diff check  | Client ↔ Server sync |
+| Java formatting | Spotless    | Code style           |
+| TypeScript      | Biome + tsc | Lint + typecheck     |
 
 ## 🔒 Security
 
-- **Trivy** — Scans Docker images for CVEs
+- **CodeQL** — SAST scanning via GitHub's Default Setup (automatic, zero maintenance)
+- **Trivy** — Scans dependencies for CVEs
+- **TruffleHog** — Secret detection in code and history
 - **Renovate** — Monitors dependencies for vulnerabilities
 - **Environment protection** — Production requires approval
 
+### CodeQL Default Setup
+
+CodeQL runs automatically via GitHub's Default Setup (enabled in repository settings), providing:
+
+- Scans on every push to main and protected branches
+- Scans on pull request creation and updates
+- Weekly scheduled scans for the full codebase
+- Incremental analysis (20% faster on PRs)
+- Zero maintenance — GitHub manages query updates
+
+This is more efficient than a custom workflow and doesn't consume CI minutes.
+
 ## 📦 Environments
 
-| Environment | Protection | Deploys On |
-| --- | --- | --- |
-| Preview (Coolify) | None | Every PR |
-| Staging | None | Every tag |
-| Production | Approval required | Tag + approval |
+| Environment       | Protection        | Deploys On     |
+| ----------------- | ----------------- | -------------- |
+| Preview (Coolify) | None              | Every PR       |
+| Staging           | None              | Every tag      |
+| Production        | Approval required | Tag + approval |
 
 ### GitHub Environment Setup
 
@@ -96,31 +109,307 @@ Before any release, code must pass:
 ## 🔄 Preview Deployments
 
 Coolify handles PR previews:
+
 - Built directly on server (fast!)
 - URL: `pr-{number}.preview.hephaestus.cit.tum.de`
 - Auto-cleanup on PR close
 
 ## ⚙️ Key Workflows
 
-| Workflow | Trigger | Purpose |
-| --- | --- | --- |
-| `cicd.yml` | Push to main, PRs | Tests, builds, quality gates |
-| `release.yml` | On CI/CD Success | Creates tag, deploys staging, gates production |
-| `deploy-staging.yml` | Called by release.yml | Deploys to staging |
-| `deploy-prod.yml` | workflow_dispatch | Deploys to production (manual trigger) |
+| Workflow               | Trigger               | Purpose                                            |
+| ---------------------- | --------------------- | -------------------------------------------------- |
+| `cicd.yml`             | Push to main, PRs     | Orchestrator: change detection + workflow dispatch |
+| `ci-quality-gates.yml` | Called by cicd.yml    | Code quality, formatting, schema validation        |
+| `ci-tests.yml`         | Called by cicd.yml    | Unit, integration, visual tests                    |
+| `ci-docker-build.yml`  | Called by cicd.yml    | Docker image builds per component                  |
+| `ci-security-scan.yml` | Called by cicd.yml    | Dependency scanning (Trivy), secret detection      |
+| `release.yml`          | On CI/CD Success      | Creates tag, deploys staging, gates production     |
+| `deploy-staging.yml`   | Called by release.yml | Deploys to staging                                 |
+| `deploy-prod.yml`      | workflow_dispatch     | Deploys to production (manual trigger)             |
+
+### Workflow Architecture
+
+```mermaid
+graph LR
+    subgraph cicd.yml
+        DC[Detect Changes] --> QG[Quality Gates]
+        DC --> TS[Test Suite]
+        DC --> DB[Docker Build]
+        DC --> SS[Security Scan]
+    end
+
+    QG --> Gate[CI Status Gate]
+    TS --> Gate
+    DB --> Gate
+    SS --> Gate
+
+    Gate -->|All Pass| Release[release.yml]
+```
+
+The `cicd.yml` workflow:
+
+1. **Detects changes** using `dorny/paths-filter`
+2. **Dispatches sub-workflows** with component-specific flags
+3. **Aggregates results** in the CI Status Gate job
 
 ## 🎯 Performance Optimizations
 
+### Path-Based Filtering
+
+CI only runs jobs for components that actually changed:
+
+| Component            | Triggers On                                                   |
+| -------------------- | ------------------------------------------------------------- |
+| Webapp               | `webapp/**`, `package.json`, `package-lock.json`              |
+| Application Server   | `server/application-server/**`, `scripts/db-utils.sh`         |
+| Intelligence Service | `server/intelligence-service/**`, scripts, root package files |
+| Webhook Ingest       | `server/webhook-ingest/**`, root package files                |
+| CI Config            | `.github/workflows/**`, `.github/actions/**` → runs all jobs  |
+
+**Benefits:**
+
+- Webapp-only changes skip Java tests (~3 min saved)
+- Docs-only changes skip all CI jobs (~7 min saved)
+- CI config changes run everything (safety net)
+
 ### Docker Layer Caching
-- All images built every run
-- Aggressive caching makes unchanged builds instant
-- Ensures every commit is deployable
+
+Docker builds use **registry-based caching** to store intermediate layers in `ghcr.io`:
+
+| Component            | First Build | Cached Build | Cache Size |
+| -------------------- | ----------- | ------------ | ---------- |
+| Application Server   | ~7 min      | ~30 sec      | ~500 MB    |
+| Webapp               | ~5 min      | ~30 sec      | ~200 MB    |
+| Intelligence Service | ~4 min      | ~30 sec      | ~150 MB    |
+| Webhook Ingest       | ~3 min      | ~30 sec      | ~100 MB    |
+
+**How it works:**
+
+- `cache-from`: Pulls cached layers from registry (main branch + current branch)
+- `cache-to`: Pushes new layers with `mode=max` (all intermediate layers)
+- Separate cache tags per platform: `image:cache-linux-amd64`, `image:cache-linux-arm64`
+- Native builds: amd64 on x86 runners, arm64 on ARM runners (no QEMU emulation)
+
+**Benefits over GitHub Actions Cache:**
+
+- No 10GB size limit (registry is unlimited)
+- No eviction after 7 days
+- Works across branches (PRs benefit from main's cache)
+- Persistent (survives cache clearing)
+
+### Docker Hub Authentication (Recommended)
+
+Without Docker Hub authentication, base image metadata resolution can be rate-limited, adding **2+ minutes** to every Docker build. To avoid this:
+
+1. Create a Docker Hub account (free tier is sufficient)
+2. Generate an access token at [hub.docker.com/settings/security](https://hub.docker.com/settings/security)
+3. Add repository variable and secret:
+   - **Variable**: `DOCKERHUB_USERNAME` = your Docker Hub username
+   - **Secret**: `DOCKERHUB_TOKEN` = your access token
+
+The Docker build workflow will automatically use these credentials if present, falling back to anonymous (slower) access if not configured.
 
 ### Parallel Execution
-- Quality gates run parallel to tests
-- Docker builds use matrix strategy
-- Fail-fast terminates on first failure
+
+- 10 test types run in parallel (3 app-server, 3 webapp, 3 intelligence-service, 1 webhook-ingest)
+- 8 quality gate checks run in parallel
+- 4 Docker builds × 2 architectures (amd64 + arm64)
+- `fail-fast: false` ensures all jobs complete for full feedback
 
 ### Concurrency Control
+
 - Outdated PR runs cancelled automatically
 - Release runs never cancelled
+
+## 🛠️ Running CI Locally
+
+Before pushing, run the same checks that CI runs:
+
+### Quick Check (Recommended)
+
+```bash
+# Format and check all services
+npm run format && npm run check
+```
+
+### Per-Service Commands
+
+```bash
+# Webapp
+npm run check:webapp          # Full check (format + lint + typecheck)
+npm run test:webapp           # Unit tests
+
+# Application Server (Java)
+npm run format:java:check     # Check formatting
+cd server/application-server && ./mvnw test -Dgroups="unit"  # Unit tests
+
+# Intelligence Service
+npm run check:intelligence-service
+cd server/intelligence-service && npm run test:unit
+
+# Webhook Ingest
+npm run check:webhook-ingest
+cd server/webhook-ingest && npm run test
+```
+
+### Common Issues
+
+| Issue                 | Solution                                      |
+| --------------------- | --------------------------------------------- |
+| Formatting errors     | Run `npm run format`                          |
+| TypeScript errors     | Run `npm run typecheck:webapp` to see details |
+| Test failures         | Check the specific test output for details    |
+| OpenAPI out of sync   | Run `npm run generate:api`                    |
+| Database schema drift | Run `npm run db:draft-changelog`              |
+
+## 📊 CI Features
+
+### Test Results
+
+All test suites generate JUnit XML reports that are displayed in the **Test Results** tab of each workflow run:
+
+- **Application Server**: Unit, integration, and architecture tests
+- **Webapp**: Unit tests and Storybook interaction tests
+- **Intelligence Service**: Unit and integration tests (with Testcontainers)
+- **Webhook Ingest**: Unit tests
+
+### Job Summary
+
+Each CI run generates a rich **Job Summary** in the Actions UI with:
+
+- Overall status with emoji indicators
+- Results table for each workflow (quality gates, tests, security, Docker)
+- Components changed table (from path filtering)
+- Failure-specific troubleshooting guides with fix commands
+- Performance metrics showing skipped workflows
+
+### Workflow Timeline
+
+The CI Status Gate job generates a visual **Mermaid timeline** showing:
+
+- Job execution order and duration
+- Parallel job execution
+- Runner wait times
+- Critical path identification
+
+This helps identify bottlenecks and optimization opportunities.
+
+## 🆕 Adding a New Service
+
+When adding a new service to the monorepo, update CI configuration in this order:
+
+### Step 1: Path Detection (`cicd.yml`)
+
+Add a path filter and output for the new service:
+
+```yaml
+# In detect-changes job outputs:
+outputs:
+  new-service: ${{ steps.filter.outputs.new-service }}
+
+# In paths-filter step:
+filters: |
+  new-service:
+    - 'server/new-service/**'
+    - 'package.json'
+    - 'package-lock.json'
+```
+
+Update the `any-code` aggregate output to include the new service.
+
+### Step 2: Quality Gates (`ci-quality-gates.yml`)
+
+1. **Add to matrix:**
+
+```yaml
+matrix:
+  check: [
+      # ... existing checks
+      new-service-quality,
+    ]
+```
+
+2. **Add case statement** in "Determine if check should run":
+
+```yaml
+"new-service-quality")
+  echo "run=${{ inputs.new_service_changed }}" >> $GITHUB_OUTPUT
+  ;;
+```
+
+3. **Add quality check step** with the appropriate linting/type checking commands.
+
+### Step 3: Tests (`ci-tests.yml`)
+
+1. **Add to matrix:**
+
+```yaml
+matrix:
+  test-type: [
+      # ... existing tests
+      new-service-unit,
+      new-service-integration, # if applicable
+    ]
+```
+
+2. **Add case statement** in "Determine if test should run":
+
+```yaml
+"new-service-unit"|"new-service-integration")
+  echo "run=${{ inputs.new_service_changed }}" >> $GITHUB_OUTPUT
+  ;;
+```
+
+3. **Add test execution step** with the test commands.
+
+4. **Add test result upload** for JUnit reporting.
+
+### Step 4: Docker Build (`ci-docker-build.yml`)
+
+Add a new build job:
+
+```yaml
+new-service-build:
+  name: "Docker: new-service"
+  if: inputs.should_skip != 'true' && inputs.new_service_changed == 'true'
+  uses: ls1intum/.github/.github/workflows/build-and-push-docker-image.yml@main
+  with:
+    image-name: "ls1intum/hephaestus/new-service"
+    docker-file: "./server/new-service/Dockerfile"
+    docker-context: "./server/new-service"
+    # ... rest of config
+```
+
+### Step 5: Caching (`setup-caches/action.yml`)
+
+Add the new service's cache-types to the appropriate conditions:
+
+```yaml
+# For Node.js services:
+- name: Cache Node.js dependencies
+  if: contains(fromJSON('["...", "new-service-quality", "new-service-unit"]'), inputs.cache-type)
+
+# For Java services:
+- name: Cache Maven dependencies
+  if: contains(fromJSON('["...", "new-service-unit"]'), inputs.cache-type)
+```
+
+### Step 6: Update Workflow Inputs
+
+In `cicd.yml`, add the new input to workflow calls:
+
+```yaml
+with:
+  new_service_changed: ${{ (needs.detect-changes.outputs.new-service == 'true' || ...) && 'true' || 'false' }}
+```
+
+### Verification Checklist
+
+After adding a new service, verify:
+
+- [ ] Path filter correctly detects changes to new service
+- [ ] Quality gates run only when new service changes
+- [ ] Tests run only when new service changes
+- [ ] Docker build runs only when new service changes
+- [ ] CI config changes trigger all jobs (safety net)
+- [ ] JUnit reports appear in Test Results tab

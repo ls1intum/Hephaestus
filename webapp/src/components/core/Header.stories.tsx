@@ -1,29 +1,24 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { fn } from "@storybook/test";
+import { fn } from "storybook/test";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import Header from "./Header";
 
 /**
- * Header component for the Hephaestus application that provides navigation,
- * authentication controls, and access to various application features.
+ * Header component - fully presentational, receives all data via props.
+ * Version badge links to GitHub releases for production versions.
  */
 const meta = {
 	component: Header,
 	parameters: {
 		layout: "fullscreen",
 		viewport: { defaultViewport: "desktop" },
-		docs: {
-			description: {
-				component:
-					"Main navigation component with adaptive layout and contextual controls based on user permissions.",
-			},
-		},
 	},
 	tags: ["autodocs"],
 	args: {
 		version: "1.0.0",
 		name: "John Doe",
 		username: "johnDoe",
+		workspaceSlug: "demo-workspace",
 		sidebarTrigger: <SidebarTrigger />,
 		onLogin: fn(),
 		onLogout: fn(),
@@ -56,11 +51,11 @@ const meta = {
 		},
 		version: {
 			control: "text",
-			description: "Application version displayed beside logo",
+			description: "Application version - links to release notes for semver",
 		},
-		sidebarTrigger: {
-			control: "object",
-			description: "Sidebar trigger button component",
+		workspaceSlug: {
+			control: "text",
+			description: "Active workspace slug for routing",
 		},
 	},
 } satisfies Meta<typeof Header>;
@@ -69,113 +64,69 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * Header state for a regular authenticated user without special permissions.
+ * Production header with clickable version linking to release notes.
  */
-export const LoggedInUser: Story = {
+export const Default: Story = {
 	args: {
 		isAuthenticated: true,
 		isLoading: false,
 	},
-	parameters: {
-		docs: {
-			description: {
-				story:
-					"Standard header view for authenticated users showing the user profile dropdown with navigation options.",
-			},
-		},
+};
+
+/**
+ * Local development header with non-clickable DEV version badge.
+ */
+export const Development: Story = {
+	args: {
+		isAuthenticated: true,
+		isLoading: false,
+		version: "DEV",
 	},
 };
 
 /**
- * Header state for unauthenticated visitors, showing minimal options and a sign-in button.
+ * Header for unauthenticated visitors with sign-in button.
  */
 export const LoggedOut: Story = {
 	args: {
 		isAuthenticated: false,
 		isLoading: false,
 	},
-	parameters: {
-		docs: {
-			description: {
-				story:
-					"Header view for unauthenticated users with sign-in button and limited navigation options.",
-			},
-		},
-	},
 };
 
 /**
- * Header state when authentication status is being determined, showing loading state.
+ * Header in loading state while authentication is being verified.
  */
 export const Loading: Story = {
 	args: {
 		isAuthenticated: false,
 		isLoading: true,
 	},
-	parameters: {
-		docs: {
-			description: {
-				story:
-					"Header in loading state while user authentication is being verified.",
-			},
-		},
+};
+
+/**
+ * Header without active workspace - logo links to landing page.
+ */
+export const NoWorkspace: Story = {
+	args: {
+		isAuthenticated: true,
+		isLoading: false,
+		workspaceSlug: undefined,
 	},
 };
 
 /**
- * Mobile view of the header showing the hamburger menu for navigation.
- * Demonstrates responsive behavior with collapsed navigation.
+ * Mobile view with compact layout.
  */
-export const MobileView: Story = {
+export const Mobile: Story = {
 	args: {
 		isAuthenticated: true,
 		isLoading: false,
 	},
-	parameters: {
-		viewport: { defaultViewport: "mobile1" },
-		docs: {
-			description: {
-				story:
-					"Header in mobile view with collapsed navigation in a hamburger menu and compact controls.",
-			},
-		},
-	},
-};
-
-/**
- * Desktop view of the header showing full horizontal navigation.
- */
-export const DesktopView: Story = {
-	args: {
-		isAuthenticated: true,
-		isLoading: false,
-	},
-	parameters: {
-		viewport: { defaultViewport: "desktop" },
-		docs: {
-			description: {
-				story:
-					"Header in desktop view with full horizontal navigation and expanded controls.",
-			},
-		},
-	},
-};
-
-/**
- * Header without sidebar trigger for layouts that don't require a sidebar.
- */
-export const WithoutSidebarTrigger: Story = {
-	args: {
-		isAuthenticated: true,
-		isLoading: false,
-		sidebarTrigger: undefined,
-	},
-	parameters: {
-		docs: {
-			description: {
-				story:
-					"Header variant without a sidebar toggle button for pages with fixed layouts.",
-			},
+	globals: {
+		viewport: {
+			value: "mobile1",
+			isRotated: false,
 		},
 	},
 };

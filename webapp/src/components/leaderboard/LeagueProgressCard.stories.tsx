@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { fn } from "@storybook/test";
+import { fn } from "storybook/test";
 import { LeagueProgressCard } from "./LeagueProgressCard";
 
 /**
@@ -37,8 +37,7 @@ const meta: Meta<typeof LeagueProgressCard> = {
 				},
 			];
 			const currentLeague = leagues.find(
-				(league) =>
-					leaguePoints >= league.minPoints && leaguePoints < league.maxPoints,
+				(league) => leaguePoints >= league.minPoints && leaguePoints < league.maxPoints,
 			);
 
 			const progressValue = currentLeague

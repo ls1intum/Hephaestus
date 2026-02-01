@@ -13,6 +13,7 @@ import java.net.URI;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -30,9 +31,11 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 @RequestMapping("/workspaces")
 @RequiredArgsConstructor
 @Validated
+@PreAuthorize("isAuthenticated()")
 public class WorkspaceRegistryController {
 
     private final WorkspaceService workspaceService;
+    private final WorkspaceQueryService workspaceQueryService;
 
     @PostMapping
     @Operation(summary = "Create a new workspace")
@@ -68,8 +71,8 @@ public class WorkspaceRegistryController {
         content = @Content(array = @ArraySchema(schema = @Schema(implementation = WorkspaceListItemDTO.class)))
     )
     public ResponseEntity<List<WorkspaceListItemDTO>> listWorkspaces() {
-        List<WorkspaceListItemDTO> workspaces = workspaceService
-            .listAccessibleWorkspacesForCurrentUser()
+        List<WorkspaceListItemDTO> workspaces = workspaceQueryService
+            .findAccessibleWorkspaces()
             .stream()
             .map(WorkspaceListItemDTO::from)
             .toList();

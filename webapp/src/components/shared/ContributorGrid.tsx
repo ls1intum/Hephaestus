@@ -59,11 +59,7 @@ export function ContributorGrid({
 	return (
 		<div className={gridClass}>
 			{contributors.map((contributor) => (
-				<ContributorCard
-					key={contributor.id}
-					contributor={contributor}
-					size={size}
-				/>
+				<ContributorCard key={contributor.id} contributor={contributor} size={size} />
 			))}
 		</div>
 	);

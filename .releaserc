@@ -12,12 +12,28 @@
             "release": "major"
           },
           {
-            "type": "feat",
-            "release": "minor"
+            "scope": "no-release",
+            "release": false
           },
           {
-            "type": "fix",
-            "release": "patch"
+            "scope": "ci",
+            "release": false
+          },
+          {
+            "scope": "config",
+            "release": false
+          },
+          {
+            "scope": "deps-dev",
+            "release": false
+          },
+          {
+            "scope": "scripts",
+            "release": false
+          },
+          {
+            "scope": "docs",
+            "release": false
           },
           {
             "type": "docs",
@@ -30,10 +46,6 @@
           {
             "type": "refactor",
             "release": false
-          },
-          {
-            "type": "perf",
-            "release": "patch"
           },
           {
             "type": "test",
@@ -49,19 +61,6 @@
           },
           {
             "type": "chore",
-            "scope": "release",
-            "release": false
-          },
-          {
-            "type": "chore",
-            "release": false
-          },
-          {
-            "type": "revert",
-            "release": "patch"
-          },
-          {
-            "scope": "no-release",
             "release": false
           }
         ],
@@ -185,10 +184,9 @@
           "server/application-server/src/main/java/de/tum/in/www1/hephaestus/intelligenceservice/**/*",
           "server/application-server/src/main/resources/application.yml",
           "server/application-server/openapi.yaml",
-          "server/intelligence-service/pyproject.toml",
-          "server/intelligence-service/app/main.py",
+          "server/intelligence-service/package.json",
           "server/intelligence-service/openapi.yaml",
-          "server/webhook-ingest/pyproject.toml"
+          "server/webhook-ingest/package.json"
         ],
         "message": "chore(release): ${nextRelease.version} [skip ci]"
       }

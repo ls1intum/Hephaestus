@@ -15,12 +15,17 @@ const sidebars: SidebarsConfig = {
     {
       type: 'category',
       label: 'Architecture & Data',
-      items: ['system-design', 'database-schema', 'database-migration'],
+      items: ['system-design', 'database-schema', 'database-migration', 'intelligence-service'],
     },
     {
       type: 'category',
       label: 'Operations',
       items: ['release-management', 'mail-notifications'],
+    },
+    {
+      type: 'category',
+      label: 'AI Development',
+      items: ['ai-agent-workflow'],
     },
   ],
 };

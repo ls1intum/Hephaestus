@@ -1,9 +1,15 @@
 package de.tum.in.www1.hephaestus.gitprovider.common.github.app;
 
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.GITHUB_API_BASE_URL;
+
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
+import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationSuspendedException;
+import de.tum.in.www1.hephaestus.gitprovider.github.GitHubProperties;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -16,35 +22,60 @@ import java.security.spec.PKCS8EncodedKeySpec;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
-import org.kohsuke.github.GHAppInstallation;
-import org.kohsuke.github.GHAppInstallationToken;
-import org.kohsuke.github.GitHub;
-import org.kohsuke.github.GitHubBuilder;
-import org.springframework.beans.factory.annotation.Value;
+import java.util.Date;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
+import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
+/**
+ * Service for generating GitHub App JWT tokens and installation access tokens.
+ * <p>
+ * <b>Why REST API instead of GraphQL:</b>
+ * GitHub App authentication (JWT generation and installation token minting) is only
+ * available via REST API. The GraphQL API requires an already-minted token, so the
+ * bootstrap process must use REST. This is a GitHub API limitation.
+ * <p>
+ * Endpoints used:
+ * <ul>
+ *   <li>{@code POST /app/installations/{installation_id}/access_tokens} - Mint installation token</li>
+ * </ul>
+ *
+ * @see <a href="https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-an-installation-access-token-for-a-github-app">GitHub Docs - Installation Access Tokens</a>
+ */
 @Service
 public class GitHubAppTokenService {
 
     private final long appId;
     private final PrivateKey privateKey;
     private final boolean credentialsConfigured;
+    private final WebClient webClient;
 
     // Cache installation tokens to avoid re-minting on every call.
     private final Cache<Long, CachedToken> installTokenCache = Caffeine.newBuilder()
-        .expireAfterWrite(Duration.ofMinutes(55)) // safety cap; GitHub returns precise expiry which we track below
+        .expireAfterWrite(Duration.ofMinutes(55))
         .maximumSize(10000)
         .build();
 
-    public GitHubAppTokenService(
-        @Value("${github.app.id}") long appId,
-        @Value("${github.app.privateKeyLocation:}") Resource privateKeyRes,
-        @Value("${github.app.privateKey:}") String privateKeyPem
-    ) {
+    // Track suspended installations to fail fast without calling GitHub.
+    // This is an in-memory set that all threads see immediately, bypassing DB transaction isolation.
+    private final Set<Long> suspendedInstallations = ConcurrentHashMap.newKeySet();
+
+    public GitHubAppTokenService(GitHubProperties gitHubProperties) {
+        long appId = gitHubProperties.app().id();
+        Resource privateKeyRes = gitHubProperties.app().privateKeyLocation();
+        String privateKeyPem = gitHubProperties.app().privateKey();
         this.appId = appId;
         this.credentialsConfigured = isKeyMaterialPresent(appId, privateKeyRes, privateKeyPem);
         this.privateKey = credentialsConfigured ? loadKey(privateKeyRes, privateKeyPem) : generateEphemeralRsaKey();
+        this.webClient = WebClient.builder()
+            .baseUrl(GITHUB_API_BASE_URL)
+            .defaultHeader(HttpHeaders.ACCEPT, "application/vnd.github+json")
+            .defaultHeader("X-GitHub-Api-Version", "2022-11-28")
+            .build();
     }
 
     /**
@@ -60,8 +91,8 @@ public class GitHubAppTokenService {
         Algorithm algorithm = Algorithm.RSA256(null, (RSAPrivateKey) privateKey);
         return JWT.create()
             .withIssuer(String.valueOf(appId))
-            .withIssuedAt(java.util.Date.from(now.minusSeconds(60))) // tolerate skew
-            .withExpiresAt(java.util.Date.from(now.plusSeconds(9 * 60))) // < 10 minutes hard limit
+            .withIssuedAt(Date.from(now.minusSeconds(60)))
+            .withExpiresAt(Date.from(now.plusSeconds(9 * 60)))
             .sign(algorithm);
     }
 
@@ -74,6 +105,13 @@ public class GitHubAppTokenService {
     }
 
     /**
+     * Alias for getInstallationToken - used by GitHubInstallationRepositoryEnumerationService.
+     */
+    public String getOrRefreshToken(long installationId) {
+        return getInstallationToken(installationId);
+    }
+
+    /**
      * Return a valid installation token along with its expiry so callers can proactively refresh clients.
      */
     public InstallationToken getInstallationTokenDetails(long installationId) {
@@ -81,31 +119,123 @@ public class GitHubAppTokenService {
         return new InstallationToken(resolved.token, resolved.expiresAt);
     }
 
-    /** Hub4J client authenticated as the installation (use this for repo/PR calls). */
-    public GitHub clientForInstallation(long installationId) throws IOException {
-        String token = getInstallationToken(installationId);
-        // Hub4J accepts installation tokens with OAuth token setter.
-        return new GitHubBuilder().withOAuthToken(token).build();
-    }
+    /**
+     * Mint a fresh installation token via REST API.
+     *
+     * @throws InstallationNotFoundException if the installation no longer exists (404 from GitHub)
+     * @throws IllegalStateException if the installation is marked as suspended
+     */
+    private CachedToken fetchTokenWithExpiry(Long installationId) {
+        // Fail fast for suspended installations - don't waste API calls
+        if (suspendedInstallations.contains(installationId)) {
+            throw new InstallationSuspendedException(installationId);
+        }
 
-    /** Hub4J client authenticated as the App (via JWT). */
-    public GitHub clientAsApp() throws IOException {
-        return new GitHubBuilder().withJwtToken(generateAppJWT()).build();
-    }
-
-    /** Mint a fresh installation token as the App and capture its expiry. */
-    private CachedToken fetchTokenWithExpiry(long installationId) {
         try {
             String appJwt = generateAppJWT();
-            GitHub asApp = new GitHubBuilder().withJwtToken(appJwt).build();
-            GHAppInstallation appInstallation = asApp.getApp().getInstallationById(installationId);
-            GHAppInstallationToken tok = appInstallation.createToken().create();
 
-            return new CachedToken(tok.getToken(), tok.getExpiresAt());
-        } catch (IOException e) {
-            throw new UncheckedIOException("GitHub error minting installation token for " + installationId, e);
+            InstallationTokenResponse response = webClient
+                .post()
+                .uri("/app/installations/{installationId}/access_tokens", installationId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + appJwt)
+                .retrieve()
+                .bodyToMono(InstallationTokenResponse.class)
+                .block();
+
+            if (response == null || response.token() == null) {
+                throw new IllegalStateException("Empty token response from GitHub for installation " + installationId);
+            }
+
+            return new CachedToken(response.token(), response.expiresAt());
+        } catch (WebClientResponseException.NotFound e) {
+            // Installation was deleted or is inaccessible.
+            // NOTE: Do NOT call invalidate() here - this method is used as a cache loader
+            // and Caffeine does not allow recursive cache modifications during compute operations.
+            // The cache will not store the result when an exception is thrown.
+            // Invalidation happens in resolveToken() after the exception propagates out.
+            throw new InstallationNotFoundException(installationId, e);
+        } catch (WebClientResponseException.Forbidden e) {
+            // 403 means suspended - mark it and fail fast
+            suspendedInstallations.add(installationId);
+            installTokenCache.invalidate(installationId);
+            throw new InstallationSuspendedException(installationId, e);
+        } catch (InstallationNotFoundException e) {
+            // Re-throw without wrapping
+            throw e;
+        } catch (Exception e) {
+            throw new UncheckedIOException(
+                new IOException("GitHub error minting installation token for " + installationId, e)
+            );
         }
     }
+
+    /**
+     * Evict a cached installation token. Call this when the installation is known to be deleted.
+     */
+    public void evictInstallationToken(long installationId) {
+        installTokenCache.invalidate(installationId);
+    }
+
+    /**
+     * Mark an installation as suspended. Token minting will fail fast for suspended installations.
+     * Call this when receiving a suspend event to immediately block all threads from hitting GitHub.
+     */
+    public void markInstallationSuspended(long installationId) {
+        suspendedInstallations.add(installationId);
+        installTokenCache.invalidate(installationId); // Also evict any cached token
+    }
+
+    /**
+     * Mark an installation as active (not suspended). Token minting will proceed normally.
+     * Call this when receiving an unsuspend event or when installation is created.
+     */
+    public void markInstallationActive(long installationId) {
+        suspendedInstallations.remove(installationId);
+    }
+
+    /**
+     * Check if an installation is marked as suspended in memory.
+     */
+    public boolean isInstallationMarkedSuspended(long installationId) {
+        return suspendedInstallations.contains(installationId);
+    }
+
+    private CachedToken resolveToken(long installationId) {
+        CachedToken cached = installTokenCache.getIfPresent(installationId);
+        if (cached != null && cached.expiresAt.isAfter(Instant.now().plusSeconds(60))) {
+            return cached;
+        }
+
+        CachedToken fresh;
+        try {
+            fresh = installTokenCache.get(installationId, this::fetchTokenWithExpiry);
+        } catch (InstallationNotFoundException e) {
+            // Invalidate cache OUTSIDE the compute operation (safe here)
+            installTokenCache.invalidate(installationId);
+            throw e;
+        }
+
+        if (fresh == null) {
+            throw new IllegalStateException("Failed to mint installation token for " + installationId);
+        }
+
+        if (fresh.expiresAt.isBefore(Instant.now().plusSeconds(30))) {
+            fresh = fetchTokenWithExpiry(installationId);
+            installTokenCache.put(installationId, fresh);
+        }
+
+        return fresh;
+    }
+
+    public boolean isConfigured() {
+        return credentialsConfigured;
+    }
+
+    public long getConfiguredAppId() {
+        return appId;
+    }
+
+    // ============ Key loading helpers ============
 
     private static PrivateKey loadKey(Resource privateKeyRes, String privateKeyPem) {
         try {
@@ -119,7 +249,6 @@ public class GitHubAppTokenService {
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to read private key", e);
         }
-
         throw new IllegalStateException("No GitHub App private key configured.");
     }
 
@@ -130,7 +259,6 @@ public class GitHubAppTokenService {
                 byte[] pkcs8 = convertPkcs1ToPkcs8(pkcs1);
                 return KeyFactory.getInstance("RSA").generatePrivate(new PKCS8EncodedKeySpec(pkcs8));
             }
-
             byte[] der = decodePemBlock(pem, "PRIVATE KEY");
             return KeyFactory.getInstance("RSA").generatePrivate(new PKCS8EncodedKeySpec(der));
         } catch (Exception e) {
@@ -172,7 +300,6 @@ public class GitHubAppTokenService {
                 0x00,
             };
             byte[] privateKeyOctetString = encodeDerOctetString(pkcs1);
-
             byte[] innerSequence = concat(version, algorithmIdentifier, privateKeyOctetString);
             return encodeDerSequence(innerSequence);
         } catch (IOException e) {
@@ -201,7 +328,6 @@ public class GitHubAppTokenService {
         if (length < 0x80) {
             return new byte[] { (byte) length };
         }
-
         int numBytes = 0;
         int temp = length;
         byte[] buffer = new byte[4];
@@ -210,7 +336,6 @@ public class GitHubAppTokenService {
             temp >>= 8;
             numBytes++;
         }
-
         byte[] result = new byte[1 + numBytes];
         result[0] = (byte) (0x80 | numBytes);
         System.arraycopy(buffer, buffer.length - numBytes, result, 1, numBytes);
@@ -253,35 +378,68 @@ public class GitHubAppTokenService {
         }
     }
 
-    public boolean isConfigured() {
-        return credentialsConfigured;
-    }
+    // ============ Installation Status Verification ============
 
-    public long getConfiguredAppId() {
-        return appId;
-    }
-
-    private CachedToken resolveToken(long installationId) {
-        CachedToken cached = installTokenCache.getIfPresent(installationId);
-        if (cached != null && cached.expiresAt.isAfter(Instant.now().plusSeconds(60))) {
-            return cached;
+    /**
+     * Verify the current status of an installation via GitHub REST API.
+     * Uses App JWT authentication (not installation token) so it works even for suspended installations.
+     *
+     * @param installationId the installation to check
+     * @return true if the installation is currently suspended, false if active
+     * @throws InstallationNotFoundException if the installation no longer exists
+     */
+    public boolean isInstallationSuspended(long installationId) {
+        if (!isConfigured()) {
+            throw new IllegalStateException("GitHub App credentials not configured.");
         }
 
-        CachedToken fresh = installTokenCache.get(installationId, this::fetchTokenWithExpiry);
-        if (fresh == null) {
-            throw new IllegalStateException("Failed to mint installation token for " + installationId);
-        }
+        try {
+            String appJwt = generateAppJWT();
 
-        // If token returned with very little validity remaining, force a proactive refresh.
-        if (fresh.expiresAt.isBefore(Instant.now().plusSeconds(30))) {
-            fresh = fetchTokenWithExpiry(installationId);
-            installTokenCache.put(installationId, fresh);
-        }
+            InstallationStatusResponse response = webClient
+                .get()
+                .uri("/app/installations/{installationId}", installationId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + appJwt)
+                .retrieve()
+                .bodyToMono(InstallationStatusResponse.class)
+                .block();
 
-        return fresh;
+            if (response == null) {
+                throw new IllegalStateException("Empty response from GitHub for installation " + installationId);
+            }
+
+            return response.suspendedAt() != null;
+        } catch (WebClientResponseException.NotFound e) {
+            throw new InstallationNotFoundException(installationId, e);
+        } catch (InstallationNotFoundException e) {
+            throw e;
+        } catch (WebClientResponseException e) {
+            // Other HTTP errors (403 Forbidden, 500 Internal Server Error, etc.)
+            throw new UncheckedIOException(
+                new IOException(
+                    "GitHub API error checking installation status for " + installationId + ": " + e.getStatusCode(),
+                    e
+                )
+            );
+        } catch (RuntimeException e) {
+            // Network errors, timeouts, or other transient issues
+            throw new UncheckedIOException(
+                new IOException("GitHub error checking installation status for " + installationId, e)
+            );
+        }
     }
+
+    // ============ DTOs ============
 
     public record InstallationToken(String token, Instant expiresAt) {}
 
     private record CachedToken(String token, Instant expiresAt) {}
+
+    private record InstallationTokenResponse(String token, @JsonProperty("expires_at") Instant expiresAt) {}
+
+    private record InstallationStatusResponse(
+        Long id,
+        @JsonProperty("suspended_at") Instant suspendedAt,
+        @JsonProperty("suspended_by") Object suspendedBy
+    ) {}
 }

@@ -1,0 +1,121 @@
+# GraphQL query for fetching pull request review comments via review threads
+# Used by GraphQL-based sync services
+# Note: comments(first: 100) is the initial batch; nested pagination via GetThreadComments.graphql
+# handles threads with more than 100 comments
+
+query GetPullRequestReviewComments($owner: String!, $name: String!, $number: Int!, $first: Int!, $after: String) {
+    rateLimit {
+        cost
+        limit
+        remaining
+        resetAt
+    }
+    repository(owner: $owner, name: $name) {
+        pullRequest(number: $number) {
+            reviewThreads(first: $first, after: $after) {
+                pageInfo {
+                    hasNextPage
+                    endCursor
+                }
+                totalCount
+                nodes {
+                    id
+                    path
+                    line
+                    startLine
+                    originalLine
+                    originalStartLine
+                    diffSide
+                    startDiffSide
+                    isResolved
+                    isOutdated
+                    isCollapsed
+
+                    # User who resolved the thread (null if unresolved)
+                    resolvedBy {
+                        id
+                        databaseId
+                        login
+                        avatarUrl
+                        name
+                        email
+                        createdAt
+                        updatedAt
+                    }
+
+                    # Comments in this thread - initial batch, pagination handled by GetThreadComments
+                    comments(first: 10) {
+                        totalCount
+                        pageInfo {
+                            hasNextPage
+                            endCursor
+                        }
+                        nodes {
+                            id
+                            fullDatabaseId
+                            body
+                            path
+                            line
+                            originalLine
+                            startLine
+                            originalStartLine
+                            diffHunk
+                            createdAt
+                            updatedAt
+                            state
+                            url
+
+                            # Author - supports User, Bot, Mannequin, and Organization types
+                            author {
+                                __typename
+                                ... on User {
+                                    id
+                                    databaseId
+                                    login
+                                    avatarUrl
+                                    name
+                                    email
+                                    createdAt
+                                    updatedAt
+                                }
+                                ... on Bot {
+                                    id
+                                    databaseId
+                                    login
+                                    avatarUrl
+                                }
+                                ... on Mannequin {
+                                    id
+                                    databaseId
+                                    login
+                                    avatarUrl
+                                }
+                                ... on Organization {
+                                    id
+                                    databaseId
+                                    login
+                                    avatarUrl
+                                }
+                            }
+
+                            # Author association
+                            authorAssociation
+
+                            # Reply to (for threading)
+                            replyTo {
+                                id
+                                fullDatabaseId
+                            }
+
+                            # Associated review
+                            pullRequestReview {
+                                id
+                                fullDatabaseId
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

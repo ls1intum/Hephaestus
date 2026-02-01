@@ -42,14 +42,12 @@ export function LeaderboardTable({
 		return <LeaderboardTableSkeleton />;
 	}
 
-	if (!leaderboard.length) {
+	if (leaderboard.length === 0) {
 		return (
 			<div className="flex flex-col items-center justify-center p-8 text-center">
 				<NoEntryIcon className="h-12 w-12 text-github-danger-foreground mb-2" />
 				<h3 className="text-lg font-medium">No entries found</h3>
-				<p className="text-muted-foreground">
-					There are no leaderboard entries available.
-				</p>
+				<p className="text-muted-foreground">There are no leaderboard entries available.</p>
 			</div>
 		);
 	}
@@ -61,12 +59,8 @@ export function LeaderboardTable({
 			<TableHeader>
 				<TableRow>
 					<TableHead className="text-center w-10">Rank</TableHead>
-					{!isTeam && (
-						<TableHead className="text-center w-20">League</TableHead>
-					)}
-					<TableHead className="w-56">
-						{isTeam ? "Team" : "Contributor"}
-					</TableHead>
+					{!isTeam && <TableHead className="text-center w-20">League</TableHead>}
+					<TableHead className="w-56">{isTeam ? "Team" : "Contributor"}</TableHead>
 					<TableHead className="text-center">
 						<div className="flex justify-center items-center gap-1 text-github-done-foreground">
 							<span className="flex items-center gap-0.5">
@@ -98,18 +92,12 @@ export function LeaderboardTable({
 												src={`https://avatars.githubusercontent.com/t/${team.id}?s=512&v=4`}
 												alt={`${displayName}'s avatar`}
 											/>
-											<AvatarFallback>
-												{displayName.slice(0, 2).toUpperCase()}
-											</AvatarFallback>
+											<AvatarFallback>{displayName.slice(0, 2).toUpperCase()}</AvatarFallback>
 										</Avatar>
-										<span className="text-muted-foreground text-wrap">
-											{displayName}
-										</span>
+										<span className="text-muted-foreground text-wrap">{displayName}</span>
 									</div>
 								</TableCell>
-								<TableCell className="text-center font-medium">
-									{entry.score}
-								</TableCell>
+								<TableCell className="text-center font-medium">{entry.score}</TableCell>
 								<TableCell>
 									<ActivityBadges
 										reviewedPullRequests={entry.reviewedPullRequests}
@@ -128,9 +116,7 @@ export function LeaderboardTable({
 						return null;
 					}
 
-					const currentUserLogin = currentUser?.login
-						? currentUser.login.toLowerCase()
-						: undefined;
+					const currentUserLogin = currentUser?.login ? currentUser.login.toLowerCase() : undefined;
 					const isCurrentUser = currentUserLogin === user.login.toLowerCase();
 
 					return (
@@ -139,8 +125,7 @@ export function LeaderboardTable({
 							id={`rank-${entry.rank}`}
 							className={cn(
 								"cursor-pointer",
-								isCurrentUser &&
-									"bg-accent dark:bg-accent/30 dark:hover:bg-accent/50",
+								isCurrentUser && "bg-accent dark:bg-accent/30 dark:hover:bg-accent/50",
 							)}
 							onClick={() => {
 								onUserClick?.(user.login);
@@ -155,22 +140,13 @@ export function LeaderboardTable({
 							<TableCell>
 								<div className="flex items-center gap-2 font-medium">
 									<Avatar className="size-9">
-										<AvatarImage
-											src={user.avatarUrl}
-											alt={`${user.name}'s avatar`}
-										/>
-										<AvatarFallback>
-											{user.name.slice(0, 2).toUpperCase()}
-										</AvatarFallback>
+										<AvatarImage src={user.avatarUrl} alt={`${user.name}'s avatar`} />
+										<AvatarFallback>{user.name.slice(0, 2).toUpperCase()}</AvatarFallback>
 									</Avatar>
-									<span className="text-muted-foreground text-wrap">
-										{user.name}
-									</span>
+									<span className="text-muted-foreground text-wrap">{user.name}</span>
 								</div>
 							</TableCell>
-							<TableCell className="text-center font-medium">
-								{entry.score}
-							</TableCell>
+							<TableCell className="text-center font-medium">{entry.score}</TableCell>
 							<TableCell>
 								<ActivityBadges
 									reviewedPullRequests={entry.reviewedPullRequests}
@@ -202,42 +178,34 @@ function LeaderboardTableSkeleton() {
 				</TableRow>
 			</TableHeader>
 			<TableBody>
-				{Array.from({ length: 10 }, (_, idx) => `skeleton-${idx}`).map(
-					(key, idx) => (
-						<TableRow key={key}>
-							<TableCell>
-								<Skeleton
-									className="h-5 w-7"
-									style={{ width: `${20 + 1 * idx}px` }}
-								/>
-							</TableCell>
-							<TableCell>
-								<Skeleton className="h-8 w-8 mx-auto" />
-							</TableCell>
-							<TableCell className="py-2">
-								<div className="flex items-center gap-2">
-									<Skeleton className="w-10 h-10 rounded-full" />
-									<Skeleton
-										className="h-5"
-										style={{ width: `${100 + (idx % 3) * 75}px` }}
-									/>
-								</div>
-							</TableCell>
-							<TableCell className="text-center">
-								<Skeleton
-									className="h-5 mx-auto"
-									style={{ width: `${20 + (10 - idx) + (idx % 3) * 4}px` }}
-								/>
-							</TableCell>
-							<TableCell className="py-2">
-								<Skeleton
-									className="h-5"
-									style={{ width: `${30 + ((idx % 4) * 20) / (idx + 1)}px` }}
-								/>
-							</TableCell>
-						</TableRow>
-					),
-				)}
+				{Array.from({ length: 10 }, (_, idx) => `skeleton-${idx}`).map((key, idx) => (
+					<TableRow key={key}>
+						<TableCell>
+							<Skeleton className="h-5 w-7" style={{ width: `${20 + 1 * idx}px` }} />
+						</TableCell>
+						<TableCell>
+							<Skeleton className="h-8 w-8 mx-auto" />
+						</TableCell>
+						<TableCell className="py-2">
+							<div className="flex items-center gap-2">
+								<Skeleton className="w-10 h-10 rounded-full" />
+								<Skeleton className="h-5" style={{ width: `${100 + (idx % 3) * 75}px` }} />
+							</div>
+						</TableCell>
+						<TableCell className="text-center">
+							<Skeleton
+								className="h-5 mx-auto"
+								style={{ width: `${20 + (10 - idx) + (idx % 3) * 4}px` }}
+							/>
+						</TableCell>
+						<TableCell className="py-2">
+							<Skeleton
+								className="h-5"
+								style={{ width: `${30 + ((idx % 4) * 20) / (idx + 1)}px` }}
+							/>
+						</TableCell>
+					</TableRow>
+				))}
 			</TableBody>
 		</Table>
 	);

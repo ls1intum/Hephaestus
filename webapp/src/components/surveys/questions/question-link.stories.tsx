@@ -2,7 +2,7 @@
  * Link survey question for routing respondents to external resources or follow-up flows.
  */
 import type { Meta, StoryObj } from "@storybook/react";
-import { fn } from "@storybook/test";
+import { fn } from "storybook/test";
 import { QuestionLink } from "./question-link";
 
 const meta = {
@@ -11,8 +11,7 @@ const meta = {
 	args: {
 		id: "link-demo",
 		question: "Want to learn more about our roadmap?",
-		description:
-			"We will open the link in a new tab so you can explore and come back.",
+		description: "We will open the link in a new tab so you can explore and come back.",
 		descriptionContentType: "text",
 		required: false,
 		buttonText: "Read the roadmap",

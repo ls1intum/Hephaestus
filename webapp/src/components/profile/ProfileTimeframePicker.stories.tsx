@@ -1,17 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { fn } from "@storybook/test";
 import { useState } from "react";
-import {
-	DEFAULT_SCHEDULE,
-	formatDateRangeForApi,
-	getDateRangeForPreset,
-} from "@/lib/timeframe";
+import { fn } from "storybook/test";
+import { DEFAULT_SCHEDULE, formatDateRangeForApi, getDateRangeForPreset } from "@/lib/timeframe";
 import { ProfileTimeframePicker } from "./ProfileTimeframePicker";
 
 // Calculate default dates using the shared timeframe utilities
 const defaultRange = getDateRangeForPreset("this-week", DEFAULT_SCHEDULE);
-const { after: defaultAfter, before: defaultBefore } =
-	formatDateRangeForApi(defaultRange);
+const { after: defaultAfter, before: defaultBefore } = formatDateRangeForApi(defaultRange);
 
 /**
  * ProfileTimeframePicker is a compact, single-row timeframe selector designed for the profile page.
@@ -47,8 +42,7 @@ const meta = {
 			control: "boolean",
 		},
 		schedule: {
-			description:
-				"Leaderboard schedule configuration. Affects week start calculation.",
+			description: "Leaderboard schedule configuration. Affects week start calculation.",
 			control: "object",
 		},
 	},
@@ -132,12 +126,8 @@ export const CustomRange: Story = {
  */
 export const Interactive: Story = {
 	render: (props) => {
-		const [afterDate, setAfterDate] = useState<string | undefined>(
-			props.afterDate,
-		);
-		const [beforeDate, setBeforeDate] = useState<string | undefined>(
-			props.beforeDate,
-		);
+		const [afterDate, setAfterDate] = useState<string | undefined>(props.afterDate);
+		const [beforeDate, setBeforeDate] = useState<string | undefined>(props.beforeDate);
 
 		return (
 			<div className="flex flex-col gap-4 items-start">

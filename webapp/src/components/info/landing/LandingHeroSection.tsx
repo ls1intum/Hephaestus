@@ -119,9 +119,8 @@ export function LandingHeroSection({
 							Process-Aware Mentoring for Agile Software Teams
 						</h1>
 						<p className="mx-auto max-w-[700px] text-xl text-muted-foreground">
-							Onboard faster and learn better habits with an AI mentor grounded
-							in your repo workflow — from issues to pull requests and team
-							rituals.
+							Onboard faster and learn better habits with an AI mentor grounded in your repo
+							workflow — from issues to pull requests and team rituals.
 						</p>
 					</div>
 					<div className="flex flex-col items-center gap-4 sm:flex-row sm:gap-6">
@@ -136,21 +135,14 @@ export function LandingHeroSection({
 								className="w-full justify-center sm:w-auto"
 							/>
 						)}
-						<Button
-							variant="outline"
-							size="lg"
-							onClick={onLearnMoreClick}
-							className="gap-2"
-						>
+						<Button variant="outline" size="lg" onClick={onLearnMoreClick} className="gap-2">
 							Learn More <ChevronDown className="h-4 w-4" />
 						</Button>
 					</div>
 					<div className="flex items-center gap-2 text-muted-foreground">
 						<MentorIcon size={36} className="text-primary" />
 						<span className="text-sm">
-							Powered by{" "}
-							<span className="text-github-done-foreground">Heph</span>, your AI
-							mentor
+							Powered by <span className="text-github-done-foreground">Heph</span>, your AI mentor
 						</span>
 					</div>
 				</div>
@@ -162,8 +154,7 @@ export function LandingHeroSection({
 					<div
 						className="overflow-auto pointer-events-none"
 						style={{
-							maskImage:
-								"linear-gradient(to bottom, rgba(0, 0, 0, 1) 50%, rgba(0, 0, 0, 0))",
+							maskImage: "linear-gradient(to bottom, rgba(0, 0, 0, 1) 50%, rgba(0, 0, 0, 0))",
 						}}
 					>
 						<LeaderboardTable

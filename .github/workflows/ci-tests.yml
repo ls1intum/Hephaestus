@@ -1,4 +1,4 @@
-name: Tests
+name: Test
 
 on:
   workflow_call:
@@ -8,105 +8,183 @@ on:
         required: false
         type: string
         default: "false"
+      # Path-based change detection for selective test execution
+      webapp_changed:
+        description: "Whether webapp files changed"
+        required: false
+        type: string
+        default: "true"
+      application_server_changed:
+        description: "Whether application-server files changed"
+        required: false
+        type: string
+        default: "true"
+      intelligence_service_changed:
+        description: "Whether intelligence-service files changed"
+        required: false
+        type: string
+        default: "true"
+      webhook_ingest_changed:
+        description: "Whether webhook-ingest files changed"
+        required: false
+        type: string
+        default: "true"
 
 jobs:
-  # Intelligent test execution matrix
   tests:
     permissions:
       contents: read
       checks: write
       statuses: write
-    name: ${{ matrix.test-type }}
+    name: "${{ matrix.display-name }}"
     runs-on: ubuntu-latest
     if: inputs.should_skip != 'true'
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        test-type:
-          [application-server-unit, application-server-integration, application-server-architecture, webapp-visual]
+        include:
+          - test-type: application-server-unit
+            display-name: "App Server: Unit"
+          - test-type: application-server-integration
+            display-name: "App Server: Integration"
+          - test-type: application-server-architecture
+            display-name: "App Server: Architecture"
+          - test-type: webapp-unit
+            display-name: "Webapp: Unit"
+          - test-type: webapp-storybook
+            display-name: "Webapp: Storybook"
+          - test-type: webapp-visual
+            display-name: "Webapp: Visual"
+          - test-type: intelligence-service-unit
+            display-name: "Intelligence: Unit"
+          - test-type: intelligence-service-integration
+            display-name: "Intelligence: Integration"
+          - test-type: intelligence-service-architecture
+            display-name: "Intelligence: Architecture"
+          - test-type: webhook-ingest-unit
+            display-name: "Webhook: Unit"
 
     steps:
-      - uses: actions/checkout@v4
-        with:
-          # Critical for TurboSnap: Ensure Chromatic can read full git history
-          fetch-depth: 0
+      - name: Determine if test should run
+        id: should_run
+        run: |
+          case "${{ matrix.test-type }}" in
+            "webapp-unit"|"webapp-storybook"|"webapp-visual")
+              echo "run=${{ inputs.webapp_changed }}" >> $GITHUB_OUTPUT
+              ;;
+            "application-server-unit"|"application-server-integration"|"application-server-architecture")
+              echo "run=${{ inputs.application_server_changed }}" >> $GITHUB_OUTPUT
+              ;;
+            "intelligence-service-unit"|"intelligence-service-integration"|"intelligence-service-architecture")
+              echo "run=${{ inputs.intelligence_service_changed }}" >> $GITHUB_OUTPUT
+              ;;
+            "webhook-ingest-unit")
+              echo "run=${{ inputs.webhook_ingest_changed }}" >> $GITHUB_OUTPUT
+              ;;
+            *)
+              # Unknown test type - fail explicitly to catch missing case statements
+              echo "::error::Unknown test type '${{ matrix.test-type }}' in ci-tests.yml matrix."
+              echo "::error::Please add a case for this test type in the 'Determine if test should run' step."
+              echo "run=false" >> $GITHUB_OUTPUT
+              exit 1
+              ;;
+          esac
 
-      # Ensure stable Node/npm and proper caching for webapp visual tests
-      - name: Setup Node.js (LTS) and npm cache
-        uses: actions/setup-node@v4
+      - name: Skip notification
+        if: steps.should_run.outputs.run != 'true'
+        run: echo "⏭️ Skipping ${{ matrix.test-type }} - no relevant files changed"
+
+      - name: Checkout repository
+        if: steps.should_run.outputs.run == 'true'
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
-          node-version-file: '.node-version'
-          cache: 'npm'
+          # Full history needed only for Chromatic TurboSnap (webapp-visual)
+          # Other tests only need HEAD for faster checkout
+          fetch-depth: ${{ matrix.test-type == 'webapp-visual' && '0' || '1' }}
+
+      - name: Setup Node.js
+        if: steps.should_run.outputs.run == 'true'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: ".node-version"
+          cache: "npm"
           cache-dependency-path: |
             package-lock.json
             webapp/package-lock.json
 
-      # Advanced caching strategy
-      - name: Setup advanced caches
+      - name: Setup caches
+        if: steps.should_run.outputs.run == 'true'
         uses: ./.github/actions/setup-caches
         with:
           cache-type: ${{ matrix.test-type }}
           os: ${{ runner.os }}
 
-      # application-server tests
-      - name: "application-server ${{ matrix.test-type }} execution"
-        if: startsWith(matrix.test-type, 'application-server-')
+      - name: Run tests
+        if: steps.should_run.outputs.run == 'true' && startsWith(matrix.test-type, 'application-server-')
         run: |
-          echo "🧪 Running application-server ${{ matrix.test-type }} tests"
           cd server/application-server
-          
-          # Clean previous test reports to ensure accurate reporting
           rm -rf target/surefire-reports/*
-
+          # Use -Dsurefire.includedGroups to override the property defined in pom.xml
+          # The pom.xml configures <groups>${surefire.includedGroups}</groups>
+          # -Dmaven.test.skip=false overrides the quick profile (auto-activated when target/classes exists from cache)
           case "${{ matrix.test-type }}" in
-            "application-server-unit")
-              mvn test -Dgroups="unit" -T 2C --batch-mode
-              ;;
-            "application-server-integration")
-              mvn test -Dgroups="integration" -T 2C --batch-mode
-              ;;
-            "application-server-architecture")
-              mvn test -Dgroups="architecture" -T 2C --batch-mode
-              ;;
+            "application-server-unit") ./mvnw test -Dsurefire.includedGroups="unit" -Dmaven.test.skip=false -T 2C --batch-mode -Dmaven.build.cache.enabled=true ;;
+            "application-server-integration") ./mvnw test -Dsurefire.includedGroups="integration" -Dmaven.test.skip=false -T 2C --batch-mode -Dmaven.build.cache.enabled=true ;;
+            "application-server-architecture") ./mvnw test -Dsurefire.includedGroups="architecture" -Dmaven.test.skip=false -T 2C --batch-mode -Dmaven.build.cache.enabled=true ;;
           esac
 
-      # Webapp tests
-      - name: "Webapp ${{ matrix.test-type }} execution"
-        if: startsWith(matrix.test-type, 'webapp-')
+      - name: Run tests
+        if: steps.should_run.outputs.run == 'true' && startsWith(matrix.test-type, 'webapp-')
         run: |
-          echo "🧪 Running webapp ${{ matrix.test-type }} tests"
-          
-          # Install from repo root for workspace/hoisted optional deps
-          rm -rf node_modules
-          npm ci --workspaces --include=dev --include=optional --no-audit --progress=false
-          
-          # Check for rollup native binary (warning only)
-          npm ls @rollup/rollup-linux-x64-gnu || echo "⚠️ rollup native not installed yet"
-          
-          # Force-install platform binaries
+          # Use npm ci only - it clears node_modules automatically when lock file changed
+          # No manual rm -rf needed (saves 60-90s of reinstalling cached packages)
+          npm ci --no-audit --progress=false
           node scripts/install-platform-binaries.mjs
-          
           cd webapp
-          
+
           case "${{ matrix.test-type }}" in
+            "webapp-unit")
+              npm run test
+              ;;
+            "webapp-storybook")
+              # Install Playwright browsers (cached in ~/.cache/ms-playwright by setup-caches)
+              npx playwright install chromium --with-deps
+              npm run test:storybook
+              ;;
             "webapp-visual")
-              if ! npm run build-storybook; then
-                echo "❌ Storybook build failed, retrying..."
-                cd ..
-                rm -rf node_modules
-                npm ci --workspaces --include=dev --include=optional --no-audit --progress=false
-                cd webapp
-                npm run build-storybook
-              fi
+              npm run build-storybook
               ;;
           esac
+
+      - name: Run tests
+        if: steps.should_run.outputs.run == 'true' && startsWith(matrix.test-type, 'intelligence-service-')
+        run: |
+          # Use npm ci - automatically handles node_modules when lock file changed
+          npm ci --no-audit --progress=false
+          node scripts/install-platform-binaries.mjs
+          cd server/intelligence-service
+
+          case "${{ matrix.test-type }}" in
+            "intelligence-service-unit") npm run test:unit ;;
+            "intelligence-service-integration") npm run test:integration ;;
+            "intelligence-service-architecture") npm run test:arch ;;
+          esac
+
+      - name: Run tests
+        if: steps.should_run.outputs.run == 'true' && matrix.test-type == 'webhook-ingest-unit'
+        run: |
+          # Use npm ci - automatically handles node_modules when lock file changed
+          npm ci --no-audit --progress=false
+          node scripts/install-platform-binaries.mjs
+          cd server/webhook-ingest
+          npm run test
 
       # Chromatic visual testing
       - name: "Chromatic Visual Testing"
-        if: matrix.test-type == 'webapp-visual'
+        if: steps.should_run.outputs.run == 'true' && matrix.test-type == 'webapp-visual'
         id: chromatic
-        uses: chromaui/action@latest
+        uses: chromaui/action@1cfa065cbdab28f6ca3afaeb3d761383076a35aa # v11
         with:
           projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
           workingDir: webapp
@@ -122,36 +200,109 @@ jobs:
           CHROMATIC_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
       # Create Storybook status check
+      # CRITICAL: For pull_request events, context.sha is the MERGE commit, not the PR head.
+      # We must use the PR head SHA for the status to appear on the PR checks page.
       - name: "Create Storybook status check"
-        if: matrix.test-type == 'webapp-visual' && always() && steps.chromatic.outputs.storybookUrl
-        uses: actions/github-script@v7
+        if: steps.should_run.outputs.run == 'true' && matrix.test-type == 'webapp-visual' && always() && startsWith(steps.chromatic.outputs.storybookUrl, 'http')
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         with:
           script: |
+            // Use PR head SHA for pull_request events, otherwise use context.sha
+            const sha = context.payload.pull_request?.head?.sha || context.sha;
+            console.log(`Creating status check on SHA: ${sha}`);
+            console.log(`Storybook URL: ${{ steps.chromatic.outputs.storybookUrl }}`);
+
             await github.rest.repos.createCommitStatus({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              sha: context.sha,
+              sha: sha,
               state: 'success',
               target_url: '${{ steps.chromatic.outputs.storybookUrl }}',
               description: 'Click Details to view your Storybook',
-              context: 'Storybook Publish'
+              context: 'Preview / Storybook'
             });
 
       # Test result aggregation
       - name: Upload application-server test results
-        if: always() && startsWith(matrix.test-type, 'application-server-')
-        uses: dorny/test-reporter@v2
+        if: steps.should_run.outputs.run == 'true' && always() && startsWith(matrix.test-type, 'application-server-')
+        uses: dorny/test-reporter@b082adf0eced0765477756c2a610396589b8c637 # v2
         with:
           name: "Test Results - ${{ matrix.test-type }}"
           path: "server/application-server/target/surefire-reports/TEST-*.xml"
           reporter: java-junit
           fail-on-error: false
 
+      - name: Upload webapp test results
+        if: steps.should_run.outputs.run == 'true' && always() && matrix.test-type == 'webapp-unit'
+        uses: dorny/test-reporter@b082adf0eced0765477756c2a610396589b8c637 # v2
+        with:
+          name: "Test Results - ${{ matrix.test-type }}"
+          path: "webapp/test-results/junit-*.xml"
+          reporter: java-junit
+          fail-on-error: false
+
+      - name: Upload webapp-storybook test results
+        if: steps.should_run.outputs.run == 'true' && always() && matrix.test-type == 'webapp-storybook'
+        uses: dorny/test-reporter@b082adf0eced0765477756c2a610396589b8c637 # v2
+        with:
+          name: "Test Results - ${{ matrix.test-type }}"
+          path: "webapp/test-results/junit-storybook.xml"
+          reporter: java-junit
+          fail-on-error: false
+
       - name: Upload Chromatic test results
-        if: always() && matrix.test-type == 'webapp-visual'
-        uses: dorny/test-reporter@v2
+        if: steps.should_run.outputs.run == 'true' && always() && matrix.test-type == 'webapp-visual' && startsWith(steps.chromatic.outputs.storybookUrl, 'http')
+        uses: dorny/test-reporter@b082adf0eced0765477756c2a610396589b8c637 # v2
         with:
           name: "Test Results - ${{ matrix.test-type }}"
           path: "webapp/chromatic-build-*.xml"
           reporter: java-junit
           fail-on-error: false
+
+      - name: Upload intelligence-service test results
+        if: steps.should_run.outputs.run == 'true' && always() && startsWith(matrix.test-type, 'intelligence-service-')
+        uses: dorny/test-reporter@b082adf0eced0765477756c2a610396589b8c637 # v2
+        with:
+          name: "Test Results - ${{ matrix.test-type }}"
+          path: "server/intelligence-service/test-results/junit-*.xml"
+          reporter: java-junit
+          fail-on-error: false
+
+      - name: Upload webhook-ingest test results
+        if: steps.should_run.outputs.run == 'true' && always() && matrix.test-type == 'webhook-ingest-unit'
+        uses: dorny/test-reporter@b082adf0eced0765477756c2a610396589b8c637 # v2
+        with:
+          name: "Test Results - ${{ matrix.test-type }}"
+          path: "server/webhook-ingest/test-results/junit-*.xml"
+          reporter: java-junit
+          fail-on-error: false
+
+      # Test Summary for Job Summary
+      - name: Generate test summary
+        if: steps.should_run.outputs.run == 'true' && always()
+        run: |
+          echo "### 🧪 ${{ matrix.test-type }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Find and summarize JUnit XML results
+          case "${{ matrix.test-type }}" in
+            application-server-*)
+              if [ -d "server/application-server/target/surefire-reports" ]; then
+                TESTS=$(find server/application-server/target/surefire-reports -name "TEST-*.xml" -exec grep -h 'testsuite' {} \; 2>/dev/null | head -1 || echo "")
+                if [ -n "$TESTS" ]; then
+                  echo "✅ Tests completed. See **Test Results** tab for details." >> $GITHUB_STEP_SUMMARY
+                fi
+              fi
+              ;;
+            webapp-*)
+              echo "✅ Webapp tests completed." >> $GITHUB_STEP_SUMMARY
+              ;;
+            intelligence-service-*)
+              if [ -d "server/intelligence-service/test-results" ]; then
+                echo "✅ Intelligence service tests completed." >> $GITHUB_STEP_SUMMARY
+              fi
+              ;;
+            webhook-ingest-*)
+              echo "✅ Webhook ingest tests completed." >> $GITHUB_STEP_SUMMARY
+              ;;
+          esac

@@ -5,9 +5,16 @@ import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+/**
+ * Repository for team repository permission records.
+ *
+ * <p>Permissions are scoped through their team which carries scope through
+ * the Team.organization relationship.
+ */
 @Repository
 public interface TeamRepositoryPermissionRepository
-    extends JpaRepository<TeamRepositoryPermission, TeamRepositoryPermission.Id> {
+    extends JpaRepository<TeamRepositoryPermission, TeamRepositoryPermission.Id>
+{
     Optional<TeamRepositoryPermission> findByTeam_IdAndRepository_Id(Long teamId, Long repositoryId);
 
     /**

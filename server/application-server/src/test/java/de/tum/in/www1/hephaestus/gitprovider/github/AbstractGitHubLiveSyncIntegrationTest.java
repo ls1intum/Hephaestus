@@ -1,40 +1,34 @@
 package de.tum.in.www1.hephaestus.gitprovider.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
-import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserSyncService;
 import de.tum.in.www1.hephaestus.workspace.AccountType;
+import de.tum.in.www1.hephaestus.workspace.RepositorySelection;
 import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
-import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
-import org.kohsuke.github.GHLabel;
-import org.kohsuke.github.GHMilestone;
-import org.kohsuke.github.GHOrganization;
-import org.kohsuke.github.GHOrganization.Permission;
-import org.kohsuke.github.GHOrganization.RepositoryRole;
-import org.kohsuke.github.GHPullRequestReview;
-import org.kohsuke.github.GHPullRequestReviewComment;
-import org.kohsuke.github.GHPullRequestReviewEvent;
-import org.kohsuke.github.GHRepository;
-import org.kohsuke.github.GHTeam;
-import org.kohsuke.github.GHUser;
-import org.kohsuke.github.GitHub;
-import org.kohsuke.github.GitHubBuilder;
-import org.kohsuke.github.PagedIterable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.graphql.client.HttpGraphQlClient;
 
-abstract class AbstractGitHubLiveSyncIntegrationTest extends BaseGitHubLiveIntegrationTest {
+/**
+ * Abstract base class for live GitHub API integration tests using GraphQL and REST.
+ * <p>
+ * This class provides pure GraphQL mutations and REST API calls for operations
+ * not supported by GraphQL.
+ */
+public abstract class AbstractGitHubLiveSyncIntegrationTest extends BaseGitHubLiveIntegrationTest {
 
     private static final Logger logger = LoggerFactory.getLogger(AbstractGitHubLiveSyncIntegrationTest.class);
 
@@ -48,25 +42,26 @@ abstract class AbstractGitHubLiveSyncIntegrationTest extends BaseGitHubLiveInteg
     protected RepositoryToMonitorRepository repositoryToMonitorRepository;
 
     @Autowired
-    protected GitHubUserSyncService gitHubUserSyncService;
-
-    @Value("${github.meta.auth-token:}")
-    private String personalAccessToken;
+    protected HttpGraphQlClient gitHubGraphQlClient;
 
     protected final List<String> repositoriesToDelete = new ArrayList<>();
-    protected final List<Long> teamsToDelete = new ArrayList<>();
+    protected final List<TeamToDelete> teamsToDelete = new ArrayList<>();
 
-    protected GitHub installationClient;
-    protected GitHub patClient;
+    // Class-level tracking for @AfterAll safety net cleanup
+    private final Set<String> allRepositoriesCreated = ConcurrentHashMap.newKeySet();
+    private final Set<TeamToDelete> allTeamsCreated = ConcurrentHashMap.newKeySet();
+
+    protected GitHubTestFixtureService fixtureService;
     protected Workspace workspace;
 
     @BeforeAll
-    void setUpGitHubClients() throws IOException {
+    void setUpFixtureService() {
         assumeGitHubCredentialsConfigured();
-        installationClient = gitHubAppTokenService.clientForInstallation(githubInstallationId());
-        if (personalAccessToken != null && !personalAccessToken.isBlank()) {
-            patClient = new GitHubBuilder().withOAuthToken(personalAccessToken).build();
-        }
+        String token = gitHubAppTokenService.getInstallationTokenDetails(githubInstallationId()).token();
+        fixtureService = new GitHubTestFixtureService(
+            gitHubGraphQlClient.mutate().header("Authorization", "Bearer " + token).build(),
+            token
+        );
     }
 
     @BeforeEach
@@ -80,12 +75,47 @@ abstract class AbstractGitHubLiveSyncIntegrationTest extends BaseGitHubLiveInteg
     @AfterEach
     void tearDownGitHubArtifacts() {
         for (String fullName : repositoriesToDelete) {
-            deleteRepositoryQuietly(fullName);
+            fixtureService.deleteRepository(fullName);
+            allRepositoriesCreated.remove(fullName); // Remove from safety net if successfully deleted
         }
-        for (Long teamId : teamsToDelete) {
-            deleteTeamQuietly(teamId);
+        for (TeamToDelete team : teamsToDelete) {
+            fixtureService.deleteTeam(team.orgLogin(), team.teamSlug());
+            allTeamsCreated.remove(team); // Remove from safety net if successfully deleted
         }
         workspace = null;
+    }
+
+    /**
+     * Safety net cleanup that runs after all tests in the class.
+     * This catches any artifacts that weren't cleaned up by @AfterEach
+     * (e.g., due to test failures, exceptions, or deletion failures).
+     */
+    @AfterAll
+    void cleanupOrphanedArtifacts() {
+        if (fixtureService == null) {
+            return; // Fixture service was never initialized (tests skipped)
+        }
+
+        if (!allRepositoriesCreated.isEmpty()) {
+            logger.warn(
+                "Safety net cleanup: {} repositories were not cleaned up by @AfterEach",
+                allRepositoriesCreated.size()
+            );
+            for (String fullName : allRepositoriesCreated) {
+                logger.info("Safety net: Deleting orphaned repository {}", fullName);
+                fixtureService.deleteRepository(fullName);
+            }
+            allRepositoriesCreated.clear();
+        }
+
+        if (!allTeamsCreated.isEmpty()) {
+            logger.warn("Safety net cleanup: {} teams were not cleaned up by @AfterEach", allTeamsCreated.size());
+            for (TeamToDelete team : allTeamsCreated) {
+                logger.info("Safety net: Deleting orphaned team {}/{}", team.orgLogin(), team.teamSlug());
+                fixtureService.deleteTeam(team.orgLogin(), team.teamSlug());
+            }
+            allTeamsCreated.clear();
+        }
     }
 
     protected Workspace createWorkspace() {
@@ -96,7 +126,7 @@ abstract class AbstractGitHubLiveSyncIntegrationTest extends BaseGitHubLiveInteg
         ws.setDisplayName(githubOrganization());
         ws.setAccountLogin(githubOrganization());
         ws.setAccountType(AccountType.ORG);
-        ws.setGithubRepositorySelection(org.kohsuke.github.GHRepositorySelection.ALL);
+        ws.setGithubRepositorySelection(RepositorySelection.ALL);
         return workspaceRepository.save(ws);
     }
 
@@ -112,42 +142,22 @@ abstract class AbstractGitHubLiveSyncIntegrationTest extends BaseGitHubLiveInteg
         return normalized;
     }
 
-    protected GHRepository createEphemeralRepository(String suffix) throws IOException, InterruptedException {
+    protected GitHubTestFixtureService.CreatedRepository createEphemeralRepository(String suffix)
+        throws InterruptedException {
         String repositoryName = nextEphemeralSlug(suffix);
-        GHOrganization organization = fetchOrganization();
-        GHRepository repository;
-        try {
-            repository = organization
-                .createRepository(repositoryName)
-                .autoInit(true)
-                .private_(true)
-                .description("Temporary repository for live integration testing")
-                .create();
-        } catch (IOException creationError) {
-            if (patClient == null) {
-                throw creationError;
-            }
-            logger.warn("Repository creation via installation token failed, retrying with PAT", creationError);
-            var patOrganization = patClient.getOrganization(organization.getLogin());
-            repository = patOrganization
-                .createRepository(repositoryName)
-                .autoInit(true)
-                .private_(true)
-                .description("Temporary repository for live integration testing")
-                .create();
-        }
-        String fullName = repository.getFullName();
-        repositoriesToDelete.add(fullName);
-        awaitCondition("repository default branch", () -> {
-            var refetched = installationClient.getRepository(fullName);
-            return refetched.getDefaultBranch() != null && !refetched.getDefaultBranch().isBlank();
-        });
-        return installationClient.getRepository(fullName);
+        GitHubTestFixtureService.CreatedRepository repository = fixtureService.createRepository(
+            githubOrganization(),
+            repositoryName,
+            true
+        );
+        repositoriesToDelete.add(repository.fullName());
+        allRepositoriesCreated.add(repository.fullName()); // Track in safety net
+        return repository;
     }
 
-    protected RepositoryToMonitor registerRepositoryToMonitor(GHRepository repository) {
+    protected RepositoryToMonitor registerRepositoryToMonitor(String fullName) {
         RepositoryToMonitor monitor = new RepositoryToMonitor();
-        monitor.setNameWithOwner(repository.getFullName());
+        monitor.setNameWithOwner(fullName);
         monitor.setWorkspace(workspace);
         RepositoryToMonitor saved = repositoryToMonitorRepository.save(monitor);
         workspace.getRepositoriesToMonitor().add(saved);
@@ -155,144 +165,139 @@ abstract class AbstractGitHubLiveSyncIntegrationTest extends BaseGitHubLiveInteg
         return saved;
     }
 
-    protected List<GHUser> seedOrganizationMembers() throws IOException {
-        GHOrganization org = fetchOrganization();
-        PagedIterable<GHUser> memberIterable = org.listMembers().withPageSize(100);
-        List<GHUser> members = memberIterable.toList();
-        members.forEach(gitHubUserSyncService::processUser);
-        return members;
+    protected RepositoryToMonitor registerRepositoryToMonitor(GitHubTestFixtureService.CreatedRepository repository) {
+        return registerRepositoryToMonitor(repository.fullName());
     }
 
-    protected GHOrganization fetchOrganization() throws IOException {
-        return installationClient.getOrganization(githubOrganization());
+    protected List<String> seedOrganizationMembers() {
+        return fixtureService.getOrganizationMemberLogins(githubOrganization());
     }
 
-    protected GHLabel createRepositoryLabel(GHRepository repository, String prefix, String color, String description)
-        throws IOException {
+    protected GitHubTestFixtureService.CreatedLabel createRepositoryLabel(
+        String repositoryNodeId,
+        String prefix,
+        String color,
+        String description
+    ) {
         String uniqueSuffix = Long.toString(Instant.now().toEpochMilli(), 36);
         String labelName = (prefix + "-" + uniqueSuffix).toLowerCase();
-        return repository.createLabel(labelName, color, description);
+        return fixtureService.createLabel(repositoryNodeId, labelName, color, description);
     }
 
-    protected GHMilestone createRepositoryMilestone(GHRepository repository, String prefix, String description)
-        throws IOException {
+    protected GitHubTestFixtureService.CreatedMilestone createRepositoryMilestone(
+        String fullName,
+        String prefix,
+        String description
+    ) {
         String uniqueSuffix = Long.toString(Instant.now().toEpochMilli(), 36);
         String milestoneTitle = prefix + " " + uniqueSuffix;
-        return repository.createMilestone(milestoneTitle, description);
-    }
-
-    protected CreatedTeam createEphemeralTeam(GHRepository repository, GHOrganization organization, GHUser maintainer)
-        throws IOException {
-        return createEphemeralTeam(repository, organization, maintainer, RepositoryRole.from(Permission.MAINTAIN));
+        return fixtureService.createMilestone(fullName, milestoneTitle, description);
     }
 
     protected CreatedTeam createEphemeralTeam(
-        GHRepository repository,
-        GHOrganization organization,
-        GHUser maintainer,
-        RepositoryRole repositoryRole
-    ) throws IOException {
+        GitHubTestFixtureService.CreatedRepository repository,
+        String maintainerLogin,
+        String permission
+    ) {
         String teamName = "it-team-" + nextEphemeralSlug("team");
-        GHTeam team;
-        try {
-            team = organization
-                .createTeam(teamName)
-                .privacy(GHTeam.Privacy.CLOSED)
-                .maintainers(maintainer.getLogin())
-                .create();
-        } catch (IOException creationError) {
-            if (patClient == null) {
-                throw creationError;
-            }
-            logger.warn("Team creation via installation token failed, retrying with PAT", creationError);
-            var patOrganization = patClient.getOrganization(organization.getLogin());
-            team = patOrganization
-                .createTeam(teamName)
-                .privacy(GHTeam.Privacy.CLOSED)
-                .maintainers(maintainer.getLogin())
-                .create();
-        }
-        teamsToDelete.add(team.getId());
-        if (!tryAddRepositoryToTeam(team, repository, repositoryRole)) {
-            if (patClient == null) {
-                throw new IOException(
-                    "Failed to add repository to team via installation token and no PAT fallback available."
-                );
-            }
-            var patTeam = patClient.getOrganization(organization.getLogin()).getTeam(team.getId());
-            var patRepository = patClient.getRepository(repository.getFullName());
-            if (!tryAddRepositoryToTeam(patTeam, patRepository, repositoryRole)) {
-                throw new IOException("Failed to add repository to team using PAT fallback.");
-            }
-        }
-        return new CreatedTeam(team.getId(), teamName, maintainer.getLogin());
+        GitHubTestFixtureService.CreatedTeam team = fixtureService.createTeam(githubOrganization(), teamName);
+        TeamToDelete teamToDelete = new TeamToDelete(githubOrganization(), team.slug());
+        teamsToDelete.add(teamToDelete);
+        allTeamsCreated.add(teamToDelete); // Track in safety net
+
+        // Add repository to team
+        fixtureService.addRepositoryToTeam(githubOrganization(), team.slug(), repository.fullName(), permission);
+
+        return new CreatedTeam(team.databaseId(), team.name(), maintainerLogin);
     }
 
-    protected CreatedIssue createIssueWithComment(GHRepository repository) throws IOException, InterruptedException {
+    protected CreatedIssue createIssueWithComment(GitHubTestFixtureService.CreatedRepository repository)
+        throws InterruptedException {
         String issueTitle = "IT issue " + nextEphemeralSlug("issue");
         String issueBody = "Live integration issue created at " + Instant.now();
-        var issue = repository.createIssue(issueTitle).body(issueBody).create();
-        String commentBody = "Issue comment seed " + Instant.now();
-        var comment = issue.comment(commentBody);
-        awaitCondition(
-            "issue comment availability",
-            () -> repository.getIssue(issue.getNumber()).getCommentsCount() >= 1
+
+        // Get repository info for node ID
+        GitHubTestFixtureService.RepositoryInfo repoInfo = fixtureService.getRepositoryInfo(repository.fullName());
+
+        GitHubTestFixtureService.CreatedIssue issue = fixtureService.createIssue(
+            repoInfo.nodeId(),
+            issueTitle,
+            issueBody
         );
-        return new CreatedIssue(issue.getId(), issue.getNumber(), issueTitle, issueBody, comment.getId(), commentBody);
+
+        String commentBody = "Issue comment seed " + Instant.now();
+        GitHubTestFixtureService.CreatedIssueComment comment = fixtureService.addIssueComment(
+            issue.nodeId(),
+            commentBody
+        );
+
+        return new CreatedIssue(
+            issue.databaseId(),
+            issue.number(),
+            issueTitle,
+            issueBody,
+            comment.databaseId(),
+            commentBody
+        );
     }
 
-    protected PullRequestArtifacts createPullRequestWithReview(GHRepository repository) throws Exception {
+    protected PullRequestArtifacts createPullRequestWithReview(GitHubTestFixtureService.CreatedRepository repository)
+        throws Exception {
         String branchSuffix = nextEphemeralSlug("branch");
         String branchName = "feature-" + branchSuffix;
-        String defaultBranch = repository.getDefaultBranch();
-        var defaultRef = repository.getRef("heads/" + defaultBranch);
-        repository.createRef("refs/heads/" + branchName, defaultRef.getObject().getSha());
 
+        // Get repository info
+        GitHubTestFixtureService.RepositoryInfo repoInfo = fixtureService.getRepositoryInfo(repository.fullName());
+        String defaultBranch = repoInfo.defaultBranch();
+        String headCommitSha = repoInfo.headCommitSha();
+
+        // Create feature branch
+        fixtureService.createBranch(repoInfo.nodeId(), branchName, headCommitSha);
+
+        // Create a file on the feature branch
         String filePath = "integration/test-" + branchSuffix + ".txt";
         String fileContent = "Integration content generated at " + Instant.now();
-        repository
-            .createContent()
-            .path(filePath)
-            .message("Add " + filePath)
-            .content(fileContent)
-            .branch(branchName)
-            .commit();
+        String commitSha = fixtureService.createCommitOnBranch(
+            repository.fullName(),
+            branchName,
+            "Add " + filePath,
+            filePath,
+            fileContent
+        );
 
+        // Create pull request
         String prTitle = "IT pull request " + nextEphemeralSlug("pr");
-        var pullRequest = repository.createPullRequest(prTitle, branchName, defaultBranch, "Integration test PR");
-        pullRequest.refresh();
+        GitHubTestFixtureService.CreatedPullRequest pullRequest = fixtureService.createPullRequest(
+            repoInfo.nodeId(),
+            prTitle,
+            "Integration test PR",
+            branchName,
+            defaultBranch
+        );
 
-        awaitCondition("pull request head commit", () -> pullRequest.getHead() != null);
-        String headCommitSha = pullRequest.getHead().getSha();
-
-        String reviewDraftBody = "Initial review message " + Instant.now();
+        // Add review with comment
+        String reviewBody = "Initial review message " + Instant.now();
         String reviewCommentBody = "Review inline note " + Instant.now();
 
-        GHPullRequestReview commentReview = pullRequest
-            .createReview()
-            .body(reviewDraftBody)
-            .comment(reviewCommentBody, filePath, 1)
-            .commitId(headCommitSha)
-            .event(GHPullRequestReviewEvent.COMMENT)
-            .create();
-        awaitCondition("review comment present", () -> !pullRequest.listReviewComments().toList().isEmpty());
-        List<GHPullRequestReviewComment> reviewComments = pullRequest.listReviewComments().toList();
-        GHPullRequestReviewComment reviewComment = reviewComments.get(0);
-        awaitCondition("pull request review present", () ->
-            pullRequest.listReviews().toList().stream().anyMatch(r -> r.getId() == commentReview.getId())
+        GitHubTestFixtureService.CreatedReview review = fixtureService.addPullRequestReview(
+            pullRequest.nodeId(),
+            reviewBody,
+            "COMMENT",
+            commitSha,
+            List.of(new GitHubTestFixtureService.ReviewComment(filePath, 1, reviewCommentBody))
         );
 
         return new PullRequestArtifacts(
-            pullRequest.getId(),
-            pullRequest.getNumber(),
+            pullRequest.databaseId(),
+            pullRequest.number(),
             prTitle,
-            commentReview.getId(),
-            reviewDraftBody,
-            reviewComment.getId(),
+            review.databaseId(),
+            reviewBody,
+            0L, // Review comment ID - we don't get this from the mutation response
             reviewCommentBody,
             filePath,
-            reviewComment.getLine(),
-            headCommitSha
+            1,
+            commitSha
         );
     }
 
@@ -311,115 +316,15 @@ abstract class AbstractGitHubLiveSyncIntegrationTest extends BaseGitHubLiveInteg
         throw new IllegalStateException("Timed out waiting for " + description);
     }
 
-    private void deleteRepositoryQuietly(String fullName) {
-        try {
-            installationClient.getRepository(fullName).delete();
-            return;
-        } catch (IOException installationDeletionError) {
-            logger.warn("Failed to delete repo {} via installation token", fullName, installationDeletionError);
-        }
-
-        if (patClient != null) {
-            try {
-                patClient.getRepository(fullName).delete();
-            } catch (IOException patDeletionError) {
-                logger.warn("Failed to delete repo {} via PAT", fullName, patDeletionError);
-            }
-        }
+    protected void addRepositoryCollaborator(String fullName, String username) {
+        fixtureService.addCollaborator(fullName, username, "push");
     }
 
-    private void deleteTeamQuietly(Long teamId) {
-        if (teamId == null) {
-            return;
-        }
-        try {
-            fetchOrganization().getTeam(teamId).delete();
-            return;
-        } catch (IOException deletionError) {
-            logger.warn("Failed to delete team {} via installation token", teamId, deletionError);
-        }
-
-        if (patClient != null) {
-            try {
-                patClient.getOrganization(githubOrganization()).getTeam(teamId).delete();
-            } catch (IOException patDeletionError) {
-                logger.warn("Failed to delete team {} via PAT", teamId, patDeletionError);
-            }
-        }
+    protected void removeRepositoryCollaborator(String fullName, String username) {
+        fixtureService.removeCollaborator(fullName, username);
     }
 
-    protected void addRepositoryCollaborator(GHRepository repository, GHUser collaborator) throws IOException {
-        if (tryAddCollaborator(repository, collaborator)) {
-            return;
-        }
-        if (patClient == null) {
-            throw new IOException("Failed to add collaborator via installation token and no PAT available.");
-        }
-        var patRepository = patClient.getRepository(repository.getFullName());
-        var patCollaborator = patClient.getUser(collaborator.getLogin());
-        if (!tryAddCollaborator(patRepository, patCollaborator)) {
-            throw new IOException("Failed to add collaborator using PAT fallback.");
-        }
-    }
-
-    protected void removeRepositoryCollaborator(GHRepository repository, GHUser collaborator) throws IOException {
-        if (tryRemoveCollaborator(repository, collaborator)) {
-            return;
-        }
-        if (patClient == null) {
-            throw new IOException("Failed to remove collaborator via installation token and no PAT available.");
-        }
-        var patRepository = patClient.getRepository(repository.getFullName());
-        var patCollaborator = patClient.getUser(collaborator.getLogin());
-        if (!tryRemoveCollaborator(patRepository, patCollaborator)) {
-            throw new IOException("Failed to remove collaborator using PAT fallback.");
-        }
-    }
-
-    private boolean tryAddRepositoryToTeam(GHTeam team, GHRepository repository, RepositoryRole role) {
-        try {
-            team.add(repository, role);
-            return true;
-        } catch (IOException linkingError) {
-            logger.warn(
-                "Failed to link repository {} to team {}",
-                repository.getFullName(),
-                team.getId(),
-                linkingError
-            );
-            return false;
-        }
-    }
-
-    private boolean tryAddCollaborator(GHRepository repository, GHUser collaborator) {
-        try {
-            repository.addCollaborators(collaborator);
-            return true;
-        } catch (IOException additionError) {
-            logger.warn(
-                "Failed to add collaborator {} to repository {}",
-                collaborator.getLogin(),
-                repository.getFullName(),
-                additionError
-            );
-            return false;
-        }
-    }
-
-    private boolean tryRemoveCollaborator(GHRepository repository, GHUser collaborator) {
-        try {
-            repository.removeCollaborators(collaborator);
-            return true;
-        } catch (IOException removalError) {
-            logger.warn(
-                "Failed to remove collaborator {} from repository {}",
-                collaborator.getLogin(),
-                repository.getFullName(),
-                removalError
-            );
-            return false;
-        }
-    }
+    // ========== RECORD TYPES ==========
 
     protected record CreatedIssue(
         long issueId,
@@ -431,6 +336,8 @@ abstract class AbstractGitHubLiveSyncIntegrationTest extends BaseGitHubLiveInteg
     ) {}
 
     protected record CreatedTeam(long id, String name, String maintainerLogin) {}
+
+    protected record TeamToDelete(String orgLogin, String teamSlug) {}
 
     protected record PullRequestArtifacts(
         long pullRequestId,

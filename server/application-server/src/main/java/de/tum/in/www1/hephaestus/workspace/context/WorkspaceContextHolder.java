@@ -33,7 +33,7 @@ public final class WorkspaceContextHolder {
         WorkspaceContext existing = contextHolder.get();
         if (existing != null && !existing.equals(context)) {
             log.warn(
-                "Overwriting existing WorkspaceContext. Potential context leak. " + "existing={}, new={}",
+                "Detected context overwrite: existingSlug={}, newSlug={}",
                 existing.slug(),
                 context != null ? context.slug() : "null"
             );

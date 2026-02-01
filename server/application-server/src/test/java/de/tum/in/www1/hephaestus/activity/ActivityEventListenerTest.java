@@ -1,0 +1,510 @@
+package de.tum.in.www1.hephaestus.activity;
+
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
+import de.tum.in.www1.hephaestus.activity.scoring.ExperiencePointCalculator;
+import de.tum.in.www1.hephaestus.gitprovider.common.DataSource;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.EventContext;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.EventPayload;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.RepositoryRef;
+import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
+import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueCommentRepository;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThreadRepository;
+import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
+import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import java.time.Instant;
+import java.util.Optional;
+import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
+
+/**
+ * Unit tests for ActivityEventListener.
+ *
+ * <p>Tests verify that activity events are correctly recorded using event payload data
+ * and getReferenceById() for entity references (no N+1 queries).
+ */
+@Tag("unit")
+@ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
+class ActivityEventListenerTest {
+
+    @Mock
+    private ActivityEventService activityEventService;
+
+    @Mock
+    private ExperiencePointCalculator experiencePointCalculator;
+
+    @Mock
+    private PullRequestReviewRepository reviewRepository;
+
+    @Mock
+    private IssueCommentRepository issueCommentRepository;
+
+    @Mock
+    private PullRequestReviewThreadRepository reviewThreadRepository;
+
+    @Mock
+    private UserRepository userRepository;
+
+    @Mock
+    private RepositoryRepository repositoryRepository;
+
+    private ActivityEventListener listener;
+
+    private User testUser;
+    private Repository testRepository;
+
+    @BeforeEach
+    void setUp() {
+        // Set up default XP values for the mock
+        when(experiencePointCalculator.getXpPullRequestOpened()).thenReturn(
+            ExperiencePointCalculator.XP_PULL_REQUEST_OPENED
+        );
+        when(experiencePointCalculator.getXpPullRequestMerged()).thenReturn(
+            ExperiencePointCalculator.XP_PULL_REQUEST_MERGED
+        );
+        when(experiencePointCalculator.getXpReviewComment()).thenReturn(ExperiencePointCalculator.XP_REVIEW_COMMENT);
+        when(experiencePointCalculator.getXpPullRequestReady()).thenReturn(0.5);
+        when(experiencePointCalculator.getXpIssueCreated()).thenReturn(0.25);
+
+        listener = new ActivityEventListener(
+            activityEventService,
+            experiencePointCalculator,
+            reviewRepository,
+            issueCommentRepository,
+            reviewThreadRepository,
+            userRepository,
+            repositoryRepository
+        );
+
+        testUser = new User();
+        testUser.setId(100L);
+        testUser.setLogin("testuser");
+
+        testRepository = new Repository();
+        testRepository.setId(200L);
+        testRepository.setName("test-repo");
+
+        // Set up getReferenceById mocks - these return proxy references without DB queries
+        when(userRepository.getReferenceById(100L)).thenReturn(testUser);
+        when(repositoryRepository.getReferenceById(200L)).thenReturn(testRepository);
+    }
+
+    @Nested
+    @DisplayName("Pull Request Created Event")
+    class PullRequestCreatedTests {
+
+        @Test
+        @DisplayName("records pull request opened with fixed XP using event data directly")
+        void recordsPullRequestOpened() {
+            PullRequest pullRequest = createPullRequest(1L);
+
+            var event = new DomainEvent.PullRequestCreated(createPullRequestData(pullRequest), createContext());
+
+            listener.onPullRequestCreated(event);
+
+            verify(activityEventService).record(
+                eq(42L),
+                eq(ActivityEventType.PULL_REQUEST_OPENED),
+                any(Instant.class),
+                eq(testUser),
+                eq(testRepository),
+                eq(ActivityTargetType.PULL_REQUEST),
+                eq(1L),
+                eq(ExperiencePointCalculator.XP_PULL_REQUEST_OPENED)
+            );
+            // Verify no findById was called (N+1 fix)
+            verify(userRepository).getReferenceById(100L);
+            verify(repositoryRepository).getReferenceById(200L);
+        }
+
+        @Test
+        @DisplayName("does nothing when authorId is missing from event data")
+        void noOpWhenAuthorIdMissing() {
+            PullRequest pullRequest = createPullRequest(1L);
+            pullRequest.setAuthor(null); // No author
+
+            var event = new DomainEvent.PullRequestCreated(createPullRequestData(pullRequest), createContext());
+
+            listener.onPullRequestCreated(event);
+
+            verifyNoInteractions(activityEventService);
+        }
+    }
+
+    @Nested
+    @DisplayName("Pull Request Merged Event")
+    class PullRequestMergedTests {
+
+        @Test
+        @DisplayName("records pull request merged with fixed XP using event data")
+        void recordsPullRequestMerged() {
+            PullRequest pullRequest = createPullRequest(2L);
+            pullRequest.setMergedAt(Instant.now());
+            pullRequest.setMergedBy(testUser);
+
+            var event = new DomainEvent.PullRequestMerged(createPullRequestData(pullRequest), createContext());
+
+            listener.onPullRequestMerged(event);
+
+            verify(activityEventService).record(
+                eq(42L),
+                eq(ActivityEventType.PULL_REQUEST_MERGED),
+                any(Instant.class),
+                eq(testUser),
+                eq(testRepository),
+                eq(ActivityTargetType.PULL_REQUEST),
+                eq(2L),
+                eq(ExperiencePointCalculator.XP_PULL_REQUEST_MERGED)
+            );
+        }
+    }
+
+    @Nested
+    @DisplayName("Pull Request Closed Event")
+    class PullRequestClosedTests {
+
+        @Test
+        @DisplayName("records pull request closed with zero XP when not merged")
+        void recordsPullRequestClosedWithZeroXp() {
+            PullRequest pullRequest = createPullRequest(3L);
+            pullRequest.setClosedAt(Instant.now());
+
+            var event = new DomainEvent.PullRequestClosed(createPullRequestData(pullRequest), false, createContext());
+
+            listener.onPullRequestClosed(event);
+
+            verify(activityEventService).record(
+                eq(42L),
+                eq(ActivityEventType.PULL_REQUEST_CLOSED),
+                any(Instant.class),
+                eq(testUser),
+                eq(testRepository),
+                eq(ActivityTargetType.PULL_REQUEST),
+                eq(3L),
+                eq(0.0)
+            );
+        }
+
+        @Test
+        @DisplayName("does nothing when pull request was merged (handled by onPullRequestMerged)")
+        void noOpWhenMerged() {
+            var event = new DomainEvent.PullRequestClosed(
+                createPullRequestData(createPullRequest(4L)),
+                true,
+                createContext()
+            );
+
+            listener.onPullRequestClosed(event);
+
+            verifyNoInteractions(activityEventService);
+        }
+    }
+
+    @Nested
+    @DisplayName("Pull Request Reopened Event")
+    class PullRequestReopenedTests {
+
+        @Test
+        @DisplayName("records pull request reopened with zero XP (lifecycle tracking only)")
+        void recordsPullRequestReopenedWithZeroXp() {
+            PullRequest pullRequest = createPullRequest(5L);
+
+            var event = new DomainEvent.PullRequestReopened(createPullRequestData(pullRequest), createContext());
+
+            listener.onPullRequestReopened(event);
+
+            verify(activityEventService).record(
+                eq(42L),
+                eq(ActivityEventType.PULL_REQUEST_REOPENED),
+                any(Instant.class),
+                eq(testUser),
+                eq(testRepository),
+                eq(ActivityTargetType.PULL_REQUEST),
+                eq(5L),
+                eq(0.0)
+            );
+        }
+    }
+
+    @Nested
+    @DisplayName("Pull Request Ready Event")
+    class PullRequestReadyTests {
+
+        @Test
+        @DisplayName("records pull request ready for review with XP")
+        void recordsPullRequestReady() {
+            PullRequest pullRequest = createPullRequest(6L);
+
+            var event = new DomainEvent.PullRequestReady(createPullRequestData(pullRequest), createContext());
+
+            listener.onPullRequestReady(event);
+
+            verify(activityEventService).record(
+                eq(42L),
+                eq(ActivityEventType.PULL_REQUEST_READY),
+                any(Instant.class),
+                eq(testUser),
+                eq(testRepository),
+                eq(ActivityTargetType.PULL_REQUEST),
+                eq(6L),
+                eq(0.5) // XP from mock
+            );
+        }
+    }
+
+    @Nested
+    @DisplayName("Review Submitted Event")
+    class ReviewSubmittedTests {
+
+        @Test
+        @DisplayName("maps APPROVED review state to REVIEW_APPROVED event type using event data")
+        void usesExperiencePointCalculatorForReviewXp() {
+            PullRequest pullRequest = createPullRequest(10L);
+            PullRequestReview review = createReview(5L, pullRequest);
+            review.setState(PullRequestReview.State.APPROVED);
+            // Mock findById to return the single review for XP calculation
+            when(reviewRepository.findById(5L)).thenReturn(Optional.of(review));
+            when(experiencePointCalculator.calculateReviewExperiencePoints(review)).thenReturn(7.5);
+
+            var event = new DomainEvent.ReviewSubmitted(createReviewData(review), createContext());
+
+            listener.onReviewSubmitted(event);
+
+            verify(experiencePointCalculator).calculateReviewExperiencePoints(review);
+            verify(activityEventService).record(
+                eq(42L),
+                eq(ActivityEventType.REVIEW_APPROVED),
+                any(Instant.class),
+                eq(testUser),
+                eq(testRepository),
+                eq(ActivityTargetType.REVIEW),
+                eq(5L),
+                eq(7.5)
+            );
+        }
+
+        @Test
+        @DisplayName("handles missing author gracefully")
+        void handlesMissingAuthor() {
+            PullRequest pullRequest = createPullRequest(1L);
+            PullRequestReview review = createReview(6L, pullRequest);
+            review.setAuthor(null); // No author
+
+            var event = new DomainEvent.ReviewSubmitted(createReviewData(review), createContext());
+
+            listener.onReviewSubmitted(event);
+
+            verifyNoInteractions(activityEventService);
+        }
+    }
+
+    @Nested
+    @DisplayName("Issue Created Event")
+    class IssueCreatedTests {
+
+        @Test
+        @DisplayName("records issue created with XP for regular issues")
+        void recordsIssueCreatedWithXp() {
+            Issue issue = createIssue(10L);
+
+            var event = new DomainEvent.IssueCreated(createIssueData(issue), createContext());
+
+            listener.onIssueCreated(event);
+
+            verify(activityEventService).record(
+                eq(42L),
+                eq(ActivityEventType.ISSUE_CREATED),
+                any(Instant.class),
+                eq(testUser),
+                eq(testRepository),
+                eq(ActivityTargetType.ISSUE),
+                eq(10L),
+                eq(0.25) // XP from mock
+            );
+        }
+
+        @Test
+        @DisplayName("skips pull requests (they have PULL_REQUEST_OPENED event)")
+        void skipsPullRequests() {
+            PullRequest pullRequest = createPullRequest(11L);
+
+            var event = new DomainEvent.IssueCreated(EventPayload.IssueData.from(pullRequest), createContext());
+
+            listener.onIssueCreated(event);
+
+            verifyNoInteractions(activityEventService);
+        }
+
+        @Test
+        @DisplayName("records issue with null author and zero XP (deleted user or bot)")
+        void recordsIssueWithNullAuthorAndZeroXp() {
+            // Create issue WITHOUT author - simulates deleted GitHub user or bot
+            Issue issue = createIssue(14L);
+            issue.setAuthor(null);
+
+            var event = new DomainEvent.IssueCreated(createIssueData(issue), createContext());
+
+            listener.onIssueCreated(event);
+
+            // Event is STILL recorded (for audit trail), but with null actor and 0 XP
+            verify(activityEventService).record(
+                eq(42L),
+                eq(ActivityEventType.ISSUE_CREATED),
+                any(Instant.class),
+                isNull(), // null actor - user deleted or bot
+                eq(testRepository),
+                eq(ActivityTargetType.ISSUE),
+                eq(14L),
+                eq(0.0) // Zero XP for unknown authors
+            );
+        }
+    }
+
+    @Nested
+    @DisplayName("Issue Closed Event")
+    class IssueClosedTests {
+
+        @Test
+        @DisplayName("records issue closed with zero XP (lifecycle tracking only)")
+        void recordsIssueClosedWithZeroXp() {
+            Issue issue = createIssue(12L);
+            issue.setClosedAt(Instant.now());
+
+            var event = new DomainEvent.IssueClosed(createIssueData(issue), null, createContext());
+
+            listener.onIssueClosed(event);
+
+            verify(activityEventService).record(
+                eq(42L),
+                eq(ActivityEventType.ISSUE_CLOSED),
+                any(Instant.class),
+                eq(testUser),
+                eq(testRepository),
+                eq(ActivityTargetType.ISSUE),
+                eq(12L),
+                eq(0.0)
+            );
+        }
+
+        @Test
+        @DisplayName("skips pull requests (they have their own close event)")
+        void skipsPullRequests() {
+            PullRequest pullRequest = createPullRequest(13L);
+
+            var event = new DomainEvent.IssueClosed(EventPayload.IssueData.from(pullRequest), null, createContext());
+
+            listener.onIssueClosed(event);
+
+            verifyNoInteractions(activityEventService);
+        }
+
+        @Test
+        @DisplayName("records issue closed with null author (deleted user or bot)")
+        void recordsIssueClosedWithNullAuthor() {
+            // Create issue WITHOUT author - simulates deleted GitHub user or bot
+            Issue issue = createIssue(15L);
+            issue.setAuthor(null);
+            issue.setClosedAt(Instant.now());
+
+            var event = new DomainEvent.IssueClosed(createIssueData(issue), null, createContext());
+
+            listener.onIssueClosed(event);
+
+            // Event is STILL recorded (for audit trail), but with null actor
+            verify(activityEventService).record(
+                eq(42L),
+                eq(ActivityEventType.ISSUE_CLOSED),
+                any(Instant.class),
+                isNull(), // null actor - user deleted or bot
+                eq(testRepository),
+                eq(ActivityTargetType.ISSUE),
+                eq(15L),
+                eq(0.0) // Issue closure has 0 XP anyway
+            );
+        }
+    }
+
+    // ========================================================================
+    // Helpers
+    // ========================================================================
+
+    private PullRequest createPullRequest(Long id) {
+        PullRequest pullRequest = new PullRequest();
+        pullRequest.setId(id);
+        pullRequest.setNumber(1);
+        pullRequest.setTitle("Test Pull Request");
+        pullRequest.setState(PullRequest.State.OPEN);
+        pullRequest.setAuthor(testUser);
+        pullRequest.setRepository(testRepository);
+        pullRequest.setCreatedAt(Instant.now());
+        pullRequest.setUpdatedAt(Instant.now());
+        pullRequest.setHtmlUrl("https://github.com/test/test-repo/pull/1");
+        return pullRequest;
+    }
+
+    private Issue createIssue(Long id) {
+        Issue issue = new Issue();
+        issue.setId(id);
+        issue.setNumber(100);
+        issue.setTitle("Test Issue");
+        issue.setState(Issue.State.OPEN);
+        issue.setAuthor(testUser);
+        issue.setRepository(testRepository);
+        issue.setCreatedAt(Instant.now());
+        issue.setUpdatedAt(Instant.now());
+        issue.setHtmlUrl("https://github.com/test/test-repo/issues/100");
+        return issue;
+    }
+
+    private PullRequestReview createReview(Long id, PullRequest pullRequest) {
+        PullRequestReview review = new PullRequestReview();
+        review.setId(id);
+        review.setAuthor(testUser);
+        review.setPullRequest(pullRequest);
+        review.setSubmittedAt(Instant.now());
+        review.setState(PullRequestReview.State.APPROVED);
+        return review;
+    }
+
+    private EventPayload.PullRequestData createPullRequestData(PullRequest pullRequest) {
+        return EventPayload.PullRequestData.from(pullRequest);
+    }
+
+    private EventPayload.ReviewData createReviewData(PullRequestReview review) {
+        return EventPayload.ReviewData.from(review).orElseThrow();
+    }
+
+    private EventPayload.IssueData createIssueData(Issue issue) {
+        return EventPayload.IssueData.from(issue);
+    }
+
+    private EventContext createContext() {
+        RepositoryRef repoRef = new RepositoryRef(testRepository.getId(), testRepository.getName(), "test");
+        return new EventContext(
+            UUID.randomUUID(),
+            Instant.now(),
+            42L,
+            repoRef,
+            DataSource.WEBHOOK,
+            null,
+            UUID.randomUUID().toString()
+        );
+    }
+}

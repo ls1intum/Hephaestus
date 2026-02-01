@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.workspace;
 
+import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import java.util.Collection;
@@ -11,12 +12,14 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Repository for {@link WorkspaceMembership} entities.
  * Manages the relationship between users and workspaces, including role
  * assignments.
  */
+@WorkspaceAgnostic("Queried by explicit workspace ID - membership queries always workspace-scoped")
 public interface WorkspaceMembershipRepository extends JpaRepository<WorkspaceMembership, WorkspaceMembership.Id> {
     List<WorkspaceMembership> findByWorkspace_Id(Long workspaceId);
 
@@ -74,6 +77,7 @@ public interface WorkspaceMembershipRepository extends JpaRepository<WorkspaceMe
      * Atomically inserts a membership if absent (race-condition safe).
      */
     @Modifying
+    @Transactional
     @Query(
         value = """
         INSERT INTO workspace_membership (workspace_id, user_id, role, league_points, created_at)
@@ -88,4 +92,15 @@ public interface WorkspaceMembershipRepository extends JpaRepository<WorkspaceMe
         @Param("role") String role,
         @Param("leaguePoints") int leaguePoints
     );
+
+    /**
+     * Deletes all memberships for a workspace.
+     * Used during workspace purge to clean up membership data.
+     *
+     * @param workspaceId the workspace ID
+     */
+    @Modifying
+    @Transactional
+    @Query("DELETE FROM WorkspaceMembership wm WHERE wm.workspace.id = :workspaceId")
+    void deleteAllByWorkspaceId(@Param("workspaceId") Long workspaceId);
 }

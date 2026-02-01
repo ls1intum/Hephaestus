@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { fn } from "@storybook/test";
 import {
 	Code2,
 	Copy,
@@ -12,6 +11,7 @@ import {
 	Save,
 	Share,
 } from "lucide-react";
+import { fn } from "storybook/test";
 import { type ArtifactAction, ArtifactActions } from "./ArtifactActions";
 
 /**

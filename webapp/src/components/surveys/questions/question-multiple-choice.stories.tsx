@@ -2,7 +2,7 @@
  * Multiple choice survey question allowing several selections plus an optional open response.
  */
 import type { Meta, StoryObj } from "@storybook/react";
-import { fn } from "@storybook/test";
+import { fn } from "storybook/test";
 import { QuestionMultipleChoice } from "./question-multiple-choice";
 
 const meta = {
@@ -14,12 +14,7 @@ const meta = {
 		description: "Pick all that resonate with you.",
 		descriptionContentType: "text",
 		required: false,
-		choices: [
-			"Tutorials",
-			"Customer case studies",
-			"Product announcements",
-			"Other",
-		],
+		choices: ["Tutorials", "Customer case studies", "Product announcements", "Other"],
 		hasOpenChoice: true,
 		value: [] as string[],
 		error: undefined,

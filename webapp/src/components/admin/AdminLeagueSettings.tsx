@@ -20,10 +20,7 @@ interface AdminLeagueSettingsProps {
 /**
  * Component for managing league settings in admin view
  */
-export function AdminLeagueSettings({
-	isResetting,
-	onResetLeagues,
-}: AdminLeagueSettingsProps) {
+export function AdminLeagueSettings({ isResetting, onResetLeagues }: AdminLeagueSettingsProps) {
 	return (
 		<div className="space-y-6">
 			<div>
@@ -32,33 +29,26 @@ export function AdminLeagueSettings({
 					<CardContent>
 						<div className="space-y-4">
 							<p className="text-sm text-muted-foreground mb-4">
-								Reset and recalculate all leagues. This will clear current
-								league assignments and recalculate based on the latest data.
+								Reset and recalculate all leagues. This will clear current league assignments and
+								recalculate based on the latest data.
 							</p>
 
 							<AlertDialog>
 								<AlertDialogTrigger asChild>
-									<Button variant="destructive">
-										Reset and Recalculate Leagues
-									</Button>
+									<Button variant="destructive">Reset and Recalculate Leagues</Button>
 								</AlertDialogTrigger>
 								<AlertDialogContent>
 									<AlertDialogHeader>
-										<AlertDialogTitle>
-											Reset and recalculate leagues?
-										</AlertDialogTitle>
+										<AlertDialogTitle>Reset and recalculate leagues?</AlertDialogTitle>
 										<AlertDialogDescription>
-											This action will clear all current league assignments and
-											recalculate them based on the latest data. This process
-											cannot be undone and may take some time to complete.
+											This action will clear all current league assignments and recalculate them
+											based on the latest data. This process cannot be undone and may take some time
+											to complete.
 										</AlertDialogDescription>
 									</AlertDialogHeader>
 									<AlertDialogFooter>
 										<AlertDialogCancel>Cancel</AlertDialogCancel>
-										<AlertDialogAction
-											onClick={onResetLeagues}
-											disabled={isResetting}
-										>
+										<AlertDialogAction onClick={onResetLeagues} disabled={isResetting}>
 											{isResetting ? "Resetting..." : "Reset and Recalculate"}
 										</AlertDialogAction>
 									</AlertDialogFooter>

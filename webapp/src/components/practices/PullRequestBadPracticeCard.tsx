@@ -100,10 +100,7 @@ export interface PullRequestBadPracticeCardProps {
 	 * @param id The ID of the bad practice
 	 * @param feedback The feedback data
 	 */
-	onProvideBadPracticeFeedback?: (
-		id: number,
-		feedback: BadPracticeFeedback,
-	) => void;
+	onProvideBadPracticeFeedback?: (id: number, feedback: BadPracticeFeedback) => void;
 }
 
 export function PullRequestBadPracticeCard({
@@ -241,9 +238,7 @@ export function PullRequestBadPracticeCard({
 					{/* Show no content message if nothing to display */}
 					{!hasCurrentAnalysis && !hasPreviousAnalysis && (
 						<div className="flex items-center justify-center px-4 pb-4 w-full">
-							<span className="text-sm text-github-muted-foreground">
-								No analysis available
-							</span>
+							<span className="text-sm text-github-muted-foreground">No analysis available</span>
 						</div>
 					)}
 					{badPracticeSummary && (
@@ -260,10 +255,7 @@ export function PullRequestBadPracticeCard({
 							onValueChange={handleAccordionValueChange}
 							className="w-full"
 						>
-							<AccordionItem
-								value="current-analysis"
-								className="border-b-0 w-full"
-							>
+							<AccordionItem value="current-analysis" className="border-b-0 w-full">
 								<div className="w-full px-4 py-0">
 									<AccordionTrigger className="w-full group">
 										<div className="flex w-full items-center justify-between gap-2">
@@ -292,25 +284,16 @@ export function PullRequestBadPracticeCard({
 								<AccordionContent className="px-0 w-full">
 									<div className="px-4 space-y-2 divide-y w-full">
 										{orderedBadPractices.map((badpractice) => (
-											<div
-												key={`current-${badpractice.id}`}
-												className="w-full pb-2 last:pb-0"
-											>
+											<div key={`current-${badpractice.id}`} className="w-full pb-2 last:pb-0">
 												<BadPracticeCard
 													id={badpractice.id}
 													title={badpractice.title}
 													description={badpractice.description}
 													state={badpractice.state}
 													currUserIsDashboardUser={currUserIsDashboardUser}
-													onResolveBadPracticeAsFixed={
-														onResolveBadPracticeAsFixed
-													}
-													onResolveBadPracticeAsWontFix={
-														onResolveBadPracticeAsWontFix
-													}
-													onResolveBadPracticeAsWrong={
-														onResolveBadPracticeAsWrong
-													}
+													onResolveBadPracticeAsFixed={onResolveBadPracticeAsFixed}
+													onResolveBadPracticeAsWontFix={onResolveBadPracticeAsWontFix}
+													onResolveBadPracticeAsWrong={onResolveBadPracticeAsWrong}
 													onProvideFeedback={onProvideBadPracticeFeedback}
 												/>
 											</div>
@@ -329,10 +312,7 @@ export function PullRequestBadPracticeCard({
 							onValueChange={handleAccordionValueChange}
 							className={`w-full ${hasCurrentAnalysis ? "border-t" : ""}`}
 						>
-							<AccordionItem
-								value="previous-analysis"
-								className="border-b-0 w-full"
-							>
+							<AccordionItem value="previous-analysis" className="border-b-0 w-full">
 								<div className="w-full px-4 py-0">
 									<AccordionTrigger className="w-full">
 										<div className="flex w-full items-center justify-between gap-2">
@@ -347,25 +327,16 @@ export function PullRequestBadPracticeCard({
 								<AccordionContent>
 									<div className="px-4 space-y-2 divide-y w-full">
 										{orderedOldBadPractices.map((badpractice) => (
-											<div
-												key={`old-${badpractice.id}`}
-												className="w-full pb-2 last:pb-0"
-											>
+											<div key={`old-${badpractice.id}`} className="w-full pb-2 last:pb-0">
 												<BadPracticeCard
 													id={badpractice.id}
 													title={badpractice.title}
 													description={badpractice.description}
 													state={badpractice.state}
 													currUserIsDashboardUser={currUserIsDashboardUser}
-													onResolveBadPracticeAsFixed={
-														onResolveBadPracticeAsFixed
-													}
-													onResolveBadPracticeAsWontFix={
-														onResolveBadPracticeAsWontFix
-													}
-													onResolveBadPracticeAsWrong={
-														onResolveBadPracticeAsWrong
-													}
+													onResolveBadPracticeAsFixed={onResolveBadPracticeAsFixed}
+													onResolveBadPracticeAsWontFix={onResolveBadPracticeAsWontFix}
+													onResolveBadPracticeAsWrong={onResolveBadPracticeAsWrong}
 													onProvideFeedback={onProvideBadPracticeFeedback}
 												/>
 											</div>

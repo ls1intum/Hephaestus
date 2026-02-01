@@ -1,0 +1,143 @@
+# GraphQL query for fetching paginated reviews for a specific pull request
+# Used by GitHubPullRequestReviewSyncService for standalone review sync
+# Includes embedded comments (first batch) to avoid N+1 queries
+# Nested pagination for comments is handled by GetReviewComments.graphql
+
+query GetPullRequestReviews($owner: String!, $name: String!, $number: Int!, $first: Int!, $after: String) {
+    rateLimit {
+        cost
+        limit
+        remaining
+        resetAt
+    }
+    repository(owner: $owner, name: $name) {
+        pullRequest(number: $number) {
+            reviews(first: $first, after: $after) {
+                totalCount
+                pageInfo {
+                    hasNextPage
+                    endCursor
+                }
+                nodes {
+                    id
+                    fullDatabaseId
+                    body
+                    state
+                    url
+                    submittedAt
+                    createdAt
+                    updatedAt
+
+                    # Commit associated with the review
+                    commit {
+                        oid
+                    }
+
+                    # Review author
+                    author {
+                        __typename
+                        ... on User {
+                            id
+                            databaseId
+                            login
+                            avatarUrl
+                            name
+                            email
+                            createdAt
+                            updatedAt
+                        }
+                        ... on Bot {
+                            id
+                            databaseId
+                            login
+                            avatarUrl
+                        }
+                        ... on Mannequin {
+                            id
+                            databaseId
+                            login
+                            avatarUrl
+                        }
+                        ... on Organization {
+                            id
+                            databaseId
+                            login
+                            avatarUrl
+                        }
+                    }
+
+                    # Embedded comments (first batch)
+                    # Most reviews have few comments; pagination handled by GetReviewComments.graphql for more
+                    comments(first: 100) {
+                        totalCount
+                        pageInfo {
+                            hasNextPage
+                            endCursor
+                        }
+                        nodes {
+                            id
+                            fullDatabaseId
+                            body
+                            path
+                            line
+                            originalLine
+                            startLine
+                            originalStartLine
+                            diffHunk
+                            createdAt
+                            updatedAt
+                            state
+                            url
+                            authorAssociation
+
+                            # Comment author
+                            author {
+                                __typename
+                                ... on User {
+                                    id
+                                    databaseId
+                                    login
+                                    avatarUrl
+                                    name
+                                    email
+                                    createdAt
+                                    updatedAt
+                                }
+                                ... on Bot {
+                                    id
+                                    databaseId
+                                    login
+                                    avatarUrl
+                                }
+                                ... on Mannequin {
+                                    id
+                                    databaseId
+                                    login
+                                    avatarUrl
+                                }
+                                ... on Organization {
+                                    id
+                                    databaseId
+                                    login
+                                    avatarUrl
+                                }
+                            }
+
+                            # Reply to (for threading)
+                            replyTo {
+                                id
+                                fullDatabaseId
+                            }
+
+                            # Associated review reference
+                            pullRequestReview {
+                                id
+                                fullDatabaseId
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

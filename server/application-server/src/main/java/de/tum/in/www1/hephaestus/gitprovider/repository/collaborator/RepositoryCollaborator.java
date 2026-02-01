@@ -99,21 +99,4 @@ public class RepositoryCollaborator {
         @Column(name = "user_id", nullable = false)
         private Long userId;
     }
-    /*
-     * Webhook coverage (member event → repository collaborators):
-     * Supported (webhook, no extra fetch):
-     * - member.login/id/avatar_url/type ⇒ persisted in User and linked through this join entity.
-     * - repository.id/full_name/private/html_url ⇒ persisted in Repository and linked here.
-     * - changes.permission.{from,to} / changes.role_name.{from,to} ⇒ mapped to Permission with MAINTAIN/TRIAGE support.
-     * Ignored although exposed by hub4j payloads:
-     * - member.site_admin/user_view_type, repository.custom_properties/topics. Reason: analytics-only signals.
-     * - changes.something_else (hub4j surfaces `role_name` duplicate) ⇒ redundant with permission translation.
-     * Desired but missing in hub4j/github-api 2.0-rc.5 (available via REST/GraphQL):
-     * - REST GET /repos/{owner}/{repo}/collaborators/{username}/permission → permission_sources, inherited team roles.
-     * - GraphQL RepositoryCollaboratorPermissionEdge.permission (full enum incl. MAINTAIN/TRIAGE) & RepositoryInvitation.ssoAuthorization.
-     * - REST GET /repos/{owner}/{repo}/outside_collaborators → pending/outside collaborator state.
-     * Requires extra fetch (out-of-scope for now):
-     * - GET /repos/{owner}/{repo}/invitations for invitation metadata & expiration timestamps.
-     * - GET /orgs/{org}/memberships/{username} for audit fields such as role_last_updated.
-     */
 }

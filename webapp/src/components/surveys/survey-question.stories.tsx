@@ -1,5 +1,5 @@
 import type { Decorator, Meta, StoryObj } from "@storybook/react";
-import { fn } from "@storybook/test";
+import { fn } from "storybook/test";
 import type { SurveyQuestion as SurveyQuestionType } from "@/types/survey";
 import { SurveyQuestion } from "./survey-question";
 
@@ -96,12 +96,7 @@ export const SingleChoice: Story = {
 			question: "What's your primary use case?",
 			description: "Pick the option that matches best.",
 			required: true,
-			choices: [
-				"Personal projects",
-				"Professional work",
-				"Team collaboration",
-				"Learning",
-			],
+			choices: ["Personal projects", "Professional work", "Team collaboration", "Learning"],
 		},
 		value: "",
 	},

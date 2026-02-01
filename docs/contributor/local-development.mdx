@@ -5,7 +5,7 @@ title: Local Development
 description: Prepare your workstation and run each Hephaestus service locally.
 ---
 
-Hephaestus supports full-stack development across Java, TypeScript, and Python. This guide focuses on the development environment; production operations are covered in the [Admin Guide](/admin/production-setup).
+Hephaestus supports full-stack development across Java and TypeScript. This guide focuses on the development environment; production operations are covered in the [Admin Guide](/admin/production-setup).
 
 ## Prerequisites
 
@@ -13,9 +13,8 @@ Install and configure the following tools before you attempt a local build:
 
 1. **Java JDK 21** – Required for the Spring Boot application server.
 2. **Docker Desktop** – Used for PostgreSQL, Keycloak, and NATS containers.
-3. **Node.js LTS (>= 22.10)** and **npm (>= 10.8)** – For the React client.
-4. **Python (>= 3.13)** and **Poetry (>= 2.0)** – For the FastAPI intelligence service.
-5. **NATS CLI (optional)** – Helpful when debugging webhook messages.
+3. **Node.js LTS (>= 22.10)** and **npm (>= 10.8)** – For the React client and TypeScript services.
+4. **NATS CLI (optional)** – Helpful when debugging webhook messages.
 
 ## Recommended IDE setup
 
@@ -23,11 +22,11 @@ Open the repository using the `project.code-workspace` file in VS Code and insta
 
 - Java Extension Pack
 - Spring Boot tools
-- Python and Poetry support
+- Node.js + TypeScript tooling
 - ESLint + Prettier
 - Tailwind CSS IntelliSense
 
-JetBrains alternatives such as IntelliJ (Java), WebStorm (React), and PyCharm (Python) work equally well.
+JetBrains alternatives such as IntelliJ (Java) and WebStorm (React/TypeScript) work equally well.
 
 ## Application server
 
@@ -136,25 +135,53 @@ Keycloak runs in Docker as part of the development compose stack. The bundled re
 
    ```bash
    cp server/application-server/.env.example server/application-server/.env
-   KEYCLOAK_GITHUB_CLIENT_ID=<github-client-id>
-   KEYCLOAK_GITHUB_CLIENT_SECRET=<github-client-secret>
-   KEYCLOAK_GITHUB_ADMIN_USERNAME=<github-handle-with-admin-access>
+   # Edit .env and set:
+   # KEYCLOAK_GITHUB_CLIENT_ID=<github-client-id>
+   # KEYCLOAK_GITHUB_CLIENT_SECRET=<github-client-secret>
+   # KEYCLOAK_GITHUB_ADMIN_USERNAME=<github-handle-with-admin-access>
    ```
 
    The Keycloak container resolves these placeholders during realm import, as documented in the [Keycloak import guide](https://www.keycloak.org/server/importExport#_using_environment_variables_within_the_realm_configuration_files).
-3. (Re)start the local stack: `docker compose up keycloak postgres`. On first boot Keycloak imports `keycloak-hephaestus-realm-example-config.json` and wires the GitHub provider automatically.
+
+   :::tip Pre-configured client secret
+   The `KEYCLOAK_CLIENT_SECRET` is pre-configured with a development default (`hephaestus-dev-secret`). You do not need to copy a secret from the Keycloak admin console for local development.
+   :::
+
+3. Run the application server with `./mvnw spring-boot:run`. Docker containers (Keycloak, PostgreSQL) start automatically via Spring Boot's Docker Compose support.
 4. Sign in via GitHub using the account referenced by `KEYCLOAK_GITHUB_ADMIN_USERNAME`. During the first brokered login Keycloak automatically grants that account the `admin` realm role and the `realm-management` → `realm-admin` client role, unlocking the administrative views in the application server and Keycloak console.
+
+#### Troubleshooting Keycloak
+
+If you encounter 401 Unauthorized errors or authentication issues after changing configuration:
+
+```bash
+cd server/application-server
+docker compose down -v  # Clear Keycloak data volume
+docker compose up       # Re-import realm with fresh settings
+```
+
+This deletes the Keycloak H2 database and forces a fresh realm import with your current `.env` values.
 
 ### Webhook ingest service
 
-When you run `docker/compose.core.yaml` or the `server/webhook-ingest/compose.yaml` stack, set the webhook secrets up front so signature checks succeed:
+When you run `docker/compose.core.yaml` or start the webhook ingest service locally, set the webhook secrets up front so signature checks succeed:
 
 ```bash
 cp docker/.env.example docker/.env
 export WEBHOOK_SECRET=$(openssl rand -hex 32)
 echo "WEBHOOK_SECRET=$WEBHOOK_SECRET" >> docker/.env
 ```
+
 The value must match the secret configured on your GitHub and GitLab webhooks (validated via `X-Hub-Signature-256` when available).
+
+To run the webhook ingest service locally:
+
+```bash
+cd server/webhook-ingest
+cp .env.example .env
+npm install
+npm run dev
+```
 
 ## Web client (`webapp`)
 
@@ -206,33 +233,28 @@ npm -w webapp run openapi-ts
 
 ## Intelligence service (`server/intelligence-service`)
 
-1. Create and activate a virtual environment:
+The intelligence service is a Node.js/TypeScript application using Hono and AI SDK v6. For detailed documentation including AI observability setup with Langfuse, see the dedicated [Intelligence Service guide](/contributor/intelligence-service).
+
+Quick start:
+
+1. Install dependencies:
 
    ```bash
-   python3 -m venv .venv
-   source .venv/bin/activate
+   cd server/intelligence-service
+   npm install
    ```
 
-2. Install dependencies with Poetry:
+2. Configure environment:
 
    ```bash
-   poetry install
+   cp .env.example .env
+   # Edit .env with your DATABASE_URL and LLM provider credentials
    ```
 
-3. Start FastAPI:
+3. Start the development server:
 
    ```bash
-   fastapi dev
+   npm run dev
    ```
 
-   The service is available at [http://127.0.0.1:8000](http://127.0.0.1:8000) with interactive docs at `/docs`.
-
-### GenAI integrations
-
-Copy `.env.example` to `.env` and add credentials for the GenAI providers (e.g., Ollama, OpenAI) plus optional LangSmith/Langfuse instrumentation.
-
-### FastAPI fundamentals
-
-- Routes live in `app/routers`. Keep dependencies minimal and favour dependency injection for shared services.
-- LangGraph flows sit in `app/mentor`. Regenerate the shared state definitions whenever you introduce new slots.
-- Auto-generated SQLAlchemy models (`app/db/models_gen.py`) must not be edited manually—use `npm run db:generate-models:intelligence-service` after schema changes.
+   The service is available at [http://localhost:8000](http://localhost:8000) with interactive docs at `/docs`.

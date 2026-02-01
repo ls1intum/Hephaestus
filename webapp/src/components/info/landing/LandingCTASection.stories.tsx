@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { fn } from "@storybook/test";
+import { fn } from "storybook/test";
 import { LandingCTASection } from "./LandingCTASection";
 
 /**
@@ -20,13 +20,11 @@ const meta = {
 	tags: ["autodocs"],
 	argTypes: {
 		onSignIn: {
-			description:
-				"Callback function triggered when the sign-in button is clicked",
+			description: "Callback function triggered when the sign-in button is clicked",
 			action: "signed in",
 		},
 		onGoToDashboard: {
-			description:
-				"Callback function triggered when the 'Go to Dashboard' button is clicked",
+			description: "Callback function triggered when the 'Go to Dashboard' button is clicked",
 			action: "go to dashboard",
 		},
 		isSignedIn: {

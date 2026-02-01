@@ -8,39 +8,65 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+/**
+ * Repository for PullRequestReview entities.
+ *
+ * <p>This repository contains domain-agnostic queries for the gitprovider domain.
+ * Scope-filtered queries (those that join with host application entities)
+ * belong in the host application to maintain clean architecture boundaries.
+ *
+ * @see de.tum.in.www1.hephaestus.leaderboard.LeaderboardReviewQueryRepository
+ */
 @Repository
 public interface PullRequestReviewRepository extends JpaRepository<PullRequestReview, Long> {
+    /**
+     * Batch fetch reviews by IDs with all related entities eagerly loaded.
+     *
+     * <p>Used by the profile module to hydrate ActivityEvent target entities.
+     * Fetches author, pullRequest, repository, and comments in one query to avoid N+1.
+     *
+     * @param ids the review IDs to fetch
+     * @return reviews with related entities eagerly loaded
+     */
     @Query(
-        value = """
+        """
         SELECT prr
         FROM PullRequestReview prr
         LEFT JOIN FETCH prr.author
-        LEFT JOIN FETCH prr.pullRequest
-        LEFT JOIN FETCH prr.pullRequest.repository
+        LEFT JOIN FETCH prr.pullRequest pr
+        LEFT JOIN FETCH pr.repository
         LEFT JOIN FETCH prr.comments
-        WHERE prr.author.login ILIKE :authorLogin
-            AND prr.submittedAt >= :activitySince
-            AND prr.pullRequest.repository.organization.workspace.id = :workspaceId
-        ORDER BY prr.submittedAt DESC
+        WHERE prr.id IN :ids
         """
     )
-    List<PullRequestReview> findAllByAuthorLoginSince(
-        @Param("authorLogin") String authorLogin,
-        @Param("activitySince") Instant activitySince,
-        @Param("workspaceId") Long workspaceId
-    );
+    List<PullRequestReview> findAllByIdWithRelations(@Param("ids") Collection<Long> ids);
 
+    /**
+     * Find all reviews by a specific author within a time range, scoped to a workspace.
+     *
+     * <p>Used by the profile module to show all review activity directly from the source,
+     * independent of ActivityEvent records.
+     *
+     * @param authorLogin the login of the review author
+     * @param after start of time range (inclusive)
+     * @param before end of time range (exclusive)
+     * @param workspaceId the workspace to scope the query to
+     * @return reviews with related entities eagerly loaded, ordered by submittedAt descending
+     */
     @Query(
-        value = """
+        """
         SELECT prr
         FROM PullRequestReview prr
         LEFT JOIN FETCH prr.author
-        LEFT JOIN FETCH prr.pullRequest
-        LEFT JOIN FETCH prr.pullRequest.repository
+        LEFT JOIN FETCH prr.pullRequest pr
+        LEFT JOIN FETCH pr.repository repo
         LEFT JOIN FETCH prr.comments
-        WHERE prr.author.login ILIKE :authorLogin
-            AND prr.submittedAt BETWEEN :after AND :before
-            AND prr.pullRequest.repository.organization.workspace.id = :workspaceId
+        JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = repo.nameWithOwner
+        WHERE prr.author.login = :authorLogin
+            AND prr.submittedAt >= :after
+            AND prr.submittedAt < :before
+            AND prr.author.type = 'USER'
+            AND rtm.workspace.id = :workspaceId
         ORDER BY prr.submittedAt DESC
         """
     )
@@ -50,85 +76,4 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
         @Param("before") Instant before,
         @Param("workspaceId") Long workspaceId
     );
-
-    @Query(
-        value = """
-        SELECT prr
-        FROM PullRequestReview prr
-        LEFT JOIN FETCH prr.author
-        LEFT JOIN FETCH prr.pullRequest
-        LEFT JOIN FETCH prr.pullRequest.repository
-        LEFT JOIN FETCH prr.comments
-        WHERE
-            prr.submittedAt BETWEEN :after AND :before
-            AND prr.author.type = 'USER'
-            AND prr.pullRequest.repository.organization.workspace.id = :workspaceId
-        ORDER BY prr.submittedAt DESC
-        """
-    )
-    List<PullRequestReview> findAllInTimeframe(
-        @Param("after") Instant after,
-        @Param("before") Instant before,
-        @Param("workspaceId") Long workspaceId
-    );
-
-    @Query(
-        value = """
-        SELECT prr
-        FROM PullRequestReview prr
-        LEFT JOIN FETCH prr.author
-        LEFT JOIN FETCH prr.pullRequest
-        LEFT JOIN FETCH prr.pullRequest.repository
-        LEFT JOIN FETCH prr.comments
-        WHERE
-            prr.submittedAt BETWEEN :after AND :before
-            AND prr.author.type = 'USER'
-            AND prr.pullRequest.repository.organization.workspace.id = :workspaceId
-            AND EXISTS (
-                SELECT 1
-                FROM TeamRepositoryPermission trp
-                JOIN trp.team t
-                WHERE trp.repository = prr.pullRequest.repository
-                AND t.id IN :teamIds
-                AND trp.hiddenFromContributions = false
-                AND (
-                    NOT EXISTS (
-                        SELECT l
-                        FROM t.labels l
-                        WHERE l.repository = prr.pullRequest.repository
-                    )
-                    OR
-                    EXISTS (
-                        SELECT l
-                        FROM t.labels l
-                        WHERE l.repository = prr.pullRequest.repository
-                        AND l MEMBER OF prr.pullRequest.labels
-                    )
-                )
-            )
-            AND EXISTS (
-                SELECT 1
-                FROM TeamMembership tm
-                WHERE tm.team.id IN :teamIds
-                AND tm.user = prr.author
-            )
-        ORDER BY prr.submittedAt DESC
-        """
-    )
-    List<PullRequestReview> findAllInTimeframeOfTeams(
-        @Param("after") Instant after,
-        @Param("before") Instant before,
-        @Param("teamIds") Collection<Long> teamIds,
-        @Param("workspaceId") Long workspaceId
-    );
-
-    @Query(
-        value = """
-        SELECT MIN(prr.submittedAt)
-        FROM PullRequestReview prr
-        WHERE prr.author.id = :userId
-            AND prr.pullRequest.repository.organization.workspace.id = :workspaceId
-        """
-    )
-    Instant findEarliestSubmissionInstant(@Param("workspaceId") Long workspaceId, @Param("userId") Long userId);
 }

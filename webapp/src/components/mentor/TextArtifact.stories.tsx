@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { fn } from "@storybook/test";
+import { fn } from "storybook/test";
 import type { ArtifactShellModel, TextContentModel } from "./artifact-model";
 import { TextArtifact } from "./TextArtifact";
 

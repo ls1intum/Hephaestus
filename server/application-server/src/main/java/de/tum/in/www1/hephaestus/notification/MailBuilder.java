@@ -1,14 +1,11 @@
 package de.tum.in.www1.hephaestus.notification;
 
-import de.tum.in.www1.hephaestus.gitprovider.user.User;
-import de.tum.in.www1.hephaestus.gitprovider.user.UserInfoDTO;
 import jakarta.mail.*;
 import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeBodyPart;
 import jakarta.mail.internet.MimeMessage;
 import jakarta.mail.internet.MimeMultipart;
 import java.util.*;
-import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -19,25 +16,24 @@ public class MailBuilder {
     private static final Logger log = LoggerFactory.getLogger(MailBuilder.class);
     private final MailConfig config;
 
-    private final User primaryRecipient;
+    private final String recipientLogin;
 
     private final String email;
 
-    @Getter
     private final String subject;
 
-    @Getter
     private final String template;
 
-    @Getter
     private final Map<String, Object> variables;
 
-    public MailBuilder(MailConfig config, User primaryRecipient, String email, String subject, String template) {
+    /**
+     * Constructor that accepts a login string instead of a User entity.
+     * Used to break circular dependencies between modules.
+     */
+    public MailBuilder(MailConfig config, String recipientLogin, String email, String subject, String template) {
         this.config = config;
-
-        this.primaryRecipient = primaryRecipient;
+        this.recipientLogin = recipientLogin;
         this.email = email;
-
         this.subject = subject;
         this.template = template;
 
@@ -51,15 +47,11 @@ public class MailBuilder {
     }
 
     public void send(JavaMailSender mailSender) {
-        if (primaryRecipient == null || email == null) {
-            log.warn("No primary recipient specified");
+        if (recipientLogin == null || email == null) {
+            log.warn("Skipped sending email: reason=noRecipient, template={}", template);
             return;
         }
 
-        if (!primaryRecipient.isNotificationsEnabled()) {
-            log.warn("Primary recipient has notifications disabled");
-            return;
-        }
         try {
             MimeMessage message = mailSender.createMimeMessage();
 
@@ -70,7 +62,7 @@ public class MailBuilder {
 
             Context templateContext = new Context();
             templateContext.setVariables(this.variables);
-            templateContext.setVariable("recipient", UserInfoDTO.fromUser(primaryRecipient));
+            templateContext.setVariable("recipientLogin", recipientLogin);
 
             message.setSubject(subject);
 
@@ -88,10 +80,14 @@ public class MailBuilder {
             if (config.isEnabled()) {
                 mailSender.send(message);
             } else {
-                log.info("Sending Mail (postfix disabled)\n{}", messageBody.getContent());
+                log.info(
+                    "Skipped sending email: reason=mailDisabled, userLogin={}, template={}",
+                    recipientLogin,
+                    template
+                );
             }
         } catch (Exception exception) {
-            log.warn("Failed to send email", exception);
+            log.warn("Failed to send email: userLogin={}, template={}", recipientLogin, template, exception);
         }
     }
 }

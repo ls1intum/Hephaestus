@@ -1,22 +1,15 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect, useRef } from "react";
 import { v4 as uuidv4 } from "uuid";
 
-import {
-	getGroupedThreadsQueryKey,
-	getThreadQueryKey,
-} from "@/api/@tanstack/react-query.gen";
+import { getGroupedThreadsQueryKey, getThreadQueryKey } from "@/api/@tanstack/react-query.gen";
 import type { ChatThreadGroup, ChatThreadSummary } from "@/api/types.gen";
-import type { ChatProps } from "@/components/mentor/Chat";
-import { Chat } from "@/components/mentor/Chat";
-import { defaultPartRenderers } from "@/components/mentor/renderers";
+import { Greeting } from "@/components/mentor/Greeting";
 import { NoWorkspace } from "@/components/workspace/NoWorkspace";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
-import type { ChatMessage } from "@/lib/types";
 
-export const Route = createFileRoute(
-	"/_authenticated/w/$workspaceSlug/mentor/",
-)({
+export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/mentor/")({
 	component: MentorContainer,
 });
 
@@ -25,21 +18,21 @@ function MentorContainer() {
 	const navigate = useNavigate({ from: Route.fullPath });
 	const { workspaceSlug } = useActiveWorkspaceSlug();
 	const slug = workspaceSlug ?? "";
+	const hasStartedRef = useRef(false);
 
-	if (!workspaceSlug) {
-		return <NoWorkspace />;
-	}
-
-	const handleMessageSubmit = ({ text }: { text: string }) => {
-		const initialMessage = text.trim();
-		if (!initialMessage || !workspaceSlug) return;
+	// Auto-start a new conversation when the page loads
+	useEffect(() => {
+		if (!workspaceSlug || hasStartedRef.current) return;
+		hasStartedRef.current = true;
 
 		const threadId = uuidv4();
-		queryClient.setQueryData(
-			getThreadQueryKey({ path: { workspaceSlug: slug, threadId } }),
-			{ messages: [] },
-		);
 
+		// Pre-populate thread cache
+		queryClient.setQueryData(getThreadQueryKey({ path: { workspaceSlug: slug, threadId } }), {
+			messages: [],
+		});
+
+		// Add to thread list
 		queryClient.setQueryData<Array<ChatThreadGroup>>(
 			getGroupedThreadsQueryKey({ path: { workspaceSlug: slug } }),
 			(prev) => {
@@ -49,9 +42,7 @@ function MentorContainer() {
 					title: "New chat",
 					createdAt: new Date(),
 				};
-				const idx = threadGroups.findIndex(
-					(g) => g.groupName.toLowerCase() === "today",
-				);
+				const idx = threadGroups.findIndex((g) => g.groupName.toLowerCase() === "today");
 				if (idx >= 0) {
 					const group = threadGroups[idx];
 					const exists = group.threads.some((t) => t.id === threadId);
@@ -60,41 +51,29 @@ function MentorContainer() {
 						groupName: group.groupName,
 						threads: [newSummary, ...group.threads],
 					};
-					return [
-						...threadGroups.slice(0, idx),
-						updatedGroup,
-						...threadGroups.slice(idx + 1),
-					];
+					return [...threadGroups.slice(0, idx), updatedGroup, ...threadGroups.slice(idx + 1)];
 				}
 				return [{ groupName: "Today", threads: [newSummary] }, ...threadGroups];
 			},
 		);
 
+		// Navigate to thread page - it will trigger the greeting via autoGreeting
 		navigate({
 			to: "/w/$workspaceSlug/mentor/$threadId",
 			params: { workspaceSlug: slug, threadId },
-			state: { initialMessage },
+			state: { autoGreeting: true },
+			replace: true,
 		});
-	};
+	}, [workspaceSlug, slug, queryClient, navigate]);
 
+	if (!workspaceSlug) {
+		return <NoWorkspace />;
+	}
+
+	// Show greeting animation while redirecting
 	return (
-		<div className="flex flex-col flex-1 min-h-0">
-			<Chat
-				id={""}
-				messages={[] as ChatMessage[]}
-				status={"idle" as ChatProps["status"]}
-				readonly={false}
-				attachments={[]}
-				onMessageSubmit={handleMessageSubmit}
-				onStop={() => {}}
-				onFileUpload={() => Promise.resolve([])}
-				onAttachmentsChange={() => {}}
-				showSuggestedActions={true}
-				inputPlaceholder="Ask me anything about software development, best practices, or agile concepts..."
-				disableAttachments={true}
-				className="h-[calc(100dvh-4rem)]"
-				partRenderers={defaultPartRenderers}
-			/>
+		<div className="flex flex-col flex-1 min-h-0 h-[calc(100dvh-4rem)]">
+			<Greeting />
 		</div>
 	);
 }

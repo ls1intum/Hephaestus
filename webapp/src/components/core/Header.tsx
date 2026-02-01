@@ -1,7 +1,9 @@
+import { TagIcon } from "@primer/octicons-react";
 import { Link } from "@tanstack/react-router";
 import { Hammer, LogOut, Settings, User } from "lucide-react";
 import { GitHubSignInButton } from "@/components/auth/GitHubSignInButton";
 import { ModeToggle } from "@/components/core/ModeToggle";
+import { SurveyNotificationButton } from "@/components/surveys/survey-notification-button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,7 +15,7 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 export interface HeaderProps {
 	/** Sidebar trigger button component */
@@ -28,12 +30,18 @@ export interface HeaderProps {
 	name?: string;
 	/** Username of the authenticated user */
 	username?: string;
+	/** Active workspace slug for routing */
+	workspaceSlug?: string;
 	/** Function to call on login button click */
 	onLogin: () => void;
 	/** Function to call on logout button click */
 	onLogout: () => void;
 }
 
+/**
+ * Header component - fully presentational, receives all data via props.
+ * Smart logic (hooks, auth) should be handled by the parent container.
+ */
 export default function Header({
 	sidebarTrigger,
 	version,
@@ -41,10 +49,10 @@ export default function Header({
 	isLoading,
 	name,
 	username,
+	workspaceSlug,
 	onLogin,
 	onLogout,
 }: HeaderProps) {
-	const { workspaceSlug } = useActiveWorkspaceSlug();
 	const hasWorkspace = Boolean(workspaceSlug);
 	const hasUsername = Boolean(username);
 
@@ -63,20 +71,34 @@ export default function Header({
 							<span className="text-xl font-semibold">Hephaestus</span>
 						</Link>
 					) : (
-						<Link
-							to="/landing"
-							className="flex gap-2 items-center hover:text-muted-foreground"
-						>
+						<Link to="/landing" className="flex gap-2 items-center hover:text-muted-foreground">
 							<Hammer className="text-2xl sm:text-3xl" />
 							<span className="text-xl font-semibold">Hephaestus</span>
 						</Link>
 					)}
-					<span className="text-xs font-semibold mt-1 text-muted-foreground">
-						{version}
-					</span>
+					{/* Version badge - clickable for production releases */}
+					{version !== "DEV" && version !== "preview" ? (
+						<Tooltip>
+							<TooltipTrigger asChild>
+								<a
+									href={`https://github.com/ls1intum/Hephaestus/releases/tag/v${version}`}
+									target="_blank"
+									rel="noopener noreferrer"
+									className="flex items-center gap-1 text-xs font-mono mt-1 text-muted-foreground hover:text-foreground transition-colors"
+								>
+									<TagIcon size={12} />
+									<span>v{version}</span>
+								</a>
+							</TooltipTrigger>
+							<TooltipContent>View release notes</TooltipContent>
+						</Tooltip>
+					) : (
+						<span className="text-xs font-mono mt-1 text-muted-foreground">{version}</span>
+					)}
 				</div>
 			</div>
 			<div className="flex gap-2 px-4">
+				<SurveyNotificationButton />
 				<ModeToggle />
 				<div className="flex items-center gap-2">
 					{!isAuthenticated ? (
@@ -93,9 +115,7 @@ export default function Header({
 												src={`https://github.com/${username}.png`}
 												alt={`${username}'s avatar`}
 											/>
-											<AvatarFallback>
-												{username?.slice(0, 2)?.toUpperCase() || "?"}
-											</AvatarFallback>
+											<AvatarFallback>{username?.slice(0, 2)?.toUpperCase() || "?"}</AvatarFallback>
 										</Avatar>
 									</Button>
 								</DropdownMenuTrigger>
@@ -121,10 +141,7 @@ export default function Header({
 												</Link>
 											</DropdownMenuItem>
 										) : (
-											<DropdownMenuItem
-												disabled
-												title="Join a workspace to view your profile"
-											>
+											<DropdownMenuItem disabled title="Join a workspace to view your profile">
 												<User />
 												<span>My Profile</span>
 											</DropdownMenuItem>

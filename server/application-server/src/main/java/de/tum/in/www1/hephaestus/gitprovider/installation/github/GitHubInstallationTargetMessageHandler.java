@@ -1,88 +1,100 @@
 package de.tum.in.www1.hephaestus.gitprovider.installation.github;
 
+import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
+
+import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.ProvisioningListener;
+import de.tum.in.www1.hephaestus.gitprovider.installation.github.dto.GitHubInstallationTargetEventDTO;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationService;
-import de.tum.in.www1.hephaestus.workspace.WorkspaceService;
-import org.kohsuke.github.GHEventPayloadInstallationTarget;
-import org.kohsuke.github.GHEventPayloadInstallationTarget.Account;
-import org.kohsuke.github.GHEventPayloadInstallationTarget.Changes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Handles installation_target rename events so workspace/account metadata stays in sync.
+ * Handles GitHub installation_target webhook events.
  */
 @Component
-public class GitHubInstallationTargetMessageHandler extends GitHubMessageHandler<GHEventPayloadInstallationTarget> {
+public class GitHubInstallationTargetMessageHandler extends GitHubMessageHandler<GitHubInstallationTargetEventDTO> {
 
-    private static final Logger logger = LoggerFactory.getLogger(GitHubInstallationTargetMessageHandler.class);
+    private static final Logger log = LoggerFactory.getLogger(GitHubInstallationTargetMessageHandler.class);
 
-    private final WorkspaceService workspaceService;
+    private final ProvisioningListener provisioningListener;
     private final OrganizationService organizationService;
 
-    public GitHubInstallationTargetMessageHandler(
-        @Lazy WorkspaceService workspaceService,
-        OrganizationService organizationService
+    GitHubInstallationTargetMessageHandler(
+        ProvisioningListener provisioningListener,
+        OrganizationService organizationService,
+        NatsMessageDeserializer deserializer,
+        TransactionTemplate transactionTemplate
     ) {
-        super(GHEventPayloadInstallationTarget.class);
-        this.workspaceService = workspaceService;
+        super(GitHubInstallationTargetEventDTO.class, deserializer, transactionTemplate);
+        this.provisioningListener = provisioningListener;
         this.organizationService = organizationService;
     }
 
     @Override
-    protected void handleEvent(GHEventPayloadInstallationTarget payload) {
-        if (!"renamed".equalsIgnoreCase(payload.getAction())) {
-            return;
-        }
-        var installation = payload.getInstallation();
-        Account account = payload.getAccount();
-        if (installation == null || account == null) {
-            logger.warn("installation_target payload missing installation/account block");
-            return;
-        }
-
-        long installationId = installation.getId();
-        String newLogin = account.getLogin();
-        if (newLogin == null || newLogin.isBlank()) {
-            logger.warn("installation_target event {} ignored because login is empty", installationId);
-            return;
-        }
-        Changes changes = payload.getChanges();
-        String previousLogin = changes != null && changes.getLogin() != null ? changes.getLogin().getFrom() : null;
-
-        workspaceService.handleInstallationTargetRename(installationId, previousLogin, newLogin);
-        upsertOrganization(payload, installationId, newLogin);
-        logger.info(
-            "Handled installation_target rename for installation {}: {} -> {}",
-            installationId,
-            previousLogin,
-            newLogin
-        );
-    }
-
-    private void upsertOrganization(GHEventPayloadInstallationTarget payload, long installationId, String login) {
-        if (!"Organization".equalsIgnoreCase(payload.getTargetType())) {
-            return;
-        }
-
-        Account account = payload.getAccount();
-        if (account == null || account.getId() == null) {
-            logger.warn("installation_target event {} missing account details for organization upsert", installationId);
-            return;
-        }
-
-        organizationService.upsertIdentityAndAttachInstallation(account.getId(), login, installationId);
-    }
-
-    @Override
-    protected String getEventKey() {
-        return "installation_target";
+    public GitHubEventType getEventType() {
+        return GitHubEventType.INSTALLATION_TARGET;
     }
 
     @Override
     public GitHubMessageDomain getDomain() {
         return GitHubMessageDomain.INSTALLATION;
+    }
+
+    @Override
+    protected void handleEvent(GitHubInstallationTargetEventDTO event) {
+        if (event.actionType() != GitHubEventAction.InstallationTarget.RENAMED) {
+            return;
+        }
+
+        var installation = event.installation();
+        var account = event.account();
+
+        if (installation == null || account == null) {
+            log.warn("Received installation_target event with missing data: action={}", event.action());
+            return;
+        }
+
+        long installationId = installation.id();
+        String newLogin = account.login();
+
+        if (newLogin == null || newLogin.isBlank()) {
+            log.warn("Skipped installation_target event: reason=emptyLogin, installationId={}", installationId);
+            return;
+        }
+
+        String previousLogin = null;
+        if (event.changes() != null && event.changes().login() != null) {
+            previousLogin = event.changes().login().from();
+        }
+
+        provisioningListener.onAccountRenamed(installationId, previousLogin, newLogin);
+        upsertOrganization(event, installationId, newLogin);
+
+        log.info(
+            "Processed installation_target rename: installationId={}, previousLogin={}, newLogin={}",
+            installationId,
+            sanitizeForLog(previousLogin),
+            sanitizeForLog(newLogin)
+        );
+    }
+
+    private void upsertOrganization(GitHubInstallationTargetEventDTO event, long installationId, String login) {
+        if (!"Organization".equalsIgnoreCase(event.targetType())) {
+            return;
+        }
+
+        var account = event.account();
+        if (account == null || account.id() == null) {
+            log.warn("Skipped organization upsert: reason=missingAccountDetails, installationId={}", installationId);
+            return;
+        }
+
+        organizationService.upsertIdentity(account.id(), login);
     }
 }

@@ -13,9 +13,7 @@ export interface ExtendedUserTeams extends Omit<ApiUserTeams, "teams"> {
 }
 
 // TypeScript utility to convert between API and component types
-export const adaptApiUserTeams = (
-	apiUserTeams: ApiUserTeams,
-): ExtendedUserTeams => {
+export const adaptApiUserTeams = (apiUserTeams: ApiUserTeams): ExtendedUserTeams => {
 	return {
 		...apiUserTeams,
 		user: {

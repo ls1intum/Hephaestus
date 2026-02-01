@@ -15,7 +15,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class WorkspaceAccessService {
 
-    private static final Logger logger = LoggerFactory.getLogger(WorkspaceAccessService.class);
+    private static final Logger log = LoggerFactory.getLogger(WorkspaceAccessService.class);
 
     // Role hierarchy levels (higher = more permissions)
     private static final int ROLE_LEVEL_MEMBER = 1;
@@ -32,13 +32,13 @@ public class WorkspaceAccessService {
     public boolean hasRole(WorkspaceRole requiredRole) {
         WorkspaceContext context = WorkspaceContextHolder.getContext();
         if (context == null) {
-            logger.warn("No workspace context found when checking role: {}", requiredRole);
+            log.warn("Denied role check: reason=noWorkspaceContext, requiredRole={}", requiredRole);
             return false;
         }
 
         Set<WorkspaceRole> userRoles = context.roles();
         if (userRoles == null || userRoles.isEmpty()) {
-            logger.debug("User has no roles in workspace: {}", context.slug());
+            log.debug("Denied role check: reason=noRoles, workspaceSlug={}", context.slug());
             return false;
         }
 
@@ -49,8 +49,8 @@ public class WorkspaceAccessService {
             }
         }
 
-        logger.debug(
-            "User roles {} do not satisfy required role {} in workspace: {}",
+        log.debug(
+            "Denied role check: reason=insufficientRole, userRoles={}, requiredRole={}, workspaceSlug={}",
             userRoles,
             requiredRole,
             context.slug()

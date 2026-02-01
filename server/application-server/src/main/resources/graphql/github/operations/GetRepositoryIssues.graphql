@@ -1,0 +1,165 @@
+# GraphQL query for fetching repository issues with all fields including issue type
+# Used by GitHubIssueSyncService for GraphQL-based sync
+# Comments are embedded inline (first 10) to avoid N+1 queries - pagination handles issues with more
+# Supports incremental sync via filterBy.since parameter (filters by updatedAt >= since)
+
+query GetRepositoryIssues($owner: String!, $name: String!, $first: Int!, $after: String, $states: [IssueState!], $since: DateTime) {
+    rateLimit {
+        cost
+        limit
+        remaining
+        resetAt
+    }
+    repository(owner: $owner, name: $name) {
+        issues(first: $first, after: $after, states: $states, filterBy: { since: $since }, orderBy: { field: UPDATED_AT, direction: DESC }) {
+            pageInfo {
+                hasNextPage
+                endCursor
+            }
+            totalCount
+            nodes {
+                id
+                fullDatabaseId
+                number
+                title
+                body
+                state
+                stateReason
+                url
+                createdAt
+                updatedAt
+                closedAt
+                locked
+
+                # Embedded comments (first 10) - pagination handled by GetIssueComments for issues with more
+                comments(first: 10) {
+                    totalCount
+                    pageInfo {
+                        hasNextPage
+                        endCursor
+                    }
+                    nodes {
+                        id
+                        fullDatabaseId
+                        body
+                        url
+                        createdAt
+                        updatedAt
+
+                        # Author
+                        author {
+                            __typename
+                            ... on User {
+                                id
+                                databaseId
+                                login
+                                avatarUrl
+                                name
+                                email
+                                createdAt
+                                updatedAt
+                            }
+                            ... on Bot {
+                                id
+                                databaseId
+                                login
+                                avatarUrl
+                            }
+                            ... on Mannequin {
+                                id
+                                databaseId
+                                login
+                                avatarUrl
+                            }
+                            ... on Organization {
+                                id
+                                databaseId
+                                login
+                                avatarUrl
+                            }
+                        }
+
+                        authorAssociation
+                    }
+                }
+
+                # Issue type (organization-level categorization)
+                issueType {
+                    id
+                    name
+                    description
+                    color
+                    isEnabled
+                }
+
+                # Author
+                author {
+                    __typename
+                    ... on User {
+                        id
+                        databaseId
+                        login
+                        avatarUrl
+                        name
+                        email
+                        createdAt
+                        updatedAt
+                    }
+                    ... on Bot {
+                        id
+                        databaseId
+                        login
+                        avatarUrl
+                    }
+                    ... on Mannequin {
+                        id
+                        databaseId
+                        login
+                        avatarUrl
+                    }
+                    ... on Organization {
+                        id
+                        databaseId
+                        login
+                        avatarUrl
+                    }
+                }
+
+                # Assignees
+                assignees(first: 20) {
+                    nodes {
+                        id
+                        databaseId
+                        login
+                        avatarUrl
+                        name
+                        email
+                        createdAt
+                        updatedAt
+                    }
+                }
+
+                # Labels
+                labels(first: 50) {
+                    nodes {
+                        id
+                        name
+                        description
+                        color
+                    }
+                }
+
+                # Milestone
+                milestone {
+                    id
+                    number
+                    title
+                    description
+                    state
+                    dueOn
+                    url
+                }
+            }
+        }
+    }
+}

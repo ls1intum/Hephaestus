@@ -19,22 +19,14 @@ export function LandingTestimonialSection() {
 					<Card>
 						<CardContent className="pt-6">
 							<div className="border-l-4 border-primary pl-4 py-2 italic mb-4">
-								"I heavily use Hephaestus to see how our team is doing. It helps
-								me write all the things I've accomplished when it's time to fill
-								a weekly report."
+								"I heavily use Hephaestus to see how our team is doing. It helps me write all the
+								things I've accomplished when it's time to fill a weekly report."
 							</div>
 							<div className="flex items-center gap-3">
 								<div className="font-medium">Ege Kocabas</div>
 								<div className="text-sm text-muted-foreground">
-									<Button
-										variant="link"
-										size="none"
-										className="text-muted-foreground"
-										asChild
-									>
-										<a href="https://github.com/ls1intum/helios">
-											Helios Project, TU Munich
-										</a>
+									<Button variant="link" size="none" className="text-muted-foreground" asChild>
+										<a href="https://github.com/ls1intum/helios">Helios Project, TU Munich</a>
 									</Button>
 								</div>
 							</div>

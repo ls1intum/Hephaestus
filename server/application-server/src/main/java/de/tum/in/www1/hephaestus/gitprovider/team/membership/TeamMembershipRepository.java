@@ -1,0 +1,30 @@
+package de.tum.in.www1.hephaestus.gitprovider.team.membership;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+/**
+ * Repository for team membership records.
+ *
+ * <p>Memberships are scoped through their team which carries scope through
+ * the Team.organization relationship.
+ */
+@Repository
+public interface TeamMembershipRepository extends JpaRepository<TeamMembership, TeamMembership.Id> {
+    /**
+     * Delete a membership by team and user IDs.
+     *
+     * @param teamId the team ID
+     * @param userId the user ID
+     */
+    void deleteByTeam_IdAndUser_Id(Long teamId, Long userId);
+
+    /**
+     * Check if a membership exists by team and user IDs.
+     *
+     * @param teamId the team ID
+     * @param userId the user ID
+     * @return true if the membership exists
+     */
+    boolean existsByTeam_IdAndUser_Id(Long teamId, Long userId);
+}

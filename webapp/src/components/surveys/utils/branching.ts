@@ -5,21 +5,8 @@ import {
 	type SurveyResponse,
 } from "@/types/survey";
 
-const DEFAULT_FALLBACK_KEYS = [
-	"default",
-	"fallback",
-	"*",
-	"__default__",
-	"__fallback__",
-];
-const OPEN_CHOICE_SENTINELS = [
-	"__other__",
-	"__custom__",
-	"other",
-	"Other",
-	"custom",
-	"Custom",
-];
+const DEFAULT_FALLBACK_KEYS = ["default", "fallback", "*", "__default__", "__fallback__"];
+const OPEN_CHOICE_SENTINELS = ["__other__", "__custom__", "other", "Other", "custom", "Custom"];
 
 const TRUE_KEYS = ["true", "True", "1", "yes", "Yes"];
 const FALSE_KEYS = ["false", "False", "0", "no", "No"];
@@ -50,9 +37,7 @@ export function determineNextQuestionIndex({
 			if (!targetId) {
 				return currentIndex + 1;
 			}
-			const targetIndex = survey.questions.findIndex(
-				(candidate) => candidate.id === targetId,
-			);
+			const targetIndex = survey.questions.findIndex((candidate) => candidate.id === targetId);
 			return targetIndex >= 0 ? targetIndex : currentIndex + 1;
 		}
 		case "response_based": {
@@ -67,9 +52,7 @@ export function determineNextQuestionIndex({
 			if (targetId === SURVEY_RESPONSE_END) {
 				return null;
 			}
-			const targetIndex = survey.questions.findIndex(
-				(candidate) => candidate.id === targetId,
-			);
+			const targetIndex = survey.questions.findIndex((candidate) => candidate.id === targetId);
 			return targetIndex >= 0 ? targetIndex : currentIndex + 1;
 		}
 		default:
@@ -87,9 +70,7 @@ export function resolveResponseBranchTarget(
 	}
 
 	const candidates = collectResponseKeys(question, response);
-	const fallbackKeys = DEFAULT_FALLBACK_KEYS.filter(
-		(key) => !candidates.includes(key),
-	);
+	const fallbackKeys = DEFAULT_FALLBACK_KEYS.filter((key) => !candidates.includes(key));
 	const lookupOrder = [...candidates, ...fallbackKeys];
 
 	for (const key of lookupOrder) {
@@ -101,10 +82,7 @@ export function resolveResponseBranchTarget(
 	return undefined;
 }
 
-export function collectResponseKeys(
-	question: SurveyQuestion,
-	response: SurveyResponse,
-): string[] {
+export function collectResponseKeys(question: SurveyQuestion, response: SurveyResponse): string[] {
 	const seen = new Set<string>();
 	const keys: string[] = [];
 
@@ -238,11 +216,8 @@ function addOpenChoiceSentinelsIfNeeded(
 
 	const choices = question.choices ?? [];
 	const baseChoices = choices.length > 0 ? choices.slice(0, -1) : choices;
-	const openChoiceLabel =
-		choices.length > 0 ? choices[choices.length - 1] : undefined;
-	const hasCustomSelection = responses.some(
-		(value) => !baseChoices.includes(value),
-	);
+	const openChoiceLabel = choices.length > 0 ? choices[choices.length - 1] : undefined;
+	const hasCustomSelection = responses.some((value) => !baseChoices.includes(value));
 
 	if (!hasCustomSelection) {
 		return;
@@ -252,10 +227,7 @@ function addOpenChoiceSentinelsIfNeeded(
 	add(openChoiceLabel);
 }
 
-function classifyRatingBucket(
-	value: number,
-	scale: number,
-): string | undefined {
+function classifyRatingBucket(value: number, scale: number): string | undefined {
 	if (!Number.isFinite(value) || !Number.isFinite(scale) || scale <= 0) {
 		return undefined;
 	}

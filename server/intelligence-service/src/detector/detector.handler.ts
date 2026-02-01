@@ -1,0 +1,134 @@
+/**
+ * Bad Practice Detector Handler
+ *
+ * Analyzes PR titles and descriptions for quality issues using structured output.
+ * Telemetry captured via Langfuse OpenTelemetry integration.
+ */
+
+import { generateText, Output } from "ai";
+import env from "@/env";
+import { badPracticeDetectorPrompt, loadPrompt } from "@/prompts";
+import { buildTelemetryOptions } from "@/shared/ai/telemetry";
+import { HTTP_STATUS } from "@/shared/constants";
+import type { AppRouteHandler } from "@/shared/http/types";
+import { extractErrorMessage, getLogger } from "@/shared/utils";
+import type { DetectBadPracticesRoute } from "./detector.routes";
+import { badPracticeResultSchema, detectorResponseSchema } from "./detector.schema";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Constants
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Trace name for Langfuse - consistent naming for filtering */
+const TRACE_NAME = "detector:bad-practices";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Handler
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const detectBadPracticesHandler: AppRouteHandler<DetectBadPracticesRoute> = async (c) => {
+	const logger = getLogger(c);
+	const {
+		title,
+		description,
+		lifecycleState,
+		repositoryName,
+		pullRequestNumber,
+		badPracticeSummary,
+		badPractices,
+		pullRequestTemplate,
+	} = c.req.valid("json");
+
+	// Construct session ID for grouping related traces
+	// Format: "detector:<repo>#<pr>" to avoid collision with mentor sessions
+	const sessionId = `detector:${repositoryName}#${pullRequestNumber}`;
+
+	try {
+		// ───────────────────────────────────────────────────────────────────
+		// 1. Load and compile prompt
+		// ───────────────────────────────────────────────────────────────────
+		const prompt = await loadPrompt(badPracticeDetectorPrompt);
+		const renderedPrompt = prompt.compile({
+			title,
+			description,
+			lifecycle_state: lifecycleState,
+			repository_name: repositoryName,
+			bad_practice_summary: badPracticeSummary,
+			bad_practices: JSON.stringify(badPractices),
+			pull_request_template: pullRequestTemplate,
+		});
+
+		// ───────────────────────────────────────────────────────────────────
+		// 2. Build telemetry options with prompt linking
+		// ───────────────────────────────────────────────────────────────────
+		// All telemetry is captured via LangfuseSpanProcessor + AI SDK's
+		// experimental_telemetry. This provides full observability without
+		// the observe() wrapper which conflicts with Hono's strict typing.
+		const telemetryOptions = buildTelemetryOptions(prompt, TRACE_NAME, {
+			sessionId,
+			repository: repositoryName,
+			pullRequestNumber,
+			lifecycleState,
+			existingBadPracticeCount: badPractices.length,
+			model: env.DETECTION_MODEL_NAME,
+		});
+
+		// ───────────────────────────────────────────────────────────────────
+		// 3. Generate detection result
+		// ───────────────────────────────────────────────────────────────────
+		const { output } = await generateText({
+			model: env.detectionModel,
+			prompt: renderedPrompt,
+			output: Output.object({ schema: badPracticeResultSchema }),
+			...telemetryOptions,
+		});
+
+		// ───────────────────────────────────────────────────────────────────
+		// 4. Build response with trace ID for Langfuse linking
+		// ───────────────────────────────────────────────────────────────────
+		// The trace ID allows linking API responses to Langfuse traces
+		// Format: detector:<repo>#<pr> (used as session ID in Langfuse)
+		const response = detectorResponseSchema.parse({
+			...output,
+			traceId: sessionId,
+		});
+
+		// Log success metrics
+		const badPracticeCount = response.badPractices.length;
+		const criticalCount = response.badPractices.filter(
+			(bp) => bp.status === "Critical Issue",
+		).length;
+
+		logger.info(
+			{
+				repositoryName,
+				pullRequestNumber,
+				badPracticeCount,
+				criticalCount,
+				sessionId,
+			},
+			"Detection completed",
+		);
+
+		return c.json(response, { status: HTTP_STATUS.OK });
+	} catch (error) {
+		// ───────────────────────────────────────────────────────────────────
+		// Error handling with logging
+		// ───────────────────────────────────────────────────────────────────
+		const errorMessage = extractErrorMessage(error);
+		logger.error(
+			{
+				error: errorMessage,
+				errorType: error instanceof Error ? error.name : "Unknown",
+				repositoryName,
+				pullRequestNumber,
+			},
+			"Detector failed",
+		);
+
+		return c.json(
+			{ error: "Failed to analyze pull request. Please try again." },
+			{ status: HTTP_STATUS.INTERNAL_SERVER_ERROR },
+		);
+	}
+};

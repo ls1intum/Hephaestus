@@ -1,34 +1,49 @@
 package de.tum.in.www1.hephaestus.contributors;
 
-import java.io.IOException;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
+import de.tum.in.www1.hephaestus.gitprovider.github.GitHubProperties;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.kohsuke.github.GHRepository.Contributor;
-import org.kohsuke.github.GitHub;
-import org.kohsuke.github.GitHubBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.http.HttpHeaders;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 /**
  * Service for fetching Hephaestus project contributors from GitHub.
- * Results are cached and periodically refreshed.
+ *
+ * <p>Workspace-agnostic: This service fetches contributors to the Hephaestus project
+ * itself (meta information about the application), not tenant-specific data.
  */
 @Service
+@WorkspaceAgnostic("Fetches Hephaestus project contributors - meta info, not tenant data")
 public class ContributorService {
 
-    private static final Logger logger = LoggerFactory.getLogger(ContributorService.class);
+    private static final Logger log = LoggerFactory.getLogger(ContributorService.class);
+    private static final String GITHUB_API_BASE = "https://api.github.com";
 
-    @Value("${github.meta.auth-token:}")
-    private String githubAuthToken;
+    private final WebClient webClient;
+    private final String githubAuthToken;
+
+    public ContributorService(WebClient.Builder webClientBuilder, GitHubProperties gitHubProperties) {
+        this.webClient = webClientBuilder
+            .baseUrl(GITHUB_API_BASE)
+            .defaultHeader(HttpHeaders.ACCEPT, "application/vnd.github+json")
+            .defaultHeader("X-GitHub-Api-Version", "2022-11-28")
+            .build();
+        this.githubAuthToken = gitHubProperties.meta().authToken();
+    }
 
     /**
      * Get all contributors to the Hephaestus project.
@@ -38,20 +53,19 @@ public class ContributorService {
      */
     @Cacheable(value = "contributors", key = "'global'")
     public List<ContributorDTO> getGlobalContributors() {
-        logger.info("Fetching global contributors from GitHub.");
+        log.info("Fetching global contributors from GitHub.");
 
         if (githubAuthToken == null || githubAuthToken.isBlank()) {
-            logger.warn("Contributor endpoint requires github.meta.auth-token to be configured.");
+            log.warn("Contributor endpoint requires hephaestus.github.meta.auth-token to be configured.");
             return new ArrayList<>();
         }
 
         try {
-            GitHub gitHub = new GitHubBuilder().withOAuthToken(githubAuthToken).build();
             Map<Long, ContributorDTO> uniqueContributors = new LinkedHashMap<>();
-            collectContributorsForRepository(gitHub, "ls1intum/Hephaestus", uniqueContributors);
+            collectContributorsForRepository("ls1intum", "Hephaestus", uniqueContributors);
             return sortContributors(uniqueContributors);
-        } catch (IOException e) {
-            logger.error("Error fetching global contributors: {}", e.getMessage());
+        } catch (WebClientResponseException e) {
+            log.error("HTTP error fetching global contributors: {} - {}", e.getStatusCode(), e.getMessage(), e);
             return new ArrayList<>();
         }
     }
@@ -60,18 +74,31 @@ public class ContributorService {
     @Scheduled(fixedRateString = "${hephaestus.cache.contributors.evict-rate:3600000}")
     public void evictContributorsCache() {}
 
-    private void collectContributorsForRepository(
-        GitHub gitHub,
-        String repositoryName,
-        Map<Long, ContributorDTO> accumulator
-    ) {
+    private void collectContributorsForRepository(String owner, String repo, Map<Long, ContributorDTO> accumulator) {
         try {
-            gitHub
-                .getRepository(repositoryName)
-                .listContributors()
-                .forEach(contributor -> safelyAddContributor(contributor, accumulator));
-        } catch (IOException e) {
-            logger.warn("Failed to fetch contributors for repository {}: {}", repositoryName, e.getMessage());
+            List<ContributorDTO.GitHubContributorResponse> contributors = webClient
+                .get()
+                .uri("/repos/{owner}/{repo}/contributors?per_page=100", owner, repo)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + githubAuthToken)
+                .retrieve()
+                .bodyToFlux(ContributorDTO.GitHubContributorResponse.class)
+                .collectList()
+                .block();
+
+            if (contributors != null) {
+                for (var contributor : contributors) {
+                    safelyAddContributor(contributor, accumulator);
+                }
+            }
+        } catch (WebClientResponseException e) {
+            log.warn(
+                "HTTP error fetching contributors for repository {}/{}: {} - {}",
+                owner,
+                repo,
+                e.getStatusCode(),
+                e.getMessage(),
+                e
+            );
         }
     }
 
@@ -82,20 +109,47 @@ public class ContributorService {
         "renovate[bot]"
     );
 
-    private void safelyAddContributor(Contributor contributor, Map<Long, ContributorDTO> accumulator) {
+    private void safelyAddContributor(
+        ContributorDTO.GitHubContributorResponse contributor,
+        Map<Long, ContributorDTO> accumulator
+    ) {
         try {
-            String login = contributor.getLogin();
+            String login = contributor.login();
             if (login != null && EXCLUDED_LOGINS.contains(login.toLowerCase())) {
-                logger.debug("Skipping excluded contributor: {}", login);
+                log.debug("Skipping excluded contributor: {}", login);
                 return;
             }
 
-            ContributorDTO dto = ContributorDTO.fromContributor(contributor);
+            // Fetch full user details to get the name
+            String fullName = fetchUserFullName(login);
+            ContributorDTO dto = contributor.toContributorDTO(fullName);
             accumulator.putIfAbsent(dto.id(), dto);
-        } catch (IOException e) {
-            logger.error("Error converting contributor to DTO: {}", e.getMessage());
+        } catch (IllegalArgumentException e) {
+            log.error("Failed to convert contributor to DTO", e);
         }
     }
+
+    private String fetchUserFullName(String login) {
+        if (login == null) {
+            return null;
+        }
+        try {
+            GitHubUserResponse user = webClient
+                .get()
+                .uri("/users/{login}", login)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + githubAuthToken)
+                .retrieve()
+                .bodyToMono(GitHubUserResponse.class)
+                .block();
+            return user != null ? user.name() : null;
+        } catch (WebClientResponseException e) {
+            log.debug("HTTP error fetching full name for user {}: {} - {}", login, e.getStatusCode(), e.getMessage());
+            return null;
+        }
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private record GitHubUserResponse(@JsonProperty("login") String login, @JsonProperty("name") String name) {}
 
     private List<ContributorDTO> sortContributors(Map<Long, ContributorDTO> uniqueContributors) {
         if (uniqueContributors.isEmpty()) {

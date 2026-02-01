@@ -1,9 +1,10 @@
 import { CodeReviewIcon, GitPullRequestIcon } from "@primer/octicons-react";
 import { Link } from "@tanstack/react-router";
 import type {
+	ProfileActivityStats,
+	ProfileReviewActivity,
 	PullRequestBaseInfo,
 	PullRequestInfo,
-	PullRequestReviewInfo,
 } from "@/api/types.gen";
 import { ActivityBadges } from "@/components/leaderboard/ActivityBadges";
 import { Button } from "@/components/ui/button";
@@ -15,8 +16,12 @@ import { ProfileTimeframePicker } from "./ProfileTimeframePicker";
 import { ReviewActivityCard } from "./ReviewActivityCard";
 
 export interface ProfileContentProps {
-	reviewActivity?: PullRequestReviewInfo[];
+	reviewActivity?: ProfileReviewActivity[];
 	openPullRequests?: PullRequestInfo[];
+	/** Server-computed activity stats; falls back to client computation if not provided */
+	activityStats?: ProfileActivityStats;
+	/** Server-provided list of reviewed pull requests */
+	reviewedPullRequests?: PullRequestInfo[];
 	isLoading: boolean;
 	username: string;
 	displayName?: string;
@@ -32,6 +37,8 @@ export interface ProfileContentProps {
 export function ProfileContent({
 	reviewActivity = [],
 	openPullRequests = [],
+	activityStats,
+	reviewedPullRequests,
 	isLoading,
 	username,
 	displayName,
@@ -43,68 +50,69 @@ export function ProfileContent({
 	schedule,
 }: ProfileContentProps) {
 	// Generate skeleton arrays for loading state
-	const skeletonReviews = isLoading
-		? Array.from({ length: 3 }, (_, i) => ({ id: i }))
-		: [];
+	const skeletonReviews = isLoading ? Array.from({ length: 3 }, (_, i) => ({ id: i })) : [];
 
-	const skeletonPullRequests = isLoading
-		? Array.from({ length: 2 }, (_, i) => ({ id: i }))
-		: [];
+	const skeletonPullRequests = isLoading ? Array.from({ length: 2 }, (_, i) => ({ id: i })) : [];
 
-	const filteredReviewActivity = isLoading
-		? skeletonReviews
-		: (reviewActivity ?? []);
+	const filteredReviewActivity = isLoading ? skeletonReviews : (reviewActivity ?? []);
 
-	const displayPullRequests = isLoading
-		? skeletonPullRequests
-		: openPullRequests;
+	const displayPullRequests = isLoading ? skeletonPullRequests : openPullRequests;
 
-	const reviewStatsSource = reviewActivity ?? [];
+	// Normalized stats interface for ActivityBadges
+	interface NormalizedStats {
+		approvals: number;
+		changeRequests: number;
+		comments: number;
+		codeComments: number;
+	}
 
-	const reviewStats = reviewStatsSource.reduce(
-		(acc, activity) => {
-			acc.totalReviews += 1;
-			acc.totalScore += activity.score ?? 0;
-			acc.codeComments += activity.codeComments ?? 0;
-			if (
-				!acc.lastReviewAt ||
-				(activity.submittedAt && activity.submittedAt > acc.lastReviewAt)
-			) {
-				acc.lastReviewAt = activity.submittedAt;
-			}
-			switch (activity.state) {
-				case "APPROVED":
-					acc.approvals += 1;
-					break;
-				case "CHANGES_REQUESTED":
-					acc.changeRequests += 1;
-					break;
-				case "UNKNOWN":
-					acc.unknowns += 1;
-					break;
-				default:
-					acc.comments += 1;
-			}
-			return acc;
-		},
-		{
-			totalReviews: 0,
-			approvals: 0,
-			changeRequests: 0,
-			comments: 0,
-			unknowns: 0,
-			codeComments: 0,
-			totalScore: 0,
-			lastReviewAt: undefined as Date | undefined,
-		},
-	);
+	// Compute stats from activity data as fallback when server stats not available
+	const computeStatsFromActivity = (activities: ProfileReviewActivity[]): NormalizedStats =>
+		activities.reduce(
+			(acc, activity) => {
+				acc.codeComments += activity.codeComments ?? 0;
+				switch (activity.state) {
+					case "APPROVED":
+						acc.approvals += 1;
+						break;
+					case "CHANGES_REQUESTED":
+						acc.changeRequests += 1;
+						break;
+					default:
+						acc.comments += 1;
+				}
+				return acc;
+			},
+			{
+				approvals: 0,
+				changeRequests: 0,
+				comments: 0,
+				codeComments: 0,
+			},
+		);
 
-	const reviewedPullRequestsForPopover: ReviewedPullRequest[] =
-		reviewStatsSource
-			.map((activity) => activity.pullRequest)
-			.filter((pullRequest): pullRequest is PullRequestBaseInfo =>
-				Boolean(pullRequest),
-			);
+	// Convert server stats to normalized format, or fall back to client computation
+	const normalizeStats = (serverStats?: ProfileActivityStats): NormalizedStats => {
+		if (serverStats) {
+			return {
+				approvals: serverStats.numberOfApprovals ?? 0,
+				changeRequests: serverStats.numberOfChangeRequests ?? 0,
+				comments: (serverStats.numberOfComments ?? 0) + (serverStats.numberOfIssueComments ?? 0),
+				codeComments: serverStats.numberOfCodeComments ?? 0,
+			};
+		}
+		return computeStatsFromActivity(reviewActivity ?? []);
+	};
+
+	const reviewStats = normalizeStats(activityStats);
+
+	// Use server-provided reviewed PRs if available, otherwise extract from review activity
+	const reviewedPRsForPopover: ReviewedPullRequest[] =
+		reviewedPullRequests && reviewedPullRequests.length > 0
+			? reviewedPullRequests
+			: (reviewActivity ?? [])
+					.map((activity) => activity.pullRequest)
+					.filter((pr): pr is PullRequestBaseInfo => Boolean(pr));
 
 	return (
 		<div className="flex flex-col gap-4">
@@ -122,9 +130,9 @@ export function ProfileContent({
 						<div className="flex flex-wrap items-center gap-3">
 							<h3 className="text-lg font-semibold">Review activity</h3>
 							<ActivityBadges
-								reviewedPullRequests={reviewedPullRequestsForPopover}
-								changeRequests={reviewStats.changeRequests}
+								reviewedPullRequests={reviewedPRsForPopover}
 								approvals={reviewStats.approvals}
+								changeRequests={reviewStats.changeRequests}
 								comments={reviewStats.comments}
 								codeComments={reviewStats.codeComments}
 								isLoading={isLoading}
@@ -133,20 +141,18 @@ export function ProfileContent({
 					</div>
 					<div className="flex flex-col gap-2 m-1">
 						{filteredReviewActivity.length > 0 ? (
-							(filteredReviewActivity as PullRequestReviewInfo[]).map(
-								(activity) => (
-									<ReviewActivityCard
-										key={activity.id}
-										isLoading={isLoading}
-										state={activity.state}
-										submittedAt={activity.submittedAt}
-										htmlUrl={activity.htmlUrl}
-										pullRequest={activity.pullRequest}
-										repositoryName={activity.pullRequest?.repository?.name}
-										score={activity.score}
-									/>
-								),
-							)
+							(filteredReviewActivity as ProfileReviewActivity[]).map((activity) => (
+								<ReviewActivityCard
+									key={activity.id}
+									isLoading={isLoading}
+									state={activity.state}
+									submittedAt={activity.submittedAt}
+									htmlUrl={activity.htmlUrl}
+									pullRequest={activity.pullRequest}
+									repositoryName={activity.pullRequest?.repository?.name}
+									score={activity.score}
+								/>
+							))
 						) : (
 							<EmptyState
 								icon={CodeReviewIcon}

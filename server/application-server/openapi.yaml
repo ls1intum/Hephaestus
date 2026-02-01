@@ -8,32 +8,26 @@ info:
     name: MIT License
     url: https://github.com/ls1intum/Hephaestus/blob/develop/LICENSE
   title: Hephaestus API
-  version: 0.10.6-rc.2
+  version: 0.14.0
 servers:
 - description: Default Server URL
   url: /
+security:
+- bearerAuth: []
 tags:
-- description: |-
-    REST controller for the chat functionality.
-     Handles streaming chat responses, message persistence, and thread management.
-  name: chat-controller
 - description: Global contributor information
   name: Contributors
-- description: Document management with versioning support
-  name: Documents
 - description: |-
     Workspace registry endpoints that operate outside of a specific workspace slug.
      These routes stay under the classic /workspaces base path while slugged routes
      live in {@link WorkspaceController WorkspaceController} via <code>@WorkspaceScopedController</code>.
   name: workspace-registry-controller
+- description: Workspace-scoped team settings management
+  name: Team Settings
 - description: Team management within workspace
   name: Teams
-- description: Vote on chat messages (upvote/downvote)
-  name: Chat Message Voting
-- description: |-
-    Controller for activity-related operations within a workspace context.
-     All endpoints require workspace membership via {@link WorkspaceScopedController WorkspaceScopedController}.
-  name: activity-controller
+- description: Bad practice detection and resolution
+  name: Code Practices
 - description: User profile and activity data
   name: Profile
 - description: |-
@@ -47,7 +41,7 @@ tags:
 paths:
   /contributors:
     get:
-      description: Returns all contributors across all workspaces
+      description: Returns contributors to the Hephaestus project (for the About page)
       operationId: listGlobalContributors
       responses:
         "200":
@@ -58,9 +52,10 @@ paths:
                 items:
                   $ref: "#/components/schemas/Contributor"
           description: list of contributors sorted by contribution count
+      security: []
       summary: List global contributors
       tags:
-      - C
+      - Contributors
   /user:
     delete:
       description: Permanently delete the current user's account and all associated
@@ -70,7 +65,8 @@ paths:
         "200":
           description: OK
       summary: Delete user account
-      tags: []
+      tags:
+      - Account
   /user/settings:
     get:
       description: Get the current user's notification and research participation
@@ -84,7 +80,8 @@ paths:
                 $ref: "#/components/schemas/UserSettings"
           description: OK
       summary: Get user settings
-      tags: []
+      tags:
+      - Account
     post:
       description: Update the current user's notification and research participation
         preferences
@@ -103,7 +100,8 @@ paths:
                 $ref: "#/components/schemas/UserSettings"
           description: OK
       summary: Update user settings
-      tags: []
+      tags:
+      - Account
   /workspaces:
     get:
       operationId: listWorkspaces
@@ -171,495 +169,10 @@ paths:
               schema:
                 $ref: "#/components/schemas/Workspace"
           description: Workspace returned
+      security: []
       summary: Fetch a workspace by slug
       tags:
       - workspace
-  /workspaces/{workspaceSlug}/activity/badpractice/{badPracticeId}/feedback:
-    post:
-      operationId: provideFeedbackForBadPractice
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: badPracticeId
-        required: true
-        schema:
-          type: integer
-          format: int64
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/BadPracticeFeedback"
-        required: true
-      responses:
-        "200":
-          description: OK
-      tags:
-      - activity
-  /workspaces/{workspaceSlug}/activity/badpractice/{badPracticeId}/resolve:
-    post:
-      operationId: resolveBadPractice
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: badPracticeId
-        required: true
-        schema:
-          type: integer
-          format: int64
-      - in: query
-        name: state
-        required: true
-        schema:
-          type: string
-          enum:
-          - GOOD_PRACTICE
-          - FIXED
-          - CRITICAL_ISSUE
-          - NORMAL_ISSUE
-          - MINOR_ISSUE
-          - WONT_FIX
-          - WRONG
-      responses:
-        "200":
-          description: OK
-      tags:
-      - activity
-  /workspaces/{workspaceSlug}/activity/pullrequest/{pullRequestId}/badpractices:
-    post:
-      operationId: detectBadPracticesForPullRequest
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: pullRequestId
-        required: true
-        schema:
-          type: integer
-          format: int64
-      responses:
-        "200":
-          description: OK
-      tags:
-      - activity
-  /workspaces/{workspaceSlug}/activity/user/{login}/badpractices:
-    post:
-      operationId: detectBadPracticesByUser
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: login
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          description: OK
-      tags:
-      - activity
-  /workspaces/{workspaceSlug}/activity/{login}:
-    get:
-      operationId: getActivityByUser
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: login
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Activity"
-          description: OK
-      tags:
-      - activity
-  /workspaces/{workspaceSlug}/api/chat/messages/{messageId}/vote:
-    patch:
-      description: Cast an upvote or downvote on a chat message
-      operationId: voteMessage
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - description: Message ID to vote on
-        in: path
-        name: messageId
-        required: true
-        schema:
-          type: string
-          format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/VoteMessageRequest"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ChatMessageVote"
-          description: Vote successfully recorded
-        "400":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ChatMessageVote"
-          description: Invalid vote type or message not found
-        "404":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ChatMessageVote"
-          description: Message not found
-      summary: Vote on a message
-      tags:
-      - Chat Mes
-  /workspaces/{workspaceSlug}/api/documents:
-    get:
-      operationId: getUserDocuments
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: query
-        name: page
-        required: false
-        schema:
-          type: integer
-          format: int32
-          default: 0
-      - in: query
-        name: size
-        required: false
-        schema:
-          type: integer
-          format: int32
-          default: 20
-      - in: query
-        name: sortBy
-        required: false
-        schema:
-          type: string
-          default: createdAt
-      - in: query
-        name: sortDir
-        required: false
-        schema:
-          type: string
-          default: desc
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PageDocumentSummary"
-          description: Documents retrieved successfully
-      summary: Get all user documents (latest versions only)
-      tags: []
-    post:
-      operationId: createDocument
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CreateDocumentRequest"
-        required: true
-      responses:
-        "201":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Document"
-          description: Document created successfully
-        "400":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Document"
-          description: Invalid request data
-      summary: Create a new document
-      tags: []
-  /workspaces/{workspaceSlug}/api/documents/{id}:
-    delete:
-      operationId: deleteDocument
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        "204":
-          description: Document deleted successfully
-        "404":
-          description: Document not found
-      summary: Delete a document and all its versions
-      tags: []
-    get:
-      operationId: getDocument
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Document"
-          description: Document retrieved successfully
-        "404":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Document"
-          description: Document not found
-      summary: Get latest version of a document
-      tags: []
-    put:
-      operationId: updateDocument
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: string
-          format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UpdateDocumentRequest"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Document"
-          description: Document updated successfully
-        "400":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Document"
-          description: Invalid request data
-        "404":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Document"
-          description: Document not found
-      summary: Update a document (creates new version)
-      tags: []
-  /workspaces/{workspaceSlug}/api/documents/{id}/versions:
-    delete:
-      operationId: deleteVersionsAfterTimestamp
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: string
-          format: uuid
-      - in: query
-        name: after
-        required: true
-        schema:
-          type: string
-          format: date-time
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Document"
-          description: Document versions deleted successfully
-        "400":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Document"
-          description: Invalid timestamp parameter
-        "404":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Document"
-          description: Document not found
-      summary: Delete document versions after specified timestamp
-      tags: []
-    get:
-      operationId: getDocumentVersions
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: string
-          format: uuid
-      - in: query
-        name: page
-        required: false
-        schema:
-          type: integer
-          format: int32
-          default: 0
-      - in: query
-        name: size
-        required: false
-        schema:
-          type: integer
-          format: int32
-          default: 20
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PageDocument"
-          description: Document versions retrieved successfully
-        "404":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PageDocument"
-          description: Document not found
-      summary: Get all versions of a document
-      tags: []
-  /workspaces/{workspaceSlug}/api/documents/{id}/versions/{versionNumber}:
-    get:
-      operationId: getDocumentVersion
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: string
-          format: uuid
-      - in: path
-        name: versionNumber
-        required: true
-        schema:
-          type: integer
-          format: int32
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Document"
-          description: Document version retrieved successfully
-        "404":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Document"
-          description: Document version not found
-      summary: Get specific version of a document by version number
-      tags: []
   /workspaces/{workspaceSlug}/leaderboard:
     get:
       description: Creates a ranked contributor list for the specified time range
@@ -679,7 +192,7 @@ paths:
         schema:
           type: string
           format: date-time
-      - description: end of the time range (inclusive)
+      - description: end of the time range (exclusive)
         in: query
         name: before
         required: true
@@ -721,11 +234,15 @@ paths:
                 items:
                   $ref: "#/components/schemas/LeaderboardEntry"
           description: ranked list of leaderboard entries
+      security: []
       summary: Generate leaderboard
-      tags: []
+      tags:
+      - Leaderboard
+  /workspaces/{workspaceSlug}/leaderboard/users/{login}/league-stats:
     post:
-      description: Calculates league changes for a specific user
-      operationId: getUserLeagueStats
+      description: Computes projected league point changes for a specific user based
+        on their leaderboard entry
+      operationId: computeUserLeagueStats
       parameters:
       - description: Workspace slug
         in: path
@@ -735,7 +252,7 @@ paths:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       - description: the user's GitHub login
-        in: query
+        in: path
         name: login
         required: true
         schema:
@@ -753,9 +270,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/LeagueChange"
-          description: league change statistics including promotion/demotion info
-      summary: Get user league stats
-      tags: []
+          description: league change statistics including projected point delta
+      summary: Calculate user league stats
+      tags:
+      - Leaderboard
   /workspaces/{workspaceSlug}/league/reset:
     put:
       operationId: resetAndRecalculateLeagues
@@ -812,6 +330,7 @@ paths:
                 items:
                   $ref: "#/components/schemas/WorkspaceMembership"
           description: List of workspace memberships
+      security: []
       summary: List all members of the workspace with pagination.
       tags:
       - workspace-membership
@@ -865,6 +384,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/WorkspaceMembership"
           description: the current user's membership details
+      security: []
       summary: Get the current user's membership in this workspace.
       tags:
       - workspace-membership
@@ -923,13 +443,13 @@ paths:
               schema:
                 $ref: "#/components/schemas/WorkspaceMembership"
           description: Workspace membership details
+      security: []
       summary: Get a specific member's details.
       tags:
       - workspace-membership
-  /workspaces/{workspaceSlug}/mentor/thread/{threadId}:
-    get:
-      description: Retrieve a specific chat thread with all messages
-      operationId: getThread
+  /workspaces/{workspaceSlug}/mentor/chat:
+    post:
+      operationId: mentorChat
       parameters:
       - description: Workspace slug
         in: path
@@ -938,39 +458,241 @@ paths:
         schema:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - description: Thread ID
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                greeting:
+                  type: boolean
+                  description: "If true, generate a greeting without user message"
+                id:
+                  type: string
+                  format: uuid
+                message:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      format: uuid
+                    parts:
+                      type: array
+                      items:
+                        anyOf:
+                        - type: object
+                          properties:
+                            text:
+                              type: string
+                              maxLength: 2000
+                              minLength: 1
+                            type:
+                              type: string
+                              enum:
+                              - text
+                          required:
+                          - text
+                          - type
+                        - type: object
+                          properties:
+                            mediaType:
+                              type: string
+                              enum:
+                              - image/jpeg
+                              - image/png
+                            name:
+                              type: string
+                              maxLength: 100
+                              minLength: 1
+                            type:
+                              type: string
+                              enum:
+                              - file
+                            url:
+                              type: string
+                              format: uri
+                          required:
+                          - mediaType
+                          - name
+                          - type
+                          - url
+                    role:
+                      type: string
+                      enum:
+                      - user
+                  required:
+                  - id
+                  - parts
+                  - role
+                previousMessageId:
+                  type: string
+              required:
+              - id
+        description: Chat request body
+        required: true
+      responses:
+        "200":
+          content:
+            text/event-stream:
+              schema:
+                $ref: "#/components/schemas/StreamPart"
+          description: Event stream of chat updates.
+      summary: Handle mentor chat (set greeting=true for initial greeting without
+        user message)
+      tags:
+      - mentor
+      - exported
+      x-hephaestus:
+        export: true
+  /workspaces/{workspaceSlug}/mentor/documents:
+    get:
+      operationId: listDocuments
+      parameters:
+      - description: Workspace slug
         in: path
-        name: threadId
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - explode: true
+        in: query
+        name: page
+        required: false
+        schema:
+          type:
+          - integer
+          - "null"
+          default: 0
+          minimum: 0
+        style: form
+      - explode: true
+        in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          default: 20
+          maximum: 100
+          minimum: 1
+        style: form
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DocumentSummary"
+          description: Document summaries
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Missing context
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Internal error
+      summary: List documents owned by the authenticated user
+      tags:
+      - documents
+      - exported
+      x-hephaestus:
+        export: true
+    post:
+      operationId: createDocument
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDocumentRequest"
+        description: Create document
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+          description: Created document
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Missing required context
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Internal error
+      summary: Create a new document
+      tags:
+      - documents
+      - exported
+      x-hephaestus:
+        export: true
+  /workspaces/{workspaceSlug}/mentor/documents/{id}:
+    delete:
+      operationId: deleteDocument
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - explode: false
+        in: path
+        name: id
         required: true
         schema:
           type: string
           format: uuid
+        style: simple
       responses:
-        "200":
+        "204":
+          description: Deleted
+        "400":
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ChatThreadDetail"
-          description: Successfully retrieved thread
-        "401":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ChatThreadDetail"
-          description: User not authenticated
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Missing context
         "404":
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ChatThreadDetail"
-          description: Thread not found or not owned by user
-      summary: Get chat thread detail
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Not found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Internal error
+      summary: Delete a document and all versions
       tags:
-      - chat
-  /workspaces/{workspaceSlug}/mentor/threads:
+      - documents
+      - exported
+      x-hephaestus:
+        export: true
     get:
-      description: Retrieve all chat threads for the authenticated user
-      operationId: getThreads
+      operationId: getDocument
       parameters:
       - description: Workspace slug
         in: path
@@ -979,6 +701,128 @@ paths:
         schema:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+          description: Document
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Missing context
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Not found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Internal error
+      summary: Get latest version of a document
+      tags:
+      - documents
+      - exported
+      x-hephaestus:
+        export: true
+    put:
+      operationId: updateDocument
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+        style: simple
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDocumentRequest"
+        description: Update document
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+          description: Updated document
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Missing context
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Not found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Internal error
+      summary: Update a document (creates new version)
+      tags:
+      - documents
+      - exported
+      x-hephaestus:
+        export: true
+  /workspaces/{workspaceSlug}/mentor/documents/{id}/versions:
+    delete:
+      operationId: deleteDocumentVersionsAfter
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+        style: simple
+      - explode: true
+        in: query
+        name: after
+        required: true
+        schema:
+          type: string
+          format: date-time
+        style: form
       responses:
         "200":
           content:
@@ -986,23 +830,222 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/ChatThreadSummary"
-          description: Successfully retrieved threads
-        "401":
+                  $ref: "#/components/schemas/Document"
+          description: Deleted versions
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Missing context
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Not found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Internal error
+      summary: Delete versions after timestamp
+      tags:
+      - documents
+      - exported
+      x-hephaestus:
+        export: true
+    get:
+      operationId: listVersions
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+        style: simple
+      - explode: true
+        in: query
+        name: page
+        required: false
+        schema:
+          type:
+          - integer
+          - "null"
+          default: 0
+          minimum: 0
+        style: form
+      - explode: true
+        in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          default: 20
+          maximum: 100
+          minimum: 1
+        style: form
+      responses:
+        "200":
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/ChatThreadSummary"
-          description: User not authenticated
-      summary: Get user's chat threads
+                  $ref: "#/components/schemas/Document"
+          description: Document versions
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Missing context
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Not found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Internal error
+      summary: List versions of a document
       tags:
-      - chat
+      - documents
+      - exported
+      x-hephaestus:
+        export: true
+  /workspaces/{workspaceSlug}/mentor/documents/{id}/versions/{versionNumber}:
+    get:
+      operationId: getVersion
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+        style: simple
+      - explode: false
+        in: path
+        name: versionNumber
+        required: true
+        schema:
+          type:
+          - integer
+          - "null"
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+          description: Document
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Missing context
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Not found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Internal error
+      summary: Get specific version
+      tags:
+      - documents
+      - exported
+      x-hephaestus:
+        export: true
+  /workspaces/{workspaceSlug}/mentor/messages/{messageId}/vote:
+    put:
+      operationId: voteMessage
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - explode: false
+        in: path
+        name: messageId
+        required: true
+        schema:
+          type: string
+          format: uuid
+        style: simple
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VoteMessageRequest"
+        description: Vote request body
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatMessageVote"
+          description: Vote recorded
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Missing context
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Message not found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Internal error
+      summary: Vote on a chat message (upvote/downvote) - idempotent upsert
+      tags:
+      - vote
+      - exported
+      x-hephaestus:
+        export: true
   /workspaces/{workspaceSlug}/mentor/threads/grouped:
     get:
-      description: Retrieve all chat threads for the authenticated user grouped by
-        time periods
       operationId: getGroupedThreads
       parameters:
       - description: Workspace slug
@@ -1020,18 +1063,81 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/ChatThreadGroup"
-          description: Successfully retrieved grouped threads
-        "401":
+          description: Grouped chat threads
+        "400":
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/ChatThreadGroup"
-          description: User not authenticated
-      summary: Get user's grouped chat threads
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Missing context
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Internal error
+      summary: List chat threads grouped by time buckets
       tags:
-      - chat
+      - mentor
+      - exported
+      x-hephaestus:
+        export: true
+  /workspaces/{workspaceSlug}/mentor/threads/{threadId}:
+    get:
+      operationId: getThread
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - explode: false
+        in: path
+        name: threadId
+        required: true
+        schema:
+          type: string
+          format: uuid
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ThreadDetail"
+          description: Thread detail with messages
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Missing required context
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Thread not found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Internal error
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+          description: Service temporarily unavailable
+      summary: Get mentor chat thread detail
+      tags:
+      - mentor
+      - exported
+      x-hephaestus:
+        export: true
   /workspaces/{workspaceSlug}/notifications:
     patch:
       operationId: updateNotifications
@@ -1059,6 +1165,230 @@ paths:
       summary: Update leaderboard notification preferences
       tags:
       - workspace
+  /workspaces/{workspaceSlug}/practices/badpractice/{id}:
+    get:
+      description: Retrieves details of a specific bad practice by ID
+      operationId: getBadPractice
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PullRequestBadPractice"
+          description: Bad practice returned
+      security: []
+      summary: Get a specific bad practice
+      tags:
+      - Code Practices
+  /workspaces/{workspaceSlug}/practices/badpractice/{id}/feedback:
+    post:
+      description: Submits user feedback for a detected bad practice
+      operationId: provideFeedback
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BadPracticeFeedback"
+        required: true
+      responses:
+        "200":
+          description: Feedback submitted successfully
+        "403":
+          description: User is not an assignee of the pull request
+      summary: Provide feedback for a bad practice
+      tags:
+      - Code Practices
+  /workspaces/{workspaceSlug}/practices/badpractice/{id}/resolve:
+    post:
+      description: "Updates the state of a bad practice to FIXED, WONT_FIX, or WRONG"
+      operationId: resolve
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - in: query
+        name: state
+        required: true
+        schema:
+          type: string
+          enum:
+          - GOOD_PRACTICE
+          - MINOR_ISSUE
+          - NORMAL_ISSUE
+          - CRITICAL_ISSUE
+          - FIXED
+          - WONT_FIX
+          - WRONG
+      responses:
+        "200":
+          description: Bad practice resolved successfully
+      summary: Resolve a bad practice
+      tags:
+      - Code Practices
+  /workspaces/{workspaceSlug}/practices/pullrequest/{pullRequestId}:
+    get:
+      description: Retrieves all detected bad practices for a specific pull request
+      operationId: getBadPracticesForPullRequest
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: pullRequestId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PullRequestWithBadPractices"
+          description: Bad practices returned
+      security: []
+      summary: Get bad practices for a pull request
+      tags:
+      - Code Practices
+  /workspaces/{workspaceSlug}/practices/pullrequest/{pullRequestId}/detect:
+    post:
+      description: Triggers bad practice detection for a specific pull request
+      operationId: detectForPullRequest
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: pullRequestId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DetectionResult"
+          description: Detection completed successfully
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DetectionResult"
+          description: Detection failed due to no updates on pull request
+      summary: Detect bad practices for a pull request
+      tags:
+      - Code Practices
+  /workspaces/{workspaceSlug}/practices/user/{login}:
+    get:
+      description: Retrieves all detected bad practices for pull requests assigned
+        to the user
+      operationId: getBadPracticesForUser
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: login
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserPractices"
+          description: Bad practices returned
+      security: []
+      summary: Get bad practices for a user
+      tags:
+      - Code Practices
+  /workspaces/{workspaceSlug}/practices/user/{login}/detect:
+    post:
+      description: Triggers bad practice detection for all pull requests of the specified
+        user
+      operationId: detectForUser
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: login
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DetectionResult"
+          description: Detection completed successfully
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DetectionResult"
+          description: Detection failed due to no updates on pull requests
+      summary: Detect bad practices for a user
+      tags:
+      - Code Practices
   /workspaces/{workspaceSlug}/profile/{login}:
     get:
       description: "Returns user profile with workspace-scoped activity data including\
@@ -1095,11 +1425,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/UserProfile"
+                $ref: "#/components/schemas/Profile"
           description: "user profile with open PRs, review activity, league points,\
             \ etc."
+      security: []
       summary: Get user profile
-      tags: []
+      tags:
+      - Profile
   /workspaces/{workspaceSlug}/public-visibility:
     patch:
       operationId: updatePublicVisibility
@@ -1147,6 +1479,7 @@ paths:
                 items:
                   type: string
           description: Repository list
+      security: []
       summary: List repositories monitored by a workspace
       tags:
       - workspace
@@ -1332,8 +1665,10 @@ paths:
                 items:
                   $ref: "#/components/schemas/TeamInfo"
           description: list of teams with their members and permissions
+      security: []
       summary: List teams
-      tags: []
+      tags:
+      - Teams
   /workspaces/{workspaceSlug}/team/{id}/visibility:
     post:
       description: Show or hide a team in leaderboard calculations
@@ -1369,7 +1704,8 @@ paths:
         "200":
           description: "200 OK on success, 404 if team not found"
       summary: Update team visibility
-      tags: []
+      tags:
+      - Teams
   /workspaces/{workspaceSlug}/team/{teamId}/repositories/{repositoryId}/visibility:
     post:
       operationId: updateRepositoryVisibility
@@ -1406,7 +1742,8 @@ paths:
       responses:
         "200":
           description: OK
-      tags: []
+      tags:
+      - Teams
   /workspaces/{workspaceSlug}/teams/{teamId}/labels/{labelId}:
     delete:
       operationId: removeLabelFromTeam
@@ -1478,6 +1815,263 @@ paths:
       summary: Add a repository label to a team
       tags:
       - workspace
+  /workspaces/{workspaceSlug}/teams/{teamId}/settings:
+    get:
+      description: Returns the visibility settings for a team in the workspace
+      operationId: getTeamSettings
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - description: the team ID
+        in: path
+        name: teamId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceTeamSettings"
+          description: Team settings returned
+      security: []
+      summary: Get team settings
+      tags:
+      - Team Settings
+    patch:
+      description: Updates the visibility settings for a team in the workspace
+      operationId: updateTeamSettings
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - description: the team ID
+        in: path
+        name: teamId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTeamSettingsRequest"
+        description: the update request containing the hidden flag
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceTeamSettings"
+          description: Team settings updated
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceTeamSettings"
+          description: Team not found in workspace
+      summary: Update team settings
+      tags:
+      - Team Settings
+  /workspaces/{workspaceSlug}/teams/{teamId}/settings/label-filters:
+    get:
+      description: Returns all labels configured as filters for a team in the workspace
+      operationId: getLabelFilters
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - description: the team ID
+        in: path
+        name: teamId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LabelInfo"
+          description: Label filters returned
+      security: []
+      summary: Get team label filters
+      tags:
+      - Team Settings
+  /workspaces/{workspaceSlug}/teams/{teamId}/settings/label-filters/{labelId}:
+    delete:
+      description: Removes a label filter from a team in the workspace
+      operationId: removeLabelFilter
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - description: the team ID
+        in: path
+        name: teamId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - description: the label ID to remove as filter
+        in: path
+        name: labelId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "204":
+          description: Label filter removed
+        "404":
+          description: Label filter not found
+      summary: Remove label filter
+      tags:
+      - Team Settings
+    post:
+      description: Adds a label as a filter for a team in the workspace
+      operationId: addLabelFilter
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - description: the team ID
+        in: path
+        name: teamId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - description: the label ID to add as filter
+        in: path
+        name: labelId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "201":
+          description: Label filter added
+        "404":
+          description: Team or label not found
+      summary: Add label filter
+      tags:
+      - Team Settings
+  /workspaces/{workspaceSlug}/teams/{teamId}/settings/repositories/{repositoryId}:
+    get:
+      description: Returns the contribution visibility settings for a repository in
+        a team
+      operationId: getRepositorySettings
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - description: the team ID
+        in: path
+        name: teamId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - description: the repository ID
+        in: path
+        name: repositoryId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceTeamRepositorySettings"
+          description: Repository settings returned
+      security: []
+      summary: Get repository settings
+      tags:
+      - Team Settings
+    patch:
+      description: Updates the contribution visibility settings for a repository in
+        a team
+      operationId: updateRepositorySettings
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - description: the team ID
+        in: path
+        name: teamId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - description: the repository ID
+        in: path
+        name: repositoryId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateRepositorySettingsRequest"
+        description: the update request containing the hiddenFromContributions flag
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceTeamRepositorySettings"
+          description: Repository settings updated
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceTeamRepositorySettings"
+          description: Team or repository not found
+      summary: Update repository settings
+      tags:
+      - Team Settings
   /workspaces/{workspaceSlug}/token:
     patch:
       operationId: updateToken
@@ -1525,26 +2119,19 @@ paths:
                 items:
                   $ref: "#/components/schemas/UserTeams"
           description: OK
+      security: []
       summary: List workspace users and the teams they belong to
       tags:
       - workspace
 components:
   schemas:
-    Activity:
-      type: object
-      properties:
-        pullRequests:
-          type: array
-          items:
-            $ref: "#/components/schemas/PullRequestWithBadPractices"
-      required:
-      - pullRequests
     AssignRoleRequest:
       type: object
-      description: DTO for assigning or updating a role for a workspace member.
+      description: Request to assign or update a user's role in a workspace
       properties:
         role:
           type: string
+          description: "New role to assign (OWNER, ADMIN, MEMBER)"
           enum:
           - OWNER
           - ADMIN
@@ -1552,22 +2139,31 @@ components:
         userId:
           type: integer
           format: int64
+          description: User ID of the member to update
       required:
       - role
       - userId
     BadPracticeFeedback:
       type: object
+      description: User feedback on a detected bad practice
       properties:
         explanation:
           type: string
+          description: User's explanation for the feedback
+          maxLength: 2000
+          minLength: 0
         type:
           type: string
+          description: "Type of feedback (e.g., 'false_positive', 'not_applicable')"
+          example: false_positive
+          maxLength: 64
+          minLength: 0
+          pattern: "^[a-zA-Z0-9_-]+$"
       required:
       - explanation
       - type
     ChatMessageVote:
       type: object
-      description: DTO for returning vote information.
       properties:
         createdAt:
           type: string
@@ -1580,191 +2176,118 @@ components:
         updatedAt:
           type: string
           format: date-time
-    ChatThreadDetail:
-      type: object
-      description: |-
-        DTO for chat thread with full message content.
-         Used for initializing useChat in the frontend.
-      properties:
-        createdAt:
-          type: string
-          format: date-time
-          description: When the thread was created
-        id:
-          type: string
-          format: uuid
-          description: Unique identifier for the thread
-        messages:
-          type: array
-          description: |-
-            All messages in the conversation path (as JSON objects for useChat initialization)
-             As exception, we do not use a DTO here since we included those intelligece-service models in the OpenAPI spec.
-          items:
-            $ref: "#/components/schemas/UIMessage"
-        selectedLeafMessageId:
-          type: string
-          format: uuid
-          description: ID of the currently selected leaf message (end of active conversation
-            path)
-        title:
-          type: string
-          description: Thread title (may be null for untitled threads)
-        votes:
-          type: array
-          description: Votes for messages in this thread
-          items:
-            $ref: "#/components/schemas/ChatMessageVote"
+      required:
+      - createdAt
+      - isUpvoted
+      - messageId
+      - updatedAt
+      x-hephaestus:
+        export: true
     ChatThreadGroup:
       type: object
-      description: |-
-        DTO for grouped chat threads.
-         Used for organizing threads by time periods (today, yesterday, etc.).
       properties:
         groupName:
           type: string
-          description: "Group name (e.g., \"Today\", \"Yesterday\", \"Last 7 Days\"\
-            , \"Last 30 Days\")"
         threads:
           type: array
-          description: List of thread summaries in this group
           items:
             $ref: "#/components/schemas/ChatThreadSummary"
       required:
       - groupName
       - threads
+      x-hephaestus:
+        export: true
     ChatThreadSummary:
       type: object
-      description: |-
-        DTO for chat thread summary information.
-         Used for listing threads without loading full message content.
       properties:
         createdAt:
           type: string
           format: date-time
-          description: When the thread was created
         id:
           type: string
           format: uuid
-          description: Unique identifier for the thread
         title:
           type: string
-          description: Thread title (may be null for untitled threads)
       required:
-      - createdAt
       - id
       - title
+      x-hephaestus:
+        export: true
     Contributor:
       type: object
-      description: |-
-        Data transfer object representing a GitHub contributor.
-         Used to display contributor information on the public about page.
+      description: Information about a contributor to the Hephaestus project
       properties:
         avatarUrl:
           type: string
+          description: URL to the contributor's avatar image
         contributions:
           type: integer
           format: int32
+          description: Number of contributions to the project
+          example: 42
         htmlUrl:
           type: string
+          description: URL to the contributor's GitHub profile
         id:
           type: integer
           format: int64
+          description: GitHub user ID
         login:
           type: string
+          description: GitHub username
         name:
           type: string
+          description: Display name of the contributor
       required:
       - avatarUrl
       - htmlUrl
       - id
       - login
       - name
-    CreateDocumentInput:
-      type: object
-      description: Input for createDocument tool.
-      x-hephaestus:
-        toolModel: true
-      properties:
-        document_id:
-          type: string
-          description: "Do not populate this field, will automatically be set by the\
-            \ system"
-          title: Document Id
-        kind:
-          type: string
-          const: text
-          title: Kind
-        title:
-          type: string
-          title: Title
-      required:
-      - document_id
-      - kind
-      - title
-      title: CreateDocumentInput
-    CreateDocumentOutput:
-      type: object
-      description: Output for createDocument tool.
-      x-hephaestus:
-        toolModel: true
-      properties:
-        content:
-          type: string
-          title: Content
-        id:
-          type: string
-          title: Id
-        kind:
-          type: string
-          const: TEXT
-          title: Kind
-        title:
-          type: string
-          title: Title
-      required:
-      - content
-      - id
-      - kind
-      - title
-      title: CreateDocumentOutput
     CreateDocumentRequest:
       type: object
-      description: |-
-        DTO for creating a new document.
-         Server generates UUID and timestamps.
       properties:
         content:
           type: string
+          minLength: 1
         kind:
-          type: string
-          enum:
-          - TEXT
+          $ref: "#/components/schemas/DocumentKind"
         title:
           type: string
           maxLength: 255
-          minLength: 0
+          minLength: 1
       required:
       - content
       - kind
       - title
+      x-hephaestus:
+        export: true
     CreateWorkspaceRequest:
       type: object
-      description: DTO for creating a new workspace.
+      description: Request to create a new workspace
       properties:
         accountLogin:
           type: string
+          description: GitHub account login to associate with this workspace
+          example: my-org
         accountType:
           type: string
+          description: Type of GitHub account (USER or ORGANIZATION)
           enum:
           - ORG
           - USER
         displayName:
           type: string
+          description: Human-readable name of the workspace
+          example: My Workspace
         ownerUserId:
           type: integer
           format: int64
+          description: User ID of the workspace owner
         workspaceSlug:
           type: string
+          description: URL-friendly identifier for the workspace
+          example: my-workspace
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       required:
       - accountLogin
@@ -1772,33 +2295,18 @@ components:
       - displayName
       - ownerUserId
       - workspaceSlug
-    DataUIPart:
+    DetectionResult:
       type: object
-      description: |-
-        A data part with dynamic type.
-
-        Note: In UI messages, data can be of any JSON type (object, array, string, number, etc.).
+      description: Response for detection operations
       properties:
-        data:
-          title: Data
-        id:
-          anyOf:
-          - type: string
-          - type: "null"
-          title: Id
-        type:
+        result:
           type: string
-          pattern: ^data-.*
-          title: Type
-      required:
-      - data
-      - type
-      title: DataUIPart
+          enum:
+          - BAD_PRACTICES_DETECTED
+          - NO_BAD_PRACTICES_DETECTED
+          - ERROR_NO_UPDATE_ON_PULLREQUEST
     Document:
       type: object
-      description: |-
-        DTO for complete document responses.
-         Used when returning full document details (includes content).
       properties:
         content:
           type: string
@@ -1809,16 +2317,13 @@ components:
           type: string
           format: uuid
         kind:
-          type: string
-          enum:
-          - TEXT
+          $ref: "#/components/schemas/DocumentKind"
         title:
           type: string
         userId:
-          type: string
+          type: integer
         versionNumber:
           type: integer
-          format: int32
       required:
       - content
       - createdAt
@@ -1827,67 +2332,16 @@ components:
       - title
       - userId
       - versionNumber
-    DocumentCreateData:
-      type: object
       x-hephaestus:
-        dataModel: true
-      properties:
-        id:
-          type: string
-          title: Id
-        kind:
-          type: string
-          const: text
-          title: Kind
-        title:
-          type: string
-          title: Title
-      required:
-      - id
-      - kind
-      - title
-      title: DocumentCreateData
-    DocumentDeltaData:
-      type: object
+        export: true
+    DocumentKind:
+      type: string
+      enum:
+      - text
       x-hephaestus:
-        dataModel: true
-      properties:
-        delta:
-          type: string
-          title: Delta
-        id:
-          type: string
-          title: Id
-        kind:
-          type: string
-          const: text
-          title: Kind
-      required:
-      - delta
-      - id
-      - kind
-      title: DocumentDeltaData
-    DocumentFinishData:
-      type: object
-      x-hephaestus:
-        dataModel: true
-      properties:
-        id:
-          type: string
-          title: Id
-        kind:
-          type: string
-          const: text
-          title: Kind
-      required:
-      - id
-      - kind
-      title: DocumentFinishData
+        export: true
     DocumentSummary:
       type: object
-      description: |-
-        DTO for document summary in list views.
-         Excludes content for performance - only metadata.
       properties:
         createdAt:
           type: string
@@ -1896,210 +2350,106 @@ components:
           type: string
           format: uuid
         kind:
-          type: string
-          enum:
-          - TEXT
+          $ref: "#/components/schemas/DocumentKind"
         title:
           type: string
         userId:
-          type: string
+          type: integer
       required:
       - createdAt
       - id
       - kind
       - title
       - userId
-    DocumentUpdateData:
-      type: object
       x-hephaestus:
-        dataModel: true
-      properties:
-        id:
-          type: string
-          title: Id
-        kind:
-          type: string
-          const: text
-          title: Kind
-      required:
-      - id
-      - kind
-      title: DocumentUpdateData
-    FileUIPart:
+        export: true
+    ErrorResponse:
       type: object
-      description: A file part of a message.
       properties:
-        filename:
-          anyOf:
-          - type: string
-          - type: "null"
-          title: Filename
-        mediaType:
+        error:
           type: string
-          title: Mediatype
-        providerMetadata:
-          anyOf:
-          - type: object
-          - type: "null"
-          title: Providermetadata
-        type:
-          type: string
-          const: file
-          default: file
-          title: Type
-        url:
-          type: string
-          title: Url
+          description: Human-readable error message
       required:
-      - mediaType
-      - url
-      title: FileUIPart
-    GetWeatherInput:
-      type: object
-      description: Input for getWeather tool.
+      - error
       x-hephaestus:
-        toolModel: true
-      properties:
-        latitude:
-          type: number
-          title: Latitude
-        longitude:
-          type: number
-          title: Longitude
-      required:
-      - latitude
-      - longitude
-      title: GetWeatherInput
-    GetWeatherOutput:
-      type: object
-      description: "Output for getWeather tool, aligned with WeatherTool.tsx expectations."
-      x-hephaestus:
-        toolModel: true
-      properties:
-        current:
-          anyOf:
-          - $ref: "#/components/schemas/WeatherCurrent"
-          - type: "null"
-          default: null
-        current_units:
-          anyOf:
-          - $ref: "#/components/schemas/WeatherCurrentUnits"
-          - type: "null"
-          default: null
-        daily:
-          anyOf:
-          - $ref: "#/components/schemas/WeatherDaily"
-          - type: "null"
-          default: null
-        daily_units:
-          anyOf:
-          - $ref: "#/components/schemas/WeatherDailyUnits"
-          - type: "null"
-          default: null
-        elevation:
-          anyOf:
-          - type: number
-          - type: "null"
-          default: null
-          title: Elevation
-        generationtime_ms:
-          anyOf:
-          - type: number
-          - type: "null"
-          default: null
-          title: Generationtime Ms
-        hourly:
-          anyOf:
-          - $ref: "#/components/schemas/WeatherHourly"
-          - type: "null"
-          default: null
-        hourly_units:
-          anyOf:
-          - $ref: "#/components/schemas/WeatherHourlyUnits"
-          - type: "null"
-          default: null
-        latitude:
-          anyOf:
-          - type: number
-          - type: "null"
-          default: null
-          title: Latitude
-        longitude:
-          anyOf:
-          - type: number
-          - type: "null"
-          default: null
-          title: Longitude
-        timezone:
-          anyOf:
-          - type: string
-          - type: "null"
-          default: null
-          title: Timezone
-        timezone_abbreviation:
-          anyOf:
-          - type: string
-          - type: "null"
-          default: null
-          title: Timezone Abbreviation
-        utc_offset_seconds:
-          anyOf:
-          - type: integer
-          - type: "null"
-          default: null
-          title: Utc Offset Seconds
-      title: GetWeatherOutput
+        export: true
     LabelInfo:
       type: object
+      description: Information about a label from a repository
       properties:
         color:
           type: string
+          description: "Hex color code of the label (without #)"
+          example: d73a4a
         id:
           type: integer
           format: int64
+          description: Unique identifier of the label
         name:
           type: string
+          description: Name of the label
         repository:
           $ref: "#/components/schemas/RepositoryInfo"
+          description: Repository the label belongs to
       required:
       - color
       - id
       - name
     LeaderboardEntry:
       type: object
+      description: A ranked entry in the leaderboard (individual or team)
       properties:
         numberOfApprovals:
           type: integer
           format: int32
+          description: Count of review approvals
+          example: 3
         numberOfChangeRequests:
           type: integer
           format: int32
+          description: Count of change requests submitted
+          example: 1
         numberOfCodeComments:
           type: integer
           format: int32
+          description: Count of inline code review comments
+          example: 7
         numberOfComments:
           type: integer
           format: int32
+          description: Count of review and issue comments
+          example: 10
         numberOfReviewedPRs:
           type: integer
           format: int32
+          description: Count of distinct PRs reviewed
+          example: 5
         numberOfUnknowns:
           type: integer
           format: int32
+          description: Count of reviews with unknown/unrecognized state
+          example: 0
         rank:
           type: integer
           format: int32
+          description: Position in the leaderboard (1-based)
+          example: 1
         reviewedPullRequests:
           type: array
+          description: Sample of reviewed PRs for display
           items:
             $ref: "#/components/schemas/PullRequestInfo"
         score:
           type: integer
           format: int32
+          description: Total XP score for the timeframe
+          example: 150
         team:
           $ref: "#/components/schemas/TeamInfo"
+          description: "Team info (populated in TEAM mode, null in INDIVIDUAL mode)"
         user:
           $ref: "#/components/schemas/UserInfo"
+          description: "User info (populated in INDIVIDUAL mode, null in TEAM mode)"
       required:
       - numberOfApprovals
       - numberOfChangeRequests
@@ -2121,108 +2471,197 @@ components:
       required:
       - leaguePointsChange
       - login
-    PageDocument:
+    Profile:
       type: object
+      description: Complete user profile including contribution history and activity
       properties:
-        content:
+        activityStats:
+          $ref: "#/components/schemas/ProfileActivityStats"
+          description: Aggregated activity stats consistent with leaderboard calculations
+        contributedRepositories:
           type: array
+          description: Repositories the user has contributed to
           items:
-            $ref: "#/components/schemas/Document"
-        empty:
-          type: boolean
-        first:
-          type: boolean
-        last:
-          type: boolean
-        number:
-          type: integer
-          format: int32
-        numberOfElements:
-          type: integer
-          format: int32
-        pageable:
-          $ref: "#/components/schemas/PageableObject"
-        size:
-          type: integer
-          format: int32
-        sort:
-          $ref: "#/components/schemas/SortObject"
-        totalElements:
-          type: integer
-          format: int64
-        totalPages:
-          type: integer
-          format: int32
-    PageDocumentSummary:
-      type: object
-      properties:
-        content:
-          type: array
-          items:
-            $ref: "#/components/schemas/DocumentSummary"
-        empty:
-          type: boolean
-        first:
-          type: boolean
-        last:
-          type: boolean
-        number:
-          type: integer
-          format: int32
-        numberOfElements:
-          type: integer
-          format: int32
-        pageable:
-          $ref: "#/components/schemas/PageableObject"
-        size:
-          type: integer
-          format: int32
-        sort:
-          $ref: "#/components/schemas/SortObject"
-        totalElements:
-          type: integer
-          format: int64
-        totalPages:
-          type: integer
-          format: int32
-    PageableObject:
-      type: object
-      properties:
-        offset:
-          type: integer
-          format: int64
-        pageNumber:
-          type: integer
-          format: int32
-        pageSize:
-          type: integer
-          format: int32
-        paged:
-          type: boolean
-        sort:
-          $ref: "#/components/schemas/SortObject"
-        unpaged:
-          type: boolean
-    PullRequestBadPractice:
-      type: object
-      properties:
-        description:
+            $ref: "#/components/schemas/RepositoryInfo"
+        firstContribution:
           type: string
+          format: date-time
+          description: Timestamp of the user's first contribution
+        openPullRequests:
+          type: array
+          description: Currently open pull requests authored by the user
+          items:
+            $ref: "#/components/schemas/PullRequestInfo"
+        reviewActivity:
+          type: array
+          description: Recent review activity with XP scores
+          items:
+            $ref: "#/components/schemas/ProfileReviewActivity"
+        reviewedPullRequests:
+          type: array
+          description: Distinct pull requests reviewed by this user
+          items:
+            $ref: "#/components/schemas/PullRequestInfo"
+        userInfo:
+          $ref: "#/components/schemas/UserInfo"
+          description: Basic information about the user
+        xpRecord:
+          $ref: "#/components/schemas/ProfileXpRecord"
+          description: XP progress information for the users' profile
+      required:
+      - contributedRepositories
+      - userInfo
+      - xpRecord
+    ProfileActivityStats:
+      type: object
+      description: Aggregated activity statistics with XP scores for a user profile
+      properties:
+        numberOfApprovals:
+          type: integer
+          format: int32
+          description: Number of approvals given
+          example: 15
+        numberOfChangeRequests:
+          type: integer
+          format: int32
+          description: Number of change requests submitted
+          example: 8
+        numberOfCodeComments:
+          type: integer
+          format: int32
+          description: Number of inline code review comments
+          example: 30
+        numberOfComments:
+          type: integer
+          format: int32
+          description: Number of review comments (COMMENTED state)
+          example: 12
+        numberOfIssueComments:
+          type: integer
+          format: int32
+          description: Number of issue comments on pull requests
+          example: 25
+        numberOfReviewedPRs:
+          type: integer
+          format: int32
+          description: Number of distinct pull requests reviewed
+          example: 42
+        numberOfUnknowns:
+          type: integer
+          format: int32
+          description: Number of reviews with unknown state
+          example: 0
+        score:
+          type: integer
+          format: int32
+          description: Total XP score
+          example: 1250
+    ProfileReviewActivity:
+      type: object
+      description: A review activity entry with XP score for profile display
+      properties:
+        author:
+          $ref: "#/components/schemas/UserInfo"
+          description: Author of the review
+        codeComments:
+          type: integer
+          format: int32
+          description: Number of inline code comments in the review
+          example: 3
+        htmlUrl:
+          type: string
+          description: URL to the review on the git provider
         id:
           type: integer
           format: int64
+          description: Unique identifier of the review
+        isDismissed:
+          type: boolean
+          description: Whether the review was dismissed
+        pullRequest:
+          $ref: "#/components/schemas/PullRequestBaseInfo"
+          description: Pull request that was reviewed
+        score:
+          type: integer
+          format: int32
+          description: XP score earned for this review
+          example: 25
         state:
           type: string
+          description: "State of the review (APPROVED, CHANGES_REQUESTED, COMMENTED,\
+            \ etc.)"
+          enum:
+          - COMMENTED
+          - APPROVED
+          - CHANGES_REQUESTED
+          - PENDING
+          - DISMISSED
+          - UNKNOWN
+        submittedAt:
+          type: string
+          format: date-time
+          description: Timestamp when the review was submitted
+      required:
+      - codeComments
+      - htmlUrl
+      - id
+      - isDismissed
+      - state
+    ProfileXpRecord:
+      type: object
+      description: User's XP and Level progress details
+      properties:
+        currentLevel:
+          type: integer
+          format: int32
+          description: Current calculated level
+          example: 5
+        currentLevelXP:
+          type: integer
+          format: int64
+          description: XP accumulated in the current level
+          example: 450
+        totalXP:
+          type: integer
+          format: int64
+          description: Overall total XP accumulated
+          example: 5450
+        xpNeeded:
+          type: integer
+          format: int64
+          description: XP needed to reach the next level
+          example: 1000
+      required:
+      - currentLevel
+      - currentLevelXP
+      - totalXP
+      - xpNeeded
+    PullRequestBadPractice:
+      type: object
+      description: A detected bad practice in a pull request
+      properties:
+        description:
+          type: string
+          description: Detailed explanation and remediation guidance
+        id:
+          type: integer
+          format: int64
+          description: Unique identifier of the bad practice
+        state:
+          type: string
+          description: "Current state of the bad practice (DETECTED, RESOLVED, DISMISSED,\
+            \ etc.)"
           enum:
           - GOOD_PRACTICE
-          - FIXED
-          - CRITICAL_ISSUE
-          - NORMAL_ISSUE
           - MINOR_ISSUE
+          - NORMAL_ISSUE
+          - CRITICAL_ISSUE
+          - FIXED
           - WONT_FIX
           - WRONG
         title:
           type: string
+          description: Short description of the bad practice
       required:
       - description
       - id
@@ -2230,28 +2669,39 @@ components:
       - title
     PullRequestBaseInfo:
       type: object
+      description: Basic information about a pull request
       properties:
         htmlUrl:
           type: string
+          description: URL to the pull request on the git provider
         id:
           type: integer
           format: int64
+          description: Unique identifier of the pull request
         isDraft:
           type: boolean
+          description: Whether the pull request is in draft mode
         isMerged:
           type: boolean
+          description: Whether the pull request has been merged
         number:
           type: integer
           format: int32
+          description: Pull request number within the repository
+          example: 42
         repository:
           $ref: "#/components/schemas/RepositoryInfo"
+          description: Repository the pull request belongs to
         state:
           type: string
+          description: "Current state of the pull request (OPEN, CLOSED, MERGED)"
           enum:
           - OPEN
           - CLOSED
+          - MERGED
         title:
           type: string
+          description: Title of the pull request
       required:
       - htmlUrl
       - id
@@ -2262,59 +2712,83 @@ components:
       - title
     PullRequestInfo:
       type: object
+      description: Detailed information about a pull request
       properties:
         additions:
           type: integer
           format: int32
+          description: Number of lines added
+          example: 150
         assignees:
           type: array
+          description: Users assigned to the pull request
           items:
             $ref: "#/components/schemas/UserInfo"
         author:
           $ref: "#/components/schemas/UserInfo"
+          description: Author of the pull request
         closedAt:
           type: string
           format: date-time
+          description: Timestamp when the pull request was closed
         commentsCount:
           type: integer
           format: int32
+          description: Number of comments on the pull request
+          example: 5
         createdAt:
           type: string
           format: date-time
+          description: Timestamp when the pull request was created
         deletions:
           type: integer
           format: int32
+          description: Number of lines deleted
+          example: 50
         htmlUrl:
           type: string
+          description: URL to the pull request on the git provider
         id:
           type: integer
           format: int64
+          description: Unique identifier of the pull request
         isDraft:
           type: boolean
+          description: Whether the pull request is in draft mode
         isMerged:
           type: boolean
+          description: Whether the pull request has been merged
         labels:
           type: array
+          description: Labels applied to the pull request
           items:
             $ref: "#/components/schemas/LabelInfo"
         mergedAt:
           type: string
           format: date-time
+          description: Timestamp when the pull request was merged
         number:
           type: integer
           format: int32
+          description: Pull request number within the repository
+          example: 42
         repository:
           $ref: "#/components/schemas/RepositoryInfo"
+          description: Repository the pull request belongs to
         state:
           type: string
+          description: "Current state of the pull request (OPEN, CLOSED, MERGED)"
           enum:
           - OPEN
           - CLOSED
+          - MERGED
         title:
           type: string
+          description: Title of the pull request
         updatedAt:
           type: string
           format: date-time
+          description: Timestamp when the pull request was last updated
       required:
       - additions
       - commentsCount
@@ -2326,93 +2800,77 @@ components:
       - number
       - state
       - title
-    PullRequestReviewInfo:
-      type: object
-      properties:
-        author:
-          $ref: "#/components/schemas/UserInfo"
-        codeComments:
-          type: integer
-          format: int32
-        htmlUrl:
-          type: string
-        id:
-          type: integer
-          format: int64
-        isDismissed:
-          type: boolean
-        pullRequest:
-          $ref: "#/components/schemas/PullRequestBaseInfo"
-        score:
-          type: integer
-          format: int32
-        state:
-          type: string
-          enum:
-          - COMMENTED
-          - APPROVED
-          - CHANGES_REQUESTED
-          - UNKNOWN
-        submittedAt:
-          type: string
-          format: date-time
-      required:
-      - codeComments
-      - htmlUrl
-      - id
-      - isDismissed
-      - score
-      - state
     PullRequestWithBadPractices:
       type: object
+      description: Pull request with associated bad practice detection results
       properties:
         additions:
           type: integer
           format: int32
+          description: Number of lines added
+          example: 150
         badPracticeSummary:
           type: string
+          description: AI-generated summary of detected bad practices
         badPractices:
           type: array
+          description: Currently active bad practices
           items:
             $ref: "#/components/schemas/PullRequestBadPractice"
         createdAt:
           type: string
           format: date-time
+          description: Timestamp when the pull request was created
         deletions:
           type: integer
           format: int32
+          description: Number of lines deleted
+          example: 50
         htmlUrl:
           type: string
+          description: URL to the pull request on the git provider
         id:
           type: integer
           format: int64
+          description: Unique identifier of the pull request
         isDraft:
           type: boolean
+          description: Whether the pull request is in draft mode
         isMerged:
           type: boolean
+          description: Whether the pull request has been merged
         labels:
           type: array
+          description: Labels applied to the pull request
           items:
             $ref: "#/components/schemas/LabelInfo"
         number:
           type: integer
           format: int32
+          description: Pull request number within the repository
+          example: 42
         oldBadPractices:
           type: array
+          description: Previously resolved or dismissed bad practices
           items:
             $ref: "#/components/schemas/PullRequestBadPractice"
         repository:
           $ref: "#/components/schemas/RepositoryInfo"
+          description: Repository the pull request belongs to
         state:
           type: string
+          description: "Current state of the pull request (OPEN, CLOSED)"
           enum:
           - OPEN
           - CLOSED
+          - MERGED
         title:
           type: string
+          description: Title of the pull request
         updatedAt:
           type: string
           format: date-time
+          description: Timestamp when the pull request was last updated
       required:
       - additions
       - badPracticeSummary
@@ -2430,709 +2888,117 @@ components:
       - state
       - title
       - updatedAt
-    ReasoningUIPart:
-      type: object
-      description: A reasoning part of a message.
-      properties:
-        providerMetadata:
-          anyOf:
-          - type: object
-          - type: "null"
-          title: Providermetadata
-        state:
-          anyOf:
-          - type: string
-            enum:
-            - streaming
-            - done
-          - type: "null"
-          title: State
-        text:
-          type: string
-          title: Text
-        type:
-          type: string
-          const: reasoning
-          default: reasoning
-          title: Type
-      required:
-      - text
-      title: ReasoningUIPart
     RenameWorkspaceSlugRequest:
       type: object
+      description: Request to rename a workspace's URL slug
       properties:
         newSlug:
           type: string
+          description: New URL-friendly identifier for the workspace
+          example: new-workspace-slug
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       required:
       - newSlug
     RepositoryInfo:
       type: object
+      description: Information about a git repository
       properties:
         description:
           type: string
+          description: Description of the repository
         hiddenFromContributions:
           type: boolean
+          description: Whether contributions from this repository are hidden from
+            leaderboard calculations
         htmlUrl:
           type: string
+          description: URL to the repository on the git provider
         id:
           type: integer
           format: int64
+          description: Unique identifier of the repository
         labels:
           type: array
+          description: Labels defined in the repository
           items:
             $ref: "#/components/schemas/LabelInfo"
         name:
           type: string
+          description: Name of the repository
         nameWithOwner:
           type: string
+          description: "Full name including owner (e.g., 'owner/repo')"
       required:
       - hiddenFromContributions
       - htmlUrl
       - id
       - name
       - nameWithOwner
-    SortObject:
+    StreamPart:
       type: object
+      additionalProperties: {}
       properties:
-        empty:
-          type: boolean
-        sorted:
-          type: boolean
-        unsorted:
-          type: boolean
-    SourceDocumentUIPart:
-      type: object
-      description: A document source part of a message.
-      properties:
-        filename:
-          anyOf:
-          - type: string
-          - type: "null"
-          title: Filename
-        mediaType:
-          type: string
-          title: Mediatype
-        providerMetadata:
-          anyOf:
-          - type: object
-          - type: "null"
-          title: Providermetadata
-        sourceId:
-          type: string
-          title: Sourceid
-        title:
-          type: string
-          title: Title
         type:
           type: string
-          const: source-document
-          default: source-document
-          title: Type
       required:
-      - mediaType
-      - sourceId
-      - title
-      title: SourceDocumentUIPart
-    SourceUrlUIPart:
-      type: object
-      description: A URL source part of a message.
-      properties:
-        providerMetadata:
-          anyOf:
-          - type: object
-          - type: "null"
-          title: Providermetadata
-        sourceId:
-          type: string
-          title: Sourceid
-        title:
-          anyOf:
-          - type: string
-          - type: "null"
-          title: Title
-        type:
-          type: string
-          const: source-url
-          default: source-url
-          title: Type
-        url:
-          type: string
-          title: Url
-      required:
-      - sourceId
-      - url
-      title: SourceUrlUIPart
-    StepStartUIPart:
-      type: object
-      description: A step boundary part of a message.
-      properties:
-        type:
-          type: string
-          const: step-start
-          default: step-start
-          title: Type
-      title: StepStartUIPart
-    StreamDataPart:
-      type: object
-      description: |-
-        Data part with dynamic type.
-
-        AI SDK v5 stream chunks support a `transient` flag that indicates the data
-        should not be added to the persisted message state.
-      properties:
-        data:
-          title: Data
-        id:
-          anyOf:
-          - type: string
-          - type: "null"
-          title: Id
-        transient:
-          anyOf:
-          - type: boolean
-          - type: "null"
-          title: Transient
-        type:
-          type: string
-          pattern: ^data-.*
-          title: Type
-      required:
-      - data
       - type
-      title: StreamDataPart
-    StreamErrorPart:
-      type: object
-      description: Error stream part.
-      properties:
-        errorText:
-          type: string
-          title: Errortext
-        type:
-          type: string
-          const: error
-          default: error
-          title: Type
-      required:
-      - errorText
-      title: StreamErrorPart
-    StreamFilePart:
-      type: object
-      description: File part of a message.
-      properties:
-        mediaType:
-          type: string
-          title: Mediatype
-        providerMetadata:
-          anyOf:
-          - type: object
-          - type: "null"
-          title: Providermetadata
-        type:
-          type: string
-          const: file
-          default: file
-          title: Type
-        url:
-          type: string
-          title: Url
-      required:
-      - mediaType
-      - url
-      title: StreamFilePart
-    StreamFinishPart:
-      type: object
-      description: End of stream event.
-      properties:
-        messageMetadata:
-          anyOf:
-          - type: object
-          - type: "null"
-          title: Messagemetadata
-        type:
-          type: string
-          const: finish
-          default: finish
-          title: Type
-      title: StreamFinishPart
-    StreamMessageMetadataPart:
-      type: object
-      description: Message metadata part.
-      properties:
-        messageMetadata:
-          type: object
-          title: Messagemetadata
-        type:
-          type: string
-          const: message-metadata
-          default: message-metadata
-          title: Type
-      required:
-      - messageMetadata
-      title: StreamMessageMetadataPart
-    StreamReasoningDeltaPart:
-      type: object
-      description: Reasoning stream delta part.
-      properties:
-        delta:
-          type: string
-          title: Delta
-        id:
-          type: string
-          title: Id
-        providerMetadata:
-          anyOf:
-          - type: object
-          - type: "null"
-          title: Providermetadata
-        type:
-          type: string
-          const: reasoning-delta
-          default: reasoning-delta
-          title: Type
-      required:
-      - delta
-      - id
-      title: StreamReasoningDeltaPart
-    StreamReasoningEndPart:
-      type: object
-      description: Reasoning stream end part.
-      properties:
-        id:
-          type: string
-          title: Id
-        providerMetadata:
-          anyOf:
-          - type: object
-          - type: "null"
-          title: Providermetadata
-        type:
-          type: string
-          const: reasoning-end
-          default: reasoning-end
-          title: Type
-      required:
-      - id
-      title: StreamReasoningEndPart
-    StreamReasoningStartPart:
-      type: object
-      description: Reasoning stream start part.
-      properties:
-        id:
-          type: string
-          title: Id
-        providerMetadata:
-          anyOf:
-          - type: object
-          - type: "null"
-          title: Providermetadata
-        type:
-          type: string
-          const: reasoning-start
-          default: reasoning-start
-          title: Type
-      required:
-      - id
-      title: StreamReasoningStartPart
-    StreamSourceDocumentPart:
-      type: object
-      description: Source document part of a message.
-      properties:
-        filename:
-          anyOf:
-          - type: string
-          - type: "null"
-          title: Filename
-        mediaType:
-          type: string
-          title: Mediatype
-        providerMetadata:
-          anyOf:
-          - type: object
-          - type: "null"
-          title: Providermetadata
-        sourceId:
-          type: string
-          title: Sourceid
-        title:
-          type: string
-          title: Title
-        type:
-          type: string
-          const: source-document
-          default: source-document
-          title: Type
-      required:
-      - mediaType
-      - sourceId
-      - title
-      title: StreamSourceDocumentPart
-    StreamSourceUrlPart:
-      type: object
-      description: Source URL part of a message.
-      properties:
-        providerMetadata:
-          anyOf:
-          - type: object
-          - type: "null"
-          title: Providermetadata
-        sourceId:
-          type: string
-          title: Sourceid
-        title:
-          anyOf:
-          - type: string
-          - type: "null"
-          title: Title
-        type:
-          type: string
-          const: source-url
-          default: source-url
-          title: Type
-        url:
-          type: string
-          title: Url
-      required:
-      - sourceId
-      - url
-      title: StreamSourceUrlPart
-    StreamStartPart:
-      type: object
-      description: Start of stream event.
-      properties:
-        messageId:
-          anyOf:
-          - type: string
-          - type: "null"
-          title: Messageid
-        messageMetadata:
-          anyOf:
-          - type: object
-          - type: "null"
-          title: Messagemetadata
-        type:
-          type: string
-          const: start
-          default: start
-          title: Type
-      title: StreamStartPart
-    StreamStepFinishPart:
-      type: object
-      description: Step finish event.
-      properties:
-        type:
-          type: string
-          const: finish-step
-          default: finish-step
-          title: Type
-      title: StreamStepFinishPart
-    StreamStepStartPart:
-      type: object
-      description: Step start event.
-      properties:
-        type:
-          type: string
-          const: start-step
-          default: start-step
-          title: Type
-      title: StreamStepStartPart
-    StreamTextDeltaPart:
-      type: object
-      description: Text stream delta part.
-      properties:
-        delta:
-          type: string
-          title: Delta
-        id:
-          type: string
-          title: Id
-        providerMetadata:
-          anyOf:
-          - type: object
-          - type: "null"
-          title: Providermetadata
-        type:
-          type: string
-          const: text-delta
-          default: text-delta
-          title: Type
-      required:
-      - delta
-      - id
-      title: StreamTextDeltaPart
-    StreamTextEndPart:
-      type: object
-      description: Text stream end part.
-      properties:
-        id:
-          type: string
-          title: Id
-        providerMetadata:
-          anyOf:
-          - type: object
-          - type: "null"
-          title: Providermetadata
-        type:
-          type: string
-          const: text-end
-          default: text-end
-          title: Type
-      required:
-      - id
-      title: StreamTextEndPart
-    StreamTextStartPart:
-      type: object
-      description: Text stream start part.
-      properties:
-        id:
-          type: string
-          title: Id
-        providerMetadata:
-          anyOf:
-          - type: object
-          - type: "null"
-          title: Providermetadata
-        type:
-          type: string
-          const: text-start
-          default: text-start
-          title: Type
-      required:
-      - id
-      title: StreamTextStartPart
-    StreamToolInputAvailablePart:
-      type: object
-      description: |-
-        Tool input available event.
-
-        AI SDK v5 uses `providerMetadata` on the stream chunk; the UI part maps this
-        to `callProviderMetadata` when persisting tool invocation parts.
-      properties:
-        dynamic:
-          anyOf:
-          - type: boolean
-          - type: "null"
-          title: Dynamic
-        input:
-          type: object
-          title: Input
-        providerExecuted:
-          anyOf:
-          - type: boolean
-          - type: "null"
-          title: Providerexecuted
-        providerMetadata:
-          anyOf:
-          - type: object
-          - type: "null"
-          title: Providermetadata
-        toolCallId:
-          type: string
-          title: Toolcallid
-        toolName:
-          type: string
-          title: Toolname
-        type:
-          type: string
-          const: tool-input-available
-          default: tool-input-available
-          title: Type
-      required:
-      - input
-      - toolCallId
-      - toolName
-      title: StreamToolInputAvailablePart
-    StreamToolInputDeltaPart:
-      type: object
-      description: Tool input delta event.
-      properties:
-        inputTextDelta:
-          type: string
-          title: Inputtextdelta
-        toolCallId:
-          type: string
-          title: Toolcallid
-        type:
-          type: string
-          const: tool-input-delta
-          default: tool-input-delta
-          title: Type
-      required:
-      - inputTextDelta
-      - toolCallId
-      title: StreamToolInputDeltaPart
-    StreamToolInputErrorPart:
-      type: object
-      description: |-
-        Tool input error event (signals an error occurred while preparing input).
-
-        Mirrors AI SDK 'tool-input-error' chunk. For non-dynamic tools, the server should
-        record an 'output-error' tool UI part where rawInput may be used for diagnostics.
-      properties:
-        dynamic:
-          anyOf:
-          - type: boolean
-          - type: "null"
-          title: Dynamic
-        errorText:
-          type: string
-          title: Errortext
-        input:
-          title: Input
-        providerExecuted:
-          anyOf:
-          - type: boolean
-          - type: "null"
-          title: Providerexecuted
-        providerMetadata:
-          anyOf:
-          - type: object
-          - type: "null"
-          title: Providermetadata
-        toolCallId:
-          type: string
-          title: Toolcallid
-        toolName:
-          type: string
-          title: Toolname
-        type:
-          type: string
-          const: tool-input-error
-          default: tool-input-error
-          title: Type
-      required:
-      - errorText
-      - input
-      - toolCallId
-      - toolName
-      title: StreamToolInputErrorPart
-    StreamToolInputStartPart:
-      type: object
-      description: Tool input start event.
-      properties:
-        dynamic:
-          anyOf:
-          - type: boolean
-          - type: "null"
-          title: Dynamic
-        providerExecuted:
-          anyOf:
-          - type: boolean
-          - type: "null"
-          title: Providerexecuted
-        toolCallId:
-          type: string
-          title: Toolcallid
-        toolName:
-          type: string
-          title: Toolname
-        type:
-          type: string
-          const: tool-input-start
-          default: tool-input-start
-          title: Type
-      required:
-      - toolCallId
-      - toolName
-      title: StreamToolInputStartPart
-    StreamToolOutputAvailablePart:
-      type: object
-      description: Tool output available event.
-      properties:
-        dynamic:
-          anyOf:
-          - type: boolean
-          - type: "null"
-          title: Dynamic
-        output:
-          type: object
-          title: Output
-        providerExecuted:
-          anyOf:
-          - type: boolean
-          - type: "null"
-          title: Providerexecuted
-        toolCallId:
-          type: string
-          title: Toolcallid
-        type:
-          type: string
-          const: tool-output-available
-          default: tool-output-available
-          title: Type
-      required:
-      - output
-      - toolCallId
-      title: StreamToolOutputAvailablePart
-    StreamToolOutputErrorPart:
-      type: object
-      description: Tool output error event.
-      properties:
-        dynamic:
-          anyOf:
-          - type: boolean
-          - type: "null"
-          title: Dynamic
-        errorText:
-          type: string
-          title: Errortext
-        providerExecuted:
-          anyOf:
-          - type: boolean
-          - type: "null"
-          title: Providerexecuted
-        toolCallId:
-          type: string
-          title: Toolcallid
-        type:
-          type: string
-          const: tool-output-error
-          default: tool-output-error
-          title: Type
-      required:
-      - errorText
-      - toolCallId
-      title: StreamToolOutputErrorPart
+      x-hephaestus:
+        export: true
     TeamInfo:
       type: object
+      description: "Detailed information about a team including members, repositories,\
+        \ and labels"
       properties:
         description:
           type: string
+          description: Description of the team
         hidden:
           type: boolean
+          description: Whether the team is hidden from leaderboard display
         htmlUrl:
           type: string
+          description: URL to the team's page on the git provider
         id:
           type: integer
           format: int64
+          description: Unique identifier of the team
         labels:
           type: array
+          description: Labels configured as filters for this team
           items:
             $ref: "#/components/schemas/LabelInfo"
         members:
           type: array
+          description: Members of the team (excluding bots)
           items:
             $ref: "#/components/schemas/UserInfo"
         membershipCount:
           type: integer
           format: int32
+          description: Total count of team memberships
         name:
           type: string
+          description: Name of the team
         organization:
           type: string
+          description: Organization the team belongs to
         parentId:
           type: integer
           format: int64
+          description: "ID of the parent team, if this is a sub-team"
         privacy:
           type: string
+          description: Privacy level of the team (SECRET or VISIBLE)
           enum:
           - SECRET
-          - CLOSED
+          - VISIBLE
         repoPermissionCount:
           type: integer
           format: int32
+          description: Count of repository permissions
         repositories:
           type: array
+          description: Repositories the team has access to
           items:
             $ref: "#/components/schemas/RepositoryInfo"
       required:
@@ -3146,364 +3012,180 @@ components:
       - repositories
     TeamSummary:
       type: object
-      description: |-
-        A lightweight DTO for team data that only contains basic information.
-         This is used in contexts where full team details (repositories, labels, members) are not needed,
-         avoiding expensive JOINs and lazy loading issues.
+      description: Lightweight summary of a team without member/repository details
       properties:
         description:
           type: string
+          description: Description of the team
         hidden:
           type: boolean
+          description: Whether the team is hidden from leaderboard display
         htmlUrl:
           type: string
+          description: URL to the team's page on the git provider
         id:
           type: integer
           format: int64
+          description: Unique identifier of the team
         name:
           type: string
+          description: Name of the team
         organization:
           type: string
+          description: Organization the team belongs to
         parentId:
           type: integer
           format: int64
+          description: "ID of the parent team, if this is a sub-team"
         privacy:
           type: string
+          description: Privacy level of the team (SECRET or VISIBLE)
           enum:
           - SECRET
-          - CLOSED
+          - VISIBLE
       required:
       - hidden
       - id
       - name
-    TextUIPart:
+    ThreadDetail:
       type: object
-      description: A text part of a message.
-      properties:
-        providerMetadata:
-          anyOf:
-          - type: object
-          - type: "null"
-          title: Providermetadata
-        state:
-          anyOf:
-          - type: string
-            enum:
-            - streaming
-            - done
-          - type: "null"
-          title: State
-        text:
-          type: string
-          title: Text
-        type:
-          type: string
-          const: text
-          default: text
-          title: Type
-      required:
-      - text
-      title: TextUIPart
-    ToolInputAvailablePart:
-      type: object
-      description: Tool part with input available.
-      properties:
-        callProviderMetadata:
-          anyOf:
-          - type: object
-          - type: "null"
-          title: Callprovidermetadata
-        input:
-          type: object
-          title: Input
-        providerExecuted:
-          anyOf:
-          - type: boolean
-          - type: "null"
-          title: Providerexecuted
-        state:
-          type: string
-          const: input-available
-          title: State
-        toolCallId:
-          type: string
-          title: Toolcallid
-        type:
-          type: string
-          pattern: ^tool-.*
-          title: Type
-      required:
-      - input
-      - state
-      - toolCallId
-      - type
-      title: ToolInputAvailablePart
-    ToolInputStreamingPart:
-      type: object
-      description: Tool part with input being streamed.
-      properties:
-        input:
-          anyOf:
-          - type: object
-          - type: "null"
-          title: Input
-        providerExecuted:
-          anyOf:
-          - type: boolean
-          - type: "null"
-          title: Providerexecuted
-        state:
-          type: string
-          const: input-streaming
-          title: State
-        toolCallId:
-          type: string
-          title: Toolcallid
-        type:
-          type: string
-          pattern: ^tool-.*
-          title: Type
-      required:
-      - state
-      - toolCallId
-      - type
-      title: ToolInputStreamingPart
-    ToolOutputAvailablePart:
-      type: object
-      description: Tool part with output available.
-      properties:
-        callProviderMetadata:
-          anyOf:
-          - type: object
-          - type: "null"
-          title: Callprovidermetadata
-        input:
-          type: object
-          title: Input
-        output:
-          type: object
-          title: Output
-        providerExecuted:
-          anyOf:
-          - type: boolean
-          - type: "null"
-          title: Providerexecuted
-        state:
-          type: string
-          const: output-available
-          title: State
-        toolCallId:
-          type: string
-          title: Toolcallid
-        type:
-          type: string
-          pattern: ^tool-.*
-          title: Type
-      required:
-      - input
-      - output
-      - state
-      - toolCallId
-      - type
-      title: ToolOutputAvailablePart
-    ToolOutputErrorPart:
-      type: object
-      description: Tool part with output error.
-      properties:
-        callProviderMetadata:
-          anyOf:
-          - type: object
-          - type: "null"
-          title: Callprovidermetadata
-        errorText:
-          type: string
-          title: Errortext
-        input:
-          type: object
-          title: Input
-        providerExecuted:
-          anyOf:
-          - type: boolean
-          - type: "null"
-          title: Providerexecuted
-        state:
-          type: string
-          const: output-error
-          title: State
-        toolCallId:
-          type: string
-          title: Toolcallid
-        type:
-          type: string
-          pattern: ^tool-.*
-          title: Type
-      required:
-      - errorText
-      - input
-      - state
-      - toolCallId
-      - type
-      title: ToolOutputErrorPart
-    UIMessage:
-      type: object
-      description: Message model that matches the TypeScript interface.
       properties:
         id:
           type: string
-          description: A unique identifier for the message
-          title: Id
-        metadata:
-          anyOf:
-          - type: object
-          - type: "null"
-          title: Metadata
-        parts:
+          format: uuid
+        messages:
           type: array
           items:
-            anyOf:
-            - $ref: "#/components/schemas/TextUIPart"
-            - $ref: "#/components/schemas/ReasoningUIPart"
-            - $ref: "#/components/schemas/ToolInputStreamingPart"
-            - $ref: "#/components/schemas/ToolInputAvailablePart"
-            - $ref: "#/components/schemas/ToolOutputAvailablePart"
-            - $ref: "#/components/schemas/ToolOutputErrorPart"
-            - $ref: "#/components/schemas/SourceUrlUIPart"
-            - $ref: "#/components/schemas/SourceDocumentUIPart"
-            - $ref: "#/components/schemas/FileUIPart"
-            - $ref: "#/components/schemas/DataUIPart"
-            - $ref: "#/components/schemas/StepStartUIPart"
-          title: Parts
-        role:
-          type: string
-          enum:
-          - system
-          - user
-          - assistant
-          title: Role
-      required:
-      - id
-      - parts
-      - role
-      title: UIMessage
-    UpdateDocumentInput:
-      type: object
-      description: Input for updateDocument tool.
-      x-hephaestus:
-        toolModel: true
-      properties:
-        description:
-          type: string
-          description: The description of changes that need to be made
-          title: Description
-        id:
-          type: string
-          description: The ID of the document to update
-          title: Id
-      required:
-      - description
-      - id
-      title: UpdateDocumentInput
-    UpdateDocumentOutput:
-      type: object
-      description: Output for updateDocument tool.
-      x-hephaestus:
-        toolModel: true
-      properties:
-        content:
-          type: string
-          title: Content
-        id:
-          type: string
-          title: Id
-        kind:
-          type: string
-          const: TEXT
-          title: Kind
+            type: object
+            properties:
+              createdAt:
+                type: string
+                format: date-time
+              id:
+                type: string
+                format: uuid
+              parentMessageId:
+                type:
+                - string
+                - "null"
+                format: uuid
+              parts:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: {}
+                  properties:
+                    type:
+                      type: string
+                  required:
+                  - type
+              role:
+                type: string
+                enum:
+                - system
+                - user
+                - assistant
+            required:
+            - id
+            - parts
+            - role
+        selectedLeafMessageId:
+          type:
+          - string
+          - "null"
+          format: uuid
         title:
-          type: string
-          title: Title
+          type:
+          - string
+          - "null"
       required:
-      - content
       - id
-      - kind
-      - title
-      title: UpdateDocumentOutput
-    UpdateDocumentRequest:
+      - messages
+      x-hephaestus:
+        export: true
+    UpdateRepositorySettingsRequest:
       type: object
-      description: |-
-        DTO for updating an existing document.
-         Creates a new version with the updated content.
+      description: Request to update repository contribution visibility settings in
+        a workspace
       properties:
-        content:
-          type: string
-        kind:
-          type: string
-          enum:
-          - TEXT
-        title:
-          type: string
-          maxLength: 255
-          minLength: 0
+        hiddenFromContributions:
+          type: boolean
+          description: Whether contributions from this repository should be hidden
+            from leaderboard calculations
       required:
-      - content
-      - kind
-      - title
+      - hiddenFromContributions
+    UpdateTeamSettingsRequest:
+      type: object
+      description: Request to update team visibility settings in a workspace
+      properties:
+        hidden:
+          type: boolean
+          description: Whether the team should be hidden from the leaderboard
+      required:
+      - hidden
     UpdateWorkspaceNotificationsRequest:
       type: object
-      description: DTO for updating workspace leaderboard notification preferences.
+      description: Request to update leaderboard notification settings
       properties:
         channelId:
           type: string
+          description: Slack channel ID for notifications
+          example: C01234567AB
           pattern: "^[CGD][A-Z0-9]{8,}$"
         enabled:
           type: boolean
+          description: Whether leaderboard notifications are enabled
         team:
           type: string
+          description: Team name for filtering leaderboard notifications
     UpdateWorkspacePublicVisibilityRequest:
       type: object
-      description: DTO for updating workspace public visibility.
+      description: Request to update workspace public visibility setting
       properties:
         isPubliclyViewable:
           type: boolean
+          description: Whether the workspace should be publicly viewable without authentication
       required:
       - isPubliclyViewable
     UpdateWorkspaceScheduleRequest:
       type: object
-      description: |-
-        DTO for updating workspace leaderboard schedule configuration.
-         Day: 1=Monday, 2=Tuesday, ..., 7=Sunday
-         Time: Format "HH:mm" (24-hour format)
+      description: Request to update the leaderboard notification schedule
       properties:
         day:
           type: integer
           format: int32
+          description: "Day of week (1=Monday, 7=Sunday)"
+          example: 1
           maximum: 7
           minimum: 1
         time:
           type: string
+          description: Time in 24-hour format (HH:mm)
+          example: 09:00
           pattern: "^([01]\\d|2[0-3]):[0-5]\\d$"
       required:
       - day
       - time
     UpdateWorkspaceSlackCredentialsRequest:
       type: object
-      description: |-
-        Request DTO for updating Slack credentials (token and signing secret) for a workspace.
-         These credentials are used for Slack API integration and webhook signature verification.
+      description: Request to update Slack integration credentials
       properties:
         slackSigningSecret:
           type: string
+          description: Slack Signing Secret for webhook verification
         slackToken:
           type: string
+          description: Slack Bot User OAuth Token for API access
       required:
       - slackSigningSecret
       - slackToken
     UpdateWorkspaceStatusRequest:
       type: object
-      description: DTO for updating a workspace lifecycle status.
+      description: Request to update the workspace lifecycle status
       properties:
         status:
           type: string
+          description: "New lifecycle status (PENDING, ACTIVE, ARCHIVED)"
           enum:
           - ACTIVE
           - SUSPENDED
@@ -3512,68 +3194,67 @@ components:
       - status
     UpdateWorkspaceTokenRequest:
       type: object
-      description: DTO for updating workspace Personal Access Token (PAT).
+      description: Request to update the workspace's GitHub Personal Access Token
       properties:
         personalAccessToken:
           type: string
+          description: GitHub Personal Access Token for API access
       required:
       - personalAccessToken
     UserInfo:
       type: object
+      description: Information about a user from the git provider
       properties:
         avatarUrl:
           type: string
+          description: URL to the user's avatar image
         email:
           type: string
+          description: "Email address of the user, if public"
         htmlUrl:
           type: string
+          description: URL to the user's profile on the git provider
         id:
           type: integer
           format: int64
+          description: Unique identifier of the user
         leaguePoints:
           type: integer
           format: int32
+          description: League points earned by the user in the current scope
+          example: 150
         login:
           type: string
+          description: Login/username of the user
         name:
           type: string
+          description: Display name of the user
       required:
       - avatarUrl
       - htmlUrl
       - id
       - login
       - name
-    UserProfile:
+    UserPractices:
       type: object
+      description: Response for user bad practices listing
       properties:
-        contributedRepositories:
-          type: array
-          items:
-            $ref: "#/components/schemas/RepositoryInfo"
-        firstContribution:
+        login:
           type: string
-          format: date-time
-        openPullRequests:
+        pullRequests:
           type: array
           items:
-            $ref: "#/components/schemas/PullRequestInfo"
-        reviewActivity:
-          type: array
-          items:
-            $ref: "#/components/schemas/PullRequestReviewInfo"
-        userInfo:
-          $ref: "#/components/schemas/UserInfo"
-      required:
-      - contributedRepositories
-      - firstContribution
-      - userInfo
+            $ref: "#/components/schemas/PullRequestWithBadPractices"
     UserSettings:
       type: object
+      description: User preferences and settings
       properties:
         participateInResearch:
           type: boolean
+          description: Whether the user consents to participate in research studies
         receiveNotifications:
           type: boolean
+          description: Whether the user wants to receive notifications
       required:
       - participateInResearch
       - receiveNotifications
@@ -3604,166 +3285,81 @@ components:
       - url
     VoteMessageRequest:
       type: object
-      description: Request DTO for voting on a message.
       properties:
         isUpvoted:
           type: boolean
       required:
       - isUpvoted
-    WeatherCurrent:
-      type: object
-      properties:
-        interval:
-          anyOf:
-          - type: integer
-          - type: "null"
-          title: Interval
-        temperature_2m:
-          anyOf:
-          - type: number
-          - type: "null"
-          title: Temperature 2M
-        time:
-          anyOf:
-          - type: string
-          - type: "null"
-          title: Time
-      title: WeatherCurrent
-    WeatherCurrentUnits:
-      type: object
-      properties:
-        interval:
-          anyOf:
-          - type: string
-          - type: "null"
-          title: Interval
-        temperature_2m:
-          anyOf:
-          - type: string
-          - type: "null"
-          title: Temperature 2M
-        time:
-          anyOf:
-          - type: string
-          - type: "null"
-          title: Time
-      title: WeatherCurrentUnits
-    WeatherDaily:
-      type: object
-      properties:
-        sunrise:
-          type: array
-          default: []
-          items:
-            type: string
-          title: Sunrise
-        sunset:
-          type: array
-          default: []
-          items:
-            type: string
-          title: Sunset
-        time:
-          type: array
-          default: []
-          items:
-            type: string
-          title: Time
-      title: WeatherDaily
-    WeatherDailyUnits:
-      type: object
-      properties:
-        sunrise:
-          anyOf:
-          - type: string
-          - type: "null"
-          title: Sunrise
-        sunset:
-          anyOf:
-          - type: string
-          - type: "null"
-          title: Sunset
-        time:
-          anyOf:
-          - type: string
-          - type: "null"
-          title: Time
-      title: WeatherDailyUnits
-    WeatherHourly:
-      type: object
-      properties:
-        temperature_2m:
-          type: array
-          default: []
-          items:
-            type: number
-          title: Temperature 2M
-        time:
-          type: array
-          default: []
-          items:
-            type: string
-          title: Time
-      title: WeatherHourly
-    WeatherHourlyUnits:
-      type: object
-      properties:
-        temperature_2m:
-          anyOf:
-          - type: string
-          - type: "null"
-          title: Temperature 2M
-        time:
-          anyOf:
-          - type: string
-          - type: "null"
-          title: Time
-      title: WeatherHourlyUnits
+      x-hephaestus:
+        export: true
     Workspace:
       type: object
+      description: Complete workspace information including configuration and settings
       properties:
         accountLogin:
           type: string
+          description: GitHub account login associated with this workspace
         createdAt:
           type: string
           format: date-time
+          description: Timestamp when the workspace was created
         displayName:
           type: string
+          description: Human-readable name of the workspace
         gitProviderMode:
           type: string
+          description: Git provider mode (INSTALLATION or PAT)
         hasSlackSigningSecret:
           type: boolean
+          description: Whether Slack signing secret is configured
         hasSlackToken:
           type: boolean
+          description: Whether Slack token is configured
         id:
           type: integer
           format: int64
+          description: Unique identifier of the workspace
         installationId:
           type: integer
           format: int64
+          description: "GitHub App installation ID, if linked"
         installationLinkedAt:
           type: string
           format: date-time
+          description: Timestamp when the GitHub App installation was linked
         isPubliclyViewable:
           type: boolean
+          description: Whether the workspace is publicly viewable without authentication
         leaderboardNotificationChannelId:
           type: string
+          description: Slack channel ID for leaderboard notifications
         leaderboardNotificationEnabled:
           type: boolean
+          description: Whether leaderboard notifications are enabled
         leaderboardNotificationTeam:
           type: string
+          description: Team name for leaderboard notifications
         leaderboardScheduleDay:
           type: integer
           format: int32
+          description: "Day of week for leaderboard notifications (1=Monday, 7=Sunday)"
+          example: 1
         leaderboardScheduleTime:
           type: string
+          description: Time for leaderboard notifications in HH:mm format
+          example: 09:00
         status:
           type: string
+          description: "Current lifecycle status of the workspace (PENDING, ACTIVE,\
+            \ ARCHIVED)"
         updatedAt:
           type: string
           format: date-time
+          description: Timestamp when the workspace was last updated
         workspaceSlug:
           type: string
+          description: URL-friendly identifier for the workspace
+          example: my-workspace
       required:
       - accountLogin
       - createdAt
@@ -3777,21 +3373,30 @@ components:
       - workspaceSlug
     WorkspaceListItem:
       type: object
+      description: Summary information about a workspace for list views
       properties:
         accountLogin:
           type: string
+          description: GitHub account login associated with this workspace
         createdAt:
           type: string
           format: date-time
+          description: Timestamp when the workspace was created
         displayName:
           type: string
+          description: Human-readable name of the workspace
         id:
           type: integer
           format: int64
+          description: Unique identifier of the workspace
         status:
           type: string
+          description: "Current lifecycle status of the workspace (PENDING, ACTIVE,\
+            \ ARCHIVED)"
         workspaceSlug:
           type: string
+          description: URL-friendly identifier for the workspace
+          example: my-workspace
       required:
       - accountLogin
       - createdAt
@@ -3801,16 +3406,20 @@ components:
       - workspaceSlug
     WorkspaceMembership:
       type: object
-      description: DTO representing a workspace membership with user information.
+      description: A user's membership in a workspace
       properties:
         createdAt:
           type: string
           format: date-time
+          description: Timestamp when the membership was created
         leaguePoints:
           type: integer
           format: int32
+          description: League points earned by the user in this workspace
+          example: 150
         role:
           type: string
+          description: "Role of the user in this workspace (OWNER, ADMIN, MEMBER)"
           enum:
           - OWNER
           - ADMIN
@@ -3818,7 +3427,62 @@ components:
         userId:
           type: integer
           format: int64
+          description: Unique identifier of the user
         userLogin:
           type: string
+          description: Login/username of the user
         userName:
           type: string
+          description: Display name of the user
+    WorkspaceTeamRepositorySettings:
+      type: object
+      description: Repository contribution visibility settings for a specific team
+        within a workspace
+      properties:
+        hiddenFromContributions:
+          type: boolean
+          description: Whether contributions from this repository are hidden from
+            leaderboard calculations
+        repositoryId:
+          type: integer
+          format: int64
+          description: The repository ID these settings apply to
+        teamId:
+          type: integer
+          format: int64
+          description: The team ID these settings apply to
+        workspaceId:
+          type: integer
+          format: int64
+          description: The workspace ID these settings belong to
+      required:
+      - hiddenFromContributions
+      - repositoryId
+      - teamId
+      - workspaceId
+    WorkspaceTeamSettings:
+      type: object
+      description: Team visibility settings for a specific workspace
+      properties:
+        hidden:
+          type: boolean
+          description: Whether the team is hidden in the leaderboard for this workspace
+        teamId:
+          type: integer
+          format: int64
+          description: The team ID these settings apply to
+        workspaceId:
+          type: integer
+          format: int64
+          description: The workspace ID these settings belong to
+      required:
+      - hidden
+      - teamId
+      - workspaceId
+  securitySchemes:
+    bearerAuth:
+      bearerFormat: JWT
+      description: JWT authentication via Keycloak. Obtain a token from your Keycloak
+        instance.
+      scheme: bearer
+      type: http

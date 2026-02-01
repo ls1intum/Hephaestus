@@ -1,17 +1,9 @@
-import {
-	CheckIcon,
-	CopyIcon,
-	GitPullRequestIcon,
-} from "@primer/octicons-react";
+import { CheckIcon, CopyIcon, GitPullRequestIcon } from "@primer/octicons-react";
 import { useEffect, useState } from "react";
 import type { PullRequestBaseInfo, PullRequestInfo } from "@/api/types.gen";
 import { Button } from "@/components/ui/button";
 import { CardTitle } from "@/components/ui/card";
-import {
-	Popover,
-	PopoverContent,
-	PopoverTrigger,
-} from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 
@@ -22,10 +14,7 @@ export interface ReviewsPopoverProps {
 	highlight?: boolean;
 }
 
-export function ReviewsPopover({
-	reviewedPRs,
-	highlight = false,
-}: ReviewsPopoverProps) {
+export function ReviewsPopover({ reviewedPRs, highlight = false }: ReviewsPopoverProps) {
 	const [isOpen, setIsOpen] = useState(false);
 	const [showCopySuccess, setShowCopySuccess] = useState(false);
 	const hasReviews = reviewedPRs?.length > 0;
@@ -36,9 +25,7 @@ export function ReviewsPopover({
 				if (a.repository?.name === b.repository?.name) {
 					return a.number - b.number;
 				}
-				return (a.repository?.name ?? "").localeCompare(
-					b.repository?.name ?? "",
-				);
+				return (a.repository?.name ?? "").localeCompare(b.repository?.name ?? "");
 			})
 		: [];
 

@@ -1,9 +1,10 @@
 {
-	"$schema": "https://biomejs.dev/schemas/2.1.4/schema.json",
+	"$schema": "https://biomejs.dev/schemas/2.3.12/schema.json",
 	"vcs": {
-		"enabled": false,
+		"enabled": true,
 		"clientKind": "git",
-		"useIgnoreFile": false
+		"useIgnoreFile": true,
+		"defaultBranch": "main"
 	},
 	"files": {
 		"ignoreUnknown": false,
@@ -13,33 +14,93 @@
 			"**/index.html",
 			"**/vite.config.js",
 			"!**/src/routeTree.gen.ts",
-			"!**/src/api/**/*.ts"
+			"!**/src/api/**/*.ts",
+			"!**/*.css"
 		]
 	},
 	"formatter": {
 		"enabled": true,
-		"indentStyle": "tab"
+		"indentStyle": "tab",
+		"lineWidth": 100,
+		"lineEnding": "lf"
 	},
-	"assist": { "actions": { "source": { "organizeImports": "on" } } },
+	"assist": {
+		"actions": {
+			"source": {
+				"organizeImports": "on"
+			}
+		}
+	},
 	"linter": {
 		"enabled": true,
 		"rules": {
 			"recommended": true,
+			"correctness": {
+				"noUnusedImports": "error",
+				"noUnusedVariables": "error"
+			},
+			"style": {
+				"noUselessElse": "error",
+				"useCollapsedElseIf": "off",
+				"useConst": "error",
+				"useExplicitLengthCheck": "off",
+				"useForOf": "error",
+				"useShorthandAssign": "error",
+				"useTemplate": "error"
+			},
 			"suspicious": {
 				"noArrayIndexKey": "off",
-				"noDocumentCookie": "off"
+				"noDocumentCookie": "off",
+				"noDoubleEquals": "error",
+				"useIterableCallbackReturn": "off"
 			},
 			"a11y": {
 				"useSemanticElements": "off",
 				"useAriaPropsForRole": "off",
 				"useFocusableInteractive": "off",
 				"useKeyWithClickEvents": "off"
+			},
+			"complexity": {
+				"noImportantStyles": "off"
 			}
 		}
 	},
 	"javascript": {
 		"formatter": {
-			"quoteStyle": "double"
+			"quoteStyle": "double",
+			"trailingCommas": "all",
+			"semicolons": "always"
+		}
+	},
+	"overrides": [
+		{
+			"includes": ["src/components/ui/**"],
+			"linter": {
+				"rules": {
+					"style": {
+						"noUselessElse": "off",
+						"useForOf": "off",
+						"useShorthandAssign": "off",
+						"useTemplate": "off"
+					},
+					"correctness": {
+						"noUnusedImports": "off",
+						"noUnusedVariables": "off"
+					}
+				}
+			}
+		}
+	],
+	"css": {
+		"parser": {
+			"cssModules": true,
+			"tailwindDirectives": true
+		},
+		"linter": {
+			"enabled": false
+		},
+		"formatter": {
+			"enabled": false
 		}
 	}
 }

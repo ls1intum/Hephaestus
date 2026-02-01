@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { fn } from "@storybook/test";
+import { fn } from "storybook/test";
 import { PullRequestBadPracticeCard } from "./PullRequestBadPracticeCard";
 
 /**
@@ -90,8 +90,7 @@ const meta = {
 			control: "boolean",
 		},
 		oldBadPractices: {
-			description:
-				"List of previously identified practices that have been resolved",
+			description: "List of previously identified practices that have been resolved",
 			control: "object",
 		},
 		openCard: {
@@ -201,8 +200,7 @@ export const WithGoodPractices: Story = {
 			{
 				id: 1,
 				title: "Good code structure",
-				description:
-					"The code follows a clean structure with proper separation of concerns.",
+				description: "The code follows a clean structure with proper separation of concerns.",
 				state: "GOOD_PRACTICE",
 			},
 			{
@@ -238,8 +236,7 @@ export const WithUserControls: Story = {
 				state: "CRITICAL_ISSUE",
 			},
 		],
-		badPracticeSummary:
-			"We found 1 bad practice in this pull request. Please fix it.",
+		badPracticeSummary: "We found 1 bad practice in this pull request. Please fix it.",
 		currUserIsDashboardUser: true,
 		openCard: true,
 	},
@@ -260,8 +257,7 @@ export const WithMixedPractices: Story = {
 			{
 				id: 1,
 				title: "Good code structure",
-				description:
-					"The code follows a clean structure with proper separation of concerns.",
+				description: "The code follows a clean structure with proper separation of concerns.",
 				state: "GOOD_PRACTICE",
 			},
 			{
@@ -279,8 +275,7 @@ export const WithMixedPractices: Story = {
 				state: "NORMAL_ISSUE",
 			},
 		],
-		badPracticeSummary:
-			"We found 1 good practice and 2 issues in this pull request.",
+		badPracticeSummary: "We found 1 good practice and 2 issues in this pull request.",
 		openCard: true,
 	},
 };
@@ -364,8 +359,7 @@ export const MergedPullRequest: Story = {
 			{
 				id: 2,
 				title: "Well-structured test scenarios",
-				description:
-					"Tests are properly organized with clear arrange-act-assert pattern.",
+				description: "Tests are properly organized with clear arrange-act-assert pattern.",
 				state: "GOOD_PRACTICE",
 			},
 		],
@@ -377,8 +371,7 @@ export const MergedPullRequest: Story = {
 				state: "FIXED",
 			},
 		],
-		badPracticeSummary:
-			"Great work! All issues resolved with 2 good practices identified.",
+		badPracticeSummary: "Great work! All issues resolved with 2 good practices identified.",
 	},
 };
 
@@ -404,7 +397,6 @@ export const DraftPullRequest: Story = {
 			{ id: 2, name: "api", color: "1d76db" },
 		],
 		badPractices: [],
-		badPracticeSummary:
-			"No analysis has been run on this draft pull request yet.",
+		badPracticeSummary: "No analysis has been run on this draft pull request yet.",
 	},
 };

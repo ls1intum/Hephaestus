@@ -2,14 +2,16 @@ package de.tum.in.www1.hephaestus.gitprovider.label;
 
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryInfoDTO;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import org.springframework.lang.NonNull;
 
+@Schema(description = "Information about a label from a repository")
 public record LabelInfoDTO(
-    @NonNull Long id,
-    @NonNull String name,
-    @NonNull String color,
-    RepositoryInfoDTO repository
+    @NonNull @Schema(description = "Unique identifier of the label") Long id,
+    @NonNull @Schema(description = "Name of the label") String name,
+    @NonNull @Schema(description = "Hex color code of the label (without #)", example = "d73a4a") String color,
+    @Schema(description = "Repository the label belongs to") RepositoryInfoDTO repository
 ) {
     /**
      * Create a LabelInfoDTO from a Label entity.

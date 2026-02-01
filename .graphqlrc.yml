@@ -1,0 +1,18 @@
+# GraphQL Configuration for Hephaestus
+# Enables VSCode IntelliSense for GraphQL operations against GitHub API
+# Extension: GraphQL.vscode-graphql
+# Docs: https://the-guild.dev/graphql/config
+
+projects:
+  github:
+    # GitHub GraphQL API schema (downloaded from docs.github.com)
+    schema: "server/application-server/src/main/resources/graphql/github/schema.github.graphql"
+    
+    # GraphQL operations (Spring's standard location)
+    documents: "server/application-server/src/main/resources/graphql-documents/**/*.graphql"
+    
+    extensions:
+      languageService:
+        enableHover: true
+        enableAutoComplete: true
+        enableValidation: true

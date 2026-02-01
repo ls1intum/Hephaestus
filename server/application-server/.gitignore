@@ -1,1 +1,5 @@
 src/test/resources/application-live-local.yml
+
+# ArchUnit freeze store - we don't freeze violations
+archunit_store/
+/.factorypath

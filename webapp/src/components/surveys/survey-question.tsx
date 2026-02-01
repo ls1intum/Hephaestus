@@ -1,7 +1,4 @@
-import type {
-	SurveyQuestion as SurveyQuestionType,
-	SurveyResponse,
-} from "@/types/survey";
+import type { SurveyQuestion as SurveyQuestionType, SurveyResponse } from "@/types/survey";
 import { QuestionLink } from "./questions/question-link";
 import { QuestionMultipleChoice } from "./questions/question-multiple-choice";
 import { QuestionOpenText } from "./questions/question-open-text";
@@ -15,12 +12,7 @@ interface SurveyQuestionProps {
 	error?: string;
 }
 
-export function SurveyQuestion({
-	question,
-	value,
-	onChange,
-	error,
-}: SurveyQuestionProps) {
+export function SurveyQuestion({ question, value, onChange, error }: SurveyQuestionProps) {
 	const commonProps = {
 		id: question.id,
 		question: question.question,

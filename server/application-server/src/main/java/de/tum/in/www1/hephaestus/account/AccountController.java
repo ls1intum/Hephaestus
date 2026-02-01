@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.account;
 
+import de.tum.in.www1.hephaestus.config.KeycloakProperties;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.integrations.posthog.PosthogClientException;
 import io.swagger.v3.oas.annotations.Operation;
@@ -7,9 +8,9 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.keycloak.admin.client.Keycloak;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -29,21 +30,26 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/user")
 @Tag(name = "Account", description = "User account management (settings, deletion)")
+@PreAuthorize("isAuthenticated()")
 public class AccountController {
 
-    private static final Logger logger = LoggerFactory.getLogger(AccountController.class);
+    private static final Logger log = LoggerFactory.getLogger(AccountController.class);
 
     private final AccountService accountService;
     private final Keycloak keycloak;
     private final UserRepository userRepository;
+    private final KeycloakProperties keycloakProperties;
 
-    @Value("${keycloak.realm}")
-    private String realm;
-
-    public AccountController(AccountService accountService, Keycloak keycloak, UserRepository userRepository) {
+    public AccountController(
+        AccountService accountService,
+        Keycloak keycloak,
+        UserRepository userRepository,
+        KeycloakProperties keycloakProperties
+    ) {
         this.accountService = accountService;
         this.keycloak = keycloak;
         this.userRepository = userRepository;
+        this.keycloakProperties = keycloakProperties;
     }
 
     @DeleteMapping
@@ -54,27 +60,27 @@ public class AccountController {
     public ResponseEntity<Void> deleteUser(@AuthenticationPrincipal JwtAuthenticationToken auth) {
         JwtAuthenticationToken token = resolveAuthentication(auth);
         if (token == null) {
-            logger.error("No authentication token found");
+            log.error("No authentication token found");
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
         String keycloakUserId = token.getToken().getClaimAsString(StandardClaimNames.SUB);
         var gitUser = userRepository.getCurrentUser();
         if (gitUser.isEmpty()) {
-            logger.warn("Could not resolve Git provider user for Keycloak subject {}", keycloakUserId);
+            log.warn("Could not resolve Git provider user for Keycloak subject {}", keycloakUserId);
         }
 
         try {
             accountService.deleteUserTrackingData(gitUser, keycloakUserId);
         } catch (PosthogClientException exception) {
-            logger.error("Failed to remove analytics data before deleting user {}", keycloakUserId, exception);
+            log.error("Failed to remove analytics data before deleting user {}", keycloakUserId, exception);
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY).build();
         }
 
-        logger.info("Deleting user {}", keycloakUserId);
-        var response = keycloak.realm(realm).users().delete(keycloakUserId);
+        log.info("Deleting user {}", keycloakUserId);
+        var response = keycloak.realm(keycloakProperties.realm()).users().delete(keycloakUserId);
         if (response.getStatus() != 204) {
-            logger.error("Failed to delete user account: {}", response.getStatusInfo().getReasonPhrase());
+            log.error("Failed to delete user account: {}", response.getStatusInfo().getReasonPhrase());
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY).build();
         }
         return ResponseEntity.noContent().build();
@@ -114,9 +120,10 @@ public class AccountController {
         if (token != null) {
             keycloakUserId = token.getToken().getClaimAsString(StandardClaimNames.SUB);
         } else {
-            logger.warn("Updating user settings without an authenticated principal");
+            log.warn("Updating user settings without an authenticated principal");
+            UserPreferences preferences = accountService.getOrCreatePreferences(user.get());
             boolean switchingOffResearch =
-                Boolean.FALSE.equals(userSettings.participateInResearch()) && user.get().isParticipateInResearch();
+                Boolean.FALSE.equals(userSettings.participateInResearch()) && preferences.isParticipateInResearch();
             if (switchingOffResearch) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
             }

@@ -11,7 +11,7 @@ import {
 	type VisibilityState,
 } from "@tanstack/react-table";
 import { ArrowUpDown, ChevronDown, Filter, Search, Users } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import type { TeamInfo } from "@/api/types.gen";
 import { Button } from "@/components/ui/button";
 import {
@@ -54,71 +54,54 @@ interface UsersTableProps {
 	isLoading?: boolean;
 }
 
-export function UsersTable({
-	users,
-	teams,
-	isLoading = false,
-}: UsersTableProps) {
+export function UsersTable({ users, teams, isLoading = false }: UsersTableProps) {
 	const [sorting, setSorting] = useState<SortingState>([]);
 	const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
 	const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
 	const [globalFilter, setGlobalFilter] = useState("");
 	const [teamFilter, setTeamFilter] = useState<string>("all");
 
-	const columns: ColumnDef<ExtendedUserTeams>[] = useMemo(
-		() => [
-			{
-				accessorKey: "user.name",
-				header: ({ column }) => {
-					return (
-						<Button
-							variant="ghost"
-							onClick={() =>
-								column.toggleSorting(column.getIsSorted() === "asc")
-							}
-							className="h-auto p-0 font-semibold"
-						>
-							Name
-							<ArrowUpDown className="ml-2 h-4 w-4" />
-						</Button>
-					);
-				},
-				cell: ({ row }) => (
-					<div className="font-medium">{row.original.user.name}</div>
-				),
+	// React Compiler handles memoization automatically - no useMemo needed
+	const columns: ColumnDef<ExtendedUserTeams>[] = [
+		{
+			accessorKey: "user.name",
+			header: ({ column }) => {
+				return (
+					<Button
+						variant="ghost"
+						onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+						className="h-auto p-0 font-semibold"
+					>
+						Name
+						<ArrowUpDown className="ml-2 h-4 w-4" />
+					</Button>
+				);
 			},
-			{
-				accessorKey: "user.login",
-				header: ({ column }) => {
-					return (
-						<Button
-							variant="ghost"
-							onClick={() =>
-								column.toggleSorting(column.getIsSorted() === "asc")
-							}
-							className="h-auto p-0 font-semibold"
-						>
-							Username
-							<ArrowUpDown className="ml-2 h-4 w-4" />
-						</Button>
-					);
-				},
-				cell: ({ row }) => (
-					<div className="text-muted-foreground">{row.original.user.login}</div>
-				),
+			cell: ({ row }) => <div className="font-medium">{row.original.user.name}</div>,
+		},
+		{
+			accessorKey: "user.login",
+			header: ({ column }) => {
+				return (
+					<Button
+						variant="ghost"
+						onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+						className="h-auto p-0 font-semibold"
+					>
+						Username
+						<ArrowUpDown className="ml-2 h-4 w-4" />
+					</Button>
+				);
 			},
-		],
-		[],
-	);
+			cell: ({ row }) => <div className="text-muted-foreground">{row.original.user.login}</div>,
+		},
+	];
 
-	const filteredData = useMemo(() => {
-		return users.filter((user) => {
-			if (teamFilter === "all") return true;
-			return (
-				user.teams?.some((team) => team.id.toString() === teamFilter) || false
-			);
-		});
-	}, [users, teamFilter]);
+	// React Compiler handles memoization automatically
+	const filteredData = users.filter((user) => {
+		if (teamFilter === "all") return true;
+		return user.teams?.some((team) => team.id.toString() === teamFilter) || false;
+	});
 
 	const table = useReactTable({
 		data: filteredData,
@@ -158,25 +141,10 @@ export function UsersTable({
 				items.push(1, 2, 3, 4, "...", pageCount);
 			} else if (currentPage >= pageCount - 2) {
 				// Show 1 ... last-3 to last
-				items.push(
-					1,
-					"...",
-					pageCount - 3,
-					pageCount - 2,
-					pageCount - 1,
-					pageCount,
-				);
+				items.push(1, "...", pageCount - 3, pageCount - 2, pageCount - 1, pageCount);
 			} else {
 				// Show 1 ... current-1, current, current+1 ... last
-				items.push(
-					1,
-					"...",
-					currentPage - 1,
-					currentPage,
-					currentPage + 1,
-					"...",
-					pageCount,
-				);
+				items.push(1, "...", currentPage - 1, currentPage, currentPage + 1, "...", pageCount);
 			}
 		}
 
@@ -248,9 +216,7 @@ export function UsersTable({
 											key={column.id}
 											className="capitalize"
 											checked={column.getIsVisible()}
-											onCheckedChange={(value) =>
-												column.toggleVisibility(!!value)
-											}
+											onCheckedChange={(value) => column.toggleVisibility(!!value)}
 										>
 											{column.id}
 										</DropdownMenuCheckboxItem>
@@ -272,10 +238,7 @@ export function UsersTable({
 										<TableHead key={header.id}>
 											{header.isPlaceholder
 												? null
-												: flexRender(
-														header.column.columnDef.header,
-														header.getContext(),
-													)}
+												: flexRender(header.column.columnDef.header, header.getContext())}
 										</TableHead>
 									);
 								})}
@@ -285,19 +248,14 @@ export function UsersTable({
 					<TableBody>
 						{isLoading ? (
 							<TableRow>
-								<TableCell
-									colSpan={columns.length}
-									className="h-32 text-center"
-								>
+								<TableCell colSpan={columns.length} className="h-32 text-center">
 									<div className="flex flex-col items-center justify-center space-y-2">
 										<Spinner />
-										<p className="text-sm text-muted-foreground">
-											Loading users...
-										</p>
+										<p className="text-sm text-muted-foreground">Loading users...</p>
 									</div>
 								</TableCell>
 							</TableRow>
-						) : table.getRowModel().rows?.length ? (
+						) : table.getRowModel().rows?.length > 0 ? (
 							table.getRowModel().rows.map((row) => (
 								<TableRow
 									key={row.id}
@@ -306,20 +264,14 @@ export function UsersTable({
 								>
 									{row.getVisibleCells().map((cell) => (
 										<TableCell key={cell.id}>
-											{flexRender(
-												cell.column.columnDef.cell,
-												cell.getContext(),
-											)}
+											{flexRender(cell.column.columnDef.cell, cell.getContext())}
 										</TableCell>
 									))}
 								</TableRow>
 							))
 						) : (
 							<TableRow>
-								<TableCell
-									colSpan={columns.length}
-									className="h-32 text-center"
-								>
+								<TableCell colSpan={columns.length} className="h-32 text-center">
 									<div className="flex flex-col items-center justify-center space-y-2">
 										<Users className="h-8 w-8 text-muted-foreground" />
 										<p className="text-sm font-medium">No users found</p>
@@ -341,16 +293,13 @@ export function UsersTable({
 				<div className="flex-1 text-sm text-muted-foreground order-2 sm:order-1">
 					<div className="flex flex-col sm:flex-row gap-1 sm:gap-4">
 						<span>
-							Showing {table.getRowModel().rows.length} of {filteredData.length}{" "}
-							users
+							Showing {table.getRowModel().rows.length} of {filteredData.length} users
 						</span>
 					</div>
 				</div>
 				<div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-6 lg:space-x-8 order-1 sm:order-2">
 					<div className="flex items-center space-x-2">
-						<p className="text-sm font-medium whitespace-nowrap">
-							Rows per page
-						</p>
+						<p className="text-sm font-medium whitespace-nowrap">Rows per page</p>
 						<Select
 							value={`${table.getState().pagination.pageSize}`}
 							onValueChange={(value) => {
@@ -358,9 +307,7 @@ export function UsersTable({
 							}}
 						>
 							<SelectTrigger className="h-8 w-[70px]">
-								<SelectValue
-									placeholder={table.getState().pagination.pageSize}
-								/>
+								<SelectValue placeholder={table.getState().pagination.pageSize} />
 							</SelectTrigger>
 							<SelectContent side="top">
 								{[10, 20, 30, 40, 50].map((pageSize) => (
@@ -388,17 +335,13 @@ export function UsersTable({
 								</PaginationItem>
 
 								{generatePaginationItems().map((page, index) => (
-									<PaginationItem
-										key={page === "..." ? `ellipsis-${index}` : `page-${page}`}
-									>
+									<PaginationItem key={page === "..." ? `ellipsis-${index}` : `page-${page}`}>
 										{page === "..." ? (
 											<PaginationEllipsis />
 										) : (
 											<PaginationLink
 												onClick={() => table.setPageIndex(Number(page) - 1)}
-												isActive={
-													table.getState().pagination.pageIndex + 1 === page
-												}
+												isActive={table.getState().pagination.pageIndex + 1 === page}
 												className="cursor-pointer"
 											>
 												{page}
@@ -411,9 +354,7 @@ export function UsersTable({
 									<PaginationNext
 										onClick={() => table.nextPage()}
 										className={
-											!table.getCanNextPage()
-												? "pointer-events-none opacity-50"
-												: "cursor-pointer"
+											!table.getCanNextPage() ? "pointer-events-none opacity-50" : "cursor-pointer"
 										}
 									/>
 								</PaginationItem>

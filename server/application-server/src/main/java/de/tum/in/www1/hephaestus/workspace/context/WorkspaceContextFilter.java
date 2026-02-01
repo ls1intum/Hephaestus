@@ -25,6 +25,7 @@ import java.util.Set;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Profile;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -41,6 +42,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @Order(-5)
+@Profile("!specs")
 public class WorkspaceContextFilter implements Filter {
 
     private static final Logger log = LoggerFactory.getLogger(WorkspaceContextFilter.class);
@@ -131,7 +133,11 @@ public class WorkspaceContextFilter implements Filter {
             boolean allowNonActive = isStatusPath || (isBasePath && isReadRequest) || allowLifecycleDelete;
 
             if (workspace.getStatus() != WorkspaceStatus.ACTIVE && !allowNonActive) {
-                log.debug("Workspace {} has non-ACTIVE status: {}. Returning 404.", safeSlug, workspace.getStatus());
+                log.debug(
+                    "Denied workspace access: reason=nonActiveStatus, workspaceSlug={}, status={}",
+                    safeSlug,
+                    workspace.getStatus()
+                );
                 sendWorkspaceNotFoundError(httpResponse, slug);
                 return;
             }
@@ -146,7 +152,7 @@ public class WorkspaceContextFilter implements Filter {
                 if (currentUser.isEmpty()) {
                     sendWorkspaceUnauthorizedError(httpResponse, slug);
                 } else {
-                    log.debug("User is not a member of workspace {}. Returning 403.", safeSlug);
+                    log.debug("Denied workspace access: reason=notMember, workspaceSlug={}", safeSlug);
                     sendWorkspaceMembershipForbiddenError(httpResponse, slug);
                 }
                 return;
@@ -157,15 +163,17 @@ public class WorkspaceContextFilter implements Filter {
 
             // Overwrite detection: warn if context already set
             if (WorkspaceContextHolder.getContext() != null) {
-                log.warn(
-                    "Context already set when entering filter for slug={}. This may indicate a filter ordering issue or context leak.",
-                    safeSlug
-                );
+                log.warn("Detected context leak: reason=contextAlreadySet, workspaceSlug={}", safeSlug);
             }
 
             WorkspaceContextHolder.setContext(context);
 
-            log.debug("Workspace context set: slug={}, id={}, roles={}", safeSlug, context.id(), context.roles());
+            log.debug(
+                "Set workspace context: workspaceSlug={}, workspaceId={}, roles={}",
+                safeSlug,
+                context.id(),
+                context.roles()
+            );
 
             // Continue filter chain
             chain.doFilter(request, response);
@@ -187,7 +195,7 @@ public class WorkspaceContextFilter implements Filter {
     ) {
         try {
             if (userOpt.isEmpty()) {
-                log.debug("No authenticated user found, returning empty roles");
+                log.debug("Skipped role fetch: reason=noAuthenticatedUser");
                 return Set.of();
             }
 
@@ -197,7 +205,7 @@ public class WorkspaceContextFilter implements Filter {
             );
 
             if (membershipOpt.isPresent()) {
-                log.debug("User has role: {}", membershipOpt.get().getRole());
+                log.debug("Resolved user role: role={}", membershipOpt.get().getRole());
                 return Set.of(membershipOpt.get().getRole());
             }
 
@@ -210,7 +218,7 @@ public class WorkspaceContextFilter implements Filter {
                         WorkspaceRole.ADMIN
                     );
                     log.info(
-                        "Auto-added user {} to workspace {} as {} (bootstrap fallback)",
+                        "Auto-added user to workspace: userLogin={}, workspaceSlug={}, role={}",
                         LoggingUtils.sanitizeForLog(userOpt.get().getLogin()),
                         LoggingUtils.sanitizeForLog(workspace.getWorkspaceSlug()),
                         created.getRole()
@@ -218,18 +226,18 @@ public class WorkspaceContextFilter implements Filter {
                     return Set.of(created.getRole());
                 } catch (IllegalArgumentException ex) {
                     log.debug(
-                        "Membership auto-add skipped for user {} in workspace {}: {}",
+                        "Skipped membership auto-add: userLogin={}, workspaceSlug={}",
                         LoggingUtils.sanitizeForLog(userOpt.get().getLogin()),
                         LoggingUtils.sanitizeForLog(workspace.getWorkspaceSlug()),
-                        LoggingUtils.sanitizeForLog(ex.getMessage())
+                        ex
                     );
                 }
             }
 
-            log.debug("User has no membership in workspace {}", workspace.getId());
+            log.debug("Returning empty roles: reason=noMembership, workspaceId={}", workspace.getId());
             return Set.of();
         } catch (Exception e) {
-            log.warn("Failed to fetch user roles for workspace {}: {}", workspace.getId(), e.getMessage());
+            log.warn("Failed to fetch user roles: workspaceId={}", workspace.getId(), e);
             return Set.of();
         }
     }
@@ -249,7 +257,7 @@ public class WorkspaceContextFilter implements Filter {
         Instant now = Instant.now();
         if (history.getRedirectExpiresAt() != null && history.getRedirectExpiresAt().isBefore(now)) {
             log.debug(
-                "Workspace slug redirect expired: '{}' at {}",
+                "Denied slug redirect: reason=expired, oldSlug={}, expiredAt={}",
                 LoggingUtils.sanitizeForLog(oldSlug),
                 history.getRedirectExpiresAt()
             );
@@ -267,7 +275,7 @@ public class WorkspaceContextFilter implements Filter {
 
         if (workspace == null) {
             log.warn(
-                "Slug redirect history points to missing workspace for oldSlug={}",
+                "Skipped slug redirect: reason=missingWorkspace, oldSlug={}",
                 LoggingUtils.sanitizeForLog(oldSlug)
             );
             return false;
@@ -277,7 +285,8 @@ public class WorkspaceContextFilter implements Filter {
         boolean isPublic = Boolean.TRUE.equals(workspace.getIsPubliclyViewable());
         boolean hasMembership = userRepository
             .getCurrentUser()
-            .flatMap(user -> workspaceMembershipRepository.findByWorkspace_IdAndUser_Id(workspace.getId(), user.getId())
+            .flatMap(user ->
+                workspaceMembershipRepository.findByWorkspace_IdAndUser_Id(workspace.getId(), user.getId())
             )
             .isPresent();
 
@@ -294,7 +303,7 @@ public class WorkspaceContextFilter implements Filter {
         }
 
         log.debug(
-            "Workspace slug redirect: '{}' → '{}'",
+            "Redirecting workspace slug: oldSlug={}, newSlug={}",
             LoggingUtils.sanitizeForLog(oldSlug),
             LoggingUtils.sanitizeForLog(newSlug)
         );

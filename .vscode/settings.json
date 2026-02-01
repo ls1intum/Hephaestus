@@ -3,7 +3,32 @@
 	"java.configuration.updateBuildConfiguration": "interactive",
 	"java.completion.importOrder": ["#"],
 	"[java]": {
-		"editor.defaultFormatter": "esbenp.prettier-vscode"
+		"editor.defaultFormatter": "esbenp.prettier-vscode",
+		"editor.formatOnSave": true
+	},
+	"[typescript]": {
+		"editor.defaultFormatter": "biomejs.biome",
+		"editor.formatOnSave": true
+	},
+	"[typescriptreact]": {
+		"editor.defaultFormatter": "biomejs.biome",
+		"editor.formatOnSave": true
+	},
+	"[javascript]": {
+		"editor.defaultFormatter": "biomejs.biome",
+		"editor.formatOnSave": true
+	},
+	"[javascriptreact]": {
+		"editor.defaultFormatter": "biomejs.biome",
+		"editor.formatOnSave": true
+	},
+	"[json]": {
+		"editor.defaultFormatter": "biomejs.biome",
+		"editor.formatOnSave": true
+	},
+	"[jsonc]": {
+		"editor.defaultFormatter": "biomejs.biome",
+		"editor.formatOnSave": true
 	},
 	"tailwindCSS.experimental.classRegex": [
 		"cva\\(([^)]*)\\)",
@@ -13,11 +38,6 @@
 		"[\"'`]([^\"'`]*).*?[\"'`]"
 	],
 	"editor.codeActionsOnSave": {
-		"source.fixAll": "explicit"
-	},
-	"[python]": {
-		"editor.defaultFormatter": "ms-python.autopep8"
-	},
-	"python.testing.pytestArgs": ["."],
-	"python.testing.pytestEnabled": true
+		"source.organizeImports.biome": "explicit"
+	}
 }

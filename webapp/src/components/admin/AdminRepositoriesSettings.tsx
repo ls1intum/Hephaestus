@@ -67,9 +67,8 @@ export function AdminRepositoriesSettings({
 				{isReadOnly && (
 					<div className="mb-4 p-4 bg-muted/50 border border-muted rounded-lg">
 						<p className="text-sm text-muted-foreground">
-							This workspace is managed by a GitHub App Installation.
-							Repositories are automatically synced based on the
-							installation&apos;s configuration.
+							This workspace is managed by a GitHub App Installation. Repositories are automatically
+							synced based on the installation&apos;s configuration.
 						</p>
 					</div>
 				)}
@@ -79,10 +78,7 @@ export function AdminRepositoriesSettings({
 							{/* Repository List */}
 							<div className="space-y-2">
 								{repositories.map((repo) => (
-									<div
-										key={repo.nameWithOwner}
-										className="flex items-center gap-2"
-									>
+									<div key={repo.nameWithOwner} className="flex items-center gap-2">
 										{!isReadOnly && (
 											<AlertDialog>
 												<AlertDialogTrigger asChild>
@@ -100,17 +96,15 @@ export function AdminRepositoriesSettings({
 															Stop monitoring {repo.nameWithOwner}?
 														</AlertDialogTitle>
 														<AlertDialogDescription>
-															Are you sure you want to stop monitoring this
-															repository? This action cannot be undone and will
-															remove all data associated with this repository.
+															Are you sure you want to stop monitoring this repository? This action
+															cannot be undone and will remove all data associated with this
+															repository.
 														</AlertDialogDescription>
 													</AlertDialogHeader>
 													<AlertDialogFooter>
 														<AlertDialogCancel>Cancel</AlertDialogCancel>
 														<AlertDialogAction
-															onClick={() =>
-																onRemoveRepository(repo.nameWithOwner)
-															}
+															onClick={() => onRemoveRepository(repo.nameWithOwner)}
 															disabled={isRemovingRepository}
 														>
 															Stop Monitoring
@@ -119,9 +113,7 @@ export function AdminRepositoriesSettings({
 												</AlertDialogContent>
 											</AlertDialog>
 										)}
-										<div className="bg-accent/50 p-2 px-4 rounded-md">
-											{repo.nameWithOwner}
-										</div>
+										<div className="bg-accent/50 p-2 px-4 rounded-md">{repo.nameWithOwner}</div>
 									</div>
 								))}{" "}
 								{isLoading && (

@@ -12,10 +12,10 @@ renovate.json                    @ls1intum/hephaestus-maintainers
 # Application Server (Java/Spring)
 server/application-server/       @ls1intum/hephaestus-maintainers
 
-# Intelligence Service (Python/FastAPI)
+# Intelligence Service (TypeScript/Hono)
 server/intelligence-service/     @ls1intum/hephaestus-maintainers
 
-# Webhook Ingest (Python)
+# Webhook Ingest (TypeScript/Hono)
 server/webhook-ingest/           @ls1intum/hephaestus-maintainers
 
 # Webapp (React/TypeScript)

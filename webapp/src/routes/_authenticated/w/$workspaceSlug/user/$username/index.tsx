@@ -1,15 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
-import {
-	createFileRoute,
-	retainSearchParams,
-	useNavigate,
-} from "@tanstack/react-router";
+import { createFileRoute, retainSearchParams, useNavigate } from "@tanstack/react-router";
 import { zodValidator } from "@tanstack/zod-adapter";
 import { z } from "zod";
-import {
-	getUserProfileOptions,
-	getWorkspaceOptions,
-} from "@/api/@tanstack/react-query.gen";
+import { getUserProfileOptions, getWorkspaceOptions } from "@/api/@tanstack/react-query.gen";
 import { ProfilePage } from "@/components/profile/ProfilePage";
 import { useAuth } from "@/integrations/auth/AuthContext";
 import {
@@ -26,9 +19,9 @@ const profileSearchSchema = z.object({
 	before: z.string().optional(),
 });
 
-export const Route = createFileRoute(
-	"/_authenticated/w/$workspaceSlug/user/$username/",
-)({
+type ProfileSearchParams = z.infer<typeof profileSearchSchema>;
+
+export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/user/$username/")({
 	component: UserProfile,
 	validateSearch: zodValidator(profileSearchSchema),
 	search: {
@@ -104,7 +97,7 @@ function UserProfile() {
 
 	const handleTimeframeChange = (nextAfter: string, nextBefore?: string) => {
 		navigate({
-			search: (prev) => ({
+			search: (prev: ProfileSearchParams) => ({
 				...prev,
 				after: nextAfter,
 				before: nextBefore,

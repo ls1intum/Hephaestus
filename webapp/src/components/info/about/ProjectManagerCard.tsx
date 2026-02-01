@@ -17,17 +17,12 @@ interface ProjectManagerCardProps {
 	projectManager: ProjectManager;
 }
 
-export function ProjectManagerCard({
-	projectManager,
-}: ProjectManagerCardProps) {
+export function ProjectManagerCard({ projectManager }: ProjectManagerCardProps) {
 	return (
 		<div className="bg-gradient-to-br from-background to-muted/30 rounded-lg p-8 mb-16 border border-muted">
 			<div className="flex flex-col md:flex-row gap-8 items-center md:items-start">
 				<Avatar className="h-32 w-32 border-4 border-background">
-					<AvatarImage
-						src={projectManager.avatarUrl}
-						alt={`${projectManager.login}'s avatar`}
-					/>
+					<AvatarImage src={projectManager.avatarUrl} alt={`${projectManager.login}'s avatar`} />
 					<AvatarFallback className="text-2xl">
 						{projectManager.name
 							.split(" ")
@@ -43,20 +38,12 @@ export function ProjectManagerCard({
 					<p className="text-muted-foreground">{projectManager.description}</p>
 					<div className="flex items-center gap-2 pt-2 justify-center md:justify-start">
 						<Button variant="outline" size="sm" asChild>
-							<a
-								href={projectManager.htmlUrl}
-								target="_blank"
-								rel="noopener noreferrer"
-							>
+							<a href={projectManager.htmlUrl} target="_blank" rel="noopener noreferrer">
 								<Github className="h-5 w-5" /> GitHub
 							</a>
 						</Button>
 						<Button variant="outline" size="sm" asChild>
-							<a
-								href={projectManager.websiteUrl}
-								target="_blank"
-								rel="noopener noreferrer"
-							>
+							<a href={projectManager.websiteUrl} target="_blank" rel="noopener noreferrer">
 								<Globe className="h-5 w-5" />
 								Website
 							</a>

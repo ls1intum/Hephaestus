@@ -37,9 +37,7 @@ export function ThemeProvider({
 
 		let appliedTheme: "light" | "dark";
 		if (theme === "system") {
-			appliedTheme = window.matchMedia("(prefers-color-scheme: dark)").matches
-				? "dark"
-				: "light";
+			appliedTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 		} else {
 			appliedTheme = theme as "light" | "dark";
 		}
@@ -51,8 +49,7 @@ export function ThemeProvider({
 		// Update theme color meta tag if it exists
 		const metaThemeColor = document.querySelector('meta[name="theme-color"]');
 		if (metaThemeColor) {
-			const color =
-				appliedTheme === "dark" ? "hsl(0 0% 10%)" : "hsl(0 0% 100%)";
+			const color = appliedTheme === "dark" ? "hsl(0 0% 10%)" : "hsl(0 0% 100%)";
 			metaThemeColor.setAttribute("content", color);
 		}
 	}, [theme]);
@@ -75,8 +72,7 @@ export function ThemeProvider({
 export const useTheme = () => {
 	const context = useContext(ThemeProviderContext);
 
-	if (context === undefined)
-		throw new Error("useTheme must be used within a ThemeProvider");
+	if (context === undefined) throw new Error("useTheme must be used within a ThemeProvider");
 
 	return context;
 };
