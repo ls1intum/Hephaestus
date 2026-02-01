@@ -19,12 +19,14 @@ max_line_length = 120
 [*.{ts,tsx,js,jsx}]
 indent_style = tab
 indent_size = 2
+tab_width = unset
 max_line_length = 100
 
 # JSON - tabs (matches Biome config)
 [*.{json,jsonc}]
 indent_style = tab
 indent_size = 2
+tab_width = unset
 
 # YAML
 [*.{yaml,yml}]
