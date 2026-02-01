@@ -208,7 +208,7 @@ export function SurveyContainer({
 				</div>
 				<ProgressRoot.Root value={progress}>
 					<ProgressTrack className="h-1.5">
-						<ProgressIndicator />
+						<ProgressIndicator className="absolute" />
 					</ProgressTrack>
 				</ProgressRoot.Root>
 			</div>

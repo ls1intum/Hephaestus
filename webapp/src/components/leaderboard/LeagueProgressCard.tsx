@@ -57,7 +57,7 @@ export function LeagueProgressCard({ leaguePoints, onInfoClick }: LeagueProgress
 						>
 							<ProgressTrack className="bg-secondary">
 								<ProgressIndicator
-									className={cn({
+									className={cn("absolute", {
 										"bg-league-bronze": currentLeague.name === "Bronze",
 										"bg-league-silver": currentLeague.name === "Silver",
 										"bg-league-gold": currentLeague.name === "Gold",

@@ -46,7 +46,7 @@ export function XpProgress({
 
 					<ProgressRoot.Root value={percentage} className="h-full">
 						<ProgressTrack className="h-full rounded-full bg-transparent">
-							<ProgressIndicator className="bg-gradient-to-r from-primary/90 to-primary rounded-full transition-all duration-500" />
+							<ProgressIndicator className="absolute bg-gradient-to-r from-primary/90 to-primary rounded-full transition-all duration-500" />
 						</ProgressTrack>
 					</ProgressRoot.Root>
 				</div>
