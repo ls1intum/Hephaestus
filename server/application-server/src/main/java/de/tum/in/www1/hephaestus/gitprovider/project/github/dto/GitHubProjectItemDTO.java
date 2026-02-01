@@ -8,11 +8,15 @@ import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHDraftIssue;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHIssue;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2Item;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2ItemContent;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2ItemFieldValue;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2ItemFieldValueConnection;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2ItemType;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.project.ProjectItem;
 import java.math.BigInteger;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import org.springframework.lang.Nullable;
 
@@ -96,6 +100,9 @@ public record GitHubProjectItemDTO(
             }
         }
 
+        // Extract field values from the GraphQL response
+        List<GitHubProjectFieldValueDTO> fieldValues = extractFieldValues(item.getFieldValues());
+
         return new GitHubProjectItemDTO(
             null,
             toLong(item.getFullDatabaseId()),
@@ -106,10 +113,33 @@ public record GitHubProjectItemDTO(
             draftTitle,
             draftBody,
             item.getIsArchived(),
-            null, // field values are extracted separately
+            fieldValues,
             toInstant(item.getCreatedAt()),
             toInstant(item.getUpdatedAt())
         );
+    }
+
+    /**
+     * Extracts field values from a GraphQL field value connection.
+     *
+     * @param fieldValuesConnection the GraphQL field values connection (may be null)
+     * @return list of field value DTOs, or empty list if no values
+     */
+    private static List<GitHubProjectFieldValueDTO> extractFieldValues(
+        @Nullable GHProjectV2ItemFieldValueConnection fieldValuesConnection
+    ) {
+        if (fieldValuesConnection == null || fieldValuesConnection.getNodes() == null) {
+            return Collections.emptyList();
+        }
+
+        List<GitHubProjectFieldValueDTO> result = new ArrayList<>();
+        for (GHProjectV2ItemFieldValue fieldValue : fieldValuesConnection.getNodes()) {
+            GitHubProjectFieldValueDTO dto = GitHubProjectFieldValueDTO.fromFieldValue(fieldValue);
+            if (dto != null && dto.fieldId() != null) {
+                result.add(dto);
+            }
+        }
+        return result;
     }
 
     // ========== CONVERSION HELPERS ==========
