@@ -354,6 +354,35 @@ erDiagram
         BIGINT resolved_by_id FK
     }
 
+    Commit {
+        BIGINT id PK
+        VARCHAR(40) sha "NOT NULL"
+        VARCHAR(1024) message "NOT NULL"
+        TEXT message_body
+        VARCHAR(512) html_url
+        TIMESTAMPTZ authored_at "NOT NULL"
+        TIMESTAMPTZ committed_at "NOT NULL"
+        INTEGER additions "NOT NULL"
+        INTEGER deletions "NOT NULL"
+        INTEGER changed_files "NOT NULL"
+        TIMESTAMPTZ last_sync_at
+        BIGINT repository_id FK
+        BIGINT author_id FK
+        BIGINT committer_id FK
+    }
+
+    CommitFileChange {
+        BIGINT id PK
+        VARCHAR(1024) filename "NOT NULL"
+        VARCHAR(32) change_type "NOT NULL"
+        INTEGER additions "NOT NULL"
+        INTEGER deletions "NOT NULL"
+        INTEGER changes "NOT NULL"
+        VARCHAR(1024) previous_filename
+        TEXT patch
+        BIGINT commit_id FK
+    }
+
     Repository {
         BIGINT id PK
         TIMESTAMPTZ created_at
@@ -529,6 +558,10 @@ erDiagram
     %% One-to-Many relationships
     User ||--o{ ActivityEvent : references
     Repository ||--o{ ActivityEvent : has
+    Commit ||--o{ CommitFileChange : has
+    Repository ||--o{ Commit : has
+    User ||--o{ Commit : authored_by
+    User ||--o{ Commit : committed_by
     Issue ||--o{ BadPracticeDetection : references
     PullRequestBadPractice ||--o{ BadPracticeFeedback : has
     ChatMessage ||--o{ ChatMessage : references
@@ -595,6 +628,8 @@ erDiagram
     classDef associationEntity fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
     classDef metadataEntity fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
 
+    class Commit primaryEntity
+    class CommitFileChange associationEntity
     class Issue primaryEntity
     class IssueAssignee associationEntity
     class IssueLabel associationEntity

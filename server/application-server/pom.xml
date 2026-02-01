@@ -391,6 +391,12 @@
             <artifactId>netty-resolver-dns-native-macos</artifactId>
             <classifier>osx-aarch_64</classifier>
         </dependency>
+        <!-- JGit for local git repository operations -->
+        <dependency>
+            <groupId>org.eclipse.jgit</groupId>
+            <artifactId>org.eclipse.jgit</artifactId>
+            <version>7.1.0.202411261347-r</version>
+        </dependency>
     </dependencies>
     <dependencyManagement>
         <dependencies>

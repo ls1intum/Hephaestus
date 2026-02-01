@@ -633,4 +633,25 @@ public sealed interface GitHubEventAction {
             };
         }
     }
+
+    // ========== Push Events ==========
+
+    /**
+     * Push events don't have a traditional "action" field. The event itself is the action.
+     * We use a synthetic PUSHED action to conform to the GitHubWebhookEvent interface.
+     */
+    enum Push implements GitHubEventAction {
+        PUSHED,
+        UNKNOWN;
+
+        @Override
+        public String value() {
+            return name().toLowerCase();
+        }
+
+        public static Push fromString(String action) {
+            // Push events don't have an action field, so any value maps to PUSHED
+            return PUSHED;
+        }
+    }
 }

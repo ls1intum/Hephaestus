@@ -1,0 +1,213 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                   http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- ========================================================================
+         Git Commit Table
+         ========================================================================
+
+         Stores Git commit metadata synced from GitHub push webhooks.
+         Uses auto-generated Long ID; SHA is a unique column per repository.
+         Table named 'git_commit' to avoid SQL reserved word 'commit'.
+    -->
+    <changeSet id="1772000000000-1" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not><tableExists tableName="git_commit"/></not>
+        </preConditions>
+        <createTable tableName="git_commit">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_git_commit"/>
+            </column>
+            <column name="sha" type="VARCHAR(40)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="message" type="VARCHAR(1024)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="message_body" type="TEXT"/>
+            <column name="html_url" type="VARCHAR(512)"/>
+            <column name="authored_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="committed_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="additions" type="INTEGER" defaultValue="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="deletions" type="INTEGER" defaultValue="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="changed_files" type="INTEGER" defaultValue="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="last_sync_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="repository_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="author_id" type="BIGINT"/>
+            <column name="committer_id" type="BIGINT"/>
+        </createTable>
+    </changeSet>
+
+    <!-- ========================================================================
+         Commit File Change Table
+         ========================================================================
+
+         Stores file-level change information for each commit.
+    -->
+    <changeSet id="1772000000000-2" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not><tableExists tableName="commit_file_change"/></not>
+        </preConditions>
+        <createTable tableName="commit_file_change">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_commit_file_change"/>
+            </column>
+            <column name="filename" type="VARCHAR(1024)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="change_type" type="VARCHAR(32)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="additions" type="INTEGER" defaultValue="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="deletions" type="INTEGER" defaultValue="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="changes" type="INTEGER" defaultValue="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="previous_filename" type="VARCHAR(1024)"/>
+            <column name="patch" type="TEXT"/>
+            <column name="commit_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <!-- ========================================================================
+         Foreign Keys
+         ======================================================================== -->
+
+    <changeSet id="1772000000000-3" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not><foreignKeyConstraintExists foreignKeyName="fk_git_commit_repository"/></not>
+        </preConditions>
+        <addForeignKeyConstraint
+            baseTableName="git_commit"
+            baseColumnNames="repository_id"
+            constraintName="fk_git_commit_repository"
+            referencedTableName="repository"
+            referencedColumnNames="id"
+            onDelete="CASCADE"/>
+    </changeSet>
+
+    <changeSet id="1772000000000-4" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not><foreignKeyConstraintExists foreignKeyName="fk_git_commit_author"/></not>
+        </preConditions>
+        <addForeignKeyConstraint
+            baseTableName="git_commit"
+            baseColumnNames="author_id"
+            constraintName="fk_git_commit_author"
+            referencedTableName="user"
+            referencedColumnNames="id"
+            onDelete="SET NULL"/>
+    </changeSet>
+
+    <changeSet id="1772000000000-5" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not><foreignKeyConstraintExists foreignKeyName="fk_git_commit_committer"/></not>
+        </preConditions>
+        <addForeignKeyConstraint
+            baseTableName="git_commit"
+            baseColumnNames="committer_id"
+            constraintName="fk_git_commit_committer"
+            referencedTableName="user"
+            referencedColumnNames="id"
+            onDelete="SET NULL"/>
+    </changeSet>
+
+    <changeSet id="1772000000000-6" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not><foreignKeyConstraintExists foreignKeyName="fk_commit_file_change_commit"/></not>
+        </preConditions>
+        <addForeignKeyConstraint
+            baseTableName="commit_file_change"
+            baseColumnNames="commit_id"
+            constraintName="fk_commit_file_change_commit"
+            referencedTableName="git_commit"
+            referencedColumnNames="id"
+            onDelete="CASCADE"/>
+    </changeSet>
+
+    <!-- ========================================================================
+         Unique Constraints
+         ======================================================================== -->
+
+    <changeSet id="1772000000000-7" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not><uniqueConstraintExists tableName="git_commit" constraintName="uq_git_commit_sha_repository"/></not>
+        </preConditions>
+        <addUniqueConstraint
+            tableName="git_commit"
+            columnNames="sha, repository_id"
+            constraintName="uq_git_commit_sha_repository"/>
+    </changeSet>
+
+    <!-- ========================================================================
+         Indexes
+         ======================================================================== -->
+
+    <changeSet id="1772000000000-8" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not><indexExists indexName="idx_git_commit_repository_id"/></not>
+        </preConditions>
+        <createIndex tableName="git_commit" indexName="idx_git_commit_repository_id">
+            <column name="repository_id"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="1772000000000-9" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not><indexExists indexName="idx_git_commit_author_id"/></not>
+        </preConditions>
+        <createIndex tableName="git_commit" indexName="idx_git_commit_author_id">
+            <column name="author_id"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="1772000000000-10" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not><indexExists indexName="idx_git_commit_authored_at"/></not>
+        </preConditions>
+        <createIndex tableName="git_commit" indexName="idx_git_commit_authored_at">
+            <column name="authored_at"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="1772000000000-11" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not><indexExists indexName="idx_commit_file_change_commit_id"/></not>
+        </preConditions>
+        <createIndex tableName="commit_file_change" indexName="idx_commit_file_change_commit_id">
+            <column name="commit_id"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="1772000000000-12" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not><indexExists indexName="idx_commit_file_change_filename"/></not>
+        </preConditions>
+        <createIndex tableName="commit_file_change" indexName="idx_commit_file_change_filename">
+            <column name="filename"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

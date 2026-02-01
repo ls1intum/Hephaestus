@@ -25,6 +25,15 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     @Query(
         """
+            SELECT u
+            FROM User u
+            WHERE u.email ILIKE :email
+        """
+    )
+    Optional<User> findByEmail(@Param("email") String email);
+
+    @Query(
+        """
             SELECT DISTINCT u
             FROM User u
             LEFT JOIN FETCH u.mergedPullRequests mpr
