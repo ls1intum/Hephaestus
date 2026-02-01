@@ -119,6 +119,21 @@ export function UsersTable({ users, teams, isLoading = false }: UsersTableProps)
 		[teams],
 	);
 
+	// Items for team filter Select
+	const teamFilterItems = useMemo(
+		() => [
+			{ value: "all", label: "All teams" },
+			...sortedTeams.map((team) => ({ value: team.id.toString(), label: team.name })),
+		],
+		[sortedTeams],
+	);
+
+	// Items for page size Select
+	const pageSizeItems = useMemo(
+		() => [10, 20, 30, 40, 50].map((size) => ({ value: `${size}`, label: `${size}` })),
+		[],
+	);
+
 	const table = useReactTable({
 		data: filteredData,
 		columns,
@@ -181,7 +196,11 @@ export function UsersTable({ users, teams, isLoading = false }: UsersTableProps)
 							className="pl-9 w-full sm:w-[300px]"
 						/>
 					</div>
-					<Select value={teamFilter} onValueChange={(value) => value && setTeamFilter(value)}>
+					<Select
+						value={teamFilter}
+						onValueChange={(value) => value && setTeamFilter(value)}
+						items={teamFilterItems}
+					>
 						<SelectTrigger className="w-full sm:w-[200px]">
 							<Filter className="mr-2 h-4 w-4" />
 							<SelectValue placeholder="Filter by team" />
@@ -321,9 +340,10 @@ export function UsersTable({ users, teams, isLoading = false }: UsersTableProps)
 							onValueChange={(value) => {
 								table.setPageSize(Number(value));
 							}}
+							items={pageSizeItems}
 						>
 							<SelectTrigger className="h-8 w-[70px]">
-								<SelectValue placeholder={table.getState().pagination.pageSize} />
+								<SelectValue />
 							</SelectTrigger>
 							<SelectContent side="top">
 								{[10, 20, 30, 40, 50].map((pageSize) => (

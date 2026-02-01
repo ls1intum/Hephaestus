@@ -1,9 +1,10 @@
+import type * as React from "react";
 import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
 import { cva, type VariantProps } from "class-variance-authority";
-import type * as React from "react";
-import { Separator } from "@/components/ui/separator";
+
 import { cn } from "@/lib/utils";
+import { Separator } from "@/components/ui/separator";
 
 function ItemGroup({ className, ...props }: React.ComponentProps<"div">) {
 	return (
@@ -31,7 +32,7 @@ function ItemSeparator({ className, ...props }: React.ComponentProps<typeof Sepa
 }
 
 const itemVariants = cva(
-	"[a]:hover:bg-muted rounded-md border text-sm w-full group/item focus-visible:border-ring focus-visible:ring-ring/50 flex items-center flex-wrap outline-none transition-colors duration-100 focus-visible:ring-[3px] [a]:transition-colors",
+	"[a]:hover:bg-muted rounded-lg border text-sm w-full group/item focus-visible:border-ring focus-visible:ring-ring/50 flex items-center flex-wrap outline-none transition-colors duration-100 focus-visible:ring-[3px] [a]:transition-colors",
 	{
 		variants: {
 			variant: {
@@ -40,7 +41,7 @@ const itemVariants = cva(
 				muted: "bg-muted/50 border-transparent",
 			},
 			size: {
-				default: "gap-3.5 px-4 py-3.5",
+				default: "gap-2.5 px-3 py-2.5",
 				sm: "gap-2.5 px-3 py-2.5",
 				xs: "gap-2 px-2.5 py-2 [[data-slot=dropdown-menu-content]_&]:p-0",
 			},

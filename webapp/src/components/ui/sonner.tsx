@@ -1,15 +1,15 @@
+import { useTheme } from "next-themes";
+import { Toaster as Sonner, type ToasterProps } from "sonner";
 import {
 	CircleCheckIcon,
 	InfoIcon,
-	Loader2Icon,
-	OctagonXIcon,
 	TriangleAlertIcon,
+	OctagonXIcon,
+	Loader2Icon,
 } from "lucide-react";
-import { Toaster as Sonner, type ToasterProps } from "sonner";
-import { useTheme } from "@/integrations/theme";
 
 const Toaster = ({ ...props }: ToasterProps) => {
-	const { theme } = useTheme();
+	const { theme = "system" } = useTheme();
 
 	return (
 		<Sonner
@@ -30,6 +30,11 @@ const Toaster = ({ ...props }: ToasterProps) => {
 					"--border-radius": "var(--radius)",
 				} as React.CSSProperties
 			}
+			toastOptions={{
+				classNames: {
+					toast: "cn-toast",
+				},
+			}}
 			{...props}
 		/>
 	);

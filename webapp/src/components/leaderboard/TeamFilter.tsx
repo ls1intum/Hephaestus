@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import {
@@ -20,10 +21,16 @@ export interface TeamFilterProps {
 }
 
 export function TeamFilter({ options = [], onTeamChange, selectedTeam = "all" }: TeamFilterProps) {
+	const items = useMemo(() => [{ value: "all", label: "All Teams" }, ...options], [options]);
+
 	return (
 		<div className="space-y-1.5">
 			<Label htmlFor="team">Team</Label>
-			<Select value={selectedTeam} onValueChange={(value) => value && onTeamChange?.(value)}>
+			<Select
+				value={selectedTeam}
+				onValueChange={(value) => value && onTeamChange?.(value)}
+				items={items}
+			>
 				<SelectTrigger id="team" className="w-full">
 					<SelectValue placeholder="Select Team" />
 				</SelectTrigger>

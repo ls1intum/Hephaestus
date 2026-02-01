@@ -1,10 +1,11 @@
+"use client";
+
 import type * as React from "react";
 
 import { cn } from "@/lib/utils";
 
 function Label({ className, ...props }: React.ComponentProps<"label">) {
 	return (
-		// biome-ignore lint/a11y/noLabelWithoutControl: This is a reusable component that receives htmlFor via spread props at the call site
 		<label
 			data-slot="label"
 			className={cn(

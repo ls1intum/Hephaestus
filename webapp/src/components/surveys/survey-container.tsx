@@ -9,7 +9,8 @@ import {
 	EmptyMedia,
 	EmptyTitle,
 } from "@/components/ui/empty";
-import { Progress } from "@/components/ui/progress";
+import { Progress as ProgressRoot } from "@base-ui/react/progress";
+import { ProgressIndicator, ProgressTrack } from "@/components/ui/progress";
 
 import type {
 	PostHogSurvey,
@@ -205,7 +206,11 @@ export function SurveyContainer({
 					</span>
 					<span>{Math.round(progress)}% complete</span>
 				</div>
-				<Progress value={progress} trackClassName="h-1.5" />
+				<ProgressRoot.Root value={progress}>
+					<ProgressTrack className="h-1.5">
+						<ProgressIndicator />
+					</ProgressTrack>
+				</ProgressRoot.Root>
 			</div>
 
 			<div className="flex-1 overflow-y-auto px-4 pb-4 sm:px-6 sm:pb-6">

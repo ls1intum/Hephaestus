@@ -1,6 +1,6 @@
 import { format, isSameYear, parseISO, subDays } from "date-fns";
 import { CalendarDays, CalendarIcon, CalendarRange, Clock } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { DateRange } from "react-day-picker";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -17,7 +17,6 @@ import {
 	detectPresetFromDates,
 	formatDateRangeForApi,
 	formatDropdownLabel,
-	formatSelectedLabel,
 	getDateRangeForPreset,
 	type LeaderboardSchedule,
 	type TimeframePreset,
@@ -74,6 +73,20 @@ export function ProfileTimeframePicker({
 	});
 
 	const lastEmittedRef = useRef<{ after: string; before?: string } | null>(null);
+
+	const items = useMemo(() => {
+		const baseItems = [
+			{ value: "this-week", label: formatDropdownLabel("this-week") },
+			{ value: "last-week", label: formatDropdownLabel("last-week") },
+			{ value: "this-month", label: formatDropdownLabel("this-month") },
+			{ value: "last-month", label: formatDropdownLabel("last-month") },
+			{ value: "custom", label: formatDropdownLabel("custom") },
+		];
+		if (enableAllActivity) {
+			return [{ value: "all-activity", label: formatDropdownLabel("all-activity") }, ...baseItems];
+		}
+		return baseItems;
+	}, [enableAllActivity]);
 
 	useEffect(() => {
 		if (userInteracted) return;
@@ -163,58 +176,43 @@ export function ProfileTimeframePicker({
 		return `${format(from, "MMM d, yyyy")} – ${format(to, "MMM d, yyyy")}`;
 	};
 
-	// Trigger shows detailed label (with dates), dropdown shows simple labels
-	const selectDisplayValue =
-		selectedPreset === "custom" ? "Custom range" : formatSelectedLabel(selectedPreset, schedule);
-
 	return (
 		<div className="flex flex-wrap items-center gap-2">
-			<Select value={selectedPreset} onValueChange={(value) => value && handlePresetChange(value)}>
+			<Select
+				value={selectedPreset}
+				onValueChange={(value) => value && handlePresetChange(value)}
+				items={items}
+			>
 				<SelectTrigger className="w-auto min-w-[260px]">
-					<div className="flex items-center gap-2">
-						<PresetIcon preset={selectedPreset} className="text-muted-foreground" />
-						<SelectValue>{selectDisplayValue}</SelectValue>
-					</div>
+					<SelectValue placeholder="Select timeframe" />
 				</SelectTrigger>
 				<SelectContent>
 					{/* Dropdown items use simple labels - easy to scan */}
 					{enableAllActivity && (
 						<SelectItem value="all-activity">
-							<div className="flex items-center gap-2">
-								<PresetIcon preset="all-activity" />
-								<span>{formatDropdownLabel("all-activity")}</span>
-							</div>
+							<PresetIcon preset="all-activity" />
+							<span>{formatDropdownLabel("all-activity")}</span>
 						</SelectItem>
 					)}
 					<SelectItem value="this-week">
-						<div className="flex items-center gap-2">
-							<PresetIcon preset="this-week" />
-							<span>{formatDropdownLabel("this-week")}</span>
-						</div>
+						<PresetIcon preset="this-week" />
+						<span>{formatDropdownLabel("this-week")}</span>
 					</SelectItem>
 					<SelectItem value="last-week">
-						<div className="flex items-center gap-2">
-							<PresetIcon preset="last-week" />
-							<span>{formatDropdownLabel("last-week")}</span>
-						</div>
+						<PresetIcon preset="last-week" />
+						<span>{formatDropdownLabel("last-week")}</span>
 					</SelectItem>
 					<SelectItem value="this-month">
-						<div className="flex items-center gap-2">
-							<PresetIcon preset="this-month" />
-							<span>{formatDropdownLabel("this-month")}</span>
-						</div>
+						<PresetIcon preset="this-month" />
+						<span>{formatDropdownLabel("this-month")}</span>
 					</SelectItem>
 					<SelectItem value="last-month">
-						<div className="flex items-center gap-2">
-							<PresetIcon preset="last-month" />
-							<span>{formatDropdownLabel("last-month")}</span>
-						</div>
+						<PresetIcon preset="last-month" />
+						<span>{formatDropdownLabel("last-month")}</span>
 					</SelectItem>
 					<SelectItem value="custom">
-						<div className="flex items-center gap-2">
-							<PresetIcon preset="custom" />
-							<span>{formatDropdownLabel("custom")}</span>
-						</div>
+						<PresetIcon preset="custom" />
+						<span>{formatDropdownLabel("custom")}</span>
 					</SelectItem>
 				</SelectContent>
 			</Select>
