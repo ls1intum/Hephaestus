@@ -259,7 +259,8 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
             FIXTURE_REPO_NAME,
             FIXTURE_REPO_FULL_NAME,
             false,
-            "https://github.com/" + FIXTURE_REPO_FULL_NAME
+            "https://github.com/" + FIXTURE_REPO_FULL_NAME,
+            "main"
         );
     }
 

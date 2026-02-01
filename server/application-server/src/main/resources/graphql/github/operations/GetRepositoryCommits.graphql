@@ -1,0 +1,89 @@
+# GraphQL query for fetching repository commits from the default branch
+# Used by GitHubCommitSyncService for GraphQL-based sync
+# Fetches commit history with author/committer information
+
+query GetRepositoryCommits(
+    $owner: String!
+    $name: String!
+    $first: Int!
+    $after: String
+    $since: GitTimestamp
+    $until: GitTimestamp
+) {
+    rateLimit {
+        cost
+        limit
+        remaining
+        resetAt
+    }
+    repository(owner: $owner, name: $name) {
+        defaultBranchRef {
+            name
+            target {
+                ... on Commit {
+                    history(first: $first, after: $after, since: $since, until: $until) {
+                        pageInfo {
+                            hasNextPage
+                            endCursor
+                        }
+                        totalCount
+                        nodes {
+                            oid
+                            message
+                            messageHeadline
+                            messageBody
+                            url
+                            committedDate
+                            authoredDate
+                            additions
+                            deletions
+                            changedFilesIfAvailable
+
+                            # Author (Git user, may not be a GitHub user)
+                            author {
+                                name
+                                email
+                                date
+                                user {
+                                    id
+                                    databaseId
+                                    login
+                                    avatarUrl
+                                    name
+                                    email
+                                    createdAt
+                                    updatedAt
+                                }
+                            }
+
+                            # Committer (Git user, may not be a GitHub user)
+                            committer {
+                                name
+                                email
+                                date
+                                user {
+                                    id
+                                    databaseId
+                                    login
+                                    avatarUrl
+                                    name
+                                    email
+                                    createdAt
+                                    updatedAt
+                                }
+                            }
+
+                            # Parents (for merge detection)
+                            parents(first: 5) {
+                                totalCount
+                                nodes {
+                                    oid
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

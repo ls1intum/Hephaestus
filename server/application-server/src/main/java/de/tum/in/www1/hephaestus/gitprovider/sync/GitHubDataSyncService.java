@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.gitprovider.sync;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
+import de.tum.in.www1.hephaestus.gitprovider.commit.github.GitHubCommitSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.Category;
@@ -14,6 +15,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncMetadata;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncTarget;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncType;
+import de.tum.in.www1.hephaestus.gitprovider.discussion.github.GitHubDiscussionSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.GitHubIssueSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.issuedependency.github.GitHubIssueDependencySyncService;
 import de.tum.in.www1.hephaestus.gitprovider.issuetype.github.GitHubIssueTypeSyncService;
@@ -79,6 +81,8 @@ public class GitHubDataSyncService {
     private final GitHubIssueTypeSyncService issueTypeSyncService;
     private final GitHubSubIssueSyncService subIssueSyncService;
     private final GitHubPullRequestSyncService pullRequestSyncService;
+    private final GitHubDiscussionSyncService discussionSyncService;
+    private final GitHubCommitSyncService commitSyncService;
     private final GitHubTeamSyncService teamSyncService;
     private final GitHubOrganizationSyncService organizationSyncService;
     private final GitHubRepositorySyncService repositorySyncService;
@@ -101,6 +105,8 @@ public class GitHubDataSyncService {
         GitHubIssueTypeSyncService issueTypeSyncService,
         GitHubSubIssueSyncService subIssueSyncService,
         GitHubPullRequestSyncService pullRequestSyncService,
+        GitHubDiscussionSyncService discussionSyncService,
+        GitHubCommitSyncService commitSyncService,
         GitHubTeamSyncService teamSyncService,
         GitHubOrganizationSyncService organizationSyncService,
         GitHubRepositorySyncService repositorySyncService,
@@ -121,6 +127,8 @@ public class GitHubDataSyncService {
         this.issueTypeSyncService = issueTypeSyncService;
         this.subIssueSyncService = subIssueSyncService;
         this.pullRequestSyncService = pullRequestSyncService;
+        this.discussionSyncService = discussionSyncService;
+        this.commitSyncService = commitSyncService;
         this.teamSyncService = teamSyncService;
         this.organizationSyncService = organizationSyncService;
         this.repositorySyncService = repositorySyncService;
@@ -258,8 +266,19 @@ public class GitHubDataSyncService {
                 );
             }
 
+            // Sync discussions and comments (with cursor persistence for resumability)
+            SyncResult discussionResult = discussionSyncService.syncForRepository(
+                scopeId,
+                repositoryId,
+                syncTarget.id(),
+                syncTarget.discussionSyncCursor()
+            );
+
+            // Sync commits (from default branch)
+            SyncResult commitResult = commitSyncService.syncForRepository(scopeId, repositoryId);
+
             log.info(
-                "Completed repository sync: scopeId={}, repoId={}, collaborators={}, labels={}, milestones={}, issues={}, prs={}, issueStatus={}, prStatus={}",
+                "Completed repository sync: scopeId={}, repoId={}, collaborators={}, labels={}, milestones={}, issues={}, prs={}, discussions={}, commits={}, issueStatus={}, prStatus={}",
                 scopeId,
                 repositoryId,
                 collaboratorsCount >= 0 ? collaboratorsCount : "skipped",
@@ -267,6 +286,8 @@ public class GitHubDataSyncService {
                 milestonesCount,
                 issueResult.count(),
                 prResult.count(),
+                discussionResult.count(),
+                commitResult.count(),
                 issueResult.status(),
                 prResult.status()
             );

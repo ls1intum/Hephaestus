@@ -1,0 +1,419 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                   http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+    =======================================================================================
+    GitHub Discussions and Commits Feature Migration
+    =======================================================================================
+
+    This changelog adds support for GitHub Discussions and Git Commits.
+
+    Table of Contents:
+    ==================
+    SECTION 1: Discussion Category Table
+    SECTION 2: Discussion Table
+    SECTION 3: Discussion Comment Table
+    SECTION 4: Discussion-Label Join Table
+    SECTION 5: Commit Table
+    SECTION 6: Commit File Change Table
+    SECTION 7: Foreign Key Constraints
+    SECTION 8: Performance Indexes
+
+    Entity Notes:
+    =============
+    - DiscussionCategory uses String ID (node_id) since GitHub doesn't expose databaseId
+    - Discussion and DiscussionComment extend BaseGitServiceEntity (Long id, createdAt, updatedAt)
+    - Commit uses auto-generated Long ID with unique constraint on (sha, repository_id)
+    - CommitFileChange uses auto-generated Long id
+
+    See: PR #643 (https://github.com/ls1intum/Hephaestus/pull/643)
+    =======================================================================================
+    -->
+
+    <!-- ==================== SECTION 1: Discussion Category Table ==================== -->
+
+    <changeSet id="1770000000000-1-create-discussion-category" author="GitHubDiscussionFeature">
+        <comment>Create discussion_category table for GitHub discussion categories</comment>
+        <createTable tableName="discussion_category">
+            <!-- Primary key is node_id (String) since databaseId is not available -->
+            <column name="id" type="VARCHAR(128)">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="name" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="slug" type="VARCHAR(128)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="emoji" type="VARCHAR(32)"/>
+            <column name="description" type="TEXT"/>
+            <column name="is_answerable" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="repository_id" type="BIGINT"/>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"/>
+        </createTable>
+    </changeSet>
+
+    <!-- ==================== SECTION 2: Discussion Table ==================== -->
+
+    <changeSet id="1770000000000-2-create-discussion" author="GitHubDiscussionFeature">
+        <comment>Create discussion table for GitHub discussions</comment>
+        <createTable tableName="discussion">
+            <!-- BaseGitServiceEntity fields -->
+            <column name="id" type="BIGINT">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <!-- Discussion-specific fields -->
+            <column name="number" type="INTEGER">
+                <constraints nullable="false"/>
+            </column>
+            <column name="title" type="VARCHAR(1024)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="body" type="TEXT"/>
+            <column name="html_url" type="VARCHAR(512)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="state" type="VARCHAR(16)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="state_reason" type="VARCHAR(32)"/>
+            <column name="is_locked" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="active_lock_reason" type="VARCHAR(32)"/>
+            <column name="closed_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="answer_chosen_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="comment_count" type="INTEGER" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="last_sync_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <!-- Foreign keys -->
+            <column name="repository_id" type="BIGINT"/>
+            <column name="author_id" type="BIGINT"/>
+            <column name="category_id" type="VARCHAR(128)"/>
+            <column name="answer_chosen_by_id" type="BIGINT"/>
+            <column name="answer_comment_id" type="BIGINT"/>
+        </createTable>
+    </changeSet>
+
+    <!-- ==================== SECTION 3: Discussion Comment Table ==================== -->
+
+    <changeSet id="1770000000000-3-create-discussion-comment" author="GitHubDiscussionFeature">
+        <comment>Create discussion_comment table for comments on GitHub discussions</comment>
+        <createTable tableName="discussion_comment">
+            <!-- BaseGitServiceEntity fields -->
+            <column name="id" type="BIGINT">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="created_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <!-- DiscussionComment-specific fields -->
+            <column name="body" type="TEXT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="html_url" type="VARCHAR(512)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="is_answer" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="is_minimized" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="minimized_reason" type="VARCHAR(64)"/>
+            <column name="author_association" type="VARCHAR(32)"/>
+            <column name="last_sync_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <!-- Foreign keys -->
+            <column name="discussion_id" type="BIGINT"/>
+            <column name="author_id" type="BIGINT"/>
+            <column name="parent_comment_id" type="BIGINT"/>
+        </createTable>
+    </changeSet>
+
+    <!-- ==================== SECTION 4: Discussion-Label Join Table ==================== -->
+
+    <changeSet id="1770000000000-4-create-discussion-label" author="GitHubDiscussionFeature">
+        <comment>Create discussion_label join table for discussion-to-label many-to-many relationship</comment>
+        <createTable tableName="discussion_label">
+            <column name="discussion_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="label_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addPrimaryKey tableName="discussion_label" columnNames="discussion_id, label_id"/>
+    </changeSet>
+
+    <!-- ==================== SECTION 5: Commit Table ==================== -->
+
+    <changeSet id="1770000000000-5-create-commit" author="GitHubDiscussionFeature">
+        <comment>Create commit table for Git commits</comment>
+        <createTable tableName="commit">
+            <!-- Auto-generated primary key -->
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <!-- SHA is unique per repository, not globally -->
+            <column name="sha" type="VARCHAR(40)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="message" type="VARCHAR(1024)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="message_body" type="TEXT"/>
+            <column name="html_url" type="VARCHAR(512)"/>
+            <column name="authored_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="committed_at" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="additions" type="INTEGER" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="deletions" type="INTEGER" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="changed_files" type="INTEGER" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="last_sync_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <!-- Foreign keys -->
+            <column name="repository_id" type="BIGINT"/>
+            <column name="author_id" type="BIGINT"/>
+            <column name="committer_id" type="BIGINT"/>
+        </createTable>
+    </changeSet>
+
+    <!-- ==================== SECTION 6: Commit File Change Table ==================== -->
+
+    <changeSet id="1770000000000-6-create-commit-file-change" author="GitHubDiscussionFeature">
+        <comment>Create commit_file_change table for file changes within commits</comment>
+        <createTable tableName="commit_file_change">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="filename" type="VARCHAR(1024)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="change_type" type="VARCHAR(32)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="additions" type="INTEGER" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="deletions" type="INTEGER" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="changes" type="INTEGER" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="previous_filename" type="VARCHAR(1024)"/>
+            <column name="patch" type="TEXT"/>
+            <!-- Foreign key to commit -->
+            <column name="commit_id" type="BIGINT"/>
+        </createTable>
+    </changeSet>
+
+    <!-- ==================== SECTION 7: Foreign Key Constraints ==================== -->
+
+    <changeSet id="1770000000000-7-add-foreign-keys" author="GitHubDiscussionFeature">
+        <comment>Add foreign key constraints for discussion and commit tables</comment>
+
+        <!-- discussion_category -> repository -->
+        <addForeignKeyConstraint baseTableName="discussion_category" baseColumnNames="repository_id"
+                                 constraintName="fk_discussion_category_repository"
+                                 referencedTableName="repository" referencedColumnNames="id"
+                                 onDelete="CASCADE"/>
+
+        <!-- discussion -> repository -->
+        <addForeignKeyConstraint baseTableName="discussion" baseColumnNames="repository_id"
+                                 constraintName="fk_discussion_repository"
+                                 referencedTableName="repository" referencedColumnNames="id"
+                                 onDelete="CASCADE"/>
+
+        <!-- discussion -> user (author) -->
+        <addForeignKeyConstraint baseTableName="discussion" baseColumnNames="author_id"
+                                 constraintName="fk_discussion_author"
+                                 referencedTableName="user" referencedColumnNames="id"
+                                 onDelete="SET NULL"/>
+
+        <!-- discussion -> discussion_category -->
+        <addForeignKeyConstraint baseTableName="discussion" baseColumnNames="category_id"
+                                 constraintName="fk_discussion_category"
+                                 referencedTableName="discussion_category" referencedColumnNames="id"
+                                 onDelete="SET NULL"/>
+
+        <!-- discussion -> user (answer_chosen_by) -->
+        <addForeignKeyConstraint baseTableName="discussion" baseColumnNames="answer_chosen_by_id"
+                                 constraintName="fk_discussion_answer_chosen_by"
+                                 referencedTableName="user" referencedColumnNames="id"
+                                 onDelete="SET NULL"/>
+
+        <!-- discussion -> discussion_comment (answer_comment) - added later to avoid circular reference during creation -->
+        <addForeignKeyConstraint baseTableName="discussion" baseColumnNames="answer_comment_id"
+                                 constraintName="fk_discussion_answer_comment"
+                                 referencedTableName="discussion_comment" referencedColumnNames="id"
+                                 onDelete="SET NULL"/>
+
+        <!-- discussion_comment -> discussion -->
+        <addForeignKeyConstraint baseTableName="discussion_comment" baseColumnNames="discussion_id"
+                                 constraintName="fk_discussion_comment_discussion"
+                                 referencedTableName="discussion" referencedColumnNames="id"
+                                 onDelete="CASCADE"/>
+
+        <!-- discussion_comment -> user (author) -->
+        <addForeignKeyConstraint baseTableName="discussion_comment" baseColumnNames="author_id"
+                                 constraintName="fk_discussion_comment_author"
+                                 referencedTableName="user" referencedColumnNames="id"
+                                 onDelete="SET NULL"/>
+
+        <!-- discussion_comment -> discussion_comment (parent_comment for threading) -->
+        <addForeignKeyConstraint baseTableName="discussion_comment" baseColumnNames="parent_comment_id"
+                                 constraintName="fk_discussion_comment_parent"
+                                 referencedTableName="discussion_comment" referencedColumnNames="id"
+                                 onDelete="SET NULL"/>
+
+        <!-- discussion_label -> discussion -->
+        <addForeignKeyConstraint baseTableName="discussion_label" baseColumnNames="discussion_id"
+                                 constraintName="fk_discussion_label_discussion"
+                                 referencedTableName="discussion" referencedColumnNames="id"
+                                 onDelete="CASCADE"/>
+
+        <!-- discussion_label -> label -->
+        <addForeignKeyConstraint baseTableName="discussion_label" baseColumnNames="label_id"
+                                 constraintName="fk_discussion_label_label"
+                                 referencedTableName="label" referencedColumnNames="id"
+                                 onDelete="CASCADE"/>
+
+        <!-- commit -> repository -->
+        <addForeignKeyConstraint baseTableName="commit" baseColumnNames="repository_id"
+                                 constraintName="fk_commit_repository"
+                                 referencedTableName="repository" referencedColumnNames="id"
+                                 onDelete="CASCADE"/>
+
+        <!-- commit -> user (author) -->
+        <addForeignKeyConstraint baseTableName="commit" baseColumnNames="author_id"
+                                 constraintName="fk_commit_author"
+                                 referencedTableName="user" referencedColumnNames="id"
+                                 onDelete="SET NULL"/>
+
+        <!-- commit -> user (committer) -->
+        <addForeignKeyConstraint baseTableName="commit" baseColumnNames="committer_id"
+                                 constraintName="fk_commit_committer"
+                                 referencedTableName="user" referencedColumnNames="id"
+                                 onDelete="SET NULL"/>
+
+        <!-- commit_file_change -> commit -->
+        <addForeignKeyConstraint baseTableName="commit_file_change" baseColumnNames="commit_id"
+                                 constraintName="fk_commit_file_change_commit"
+                                 referencedTableName="commit" referencedColumnNames="id"
+                                 onDelete="CASCADE"/>
+    </changeSet>
+
+    <!-- ==================== SECTION 8: Unique Constraints ==================== -->
+
+    <changeSet id="1770000000000-8-add-unique-constraints" author="GitHubDiscussionFeature">
+        <comment>Add unique constraints for discussion and commit tables</comment>
+
+        <!-- discussion_category: unique (repository_id, slug) -->
+        <addUniqueConstraint tableName="discussion_category"
+                             columnNames="repository_id, slug"
+                             constraintName="uq_discussion_category_repo_slug"/>
+
+        <!-- discussion: unique (repository_id, number) -->
+        <addUniqueConstraint tableName="discussion"
+                             columnNames="repository_id, number"
+                             constraintName="uq_discussion_repo_number"/>
+
+        <!-- commit: unique (sha, repository_id) - same SHA can exist in different repos (forks) -->
+        <addUniqueConstraint tableName="commit"
+                             columnNames="sha, repository_id"
+                             constraintName="uq_commit_sha_repo"/>
+    </changeSet>
+
+    <!-- ==================== SECTION 9: Performance Indexes ==================== -->
+
+    <changeSet id="1770000000000-9-add-indexes" author="GitHubDiscussionFeature">
+        <comment>Add performance indexes for discussion and commit tables</comment>
+
+        <!-- Discussion indexes -->
+        <createIndex tableName="discussion" indexName="idx_discussion_repository">
+            <column name="repository_id"/>
+        </createIndex>
+        <createIndex tableName="discussion" indexName="idx_discussion_author">
+            <column name="author_id"/>
+        </createIndex>
+        <createIndex tableName="discussion" indexName="idx_discussion_category">
+            <column name="category_id"/>
+        </createIndex>
+        <createIndex tableName="discussion" indexName="idx_discussion_state">
+            <column name="state"/>
+        </createIndex>
+        <createIndex tableName="discussion" indexName="idx_discussion_created_at">
+            <column name="created_at"/>
+        </createIndex>
+
+        <!-- Discussion comment indexes -->
+        <createIndex tableName="discussion_comment" indexName="idx_discussion_comment_discussion">
+            <column name="discussion_id"/>
+        </createIndex>
+        <createIndex tableName="discussion_comment" indexName="idx_discussion_comment_discussion_created">
+            <column name="discussion_id"/>
+            <column name="created_at"/>
+        </createIndex>
+        <createIndex tableName="discussion_comment" indexName="idx_discussion_comment_author">
+            <column name="author_id"/>
+        </createIndex>
+        <createIndex tableName="discussion_comment" indexName="idx_discussion_comment_parent">
+            <column name="parent_comment_id"/>
+        </createIndex>
+        <createIndex tableName="discussion_comment" indexName="idx_discussion_comment_is_answer">
+            <column name="is_answer"/>
+        </createIndex>
+
+        <!-- Commit indexes -->
+        <createIndex tableName="commit" indexName="idx_commit_repository">
+            <column name="repository_id"/>
+        </createIndex>
+        <createIndex tableName="commit" indexName="idx_commit_repo_committed_at">
+            <column name="repository_id"/>
+            <column name="committed_at" descending="true"/>
+        </createIndex>
+        <createIndex tableName="commit" indexName="idx_commit_author">
+            <column name="author_id"/>
+        </createIndex>
+        <createIndex tableName="commit" indexName="idx_commit_committer">
+            <column name="committer_id"/>
+        </createIndex>
+        <createIndex tableName="commit" indexName="idx_commit_authored_at">
+            <column name="authored_at"/>
+        </createIndex>
+        <createIndex tableName="commit" indexName="idx_commit_committed_at">
+            <column name="committed_at"/>
+        </createIndex>
+
+        <!-- Commit file change indexes -->
+        <createIndex tableName="commit_file_change" indexName="idx_commit_file_change_commit">
+            <column name="commit_id"/>
+        </createIndex>
+        <createIndex tableName="commit_file_change" indexName="idx_commit_file_change_type">
+            <column name="change_type"/>
+        </createIndex>
+
+        <!-- Discussion category indexes -->
+        <createIndex tableName="discussion_category" indexName="idx_discussion_category_repository">
+            <column name="repository_id"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

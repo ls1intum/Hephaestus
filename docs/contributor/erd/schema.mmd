@@ -72,6 +72,91 @@ erDiagram
         BIGINT workspace_id FK "NOT NULL"
     }
 
+    Commit {
+        BIGINT id PK
+        VARCHAR(40) sha UK "NOT NULL"
+        VARCHAR(1024) message "NOT NULL"
+        TEXT message_body
+        VARCHAR(512) html_url
+        TIMESTAMPTZ authored_at "NOT NULL"
+        TIMESTAMPTZ committed_at "NOT NULL"
+        INTEGER additions "NOT NULL"
+        INTEGER deletions "NOT NULL"
+        INTEGER changed_files "NOT NULL"
+        TIMESTAMPTZ last_sync_at
+        BIGINT repository_id FK,UK
+        BIGINT author_id FK
+        BIGINT committer_id FK
+    }
+
+    CommitFileChange {
+        BIGINT id PK
+        VARCHAR(1024) filename "NOT NULL"
+        VARCHAR(32) change_type "NOT NULL"
+        INTEGER additions "NOT NULL"
+        INTEGER deletions "NOT NULL"
+        INTEGER changes "NOT NULL"
+        VARCHAR(1024) previous_filename
+        TEXT patch
+        BIGINT commit_id FK
+    }
+
+    Discussion {
+        BIGINT id PK
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+        INTEGER number UK "NOT NULL"
+        VARCHAR(1024) title "NOT NULL"
+        TEXT body
+        VARCHAR(512) html_url "NOT NULL"
+        VARCHAR(16) state "NOT NULL"
+        VARCHAR(32) state_reason
+        BOOLEAN is_locked "NOT NULL"
+        VARCHAR(32) active_lock_reason
+        TIMESTAMPTZ closed_at
+        TIMESTAMPTZ answer_chosen_at
+        INTEGER comment_count "NOT NULL"
+        TIMESTAMPTZ last_sync_at
+        BIGINT repository_id FK,UK
+        BIGINT author_id FK
+        VARCHAR(128) category_id FK
+        BIGINT answer_chosen_by_id FK
+        BIGINT answer_comment_id FK,UK
+    }
+
+    DiscussionCategory {
+        VARCHAR(128) id PK
+        VARCHAR(255) name "NOT NULL"
+        VARCHAR(128) slug UK "NOT NULL"
+        VARCHAR(32) emoji
+        TEXT description
+        BOOLEAN is_answerable "NOT NULL"
+        BIGINT repository_id FK,UK
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+    }
+
+    DiscussionComment {
+        BIGINT id PK
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+        TEXT body
+        VARCHAR(512) html_url "NOT NULL"
+        BOOLEAN is_answer "NOT NULL"
+        BOOLEAN is_minimized "NOT NULL"
+        VARCHAR(64) minimized_reason
+        VARCHAR(32) author_association
+        TIMESTAMPTZ last_sync_at
+        BIGINT discussion_id FK
+        BIGINT author_id FK
+        BIGINT parent_comment_id FK
+    }
+
+    DiscussionLabel {
+        BIGINT discussion_id PK,FK
+        BIGINT label_id PK,FK
+    }
+
     Document {
         UUID id PK
         INTEGER version_number PK
@@ -317,6 +402,7 @@ erDiagram
         INTEGER issue_backfill_checkpoint
         INTEGER pull_request_backfill_high_water_mark
         INTEGER pull_request_backfill_checkpoint
+        VARCHAR(255) discussion_sync_cursor
     }
 
     Team {
@@ -435,6 +521,10 @@ erDiagram
     Workspace ||--|| ActivityEvent : has
     ChatMessage ||--|| ChatMessagePart : has
     ChatMessage ||--|| ChatThread : references
+    Repository ||--|| Commit : has
+    DiscussionComment ||--|| Discussion : references
+    Repository ||--|| Discussion : has
+    Repository ||--|| DiscussionCategory : has
     Repository ||--|| Issue : has
     Repository ||--|| Label : labeled
     Repository ||--|| Milestone : has
@@ -453,6 +543,15 @@ erDiagram
     ChatThread ||--o{ ChatMessage : has
     User ||--o{ ChatThread : has
     Workspace ||--o{ ChatThread : has
+    User ||--o{ Commit : authored_by
+    User ||--o{ Commit : references
+    Commit ||--o{ CommitFileChange : has
+    User ||--o{ Discussion : references
+    User ||--o{ Discussion : authored_by
+    DiscussionCategory ||--o{ Discussion : has
+    User ||--o{ DiscussionComment : commented_on
+    Discussion ||--o{ DiscussionComment : commented_on
+    DiscussionComment ||--o{ DiscussionComment : commented_on
     User ||--o{ Document : has
     Workspace ||--o{ Document : has
     User ||--o{ Issue : authored_by
@@ -480,6 +579,8 @@ erDiagram
     Workspace ||--o{ WorkspaceSlugHistory : has
 
     %% Many-to-Many relationships
+    Discussion }o--o{ DiscussionLabel : labeled
+    Label }o--o{ DiscussionLabel : labeled
     Issue }o--o{ IssueAssignee : assigned_to
     User }o--o{ IssueAssignee : assigned_to
     Issue }o--o{ IssueBlocking : has

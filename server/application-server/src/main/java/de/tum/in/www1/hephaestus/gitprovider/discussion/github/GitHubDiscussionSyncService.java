@@ -1,0 +1,745 @@
+package de.tum.in.www1.hephaestus.gitprovider.discussion.github;
+
+import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.DEFAULT_PAGE_SIZE;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.MAX_PAGINATION_PAGES;
+
+import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.ExponentialBackoff;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.Category;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.BackfillStateProvider;
+import de.tum.in.www1.hephaestus.gitprovider.discussion.Discussion;
+import de.tum.in.www1.hephaestus.gitprovider.discussion.DiscussionRepository;
+import de.tum.in.www1.hephaestus.gitprovider.discussion.github.dto.GitHubDiscussionDTO;
+import de.tum.in.www1.hephaestus.gitprovider.discussioncomment.DiscussionComment;
+import de.tum.in.www1.hephaestus.gitprovider.discussioncomment.DiscussionCommentRepository;
+import de.tum.in.www1.hephaestus.gitprovider.discussioncomment.github.GitHubDiscussionCommentProcessor;
+import de.tum.in.www1.hephaestus.gitprovider.discussioncomment.github.dto.GitHubDiscussionCommentDTO;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHDiscussionCommentConnection;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHDiscussionConnection;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPageInfo;
+import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
+import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
+import de.tum.in.www1.hephaestus.gitprovider.sync.SyncResult;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.graphql.client.ClientGraphQlResponse;
+import org.springframework.graphql.client.GraphQlTransportException;
+import org.springframework.graphql.client.HttpGraphQlClient;
+import org.springframework.lang.Nullable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
+import reactor.core.publisher.Mono;
+import reactor.util.retry.Retry;
+
+/**
+ * Service for synchronizing GitHub Discussions via GraphQL API.
+ * <p>
+ * Discussions are fetched with embedded comments (first 10 per discussion).
+ * Discussions with more comments require additional pagination calls.
+ * <p>
+ * Supports checkpoint/cursor persistence for resumable sync operations.
+ * When a sync target ID is provided, the pagination cursor is persisted after
+ * each page, allowing sync to resume from where it left off if interrupted.
+ */
+@Service
+public class GitHubDiscussionSyncService {
+
+    private static final Logger log = LoggerFactory.getLogger(GitHubDiscussionSyncService.class);
+    private static final String QUERY_DOCUMENT = "GetRepositoryDiscussions";
+    private static final String COMMENTS_QUERY_DOCUMENT = "GetDiscussionComments";
+    private static final int EMBEDDED_COMMENTS_COUNT = 10;
+
+    /** Maximum number of retry attempts for transient failures. */
+    private static final int MAX_RETRY_ATTEMPTS = 3;
+
+    /** Retry configuration for transport-level errors during body streaming. */
+    private static final int TRANSPORT_MAX_RETRIES = 2;
+    private static final Duration TRANSPORT_INITIAL_BACKOFF = Duration.ofMillis(500);
+
+    /**
+     * Container for discussions that need additional comment pagination.
+     * <p>
+     * Stores primitive IDs instead of the Discussion entity to avoid
+     * LazyInitializationException when accessing lazy relationships
+     * after the original transaction has ended.
+     */
+    private record DiscussionWithCommentCursor(
+        Long discussionId,
+        int discussionNumber,
+        Long repositoryId,
+        String commentCursor
+    ) {}
+
+    private final RepositoryRepository repositoryRepository;
+    private final DiscussionRepository discussionRepository;
+    private final DiscussionCommentRepository commentRepository;
+    private final GitHubGraphQlClientProvider graphQlClientProvider;
+    private final GitHubDiscussionProcessor discussionProcessor;
+    private final GitHubDiscussionCommentProcessor commentProcessor;
+    private final BackfillStateProvider backfillStateProvider;
+    private final TransactionTemplate transactionTemplate;
+    private final GitHubSyncProperties syncProperties;
+    private final GitHubExceptionClassifier exceptionClassifier;
+
+    public GitHubDiscussionSyncService(
+        RepositoryRepository repositoryRepository,
+        DiscussionRepository discussionRepository,
+        DiscussionCommentRepository commentRepository,
+        GitHubGraphQlClientProvider graphQlClientProvider,
+        GitHubDiscussionProcessor discussionProcessor,
+        GitHubDiscussionCommentProcessor commentProcessor,
+        BackfillStateProvider backfillStateProvider,
+        TransactionTemplate transactionTemplate,
+        GitHubSyncProperties syncProperties,
+        GitHubExceptionClassifier exceptionClassifier
+    ) {
+        this.repositoryRepository = repositoryRepository;
+        this.discussionRepository = discussionRepository;
+        this.commentRepository = commentRepository;
+        this.graphQlClientProvider = graphQlClientProvider;
+        this.discussionProcessor = discussionProcessor;
+        this.commentProcessor = commentProcessor;
+        this.backfillStateProvider = backfillStateProvider;
+        this.transactionTemplate = transactionTemplate;
+        this.syncProperties = syncProperties;
+        this.exceptionClassifier = exceptionClassifier;
+    }
+
+    /**
+     * Synchronizes all discussions for a repository without cursor persistence.
+     * <p>
+     * This method is kept for backward compatibility. For resumable sync with
+     * cursor persistence, use {@link #syncForRepository(Long, Long, Long, String)}.
+     *
+     * @param scopeId      the scope ID for authentication
+     * @param repositoryId the repository ID to sync discussions for
+     * @return sync result containing status and count of discussions synced
+     */
+    public SyncResult syncForRepository(Long scopeId, Long repositoryId) {
+        return syncForRepository(scopeId, repositoryId, null, null);
+    }
+
+    /**
+     * Synchronizes all discussions for a repository with cursor persistence support.
+     * <p>
+     * When {@code syncTargetId} is provided, the pagination cursor is persisted after
+     * each successfully processed page. This allows sync to resume from where it left
+     * off if the process is interrupted (e.g., crash, timeout, deployment).
+     * <p>
+     * On successful completion, the cursor is cleared to indicate sync finished.
+     *
+     * @param scopeId       the scope ID for authentication
+     * @param repositoryId  the repository ID to sync discussions for
+     * @param syncTargetId  the sync target ID for cursor persistence (null to disable)
+     * @param initialCursor the cursor to resume from (null to start from beginning)
+     * @return sync result containing status and count of discussions synced
+     */
+    public SyncResult syncForRepository(
+        Long scopeId,
+        Long repositoryId,
+        @Nullable Long syncTargetId,
+        @Nullable String initialCursor
+    ) {
+        // Fetch repository outside of transaction
+        Repository repository = transactionTemplate.execute(status ->
+            repositoryRepository.findById(repositoryId).orElse(null)
+        );
+        if (repository == null) {
+            log.debug("Skipped discussion sync: reason=repositoryNotFound, repoId={}", repositoryId);
+            return SyncResult.completed(0);
+        }
+
+        String nameWithOwner = repository.getNameWithOwner();
+        String safeNameWithOwner = sanitizeForLog(nameWithOwner);
+        Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(nameWithOwner);
+        if (parsedName.isEmpty()) {
+            log.warn("Skipped discussion sync: reason=invalidRepoNameFormat, repoName={}", safeNameWithOwner);
+            return SyncResult.completed(0);
+        }
+        RepositoryOwnerAndName ownerAndName = parsedName.get();
+
+        HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
+        Duration timeout = syncProperties.graphqlTimeout();
+
+        int totalDiscussionsSynced = 0;
+        int totalCommentsSynced = 0;
+        List<DiscussionWithCommentCursor> discussionsNeedingCommentPagination = new ArrayList<>();
+        String cursor = initialCursor;
+        boolean hasMore = true;
+        int pageCount = 0;
+        int retryAttempt = 0;
+        boolean resuming = initialCursor != null;
+        SyncResult.Status abortReason = null;
+
+        if (resuming) {
+            log.info(
+                "Resuming discussion sync from checkpoint: repoName={}, cursor={}",
+                safeNameWithOwner,
+                initialCursor.substring(0, Math.min(20, initialCursor.length())) + "..."
+            );
+        }
+
+        while (hasMore) {
+            pageCount++;
+            if (pageCount >= MAX_PAGINATION_PAGES) {
+                log.warn(
+                    "Reached maximum pagination limit for discussion sync: repoName={}, limit={}",
+                    safeNameWithOwner,
+                    MAX_PAGINATION_PAGES
+                );
+                break;
+            }
+
+            try {
+                final String currentCursor = cursor;
+                final int currentPage = pageCount;
+                ClientGraphQlResponse response = Mono.defer(() ->
+                    client
+                        .documentName(QUERY_DOCUMENT)
+                        .variable("owner", ownerAndName.owner())
+                        .variable("name", ownerAndName.name())
+                        .variable("first", DEFAULT_PAGE_SIZE)
+                        .variable("after", currentCursor)
+                        .execute()
+                )
+                    .retryWhen(
+                        Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                            .filter(this::isTransportError)
+                            .doBeforeRetry(signal ->
+                                log.warn(
+                                    "Retrying discussion sync after transport error: repoName={}, page={}, attempt={}, error={}",
+                                    safeNameWithOwner,
+                                    currentPage,
+                                    signal.totalRetries() + 1,
+                                    signal.failure().getMessage()
+                                )
+                            )
+                            .onRetryExhaustedThrow((spec, signal) -> signal.failure())
+                    )
+                    .block(timeout);
+
+                if (response == null || !response.isValid()) {
+                    log.warn(
+                        "Received invalid GraphQL response: repoName={}, errors={}",
+                        safeNameWithOwner,
+                        response != null ? response.getErrors() : "null"
+                    );
+                    break;
+                }
+
+                // Track rate limit
+                graphQlClientProvider.trackRateLimit(scopeId, response);
+                if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
+                    log.warn("Aborting discussion sync due to critical rate limit: repoName={}", safeNameWithOwner);
+                    abortReason = SyncResult.Status.ABORTED_RATE_LIMIT;
+                    break;
+                }
+
+                GHDiscussionConnection connection = response
+                    .field("repository.discussions")
+                    .toEntity(GHDiscussionConnection.class);
+
+                if (connection == null || connection.getNodes() == null || connection.getNodes().isEmpty()) {
+                    break;
+                }
+
+                // Process page within transaction
+                final Long repoId = repositoryId;
+                final List<DiscussionWithCommentCursor> pageDiscussionsNeedingPagination = new ArrayList<>();
+                PageResult pageResult = transactionTemplate.execute(status -> {
+                    Repository repo = repositoryRepository.findById(repoId).orElse(null);
+                    if (repo == null) {
+                        return new PageResult(0, 0);
+                    }
+                    ProcessingContext context = ProcessingContext.forSync(scopeId, repo);
+                    return processDiscussionPage(connection, context, pageDiscussionsNeedingPagination);
+                });
+
+                if (pageResult != null) {
+                    totalDiscussionsSynced += pageResult.discussionCount;
+                    totalCommentsSynced += pageResult.commentCount;
+                }
+                discussionsNeedingCommentPagination.addAll(pageDiscussionsNeedingPagination);
+
+                GHPageInfo pageInfo = connection.getPageInfo();
+                hasMore = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
+                cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
+
+                // Persist cursor checkpoint after each successful page (uses REQUIRES_NEW)
+                if (syncTargetId != null && cursor != null && hasMore) {
+                    persistCursorCheckpoint(syncTargetId, cursor);
+                }
+
+                // Reset retry counter after successful page
+                retryAttempt = 0;
+            } catch (Exception e) {
+                ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
+                Category category = classification.category();
+
+                switch (category) {
+                    case RETRYABLE -> {
+                        // Transient error - retry with exponential backoff
+                        if (retryAttempt < MAX_RETRY_ATTEMPTS) {
+                            retryAttempt++;
+                            log.warn(
+                                "Retrying discussion sync after transient error: repoName={}, attempt={}, error={}",
+                                safeNameWithOwner,
+                                retryAttempt,
+                                classification.message()
+                            );
+                            try {
+                                ExponentialBackoff.sleep(retryAttempt);
+                            } catch (InterruptedException ie) {
+                                Thread.currentThread().interrupt();
+                                log.warn("Discussion sync interrupted during backoff: repoName={}", safeNameWithOwner);
+                                abortReason = SyncResult.Status.ABORTED_ERROR;
+                                break;
+                            }
+                            continue; // Retry the same page
+                        }
+                        log.error(
+                            "Failed to sync discussions after {} retries: repoName={}, error={}",
+                            MAX_RETRY_ATTEMPTS,
+                            safeNameWithOwner,
+                            classification.message()
+                        );
+                        abortReason = SyncResult.Status.ABORTED_ERROR;
+                    }
+                    case RATE_LIMITED -> {
+                        // Rate limited - wait for reset time if available, then retry
+                        if (retryAttempt < MAX_RETRY_ATTEMPTS && classification.suggestedWait() != null) {
+                            retryAttempt++;
+                            long waitMs = Math.min(
+                                classification.suggestedWait().toMillis(),
+                                300_000 // Cap at 5 minutes
+                            );
+                            log.warn(
+                                "Rate limited during discussion sync, waiting: repoName={}, waitMs={}, attempt={}",
+                                safeNameWithOwner,
+                                waitMs,
+                                retryAttempt
+                            );
+                            try {
+                                Thread.sleep(waitMs);
+                            } catch (InterruptedException ie) {
+                                Thread.currentThread().interrupt();
+                                log.warn(
+                                    "Discussion sync interrupted during rate limit wait: repoName={}",
+                                    safeNameWithOwner
+                                );
+                                abortReason = SyncResult.Status.ABORTED_RATE_LIMIT;
+                                break;
+                            }
+                            continue; // Retry the same page
+                        }
+                        log.error(
+                            "Aborting discussion sync due to rate limiting: repoName={}, error={}",
+                            safeNameWithOwner,
+                            classification.message()
+                        );
+                        abortReason = SyncResult.Status.ABORTED_RATE_LIMIT;
+                    }
+                    default -> {
+                        log.error(
+                            "Failed to sync discussions: repoName={}, error={}",
+                            safeNameWithOwner,
+                            classification.message(),
+                            e
+                        );
+                        abortReason = SyncResult.Status.ABORTED_ERROR;
+                    }
+                }
+                break;
+            }
+        }
+
+        // Fetch remaining comments for discussions with >10 comments
+        if (!discussionsNeedingCommentPagination.isEmpty()) {
+            log.debug(
+                "Starting additional comment fetch for discussions with pagination: repoName={}, discussionCount={}",
+                safeNameWithOwner,
+                discussionsNeedingCommentPagination.size()
+            );
+            for (DiscussionWithCommentCursor discussionWithCursor : discussionsNeedingCommentPagination) {
+                int additionalComments = syncRemainingComments(
+                    scopeId,
+                    discussionWithCursor.discussionId(),
+                    discussionWithCursor.discussionNumber(),
+                    discussionWithCursor.repositoryId(),
+                    discussionWithCursor.commentCursor(),
+                    ownerAndName,
+                    client,
+                    timeout
+                );
+                totalCommentsSynced += additionalComments;
+            }
+        }
+
+        // Clear cursor on successful completion (uses REQUIRES_NEW)
+        // Only clear if sync completed without abort
+        if (syncTargetId != null && !hasMore && abortReason == null) {
+            clearCursorCheckpoint(syncTargetId);
+        }
+
+        SyncResult.Status finalStatus = abortReason != null ? abortReason : SyncResult.Status.COMPLETED;
+        log.info(
+            "Completed discussion sync: repoName={}, discussionCount={}, commentCount={}, discussionsWithPagination={}, resumed={}, status={}",
+            safeNameWithOwner,
+            totalDiscussionsSynced,
+            totalCommentsSynced,
+            discussionsNeedingCommentPagination.size(),
+            resuming,
+            finalStatus
+        );
+        return new SyncResult(finalStatus, totalDiscussionsSynced);
+    }
+
+    /**
+     * Result container for page processing.
+     */
+    private record PageResult(int discussionCount, int commentCount) {}
+
+    /**
+     * Processes a page of discussions with embedded comments.
+     * Also populates the list of discussions that need additional comment pagination.
+     */
+    private PageResult processDiscussionPage(
+        GHDiscussionConnection connection,
+        ProcessingContext context,
+        List<DiscussionWithCommentCursor> discussionsNeedingPagination
+    ) {
+        int discussionsSynced = 0;
+        int commentsSynced = 0;
+
+        // Map to track node ID -> processed comment for reply threading
+        Map<String, DiscussionComment> nodeIdToComment = new HashMap<>();
+
+        for (var graphQlDiscussion : connection.getNodes()) {
+            GitHubDiscussionDTO discussionDTO = GitHubDiscussionDTO.fromDiscussion(graphQlDiscussion);
+            if (discussionDTO == null) {
+                continue;
+            }
+
+            Discussion discussion = discussionProcessor.process(discussionDTO, context);
+            if (discussion == null) {
+                continue;
+            }
+            discussionsSynced++;
+
+            // Process embedded comments
+            GHDiscussionCommentConnection commentConn = graphQlDiscussion.getComments();
+            if (commentConn != null && commentConn.getNodes() != null) {
+                List<GitHubDiscussionCommentDTO> commentDTOs =
+                    GitHubDiscussionCommentDTO.fromDiscussionCommentConnection(commentConn);
+
+                for (GitHubDiscussionCommentDTO commentDTO : commentDTOs) {
+                    DiscussionComment comment = commentProcessor.process(commentDTO, discussion, context);
+                    if (comment != null) {
+                        commentsSynced++;
+                        // Track by node ID for reply threading
+                        if (commentDTO.nodeId() != null) {
+                            nodeIdToComment.put(commentDTO.nodeId(), comment);
+                        }
+                    }
+                }
+
+                // Resolve reply threading (second pass)
+                for (GitHubDiscussionCommentDTO commentDTO : commentDTOs) {
+                    if (commentDTO.replyToNodeId() != null && commentDTO.nodeId() != null) {
+                        DiscussionComment comment = nodeIdToComment.get(commentDTO.nodeId());
+                        DiscussionComment parent = nodeIdToComment.get(commentDTO.replyToNodeId());
+                        if (comment != null && parent != null) {
+                            commentProcessor.resolveParentComment(comment, parent);
+                        }
+                    }
+                }
+
+                // Update answer comment if this discussion has one
+                if (discussionDTO.answerComment() != null && discussionDTO.answerComment().nodeId() != null) {
+                    DiscussionComment answerComment = nodeIdToComment.get(discussionDTO.answerComment().nodeId());
+                    if (answerComment != null) {
+                        discussion.setAnswerComment(answerComment);
+                        discussionRepository.save(discussion);
+                    }
+                }
+
+                // Track discussions that need additional comment pagination
+                // Store primitive IDs to avoid LazyInitializationException after transaction ends
+                GHPageInfo commentPageInfo = commentConn.getPageInfo();
+                if (commentPageInfo != null && commentPageInfo.getHasNextPage()) {
+                    discussionsNeedingPagination.add(
+                        new DiscussionWithCommentCursor(
+                            discussion.getId(),
+                            discussion.getNumber(),
+                            context.repository().getId(),
+                            commentPageInfo.getEndCursor()
+                        )
+                    );
+                }
+            }
+        }
+
+        return new PageResult(discussionsSynced, commentsSynced);
+    }
+
+    /**
+     * Synchronizes remaining comments for a discussion, starting from the given cursor.
+     * <p>
+     * This method is called when a discussion has more than 10 comments (the embedded limit
+     * in GetRepositoryDiscussions query). It continues pagination from where the embedded
+     * comments left off, avoiding re-fetching already synced comments.
+     * <p>
+     * Uses primitive IDs instead of entity references to avoid LazyInitializationException
+     * when the original transaction has ended. The discussion is re-fetched inside each
+     * page's transaction.
+     *
+     * @param scopeId          the scope ID for authentication
+     * @param discussionId     the discussion database ID
+     * @param discussionNumber the discussion number (for GraphQL query)
+     * @param repositoryId     the repository ID (for re-fetching)
+     * @param startCursor      the pagination cursor to start from (from embedded comments)
+     * @param ownerAndName     the parsed repository owner and name
+     * @param client           the GraphQL client
+     * @param timeout          the request timeout
+     * @return number of additional comments synced
+     */
+    private int syncRemainingComments(
+        Long scopeId,
+        Long discussionId,
+        int discussionNumber,
+        Long repositoryId,
+        String startCursor,
+        RepositoryOwnerAndName ownerAndName,
+        HttpGraphQlClient client,
+        Duration timeout
+    ) {
+        int totalSynced = 0;
+        String cursor = startCursor;
+        boolean hasMore = true;
+        int pageCount = 0;
+
+        log.debug(
+            "Starting remaining comment sync: discussionNumber={}, startCursor={}",
+            discussionNumber,
+            startCursor != null ? startCursor.substring(0, Math.min(20, startCursor.length())) + "..." : "null"
+        );
+
+        // Map to track node ID -> processed comment for reply threading within this pagination
+        Map<String, DiscussionComment> nodeIdToComment = new HashMap<>();
+
+        while (hasMore) {
+            pageCount++;
+            if (pageCount >= MAX_PAGINATION_PAGES) {
+                log.warn(
+                    "Reached maximum pagination limit for remaining comment sync: discussionNumber={}, limit={}",
+                    discussionNumber,
+                    MAX_PAGINATION_PAGES
+                );
+                break;
+            }
+
+            try {
+                ClientGraphQlResponse response = client
+                    .documentName(COMMENTS_QUERY_DOCUMENT)
+                    .variable("owner", ownerAndName.owner())
+                    .variable("name", ownerAndName.name())
+                    .variable("discussionNumber", discussionNumber)
+                    .variable("first", DEFAULT_PAGE_SIZE)
+                    .variable("after", cursor)
+                    .execute()
+                    .block(timeout);
+
+                if (response == null || !response.isValid()) {
+                    log.warn(
+                        "Invalid GraphQL response for remaining comment sync: discussionNumber={}, errors={}",
+                        discussionNumber,
+                        response != null ? response.getErrors() : "null"
+                    );
+                    break;
+                }
+
+                // Track rate limit
+                graphQlClientProvider.trackRateLimit(scopeId, response);
+                if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
+                    log.warn(
+                        "Aborting remaining comment sync due to critical rate limit: discussionNumber={}",
+                        discussionNumber
+                    );
+                    break;
+                }
+
+                GHDiscussionCommentConnection connection = response
+                    .field("repository.discussion.comments")
+                    .toEntity(GHDiscussionCommentConnection.class);
+
+                if (connection == null || connection.getNodes() == null || connection.getNodes().isEmpty()) {
+                    break;
+                }
+
+                // Process comments within transaction
+                // Re-fetch entities inside the transaction to avoid LazyInitializationException
+                final Long finalDiscussionId = discussionId;
+                final Long finalRepositoryId = repositoryId;
+                Integer pageSynced = transactionTemplate.execute(status -> {
+                    Repository repo = repositoryRepository.findById(finalRepositoryId).orElse(null);
+                    if (repo == null) {
+                        return 0;
+                    }
+                    Discussion discussion = discussionRepository.findById(finalDiscussionId).orElse(null);
+                    if (discussion == null) {
+                        return 0;
+                    }
+                    ProcessingContext context = ProcessingContext.forSync(scopeId, repo);
+
+                    int synced = 0;
+                    List<GitHubDiscussionCommentDTO> commentDTOs =
+                        GitHubDiscussionCommentDTO.fromDiscussionCommentConnection(connection);
+
+                    for (GitHubDiscussionCommentDTO commentDTO : commentDTOs) {
+                        DiscussionComment comment = commentProcessor.process(commentDTO, discussion, context);
+                        if (comment != null) {
+                            synced++;
+                            if (commentDTO.nodeId() != null) {
+                                nodeIdToComment.put(commentDTO.nodeId(), comment);
+                            }
+                        }
+                    }
+
+                    // Resolve reply threading
+                    for (GitHubDiscussionCommentDTO commentDTO : commentDTOs) {
+                        if (commentDTO.replyToNodeId() != null && commentDTO.nodeId() != null) {
+                            DiscussionComment comment = nodeIdToComment.get(commentDTO.nodeId());
+                            DiscussionComment parent = nodeIdToComment.get(commentDTO.replyToNodeId());
+                            // Note: If parent is not in this page, we skip - it may have been
+                            // processed in the embedded comments during main sync
+                            if (comment != null && parent != null) {
+                                commentProcessor.resolveParentComment(comment, parent);
+                            }
+                        }
+                    }
+
+                    return synced;
+                });
+
+                if (pageSynced != null) {
+                    totalSynced += pageSynced;
+                }
+
+                GHPageInfo pageInfo = connection.getPageInfo();
+                hasMore = pageInfo != null && pageInfo.getHasNextPage();
+                cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
+            } catch (Exception e) {
+                ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
+                log.error(
+                    "Failed to sync remaining comments: discussionNumber={}, error={}",
+                    discussionNumber,
+                    classification.message(),
+                    e
+                );
+                break;
+            }
+        }
+
+        log.debug(
+            "Completed remaining comment sync: discussionNumber={}, additionalComments={}",
+            discussionNumber,
+            totalSynced
+        );
+        return totalSynced;
+    }
+
+    // ========================================================================
+    // Cursor Checkpoint Persistence
+    // ========================================================================
+
+    /**
+     * Persists the cursor checkpoint in a new transaction.
+     * This ensures the cursor is saved even if the main transaction is rolled back.
+     * <p>
+     * Uses programmatic transaction management with REQUIRES_NEW propagation
+     * to avoid Spring proxy issues with self-invocation.
+     */
+    private void persistCursorCheckpoint(Long syncTargetId, String cursor) {
+        TransactionTemplate requiresNewTemplate = new TransactionTemplate(transactionTemplate.getTransactionManager());
+        requiresNewTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        requiresNewTemplate.executeWithoutResult(status -> {
+            backfillStateProvider.updateDiscussionSyncCursor(syncTargetId, cursor);
+            log.debug("Persisted discussion sync cursor checkpoint: syncTargetId={}", syncTargetId);
+        });
+    }
+
+    /**
+     * Clears the cursor checkpoint in a new transaction.
+     * Called when sync completes successfully to indicate no resume needed.
+     * <p>
+     * Uses programmatic transaction management with REQUIRES_NEW propagation
+     * to avoid Spring proxy issues with self-invocation.
+     */
+    private void clearCursorCheckpoint(Long syncTargetId) {
+        TransactionTemplate requiresNewTemplate = new TransactionTemplate(transactionTemplate.getTransactionManager());
+        requiresNewTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        requiresNewTemplate.executeWithoutResult(status -> {
+            backfillStateProvider.updateDiscussionSyncCursor(syncTargetId, null);
+            log.debug("Cleared discussion sync cursor checkpoint: syncTargetId={}", syncTargetId);
+        });
+    }
+
+    // ========================================================================
+    // Transport Error Detection
+    // ========================================================================
+
+    /**
+     * Determines if an exception is a transport-level error that should be retried.
+     *
+     * @param throwable the exception to check
+     * @return true if this is a retryable transport error
+     */
+    private boolean isTransportError(Throwable throwable) {
+        if (throwable instanceof GraphQlTransportException) {
+            return true;
+        }
+
+        Throwable cause = throwable;
+        while (cause != null) {
+            String className = cause.getClass().getName();
+            if (
+                className.contains("PrematureCloseException") ||
+                className.contains("AbortedException") ||
+                className.contains("ConnectionResetException")
+            ) {
+                return true;
+            }
+
+            if (cause instanceof java.io.IOException) {
+                String message = cause.getMessage();
+                if (message != null) {
+                    String lower = message.toLowerCase();
+                    if (
+                        lower.contains("connection reset") ||
+                        lower.contains("broken pipe") ||
+                        lower.contains("premature")
+                    ) {
+                        return true;
+                    }
+                }
+            }
+
+            cause = cause.getCause();
+        }
+        return false;
+    }
+}

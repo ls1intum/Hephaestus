@@ -54,6 +54,10 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         "IssueComment",
         "Label",
         "Milestone",
+        "Commit", // through Repository -> Workspace.organization
+        "CommitFileChange", // through Commit -> Repository -> Workspace.organization
+        "Discussion", // through Repository -> Workspace.organization
+        "DiscussionComment", // through Discussion -> Repository -> Workspace.organization
         // Through Workspace.organization (JOIN)
         "Repository",
         "Team",
