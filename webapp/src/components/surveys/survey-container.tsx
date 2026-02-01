@@ -1,3 +1,4 @@
+import { Progress as ProgressRoot } from "@base-ui/react/progress";
 import { AlertCircle, CheckCircle2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -9,7 +10,6 @@ import {
 	EmptyMedia,
 	EmptyTitle,
 } from "@/components/ui/empty";
-import { Progress as ProgressRoot } from "@base-ui/react/progress";
 import { ProgressIndicator, ProgressTrack } from "@/components/ui/progress";
 
 import type {
