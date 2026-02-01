@@ -24,9 +24,12 @@ import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository
 import de.tum.in.www1.hephaestus.gitprovider.project.Project;
 import de.tum.in.www1.hephaestus.gitprovider.project.ProjectField;
 import de.tum.in.www1.hephaestus.gitprovider.project.ProjectFieldRepository;
+import de.tum.in.www1.hephaestus.gitprovider.project.ProjectFieldValueRepository;
+import de.tum.in.www1.hephaestus.gitprovider.project.ProjectItem;
 import de.tum.in.www1.hephaestus.gitprovider.project.ProjectRepository;
 import de.tum.in.www1.hephaestus.gitprovider.project.github.dto.GitHubProjectDTO;
 import de.tum.in.www1.hephaestus.gitprovider.project.github.dto.GitHubProjectFieldDTO;
+import de.tum.in.www1.hephaestus.gitprovider.project.github.dto.GitHubProjectFieldValueDTO;
 import de.tum.in.www1.hephaestus.gitprovider.project.github.dto.GitHubProjectItemDTO;
 import de.tum.in.www1.hephaestus.gitprovider.sync.SyncResult;
 import java.time.Duration;
@@ -87,6 +90,7 @@ public class GitHubProjectSyncService {
 
     private final ProjectRepository projectRepository;
     private final ProjectFieldRepository projectFieldRepository;
+    private final ProjectFieldValueRepository projectFieldValueRepository;
     private final OrganizationRepository organizationRepository;
     private final GitHubGraphQlClientProvider graphQlClientProvider;
     private final GitHubProjectProcessor projectProcessor;
@@ -99,6 +103,7 @@ public class GitHubProjectSyncService {
     public GitHubProjectSyncService(
         ProjectRepository projectRepository,
         ProjectFieldRepository projectFieldRepository,
+        ProjectFieldValueRepository projectFieldValueRepository,
         OrganizationRepository organizationRepository,
         GitHubGraphQlClientProvider graphQlClientProvider,
         GitHubProjectProcessor projectProcessor,
@@ -110,6 +115,7 @@ public class GitHubProjectSyncService {
     ) {
         this.projectRepository = projectRepository;
         this.projectFieldRepository = projectFieldRepository;
+        this.projectFieldValueRepository = projectFieldValueRepository;
         this.organizationRepository = organizationRepository;
         this.graphQlClientProvider = graphQlClientProvider;
         this.projectProcessor = projectProcessor;
@@ -543,8 +549,12 @@ public class GitHubProjectSyncService {
                         }
 
                         syncedItemNodeIds.add(itemDto.nodeId());
-                        if (itemProcessor.process(itemDto, proj, context) != null) {
+                        ProjectItem processedItem = itemProcessor.process(itemDto, proj, context);
+                        if (processedItem != null) {
                             itemsProcessed++;
+
+                            // Process field values for this item
+                            processFieldValues(processedItem.getId(), itemDto.fieldValues());
                         }
                     }
 
@@ -860,6 +870,60 @@ public class GitHubProjectSyncService {
      */
     public List<Project> getProjectsNeedingItemSync(Long organizationId) {
         return projectRepository.findProjectsNeedingItemSync(organizationId);
+    }
+
+    /**
+     * Processes field values for a project item.
+     * <p>
+     * Uses atomic upsert to handle concurrent updates and removes stale values.
+     *
+     * @param itemId      the item's database ID
+     * @param fieldValues the field values from the GraphQL response
+     */
+    private void processFieldValues(Long itemId, List<GitHubProjectFieldValueDTO> fieldValues) {
+        if (itemId == null || fieldValues == null || fieldValues.isEmpty()) {
+            return;
+        }
+
+        List<String> processedFieldIds = new ArrayList<>();
+
+        for (GitHubProjectFieldValueDTO fieldValue : fieldValues) {
+            if (fieldValue == null || fieldValue.fieldId() == null) {
+                continue;
+            }
+
+            // Verify the field exists before attempting to insert
+            // (fields should have been synced before items)
+            if (!projectFieldRepository.existsById(fieldValue.fieldId())) {
+                log.debug(
+                    "Skipped field value: reason=fieldNotFound, fieldId={}, itemId={}",
+                    fieldValue.fieldId(),
+                    itemId
+                );
+                continue;
+            }
+
+            processedFieldIds.add(fieldValue.fieldId());
+
+            projectFieldValueRepository.upsertCore(
+                itemId,
+                fieldValue.fieldId(),
+                fieldValue.textValue(),
+                fieldValue.numberValue(),
+                fieldValue.dateValue(),
+                fieldValue.singleSelectOptionId(),
+                fieldValue.iterationId(),
+                Instant.now()
+            );
+        }
+
+        // Remove field values that are no longer present
+        if (!processedFieldIds.isEmpty()) {
+            int removed = projectFieldValueRepository.deleteByItemIdAndFieldIdNotIn(itemId, processedFieldIds);
+            if (removed > 0) {
+                log.debug("Removed stale field values: itemId={}, count={}", itemId, removed);
+            }
+        }
     }
 
     /**
