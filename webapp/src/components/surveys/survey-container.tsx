@@ -206,7 +206,7 @@ export function SurveyContainer({
 					</span>
 					<span>{Math.round(progress)}% complete</span>
 				</div>
-				<ProgressRoot.Root value={progress}>
+				<ProgressRoot.Root value={progress} className="w-full">
 					<ProgressTrack className="h-1.5">
 						<ProgressIndicator className="absolute" />
 					</ProgressTrack>

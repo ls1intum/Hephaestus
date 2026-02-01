@@ -44,7 +44,7 @@ export function XpProgress({
 					{/* Subtle gloss effect */}
 					<div className="absolute inset-0 z-10 bg-gradient-to-b from-white/10 to-transparent pointer-events-none rounded-full" />
 
-					<ProgressRoot.Root value={percentage} className="h-full">
+					<ProgressRoot.Root value={percentage} className="h-full w-full">
 						<ProgressTrack className="h-full rounded-full bg-transparent">
 							<ProgressIndicator className="absolute bg-gradient-to-r from-primary/90 to-primary rounded-full transition-all duration-500" />
 						</ProgressTrack>

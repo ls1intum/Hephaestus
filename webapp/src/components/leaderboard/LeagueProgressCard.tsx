@@ -54,6 +54,7 @@ export function LeagueProgressCard({ leaguePoints, onInfoClick }: LeagueProgress
 						<ProgressRoot.Root
 							value={progressValue}
 							aria-label={`${Math.round(progressValue)}% progress to next league`}
+							className="w-full"
 						>
 							<ProgressTrack className="bg-secondary">
 								<ProgressIndicator
