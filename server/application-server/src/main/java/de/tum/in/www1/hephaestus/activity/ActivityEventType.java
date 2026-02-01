@@ -94,7 +94,35 @@ public enum ActivityEventType {
     /** Issue type assigned (e.g., bug, feature, task) - work categorization */
     ISSUE_TYPED("issue.typed"),
     /** Issue type removed - work categorization change */
-    ISSUE_UNTYPED("issue.untyped");
+    ISSUE_UNTYPED("issue.untyped"),
+
+    // ========================================================================
+    // Project Lifecycle (Project management tracking)
+    // ========================================================================
+    /** Project created - new project board started */
+    PROJECT_CREATED("project.created"),
+    /** Project updated - project settings or metadata changed */
+    PROJECT_UPDATED("project.updated"),
+    /** Project closed - project archived or completed */
+    PROJECT_CLOSED("project.closed"),
+    /** Project reopened - project reactivated */
+    PROJECT_REOPENED("project.reopened"),
+    /** Project deleted - project removed */
+    PROJECT_DELETED("project.deleted"),
+
+    // ========================================================================
+    // Project Item Lifecycle (Work item tracking in projects)
+    // ========================================================================
+    /** Item added to project - issue/PR/draft added to project board */
+    PROJECT_ITEM_CREATED("project_item.created"),
+    /** Item updated - field values or status changed */
+    PROJECT_ITEM_UPDATED("project_item.updated"),
+    /** Item archived - item hidden from active view */
+    PROJECT_ITEM_ARCHIVED("project_item.archived"),
+    /** Item restored - item unarchived back to active view */
+    PROJECT_ITEM_RESTORED("project_item.restored"),
+    /** Item deleted - item removed from project */
+    PROJECT_ITEM_DELETED("project_item.deleted");
 
     private final String value;
 
