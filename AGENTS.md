@@ -2,7 +2,11 @@
 
 **⚠️ Do NOT stage, commit, or push unless you have permission to do so.**
 
-This file governs the entire repository. Combine these guardrails with the scoped instructions under `.github/instructions/**` (general coding, TSX, Storybook, Java tests).
+This file governs the entire repository. Each service has its own `AGENTS.md` with service-specific patterns:
+- `webapp/AGENTS.md` — React, TanStack, Tailwind patterns
+- `server/application-server/AGENTS.md` — Spring Boot, JPA, testing
+- `server/intelligence-service/AGENTS.md` — AI/Hono service patterns
+- `server/webhook-ingest/AGENTS.md` — Webhook processing, NATS
 
 ## 0. Beads Issue Tracker
 
@@ -19,21 +23,21 @@ Use **beads** (`bd` CLI) for persistent task tracking across sessions. This repl
 
 ### Issue Types & Priorities
 
-| Type      | Use For                              |
-| --------- | ------------------------------------ |
-| `bug`     | Something broken                     |
-| `feature` | New functionality                    |
-| `task`    | Work item (tests, docs, refactoring) |
-| `epic`    | Large feature with subtasks          |
-| `chore`   | Maintenance                          |
+| Type | Use For |
+|------|---------|
+| `bug` | Something broken |
+| `feature` | New functionality |
+| `task` | Work item (tests, docs, refactoring) |
+| `epic` | Large feature with subtasks |
+| `chore` | Maintenance |
 
-| Priority | Meaning                                       |
-| -------- | --------------------------------------------- |
-| `0`      | Critical (security, data loss, broken builds) |
-| `1`      | High (major features, important bugs)         |
-| `2`      | Medium (default)                              |
-| `3`      | Low (polish, optimization)                    |
-| `4`      | Backlog                                       |
+| Priority | Meaning |
+|----------|---------|
+| `0` | Critical (security, data loss, broken builds) |
+| `1` | High (major features, important bugs) |
+| `2` | Medium (default) |
+| `3` | Low (polish, optimization) |
+| `4` | Backlog |
 
 ### Session Start Protocol
 
@@ -137,8 +141,8 @@ bd sync               # Force sync with JSONL
 
 ## 2. Toolchain & environment prerequisites
 
-- **Node.js**: Use the exact version from `.node-version` (currently 22.22.0). Stick with npm—the repo maintains `package-lock.json` and uses npm workspaces. The intelligence-service and webhook-ingest are TypeScript services that use npm.
-- **Java**: JDK 21 (see `pom.xml`). Maven wrapper is checked in; **always run builds through `./mvnw`** to ensure consistent Maven versions.
+- **Node.js**: Use the exact version from `.node-version` (currently 22.10.0). Stick with npm—the repo maintains `package-lock.json` and uses npm workspaces. The intelligence-service and webhook-ingest are TypeScript services that use npm.
+- **Java**: JDK 21 (see `pom.xml`). Run builds with `mvn` from `server/application-server/`.
 - **Docker & Docker Compose**: Required for database helper scripts (`scripts/db-utils.sh`) and for spinning up Postgres/Keycloak/NATS locally.
 - **Databases**: Default PostgreSQL DSN is `postgresql://root:root@localhost:5432/hephaestus`. The database helpers spin this up for you via Docker.
 - **Environment variables**: When generating intelligence service OpenAPI specs locally, set `MODEL_NAME=fake:model` and `DETECTION_MODEL_NAME=fake:model` (the service settings expect a provider-qualified model name).
@@ -149,32 +153,32 @@ Run the relevant commands locally before opening a PR:
 
 ### Aggregate commands (all services)
 
-| Concern           | Command                | Description                                    |
-| ----------------- | ---------------------- | ---------------------------------------------- |
-| Format everything | `npm run format`       | Apply formatting to Java + TypeScript + webapp |
-| Check formatting  | `npm run format:check` | Verify formatting without changes (CI)         |
-| Lint everything   | `npm run lint`         | Format check + Biome + typecheck               |
-| Full check        | `npm run check`        | Comprehensive: format + lint + typecheck       |
-| CI check          | `npm run ci`           | CI-optimized check across all services         |
+| Concern | Command | Description |
+| --- | --- | --- |
+| Format everything | `npm run format` | Apply formatting to Java + TypeScript + webapp |
+| Check formatting | `npm run format:check` | Verify formatting without changes (CI) |
+| Lint everything | `npm run lint` | Format check + Biome + typecheck |
+| Full check | `npm run check` | Comprehensive: format + lint + typecheck |
+| CI check | `npm run ci` | CI-optimized check across all services |
 
 ### Per-service commands
 
-| Service                  | Format                                | Format Check                                | Lint                                | Check                                |
-| ------------------------ | ------------------------------------- | ------------------------------------------- | ----------------------------------- | ------------------------------------ |
-| **Webapp**               | `npm run format:webapp`               | `npm run format:webapp:check`               | `npm run lint:webapp`               | `npm run check:webapp`               |
-| **Java**                 | `npm run format:java`                 | `npm run format:java:check`                 | —                                   | —                                    |
+| Service | Format | Format Check | Lint | Check |
+| --- | --- | --- | --- | --- |
+| **Webapp** | `npm run format:webapp` | `npm run format:webapp:check` | `npm run lint:webapp` | `npm run check:webapp` |
+| **Java** | `npm run format:java` | `npm run format:java:check` | — | — |
 | **Intelligence Service** | `npm run format:intelligence-service` | `npm run format:intelligence-service:check` | `npm run lint:intelligence-service` | `npm run check:intelligence-service` |
-| **Webhook Ingest**       | `npm run format:webhook-ingest`       | `npm run format:webhook-ingest:check`       | `npm run lint:webhook-ingest`       | `npm run check:webhook-ingest`       |
+| **Webhook Ingest** | `npm run format:webhook-ingest` | `npm run format:webhook-ingest:check` | `npm run lint:webhook-ingest` | `npm run check:webhook-ingest` |
 
 ### Additional commands
 
-| Concern                  | Command                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Webapp build             | `npm run build:webapp`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| Webapp tests             | `npm run test:webapp`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| Webapp typecheck         | `npm run typecheck:webapp`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| Webapp Storybook         | `npm -w webapp run build-storybook`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| Application-server tests | **Four test tiers:** <br>• `./mvnw test` runs unit tests (`@Tag("unit")`) <br>• `./mvnw verify` runs unit + integration tests (`@Tag("integration")`) <br>• `./mvnw test -Parchitecture-tests` runs ArchUnit architecture tests (`@Tag("architecture")`) <br>• `./mvnw test -Plive-tests` runs live GitHub API tests (`@Tag("live")`) <br><br>Live tests require GitHub App credentials configured in `application-live-local.yml` (gitignored). Maven profiles guard test execution—tests only run when explicitly activated. |
+| Concern | Command |
+| --- | --- |
+| Webapp build | `npm run build:webapp` |
+| Webapp tests | `npm run test:webapp` |
+| Webapp typecheck | `npm run typecheck:webapp` |
+| Webapp Storybook | `npm -w webapp run build-storybook` |
+| Application-server tests | **Three test tiers:** <br>• `mvn test` runs unit tests (`@Tag("unit")`) <br>• `mvn verify` runs unit + integration tests (`@Tag("integration")`) <br>• `mvn test -Plive-tests` runs live GitHub API tests (`@Tag("live")`) <br><br>Live tests require GitHub App credentials configured in `application-live-local.yml` (gitignored). The Maven profile is the single guard—tests only run when explicitly activated. |
 
 **Script naming conventions:**
 
@@ -192,14 +196,14 @@ Document any skipped gate in the PR description with a rationale. Always finish 
 
 We rely heavily on generated artifacts. Never hand-edit these directories—regenerate instead:
 
-| Artifact                                                                                                                            | Source command                                                                                                    |
-| ----------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `server/application-server/openapi.yaml`                                                                                            | `npm run generate:api:application-server:specs` (runs `./mvnw verify -DskipTests=true -Dapp.profiles=specs`).     |
-| `webapp/src/api/**/*`, `webapp/src/api/@tanstack/react-query.gen.ts`, `webapp/src/api/client.gen.ts`, `webapp/src/api/types.gen.ts` | `npm run generate:api:application-server:client` (wraps `npm -w webapp run openapi-ts`).                          |
-| `server/application-server/src/main/java/de/tum/in/www1/hephaestus/intelligenceservice/**`                                          | `npm run generate:api:intelligence-service:client` (OpenAPI Generator CLI).                                       |
-| `server/intelligence-service/openapi.yaml`                                                                                          | `npm run generate:api:intelligence-service:specs` (runs `npm -w server/intelligence-service run openapi:export`). |
-| `server/intelligence-service/src/shared/db/schema.ts`                                                                               | `npm run db:generate-models:intelligence-service` (requires the application-server database to be reachable).     |
-| `docs/contributor/erd/schema.mmd`                                                                                                   | `npm run db:generate-erd-docs` (connects to the same Postgres instance).                                          |
+| Artifact | Source command |
+| --- | --- |
+| `server/application-server/openapi.yaml` | `npm run generate:api:application-server:specs` (runs `mvn verify -DskipTests=true -Dapp.profiles=specs`). |
+| `webapp/src/api/**/*`, `webapp/src/api/@tanstack/react-query.gen.ts`, `webapp/src/api/client.gen.ts`, `webapp/src/api/types.gen.ts` | `npm run generate:api:application-server:client` (wraps `npm -w webapp run openapi-ts`). |
+| `server/application-server/src/main/java/de/tum/in/www1/hephaestus/intelligenceservice/**` | `npm run generate:api:intelligence-service:client` (OpenAPI Generator CLI). |
+| `server/intelligence-service/openapi.yaml` | `npm run generate:api:intelligence-service:specs` (runs `npm -w server/intelligence-service run openapi:export`). |
+| `server/intelligence-service/src/shared/db/schema.ts` | `npm run db:generate-models:intelligence-service` (requires the application-server database to be reachable). |
+| `docs/contributor/erd/schema.mmd` | `npm run db:generate-erd-docs` (connects to the same Postgres instance). |
 
 Regeneration is destructive; stash local edits before running these commands. Check diffs carefully—generated clients must be committed alongside API changes.
 
@@ -220,9 +224,9 @@ Regeneration is destructive; stash local edits before running these commands. Ch
 - Fetch data exclusively with TanStack Query v5 and the generated helpers in `@/api/@tanstack/react-query.gen.ts`. Spread the option objects: `useQuery(getTeamsOptions({ ... }))`. Use the generated `*.QueryKey()` helpers for cache invalidation.
 - Do not call `fetch` directly; reuse the generated `@hey-api` client configured in `src/api/client.ts` and the shared QueryClient from `src/integrations/tanstack-query/root-provider.tsx`.
 - State management lives in the colocated Zustand stores (`src/stores/**`). Derive UI state from TanStack Query results instead of duplicating loading/error flags.
-- TypeScript style mirrors `.github/instructions/tsx.instructions.md`: explicit prop interfaces, no `React.FC`, favour `type` aliases for composite shapes, prefer discriminated unions or Zod guards when needed, keep imports using the `@/*` alias, avoid deep relative paths.
+- TypeScript style: explicit prop interfaces, no `React.FC`, favour `type` aliases for composite shapes, prefer discriminated unions or Zod guards when needed, keep imports using the `@/*` alias, avoid deep relative paths. See `webapp/AGENTS.md` for full patterns.
 - Styling: Tailwind utility classes + shadcn primitives in `src/components/ui`. Compose class names with `clsx`/`tailwind-merge`; use tokenized colors (`bg-surface`, `text-muted`, etc.).
-- Accessibility: follow shadcn patterns, wire up ARIA roles, and manage focus for dialogs/menus. Storybook stories should cover default/variant/edge states and satisfy `.github/instructions/storybook.instructions.md`.
+- Accessibility: follow shadcn patterns, wire up ARIA roles, and manage focus for dialogs/menus. Storybook stories should cover default/variant/edge states. See `webapp/AGENTS.md` for Storybook patterns.
 - Tests: extend Vitest coverage when you change behaviour (`npm run test:webapp`). Use Testing Library queries that mirror user intent (`getByRole`, `findByText`).
 - Routing: declare new routes via `createFileRoute`, respect loader/guard conventions, and keep loader side effects out of render paths.
 - Never hand-edit `routeTree.gen.ts`; it is generated by TanStack Router tooling.
@@ -236,7 +240,7 @@ Regeneration is destructive; stash local edits before running these commands. Ch
 
 - Keep business logic in services annotated with `@Service` and transactional boundaries (`@Transactional`) where needed. Controllers should be thin (input validation + delegation).
 - Use Lombok consistently (`@Getter`, `@Setter`, etc.) but prefer explicit builders or records when immutability helps.
-- Group new tests under the proper JUnit tag so CI picks them up (`@Tag("unit")`, `@Tag("integration")`, or `@Tag("live")`). Follow the mantra in `.github/instructions/java-tests.instructions.md` (AAA structure, single assertion focus, deterministic data).
+- Group new tests under the proper JUnit tag so CI picks them up (`@Tag("unit")`, `@Tag("integration")`, or `@Tag("live")`). Follow AAA structure, single assertion focus, deterministic data. See `server/application-server/AGENTS.md` for testing patterns.
 - Reuse existing DTO converters/mappers instead of duplicating mapping logic. Look at `gitprovider.team` for established patterns.
 - Security: new endpoints must enforce permissions using the existing security utilities (`EnsureAdminUser`, etc.).
 - Keep Liquibase changelog IDs monotonic and descriptive. Align entity annotations with the generated change sets.

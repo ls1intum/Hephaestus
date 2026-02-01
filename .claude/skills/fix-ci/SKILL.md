@@ -1,10 +1,23 @@
 ---
-description: Diagnose and fix failing CI checks on the current PR
+name: fix-ci
+description: |
+  Diagnose and fix failing CI checks on the current PR. Use when CI is failing,
+  tests are broken, GitHub Actions report errors, or PR checks show red.
+disable-model-invocation: true
+allowed-tools:
+  - Bash(gh *)
+  - Bash(git *)
+  - Bash(npm *)
+  - Bash(mvn *)
+  - Read
+  - Grep
+  - Glob
+metadata:
+  source: internal
+  version: "1.0.0"
 ---
 
 # Fix CI
-
-// turbo-all
 
 Diagnose and fix failing CI checks on the current PR.
 
@@ -56,7 +69,7 @@ PAGER=cat gh api repos/$OWNER/$REPO/actions/jobs/$JOB_ID/logs 2>&1 | tail -100
 | Check Name | Likely Cause | Fix Command |
 |------------|--------------|-------------|
 | `docs-quality` | Markdown lint errors | `npm run lint:md` in `docs/` |
-| `application-server-quality` | Java compile/test failure | `./mvnw verify` |
+| `application-server-quality` | Java compile/test failure | `mvn verify` |
 | `webapp-quality` | TypeScript/lint errors | `npm run check` |
 | `openapi-validation` | Stale API specs | `npm run generate:api:application-server:specs` |
 | `database-*-validation` | Stale DB docs/models | `npm run db:generate-erd-docs` |

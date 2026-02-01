@@ -1,0 +1,62 @@
+{
+  "id": 5911,
+  "created_at": "2026-01-31 19:04:10 +0100",
+  "description": "Updated release notes:\\n\\n- OAuth authentication\\n- Contributing guidelines\\n- CI/CD setup",
+  "name": "v0.1.0 - Initial Release",
+  "released_at": "2026-01-31 19:04:10 +0100",
+  "tag": "v0.1.0",
+  "object_kind": "release",
+  "project": {
+    "id": 246765,
+    "name": "demo-repository",
+    "description": "Demo repository for testing GitLab webhooks and generating fixture data",
+    "web_url": "https://gitlab.lrz.de/hephaestustest/demo-repository",
+    "avatar_url": null,
+    "git_ssh_url": "git@gitlab.lrz.de:hephaestustest/demo-repository.git",
+    "git_http_url": "https://gitlab.lrz.de/hephaestustest/demo-repository.git",
+    "namespace": "HephaestusTest",
+    "visibility_level": 0,
+    "path_with_namespace": "hephaestustest/demo-repository",
+    "default_branch": "main",
+    "ci_config_path": "",
+    "homepage": "https://gitlab.lrz.de/hephaestustest/demo-repository",
+    "url": "git@gitlab.lrz.de:hephaestustest/demo-repository.git",
+    "ssh_url": "git@gitlab.lrz.de:hephaestustest/demo-repository.git",
+    "http_url": "https://gitlab.lrz.de/hephaestustest/demo-repository.git"
+  },
+  "url": "https://gitlab.lrz.de/hephaestustest/demo-repository/-/releases/v0.1.0",
+  "action": "update",
+  "assets": {
+    "count": 4,
+    "links": [],
+    "sources": [
+      {
+        "format": "zip",
+        "url": "https://gitlab.lrz.de/hephaestustest/demo-repository/-/archive/v0.1.0/demo-repository-v0.1.0.zip"
+      },
+      {
+        "format": "tar.gz",
+        "url": "https://gitlab.lrz.de/hephaestustest/demo-repository/-/archive/v0.1.0/demo-repository-v0.1.0.tar.gz"
+      },
+      {
+        "format": "tar.bz2",
+        "url": "https://gitlab.lrz.de/hephaestustest/demo-repository/-/archive/v0.1.0/demo-repository-v0.1.0.tar.bz2"
+      },
+      {
+        "format": "tar",
+        "url": "https://gitlab.lrz.de/hephaestustest/demo-repository/-/archive/v0.1.0/demo-repository-v0.1.0.tar"
+      }
+    ]
+  },
+  "commit": {
+    "id": "a4bf10d93a2d136f1db911b6f1c03d26d835a44f",
+    "message": "Merge 'Add contributing guidelines'",
+    "title": "Merge 'Add contributing guidelines'",
+    "timestamp": "2026-01-31T18:46:43+01:00",
+    "url": "https://gitlab.lrz.de/hephaestustest/demo-repository/-/commit/a4bf10d93a2d136f1db911b6f1c03d26d835a44f",
+    "author": {
+      "name": "Dietrich, Felix (Timotheus Johannes)",
+      "email": "felixtj.dietrich@tum.de"
+    }
+  }
+}

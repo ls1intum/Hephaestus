@@ -1,0 +1,13 @@
+{
+  "created_at": "2026-01-31T20:11:23+01:00",
+  "updated_at": "2026-01-31T20:11:23+01:00",
+  "event_name": "subgroup_create",
+  "name": "test-subgroup",
+  "path": "test-subgroup",
+  "full_path": "hephaestustest/test-subgroup",
+  "group_id": 319723,
+  "parent_group_id": 319719,
+  "parent_name": "HephaestusTest",
+  "parent_path": "hephaestustest",
+  "parent_full_path": "hephaestustest"
+}
