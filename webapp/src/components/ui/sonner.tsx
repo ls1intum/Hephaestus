@@ -5,11 +5,11 @@ import {
 	OctagonXIcon,
 	TriangleAlertIcon,
 } from "lucide-react";
+import { useTheme } from "next-themes";
 import { Toaster as Sonner, type ToasterProps } from "sonner";
-import { useTheme } from "@/integrations/theme";
 
 const Toaster = ({ ...props }: ToasterProps) => {
-	const { theme } = useTheme();
+	const { theme = "system" } = useTheme();
 
 	return (
 		<Sonner
@@ -30,6 +30,11 @@ const Toaster = ({ ...props }: ToasterProps) => {
 					"--border-radius": "var(--radius)",
 				} as React.CSSProperties
 			}
+			toastOptions={{
+				classNames: {
+					toast: "cn-toast",
+				},
+			}}
 			{...props}
 		/>
 	);

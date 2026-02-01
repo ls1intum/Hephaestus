@@ -12,7 +12,7 @@ function MentorLayout() {
 	if (isLoading) {
 		return (
 			<div className="flex items-center justify-center h-96">
-				<Spinner size="lg" />
+				<Spinner className="size-8" />
 			</div>
 		);
 	}

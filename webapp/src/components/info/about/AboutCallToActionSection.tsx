@@ -15,25 +15,33 @@ export function AboutCallToActionSection() {
 				our platform.
 			</p>
 			<div className="flex flex-col sm:flex-row gap-4 justify-center">
-				<Button asChild variant="default" size="lg">
-					<a
-						href="https://github.com/ls1intum/Hephaestus"
-						target="_blank"
-						rel="noopener noreferrer"
-						className="inline-flex items-center gap-2"
-					>
-						<Github className="h-4 w-4" />
-						<span>GitHub Repository</span>
-					</a>
+				<Button
+					variant="default"
+					size="lg"
+					render={
+						<a
+							href="https://github.com/ls1intum/Hephaestus"
+							target="_blank"
+							rel="noopener noreferrer"
+							className="inline-flex items-center gap-2"
+						/>
+					}
+				>
+					<Github className="h-4 w-4" />
+					<span>GitHub Repository</span>
 				</Button>
-				<Button asChild variant="outline" size="lg">
-					<a
-						href="https://ls1intum.github.io/Hephaestus/"
-						target="_blank"
-						rel="noopener noreferrer"
-					>
-						<span>View Documentation</span>
-					</a>
+				<Button
+					variant="outline"
+					size="lg"
+					render={
+						<a
+							href="https://ls1intum.github.io/Hephaestus/"
+							target="_blank"
+							rel="noopener noreferrer"
+						/>
+					}
+				>
+					<span>View Documentation</span>
 				</Button>
 			</div>
 		</section>

@@ -45,7 +45,7 @@ export function LandingFAQSection() {
 				</div>
 
 				<div className="max-w-3xl mx-auto">
-					<Accordion type="single" collapsible className="w-full">
+					<Accordion className="w-full">
 						{faqItems.map((item, index) => (
 							<AccordionItem
 								key={item.key}
@@ -60,16 +60,19 @@ export function LandingFAQSection() {
 
 					<div className="mt-8 p-6 bg-muted/50 border border-muted rounded-lg text-center">
 						<p className="mb-4">Have more questions?</p>
-						<Button variant="outline" asChild>
-							<a
-								href="https://github.com/ls1intum/Hephaestus/discussions"
-								target="_blank"
-								rel="noopener noreferrer"
-								className="gap-2"
-							>
-								<Github className="h-4 w-4" />
-								<span>Ask the Community</span>
-							</a>
+						<Button
+							variant="outline"
+							render={
+								<a
+									href="https://github.com/ls1intum/Hephaestus/discussions"
+									target="_blank"
+									rel="noopener noreferrer"
+									className="gap-2"
+								/>
+							}
+						>
+							<Github className="h-4 w-4" />
+							<span>Ask the Community</span>
 						</Button>
 					</div>
 				</div>

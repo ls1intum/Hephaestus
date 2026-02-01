@@ -58,7 +58,8 @@
 				"useSemanticElements": "off",
 				"useAriaPropsForRole": "off",
 				"useFocusableInteractive": "off",
-				"useKeyWithClickEvents": "off"
+				"useKeyWithClickEvents": "off",
+				"useAnchorContent": "off"
 			},
 			"complexity": {
 				"noImportantStyles": "off"
@@ -86,6 +87,13 @@
 					"correctness": {
 						"noUnusedImports": "off",
 						"noUnusedVariables": "off"
+					},
+					"a11y": {
+						"noLabelWithoutControl": "off",
+						"noRedundantRoles": "off"
+					},
+					"security": {
+						"noDangerouslySetInnerHtml": "off"
 					}
 				}
 			}

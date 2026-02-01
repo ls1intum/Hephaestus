@@ -80,14 +80,16 @@ export function AppSidebar({
 	} else if (context === "mentor") {
 		contextHeader = (
 			<NavContextHeader title="Mentor" workspaceSlug={activeWorkspace.workspaceSlug}>
-				<SidebarMenuButton asChild>
-					<Link
-						to="/w/$workspaceSlug/mentor"
-						params={{ workspaceSlug: activeWorkspace.workspaceSlug }}
-					>
-						<SquarePen />
-						New chat
-					</Link>
+				<SidebarMenuButton
+					render={
+						<Link
+							to="/w/$workspaceSlug/mentor"
+							params={{ workspaceSlug: activeWorkspace.workspaceSlug }}
+						/>
+					}
+				>
+					<SquarePen />
+					New chat
 				</SidebarMenuButton>
 			</NavContextHeader>
 		);

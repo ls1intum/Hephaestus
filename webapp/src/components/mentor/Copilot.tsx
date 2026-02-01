@@ -85,29 +85,37 @@ export function Copilot({
 		return () => unlockBodyScroll();
 	}, [isOpen]);
 
+	// Handle open change with click outside detection
+	const handleOpenChange = (open: boolean, eventDetails?: { reason?: string }) => {
+		// Close on click outside but prevent default behavior
+		if (!open && eventDetails?.reason === "outside-press") {
+			setIsOpen(false);
+			return;
+		}
+		setIsOpen(open);
+	};
+
 	return (
 		<div className={cn("fixed bottom-6 right-6 z-50", className)}>
-			<Popover open={isOpen} onOpenChange={setIsOpen}>
-				<PopoverTrigger asChild>
-					<Button
-						onClick={handleTriggerClick}
-						className="size-16 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 active:scale-95"
-						size="icon"
-						aria-label="Open Heph - AI Mentor"
-					>
-						<MentorIcon size={56} pad={8} />
-					</Button>
-				</PopoverTrigger>
+			<Popover open={isOpen} onOpenChange={handleOpenChange}>
+				<PopoverTrigger
+					render={
+						<Button
+							onClick={handleTriggerClick}
+							className="size-16 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 active:scale-95"
+							size="icon"
+							aria-label="Open Heph - AI Mentor"
+						>
+							<MentorIcon size={56} pad={8} />
+						</Button>
+					}
+				/>
 				<PopoverContent
 					className="p-0 h-[calc(100dvh-10rem)] rounded-2xl overflow-hidden shadow-2xl border-1 overscroll-contain w-[calc(100vw-3rem)] sm:w-[28rem] md:w-[32rem] max-w-[32rem]"
 					side="top"
 					align="end"
 					alignOffset={0}
 					sideOffset={8}
-					onInteractOutside={(e) => {
-						e.preventDefault();
-						setIsOpen(false);
-					}}
 					onPointerEnter={lockBodyScroll}
 					onPointerLeave={unlockBodyScroll}
 					onTouchStart={lockBodyScroll}
@@ -125,50 +133,56 @@ export function Copilot({
 									<Sparkles /> AI Mentor
 								</Badge>
 							</h3>
-							<TooltipProvider delayDuration={0}>
+							<TooltipProvider delay={0}>
 								<div className="flex items-center gap-1">
 									{onOpenFullChat && (
 										<Tooltip>
-											<TooltipTrigger asChild>
-												<Button
-													variant="outline"
-													size="icon"
-													onClick={onOpenFullChat}
-													aria-label="Open in mentor view"
-													disabled={!hasMessages}
-												>
-													<SquareArrowOutUpRight />
-												</Button>
+											<TooltipTrigger
+												render={
+													<Button
+														variant="outline"
+														size="icon"
+														onClick={onOpenFullChat}
+														aria-label="Open in mentor view"
+														disabled={!hasMessages}
+													/>
+												}
+											>
+												<SquareArrowOutUpRight />
 											</TooltipTrigger>
 											<TooltipContent>Open in full screen</TooltipContent>
 										</Tooltip>
 									)}
 									{onNewChat && (
 										<Tooltip>
-											<TooltipTrigger asChild>
-												<Button
-													variant="outline"
-													size="icon"
-													onClick={onNewChat}
-													aria-label="Start new chat"
-													disabled={!hasMessages}
-												>
-													<SquarePen />
-												</Button>
+											<TooltipTrigger
+												render={
+													<Button
+														variant="outline"
+														size="icon"
+														onClick={onNewChat}
+														aria-label="Start new chat"
+														disabled={!hasMessages}
+													/>
+												}
+											>
+												<SquarePen />
 											</TooltipTrigger>
 											<TooltipContent>New chat</TooltipContent>
 										</Tooltip>
 									)}
 									<Tooltip>
-										<TooltipTrigger asChild>
-											<Button
-												variant="outline"
-												size="icon"
-												onClick={handleClose}
-												aria-label="Close Heph - AI Mentor"
-											>
-												<X />
-											</Button>
+										<TooltipTrigger
+											render={
+												<Button
+													variant="outline"
+													size="icon"
+													onClick={handleClose}
+													aria-label="Close Heph - AI Mentor"
+												/>
+											}
+										>
+											<X />
 										</TooltipTrigger>
 										<TooltipContent>Close</TooltipContent>
 									</Tooltip>

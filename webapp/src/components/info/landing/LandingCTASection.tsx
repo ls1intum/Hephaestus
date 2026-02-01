@@ -42,14 +42,19 @@ export function LandingCTASection({
 								className="w-full justify-center sm:w-auto"
 							/>
 						)}
-						<Button size="lg" variant="outline" className="text-primary" asChild>
-							<a
-								href="https://ls1intum.github.io/Hephaestus/"
-								target="_blank"
-								rel="noopener noreferrer"
-							>
-								<span>Read Documentation</span>
-							</a>
+						<Button
+							size="lg"
+							variant="outline"
+							className="text-primary"
+							render={
+								<a
+									href="https://ls1intum.github.io/Hephaestus/"
+									target="_blank"
+									rel="noopener noreferrer"
+								/>
+							}
+						>
+							<span>Read Documentation</span>
 						</Button>
 					</div>
 					{!isSignedIn && (

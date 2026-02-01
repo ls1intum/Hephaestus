@@ -1,3 +1,4 @@
+import { Progress as ProgressRoot } from "@base-ui/react/progress";
 import { AlertCircle, CheckCircle2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -9,7 +10,7 @@ import {
 	EmptyMedia,
 	EmptyTitle,
 } from "@/components/ui/empty";
-import { Progress } from "@/components/ui/progress";
+import { ProgressIndicator, ProgressTrack } from "@/components/ui/progress";
 
 import type {
 	PostHogSurvey,
@@ -205,7 +206,11 @@ export function SurveyContainer({
 					</span>
 					<span>{Math.round(progress)}% complete</span>
 				</div>
-				<Progress value={progress} className="h-1.5" />
+				<ProgressRoot.Root value={progress} className="w-full">
+					<ProgressTrack className="h-1.5">
+						<ProgressIndicator className="absolute" />
+					</ProgressTrack>
+				</ProgressRoot.Root>
 			</div>
 
 			<div className="flex-1 overflow-y-auto px-4 pb-4 sm:px-6 sm:pb-6">
