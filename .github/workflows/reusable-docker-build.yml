@@ -62,7 +62,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 1
 
@@ -71,7 +71,7 @@ jobs:
       # - linux/arm64 builds on ubuntu-24.04-arm (aarch64)
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
         with:
           # Use TUM's Docker Hub mirror to avoid rate limits (standard ls1intum approach)
           # See: https://github.com/ls1intum/.github/blob/main/.github/workflows/build-and-push-docker-image.yml
@@ -80,7 +80,7 @@ jobs:
               mirrors = ["https://docker-mirror.ase.in.tum.de:8765"]
 
       - name: Log in to Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ${{ inputs.registry }}
           username: ${{ github.actor }}
@@ -88,7 +88,7 @@ jobs:
 
       - name: Extract metadata
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
           images: ${{ inputs.registry }}/${{ inputs.image-name }}
 
@@ -105,7 +105,7 @@ jobs:
       # - cache-to: Push cache to registry (only for non-PR builds to avoid cache pollution)
       - name: Build and push
         id: build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
         with:
           context: ${{ inputs.docker-context }}
           file: ${{ inputs.docker-file }}
@@ -129,7 +129,7 @@ jobs:
           touch "${{ runner.temp }}/digests/${digest#sha256:}"
 
       - name: Upload digest
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: digests-${{ steps.prep.outputs.image_name }}-${{ steps.prep.outputs.platform_pair }}
           path: ${{ runner.temp }}/digests/*
@@ -148,21 +148,21 @@ jobs:
           echo "image_name=${image//\//-}" >> $GITHUB_OUTPUT
 
       - name: Download digests
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           path: ${{ runner.temp }}/digests
           pattern: digests-${{ steps.prep.outputs.image_name }}-*
           merge-multiple: true
 
       - name: Log in to Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ${{ inputs.registry }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
       - name: Prepare tag configuration
         id: tags
@@ -198,7 +198,7 @@ jobs:
 
       - name: Extract metadata
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         with:
           images: ${{ inputs.registry }}/${{ inputs.image-name }}
           tags: ${{ steps.tags.outputs.tags }}
