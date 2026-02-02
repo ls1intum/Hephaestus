@@ -100,7 +100,7 @@
     "babel-plugin-react-compiler": "1.0.0",
     "chromatic": "12.2.0",
     "jsdom": "26.1.0",
-    "playwright": "1.57.0",
+    "playwright": "1.58.0",
     "storybook": "10.1.10",
     "typescript": "5.9.3",
     "vite": "6.4.1",
