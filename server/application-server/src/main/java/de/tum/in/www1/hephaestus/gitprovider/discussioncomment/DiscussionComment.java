@@ -36,6 +36,13 @@ import org.springframework.lang.NonNull;
 @ToString(callSuper = true)
 public class DiscussionComment extends BaseGitServiceEntity {
 
+    /**
+     * GitHub GraphQL node ID (e.g., "DC_kwDONx...").
+     * Used for cross-page reply threading resolution.
+     */
+    @Column(length = 128)
+    private String gitHubNodeId;
+
     @Column(columnDefinition = "TEXT")
     @ToString.Exclude
     private String body;

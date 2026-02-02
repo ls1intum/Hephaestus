@@ -6,10 +6,10 @@
 
     <!--
     =======================================================================================
-    GitHub Discussions Feature Migration
+    GitHub Discussions Feature Migration (Consolidated)
     =======================================================================================
 
-    This changelog adds support for GitHub Discussions.
+    This changelog adds complete support for GitHub Discussions synchronization.
 
     Table of Contents:
     ==================
@@ -20,19 +20,21 @@
     SECTION 5: Foreign Key Constraints
     SECTION 6: Unique Constraints
     SECTION 7: Performance Indexes
+    SECTION 8: Discussion Sync Cursor (for resumable sync)
+    SECTION 9: Discussion Sync Timestamp (for incremental sync)
 
     Entity Notes:
     =============
     - DiscussionCategory uses String ID (node_id) since GitHub doesn't expose databaseId
     - Discussion and DiscussionComment extend BaseGitServiceEntity (Long id, createdAt, updatedAt)
 
-    See: https://github.com/ls1intum/Hephaestus/pull/686
+    See: https://github.com/ls1intum/Hephaestus/pull/693
     =======================================================================================
     -->
 
     <!-- ==================== SECTION 1: Discussion Category Table ==================== -->
 
-    <changeSet id="1770000000000-1-create-discussion-category" author="GitHubDiscussionFeature">
+    <changeSet id="1770057304186-1" author="GitHubDiscussionFeature">
         <comment>Create discussion_category table for GitHub discussion categories</comment>
         <createTable tableName="discussion_category">
             <!-- Primary key is node_id (String) since databaseId is not available -->
@@ -58,7 +60,7 @@
 
     <!-- ==================== SECTION 2: Discussion Table ==================== -->
 
-    <changeSet id="1770000000000-2-create-discussion" author="GitHubDiscussionFeature">
+    <changeSet id="1770057304186-2" author="GitHubDiscussionFeature">
         <comment>Create discussion table for GitHub discussions</comment>
         <createTable tableName="discussion">
             <!-- BaseGitServiceEntity fields -->
@@ -103,7 +105,7 @@
 
     <!-- ==================== SECTION 3: Discussion Comment Table ==================== -->
 
-    <changeSet id="1770000000000-3-create-discussion-comment" author="GitHubDiscussionFeature">
+    <changeSet id="1770057304186-3" author="GitHubDiscussionFeature">
         <comment>Create discussion_comment table for comments on GitHub discussions</comment>
         <createTable tableName="discussion_comment">
             <!-- BaseGitServiceEntity fields -->
@@ -113,6 +115,9 @@
             <column name="created_at" type="TIMESTAMP WITH TIME ZONE"/>
             <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"/>
             <!-- DiscussionComment-specific fields -->
+            <column name="git_hub_node_id" type="VARCHAR(128)">
+                <constraints nullable="true"/>
+            </column>
             <column name="body" type="TEXT"/>
             <column name="html_url" type="VARCHAR(512)">
                 <constraints nullable="false"/>
@@ -135,7 +140,7 @@
 
     <!-- ==================== SECTION 4: Discussion-Label Join Table ==================== -->
 
-    <changeSet id="1770000000000-4-create-discussion-label" author="GitHubDiscussionFeature">
+    <changeSet id="1770057304186-4" author="GitHubDiscussionFeature">
         <comment>Create discussion_label join table for discussion-to-label many-to-many relationship</comment>
         <createTable tableName="discussion_label">
             <column name="discussion_id" type="BIGINT">
@@ -150,7 +155,7 @@
 
     <!-- ==================== SECTION 5: Foreign Key Constraints ==================== -->
 
-    <changeSet id="1770000000000-5-add-foreign-keys" author="GitHubDiscussionFeature">
+    <changeSet id="1770057304186-5" author="GitHubDiscussionFeature">
         <comment>Add foreign key constraints for discussion tables</comment>
 
         <!-- discussion_category -> repository -->
@@ -222,7 +227,7 @@
 
     <!-- ==================== SECTION 6: Unique Constraints ==================== -->
 
-    <changeSet id="1770000000000-6-add-unique-constraints" author="GitHubDiscussionFeature">
+    <changeSet id="1770057304186-6" author="GitHubDiscussionFeature">
         <comment>Add unique constraints for discussion tables</comment>
 
         <!-- discussion_category: unique (repository_id, slug) -->
@@ -243,7 +248,7 @@
 
     <!-- ==================== SECTION 7: Performance Indexes ==================== -->
 
-    <changeSet id="1770000000000-7-add-indexes" author="GitHubDiscussionFeature">
+    <changeSet id="1770057304186-7" author="GitHubDiscussionFeature">
         <comment>Add performance indexes for discussion tables</comment>
 
         <!-- Discussion indexes -->
@@ -280,11 +285,32 @@
         <createIndex tableName="discussion_comment" indexName="idx_discussion_comment_is_answer">
             <column name="is_answer"/>
         </createIndex>
+        <createIndex tableName="discussion_comment" indexName="idx_discussion_comment_node_id">
+            <column name="git_hub_node_id"/>
+        </createIndex>
 
         <!-- Discussion category indexes -->
         <createIndex tableName="discussion_category" indexName="idx_discussion_category_repository">
             <column name="repository_id"/>
         </createIndex>
+    </changeSet>
+
+    <!-- ==================== SECTION 8: Discussion Sync Cursor ==================== -->
+
+    <changeSet id="1770057304186-8" author="GitHubDiscussionFeature">
+        <comment>Add discussion_sync_cursor column to repository_to_monitor for resumable discussion sync</comment>
+        <addColumn tableName="repository_to_monitor">
+            <column name="discussion_sync_cursor" type="VARCHAR(255)"/>
+        </addColumn>
+    </changeSet>
+
+    <!-- ==================== SECTION 9: Discussion Sync Timestamp ==================== -->
+
+    <changeSet id="1770057304186-9" author="GitHubDiscussionFeature">
+        <comment>Add discussions_synced_at column to repository_to_monitor for incremental discussion sync</comment>
+        <addColumn tableName="repository_to_monitor">
+            <column name="discussions_synced_at" type="TIMESTAMP WITH TIME ZONE"/>
+        </addColumn>
     </changeSet>
 
 </databaseChangeLog>

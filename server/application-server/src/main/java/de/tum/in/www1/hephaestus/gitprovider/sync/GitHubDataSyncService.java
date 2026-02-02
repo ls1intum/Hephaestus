@@ -262,13 +262,8 @@ public class GitHubDataSyncService {
                 );
             }
 
-            // Sync discussions and comments (with cursor persistence for resumability)
-            SyncResult discussionResult = discussionSyncService.syncForRepository(
-                scopeId,
-                repositoryId,
-                syncTarget.id(),
-                syncTarget.discussionSyncCursor()
-            );
+            // Sync discussions and comments (with cooldown check and cursor persistence)
+            SyncResult discussionResult = syncDiscussionsIfNeeded(syncTarget, scopeId, repositoryId);
 
             log.info(
                 "Completed repository sync: scopeId={}, repoId={}, collaborators={}, labels={}, milestones={}, issues={}, prs={}, discussions={}, issueStatus={}, prStatus={}",
@@ -672,6 +667,57 @@ public class GitHubDataSyncService {
         syncTargetProvider.updateSyncTimestamp(syncTarget.id(), SyncType.COLLABORATORS, Instant.now());
 
         return count;
+    }
+
+    /**
+     * Syncs discussions for a repository if cooldown has expired.
+     * <p>
+     * Discussions sync uses cursor-based pagination with checkpoint persistence
+     * for resumability. Incremental sync only fetches discussions updated since
+     * the last successful sync.
+     *
+     * @param syncTarget   the sync target configuration
+     * @param scopeId      the scope ID
+     * @param repositoryId the repository ID
+     * @return sync result, or a COMPLETED result with 0 count if skipped due to cooldown
+     */
+    private SyncResult syncDiscussionsIfNeeded(SyncTarget syncTarget, Long scopeId, Long repositoryId) {
+        Instant cooldownThreshold = Instant.now().minusSeconds(syncSchedulerProperties.cooldownMinutes() * 60L);
+        boolean shouldSync =
+            syncTarget.lastDiscussionsSyncedAt() == null ||
+            syncTarget.lastDiscussionsSyncedAt().isBefore(cooldownThreshold);
+
+        if (!shouldSync) {
+            log.debug(
+                "Skipped discussion sync: reason=cooldownActive, repoId={}, lastSyncedAt={}",
+                repositoryId,
+                syncTarget.lastDiscussionsSyncedAt()
+            );
+            return SyncResult.completed(0);
+        }
+
+        // Pass last sync timestamp for incremental sync - only fetch discussions updated after this time
+        SyncResult result = discussionSyncService.syncForRepository(
+            scopeId,
+            repositoryId,
+            syncTarget.id(),
+            syncTarget.discussionSyncCursor(),
+            syncTarget.lastDiscussionsSyncedAt()
+        );
+
+        // Update discussions sync timestamp if sync completed successfully
+        if (result.isCompleted()) {
+            syncTargetProvider.updateSyncTimestamp(syncTarget.id(), SyncType.DISCUSSIONS, Instant.now());
+        } else {
+            log.info(
+                "Skipped discussions timestamp update due to incomplete sync: scopeId={}, repoId={}, status={}",
+                scopeId,
+                repositoryId,
+                result.status()
+            );
+        }
+
+        return result;
     }
 
     private boolean shouldSync(SyncTarget target) {

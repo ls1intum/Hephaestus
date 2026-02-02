@@ -218,6 +218,7 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
      * @param lastMilestonesSyncedAt              last milestones sync timestamp
      * @param lastIssuesAndPullRequestsSyncedAt   last issues/PRs sync timestamp
      * @param lastCollaboratorsSyncedAt           last collaborators sync timestamp
+     * @param lastDiscussionsSyncedAt             last discussions sync timestamp
      * @param lastFullSyncAt                      last full repository sync timestamp
      * @param issueBackfillHighWaterMark          highest issue number at issue backfill start
      * @param issueBackfillCheckpoint             current issue backfill position (counts down to 0)
@@ -239,6 +240,7 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
         Instant lastMilestonesSyncedAt,
         Instant lastIssuesAndPullRequestsSyncedAt,
         Instant lastCollaboratorsSyncedAt,
+        Instant lastDiscussionsSyncedAt,
         Instant lastFullSyncAt,
         Integer issueBackfillHighWaterMark,
         Integer issueBackfillCheckpoint,
@@ -381,5 +383,7 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
         ISSUE_DEPENDENCIES,
         /** Issue parent/child hierarchy sync */
         SUB_ISSUES,
+        /** Repository discussions sync */
+        DISCUSSIONS,
     }
 }

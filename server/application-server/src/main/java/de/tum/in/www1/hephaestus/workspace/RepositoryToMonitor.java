@@ -38,6 +38,9 @@ public class RepositoryToMonitor {
     // The time up to which issues and pull requests have been synced in the recent sync
     private Instant issuesAndPullRequestsSyncedAt;
 
+    // The time up to which discussions have been synced in the recent sync
+    private Instant discussionsSyncedAt;
+
     // ========================================================================
     // Issue Backfill Tracking
     // ========================================================================

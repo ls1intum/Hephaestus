@@ -108,6 +108,7 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
                         case MILESTONES -> rtm.setMilestonesSyncedAt(syncedAt);
                         case ISSUES_AND_PULL_REQUESTS -> rtm.setIssuesAndPullRequestsSyncedAt(syncedAt);
                         case COLLABORATORS -> rtm.setCollaboratorsSyncedAt(syncedAt);
+                        case DISCUSSIONS -> rtm.setDiscussionsSyncedAt(syncedAt);
                         case FULL_REPOSITORY -> rtm.setRepositorySyncedAt(syncedAt);
                         default -> {
                         }

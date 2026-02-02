@@ -75,6 +75,7 @@ public class GitHubDiscussionCommentProcessor extends BaseGitHubProcessor {
         });
 
         // Update fields
+        comment.setGitHubNodeId(dto.nodeId());
         comment.setBody(sanitize(dto.body()));
         comment.setHtmlUrl(dto.htmlUrl());
         comment.setAnswer(dto.isAnswer());
@@ -122,6 +123,35 @@ public class GitHubDiscussionCommentProcessor extends BaseGitHubProcessor {
     }
 
     /**
+     * Resolve reply threading by looking up parent from database.
+     * <p>
+     * This is used for cross-page threading where the parent comment was
+     * processed in a previous page and is not in the current page's map.
+     *
+     * @param comment          the comment to update
+     * @param parentNodeId     the GitHub node ID of the parent comment
+     * @return true if the parent was found and resolved, false otherwise
+     */
+    @Transactional
+    public boolean resolveParentCommentByNodeId(DiscussionComment comment, String parentNodeId) {
+        if (parentNodeId == null) {
+            return false;
+        }
+
+        Optional<DiscussionComment> parentOpt = commentRepository.findByGitHubNodeId(parentNodeId);
+        if (parentOpt.isPresent()) {
+            DiscussionComment parent = parentOpt.get();
+            comment.setParentComment(parent);
+            commentRepository.save(comment);
+            log.debug("Resolved cross-page parent comment: commentId={}, parentId={}", comment.getId(), parent.getId());
+            return true;
+        }
+
+        log.debug("Could not resolve parent comment: commentId={}, parentNodeId={}", comment.getId(), parentNodeId);
+        return false;
+    }
+
+    /**
      * Convert author association string to AuthorAssociation enum.
      */
     @Nullable
@@ -140,5 +170,19 @@ public class GitHubDiscussionCommentProcessor extends BaseGitHubProcessor {
             case "NONE" -> AuthorAssociation.NONE;
             default -> AuthorAssociation.NONE;
         };
+    }
+
+    /**
+     * Deletes a discussion comment by its database ID.
+     *
+     * @param commentId the database ID of the comment to delete
+     */
+    public void delete(Long commentId) {
+        if (commentId == null) {
+            log.warn("Cannot delete discussion comment: reason=missingDatabaseId");
+            return;
+        }
+        commentRepository.deleteById(commentId);
+        log.info("Deleted discussion comment: commentId={}", commentId);
     }
 }

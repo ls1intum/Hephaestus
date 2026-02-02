@@ -8,6 +8,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHCommentAuthorAssociation;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHDiscussionComment;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHDiscussionCommentConnection;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPageInfo;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
 import java.time.Instant;
 import java.util.Collections;
@@ -83,6 +84,9 @@ public record GitHubDiscussionCommentDTO(
 
     /**
      * Creates a list of GitHubDiscussionCommentDTOs from a GraphQL DiscussionCommentConnection.
+     * <p>
+     * NOTE: This method only returns top-level comments. To include replies, use
+     * {@link #fromDiscussionCommentConnectionWithReplies(GHDiscussionCommentConnection)}.
      */
     public static List<GitHubDiscussionCommentDTO> fromDiscussionCommentConnection(
         @Nullable GHDiscussionCommentConnection connection
@@ -96,6 +100,91 @@ public record GitHubDiscussionCommentDTO(
             .map(GitHubDiscussionCommentDTO::fromDiscussionComment)
             .filter(dto -> dto != null)
             .toList();
+    }
+
+    /**
+     * Creates a list of GitHubDiscussionCommentDTOs from a GraphQL DiscussionCommentConnection,
+     * including all nested replies.
+     * <p>
+     * This is the comprehensive version that should be used for sync operations
+     * to ensure no replies are lost.
+     *
+     * @param connection the GraphQL connection
+     * @return flattened list containing both top-level comments and their replies
+     */
+    public static List<GitHubDiscussionCommentDTO> fromDiscussionCommentConnectionWithReplies(
+        @Nullable GHDiscussionCommentConnection connection
+    ) {
+        if (connection == null || connection.getNodes() == null) {
+            return Collections.emptyList();
+        }
+        List<GitHubDiscussionCommentDTO> result = new java.util.ArrayList<>();
+
+        for (GHDiscussionComment comment : connection.getNodes()) {
+            GitHubDiscussionCommentDTO dto = fromDiscussionComment(comment);
+            if (dto != null) {
+                result.add(dto);
+
+                // Process replies
+                if (comment.getReplies() != null && comment.getReplies().getNodes() != null) {
+                    for (GHDiscussionComment reply : comment.getReplies().getNodes()) {
+                        GitHubDiscussionCommentDTO replyDto = fromReply(reply, comment.getId());
+                        if (replyDto != null) {
+                            result.add(replyDto);
+                        }
+                    }
+                }
+            }
+        }
+
+        return result;
+    }
+
+    /**
+     * Creates a GitHubDiscussionCommentDTO from a reply comment, with the parent's node ID.
+     * <p>
+     * Replies in the GraphQL API don't have a replyTo field populated when nested,
+     * so we need to track the parent explicitly.
+     */
+    @Nullable
+    private static GitHubDiscussionCommentDTO fromReply(
+        @Nullable GHDiscussionComment reply,
+        @Nullable String parentNodeId
+    ) {
+        if (reply == null) {
+            return null;
+        }
+
+        return new GitHubDiscussionCommentDTO(
+            null,
+            reply.getDatabaseId() != null ? reply.getDatabaseId().longValue() : null,
+            reply.getId(),
+            reply.getBody(),
+            uriToString(reply.getUrl()),
+            reply.getIsAnswer(),
+            reply.getIsMinimized(),
+            reply.getMinimizedReason(),
+            convertAuthorAssociation(reply.getAuthorAssociation()),
+            toInstant(reply.getCreatedAt()),
+            toInstant(reply.getUpdatedAt()),
+            GitHubUserDTO.fromActor(reply.getAuthor()),
+            parentNodeId
+        );
+    }
+
+    /**
+     * Extracts page info for replies from a comment.
+     * Used to track which comments need additional reply pagination.
+     *
+     * @param comment the GraphQL comment
+     * @return the page info for replies, or null if no replies or no pagination needed
+     */
+    @Nullable
+    public static GHPageInfo getReplyPageInfo(@Nullable GHDiscussionComment comment) {
+        if (comment == null || comment.getReplies() == null) {
+            return null;
+        }
+        return comment.getReplies().getPageInfo();
     }
 
     // ========== CONVERSION HELPERS ==========
