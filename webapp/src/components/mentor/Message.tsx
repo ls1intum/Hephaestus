@@ -51,7 +51,7 @@ export function PreviewMessage({
 }: MessageProps) {
 	const [mode, setMode] = useState<"view" | "edit">(initialEditMode ? "edit" : "view");
 
-	const attachmentsFromMessage = message.parts.filter((part) => part.type === "file");
+	const attachmentsFromMessage = message.parts?.filter((part) => part.type === "file") ?? [];
 
 	const isArtifact = variant === "artifact";
 
@@ -105,13 +105,14 @@ export function PreviewMessage({
 
 							if (type === "reasoning" && part.text?.trim().length > 0) {
 								// Consider reasoning "done" as soon as any following text part has started streaming
-								const hasAnswerTextStarted = message.parts.some(
-									(p, i2) =>
-										i2 > index &&
-										p.type === "text" &&
-										typeof p.text === "string" &&
-										p.text.trim().length > 0,
-								);
+								const hasAnswerTextStarted =
+									message.parts?.some(
+										(p, i2) =>
+											i2 > index &&
+											p.type === "text" &&
+											typeof p.text === "string" &&
+											p.text.trim().length > 0,
+									) ?? false;
 								const isReasoningLoading = Boolean(isLoading && !hasAnswerTextStarted);
 
 								return (
@@ -184,10 +185,12 @@ export function PreviewMessage({
 							<MessageActions
 								className="-mt-3"
 								key={`action-${message.id}`}
-								messageContentToCopy={message.parts
-									.filter((p) => p.type === "text")
-									.map((p) => p.text)
-									.join("\n")}
+								messageContentToCopy={
+									message.parts
+										?.filter((p) => p.type === "text")
+										?.map((p) => p.text)
+										?.join("\n") ?? ""
+								}
 								messageRole={message.role}
 								vote={vote}
 								isLoading={isLoading}

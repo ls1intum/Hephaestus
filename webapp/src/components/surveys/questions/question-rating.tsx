@@ -60,12 +60,14 @@ export function QuestionRating({
 
 	const ratings = Array.from({ length: ratingScale }, (_, index) => index + 1);
 
-	const handleNumericChange = (nextValue: string) => {
-		if (!nextValue) {
+	const handleNumericChange = (nextValue: readonly string[]) => {
+		// Base UI ToggleGroup uses array-based API - take the last selected value
+		const value = nextValue[nextValue.length - 1];
+		if (!value) {
 			return;
 		}
 
-		const parsed = Number(nextValue);
+		const parsed = Number(value);
 		if (!Number.isNaN(parsed)) {
 			onChange(parsed);
 		}
@@ -123,8 +125,7 @@ export function QuestionRating({
 				) : (
 					<div className="mx-auto mt-3 space-y-2">
 						<ToggleGroup
-							type="single"
-							value={numericValue !== null ? String(numericValue) : undefined}
+							value={numericValue !== null ? [String(numericValue)] : []}
 							onValueChange={handleNumericChange}
 							variant="outline"
 							size="sm"

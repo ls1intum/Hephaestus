@@ -37,16 +37,22 @@ export function ProjectManagerCard({ projectManager }: ProjectManagerCardProps) 
 					</div>
 					<p className="text-muted-foreground">{projectManager.description}</p>
 					<div className="flex items-center gap-2 pt-2 justify-center md:justify-start">
-						<Button variant="outline" size="sm" asChild>
-							<a href={projectManager.htmlUrl} target="_blank" rel="noopener noreferrer">
-								<Github className="h-5 w-5" /> GitHub
-							</a>
+						<Button
+							variant="outline"
+							size="sm"
+							render={<a href={projectManager.htmlUrl} target="_blank" rel="noopener noreferrer" />}
+						>
+							<Github className="h-5 w-5" /> GitHub
 						</Button>
-						<Button variant="outline" size="sm" asChild>
-							<a href={projectManager.websiteUrl} target="_blank" rel="noopener noreferrer">
-								<Globe className="h-5 w-5" />
-								Website
-							</a>
+						<Button
+							variant="outline"
+							size="sm"
+							render={
+								<a href={projectManager.websiteUrl} target="_blank" rel="noopener noreferrer" />
+							}
+						>
+							<Globe className="h-5 w-5" />
+							Website
 						</Button>
 					</div>
 				</div>

@@ -42,7 +42,7 @@ export const VersionFooter = ({
 			<div className="flex flex-row gap-4">
 				<Button disabled={isRestoring} onClick={onRestore}>
 					<div>Restore this version</div>
-					{isRestoring && <Spinner size="sm" />}
+					{isRestoring && <Spinner />}
 				</Button>
 				<Button variant="outline" onClick={() => handleVersionChange("latest")}>
 					Back to latest version

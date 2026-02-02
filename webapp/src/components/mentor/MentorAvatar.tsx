@@ -13,7 +13,7 @@ interface MentorAvatarProps {
 
 export function MentorAvatar({ className, streaming = false }: MentorAvatarProps) {
 	return (
-		<Avatar className={cn("size-16 -m-4", className)}>
+		<Avatar className={cn("size-16 -m-4 after:border-0", className)}>
 			<AvatarFallback className="bg-transparent text-muted-foreground size-16">
 				<MentorIcon size={64} pad={8} streaming={streaming} />
 			</AvatarFallback>

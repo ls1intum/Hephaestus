@@ -92,7 +92,7 @@ export function IssueCard({
 			onClick={onClick}
 		>
 			<div
-				className={cn("flex flex-col gap-1 p-6", {
+				className={cn("flex flex-col gap-1 p-4", {
 					"pb-0": isLoading || pullRequestLabels.length > 0,
 				})}
 			>
@@ -151,7 +151,7 @@ export function IssueCard({
 
 				<div className="flex justify-between font-medium contain-inline-size leading-normal">
 					{isLoading ? (
-						<Skeleton className="h-6 w-3/4 mb-6" />
+						<Skeleton className="h-6 w-3/4 mb-4" />
 					) : (
 						<FormattedTitle title={title ?? ""} />
 					)}
@@ -160,7 +160,7 @@ export function IssueCard({
 			</div>
 
 			{!isLoading && pullRequestLabels.length > 0 && (
-				<div className="flex flex-row items-center flex-wrap gap-2 p-6 pt-2">
+				<div className="flex flex-row items-center flex-wrap gap-2 p-4 pt-2">
 					{pullRequestLabels.map((label) => (
 						<GithubBadge key={label.id} label={label.name} color={label.color} />
 					))}

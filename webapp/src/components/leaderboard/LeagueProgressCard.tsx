@@ -1,6 +1,8 @@
+import { Progress as ProgressRoot } from "@base-ui/react/progress";
 import { Info, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
+import { ProgressIndicator, ProgressTrack } from "@/components/ui/progress";
+import { cn } from "@/lib/utils";
 import { LeagueIcon } from "./LeagueIcon";
 import { getLeagueFromPoints } from "./utils";
 
@@ -49,17 +51,22 @@ export function LeagueProgressCard({ leaguePoints, onInfoClick }: LeagueProgress
 				{/* Progress bar container */}
 				{currentLeague.maxPoints !== Number.POSITIVE_INFINITY && (
 					<div className="flex items-center gap-2 mt-1">
-						<Progress
+						<ProgressRoot.Root
 							value={progressValue}
-							className="bg-secondary"
-							indicatorClassName={{
-								"bg-league-bronze": currentLeague.name === "Bronze",
-								"bg-league-silver": currentLeague.name === "Silver",
-								"bg-league-gold": currentLeague.name === "Gold",
-								"bg-league-diamond": currentLeague.name === "Diamond",
-							}}
 							aria-label={`${Math.round(progressValue)}% progress to next league`}
-						/>
+							className="w-full"
+						>
+							<ProgressTrack className="h-2 bg-secondary">
+								<ProgressIndicator
+									className={cn("absolute", {
+										"bg-league-bronze": currentLeague.name === "Bronze",
+										"bg-league-silver": currentLeague.name === "Silver",
+										"bg-league-gold": currentLeague.name === "Gold",
+										"bg-league-diamond": currentLeague.name === "Diamond",
+									})}
+								/>
+							</ProgressTrack>
+						</ProgressRoot.Root>
 						<LeagueIcon
 							leaguePoints={currentLeague.maxPoints + 1}
 							size="sm"

@@ -30,7 +30,7 @@ export const PreviewAttachment = ({
 
 				{isUploading && (
 					<div data-testid="input-attachment-loader" className="absolute text-zinc-500">
-						<Spinner size="sm" />
+						<Spinner />
 					</div>
 				)}
 			</div>

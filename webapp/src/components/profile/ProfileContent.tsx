@@ -171,13 +171,16 @@ export function ProfileContent({
 				<div className="flex flex-col gap-2">
 					<span className="flex justify-between items-center">
 						<h3 className="text-lg font-semibold">Open pull requests</h3>
-						<Button variant="secondary" asChild>
-							<Link
-								to="/w/$workspaceSlug/user/$username/best-practices"
-								params={{ username, workspaceSlug }}
-							>
-								Best practices
-							</Link>
+						<Button
+							variant="secondary"
+							render={
+								<Link
+									to="/w/$workspaceSlug/user/$username/best-practices"
+									params={{ username, workspaceSlug }}
+								/>
+							}
+						>
+							Best practices
 						</Button>
 					</span>
 					<div className="flex flex-col gap-2 m-1">

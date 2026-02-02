@@ -188,11 +188,13 @@ export const InPagePopover: Story = {
 		return (
 			<div className="relative flex min-h-[480px] w-full justify-center bg-background sm:min-h-[600px]">
 				<Popover open={open} onOpenChange={setOpen} modal={false}>
-					<PopoverTrigger asChild>
-						<Button className="absolute bottom-4 right-4 z-20 shadow-lg sm:bottom-6 sm:right-6">
-							Share feedback
-						</Button>
-					</PopoverTrigger>
+					<PopoverTrigger
+						render={
+							<Button className="absolute bottom-4 right-4 z-20 shadow-lg sm:bottom-6 sm:right-6">
+								Share feedback
+							</Button>
+						}
+					/>
 					<PopoverContent
 						side="top"
 						align="end"

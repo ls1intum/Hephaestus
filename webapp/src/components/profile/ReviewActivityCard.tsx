@@ -98,8 +98,8 @@ export function ReviewActivityCard({
 	// Use CSS to style the card as a clickable link with hover effects
 	return (
 		<a href={htmlUrl} target="_blank" rel="noopener noreferrer" className="block w-full">
-			<Card className="rounded-lg border border-border bg-card text-card-foreground shadow-sm hover:bg-accent/50 cursor-pointer">
-				<div className="flex flex-col gap-1 px-6">
+			<Card className="rounded-lg border border-border bg-card text-card-foreground shadow-sm hover:bg-accent/50 cursor-pointer py-0 gap-0">
+				<div className="flex flex-col gap-1 p-4">
 					{/* Repository, PR number and points */}
 					<div className="flex justify-between gap-2 items-center text-sm text-github-muted-foreground">
 						<span className="font-medium flex justify-center items-center space-x-1">

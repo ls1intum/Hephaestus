@@ -79,16 +79,19 @@ export default function Header({
 					{/* Version badge - clickable for production releases */}
 					{version !== "DEV" && version !== "preview" ? (
 						<Tooltip>
-							<TooltipTrigger asChild>
-								<a
-									href={`https://github.com/ls1intum/Hephaestus/releases/tag/v${version}`}
-									target="_blank"
-									rel="noopener noreferrer"
-									className="flex items-center gap-1 text-xs font-mono mt-1 text-muted-foreground hover:text-foreground transition-colors"
-								>
-									<TagIcon size={12} />
-									<span>v{version}</span>
-								</a>
+							<TooltipTrigger
+								render={
+									<a
+										href={`https://github.com/ls1intum/Hephaestus/releases/tag/v${version}`}
+										target="_blank"
+										rel="noopener noreferrer"
+										aria-label={`View release v${version}`}
+										className="flex items-center gap-1 text-xs font-mono mt-1 text-muted-foreground hover:text-foreground transition-colors"
+									/>
+								}
+							>
+								<TagIcon size={12} />
+								<span>v{version}</span>
 							</TooltipTrigger>
 							<TooltipContent>View release notes</TooltipContent>
 						</Tooltip>
@@ -108,50 +111,53 @@ export default function Header({
 					) : (
 						<div className="flex items-center gap-2">
 							<DropdownMenu>
-								<DropdownMenuTrigger asChild>
-									<Button variant="ghost" size="icon" className="rounded-full">
-										<Avatar className="hover:brightness-90">
-											<AvatarImage
-												src={`https://github.com/${username}.png`}
-												alt={`${username}'s avatar`}
-											/>
-											<AvatarFallback>{username?.slice(0, 2)?.toUpperCase() || "?"}</AvatarFallback>
-										</Avatar>
-									</Button>
+								<DropdownMenuTrigger
+									render={<Button variant="ghost" size="icon" className="rounded-full" />}
+								>
+									<Avatar className="hover:brightness-90">
+										<AvatarImage
+											src={`https://github.com/${username}.png`}
+											alt={`${username}'s avatar`}
+										/>
+										<AvatarFallback>{username?.slice(0, 2)?.toUpperCase() || "?"}</AvatarFallback>
+									</Avatar>
 								</DropdownMenuTrigger>
-								<DropdownMenuContent className="w-56" align="end" forceMount>
-									<DropdownMenuLabel className="font-normal">
-										<div className="flex flex-col space-y-1">
-											<p className="text-sm font-medium leading-none">{name}</p>
-										</div>
-									</DropdownMenuLabel>
+								<DropdownMenuContent className="w-56" align="end">
+									<DropdownMenuGroup>
+										<DropdownMenuLabel className="font-normal">
+											<div className="flex flex-col space-y-1">
+												<p className="text-sm font-medium leading-none">{name}</p>
+											</div>
+										</DropdownMenuLabel>
+									</DropdownMenuGroup>
 									<DropdownMenuSeparator />
 									<DropdownMenuGroup>
 										{hasWorkspace && hasUsername ? (
-											<DropdownMenuItem asChild>
-												<Link
-													to="/w/$workspaceSlug/user/$username"
-													params={{
-														workspaceSlug: workspaceSlug ?? "",
-														username: username ?? "",
-													}}
-												>
+											<Link
+												to="/w/$workspaceSlug/user/$username"
+												params={{
+													workspaceSlug: workspaceSlug ?? "",
+													username: username ?? "",
+												}}
+												className="[&]:no-underline"
+											>
+												<DropdownMenuItem>
 													<User />
 													<span>My Profile</span>
-												</Link>
-											</DropdownMenuItem>
+												</DropdownMenuItem>
+											</Link>
 										) : (
 											<DropdownMenuItem disabled title="Join a workspace to view your profile">
 												<User />
 												<span>My Profile</span>
 											</DropdownMenuItem>
 										)}
-										<DropdownMenuItem asChild>
-											<Link to="/settings" search={{}}>
+										<Link to="/settings" className="[&]:no-underline">
+											<DropdownMenuItem>
 												<Settings />
 												<span>Settings</span>
-											</Link>
-										</DropdownMenuItem>
+											</DropdownMenuItem>
+										</Link>
 									</DropdownMenuGroup>
 									<DropdownMenuSeparator />
 									<DropdownMenuItem onClick={onLogout}>

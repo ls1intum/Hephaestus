@@ -49,7 +49,7 @@ const LoadingSkeleton = () => (
 		<div className="p-4 border rounded-t-2xl flex flex-row gap-2 items-center justify-between dark:bg-muted h-[57px] dark:border-zinc-700 border-b-0">
 			<div className="flex flex-row items-center gap-3">
 				<div className="text-muted-foreground">
-					<Spinner size="sm" />
+					<Spinner />
 				</div>
 				<Skeleton className="h-4 w-32" />
 			</div>
@@ -90,9 +90,7 @@ interface DocumentHeaderProps {
 const DocumentHeader = ({ title, isStreaming }: DocumentHeaderProps) => (
 	<div className="p-4 border rounded-t-2xl flex flex-row gap-2 items-start sm:items-center justify-between dark:bg-muted border-b-0 dark:border-zinc-700">
 		<div className="flex flex-row items-start sm:items-center gap-3">
-			<div className="text-muted-foreground">
-				{isStreaming ? <Spinner size="sm" /> : <FileText />}
-			</div>
+			<div className="text-muted-foreground">{isStreaming ? <Spinner /> : <FileText />}</div>
 			<div className="-translate-y-1 sm:translate-y-0 font-medium">{title}</div>
 		</div>
 		<div className="w-8" />

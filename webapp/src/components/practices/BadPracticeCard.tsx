@@ -58,7 +58,13 @@ export function BadPracticeCard({
 	const Icon = stateInfo.icon;
 	const [feedbackType, setFeedbackType] = useState<string | undefined>(undefined);
 	const [feedbackExplanation, setFeedbackExplanation] = useState<string>("");
-	const feedbackTypes = ["Not a bad practice", "Irrelevant", "Incorrect", "Imprecise", "Other"];
+	const feedbackTypes = [
+		{ value: "Not a bad practice", label: "Not a bad practice" },
+		{ value: "Irrelevant", label: "Irrelevant" },
+		{ value: "Incorrect", label: "Incorrect" },
+		{ value: "Imprecise", label: "Imprecise" },
+		{ value: "Other", label: "Other" },
+	];
 
 	const handleResolveAsFixed = () => {
 		onResolveBadPracticeAsFixed?.(id);
@@ -108,8 +114,8 @@ export function BadPracticeCard({
 				<div className="justify-self-end">
 					<Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
 						<DropdownMenu>
-							<DropdownMenuTrigger asChild>
-								<Button variant="outline">Resolve</Button>
+							<DropdownMenuTrigger render={<Button variant="outline" />}>
+								Resolve
 							</DropdownMenuTrigger>
 							<DropdownMenuContent className="w-56">
 								<DropdownMenuGroup>
@@ -156,14 +162,18 @@ export function BadPracticeCard({
 										Feedback
 									</Label>
 									<div className="col-span-3">
-										<Select onValueChange={(value) => setFeedbackType(value)} value={feedbackType}>
+										<Select
+											onValueChange={(value) => value && setFeedbackType(value)}
+											value={feedbackType}
+											items={feedbackTypes}
+										>
 											<SelectTrigger id="feedback-type" className="w-full">
 												<SelectValue placeholder="Select the type of feedback" />
 											</SelectTrigger>
 											<SelectContent>
 												{feedbackTypes.map((type) => (
-													<SelectItem key={type} value={type}>
-														{type}
+													<SelectItem key={type.value} value={type.value}>
+														{type.label}
 													</SelectItem>
 												))}
 											</SelectContent>

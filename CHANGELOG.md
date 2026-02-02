@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.15.0](https://github.com/ls1intum/Hephaestus/compare/v0.14.0...v0.15.0) (2026-02-01)
+
+### 🚀 Features
+
+* **scripts:** add GitLab GraphQL schema and update script ([#685](https://github.com/ls1intum/Hephaestus/issues/685)) ([298f4c4](https://github.com/ls1intum/Hephaestus/commit/298f4c497f84b227aee3b7745ab8c08283dbabfe))
+* **config:** add verified agent skills and workflow commands ([#654](https://github.com/ls1intum/Hephaestus/issues/654)) ([08ae20f](https://github.com/ls1intum/Hephaestus/commit/08ae20f4f042bbaf07a003c4c0d0e940e3a93963))
+* **webapp:** migrate from Radix UI to Base UI ([#688](https://github.com/ls1intum/Hephaestus/issues/688)) ([8c38f31](https://github.com/ls1intum/Hephaestus/commit/8c38f3160ff69ddc82e4116d147df2a12b208eb8))
+
+### 📚 Documentation
+
+* **config:** use mvn instead of ./mvnw in agent-facing docs ([#691](https://github.com/ls1intum/Hephaestus/issues/691)) ([75ed97d](https://github.com/ls1intum/Hephaestus/commit/75ed97dcc27ace6c295fa105ee7ffa3aa12c9777))
+
 ## [0.14.0](https://github.com/ls1intum/Hephaestus/compare/v0.13.8...v0.14.0) (2026-01-31)
 
 ### 🚀 Features

@@ -54,11 +54,13 @@ export function AccountSection({
 					</p>
 				</div>
 				<AlertDialog>
-					<AlertDialogTrigger asChild>
-						<Button variant="destructive" disabled={pending || processing} className="mt-1">
-							{processing ? "Deleting…" : "Delete"}
-						</Button>
-					</AlertDialogTrigger>
+					<AlertDialogTrigger
+						render={
+							<Button variant="destructive" disabled={pending || processing} className="mt-1">
+								{processing ? "Deleting…" : "Delete"}
+							</Button>
+						}
+					/>
 					<AlertDialogContent>
 						<AlertDialogHeader>
 							<AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>

@@ -20,41 +20,49 @@ export function NavDashboards({
 			<SidebarGroupLabel>Dashboards</SidebarGroupLabel>
 			<SidebarMenu>
 				<SidebarMenuItem>
-					<SidebarMenuButton asChild tooltip="Leaderboard">
-						<Link to="/w/$workspaceSlug" params={{ workspaceSlug }}>
-							<Trophy />
-							<span>Leaderboard</span>
-						</Link>
+					<SidebarMenuButton
+						tooltip="Leaderboard"
+						render={<Link to="/w/$workspaceSlug" params={{ workspaceSlug }} />}
+					>
+						<Trophy />
+						<span>Leaderboard</span>
 					</SidebarMenuButton>
 				</SidebarMenuItem>
 				<SidebarMenuItem>
-					<SidebarMenuButton asChild tooltip="Best practices">
-						<Link
-							to="/w/$workspaceSlug/user/$username/best-practices"
-							params={{ workspaceSlug, username }}
-						>
-							<CheckCheck />
-							<span>Best practices</span>
-						</Link>
+					<SidebarMenuButton
+						tooltip="Best practices"
+						render={
+							<Link
+								to="/w/$workspaceSlug/user/$username/best-practices"
+								params={{ workspaceSlug, username }}
+							/>
+						}
+					>
+						<CheckCheck />
+						<span>Best practices</span>
 					</SidebarMenuButton>
 				</SidebarMenuItem>
 				<SidebarMenuItem>
-					<SidebarMenuButton asChild tooltip="Profile">
-						<Link
-							to="/w/$workspaceSlug/user/$username"
-							params={{ username: username ?? "", workspaceSlug }}
-						>
-							<User />
-							<span>Profile</span>
-						</Link>
+					<SidebarMenuButton
+						tooltip="Profile"
+						render={
+							<Link
+								to="/w/$workspaceSlug/user/$username"
+								params={{ username: username ?? "", workspaceSlug }}
+							/>
+						}
+					>
+						<User />
+						<span>Profile</span>
 					</SidebarMenuButton>
 				</SidebarMenuItem>
 				<SidebarMenuItem>
-					<SidebarMenuButton asChild tooltip="Teams">
-						<Link to="/w/$workspaceSlug/teams" params={{ workspaceSlug }}>
-							<Users />
-							<span>Teams</span>
-						</Link>
+					<SidebarMenuButton
+						tooltip="Teams"
+						render={<Link to="/w/$workspaceSlug/teams" params={{ workspaceSlug }} />}
+					>
+						<Users />
+						<span>Teams</span>
 					</SidebarMenuButton>
 				</SidebarMenuItem>
 			</SidebarMenu>

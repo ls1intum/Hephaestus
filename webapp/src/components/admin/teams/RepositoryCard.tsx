@@ -99,11 +99,13 @@ export function RepositoryCard({
 							</Button>
 						)}
 						<Popover>
-							<PopoverTrigger asChild>
-								<Button variant="ghost" size="sm" className="h-7 w-7 p-0">
-									<Settings className="h-3 w-3" />
-								</Button>
-							</PopoverTrigger>
+							<PopoverTrigger
+								render={
+									<Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+										<Settings className="h-3 w-3" />
+									</Button>
+								}
+							/>
 							<PopoverContent className="w-[32rem] max-w-[calc(100vw-2rem)] p-3 sm:p-4" align="end">
 								<RepositoryLabelsToggle
 									team={team}

@@ -25,7 +25,8 @@ export function SortFilter({ onSortChange, selectedSort = "SCORE" }: SortFilterP
 			<Label htmlFor="sort">Sort by</Label>
 			<Select
 				value={selectedSort}
-				onValueChange={(value) => onSortChange?.(value as LeaderboardSortType)}
+				onValueChange={(value) => value && onSortChange?.(value as LeaderboardSortType)}
+				items={SORT_OPTIONS}
 			>
 				<SelectTrigger id="sort" className="w-full">
 					<SelectValue placeholder="Sort by" />

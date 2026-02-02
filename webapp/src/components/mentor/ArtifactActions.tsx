@@ -43,20 +43,22 @@ export function ArtifactActions({
 		<div className={cn("flex flex-row gap-1", className)}>
 			{actions.map((action) => (
 				<Tooltip key={action.id}>
-					<TooltipTrigger asChild>
-						<Button
-							variant="outline"
-							className={cn("dark:border-primary/10 dark:hover:bg-primary/10", {
-								"p-2": !action.label,
-								"py-1.5 px-2": action.label,
-							})}
-							size={action.label ? "default" : "icon"}
-							onClick={action.onClick}
-							disabled={isLoading || isStreaming || action.disabled}
-						>
-							{action.icon}
-							{action.label}
-						</Button>
+					<TooltipTrigger
+						render={
+							<Button
+								variant="outline"
+								className={cn("dark:border-primary/10 dark:hover:bg-primary/10", {
+									"p-2": !action.label,
+									"py-1.5 px-2": action.label,
+								})}
+								size={action.label ? "default" : "icon"}
+								onClick={action.onClick}
+								disabled={isLoading || isStreaming || action.disabled}
+							/>
+						}
+					>
+						{action.icon}
+						{action.label}
 					</TooltipTrigger>
 					<TooltipContent>{action.description}</TooltipContent>
 				</Tooltip>

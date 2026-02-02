@@ -1,5 +1,4 @@
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
 export function LandingTestimonialSection() {
@@ -25,9 +24,12 @@ export function LandingTestimonialSection() {
 							<div className="flex items-center gap-3">
 								<div className="font-medium">Ege Kocabas</div>
 								<div className="text-sm text-muted-foreground">
-									<Button variant="link" size="none" className="text-muted-foreground" asChild>
-										<a href="https://github.com/ls1intum/helios">Helios Project, TU Munich</a>
-									</Button>
+									<a
+										href="https://github.com/ls1intum/helios"
+										className="text-muted-foreground underline-offset-4 hover:underline"
+									>
+										Helios Project, TU Munich
+									</a>
 								</div>
 							</div>
 						</CardContent>

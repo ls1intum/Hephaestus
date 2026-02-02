@@ -87,23 +87,25 @@ export function ReviewsPopover({ reviewedPRs, highlight = false }: ReviewsPopove
 
 	return (
 		<Popover open={isOpen} onOpenChange={setIsOpen}>
-			<PopoverTrigger asChild>
-				<Button
-					variant="outline"
-					size="sm"
-					disabled={!hasReviews}
-					className={cn(
-						"flex items-center gap-1",
-						!highlight
-							? "text-github-muted-foreground"
-							: "border-primary bg-accent hover:bg-foreground hover:text-background",
-					)}
-					onClick={(e) => e.stopPropagation()}
-				>
-					<GitPullRequestIcon size={16} />
-					{reviewedPRs?.length || 0}
-				</Button>
-			</PopoverTrigger>
+			<PopoverTrigger
+				render={
+					<Button
+						variant="outline"
+						size="sm"
+						disabled={!hasReviews}
+						className={cn(
+							"flex items-center gap-1",
+							!highlight
+								? "text-github-muted-foreground"
+								: "border-primary bg-accent hover:bg-foreground hover:text-background",
+						)}
+						onClick={(e) => e.stopPropagation()}
+					>
+						<GitPullRequestIcon size={16} />
+						{reviewedPRs?.length || 0}
+					</Button>
+				}
+			/>
 			<PopoverContent
 				className="space-y-2 w-60"
 				sideOffset={5}
