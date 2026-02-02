@@ -2,6 +2,7 @@ import { Handle, Position } from "@xyflow/react";
 import { memo } from "react";
 import { getLeagueTier } from "@/components/leaderboard/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 interface AvatarNodeData {
@@ -32,14 +33,23 @@ function AvatarNodeComponent({ data }: { data: AvatarNodeData }) {
 				</Avatar>
 
 				{/* Level Badge */}
-				<div
-					className={cn(
-						"absolute -bottom-1 -right-1 flex size-9 items-center justify-center rounded-full border-4 border-background text-primary-foreground font-bold text-sm shadow-md",
-						`bg-league-${leagueTier}`,
-					)}
-				>
-					{level}
-				</div>
+				<Tooltip>
+					<TooltipTrigger
+						render={
+							<div
+								className={cn(
+									"absolute -bottom-1 -right-1 flex size-9 items-center justify-center rounded-full border-4 border-background text-primary-foreground font-bold text-sm shadow-md cursor-help",
+									`bg-league-${leagueTier}`,
+								)}
+							/>
+						}
+					>
+						{level}
+					</TooltipTrigger>
+					<TooltipContent side="bottom">
+						<p>Level {level}</p>
+					</TooltipContent>
+				</Tooltip>
 			</div>
 
 			{/* Source Handle - connect to first nodes */}

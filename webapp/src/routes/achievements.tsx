@@ -1,28 +1,39 @@
+import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { ReactFlowProvider } from "@xyflow/react";
 import React from "react";
+import { getUserProfileOptions } from "@/api/@tanstack/react-query.gen";
 import { CategoryLabels } from "@/components/achievements/category-labels";
 import { Header } from "@/components/achievements/header";
 import { SkillTree } from "@/components/achievements/skill-tree";
 import { StatsPanel } from "@/components/achievements/stats-panel";
 import { useAuth } from "@/integrations/auth/AuthContext";
+import { useWorkspaceStore } from "@/stores/workspace-store";
 
 export const Route = createFileRoute("/achievements")({
 	component: AchievementsPage,
 });
 
 function AchievementsPage() {
-	const { userProfile, getUserGithubProfilePictureUrl } = useAuth();
+	const { userProfile, getUserGithubProfilePictureUrl, username } = useAuth();
+	const selectedSlug = useWorkspaceStore((state) => state.selectedSlug);
+
+	// Attempt to fetch real profile data if we have a workspace context
+	const profileQuery = useQuery({
+		...getUserProfileOptions({
+			path: { workspaceSlug: selectedSlug || "", login: username || "" },
+		}),
+		enabled: Boolean(selectedSlug) && Boolean(username),
+	});
 
 	const user = React.useMemo(
 		() => ({
-			name: userProfile?.name || userProfile?.username,
-			avatarUrl: getUserGithubProfilePictureUrl(),
-			// TODO: Fetch real level and league points from API
-			level: 42,
-			leaguePoints: 1600,
+			name: profileQuery.data?.userInfo?.name || userProfile?.name || userProfile?.username,
+			avatarUrl: profileQuery.data?.userInfo?.avatarUrl || getUserGithubProfilePictureUrl(),
+			level: profileQuery.data?.xpRecord?.currentLevel ?? 1,
+			leaguePoints: profileQuery.data?.userInfo?.leaguePoints ?? 0,
 		}),
-		[userProfile, getUserGithubProfilePictureUrl],
+		[userProfile, getUserGithubProfilePictureUrl, profileQuery.data],
 	);
 
 	return (
