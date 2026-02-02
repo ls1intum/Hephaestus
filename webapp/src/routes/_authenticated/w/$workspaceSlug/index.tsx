@@ -1,6 +1,5 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { createFileRoute, retainSearchParams, useNavigate } from "@tanstack/react-router";
-import { zodValidator } from "@tanstack/zod-adapter";
 import { formatISO } from "date-fns";
 import { useEffect } from "react";
 import { z } from "zod";
@@ -39,7 +38,7 @@ type LeaderboardSearchParams = z.infer<typeof leaderboardSearchSchema>;
 // Export route with search param validation
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/")({
 	component: LeaderboardContainer,
-	validateSearch: zodValidator(leaderboardSearchSchema),
+	validateSearch: leaderboardSearchSchema,
 	// Configure search middleware to retain params when navigating
 	search: {
 		middlewares: [retainSearchParams(["team", "sort", "after", "before", "mode"])],
