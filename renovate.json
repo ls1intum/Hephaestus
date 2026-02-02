@@ -143,7 +143,6 @@
   "ignorePaths": [
     "**/node_modules/**",
     "**/target/**",
-    "**/.venv/**",
     "**/dist/**",
     "**/build/**"
   ]
