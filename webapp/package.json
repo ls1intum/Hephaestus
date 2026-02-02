@@ -28,7 +28,7 @@
     "openapi-ts": "openapi-ts"
   },
   "dependencies": {
-    "@ai-sdk/react": "3.0.3",
+    "@ai-sdk/react": "3.0.64",
     "@base-ui/react": "1.1.0",
     "@primer/octicons-react": "19.21.1",
     "@primer/primitives": "10.7.0",
@@ -41,7 +41,7 @@
     "@tanstack/react-table": "8.21.3",
     "@tanstack/router-plugin": "1.154.1",
     "@tanstack/zod-adapter": "1.154.1",
-    "ai": "6.0.3",
+    "ai": "6.0.62",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
     "cmdk": "^1.1.1",

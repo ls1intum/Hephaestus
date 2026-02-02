@@ -33,10 +33,10 @@
     "validate": "npm run typecheck && npm run lint && npm run test"
   },
   "dependencies": {
-    "@ai-sdk/azure": "3.0.1",
-    "@ai-sdk/devtools": "0.0.2",
-    "@ai-sdk/openai": "3.0.1",
-    "@ai-sdk/provider": "3.0.0",
+    "@ai-sdk/azure": "3.0.24",
+    "@ai-sdk/devtools": "0.0.10",
+    "@ai-sdk/openai": "3.0.23",
+    "@ai-sdk/provider": "3.0.6",
     "@hono/node-server": "1.19.7",
     "@hono/zod-openapi": "1.2.0",
     "@hono/zod-validator": "0.7.6",
@@ -44,7 +44,7 @@
     "@langfuse/otel": "4.5.1",
     "@opentelemetry/sdk-node": "0.210.0",
     "@scalar/hono-api-reference": "0.9.37",
-    "ai": "6.0.3",
+    "ai": "6.0.62",
     "dotenv": "17.2.3",
     "dotenv-expand": "12.0.3",
     "drizzle-orm": "0.45.1",
