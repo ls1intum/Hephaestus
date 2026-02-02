@@ -137,7 +137,8 @@
   "lockFileMaintenance": {
     "enabled": true,
     "schedule": ["before 7am on monday"],
-    "automerge": true
+    "automerge": true,
+    "automergeType": "pr"
   },
 
   "ignorePaths": [
