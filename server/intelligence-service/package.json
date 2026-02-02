@@ -53,7 +53,7 @@
     "hono-pino": "0.10.3",
     "lru-cache": "11.2.4",
     "pg": "8.17.2",
-    "pino": "10.1.0",
+    "pino": "10.3.0",
     "stoker": "2.0.1",
     "uuid": "13.0.0",
     "yaml": "2.8.2",
@@ -61,7 +61,7 @@
   },
   "devDependencies": {
     "@testcontainers/postgresql": "11.11.0",
-    "@types/node": "22.19.3",
+    "@types/node": "22.19.7",
     "@types/pg": "8.16.0",
     "@vitest/coverage-v8": "4.0.16",
     "commander": "14.0.2",
