@@ -40,7 +40,6 @@
     "@tanstack/react-router-devtools": "1.154.1",
     "@tanstack/react-table": "8.21.3",
     "@tanstack/router-plugin": "1.154.1",
-    "@tanstack/zod-adapter": "1.154.1",
     "ai": "6.0.3",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
@@ -75,7 +74,7 @@
     "usehooks-ts": "3.1.1",
     "uuid": "13.0.0",
     "vaul": "^1.1.2",
-    "zod": "3.25.76",
+    "zod": "4.2.1",
     "zustand": "5.0.9"
   },
   "devDependencies": {

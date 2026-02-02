@@ -117,12 +117,6 @@
       "labels": ["dependencies", "infrastructure"]
     },
     {
-      "description": "Zod webapp - pinned for TanStack compatibility",
-      "matchPackageNames": ["zod"],
-      "matchFileNames": ["webapp/package.json"],
-      "allowedVersions": "<4.0.0"
-    },
-    {
       "description": "Node.js runtime - manual review",
       "matchDepNames": ["node"],
       "matchManagers": ["nodenv", "nvm"],
