@@ -640,6 +640,7 @@ public class GitHubProjectSyncService {
                     projectId,
                     MAX_PAGINATION_PAGES
                 );
+                abortReason = SyncResult.Status.ABORTED_ERROR;
                 break;
             }
 
@@ -702,6 +703,7 @@ public class GitHubProjectSyncService {
                     itemsConnection.getNodes() == null ||
                     itemsConnection.getNodes().isEmpty()
                 ) {
+                    hasMore = false;
                     break;
                 }
 
@@ -947,8 +949,8 @@ public class GitHubProjectSyncService {
         if (abortReason != null) {
             // Item sync was aborted
             finalStatus = abortReason;
-        } else if (!fieldsSynced || !statusUpdatesSynced) {
-            // Item sync succeeded but one or more phases failed
+        } else if (!itemsSynced || !fieldsSynced || !statusUpdatesSynced) {
+            // Item sync incomplete or secondary phases failed
             finalStatus = SyncResult.Status.COMPLETED_WITH_WARNINGS;
         } else {
             // All phases completed successfully

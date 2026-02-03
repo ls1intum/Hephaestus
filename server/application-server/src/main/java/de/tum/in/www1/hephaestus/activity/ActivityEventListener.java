@@ -3,9 +3,11 @@ package de.tum.in.www1.hephaestus.activity;
 import de.tum.in.www1.hephaestus.activity.scoring.ExperiencePointCalculator;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.EventPayload;
+import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueCommentRepository;
 import de.tum.in.www1.hephaestus.gitprovider.project.Project;
+import de.tum.in.www1.hephaestus.gitprovider.project.ProjectRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThread;
@@ -52,6 +54,8 @@ public class ActivityEventListener {
     private final PullRequestReviewThreadRepository reviewThreadRepository;
     private final UserRepository userRepository;
     private final RepositoryRepository repositoryRepository;
+    private final ProjectRepository projectRepository;
+    private final IssueRepository issueRepository;
 
     public ActivityEventListener(
         ActivityEventService activityEventService,
@@ -60,7 +64,9 @@ public class ActivityEventListener {
         IssueCommentRepository issueCommentRepository,
         PullRequestReviewThreadRepository reviewThreadRepository,
         UserRepository userRepository,
-        RepositoryRepository repositoryRepository
+        RepositoryRepository repositoryRepository,
+        ProjectRepository projectRepository,
+        IssueRepository issueRepository
     ) {
         this.activityEventService = activityEventService;
         this.xpCalc = xpCalc;
@@ -69,6 +75,8 @@ public class ActivityEventListener {
         this.reviewThreadRepository = reviewThreadRepository;
         this.userRepository = userRepository;
         this.repositoryRepository = repositoryRepository;
+        this.projectRepository = projectRepository;
+        this.issueRepository = issueRepository;
     }
 
     /**
@@ -137,8 +145,8 @@ public class ActivityEventListener {
      * @param xpIfKnown the XP to award if the author is known
      * @return xpIfKnown if authorId is present, 0.0 otherwise
      */
-    private double xpForActor(@Nullable Long authorId, double xpIfKnown) {
-        return authorId != null ? xpIfKnown : 0.0;
+    private double xpForActor(@Nullable User actor, double xpIfKnown) {
+        return actor != null ? xpIfKnown : 0.0;
     }
 
     @Async
@@ -891,8 +899,9 @@ public class ActivityEventListener {
         if (!hasValidScopeId("Issue created", issueData.id(), event.context().scopeId())) {
             return;
         }
+        User actor = getActorOrNull(issueData.authorId());
         // Log unknown authors for observability, but don't skip the event
-        if (issueData.authorId() == null) {
+        if (actor == null) {
             log.info(
                 "Recording issue created event with unknown author (user deleted or bot): issueId={}, xp=0",
                 issueData.id()
@@ -904,11 +913,11 @@ public class ActivityEventListener {
                 event.context().scopeId(),
                 ActivityEventType.ISSUE_CREATED,
                 occurredAt,
-                getActorOrNull(issueData.authorId()),
+                actor,
                 repositoryRepository.getReferenceById(issueData.repository().id()),
                 ActivityTargetType.ISSUE,
                 issueData.id(),
-                xpForActor(issueData.authorId(), xpCalc.getXpIssueCreated())
+                xpForActor(actor, xpCalc.getXpIssueCreated())
             )
         );
     }
@@ -1160,7 +1169,7 @@ public class ActivityEventListener {
     /**
      * Handle project created events.
      *
-     * <p>Records PROJECT_CREATED activity event with configurable XP. Project creation is
+     * <p>Records PROJECT_CREATED activity event with 0 XP. Project creation is
      * tracked for activity completeness and audit trail purposes.
      *
      * <p>The actor is the project creator if available.
@@ -1173,7 +1182,9 @@ public class ActivityEventListener {
         if (!hasValidScopeId("Project created", projectData.id(), event.context().scopeId())) {
             return;
         }
-        Instant occurredAt = Instant.now();
+        Instant occurredAt = projectData.createdAt() != null
+            ? projectData.createdAt()
+            : projectData.updatedAt() != null ? projectData.updatedAt() : Instant.now();
         safeRecord("project created", projectData.id(), () ->
             activityEventService.record(
                 event.context().scopeId(),
@@ -1183,7 +1194,7 @@ public class ActivityEventListener {
                 getRepositoryForProject(projectData),
                 ActivityTargetType.PROJECT,
                 projectData.id(),
-                xpCalc.getXpProjectCreated()
+                0.0 // Project creation is tracked without XP
             )
         );
     }
@@ -1205,7 +1216,7 @@ public class ActivityEventListener {
         if (!hasValidScopeId("Project updated", projectData.id(), event.context().scopeId())) {
             return;
         }
-        Instant occurredAt = Instant.now();
+        Instant occurredAt = projectData.updatedAt() != null ? projectData.updatedAt() : Instant.now();
         // Use actorId (webhook sender) if available, fall back to creatorId for sync
         Long actorId = projectData.actorId() != null ? projectData.actorId() : projectData.creatorId();
         safeRecord("project updated", projectData.id(), () ->
@@ -1239,7 +1250,9 @@ public class ActivityEventListener {
         if (!hasValidScopeId("Project closed", projectData.id(), event.context().scopeId())) {
             return;
         }
-        Instant occurredAt = Instant.now();
+        Instant occurredAt = projectData.closedAt() != null
+            ? projectData.closedAt()
+            : projectData.updatedAt() != null ? projectData.updatedAt() : Instant.now();
         // Use actorId (webhook sender) if available, fall back to creatorId for sync
         Long actorId = projectData.actorId() != null ? projectData.actorId() : projectData.creatorId();
         safeRecord("project closed", projectData.id(), () ->
@@ -1273,7 +1286,7 @@ public class ActivityEventListener {
         if (!hasValidScopeId("Project reopened", projectData.id(), event.context().scopeId())) {
             return;
         }
-        Instant occurredAt = Instant.now();
+        Instant occurredAt = projectData.updatedAt() != null ? projectData.updatedAt() : Instant.now();
         // Use actorId (webhook sender) if available, fall back to creatorId for sync
         Long actorId = projectData.actorId() != null ? projectData.actorId() : projectData.creatorId();
         safeRecord("project reopened", projectData.id(), () ->
@@ -1323,7 +1336,7 @@ public class ActivityEventListener {
     /**
      * Handle project item created events.
      *
-     * <p>Records PROJECT_ITEM_CREATED activity event with configurable XP. Adding items to
+     * <p>Records PROJECT_ITEM_CREATED activity event with 0 XP. Adding items to
      * a project is tracked for activity completeness.
      *
      * <p>The actor is the user who created the item (from webhook sender),
@@ -1337,17 +1350,20 @@ public class ActivityEventListener {
         if (!hasValidScopeId("Project item created", itemData.id(), event.context().scopeId())) {
             return;
         }
-        Instant occurredAt = Instant.now();
+        Instant occurredAt = itemData.createdAt() != null
+            ? itemData.createdAt()
+            : itemData.updatedAt() != null ? itemData.updatedAt() : Instant.now();
+        User actor = getActorOrNull(itemData.actorId());
         safeRecord("project item created", itemData.id(), () ->
             activityEventService.record(
                 event.context().scopeId(),
                 ActivityEventType.PROJECT_ITEM_CREATED,
                 occurredAt,
-                getActorOrNull(itemData.actorId()),
-                null, // Repository resolved through project, not directly available
+                actor,
+                resolveRepositoryForProjectItem(itemData, event.projectId()),
                 ActivityTargetType.PROJECT_ITEM,
                 itemData.id(),
-                xpForActor(itemData.actorId(), xpCalc.getXpProjectItemCreated())
+                0.0 // Project item events are tracked without XP
             )
         );
     }
@@ -1369,14 +1385,14 @@ public class ActivityEventListener {
         if (!hasValidScopeId("Project item updated", itemData.id(), event.context().scopeId())) {
             return;
         }
-        Instant occurredAt = Instant.now();
+        Instant occurredAt = itemData.updatedAt() != null ? itemData.updatedAt() : Instant.now();
         safeRecord("project item updated", itemData.id(), () ->
             activityEventService.record(
                 event.context().scopeId(),
                 ActivityEventType.PROJECT_ITEM_UPDATED,
                 occurredAt,
                 getActorOrNull(itemData.actorId()),
-                null, // Repository resolved through project, not directly available
+                resolveRepositoryForProjectItem(itemData, event.projectId()),
                 ActivityTargetType.PROJECT_ITEM,
                 itemData.id(),
                 0.0 // Item updates are workflow tracking, no XP reward
@@ -1401,14 +1417,14 @@ public class ActivityEventListener {
         if (!hasValidScopeId("Project item archived", itemData.id(), event.context().scopeId())) {
             return;
         }
-        Instant occurredAt = Instant.now();
+        Instant occurredAt = itemData.updatedAt() != null ? itemData.updatedAt() : Instant.now();
         safeRecord("project item archived", itemData.id(), () ->
             activityEventService.record(
                 event.context().scopeId(),
                 ActivityEventType.PROJECT_ITEM_ARCHIVED,
                 occurredAt,
                 getActorOrNull(itemData.actorId()),
-                null, // Repository resolved through project, not directly available
+                resolveRepositoryForProjectItem(itemData, event.projectId()),
                 ActivityTargetType.PROJECT_ITEM,
                 itemData.id(),
                 0.0 // Item archiving is workflow tracking, no XP reward
@@ -1433,14 +1449,14 @@ public class ActivityEventListener {
         if (!hasValidScopeId("Project item restored", itemData.id(), event.context().scopeId())) {
             return;
         }
-        Instant occurredAt = Instant.now();
+        Instant occurredAt = itemData.updatedAt() != null ? itemData.updatedAt() : Instant.now();
         safeRecord("project item restored", itemData.id(), () ->
             activityEventService.record(
                 event.context().scopeId(),
                 ActivityEventType.PROJECT_ITEM_RESTORED,
                 occurredAt,
                 getActorOrNull(itemData.actorId()),
-                null, // Repository resolved through project, not directly available
+                resolveRepositoryForProjectItem(itemData, event.projectId()),
                 ActivityTargetType.PROJECT_ITEM,
                 itemData.id(),
                 0.0 // Item restoration is workflow tracking, no XP reward
@@ -1464,12 +1480,15 @@ public class ActivityEventListener {
         }
         log.debug("Recording project item deleted event: itemId={}", itemId);
         safeRecord("project item deleted", itemId, () ->
-            activityEventService.recordDeleted(
+            activityEventService.record(
                 event.context().scopeId(),
                 ActivityEventType.PROJECT_ITEM_DELETED,
                 Instant.now(),
+                null,
+                resolveRepositoryForProjectId(event.projectId()),
                 ActivityTargetType.PROJECT_ITEM,
-                itemId
+                itemId,
+                0.0
             )
         );
     }
@@ -1491,14 +1510,14 @@ public class ActivityEventListener {
         if (!hasValidScopeId("Project item converted", itemData.id(), event.context().scopeId())) {
             return;
         }
-        Instant occurredAt = Instant.now();
+        Instant occurredAt = itemData.updatedAt() != null ? itemData.updatedAt() : Instant.now();
         safeRecord("project item converted", itemData.id(), () ->
             activityEventService.record(
                 event.context().scopeId(),
                 ActivityEventType.PROJECT_ITEM_CONVERTED,
                 occurredAt,
                 getActorOrNull(itemData.actorId()),
-                null, // Repository resolved through project, not directly available
+                resolveRepositoryForProjectItem(itemData, event.projectId()),
                 ActivityTargetType.PROJECT_ITEM,
                 itemData.id(),
                 0.0 // Item conversion is workflow tracking, no XP reward
@@ -1523,14 +1542,14 @@ public class ActivityEventListener {
         if (!hasValidScopeId("Project item reordered", itemData.id(), event.context().scopeId())) {
             return;
         }
-        Instant occurredAt = Instant.now();
+        Instant occurredAt = itemData.updatedAt() != null ? itemData.updatedAt() : Instant.now();
         safeRecord("project item reordered", itemData.id(), () ->
             activityEventService.record(
                 event.context().scopeId(),
                 ActivityEventType.PROJECT_ITEM_REORDERED,
                 occurredAt,
                 getActorOrNull(itemData.actorId()),
-                null, // Repository resolved through project, not directly available
+                resolveRepositoryForProjectItem(itemData, event.projectId()),
                 ActivityTargetType.PROJECT_ITEM,
                 itemData.id(),
                 0.0 // Item reordering is workflow tracking, no XP reward
@@ -1554,6 +1573,40 @@ public class ActivityEventListener {
         }
         // Organization or user-scoped projects don't have a direct repository link
         return null;
+    }
+
+    @Nullable
+    private de.tum.in.www1.hephaestus.gitprovider.repository.Repository resolveRepositoryForProjectId(
+        @Nullable Long projectId
+    ) {
+        if (projectId == null) {
+            return null;
+        }
+        Project project = projectRepository.findById(projectId).orElse(null);
+        if (project == null) {
+            return null;
+        }
+        if (project.getOwnerType() == Project.OwnerType.REPOSITORY) {
+            return repositoryRepository.getReferenceById(project.getOwnerId());
+        }
+        return null;
+    }
+
+    @Nullable
+    private de.tum.in.www1.hephaestus.gitprovider.repository.Repository resolveRepositoryForProjectItem(
+        EventPayload.ProjectItemData itemData,
+        @Nullable Long projectId
+    ) {
+        if (itemData == null) {
+            return resolveRepositoryForProjectId(projectId);
+        }
+        if (itemData.issueId() != null) {
+            var issue = issueRepository.findById(itemData.issueId()).orElse(null);
+            if (issue != null && issue.getRepository() != null) {
+                return repositoryRepository.getReferenceById(issue.getRepository().getId());
+            }
+        }
+        return resolveRepositoryForProjectId(projectId);
     }
 
     private ActivityEventType mapReviewState(PullRequestReview.State state) {
@@ -1581,17 +1634,19 @@ public class ActivityEventListener {
         if (!hasValidScopeId("Project status update created", data.id(), event.context().scopeId())) {
             return;
         }
-        Instant occurredAt = Instant.now();
+        Instant occurredAt = data.createdAt() != null
+            ? data.createdAt()
+            : data.updatedAt() != null ? data.updatedAt() : Instant.now();
         safeRecord("project status update created", data.id(), () ->
             activityEventService.record(
                 event.context().scopeId(),
                 ActivityEventType.PROJECT_STATUS_UPDATE_CREATED,
                 occurredAt,
                 getActorOrNull(data.creatorId()),
-                null, // Repository not directly available for org-level projects
+                resolveRepositoryForProjectId(event.projectId()),
                 ActivityTargetType.PROJECT_STATUS_UPDATE,
                 data.id(),
-                xpCalc.getXpProjectStatusUpdateCreated()
+                0.0 // Status updates tracked without XP
             )
         );
     }
@@ -1604,14 +1659,14 @@ public class ActivityEventListener {
         if (!hasValidScopeId("Project status update updated", data.id(), event.context().scopeId())) {
             return;
         }
-        Instant occurredAt = Instant.now();
+        Instant occurredAt = data.updatedAt() != null ? data.updatedAt() : Instant.now();
         safeRecord("project status update updated", data.id(), () ->
             activityEventService.record(
                 event.context().scopeId(),
                 ActivityEventType.PROJECT_STATUS_UPDATE_UPDATED,
                 occurredAt,
                 getActorOrNull(data.creatorId()),
-                null,
+                resolveRepositoryForProjectId(event.projectId()),
                 ActivityTargetType.PROJECT_STATUS_UPDATE,
                 data.id(),
                 0.0
@@ -1628,12 +1683,15 @@ public class ActivityEventListener {
             return;
         }
         safeRecord("project status update deleted", id, () ->
-            activityEventService.recordDeleted(
+            activityEventService.record(
                 event.context().scopeId(),
                 ActivityEventType.PROJECT_STATUS_UPDATE_DELETED,
                 Instant.now(),
+                null,
+                resolveRepositoryForProjectId(event.projectId()),
                 ActivityTargetType.PROJECT_STATUS_UPDATE,
-                id
+                id,
+                0.0
             )
         );
     }

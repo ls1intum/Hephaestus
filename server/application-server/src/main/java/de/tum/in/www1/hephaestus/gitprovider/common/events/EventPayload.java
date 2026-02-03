@@ -354,7 +354,10 @@ public final class EventPayload {
         @NonNull Project.OwnerType ownerType,
         @NonNull Long ownerId,
         @Nullable Long creatorId,
-        @Nullable Long actorId
+        @Nullable Long actorId,
+        @Nullable Instant createdAt,
+        @Nullable Instant updatedAt,
+        @Nullable Instant closedAt
     ) {
         /**
          * Creates ProjectData from a Project entity with no actor specified.
@@ -383,7 +386,10 @@ public final class EventPayload {
                 project.getOwnerType(),
                 project.getOwnerId(),
                 project.getCreator() != null ? project.getCreator().getId() : null,
-                actorId
+                actorId,
+                project.getCreatedAt(),
+                project.getUpdatedAt(),
+                project.getClosedAt()
             );
         }
     }
@@ -406,7 +412,9 @@ public final class EventPayload {
         @NonNull ProjectItem.ContentType contentType,
         @Nullable Long issueId,
         boolean archived,
-        @Nullable Long actorId
+        @Nullable Long actorId,
+        @Nullable Instant createdAt,
+        @Nullable Instant updatedAt
     ) {
         /**
          * Creates ProjectItemData from a ProjectItem entity with no actor specified.
@@ -431,7 +439,9 @@ public final class EventPayload {
                 item.getContentType(),
                 item.getIssue() != null ? item.getIssue().getId() : null,
                 item.isArchived(),
-                actorId
+                actorId,
+                item.getCreatedAt(),
+                item.getUpdatedAt()
             );
         }
     }
@@ -451,7 +461,9 @@ public final class EventPayload {
         @Nullable LocalDate startDate,
         @Nullable LocalDate targetDate,
         @Nullable ProjectStatusUpdate.Status status,
-        @Nullable Long creatorId
+        @Nullable Long creatorId,
+        @Nullable Instant createdAt,
+        @Nullable Instant updatedAt
     ) {
         public static ProjectStatusUpdateData from(ProjectStatusUpdate update) {
             return new ProjectStatusUpdateData(
@@ -462,7 +474,9 @@ public final class EventPayload {
                 update.getStartDate(),
                 update.getTargetDate(),
                 update.getStatus(),
-                update.getCreator() != null ? update.getCreator().getId() : null
+                update.getCreator() != null ? update.getCreator().getId() : null,
+                update.getCreatedAt(),
+                update.getUpdatedAt()
             );
         }
     }

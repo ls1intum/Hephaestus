@@ -356,6 +356,7 @@ public class GitHubDataSyncService {
      * <ol>
      *   <li>Organization + memberships (users must exist first)</li>
      *   <li>Issue types (organization-level, must exist before issues are synced)</li>
+     *   <li>Projects (org-level metadata before issue/PR sync to link items)</li>
      *   <li>Per-repository syncs (creates repository records, syncs issues/PRs)</li>
      *   <li>Teams + team repository permissions (requires repos to exist)</li>
      *   <li>Issue dependencies (requires issues to exist)</li>
@@ -400,7 +401,10 @@ public class GitHubDataSyncService {
             // and must exist before issues are synced so they can be linked immediately)
             syncIssueTypes(scopeId);
 
-            // Sync each repository (creates repository records)
+            // Sync projects BEFORE repositories so embedded project items can be linked
+            syncProjects(scopeId);
+
+            // Sync each repository (creates repository records, issues, PRs)
             for (SyncTarget target : syncTargets) {
                 // Check if installation became suspended mid-sync - abort remaining syncs
                 if (installationId != null && gitHubAppTokenService.isInstallationMarkedSuspended(installationId)) {
@@ -414,9 +418,6 @@ public class GitHubDataSyncService {
 
             // Sync teams AFTER repositories exist (team repo permissions need repos to exist)
             syncTeams(scopeId);
-
-            // Sync projects AFTER repositories and teams (projects may reference issues/PRs)
-            syncProjects(scopeId);
 
             // Sync scope-level relationships (after all issues/PRs are synced)
             syncScopeLevelRelationships(scopeId);
@@ -587,7 +588,7 @@ public class GitHubDataSyncService {
     /**
      * Syncs GitHub Projects V2 for a scope from its GitHub organization.
      * <p>
-     * This runs AFTER teams are synced (projects may reference issues/PRs which need to exist).
+     * This runs BEFORE repository syncs so embedded project items can be linked.
      * Projects are organization-level entities in GitHub.
      * <p>
      * Sync is performed in two phases:
