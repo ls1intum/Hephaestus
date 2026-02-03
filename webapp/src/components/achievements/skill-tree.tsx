@@ -87,9 +87,17 @@ export function SkillTree({
 				maxZoom={2.5}
 				proOptions={{ hideAttribution: true }}
 				className="bg-background"
+				// Nodes should be not accessible besides selection for tooltip
+				elementsSelectable={true}
 				nodesDraggable={false}
 				nodesConnectable={false}
-				elementsSelectable={false}
+				// Disable all keyboard props
+				deleteKeyCode={null}
+				selectionKeyCode={null}
+				multiSelectionKeyCode={null}
+				zoomActivationKeyCode={null}
+				panActivationKeyCode={null}
+				disableKeyboardA11y={true}
 			>
 				{/* Subtle dot grid background */}
 				<Background gap={40} size={1} color="var(--border)" className="opacity-20" />

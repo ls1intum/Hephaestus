@@ -28,7 +28,7 @@ function AvatarNodeComponent({ data }: { data: AvatarNodeData }) {
 				<Avatar className="size-24 border-4 border-background shadow-[0_0_30px_rgba(var(--shadow-rgb),0.3)]">
 					<AvatarImage src={data.avatarUrl} alt={`${data.name}'s avatar`} />
 					<AvatarFallback className="text-2xl font-bold bg-secondary/50">
-						{data.name?.slice(0, 2)?.toUpperCase() ?? "ME"}
+						{data.name?.slice(0, 2)?.toUpperCase() ?? "HP"}
 					</AvatarFallback>
 				</Avatar>
 
