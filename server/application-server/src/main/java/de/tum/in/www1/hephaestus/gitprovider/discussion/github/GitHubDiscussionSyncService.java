@@ -259,9 +259,10 @@ public class GitHubDiscussionSyncService {
         boolean resuming = initialCursor != null;
         SyncResult.Status abortReason = null;
         // For incremental sync: track pages fetched after hitting stop condition
-        // to catch same-timestamp items that might span page boundaries
+        // to catch same-timestamp items that might span page boundaries.
+        // Using 3 pages provides margin for high-activity repos with batch updates.
         int pagesAfterStopCondition = 0;
-        final int safetyPagesAfterStop = 1;
+        final int safetyPagesAfterStop = 3;
 
         if (resuming) {
             log.info(

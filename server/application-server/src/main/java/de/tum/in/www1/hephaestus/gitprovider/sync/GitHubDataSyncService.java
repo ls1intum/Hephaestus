@@ -6,6 +6,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFou
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.Category;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.InstallationTokenProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.OrganizationMembershipListener;
@@ -68,6 +69,7 @@ public class GitHubDataSyncService {
     private static final Logger log = LoggerFactory.getLogger(GitHubDataSyncService.class);
 
     private final SyncSchedulerProperties syncSchedulerProperties;
+    private final GitHubSyncProperties gitHubSyncProperties;
 
     private final SyncTargetProvider syncTargetProvider;
     private final OrganizationMembershipListener organizationMembershipListener;
@@ -93,6 +95,7 @@ public class GitHubDataSyncService {
 
     public GitHubDataSyncService(
         SyncSchedulerProperties syncSchedulerProperties,
+        GitHubSyncProperties gitHubSyncProperties,
         SyncTargetProvider syncTargetProvider,
         OrganizationMembershipListener organizationMembershipListener,
         RepositoryRepository repositoryRepository,
@@ -114,6 +117,7 @@ public class GitHubDataSyncService {
         @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor
     ) {
         this.syncSchedulerProperties = syncSchedulerProperties;
+        this.gitHubSyncProperties = gitHubSyncProperties;
         this.syncTargetProvider = syncTargetProvider;
         this.organizationMembershipListener = organizationMembershipListener;
         this.repositoryRepository = repositoryRepository;
@@ -696,13 +700,26 @@ public class GitHubDataSyncService {
             return SyncResult.completed(0);
         }
 
-        // Pass last sync timestamp for incremental sync - only fetch discussions updated after this time
+        // For incremental sync, apply safety buffer to handle clock skew and race conditions
+        // This ensures we re-fetch discussions that may have been updated during the previous sync
+        Instant stopAfterTimestamp = null;
+        if (syncTarget.lastDiscussionsSyncedAt() != null) {
+            stopAfterTimestamp = syncTarget.lastDiscussionsSyncedAt()
+                .minus(gitHubSyncProperties.incrementalSyncBuffer());
+            log.debug(
+                "Incremental discussion sync with buffer: lastSyncedAt={}, buffer={}, effectiveStopTime={}",
+                syncTarget.lastDiscussionsSyncedAt(),
+                gitHubSyncProperties.incrementalSyncBuffer(),
+                stopAfterTimestamp
+            );
+        }
+
         SyncResult result = discussionSyncService.syncForRepository(
             scopeId,
             repositoryId,
             syncTarget.id(),
             syncTarget.discussionSyncCursor(),
-            syncTarget.lastDiscussionsSyncedAt()
+            stopAfterTimestamp
         );
 
         // Update discussions sync timestamp if sync completed successfully
