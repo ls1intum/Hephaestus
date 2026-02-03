@@ -57,6 +57,62 @@ public class GitHubProjectProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public Project process(GitHubProjectDTO dto, Project.OwnerType ownerType, Long ownerId, ProcessingContext context) {
+        return process(dto, ownerType, ownerId, context, null);
+    }
+
+    /**
+     * Process a GitHub project DTO and persist it as a Project entity.
+     *
+     * @param dto the GitHub project DTO
+     * @param ownerType the type of owner (ORGANIZATION, USER, REPOSITORY)
+     * @param ownerId the ID of the owner entity
+     * @param context processing context with scope information
+     * @param actorId the ID of the user who performed the action (from webhook sender), or null for sync
+     * @return the persisted Project entity
+     */
+    @Transactional
+    public Project process(
+        GitHubProjectDTO dto,
+        Project.OwnerType ownerType,
+        Long ownerId,
+        ProcessingContext context,
+        Long actorId
+    ) {
+        UpsertResult result = upsertProject(dto, ownerType, ownerId);
+        if (result == null) {
+            return null;
+        }
+
+        // Publish domain events with actor information
+        EventPayload.ProjectData projectData = EventPayload.ProjectData.from(result.project(), actorId);
+        EventContext eventContext = EventContext.from(context);
+
+        if (result.isNew()) {
+            eventPublisher.publishEvent(new DomainEvent.ProjectCreated(projectData, eventContext));
+            log.debug("Created project: projectId={}, projectNumber={}", result.project().getId(), result.project().getNumber());
+        } else {
+            eventPublisher.publishEvent(new DomainEvent.ProjectUpdated(projectData, Set.of(), eventContext));
+            log.debug("Updated project: projectId={}, projectNumber={}", result.project().getId(), result.project().getNumber());
+        }
+
+        return result.project();
+    }
+
+    /**
+     * Internal record to hold upsert result with new/existing flag.
+     */
+    private record UpsertResult(Project project, boolean isNew) {}
+
+    /**
+     * Internal method to upsert a project without publishing events.
+     * Used by process(), processClosed(), and processReopened() to avoid double event publishing.
+     *
+     * @param dto the GitHub project DTO
+     * @param ownerType the type of owner
+     * @param ownerId the ID of the owner entity
+     * @return UpsertResult containing the project and whether it was new, or null if processing was skipped
+     */
+    private UpsertResult upsertProject(GitHubProjectDTO dto, Project.OwnerType ownerType, Long ownerId) {
         if (dto == null) {
             log.warn("Skipped project processing: reason=nullDto, ownerId={}", ownerId);
             return null;
@@ -83,6 +139,8 @@ public class GitHubProjectProcessor extends BaseGitHubProcessor {
             dto.number(),
             sanitize(dto.title()),
             sanitize(dto.shortDescription()),
+            sanitize(dto.readme()),
+            dto.template(),
             dto.url(),
             dto.isClosed(),
             dto.closedAt(),
@@ -107,19 +165,7 @@ public class GitHubProjectProcessor extends BaseGitHubProcessor {
                 )
             );
 
-        // Publish domain events
-        EventPayload.ProjectData projectData = EventPayload.ProjectData.from(project);
-        EventContext eventContext = EventContext.from(context);
-
-        if (isNew) {
-            eventPublisher.publishEvent(new DomainEvent.ProjectCreated(projectData, eventContext));
-            log.debug("Created project: projectId={}, projectNumber={}", project.getId(), project.getNumber());
-        } else {
-            eventPublisher.publishEvent(new DomainEvent.ProjectUpdated(projectData, Set.of(), eventContext));
-            log.debug("Updated project: projectId={}, projectNumber={}", project.getId(), project.getNumber());
-        }
-
-        return project;
+        return new UpsertResult(project, isNew);
     }
 
     /**
@@ -138,12 +184,36 @@ public class GitHubProjectProcessor extends BaseGitHubProcessor {
         Long ownerId,
         ProcessingContext context
     ) {
-        Project project = process(dto, ownerType, ownerId, context);
-        if (project != null) {
-            EventPayload.ProjectData projectData = EventPayload.ProjectData.from(project);
-            eventPublisher.publishEvent(new DomainEvent.ProjectClosed(projectData, EventContext.from(context)));
-            log.info("Project closed: projectId={}, projectNumber={}", project.getId(), project.getNumber());
+        return processClosed(dto, ownerType, ownerId, context, null);
+    }
+
+    /**
+     * Process a project close event.
+     *
+     * @param dto the GitHub project DTO
+     * @param ownerType the type of owner
+     * @param ownerId the ID of the owner entity
+     * @param context processing context
+     * @param actorId the ID of the user who closed the project (from webhook sender), or null for sync
+     * @return the updated Project entity
+     */
+    @Transactional
+    public Project processClosed(
+        GitHubProjectDTO dto,
+        Project.OwnerType ownerType,
+        Long ownerId,
+        ProcessingContext context,
+        Long actorId
+    ) {
+        UpsertResult result = upsertProject(dto, ownerType, ownerId);
+        if (result == null) {
+            return null;
         }
+
+        Project project = result.project();
+        EventPayload.ProjectData projectData = EventPayload.ProjectData.from(project, actorId);
+        eventPublisher.publishEvent(new DomainEvent.ProjectClosed(projectData, EventContext.from(context)));
+        log.info("Project closed: projectId={}, projectNumber={}", project.getId(), project.getNumber());
         return project;
     }
 
@@ -163,12 +233,36 @@ public class GitHubProjectProcessor extends BaseGitHubProcessor {
         Long ownerId,
         ProcessingContext context
     ) {
-        Project project = process(dto, ownerType, ownerId, context);
-        if (project != null) {
-            EventPayload.ProjectData projectData = EventPayload.ProjectData.from(project);
-            eventPublisher.publishEvent(new DomainEvent.ProjectReopened(projectData, EventContext.from(context)));
-            log.info("Project reopened: projectId={}, projectNumber={}", project.getId(), project.getNumber());
+        return processReopened(dto, ownerType, ownerId, context, null);
+    }
+
+    /**
+     * Process a project reopen event.
+     *
+     * @param dto the GitHub project DTO
+     * @param ownerType the type of owner
+     * @param ownerId the ID of the owner entity
+     * @param context processing context
+     * @param actorId the ID of the user who reopened the project (from webhook sender), or null for sync
+     * @return the updated Project entity
+     */
+    @Transactional
+    public Project processReopened(
+        GitHubProjectDTO dto,
+        Project.OwnerType ownerType,
+        Long ownerId,
+        ProcessingContext context,
+        Long actorId
+    ) {
+        UpsertResult result = upsertProject(dto, ownerType, ownerId);
+        if (result == null) {
+            return null;
         }
+
+        Project project = result.project();
+        EventPayload.ProjectData projectData = EventPayload.ProjectData.from(project, actorId);
+        eventPublisher.publishEvent(new DomainEvent.ProjectReopened(projectData, EventContext.from(context)));
+        log.info("Project reopened: projectId={}, projectNumber={}", project.getId(), project.getNumber());
         return project;
     }
 

@@ -19,6 +19,7 @@ import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHIssueConnect
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPageInfo;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.dto.EmbeddedCommentsDTO;
+import de.tum.in.www1.hephaestus.gitprovider.issue.github.dto.EmbeddedProjectItemsDTO;
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.dto.IssueWithComments;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.github.GitHubIssueCommentProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.github.GitHubIssueCommentSyncService;
@@ -70,6 +71,7 @@ public class GitHubIssueSyncService {
     private final GitHubIssueProcessor issueProcessor;
     private final GitHubIssueCommentProcessor commentProcessor;
     private final GitHubIssueCommentSyncService commentSyncService;
+    private final de.tum.in.www1.hephaestus.gitprovider.project.github.GitHubProjectItemSyncService projectItemSyncService;
     private final BackfillStateProvider backfillStateProvider;
     private final TransactionTemplate transactionTemplate;
     private final GitHubSyncProperties syncProperties;
@@ -96,12 +98,22 @@ public class GitHubIssueSyncService {
      */
     private record IssueWithCommentCursor(Issue issue, String commentCursor) {}
 
+    /**
+     * Container for issues that need additional project item pagination.
+     *
+     * @param issue the processed Issue entity
+     * @param nodeId the GitHub GraphQL node ID (needed for pagination query)
+     * @param projectItemCursor the pagination cursor to start from
+     */
+    private record IssueWithProjectItemCursor(Issue issue, String nodeId, String projectItemCursor) {}
+
     public GitHubIssueSyncService(
         RepositoryRepository repositoryRepository,
         GitHubGraphQlClientProvider graphQlClientProvider,
         GitHubIssueProcessor issueProcessor,
         GitHubIssueCommentProcessor commentProcessor,
         GitHubIssueCommentSyncService commentSyncService,
+        de.tum.in.www1.hephaestus.gitprovider.project.github.GitHubProjectItemSyncService projectItemSyncService,
         BackfillStateProvider backfillStateProvider,
         TransactionTemplate transactionTemplate,
         GitHubSyncProperties syncProperties,
@@ -113,6 +125,7 @@ public class GitHubIssueSyncService {
         this.issueProcessor = issueProcessor;
         this.commentProcessor = commentProcessor;
         this.commentSyncService = commentSyncService;
+        this.projectItemSyncService = projectItemSyncService;
         this.backfillStateProvider = backfillStateProvider;
         this.transactionTemplate = transactionTemplate;
         this.syncProperties = syncProperties;
@@ -243,7 +256,9 @@ public class GitHubIssueSyncService {
 
         int totalIssuesSynced = 0;
         int totalCommentsSynced = 0;
+        int totalProjectItemsSynced = 0;
         List<IssueWithCommentCursor> issuesNeedingCommentPagination = new ArrayList<>();
+        List<IssueWithProjectItemCursor> issuesNeedingProjectItemPagination = new ArrayList<>();
         String cursor = initialCursor;
         boolean hasMore = true;
         int pageCount = 0;
@@ -346,15 +361,21 @@ public class GitHubIssueSyncService {
                 PageResult pageResult = transactionTemplate.execute(status -> {
                     Repository repo = repositoryRepository.findByIdWithOrganization(repoId).orElse(null);
                     if (repo == null) {
-                        return new PageResult(0, 0);
+                        return new PageResult(0, 0, 0);
                     }
                     ProcessingContext context = ProcessingContext.forSync(scopeId, repo);
-                    return processIssuePage(connection, context, issuesNeedingCommentPagination);
+                    return processIssuePage(
+                        connection,
+                        context,
+                        issuesNeedingCommentPagination,
+                        issuesNeedingProjectItemPagination
+                    );
                 });
 
                 if (pageResult != null) {
                     totalIssuesSynced += pageResult.issueCount;
                     totalCommentsSynced += pageResult.commentCount;
+                    totalProjectItemsSynced += pageResult.projectItemCount;
                 }
 
                 GHPageInfo pageInfo = connection.getPageInfo();
@@ -504,6 +525,26 @@ public class GitHubIssueSyncService {
             }
         }
 
+        // Fetch remaining project items for issues in >5 projects (using cursor for efficient continuation)
+        // Each call to syncRemainingProjectItems handles its own transactions
+        if (!issuesNeedingProjectItemPagination.isEmpty()) {
+            log.debug(
+                "Starting additional project item fetch for issues with pagination: repoName={}, issueCount={}",
+                safeNameWithOwner,
+                issuesNeedingProjectItemPagination.size()
+            );
+            for (IssueWithProjectItemCursor issueWithCursor : issuesNeedingProjectItemPagination) {
+                int additionalItems = projectItemSyncService.syncRemainingProjectItems(
+                    scopeId,
+                    issueWithCursor.nodeId(),
+                    false, // Not a pull request
+                    issueWithCursor.issue().getRepository(),
+                    issueWithCursor.projectItemCursor()
+                );
+                totalProjectItemsSynced += additionalItems;
+            }
+        }
+
         // Clear cursor on successful completion (uses REQUIRES_NEW)
         // Only clear if sync completed without abort
         if (syncTargetId != null && !hasMore && abortReason == null) {
@@ -514,11 +555,13 @@ public class GitHubIssueSyncService {
         SyncResult.Status finalStatus = abortReason != null ? abortReason : SyncResult.Status.COMPLETED;
 
         log.info(
-            "Completed issue sync: repoName={}, issueCount={}, commentCount={}, issuesWithPagination={}, scopeId={}, resumed={}, incremental={}, status={}",
+            "Completed issue sync: repoName={}, issueCount={}, commentCount={}, projectItemCount={}, issuesWithCommentPagination={}, issuesWithProjectItemPagination={}, scopeId={}, resumed={}, incremental={}, status={}",
             safeNameWithOwner,
             totalIssuesSynced,
             totalCommentsSynced,
+            totalProjectItemsSynced,
             issuesNeedingCommentPagination.size(),
+            issuesNeedingProjectItemPagination.size(),
             scopeId,
             resuming,
             incrementalSync,
@@ -530,19 +573,24 @@ public class GitHubIssueSyncService {
     /**
      * Result container for page processing.
      */
-    private record PageResult(int issueCount, int commentCount) {}
+    private record PageResult(int issueCount, int commentCount, int projectItemCount) {}
 
     /**
-     * Processes a page of issues with embedded comments and returns the counts.
-     * Also populates the list of issues that need additional comment pagination.
+     * Processes a page of issues with embedded comments and project items.
+     * <p>
+     * Also populates lists of issues that need additional pagination for:
+     * - Comments (when issue has more than 10 embedded comments)
+     * - Project items (when issue is in more than 5 projects)
      */
     private PageResult processIssuePage(
         GHIssueConnection connection,
         ProcessingContext context,
-        List<IssueWithCommentCursor> issuesNeedingPagination
+        List<IssueWithCommentCursor> issuesNeedingCommentPagination,
+        List<IssueWithProjectItemCursor> issuesNeedingProjectItemPagination
     ) {
         int issuesSynced = 0;
         int commentsSynced = 0;
+        int projectItemsSynced = 0;
 
         for (var graphQlIssue : connection.getNodes()) {
             IssueWithComments issueWithComments = IssueWithComments.fromIssue(graphQlIssue);
@@ -567,11 +615,26 @@ public class GitHubIssueSyncService {
 
             // Track issues that need additional comment pagination (with cursor for efficient continuation)
             if (embeddedComments.needsPagination()) {
-                issuesNeedingPagination.add(new IssueWithCommentCursor(entity, embeddedComments.endCursor()));
+                issuesNeedingCommentPagination.add(new IssueWithCommentCursor(entity, embeddedComments.endCursor()));
+            }
+
+            // Process embedded project items
+            EmbeddedProjectItemsDTO embeddedProjectItems = issueWithComments.embeddedProjectItems();
+            projectItemsSynced += projectItemSyncService.processEmbeddedItems(embeddedProjectItems, context);
+
+            // Track issues that need additional project item pagination
+            if (embeddedProjectItems.needsPagination()) {
+                issuesNeedingProjectItemPagination.add(
+                    new IssueWithProjectItemCursor(
+                        entity,
+                        issueWithComments.issue().nodeId(),
+                        embeddedProjectItems.endCursor()
+                    )
+                );
             }
         }
 
-        return new PageResult(issuesSynced, commentsSynced);
+        return new PageResult(issuesSynced, commentsSynced, projectItemsSynced);
     }
 
     /**

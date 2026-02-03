@@ -3,15 +3,21 @@ package de.tum.in.www1.hephaestus.config;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.config.jackson.GitHubActorMixin;
+import de.tum.in.www1.hephaestus.config.jackson.GitHubIssueMixin;
 import de.tum.in.www1.hephaestus.config.jackson.GitHubProjectV2FieldConfigurationMixin;
 import de.tum.in.www1.hephaestus.config.jackson.GitHubProjectV2ItemContentMixin;
 import de.tum.in.www1.hephaestus.config.jackson.GitHubProjectV2ItemFieldValueMixin;
+import de.tum.in.www1.hephaestus.config.jackson.GitHubProjectV2OwnerMixin;
+import de.tum.in.www1.hephaestus.config.jackson.GitHubPullRequestMixin;
 import de.tum.in.www1.hephaestus.config.jackson.GitHubRepositoryOwnerMixin;
 import de.tum.in.www1.hephaestus.config.jackson.GitHubRequestedReviewerMixin;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHActor;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHIssue;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2FieldConfiguration;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2ItemContent;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2ItemFieldValue;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2Owner;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHRepositoryOwner;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHRequestedReviewer;
 import io.micrometer.core.instrument.Gauge;
@@ -118,9 +124,12 @@ public class GitHubGraphQlConfig {
             .addMixIn(GHActor.class, GitHubActorMixin.class)
             .addMixIn(GHRequestedReviewer.class, GitHubRequestedReviewerMixin.class)
             .addMixIn(GHRepositoryOwner.class, GitHubRepositoryOwnerMixin.class)
+            .addMixIn(GHProjectV2Owner.class, GitHubProjectV2OwnerMixin.class)
             .addMixIn(GHProjectV2FieldConfiguration.class, GitHubProjectV2FieldConfigurationMixin.class)
             .addMixIn(GHProjectV2ItemContent.class, GitHubProjectV2ItemContentMixin.class)
-            .addMixIn(GHProjectV2ItemFieldValue.class, GitHubProjectV2ItemFieldValueMixin.class);
+            .addMixIn(GHProjectV2ItemFieldValue.class, GitHubProjectV2ItemFieldValueMixin.class)
+            .addMixIn(GHIssue.class, GitHubIssueMixin.class)
+            .addMixIn(GHPullRequest.class, GitHubPullRequestMixin.class);
 
         ExchangeStrategies strategies = ExchangeStrategies.builder()
             .codecs(config -> {
@@ -166,10 +175,14 @@ public class GitHubGraphQlConfig {
 
     @Bean
     public HttpGraphQlClient gitHubGraphQlClient(WebClient gitHubGraphQlWebClient) {
-        // Configure document source to load operations from the correct location
+        // Configure document source to load operations and fragments from the correct locations
         // Operations are colocated with the GitHub schema at graphql/github/operations/
+        // Reusable fragments are stored in graphql/github/fragments/
         ResourceDocumentSource documentSource = new ResourceDocumentSource(
-            List.of(new ClassPathResource("graphql/github/operations/")),
+            List.of(
+                new ClassPathResource("graphql/github/operations/"),
+                new ClassPathResource("graphql/github/fragments/")
+            ),
             List.of(".graphql", ".gql")
         );
         return HttpGraphQlClient.builder(gitHubGraphQlWebClient).documentSource(documentSource).build();

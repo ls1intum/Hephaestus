@@ -10,7 +10,12 @@ import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncS
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncTarget;
 import de.tum.in.www1.hephaestus.gitprovider.issuedependency.github.GitHubIssueDependencySyncService;
 import de.tum.in.www1.hephaestus.gitprovider.issuetype.github.GitHubIssueTypeSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
+import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
+import de.tum.in.www1.hephaestus.gitprovider.project.Project;
+import de.tum.in.www1.hephaestus.gitprovider.project.github.GitHubProjectSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.subissue.github.GitHubSubIssueSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.sync.SyncResult;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -18,6 +23,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.annotation.Order;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -76,6 +82,9 @@ public class GitHubDataSyncScheduler {
     private final GitHubSubIssueSyncService subIssueSyncService;
     private final GitHubIssueTypeSyncService issueTypeSyncService;
     private final GitHubIssueDependencySyncService issueDependencySyncService;
+    private final GitHubProjectSyncService projectSyncService;
+    private final OrganizationRepository organizationRepository;
+    private final SyncSchedulerProperties syncSchedulerProperties;
     private final Executor monitoringExecutor;
 
     public GitHubDataSyncScheduler(
@@ -85,6 +94,9 @@ public class GitHubDataSyncScheduler {
         GitHubSubIssueSyncService subIssueSyncService,
         GitHubIssueTypeSyncService issueTypeSyncService,
         GitHubIssueDependencySyncService issueDependencySyncService,
+        GitHubProjectSyncService projectSyncService,
+        OrganizationRepository organizationRepository,
+        SyncSchedulerProperties syncSchedulerProperties,
         @Qualifier("monitoringExecutor") Executor monitoringExecutor
     ) {
         this.syncTargetProvider = syncTargetProvider;
@@ -93,7 +105,43 @@ public class GitHubDataSyncScheduler {
         this.subIssueSyncService = subIssueSyncService;
         this.issueTypeSyncService = issueTypeSyncService;
         this.issueDependencySyncService = issueDependencySyncService;
+        this.projectSyncService = projectSyncService;
+        this.organizationRepository = organizationRepository;
+        this.syncSchedulerProperties = syncSchedulerProperties;
         this.monitoringExecutor = monitoringExecutor;
+    }
+
+    /**
+     * Logs the sync configuration at startup for visibility.
+     * Clarifies the difference between incremental sync and historical backfill.
+     */
+    @PostConstruct
+    void logSyncConfiguration() {
+        log.info(
+            "Incremental sync config: runOnStartup={}, cron={}, timeframeDays={}, cooldownMinutes={} " +
+                "(syncs repos, issues, PRs, labels, milestones, teams, AND projects)",
+            syncSchedulerProperties.runOnStartup(),
+            syncSchedulerProperties.cron(),
+            syncSchedulerProperties.timeframeDays(),
+            syncSchedulerProperties.cooldownMinutes()
+        );
+        log.info(
+            "Historical backfill config: enabled={}, batchSize={}, intervalSeconds={} " +
+                "(backfills old issues/PRs only - does NOT affect projects)",
+            syncSchedulerProperties.backfill().enabled(),
+            syncSchedulerProperties.backfill().batchSize(),
+            syncSchedulerProperties.backfill().intervalSeconds()
+        );
+
+        // Log filter configuration if active
+        var filters = syncSchedulerProperties.filters();
+        if (!filters.allowedOrganizations().isEmpty() || !filters.allowedRepositories().isEmpty()) {
+            log.info(
+                "Sync filters active: allowedOrganizations={}, allowedRepositories={}",
+                filters.allowedOrganizations(),
+                filters.allowedRepositories()
+            );
+        }
     }
 
     /**
@@ -217,6 +265,10 @@ public class GitHubDataSyncScheduler {
                     dataSyncService.syncSyncTarget(target);
                 }
 
+                // Sync projects AFTER repositories so that issues/PRs exist for project items
+                // to reference. Projects are organization-level entities.
+                syncProjects(session);
+
                 // Sync sub-issues and issue dependencies via GraphQL
                 // These are scope-level relationships that require issues/PRs to exist first
                 syncSubIssues(session);
@@ -273,6 +325,77 @@ public class GitHubDataSyncScheduler {
         } catch (Exception e) {
             log.error(
                 "Failed to sync issue dependencies: scopeId={}, scopeSlug={}",
+                session.scopeId(),
+                session.slug(),
+                e
+            );
+        }
+    }
+
+    private void syncProjects(SyncSession session) {
+        String safeAccountLogin = sanitizeForLog(session.accountLogin());
+        try {
+            log.debug(
+                "Starting projects sync: scopeId={}, scopeSlug={}, accountLogin={}",
+                session.scopeId(),
+                session.slug(),
+                safeAccountLogin
+            );
+
+            // Sync project list for the organization
+            projectSyncService.syncProjectsForOrganization(session.scopeId(), session.accountLogin());
+
+            // Find the organization to get its ID for item sync
+            Organization organization = organizationRepository
+                .findByLoginIgnoreCase(session.accountLogin())
+                .orElse(null);
+            if (organization == null) {
+                log.debug("Skipped project items sync: reason=organizationNotFound, orgLogin={}", safeAccountLogin);
+                return;
+            }
+
+            // Sync project items for each project that needs it
+            // This is done separately because project items can be large and
+            // benefit from resumable pagination via cursor persistence
+            List<Project> projects = projectSyncService.getProjectsNeedingItemSync(organization.getId());
+            if (projects.isEmpty()) {
+                log.debug("Skipped project items sync: reason=noProjects, orgLogin={}", safeAccountLogin);
+                return;
+            }
+
+            int totalItemsSynced = 0;
+            int projectsWithItems = 0;
+
+            for (Project project : projects) {
+                SyncResult itemResult = projectSyncService.syncDraftIssues(session.scopeId(), project);
+                totalItemsSynced += itemResult.count();
+                if (itemResult.count() > 0) {
+                    projectsWithItems++;
+                }
+
+                // If rate limited, stop processing more projects
+                if (itemResult.status() == SyncResult.Status.ABORTED_RATE_LIMIT) {
+                    log.info(
+                        "Stopping project items sync: reason=rateLimited, scopeId={}, projectsProcessed={}",
+                        session.scopeId(),
+                        projectsWithItems
+                    );
+                    break;
+                }
+            }
+
+            log.debug(
+                "Completed projects sync: scopeId={}, orgLogin={}, projectCount={}, itemsSynced={}",
+                session.scopeId(),
+                safeAccountLogin,
+                projects.size(),
+                totalItemsSynced
+            );
+        } catch (InstallationNotFoundException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error(
+                "Failed to sync projects: scopeId={}, scopeSlug={}",
                 session.scopeId(),
                 session.slug(),
                 e

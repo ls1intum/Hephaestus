@@ -81,6 +81,7 @@ public class GitHubProjectStatusUpdateProcessor {
             dto.nodeId(),
             project.getId(),
             sanitize(dto.body()),
+            sanitize(dto.bodyHtml()),
             dto.startDate(),
             dto.targetDate(),
             status != null ? status.name() : null,

@@ -13,6 +13,7 @@ import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2Ite
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2ItemType;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.project.ProjectItem;
+import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
 import java.math.BigInteger;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -40,7 +41,11 @@ public record GitHubProjectItemDTO(
     @JsonProperty("draft_title") String draftTitle,
     @JsonProperty("draft_body") String draftBody,
     @JsonProperty("archived") boolean archived,
+    @JsonProperty("creator") GitHubUserDTO creator,
     @JsonProperty("field_values") List<GitHubProjectFieldValueDTO> fieldValues,
+    @JsonProperty("field_values_truncated") boolean fieldValuesTruncated,
+    @JsonProperty("field_values_total_count") int fieldValuesTotalCount,
+    @JsonProperty("field_values_end_cursor") @Nullable String fieldValuesEndCursor,
     @JsonProperty("created_at") Instant createdAt,
     @JsonProperty("updated_at") Instant updatedAt
 ) {
@@ -102,7 +107,25 @@ public record GitHubProjectItemDTO(
         }
 
         // Extract field values from the GraphQL response
-        List<GitHubProjectFieldValueDTO> fieldValues = extractFieldValues(item.getFieldValues());
+        GHProjectV2ItemFieldValueConnection fieldValuesConnection = item.getFieldValues();
+        List<GitHubProjectFieldValueDTO> fieldValues = extractFieldValues(fieldValuesConnection);
+
+        // Check if field values were truncated (more than the inline page size)
+        // and extract cursor for follow-up pagination if needed
+        boolean fieldValuesTruncated = false;
+        int fieldValuesTotalCount = 0;
+        String fieldValuesEndCursor = null;
+        if (fieldValuesConnection != null) {
+            fieldValuesTotalCount = fieldValuesConnection.getTotalCount();
+            var pageInfo = fieldValuesConnection.getPageInfo();
+            if (pageInfo != null) {
+                fieldValuesTruncated = Boolean.TRUE.equals(pageInfo.getHasNextPage());
+                fieldValuesEndCursor = pageInfo.getEndCursor();
+            }
+        }
+
+        // Extract creator info
+        GitHubUserDTO creator = GitHubUserDTO.fromActor(item.getCreator());
 
         return new GitHubProjectItemDTO(
             null,
@@ -115,7 +138,11 @@ public record GitHubProjectItemDTO(
             draftTitle,
             draftBody,
             item.getIsArchived(),
+            creator,
             fieldValues,
+            fieldValuesTruncated,
+            fieldValuesTotalCount,
+            fieldValuesEndCursor,
             toInstant(item.getCreatedAt()),
             toInstant(item.getUpdatedAt())
         );
@@ -151,7 +178,11 @@ public record GitHubProjectItemDTO(
         if (value == null) {
             return null;
         }
-        return value.longValueExact();
+        try {
+            return value.longValueExact();
+        } catch (ArithmeticException e) {
+            return value.longValue();
+        }
     }
 
     @Nullable

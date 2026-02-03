@@ -27,6 +27,10 @@
             </column>
             <column name="title" type="VARCHAR(256)"/>
             <column name="short_description" type="TEXT"/>
+            <column name="readme" type="TEXT"/>
+            <column name="template" type="BOOLEAN" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
             <column name="url" type="VARCHAR(512)"/>
             <column name="closed" type="BOOLEAN" defaultValueBoolean="false">
                 <constraints nullable="false"/>
@@ -42,6 +46,14 @@
                 <constraints nullable="true"/>
             </column>
             <column name="items_synced_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="field_sync_cursor" type="VARCHAR(256)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="fields_synced_at" type="TIMESTAMP WITH TIME ZONE"/>
+            <column name="status_update_sync_cursor" type="VARCHAR(256)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="status_updates_synced_at" type="TIMESTAMP WITH TIME ZONE"/>
             <column name="created_at" type="TIMESTAMP WITH TIME ZONE"/>
             <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"/>
         </createTable>
@@ -122,6 +134,7 @@
             <column name="archived" type="BOOLEAN" defaultValueBoolean="false">
                 <constraints nullable="false"/>
             </column>
+            <column name="creator_id" type="BIGINT"/>
             <column name="created_at" type="TIMESTAMP WITH TIME ZONE"/>
             <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"/>
         </createTable>
@@ -147,6 +160,14 @@
                 constraintName="fk_project_item_issue"
                 onDelete="CASCADE"/>
 
+        <addForeignKeyConstraint
+                baseTableName="project_item"
+                baseColumnNames="creator_id"
+                referencedTableName="user"
+                referencedColumnNames="id"
+                constraintName="fk_project_item_creator"
+                onDelete="SET NULL"/>
+
         <createIndex tableName="project_item" indexName="idx_project_item_project_id">
             <column name="project_id"/>
         </createIndex>
@@ -158,6 +179,10 @@
         <createIndex tableName="project_item" indexName="idx_project_item_project_archived">
             <column name="project_id"/>
             <column name="archived"/>
+        </createIndex>
+
+        <createIndex tableName="project_item" indexName="idx_project_item_creator_id">
+            <column name="creator_id"/>
         </createIndex>
     </changeSet>
 
@@ -222,6 +247,7 @@
                 <constraints nullable="false"/>
             </column>
             <column name="body" type="TEXT"/>
+            <column name="body_html" type="TEXT"/>
             <column name="start_date" type="DATE"/>
             <column name="target_date" type="DATE"/>
             <column name="status" type="VARCHAR(32)"/>

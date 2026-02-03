@@ -3,6 +3,10 @@ package de.tum.in.www1.hephaestus.gitprovider.project.github;
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.LARGE_PAGE_SIZE;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.MAX_PAGINATION_PAGES;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.FIELD_VALUES_PAGINATION_SIZE;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.PROJECT_FIELD_PAGE_SIZE;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.PROJECT_ITEM_PAGE_SIZE;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.STATUS_UPDATE_PAGE_SIZE;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
@@ -19,6 +23,7 @@ import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2Fie
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2FieldConfigurationConnection;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2Item;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2ItemConnection;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2ItemFieldValueConnection;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2StatusUpdate;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2StatusUpdateConnection;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
@@ -28,6 +33,7 @@ import de.tum.in.www1.hephaestus.gitprovider.project.ProjectField;
 import de.tum.in.www1.hephaestus.gitprovider.project.ProjectFieldRepository;
 import de.tum.in.www1.hephaestus.gitprovider.project.ProjectFieldValueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.project.ProjectItem;
+import de.tum.in.www1.hephaestus.gitprovider.project.ProjectItemRepository;
 import de.tum.in.www1.hephaestus.gitprovider.project.ProjectRepository;
 import de.tum.in.www1.hephaestus.gitprovider.project.ProjectStatusUpdateRepository;
 import de.tum.in.www1.hephaestus.gitprovider.project.github.dto.GitHubProjectDTO;
@@ -57,17 +63,64 @@ import reactor.util.retry.Retry;
 /**
  * Service for synchronizing GitHub Projects V2 via GraphQL API.
  * <p>
- * This service follows the production-grade sync pattern with:
+ * Features: per-page transactions, cursor persistence for resumability, transport error retry,
+ * decoupled phases (project list → items), client-side incremental sync, cost-optimized page sizes.
+ * <p>
+ * <h2>Architecture Note: Issue/PR Items vs Draft Issues</h2>
+ * <p>
+ * Project items linking to Issues and Pull Requests are synced <b>from the issue/PR side</b>
+ * (embedded in issue/PR GraphQL queries), NOT from the project side. This enables:
  * <ul>
- *   <li>Per-page transactions to avoid long-running transaction locks</li>
- *   <li>Cursor persistence for resumable sync operations</li>
- *   <li>Transport error retry for network failures</li>
- *   <li>Decoupled phases: project list sync, then item sync</li>
+ *   <li>Historical backfill: Items naturally backfilled with their parent issues/PRs</li>
+ *   <li>Efficient sync: {@code filterBy.since} on issues propagates to item updates</li>
+ *   <li>Proper pagination: Uses issue's {@code projectItems(first:, after:)} connection</li>
  * </ul>
  * <p>
- * Supports checkpoint/cursor persistence for resumable sync operations.
- * When sync is interrupted (rate limit, error, crash), it can resume from
- * where it left off using the persisted cursor.
+ * <b>Draft Issues</b> have no parent Issue/PR, so they must still be synced from the project side.
+ * The {@link #syncDraftIssues} method handles this case.
+ * <p>
+ * <h2>Supported Owner Types</h2>
+ * <p>
+ * This sync service currently only supports <b>ORGANIZATION</b> owned projects.
+ * <p>
+ * <table border="1">
+ *   <tr><th>Owner Type</th><th>Sync Support</th><th>Notes</th></tr>
+ *   <tr>
+ *     <td><b>ORGANIZATION</b></td>
+ *     <td>Full</td>
+ *     <td>Primary use case. Use {@link #syncProjectsForOrganization}.</td>
+ *   </tr>
+ *   <tr>
+ *     <td><b>REPOSITORY</b></td>
+ *     <td>Not implemented</td>
+ *     <td>Would require a new syncProjectsForRepository method with appropriate GraphQL query.</td>
+ *   </tr>
+ *   <tr>
+ *     <td><b>USER</b></td>
+ *     <td>Not implemented</td>
+ *     <td>Would require a new syncProjectsForUser method. User projects aren't linked to workspaces.</td>
+ *   </tr>
+ * </table>
+ * <p>
+ * <b>To add REPOSITORY support:</b> Create a new GraphQL query {@code GetRepositoryProjects} and
+ * implement {@code syncProjectsForRepository(Long scopeId, String repositoryFullName)} following
+ * the same pattern as organization sync.
+ * <p>
+ * <h2>Phase Tracking</h2>
+ * <p>
+ * The {@link #syncDraftIssues} method tracks three phases:
+ * <ol>
+ *   <li><b>Fields:</b> Project field definitions (custom fields like Status, Priority)</li>
+ *   <li><b>Status Updates:</b> Project health status updates (ON_TRACK, AT_RISK, OFF_TRACK)</li>
+ *   <li><b>Draft Issues:</b> Project items that are draft issues (no parent issue)</li>
+ * </ol>
+ * <p>
+ * Each phase has independent cursor persistence for resumability. If one phase fails (e.g., rate limit),
+ * the returned {@link SyncResult} includes phase-level success/failure information for monitoring.
+ *
+ * @see de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants
+ * @see de.tum.in.www1.hephaestus.gitprovider.project.Project.OwnerType
+ * @see de.tum.in.www1.hephaestus.gitprovider.project.github.GitHubProjectItemSyncService
  */
 @Service
 public class GitHubProjectSyncService {
@@ -76,6 +129,7 @@ public class GitHubProjectSyncService {
     private static final String GET_ORGANIZATION_PROJECTS_DOCUMENT = "GetOrganizationProjects";
     private static final String GET_PROJECT_WITH_FIELDS_DOCUMENT = "GetProjectWithFields";
     private static final String GET_PROJECT_ITEMS_DOCUMENT = "GetProjectItems";
+    private static final String GET_PROJECT_ITEM_FIELD_VALUES_DOCUMENT = "GetProjectItemFieldValues";
     private static final String GET_PROJECT_STATUS_UPDATES_DOCUMENT = "GetProjectStatusUpdates";
 
     /** Maximum number of retry attempts for transient failures. */
@@ -94,6 +148,7 @@ public class GitHubProjectSyncService {
     private static final double JITTER_FACTOR = 0.5;
 
     private final ProjectRepository projectRepository;
+    private final ProjectItemRepository projectItemRepository;
     private final ProjectFieldRepository projectFieldRepository;
     private final ProjectFieldValueRepository projectFieldValueRepository;
     private final ProjectStatusUpdateRepository statusUpdateRepository;
@@ -109,6 +164,7 @@ public class GitHubProjectSyncService {
 
     public GitHubProjectSyncService(
         ProjectRepository projectRepository,
+        ProjectItemRepository projectItemRepository,
         ProjectFieldRepository projectFieldRepository,
         ProjectFieldValueRepository projectFieldValueRepository,
         ProjectStatusUpdateRepository statusUpdateRepository,
@@ -123,6 +179,7 @@ public class GitHubProjectSyncService {
         GitHubExceptionClassifier exceptionClassifier
     ) {
         this.projectRepository = projectRepository;
+        this.projectItemRepository = projectItemRepository;
         this.projectFieldRepository = projectFieldRepository;
         this.projectFieldValueRepository = projectFieldValueRepository;
         this.statusUpdateRepository = statusUpdateRepository;
@@ -140,8 +197,8 @@ public class GitHubProjectSyncService {
     /**
      * Synchronizes all projects for an organization using GraphQL.
      * <p>
-     * This method syncs only the project list (metadata). Item sync should be
-     * called separately via {@link #syncProjectItems} for each project.
+     * This method syncs only the project list (metadata). Draft Issue sync should be
+     * called separately via {@link #syncDraftIssues} for each project.
      * <p>
      * Note: This method intentionally does NOT use @Transactional to avoid long-running
      * transactions. Each page of projects is processed in its own transaction.
@@ -429,17 +486,33 @@ public class GitHubProjectSyncService {
     }
 
     /**
-     * Synchronizes items for a single project with cursor persistence for resumability.
+     * Synchronizes Draft Issues for a single project with cursor persistence for resumability.
+     * <p>
+     * <b>Important:</b> This method only syncs <b>Draft Issues</b> from the project side.
+     * Items that link to Issues or Pull Requests are synced from the issue/PR side
+     * (via embedded projectItems in issue/PR GraphQL queries) for better efficiency
+     * and historical backfill support.
      * <p>
      * Uses the project's {@code itemSyncCursor} field for resumable pagination.
      * Each page is processed in its own transaction to avoid long-running locks.
      * On successful completion, clears the cursor and updates {@code itemsSyncedAt}.
+     * <p>
+     * <b>Incremental Sync (Client-Side):</b>
+     * Since GitHub's API doesn't support server-side filtering by updatedAt for project items,
+     * we implement client-side incremental sync:
+     * <ul>
+     *   <li>All items are fetched (full pagination required)</li>
+     *   <li>Items where updatedAt &lt; lastSyncTimestamp are skipped during processing</li>
+     *   <li>This saves database writes but not API calls</li>
+     *   <li>All Draft Issue node IDs are still tracked for stale item removal</li>
+     * </ul>
      *
      * @param scopeId the scope ID for authentication
-     * @param project the project to sync items for
-     * @return sync result containing status and count of items synced
+     * @param project the project to sync Draft Issues for
+     * @return sync result containing status and count of Draft Issues synced
+     * @see GitHubProjectItemSyncService for Issue/PR item sync from the issue/PR side
      */
-    public SyncResult syncProjectItems(Long scopeId, Project project) {
+    public SyncResult syncDraftIssues(Long scopeId, Project project) {
         if (project == null || project.getNodeId() == null) {
             log.debug("Skipped project item sync: reason=invalidProject");
             return SyncResult.completed(0);
@@ -450,15 +523,44 @@ public class GitHubProjectSyncService {
         HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
         Duration timeout = syncProperties.graphqlTimeout();
 
-        // Sync fields first (separate phase)
-        syncProjectFields(client, project, scopeId);
+        // Phase 1: Sync fields (separate phase with independent cursor)
+        boolean fieldsSynced = syncProjectFields(client, project, scopeId);
 
-        // Sync status updates (separate phase)
-        syncProjectStatusUpdates(client, project, scopeId);
+        // Phase 2: Sync status updates (separate phase with independent cursor)
+        boolean statusUpdatesSynced = syncProjectStatusUpdates(client, project, scopeId);
 
         // Resume from cursor if present (via SPI for consistency)
         String cursor = backfillStateProvider.getProjectItemSyncCursor(projectId).orElse(null);
         boolean resuming = cursor != null;
+
+        // Determine incremental sync threshold (client-side filtering)
+        // Items with updatedAt >= incrementalSyncThreshold will be processed
+        // Items with updatedAt < incrementalSyncThreshold will be skipped (but still tracked for stale removal)
+        Instant incrementalSyncThreshold = null;
+        boolean isIncrementalSync = false;
+        if (syncProperties.incrementalSyncEnabled() && !resuming) {
+            // Only use incremental sync if:
+            // 1. Incremental sync is enabled in config
+            // 2. We're not resuming from a cursor (resuming means we're mid-sync, need full processing)
+            // 3. We have a previous sync timestamp
+            Instant lastSyncedAt = backfillStateProvider.getProjectItemsSyncedAt(projectId).orElse(null);
+            if (lastSyncedAt != null) {
+                // Apply safety buffer to handle clock skew
+                incrementalSyncThreshold = lastSyncedAt.minus(syncProperties.incrementalSyncBuffer());
+                isIncrementalSync = true;
+                log.info(
+                    "Starting incremental project item sync: projectId={}, threshold={}, buffer={}",
+                    projectId,
+                    incrementalSyncThreshold,
+                    syncProperties.incrementalSyncBuffer()
+                );
+            } else {
+                log.info(
+                    "Starting full project item sync (first sync): projectId={}",
+                    projectId
+                );
+            }
+        }
 
         if (resuming) {
             log.info(
@@ -469,11 +571,16 @@ public class GitHubProjectSyncService {
         }
 
         List<String> syncedItemNodeIds = new ArrayList<>();
+        // Track items needing follow-up field value pagination (items with >20 field values)
+        List<ItemWithFieldValueCursor> itemsNeedingFieldValuePagination = new ArrayList<>();
         int totalSynced = 0;
+        int totalSkipped = 0; // Items skipped due to incremental sync
         boolean hasMore = true;
         int pageCount = 0;
         int retryAttempt = 0;
         SyncResult.Status abortReason = null;
+        final Instant syncThreshold = incrementalSyncThreshold; // Final for lambda capture
+        final boolean incrementalSync = isIncrementalSync;
 
         while (hasMore) {
             pageCount++;
@@ -490,11 +597,14 @@ public class GitHubProjectSyncService {
                 final String currentCursor = cursor;
                 final int currentPage = pageCount;
 
+                // Uses PROJECT_ITEM_PAGE_SIZE (50) instead of LARGE_PAGE_SIZE (100)
+                // due to nested field values that multiply API cost.
+                // See GitHubSyncConstants for detailed cost calculation.
                 ClientGraphQlResponse graphQlResponse = Mono.defer(() ->
                     client
                         .documentName(GET_PROJECT_ITEMS_DOCUMENT)
                         .variable("nodeId", projectNodeId)
-                        .variable("first", LARGE_PAGE_SIZE)
+                        .variable("first", PROJECT_ITEM_PAGE_SIZE)
                         .variable("after", currentCursor)
                         .execute()
                 )
@@ -546,15 +656,18 @@ public class GitHubProjectSyncService {
                 }
 
                 // Process this page of items in its own transaction
+                // Only Draft Issues are processed - Issue/PR items are synced from the issue/PR side
+                // For incremental sync, items unchanged since last sync are tracked but not processed
                 final Long projId = projectId;
-                PageResult pageResult = transactionTemplate.execute(status -> {
+                ItemPageResult pageResult = transactionTemplate.execute(status -> {
                     Project proj = projectRepository.findById(projId).orElse(null);
                     if (proj == null) {
-                        return new PageResult(0);
+                        return new ItemPageResult(0, 0);
                     }
 
                     ProcessingContext context = ProcessingContext.forSync(scopeId, null);
                     int itemsProcessed = 0;
+                    int itemsSkipped = 0;
 
                     for (GHProjectV2Item graphQlItem : itemsConnection.getNodes()) {
                         GitHubProjectItemDTO itemDto = GitHubProjectItemDTO.fromProjectV2Item(graphQlItem);
@@ -562,21 +675,62 @@ public class GitHubProjectSyncService {
                             continue;
                         }
 
+                        // Only process Draft Issues from the project side.
+                        // Issue and Pull Request items are synced from the issue/PR side
+                        // (embedded in issue/PR GraphQL queries) for better efficiency.
+                        ProjectItem.ContentType contentType = itemDto.getContentTypeEnum();
+                        if (contentType != ProjectItem.ContentType.DRAFT_ISSUE) {
+                            // Skip Issue/PR items - they're synced from the issue/PR side
+                            continue;
+                        }
+
+                        // Track the node ID for stale Draft Issue removal
                         syncedItemNodeIds.add(itemDto.nodeId());
-                        ProjectItem processedItem = itemProcessor.process(itemDto, proj, context);
+
+                        // Client-side incremental sync: skip items that haven't changed
+                        // This saves database writes while still tracking all items for deletion detection
+                        if (incrementalSync && syncThreshold != null && itemDto.updatedAt() != null) {
+                            if (itemDto.updatedAt().isBefore(syncThreshold)) {
+                                itemsSkipped++;
+                                continue; // Skip processing - item unchanged since last sync
+                            }
+                        }
+
+                        // Sync uses null actorId - attribution only happens via webhooks
+                        ProjectItem processedItem = itemProcessor.process(itemDto, proj, context, null);
                         if (processedItem != null) {
                             itemsProcessed++;
 
-                            // Process field values for this item
+                            // Process inline field values for this item
                             processFieldValues(processedItem.getId(), itemDto.fieldValues());
+
+                            // Track items needing follow-up pagination for field values
+                            // This follows the IssueWithCommentCursor pattern from GitHubIssueSyncService
+                            if (itemDto.fieldValuesTruncated() && itemDto.fieldValuesEndCursor() != null) {
+                                itemsNeedingFieldValuePagination.add(
+                                    new ItemWithFieldValueCursor(
+                                        processedItem.getId(),
+                                        itemDto.nodeId(),
+                                        itemDto.fieldValuesEndCursor()
+                                    )
+                                );
+                                log.debug(
+                                    "Draft Issue queued for field value pagination: itemNodeId={}, projectId={}, fetched={}, total={}",
+                                    itemDto.nodeId(),
+                                    projId,
+                                    itemDto.fieldValues() != null ? itemDto.fieldValues().size() : 0,
+                                    itemDto.fieldValuesTotalCount()
+                                );
+                            }
                         }
                     }
 
-                    return new PageResult(itemsProcessed);
+                    return new ItemPageResult(itemsProcessed, itemsSkipped);
                 });
 
                 if (pageResult != null) {
-                    totalSynced += pageResult.count;
+                    totalSynced += pageResult.processedCount;
+                    totalSkipped += pageResult.skippedCount;
                 }
 
                 var pageInfo = itemsConnection.getPageInfo();
@@ -692,129 +846,267 @@ public class GitHubProjectSyncService {
             }
         }
 
+        // Process remaining field values for Draft Issues that had truncated inline data
+        // This follows the nested pagination pattern from GitHubIssueSyncService (comments)
+        // and GitHubPullRequestSyncService (review threads)
+        if (!itemsNeedingFieldValuePagination.isEmpty()) {
+            log.info(
+                "Processing remaining field values for {} Draft Issues: projectId={}",
+                itemsNeedingFieldValuePagination.size(),
+                projectId
+            );
+            for (ItemWithFieldValueCursor itemWithCursor : itemsNeedingFieldValuePagination) {
+                // Abort if we hit rate limit during follow-up pagination
+                if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
+                    log.warn(
+                        "Aborting field value pagination due to critical rate limit: projectId={}",
+                        projectId
+                    );
+                    abortReason = SyncResult.Status.ABORTED_RATE_LIMIT;
+                    break;
+                }
+                syncRemainingFieldValues(scopeId, projectId, itemWithCursor, client, timeout);
+            }
+        }
+
         // Handle completion
         boolean syncCompletedNormally = !hasMore && abortReason == null;
         if (syncCompletedNormally) {
             // Clear cursor and update sync timestamp
             updateItemsSyncCompleted(projectId, Instant.now());
 
-            // Remove stale items only on complete sync
-            if (!syncedItemNodeIds.isEmpty()) {
-                ProcessingContext context = ProcessingContext.forSync(scopeId, null);
-                int removed = itemProcessor.removeStaleItems(projectId, syncedItemNodeIds, context);
-                if (removed > 0) {
-                    log.debug("Removed stale project items: projectId={}, count={}", projectId, removed);
-                }
+            // Remove stale Draft Issues only on complete sync
+            // Note: Issue/PR items are NOT removed here - they are synced from the issue/PR side
+            ProcessingContext context = ProcessingContext.forSync(scopeId, null);
+            int removed = itemProcessor.removeStaleDraftIssues(projectId, syncedItemNodeIds, context);
+            if (removed > 0) {
+                log.debug("Removed stale Draft Issues: projectId={}, count={}", projectId, removed);
             }
         } else {
             log.warn(
-                "Skipped stale item removal: reason=incompleteSync, projectId={}, pagesProcessed={}",
+                "Skipped stale Draft Issue removal: reason=incompleteSync, projectId={}, pagesProcessed={}",
                 projectId,
                 pageCount
             );
         }
 
-        SyncResult.Status finalStatus = abortReason != null ? abortReason : SyncResult.Status.COMPLETED;
+        // Determine final status based on item sync success and phase results
+        boolean itemsSynced = abortReason == null && !hasMore;
+        SyncResult.Status finalStatus;
+
+        if (abortReason != null) {
+            // Item sync was aborted
+            finalStatus = abortReason;
+        } else if (!fieldsSynced || !statusUpdatesSynced) {
+            // Item sync succeeded but one or more phases failed
+            finalStatus = SyncResult.Status.COMPLETED_WITH_WARNINGS;
+        } else {
+            // All phases completed successfully
+            finalStatus = SyncResult.Status.COMPLETED;
+        }
 
         log.info(
-            "Completed project item sync: projectId={}, itemCount={}, resumed={}, status={}",
+            "Completed Draft Issue sync: projectId={}, draftIssuesProcessed={}, skipped={}, fieldValuePaginations={}, " +
+                "resumed={}, incremental={}, status={}, phases=[fields={}, statusUpdates={}, draftIssues={}]",
             projectId,
             totalSynced,
+            totalSkipped,
+            itemsNeedingFieldValuePagination.size(),
             resuming,
-            finalStatus
+            incrementalSync,
+            finalStatus,
+            fieldsSynced,
+            statusUpdatesSynced,
+            itemsSynced
         );
 
-        return new SyncResult(finalStatus, totalSynced);
+        // Return phase-aware SyncResult
+        if (finalStatus == SyncResult.Status.ABORTED_RATE_LIMIT) {
+            return SyncResult.abortedRateLimitWithPhases(totalSynced, fieldsSynced, statusUpdatesSynced, itemsSynced);
+        } else if (finalStatus == SyncResult.Status.ABORTED_ERROR) {
+            return SyncResult.abortedErrorWithPhases(totalSynced, fieldsSynced, statusUpdatesSynced, itemsSynced);
+        } else if (finalStatus == SyncResult.Status.COMPLETED_WITH_WARNINGS) {
+            return SyncResult.completedWithWarnings(totalSynced, fieldsSynced, statusUpdatesSynced, itemsSynced);
+        } else {
+            return SyncResult.completedWithPhases(totalSynced, fieldsSynced, statusUpdatesSynced, itemsSynced);
+        }
     }
 
     /**
-     * Synchronizes project field definitions.
+     * Synchronizes project field definitions with pagination support.
      * <p>
+     * Handles projects with many fields (>100) by paginating through all pages.
      * Uses Mono.defer() with retry for transport error resilience.
+     *
+     * @return true if field sync completed successfully, false if aborted or failed
      */
-    private void syncProjectFields(HttpGraphQlClient client, Project project, Long scopeId) {
+    private boolean syncProjectFields(HttpGraphQlClient client, Project project, Long scopeId) {
         String projectNodeId = project.getNodeId();
         if (projectNodeId == null) {
-            return;
+            return true; // Nothing to sync, consider it success
         }
+
+        Long projectId = project.getId();
+        List<String> allSyncedFieldIds = new ArrayList<>();
+        boolean completedNormally = false;
 
         try {
-            // Use Mono.defer() for transport error retry
-            ClientGraphQlResponse graphQlResponse = Mono.defer(() ->
-                client.documentName(GET_PROJECT_WITH_FIELDS_DOCUMENT).variable("nodeId", projectNodeId).execute()
-            )
-                .retryWhen(
-                    Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
-                        .maxBackoff(TRANSPORT_MAX_BACKOFF)
-                        .jitter(JITTER_FACTOR)
-                        .filter(this::isTransportError)
-                        .doBeforeRetry(signal ->
-                            log.warn(
-                                "Retrying project fields sync after transport error: projectId={}, attempt={}, error={}",
-                                project.getId(),
-                                signal.totalRetries() + 1,
-                                signal.failure().getMessage()
-                            )
-                        )
-                )
-                .block(syncProperties.graphqlTimeout());
+            String cursor = null;
+            boolean hasMore = true;
+            int pageCount = 0;
 
-            if (graphQlResponse == null || !graphQlResponse.isValid()) {
-                log.warn("Received invalid GraphQL response for project fields: projectId={}", project.getId());
-                return;
-            }
-
-            graphQlClientProvider.trackRateLimit(scopeId, graphQlResponse);
-
-            GHProjectV2FieldConfigurationConnection fieldsConnection = graphQlResponse
-                .field("node.fields")
-                .toEntity(GHProjectV2FieldConfigurationConnection.class);
-
-            if (fieldsConnection == null || fieldsConnection.getNodes() == null) {
-                return;
-            }
-
-            // Process fields in a transaction
-            final Long projectId = project.getId();
-            transactionTemplate.executeWithoutResult(status -> {
-                List<String> syncedFieldIds = new ArrayList<>();
-
-                for (GHProjectV2FieldConfiguration fieldConfig : fieldsConnection.getNodes()) {
-                    GitHubProjectFieldDTO fieldDto = GitHubProjectFieldDTO.fromFieldConfiguration(fieldConfig);
-                    if (fieldDto == null || fieldDto.id() == null) {
-                        continue;
-                    }
-
-                    syncedFieldIds.add(fieldDto.id());
-
-                    ProjectField.DataType dataType = fieldDto.getDataTypeEnum();
-                    if (dataType == null) {
-                        dataType = ProjectField.DataType.TEXT;
-                    }
-
-                    projectFieldRepository.upsertCore(
-                        fieldDto.id(),
+            while (hasMore) {
+                pageCount++;
+                if (pageCount >= MAX_PAGINATION_PAGES) {
+                    log.warn(
+                        "Reached maximum pagination limit for project fields: projectId={}, limit={}",
                         projectId,
-                        fieldDto.name(),
-                        dataType.name(),
-                        fieldDto.getOptionsJson(),
-                        Instant.now(),
-                        Instant.now()
+                        MAX_PAGINATION_PAGES
                     );
+                    break;
                 }
 
-                if (!syncedFieldIds.isEmpty()) {
-                    int removed = projectFieldRepository.deleteByProjectIdAndIdNotIn(projectId, syncedFieldIds);
-                    if (removed > 0) {
-                        log.debug("Removed stale project fields: projectId={}, count={}", projectId, removed);
+                final String currentCursor = cursor;
+
+                // Use Mono.defer() for transport error retry
+                // Uses PROJECT_FIELD_PAGE_SIZE (50) - fields have minimal nesting,
+                // but 50 is sufficient for most projects and reduces response size.
+                ClientGraphQlResponse graphQlResponse = Mono.defer(() ->
+                    client
+                        .documentName(GET_PROJECT_WITH_FIELDS_DOCUMENT)
+                        .variable("nodeId", projectNodeId)
+                        .variable("fieldsFirst", PROJECT_FIELD_PAGE_SIZE)
+                        .variable("fieldsAfter", currentCursor)
+                        .execute()
+                )
+                    .retryWhen(
+                        Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                            .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                            .jitter(JITTER_FACTOR)
+                            .filter(this::isTransportError)
+                            .doBeforeRetry(signal ->
+                                log.warn(
+                                    "Retrying project fields sync after transport error: projectId={}, attempt={}, error={}",
+                                    projectId,
+                                    signal.totalRetries() + 1,
+                                    signal.failure().getMessage()
+                                )
+                            )
+                    )
+                    .block(syncProperties.graphqlTimeout());
+
+                if (graphQlResponse == null || !graphQlResponse.isValid()) {
+                    log.warn(
+                        "Received invalid GraphQL response for project fields: projectId={}, errors={}",
+                        projectId,
+                        graphQlResponse != null ? graphQlResponse.getErrors() : "null"
+                    );
+                    return false;
+                }
+
+                graphQlClientProvider.trackRateLimit(scopeId, graphQlResponse);
+
+                if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
+                    log.warn("Aborting project fields sync due to critical rate limit: projectId={}", projectId);
+                    return false;
+                }
+
+                GHProjectV2FieldConfigurationConnection fieldsConnection = graphQlResponse
+                    .field("node.fields")
+                    .toEntity(GHProjectV2FieldConfigurationConnection.class);
+
+                if (fieldsConnection == null || fieldsConnection.getNodes() == null || fieldsConnection.getNodes().isEmpty()) {
+                    completedNormally = true;
+                    break;
+                }
+
+                // Process this page of fields in a transaction
+                transactionTemplate.executeWithoutResult(status -> {
+                    for (GHProjectV2FieldConfiguration fieldConfig : fieldsConnection.getNodes()) {
+                        GitHubProjectFieldDTO fieldDto = GitHubProjectFieldDTO.fromFieldConfiguration(fieldConfig);
+                        if (fieldDto == null || fieldDto.id() == null) {
+                            continue;
+                        }
+
+                        allSyncedFieldIds.add(fieldDto.id());
+
+                        ProjectField.DataType dataType = fieldDto.getDataTypeEnum();
+                        if (dataType == null) {
+                            dataType = ProjectField.DataType.TEXT;
+                        }
+
+                        // Use actual timestamps from GitHub, falling back to now if not available
+                        Instant createdAt = fieldDto.createdAt() != null ? fieldDto.createdAt() : Instant.now();
+                        Instant updatedAt = fieldDto.updatedAt() != null ? fieldDto.updatedAt() : Instant.now();
+
+                        projectFieldRepository.upsertCore(
+                            fieldDto.id(),
+                            projectId,
+                            fieldDto.name(),
+                            dataType.name(),
+                            fieldDto.getOptionsJson(),
+                            createdAt,
+                            updatedAt
+                        );
+                    }
+                });
+
+                var pageInfo = fieldsConnection.getPageInfo();
+                hasMore = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
+                cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
+
+                // Apply pagination throttle
+                if (hasMore && !syncProperties.paginationThrottle().isZero()) {
+                    try {
+                        Thread.sleep(syncProperties.paginationThrottle().toMillis());
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        log.debug("Project fields sync interrupted during throttle: projectId={}", projectId);
+                        return false;
                     }
                 }
-            });
+            }
 
-            log.debug("Synced project fields: projectId={}", project.getId());
+            // Set completedNormally only if not already set (e.g., by empty response branch)
+            // This preserves true if already set via early break, otherwise uses hasMore state
+            completedNormally = completedNormally || !hasMore;
+
+            // On successful completion, handle cleanup and update timestamp
+            if (completedNormally) {
+                // Remove stale fields only if we have synced IDs to compare against
+                if (!allSyncedFieldIds.isEmpty()) {
+                    transactionTemplate.executeWithoutResult(status -> {
+                        int removed = projectFieldRepository.deleteByProjectIdAndIdNotIn(projectId, allSyncedFieldIds);
+                        if (removed > 0) {
+                            log.debug("Removed stale project fields: projectId={}, count={}", projectId, removed);
+                        }
+                    });
+                }
+
+                // Update fields synced timestamp (even for projects with zero fields)
+                updateFieldsSyncCompleted(projectId, Instant.now());
+            }
+
+            log.debug("Synced project fields: projectId={}, fieldCount={}, success={}", projectId, allSyncedFieldIds.size(), completedNormally);
+            return completedNormally;
         } catch (Exception e) {
-            log.warn("Failed to sync project fields: projectId={}, error={}", project.getId(), e.getMessage());
+            log.warn("Failed to sync project fields: projectId={}, error={}", projectId, e.getMessage());
+            return false;
         }
+    }
+
+    /**
+     * Updates field sync completion state in a new transaction.
+     * <p>
+     * Clears the cursor and sets the fieldsSyncedAt timestamp.
+     */
+    private void updateFieldsSyncCompleted(Long projectId, Instant syncedAt) {
+        TransactionTemplate requiresNewTemplate = new TransactionTemplate(transactionTemplate.getTransactionManager());
+        requiresNewTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        requiresNewTemplate.executeWithoutResult(status -> {
+            projectRepository.updateFieldsSyncedAt(projectId, syncedAt);
+            log.debug("Updated project fields sync completion: projectId={}", projectId);
+        });
     }
 
     /**
@@ -826,14 +1118,16 @@ public class GitHubProjectSyncService {
      * @param client  the GraphQL client
      * @param project the project to sync status updates for
      * @param scopeId the scope ID for rate limit tracking
+     * @return true if status update sync completed successfully, false if aborted or failed
      */
-    private void syncProjectStatusUpdates(HttpGraphQlClient client, Project project, Long scopeId) {
+    private boolean syncProjectStatusUpdates(HttpGraphQlClient client, Project project, Long scopeId) {
         String projectNodeId = project.getNodeId();
         if (projectNodeId == null) {
-            return;
+            return true; // Nothing to sync, consider it success
         }
 
         Long projectId = project.getId();
+        boolean completedNormally = false;
 
         try {
             List<String> syncedStatusUpdateNodeIds = new ArrayList<>();
@@ -854,11 +1148,13 @@ public class GitHubProjectSyncService {
 
                 final String currentCursor = cursor;
 
+                // Uses STATUS_UPDATE_PAGE_SIZE (100) - status updates have minimal nesting
+                // (only creator field), so full page size is cost-efficient.
                 ClientGraphQlResponse graphQlResponse = Mono.defer(() ->
                     client
                         .documentName(GET_PROJECT_STATUS_UPDATES_DOCUMENT)
                         .variable("nodeId", projectNodeId)
-                        .variable("first", LARGE_PAGE_SIZE)
+                        .variable("first", STATUS_UPDATE_PAGE_SIZE)
                         .variable("after", currentCursor)
                         .execute()
                 )
@@ -884,14 +1180,14 @@ public class GitHubProjectSyncService {
                         projectId,
                         graphQlResponse != null ? graphQlResponse.getErrors() : "null"
                     );
-                    break;
+                    return false;
                 }
 
                 graphQlClientProvider.trackRateLimit(scopeId, graphQlResponse);
 
                 if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
                     log.warn("Aborting status updates sync due to critical rate limit: projectId={}", projectId);
-                    break;
+                    return false;
                 }
 
                 GHProjectV2StatusUpdateConnection statusUpdatesConnection = graphQlResponse
@@ -903,6 +1199,7 @@ public class GitHubProjectSyncService {
                     statusUpdatesConnection.getNodes() == null ||
                     statusUpdatesConnection.getNodes().isEmpty()
                 ) {
+                    completedNormally = true;
                     break;
                 }
 
@@ -934,34 +1231,61 @@ public class GitHubProjectSyncService {
                     } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
                         log.debug("Status updates sync interrupted during throttle: projectId={}", projectId);
-                        break;
+                        return false;
                     }
                 }
             }
 
-            // Remove stale status updates only if we completed normally (no more pages)
-            if (!hasMore && !syncedStatusUpdateNodeIds.isEmpty()) {
-                transactionTemplate.executeWithoutResult(status -> {
-                    ProcessingContext context = ProcessingContext.forSync(scopeId, null);
-                    int removed = statusUpdateProcessor.removeStaleStatusUpdates(
-                        projectId,
-                        syncedStatusUpdateNodeIds,
-                        context
-                    );
-                    if (removed > 0) {
-                        log.debug("Removed stale status updates: projectId={}, count={}", projectId, removed);
-                    }
-                });
+            // Set completedNormally only if not already set (e.g., by empty response branch)
+            // This preserves true if already set via early break, otherwise uses hasMore state
+            completedNormally = completedNormally || !hasMore;
+
+            // On successful completion, handle cleanup and update timestamp
+            if (completedNormally) {
+                // Remove stale status updates only if we have synced IDs to compare against
+                if (!syncedStatusUpdateNodeIds.isEmpty()) {
+                    transactionTemplate.executeWithoutResult(status -> {
+                        ProcessingContext context = ProcessingContext.forSync(scopeId, null);
+                        int removed = statusUpdateProcessor.removeStaleStatusUpdates(
+                            projectId,
+                            syncedStatusUpdateNodeIds,
+                            context
+                        );
+                        if (removed > 0) {
+                            log.debug("Removed stale status updates: projectId={}, count={}", projectId, removed);
+                        }
+                    });
+                }
+
+                // Update status updates synced timestamp (even for projects with zero updates)
+                updateStatusUpdatesSyncCompleted(projectId, Instant.now());
             }
 
             log.debug(
-                "Synced project status updates: projectId={}, count={}",
+                "Synced project status updates: projectId={}, count={}, success={}",
                 projectId,
-                syncedStatusUpdateNodeIds.size()
+                syncedStatusUpdateNodeIds.size(),
+                completedNormally
             );
+            return completedNormally;
         } catch (Exception e) {
             log.warn("Failed to sync project status updates: projectId={}, error={}", projectId, e.getMessage());
+            return false;
         }
+    }
+
+    /**
+     * Updates status update sync completion state in a new transaction.
+     * <p>
+     * Clears the cursor and sets the statusUpdatesSyncedAt timestamp.
+     */
+    private void updateStatusUpdatesSyncCompleted(Long projectId, Instant syncedAt) {
+        TransactionTemplate requiresNewTemplate = new TransactionTemplate(transactionTemplate.getTransactionManager());
+        requiresNewTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        requiresNewTemplate.executeWithoutResult(status -> {
+            projectRepository.updateStatusUpdatesSyncedAt(projectId, syncedAt);
+            log.debug("Updated project status updates sync completion: projectId={}", projectId);
+        });
     }
 
     /**
@@ -1088,9 +1412,216 @@ public class GitHubProjectSyncService {
     }
 
     /**
-     * Result container for page processing.
+     * Syncs remaining field values for an item that had truncated inline data.
+     * <p>
+     * This method paginates through the remaining field values using the
+     * {@code GetProjectItemFieldValues} GraphQL query, starting from the cursor
+     * where the inline data was truncated.
+     * <p>
+     * This follows the same nested pagination pattern used in:
+     * <ul>
+     *   <li>{@code GitHubIssueSyncService.syncRemainingComments()} for issue comments</li>
+     *   <li>{@code GitHubPullRequestSyncService.syncRemainingReviews()} for PR reviews</li>
+     * </ul>
+     *
+     * @param scopeId        the scope ID for authentication
+     * @param projectId      the project database ID (for logging)
+     * @param itemWithCursor the item with cursor information
+     * @param client         the GraphQL client
+     * @param timeout        the timeout for GraphQL requests
+     */
+    private void syncRemainingFieldValues(
+        Long scopeId,
+        Long projectId,
+        ItemWithFieldValueCursor itemWithCursor,
+        HttpGraphQlClient client,
+        Duration timeout
+    ) {
+        String cursor = itemWithCursor.fieldValueCursor();
+        Long itemId = itemWithCursor.itemId();
+        String itemNodeId = itemWithCursor.itemNodeId();
+
+        boolean hasMore = true;
+        int pageCount = 0;
+        int totalFieldValuesSynced = 0;
+
+        while (hasMore) {
+            pageCount++;
+            if (pageCount >= MAX_PAGINATION_PAGES) {
+                log.warn(
+                    "Reached maximum pagination limit for item field values: itemId={}, projectId={}, limit={}",
+                    itemId,
+                    projectId,
+                    MAX_PAGINATION_PAGES
+                );
+                break;
+            }
+
+            try {
+                final String currentCursor = cursor;
+                final int currentPage = pageCount;
+
+                ClientGraphQlResponse graphQlResponse = Mono.defer(() ->
+                    client
+                        .documentName(GET_PROJECT_ITEM_FIELD_VALUES_DOCUMENT)
+                        .variable("itemId", itemNodeId)
+                        .variable("first", FIELD_VALUES_PAGINATION_SIZE)
+                        .variable("after", currentCursor)
+                        .execute()
+                )
+                    .retryWhen(
+                        Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                            .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                            .jitter(JITTER_FACTOR)
+                            .filter(this::isTransportError)
+                            .doBeforeRetry(signal ->
+                                log.warn(
+                                    "Retrying field values pagination after transport error: itemId={}, page={}, attempt={}, error={}",
+                                    itemId,
+                                    currentPage,
+                                    signal.totalRetries() + 1,
+                                    signal.failure().getMessage()
+                                )
+                            )
+                    )
+                    .block(timeout);
+
+                if (graphQlResponse == null || !graphQlResponse.isValid()) {
+                    log.warn(
+                        "Received invalid GraphQL response for item field values: itemId={}, errors={}",
+                        itemId,
+                        graphQlResponse != null ? graphQlResponse.getErrors() : "null"
+                    );
+                    break;
+                }
+
+                graphQlClientProvider.trackRateLimit(scopeId, graphQlResponse);
+
+                if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
+                    log.warn(
+                        "Aborting field values pagination due to critical rate limit: itemId={}",
+                        itemId
+                    );
+                    break;
+                }
+
+                // Parse the response - the node query returns the item directly
+                GHProjectV2ItemFieldValueConnection fieldValuesConnection = graphQlResponse
+                    .field("node.fieldValues")
+                    .toEntity(GHProjectV2ItemFieldValueConnection.class);
+
+                if (
+                    fieldValuesConnection == null ||
+                    fieldValuesConnection.getNodes() == null ||
+                    fieldValuesConnection.getNodes().isEmpty()
+                ) {
+                    break;
+                }
+
+                // Process this page of field values in a transaction
+                final Long finalItemId = itemId;
+                transactionTemplate.executeWithoutResult(status -> {
+                    // Verify the item still exists
+                    if (!projectItemRepository.existsById(finalItemId)) {
+                        log.debug(
+                            "Skipped field values: reason=itemNotFound, itemId={}",
+                            finalItemId
+                        );
+                        return;
+                    }
+
+                    // Convert and process field values
+                    List<GitHubProjectFieldValueDTO> fieldValueDTOs = fieldValuesConnection.getNodes().stream()
+                        .map(GitHubProjectFieldValueDTO::fromFieldValue)
+                        .filter(dto -> dto != null && dto.fieldId() != null)
+                        .toList();
+
+                    // Process each field value (append mode - don't remove stale values yet)
+                    for (GitHubProjectFieldValueDTO fieldValue : fieldValueDTOs) {
+                        // Verify the field exists before attempting to insert
+                        if (!projectFieldRepository.existsById(fieldValue.fieldId())) {
+                            log.debug(
+                                "Skipped field value: reason=fieldNotFound, fieldId={}, itemId={}",
+                                fieldValue.fieldId(),
+                                finalItemId
+                            );
+                            continue;
+                        }
+
+                        projectFieldValueRepository.upsertCore(
+                            finalItemId,
+                            fieldValue.fieldId(),
+                            fieldValue.textValue(),
+                            fieldValue.numberValue(),
+                            fieldValue.dateValue(),
+                            fieldValue.singleSelectOptionId(),
+                            fieldValue.iterationId(),
+                            Instant.now()
+                        );
+                    }
+                });
+
+                totalFieldValuesSynced += fieldValuesConnection.getNodes().size();
+
+                var pageInfo = fieldValuesConnection.getPageInfo();
+                hasMore = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
+                cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
+
+                // Apply pagination throttle
+                if (hasMore && !syncProperties.paginationThrottle().isZero()) {
+                    try {
+                        Thread.sleep(syncProperties.paginationThrottle().toMillis());
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        log.debug("Field values pagination interrupted during throttle: itemId={}", itemId);
+                        break;
+                    }
+                }
+            } catch (Exception e) {
+                log.warn(
+                    "Failed to sync remaining field values: itemId={}, projectId={}, error={}",
+                    itemId,
+                    projectId,
+                    e.getMessage()
+                );
+                break;
+            }
+        }
+
+        if (totalFieldValuesSynced > 0) {
+            log.debug(
+                "Synced remaining field values: itemId={}, projectId={}, count={}, pages={}",
+                itemId,
+                projectId,
+                totalFieldValuesSynced,
+                pageCount
+            );
+        }
+    }
+
+    /**
+     * Result container for project list page processing.
      */
     private record PageResult(int count) {}
+
+    /**
+     * Result container for project item page processing with incremental sync support.
+     * Tracks both processed items (updated) and skipped items (unchanged since last sync).
+     */
+    private record ItemPageResult(int processedCount, int skippedCount) {}
+
+    /**
+     * Record for tracking items that need follow-up field value pagination.
+     * <p>
+     * When an item has more than 20 field values (the inline page size), we need to
+     * fetch the remaining field values using a separate query. This follows the same
+     * pattern as {@code IssueWithCommentCursor} in GitHubIssueSyncService.
+     *
+     * @param itemId           the database ID of the item
+     * @param itemNodeId       the GraphQL node ID of the item (used in follow-up query)
+     * @param fieldValueCursor the cursor to resume field value pagination from
+     */
+    private record ItemWithFieldValueCursor(Long itemId, String itemNodeId, String fieldValueCursor) {}
 
     /**
      * Determines if an exception is a transport-level error that should be retried.

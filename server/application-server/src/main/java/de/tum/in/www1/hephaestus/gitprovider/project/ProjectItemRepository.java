@@ -96,6 +96,38 @@ public interface ProjectItemRepository extends JpaRepository<ProjectItem, Long> 
     int deleteByProjectIdAndNodeIdNotIn(@Param("projectId") Long projectId, @Param("nodeIds") List<String> nodeIds);
 
     /**
+     * Deletes all items of a specific content type for a project that are not in the given list of node IDs.
+     * Used during Draft Issue sync to remove stale Draft Issues without affecting Issue/PR items
+     * (which are synced from the issue/PR side).
+     *
+     * @param projectId the project's ID
+     * @param contentType the content type to filter by (e.g., "DRAFT_ISSUE")
+     * @param nodeIds the node IDs to keep
+     * @return number of deleted items
+     */
+    @Modifying
+    @Query(
+        "DELETE FROM ProjectItem i WHERE i.project.id = :projectId AND i.contentType = :contentType AND i.nodeId NOT IN :nodeIds"
+    )
+    int deleteByProjectIdAndContentTypeAndNodeIdNotIn(
+        @Param("projectId") Long projectId,
+        @Param("contentType") ProjectItem.ContentType contentType,
+        @Param("nodeIds") List<String> nodeIds
+    );
+
+    /**
+     * Deletes all items of a specific content type for a project.
+     * Used when no items of that type were synced (empty sync means all items of that type were deleted).
+     *
+     * @param projectId the project's ID
+     * @param contentType the content type to filter by (e.g., "DRAFT_ISSUE")
+     * @return number of deleted items
+     */
+    @Modifying
+    @Query("DELETE FROM ProjectItem i WHERE i.project.id = :projectId AND i.contentType = :contentType")
+    int deleteByProjectIdAndContentType(@Param("projectId") Long projectId, @Param("contentType") ProjectItem.ContentType contentType);
+
+    /**
      * Atomically inserts or updates a project item (race-condition safe).
      * <p>
      * Uses PostgreSQL's ON CONFLICT to handle concurrent inserts on the unique constraint
@@ -109,11 +141,11 @@ public interface ProjectItemRepository extends JpaRepository<ProjectItem, Long> 
         value = """
         INSERT INTO project_item (
             id, node_id, project_id, content_type, issue_id,
-            draft_title, draft_body, archived, created_at, updated_at
+            draft_title, draft_body, archived, creator_id, created_at, updated_at
         )
         VALUES (
             :id, :nodeId, :projectId, :contentType, :issueId,
-            :draftTitle, :draftBody, :archived, :createdAt, :updatedAt
+            :draftTitle, :draftBody, :archived, :creatorId, :createdAt, :updatedAt
         )
         ON CONFLICT (project_id, node_id) DO UPDATE SET
             content_type = EXCLUDED.content_type,
@@ -121,6 +153,7 @@ public interface ProjectItemRepository extends JpaRepository<ProjectItem, Long> 
             draft_title = EXCLUDED.draft_title,
             draft_body = EXCLUDED.draft_body,
             archived = EXCLUDED.archived,
+            creator_id = COALESCE(EXCLUDED.creator_id, project_item.creator_id),
             updated_at = EXCLUDED.updated_at
         """,
         nativeQuery = true
@@ -134,6 +167,7 @@ public interface ProjectItemRepository extends JpaRepository<ProjectItem, Long> 
         @Param("draftTitle") String draftTitle,
         @Param("draftBody") String draftBody,
         @Param("archived") boolean archived,
+        @Param("creatorId") Long creatorId,
         @Param("createdAt") Instant createdAt,
         @Param("updatedAt") Instant updatedAt
     );

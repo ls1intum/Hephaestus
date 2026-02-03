@@ -19,6 +19,8 @@ import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPageInfo;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPullRequestConnection;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
+import de.tum.in.www1.hephaestus.gitprovider.issue.github.dto.EmbeddedProjectItemsDTO;
+import de.tum.in.www1.hephaestus.gitprovider.project.github.GitHubProjectItemSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.dto.EmbeddedReviewThreadsDTO;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.dto.EmbeddedReviewsDTO;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.dto.GitHubReviewThreadDTO;
@@ -80,6 +82,7 @@ public class GitHubPullRequestSyncService {
     private final GitHubPullRequestReviewProcessor reviewProcessor;
     private final GitHubPullRequestReviewSyncService reviewSyncService;
     private final GitHubPullRequestReviewCommentSyncService reviewCommentSyncService;
+    private final GitHubProjectItemSyncService projectItemSyncService;
     private final BackfillStateProvider backfillStateProvider;
     private final TransactionTemplate transactionTemplate;
     private final GitHubSyncProperties syncProperties;
@@ -115,6 +118,16 @@ public class GitHubPullRequestSyncService {
      */
     private record PullRequestWithThreadCursor(Long pullRequestId, String threadCursor) {}
 
+    /**
+     * Container for PRs that need additional project item pagination.
+     * Stores PR ID instead of entity reference to survive transaction rollbacks.
+     *
+     * @param pullRequestId the database ID of the PR
+     * @param nodeId the GitHub GraphQL node ID (needed for pagination query)
+     * @param projectItemCursor the pagination cursor to start from
+     */
+    private record PullRequestWithProjectItemCursor(Long pullRequestId, String nodeId, String projectItemCursor) {}
+
     public GitHubPullRequestSyncService(
         RepositoryRepository repositoryRepository,
         PullRequestRepository pullRequestRepository,
@@ -123,6 +136,7 @@ public class GitHubPullRequestSyncService {
         GitHubPullRequestReviewProcessor reviewProcessor,
         GitHubPullRequestReviewSyncService reviewSyncService,
         GitHubPullRequestReviewCommentSyncService reviewCommentSyncService,
+        GitHubProjectItemSyncService projectItemSyncService,
         BackfillStateProvider backfillStateProvider,
         TransactionTemplate transactionTemplate,
         GitHubSyncProperties syncProperties,
@@ -136,6 +150,7 @@ public class GitHubPullRequestSyncService {
         this.reviewProcessor = reviewProcessor;
         this.reviewSyncService = reviewSyncService;
         this.reviewCommentSyncService = reviewCommentSyncService;
+        this.projectItemSyncService = projectItemSyncService;
         this.backfillStateProvider = backfillStateProvider;
         this.transactionTemplate = transactionTemplate;
         this.syncProperties = syncProperties;
@@ -280,8 +295,10 @@ public class GitHubPullRequestSyncService {
         int totalPRsSynced = 0;
         int totalReviewsSynced = 0;
         int totalReviewCommentsSynced = 0;
+        int totalProjectItemsSynced = 0;
         List<PullRequestWithReviewCursor> prsNeedingReviewPagination = new ArrayList<>();
         List<PullRequestWithThreadCursor> prsNeedingThreadPagination = new ArrayList<>();
+        List<PullRequestWithProjectItemCursor> prsNeedingProjectItemPagination = new ArrayList<>();
         String cursor = initialCursor;
         boolean hasMore = true;
         int pageCount = 0;
@@ -380,7 +397,7 @@ public class GitHubPullRequestSyncService {
                     // Re-fetch repository within transaction to ensure it's attached to session
                     Repository repo = repositoryRepository.findById(repoId).orElse(null);
                     if (repo == null) {
-                        return new PageSyncResult(0, 0, 0);
+                        return new PageSyncResult(0, 0, 0, 0);
                     }
                     ProcessingContext context = ProcessingContext.forSync(scopeId, repo);
                     return processPullRequestPage(
@@ -388,7 +405,8 @@ public class GitHubPullRequestSyncService {
                         context,
                         scopeId,
                         prsNeedingReviewPagination,
-                        prsNeedingThreadPagination
+                        prsNeedingThreadPagination,
+                        prsNeedingProjectItemPagination
                     );
                 });
 
@@ -396,6 +414,7 @@ public class GitHubPullRequestSyncService {
                     totalPRsSynced += pageResult.prsSynced();
                     totalReviewsSynced += pageResult.reviewsSynced();
                     totalReviewCommentsSynced += pageResult.reviewCommentsSynced();
+                    totalProjectItemsSynced += pageResult.projectItemsSynced();
                 }
 
                 GHPageInfo pageInfo = connection.getPageInfo();
@@ -619,6 +638,41 @@ public class GitHubPullRequestSyncService {
             }
         }
 
+        // Fetch remaining project items for PRs in >5 projects (using cursor for efficient continuation)
+        // Each call to syncRemainingProjectItems handles its own transactions
+        // Re-fetch PRs from database to handle transaction rollbacks gracefully
+        if (!prsNeedingProjectItemPagination.isEmpty()) {
+            log.debug(
+                "Starting additional project item fetch for PRs with pagination: repoName={}, prCount={}",
+                safeNameWithOwner,
+                prsNeedingProjectItemPagination.size()
+            );
+            for (PullRequestWithProjectItemCursor prWithCursor : prsNeedingProjectItemPagination) {
+                // Re-fetch PR from database with repository eagerly loaded to avoid
+                // LazyInitializationException when syncRemainingProjectItems accesses pr.getRepository()
+                // in a new transaction. If the transaction that created this PR was rolled back, skip it.
+                PullRequest pr = pullRequestRepository
+                    .findByIdWithRepository(prWithCursor.pullRequestId())
+                    .orElse(null);
+                if (pr == null) {
+                    log.debug(
+                        "Skipped project item pagination: reason=prNotFound (likely transaction rollback), prId={}",
+                        prWithCursor.pullRequestId()
+                    );
+                    continue;
+                }
+                // Sync remaining project items using the nodeId stored in the cursor
+                int additionalItems = projectItemSyncService.syncRemainingProjectItems(
+                    scopeId,
+                    prWithCursor.nodeId(),
+                    true, // This is a pull request
+                    pr.getRepository(),
+                    prWithCursor.projectItemCursor()
+                );
+                totalProjectItemsSynced += additionalItems;
+            }
+        }
+
         // Clear cursor on successful completion (uses REQUIRES_NEW)
         // Only clear if sync completed without abort
         if (syncTargetId != null && !hasMore && abortReason == null) {
@@ -629,13 +683,15 @@ public class GitHubPullRequestSyncService {
         SyncResult.Status finalStatus = abortReason != null ? abortReason : SyncResult.Status.COMPLETED;
 
         log.info(
-            "Completed pull request sync: repoName={}, prCount={}, reviewCount={}, reviewCommentCount={}, prsWithReviewPagination={}, prsWithThreadPagination={}, resumed={}, incremental={}, stoppedByIncremental={}, status={}",
+            "Completed pull request sync: repoName={}, prCount={}, reviewCount={}, reviewCommentCount={}, projectItemCount={}, prsWithReviewPagination={}, prsWithThreadPagination={}, prsWithProjectItemPagination={}, resumed={}, incremental={}, stoppedByIncremental={}, status={}",
             safeNameWithOwner,
             totalPRsSynced,
             totalReviewsSynced,
             totalReviewCommentsSynced,
+            totalProjectItemsSynced,
             prsNeedingReviewPagination.size(),
             prsNeedingThreadPagination.size(),
+            prsNeedingProjectItemPagination.size(),
             resuming,
             incrementalSync,
             stoppedByIncrementalSync,
@@ -647,21 +703,23 @@ public class GitHubPullRequestSyncService {
     /**
      * Result of processing a page of pull requests.
      */
-    private record PageSyncResult(int prsSynced, int reviewsSynced, int reviewCommentsSynced) {}
+    private record PageSyncResult(int prsSynced, int reviewsSynced, int reviewCommentsSynced, int projectItemsSynced) {}
 
     /**
-     * Processes a page of pull requests with their embedded reviews and review threads.
+     * Processes a page of pull requests with their embedded reviews, review threads, and project items.
      */
     private PageSyncResult processPullRequestPage(
         GHPullRequestConnection connection,
         ProcessingContext context,
         Long scopeId,
         List<PullRequestWithReviewCursor> prsNeedingReviewPagination,
-        List<PullRequestWithThreadCursor> prsNeedingThreadPagination
+        List<PullRequestWithThreadCursor> prsNeedingThreadPagination,
+        List<PullRequestWithProjectItemCursor> prsNeedingProjectItemPagination
     ) {
         int prsSynced = 0;
         int reviewsSynced = 0;
         int reviewCommentsSynced = 0;
+        int projectItemsSynced = 0;
 
         for (var graphQlPullRequest : connection.getNodes()) {
             PullRequestWithReviewThreads prWithReviews = PullRequestWithReviewThreads.fromPullRequest(
@@ -708,9 +766,25 @@ public class GitHubPullRequestSyncService {
                     new PullRequestWithThreadCursor(entity.getId(), embeddedThreads.endCursor())
                 );
             }
+
+            // Process embedded project items
+            EmbeddedProjectItemsDTO embeddedProjectItems = prWithReviews.embeddedProjectItems();
+            projectItemsSynced += projectItemSyncService.processEmbeddedItems(embeddedProjectItems, context);
+
+            // Track PRs that need additional project item pagination
+            // Store PR ID instead of entity reference to survive transaction rollbacks
+            if (embeddedProjectItems.needsPagination()) {
+                prsNeedingProjectItemPagination.add(
+                    new PullRequestWithProjectItemCursor(
+                        entity.getId(),
+                        prWithReviews.pullRequest().nodeId(),
+                        embeddedProjectItems.endCursor()
+                    )
+                );
+            }
         }
 
-        return new PageSyncResult(prsSynced, reviewsSynced, reviewCommentsSynced);
+        return new PageSyncResult(prsSynced, reviewsSynced, reviewCommentsSynced, projectItemsSynced);
     }
 
     /**

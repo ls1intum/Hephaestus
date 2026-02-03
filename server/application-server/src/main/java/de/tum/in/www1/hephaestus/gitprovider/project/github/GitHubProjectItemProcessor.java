@@ -4,15 +4,16 @@ import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.EventContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.EventPayload;
-import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.BaseGitHubProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
+import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
+import de.tum.in.www1.hephaestus.gitprovider.milestone.MilestoneRepository;
 import de.tum.in.www1.hephaestus.gitprovider.project.Project;
 import de.tum.in.www1.hephaestus.gitprovider.project.ProjectItem;
 import de.tum.in.www1.hephaestus.gitprovider.project.ProjectItemRepository;
 import de.tum.in.www1.hephaestus.gitprovider.project.github.dto.GitHubProjectItemDTO;
-import java.time.Instant;
+import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,9 +26,12 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>
  * This service handles the conversion of GitHubProjectItemDTO to ProjectItem entities,
  * persists them, and publishes appropriate domain events.
+ * <p>
+ * Extends {@link BaseGitHubProcessor} for consistency with other GitHub entity processors
+ * and to reuse common functionality like the {@code sanitize()} method.
  */
 @Service
-public class GitHubProjectItemProcessor {
+public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubProjectItemProcessor.class);
 
@@ -38,8 +42,12 @@ public class GitHubProjectItemProcessor {
     public GitHubProjectItemProcessor(
         ProjectItemRepository projectItemRepository,
         IssueRepository issueRepository,
+        UserRepository userRepository,
+        LabelRepository labelRepository,
+        MilestoneRepository milestoneRepository,
         ApplicationEventPublisher eventPublisher
     ) {
+        super(userRepository, labelRepository, milestoneRepository);
         this.projectItemRepository = projectItemRepository;
         this.issueRepository = issueRepository;
         this.eventPublisher = eventPublisher;
@@ -55,6 +63,20 @@ public class GitHubProjectItemProcessor {
      */
     @Transactional
     public ProjectItem process(GitHubProjectItemDTO dto, Project project, ProcessingContext context) {
+        return process(dto, project, context, null);
+    }
+
+    /**
+     * Process a GitHub project item DTO and persist it as a ProjectItem entity.
+     *
+     * @param dto the GitHub project item DTO
+     * @param project the project this item belongs to
+     * @param context processing context with scope information
+     * @param actorId the ID of the user who performed the action (from webhook sender), or null for sync
+     * @return the persisted ProjectItem entity
+     */
+    @Transactional
+    public ProjectItem process(GitHubProjectItemDTO dto, Project project, ProcessingContext context, Long actorId) {
         if (dto == null) {
             log.warn(
                 "Skipped project item processing: reason=nullDto, projectId={}",
@@ -92,6 +114,9 @@ public class GitHubProjectItemProcessor {
             issueId = resolveIssueId(dto);
         }
 
+        // Resolve creator if applicable
+        Long creatorId = resolveCreatorId(dto);
+
         // Perform atomic upsert
         projectItemRepository.upsertCore(
             dbId,
@@ -102,6 +127,7 @@ public class GitHubProjectItemProcessor {
             sanitize(dto.draftTitle()),
             sanitize(dto.draftBody()),
             dto.archived(),
+            creatorId,
             dto.createdAt(),
             dto.updatedAt()
         );
@@ -115,8 +141,8 @@ public class GitHubProjectItemProcessor {
                 )
             );
 
-        // Publish domain events
-        EventPayload.ProjectItemData itemData = EventPayload.ProjectItemData.from(item);
+        // Publish domain events with actor information
+        EventPayload.ProjectItemData itemData = EventPayload.ProjectItemData.from(item, actorId);
         EventContext eventContext = EventContext.from(context);
 
         if (isNew) {
@@ -142,9 +168,28 @@ public class GitHubProjectItemProcessor {
      */
     @Transactional
     public ProjectItem processArchived(GitHubProjectItemDTO dto, Project project, ProcessingContext context) {
-        ProjectItem item = process(dto, project, context);
+        return processArchived(dto, project, context, null);
+    }
+
+    /**
+     * Process an item archived event.
+     *
+     * @param dto the GitHub project item DTO
+     * @param project the project this item belongs to
+     * @param context processing context
+     * @param actorId the ID of the user who archived the item (from webhook sender), or null for sync
+     * @return the updated ProjectItem entity
+     */
+    @Transactional
+    public ProjectItem processArchived(
+        GitHubProjectItemDTO dto,
+        Project project,
+        ProcessingContext context,
+        Long actorId
+    ) {
+        ProjectItem item = process(dto, project, context, actorId);
         if (item != null) {
-            EventPayload.ProjectItemData itemData = EventPayload.ProjectItemData.from(item);
+            EventPayload.ProjectItemData itemData = EventPayload.ProjectItemData.from(item, actorId);
             eventPublisher.publishEvent(
                 new DomainEvent.ProjectItemArchived(itemData, project.getId(), EventContext.from(context))
             );
@@ -163,13 +208,112 @@ public class GitHubProjectItemProcessor {
      */
     @Transactional
     public ProjectItem processRestored(GitHubProjectItemDTO dto, Project project, ProcessingContext context) {
-        ProjectItem item = process(dto, project, context);
+        return processRestored(dto, project, context, null);
+    }
+
+    /**
+     * Process an item restored (unarchived) event.
+     *
+     * @param dto the GitHub project item DTO
+     * @param project the project this item belongs to
+     * @param context processing context
+     * @param actorId the ID of the user who restored the item (from webhook sender), or null for sync
+     * @return the updated ProjectItem entity
+     */
+    @Transactional
+    public ProjectItem processRestored(
+        GitHubProjectItemDTO dto,
+        Project project,
+        ProcessingContext context,
+        Long actorId
+    ) {
+        ProjectItem item = process(dto, project, context, actorId);
         if (item != null) {
-            EventPayload.ProjectItemData itemData = EventPayload.ProjectItemData.from(item);
+            EventPayload.ProjectItemData itemData = EventPayload.ProjectItemData.from(item, actorId);
             eventPublisher.publishEvent(
                 new DomainEvent.ProjectItemRestored(itemData, project.getId(), EventContext.from(context))
             );
             log.info("Project item restored: itemId={}, nodeId={}", item.getId(), item.getNodeId());
+        }
+        return item;
+    }
+
+    /**
+     * Process an item converted event (draft issue converted to real issue).
+     *
+     * @param dto the GitHub project item DTO
+     * @param project the project this item belongs to
+     * @param context processing context
+     * @return the updated ProjectItem entity
+     */
+    @Transactional
+    public ProjectItem processConverted(GitHubProjectItemDTO dto, Project project, ProcessingContext context) {
+        return processConverted(dto, project, context, null);
+    }
+
+    /**
+     * Process an item converted event (draft issue converted to real issue).
+     *
+     * @param dto the GitHub project item DTO
+     * @param project the project this item belongs to
+     * @param context processing context
+     * @param actorId the ID of the user who converted the item (from webhook sender), or null for sync
+     * @return the updated ProjectItem entity
+     */
+    @Transactional
+    public ProjectItem processConverted(
+        GitHubProjectItemDTO dto,
+        Project project,
+        ProcessingContext context,
+        Long actorId
+    ) {
+        ProjectItem item = process(dto, project, context, actorId);
+        if (item != null) {
+            EventPayload.ProjectItemData itemData = EventPayload.ProjectItemData.from(item, actorId);
+            eventPublisher.publishEvent(
+                new DomainEvent.ProjectItemConverted(itemData, project.getId(), EventContext.from(context))
+            );
+            log.info("Project item converted: itemId={}, nodeId={}", item.getId(), item.getNodeId());
+        }
+        return item;
+    }
+
+    /**
+     * Process an item reordered event (position changed in project view).
+     *
+     * @param dto the GitHub project item DTO
+     * @param project the project this item belongs to
+     * @param context processing context
+     * @return the updated ProjectItem entity
+     */
+    @Transactional
+    public ProjectItem processReordered(GitHubProjectItemDTO dto, Project project, ProcessingContext context) {
+        return processReordered(dto, project, context, null);
+    }
+
+    /**
+     * Process an item reordered event (position changed in project view).
+     *
+     * @param dto the GitHub project item DTO
+     * @param project the project this item belongs to
+     * @param context processing context
+     * @param actorId the ID of the user who reordered the item (from webhook sender), or null for sync
+     * @return the updated ProjectItem entity
+     */
+    @Transactional
+    public ProjectItem processReordered(
+        GitHubProjectItemDTO dto,
+        Project project,
+        ProcessingContext context,
+        Long actorId
+    ) {
+        ProjectItem item = process(dto, project, context, actorId);
+        if (item != null) {
+            EventPayload.ProjectItemData itemData = EventPayload.ProjectItemData.from(item, actorId);
+            eventPublisher.publishEvent(
+                new DomainEvent.ProjectItemReordered(itemData, project.getId(), EventContext.from(context))
+            );
+            log.debug("Project item reordered: itemId={}, nodeId={}", item.getId(), item.getNodeId());
         }
         return item;
     }
@@ -223,6 +367,45 @@ public class GitHubProjectItemProcessor {
     }
 
     /**
+     * Removes stale Draft Issues that no longer exist in the project.
+     * <p>
+     * This method is used by the project-side sync which only handles Draft Issues.
+     * Issue and PR items are synced from the issue/PR side and should not be removed here.
+     *
+     * @param projectId the project ID
+     * @param syncedDraftIssueNodeIds list of Draft Issue node IDs that were synced
+     * @param context processing context
+     * @return number of Draft Issues removed
+     */
+    @Transactional
+    public int removeStaleDraftIssues(Long projectId, List<String> syncedDraftIssueNodeIds, ProcessingContext context) {
+        if (projectId == null) {
+            return 0;
+        }
+
+        int removed;
+        if (syncedDraftIssueNodeIds == null || syncedDraftIssueNodeIds.isEmpty()) {
+            // No Draft Issues were synced - remove all Draft Issues for this project
+            removed = projectItemRepository.deleteByProjectIdAndContentType(
+                projectId,
+                ProjectItem.ContentType.DRAFT_ISSUE
+            );
+        } else {
+            // Remove only Draft Issues not in the synced list
+            removed = projectItemRepository.deleteByProjectIdAndContentTypeAndNodeIdNotIn(
+                projectId,
+                ProjectItem.ContentType.DRAFT_ISSUE,
+                syncedDraftIssueNodeIds
+            );
+        }
+
+        if (removed > 0) {
+            log.info("Removed stale Draft Issues: projectId={}, count={}", projectId, removed);
+        }
+        return removed;
+    }
+
+    /**
      * Resolve the issue ID from the DTO, verifying the issue exists locally.
      * <p>
      * GitHub Projects V2 are organization-scoped and can contain items from ANY
@@ -256,12 +439,29 @@ public class GitHubProjectItemProcessor {
     }
 
     /**
-     * Sanitize string for PostgreSQL storage (removes null characters).
+     * Resolve the creator ID from the DTO, verifying the user exists locally.
+     * <p>
+     * The creator is the user who added the item to the project. We only link
+     * to users that exist in our database to avoid FK constraint violations.
+     *
+     * @param dto the project item DTO containing creator information
+     * @return the creator's user ID if they exist locally, null otherwise
      */
-    private String sanitize(String input) {
-        if (input == null) {
+    private Long resolveCreatorId(GitHubProjectItemDTO dto) {
+        if (dto.creator() == null || dto.creator().getDatabaseId() == null) {
             return null;
         }
-        return input.replace("\u0000", "");
+
+        Long creatorId = dto.creator().getDatabaseId();
+        if (userRepository.existsById(creatorId)) {
+            return creatorId;
+        }
+
+        log.debug(
+            "Project item creator not synced locally: creatorId={}, itemNodeId={}",
+            creatorId,
+            dto.nodeId()
+        );
+        return null;
     }
 }

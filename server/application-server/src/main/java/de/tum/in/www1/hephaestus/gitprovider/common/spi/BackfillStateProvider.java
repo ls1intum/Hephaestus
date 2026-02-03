@@ -196,4 +196,130 @@ public interface BackfillStateProvider {
     default Optional<Instant> getProjectItemsSyncedAt(Long projectId) {
         return Optional.empty();
     }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // PROJECT FIELD SYNC CURSOR PERSISTENCE
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Updates the pagination cursor for project field sync.
+     * <p>
+     * This allows field sync to resume from where it left off if interrupted mid-pagination.
+     * <p>
+     * <b>Important:</b> The default implementation is a no-op. Implementations
+     * MUST override this method to persist cursor state for reliable resumption.
+     *
+     * @param projectId the project ID
+     * @param cursor    the GraphQL pagination cursor, or null to clear (sync complete)
+     */
+    default void updateProjectFieldSyncCursor(Long projectId, String cursor) {
+        // Default no-op - implementations MUST override to persist cursor
+    }
+
+    /**
+     * Updates the project field sync completion state.
+     * <p>
+     * Called when project field sync completes successfully to clear the cursor
+     * and record the completion timestamp.
+     * <p>
+     * <b>Important:</b> The default implementation is a no-op. Implementations
+     * MUST override this method to persist completion state.
+     *
+     * @param projectId the project ID
+     * @param syncedAt  the timestamp of successful sync completion
+     */
+    default void updateProjectFieldsSyncedAt(Long projectId, Instant syncedAt) {
+        // Default no-op - implementations MUST override to persist state
+    }
+
+    /**
+     * Gets the current field sync cursor for a project.
+     * <p>
+     * Used to resume field sync from where it left off after interruption.
+     * <p>
+     * <b>Important:</b> The default implementation returns empty. Implementations
+     * MUST override this method to retrieve persisted cursor state.
+     *
+     * @param projectId the project ID
+     * @return the cursor if present, or empty if no checkpoint exists
+     */
+    default Optional<String> getProjectFieldSyncCursor(Long projectId) {
+        return Optional.empty();
+    }
+
+    /**
+     * Gets the timestamp of the last successful field sync for a project.
+     * <p>
+     * <b>Important:</b> The default implementation returns empty. Implementations
+     * MUST override this method to retrieve persisted state.
+     *
+     * @param projectId the project ID
+     * @return the timestamp if present, or empty if never synced
+     */
+    default Optional<Instant> getProjectFieldsSyncedAt(Long projectId) {
+        return Optional.empty();
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // PROJECT STATUS UPDATE SYNC CURSOR PERSISTENCE
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Updates the pagination cursor for project status update sync.
+     * <p>
+     * This allows status update sync to resume from where it left off if interrupted mid-pagination.
+     * <p>
+     * <b>Important:</b> The default implementation is a no-op. Implementations
+     * MUST override this method to persist cursor state for reliable resumption.
+     *
+     * @param projectId the project ID
+     * @param cursor    the GraphQL pagination cursor, or null to clear (sync complete)
+     */
+    default void updateProjectStatusUpdateSyncCursor(Long projectId, String cursor) {
+        // Default no-op - implementations MUST override to persist cursor
+    }
+
+    /**
+     * Updates the project status update sync completion state.
+     * <p>
+     * Called when project status update sync completes successfully to clear the cursor
+     * and record the completion timestamp.
+     * <p>
+     * <b>Important:</b> The default implementation is a no-op. Implementations
+     * MUST override this method to persist completion state.
+     *
+     * @param projectId the project ID
+     * @param syncedAt  the timestamp of successful sync completion
+     */
+    default void updateProjectStatusUpdatesSyncedAt(Long projectId, Instant syncedAt) {
+        // Default no-op - implementations MUST override to persist state
+    }
+
+    /**
+     * Gets the current status update sync cursor for a project.
+     * <p>
+     * Used to resume status update sync from where it left off after interruption.
+     * <p>
+     * <b>Important:</b> The default implementation returns empty. Implementations
+     * MUST override this method to retrieve persisted cursor state.
+     *
+     * @param projectId the project ID
+     * @return the cursor if present, or empty if no checkpoint exists
+     */
+    default Optional<String> getProjectStatusUpdateSyncCursor(Long projectId) {
+        return Optional.empty();
+    }
+
+    /**
+     * Gets the timestamp of the last successful status update sync for a project.
+     * <p>
+     * <b>Important:</b> The default implementation returns empty. Implementations
+     * MUST override this method to retrieve persisted state.
+     *
+     * @param projectId the project ID
+     * @return the timestamp if present, or empty if never synced
+     */
+    default Optional<Instant> getProjectStatusUpdatesSyncedAt(Long projectId) {
+        return Optional.empty();
+    }
 }

@@ -1,5 +1,30 @@
 # GraphQL query for fetching project status updates
 # Status updates track project health with ON_TRACK, AT_RISK, OFF_TRACK statuses
+#
+# =============================================================================
+# COST ANALYSIS
+# =============================================================================
+#
+# This query has minimal nesting complexity:
+#   - statusUpdates: Single-level collection
+#   - creator: Inline user object (not a collection), no additional cost
+#
+# Cost calculation: statusUpdates(100) = 100 nodes = 1 cost point (very efficient)
+#
+# Using full page size of 100 is appropriate because:
+#   - Status updates are simple flat records
+#   - Only nesting is the creator field (single object, not a collection)
+#   - No multiplicative cost concerns
+#   - Projects typically have few status updates (weekly/monthly cadence)
+#
+# Reference: https://docs.github.com/en/graphql/overview/rate-limits-and-node-limits
+#
+# =============================================================================
+# FRAGMENTS
+# =============================================================================
+#
+# Uses fragments for consistent field selection. See ProjectFragments.graphql
+# for canonical fragment definitions.
 
 query GetProjectStatusUpdates($nodeId: ID!, $first: Int!, $after: String) {
     rateLimit {
@@ -18,46 +43,57 @@ query GetProjectStatusUpdates($nodeId: ID!, $first: Int!, $after: String) {
                 }
                 totalCount
                 nodes {
-                    __typename
-                    id
-                    fullDatabaseId
-                    body
-                    bodyHTML
-                    startDate
-                    targetDate
-                    status
-                    createdAt
-                    updatedAt
-                    creator {
-                        __typename
-                        ... on User {
-                            id
-                            databaseId
-                            login
-                            avatarUrl
-                            name
-                        }
-                        ... on Bot {
-                            id
-                            databaseId
-                            login
-                            avatarUrl
-                        }
-                        ... on Mannequin {
-                            id
-                            databaseId
-                            login
-                            avatarUrl
-                        }
-                        ... on Organization {
-                            id
-                            databaseId
-                            login
-                            avatarUrl
-                        }
-                    }
+                    ...ProjectV2StatusUpdateFields
                 }
             }
         }
+    }
+}
+
+# =============================================================================
+# Fragment Definitions
+# =============================================================================
+
+# Fragment for project status updates
+fragment ProjectV2StatusUpdateFields on ProjectV2StatusUpdate {
+    __typename
+    id
+    fullDatabaseId
+    body
+    bodyHTML
+    startDate
+    targetDate
+    status
+    createdAt
+    updatedAt
+    creator {
+        ...ActorFieldsCompact
+    }
+}
+
+# Compact actor fields (without email, appropriate for nested contexts)
+fragment ActorFieldsCompact on Actor {
+    __typename
+    login
+    ... on User {
+        id
+        databaseId
+        avatarUrl
+        name
+    }
+    ... on Bot {
+        id
+        databaseId
+        avatarUrl
+    }
+    ... on Mannequin {
+        id
+        databaseId
+        avatarUrl
+    }
+    ... on Organization {
+        id
+        databaseId
+        avatarUrl
     }
 }

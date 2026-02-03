@@ -1,42 +1,87 @@
-# Fetches project items with field values. Cost-optimized page sizes for nested queries.
-# See GitHubSyncConstants.java for page size rationale.
+# Reusable fragments for GitHub Projects V2. Use ...FragmentName to include.
+# Page sizes here are defaults; GetProjectItems.graphql uses cost-optimized sizes.
 
-query GetProjectItems($nodeId: ID!, $first: Int!, $after: String) {
-    rateLimit {
-        cost
-        limit
-        remaining
-        resetAt
+fragment ActorFields on Actor {
+    __typename
+    login
+    ... on User {
+        id
+        databaseId
+        avatarUrl
+        name
+        email
     }
-    node(id: $nodeId) {
-        ... on ProjectV2 {
-            id
-            fullDatabaseId
-            number
-            items(first: $first, after: $after) {
-                pageInfo {
-                    hasNextPage
-                    endCursor
-                }
-                totalCount
-                nodes {
-                    ...ProjectV2ItemFields
-                    content {
-                        ...ProjectV2ItemContentFields
-                    }
-                    fieldValues(first: 20) {
-                        pageInfo {
-                            hasNextPage
-                            endCursor
-                        }
-                        totalCount
-                        nodes {
-                            ...FieldValueFieldsCostOptimized
-                        }
-                    }
-                }
-            }
-        }
+    ... on Bot {
+        id
+        databaseId
+        avatarUrl
+    }
+    ... on Mannequin {
+        id
+        databaseId
+        avatarUrl
+    }
+    ... on Organization {
+        id
+        databaseId
+        avatarUrl
+    }
+}
+
+fragment ActorFieldsCompact on Actor {
+    __typename
+    login
+    ... on User {
+        id
+        databaseId
+        avatarUrl
+        name
+    }
+    ... on Bot {
+        id
+        databaseId
+        avatarUrl
+    }
+    ... on Mannequin {
+        id
+        databaseId
+        avatarUrl
+    }
+    ... on Organization {
+        id
+        databaseId
+        avatarUrl
+    }
+}
+
+fragment ProjectV2BaseFields on ProjectV2 {
+    __typename
+    id
+    fullDatabaseId
+    number
+    title
+    shortDescription
+    readme
+    template
+    url
+    closed
+    closedAt
+    public
+    createdAt
+    updatedAt
+}
+
+fragment ProjectV2OwnerFields on ProjectV2Owner {
+    __typename
+    ... on Organization {
+        id
+        databaseId
+        login
+    }
+    ... on User {
+        id
+        databaseId
+        login
     }
 }
 
@@ -95,33 +140,7 @@ fragment ProjectV2ItemContentFields on ProjectV2ItemContent {
     }
 }
 
-fragment ActorFieldsCompact on Actor {
-    __typename
-    login
-    ... on User {
-        id
-        databaseId
-        avatarUrl
-        name
-    }
-    ... on Bot {
-        id
-        databaseId
-        avatarUrl
-    }
-    ... on Mannequin {
-        id
-        databaseId
-        avatarUrl
-    }
-    ... on Organization {
-        id
-        databaseId
-        avatarUrl
-    }
-}
-
-fragment FieldValueFieldsCostOptimized on ProjectV2ItemFieldValue {
+fragment FieldValueFields on ProjectV2ItemFieldValue {
     __typename
     ... on ProjectV2ItemFieldTextValue {
         text
@@ -174,7 +193,7 @@ fragment FieldValueFieldsCostOptimized on ProjectV2ItemFieldValue {
         }
     }
     ... on ProjectV2ItemFieldLabelValue {
-        labels(first: 10) {
+        labels(first: 50) {
             pageInfo {
                 hasNextPage
             }
@@ -207,7 +226,7 @@ fragment FieldValueFieldsCostOptimized on ProjectV2ItemFieldValue {
         }
     }
     ... on ProjectV2ItemFieldUserValue {
-        users(first: 10) {
+        users(first: 50) {
             pageInfo {
                 hasNextPage
             }
@@ -239,7 +258,7 @@ fragment FieldValueFieldsCostOptimized on ProjectV2ItemFieldValue {
         }
     }
     ... on ProjectV2ItemFieldPullRequestValue {
-        pullRequests(first: 5) {
+        pullRequests(first: 20) {
             pageInfo {
                 hasNextPage
             }
@@ -259,7 +278,7 @@ fragment FieldValueFieldsCostOptimized on ProjectV2ItemFieldValue {
         }
     }
     ... on ProjectV2ItemFieldReviewerValue {
-        reviewers(first: 10) {
+        reviewers(first: 50) {
             pageInfo {
                 hasNextPage
             }
@@ -301,5 +320,60 @@ fragment RequestedReviewerFields on RequestedReviewer {
         databaseId
         login
         avatarUrl
+    }
+}
+
+fragment ProjectV2FieldConfigFields on ProjectV2FieldConfiguration {
+    __typename
+    ... on ProjectV2Field {
+        id
+        name
+        dataType
+        createdAt
+        updatedAt
+    }
+    ... on ProjectV2SingleSelectField {
+        id
+        name
+        dataType
+        createdAt
+        updatedAt
+        options {
+            id
+            name
+            color
+            description
+        }
+    }
+    ... on ProjectV2IterationField {
+        id
+        name
+        dataType
+        createdAt
+        updatedAt
+        configuration {
+            iterations {
+                id
+                title
+                startDate
+                duration
+            }
+        }
+    }
+}
+
+fragment ProjectV2StatusUpdateFields on ProjectV2StatusUpdate {
+    __typename
+    id
+    fullDatabaseId
+    body
+    bodyHTML
+    startDate
+    targetDate
+    status
+    createdAt
+    updatedAt
+    creator {
+        ...ActorFields
     }
 }
