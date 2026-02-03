@@ -17,6 +17,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassi
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.BackfillStateProvider;
+import de.tum.in.www1.hephaestus.gitprovider.sync.SyncSchedulerProperties;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2Connection;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2FieldConfiguration;
@@ -160,6 +161,7 @@ public class GitHubProjectSyncService {
     private final BackfillStateProvider backfillStateProvider;
     private final TransactionTemplate transactionTemplate;
     private final GitHubSyncProperties syncProperties;
+    private final SyncSchedulerProperties syncSchedulerProperties;
     private final GitHubExceptionClassifier exceptionClassifier;
 
     public GitHubProjectSyncService(
@@ -176,6 +178,7 @@ public class GitHubProjectSyncService {
         BackfillStateProvider backfillStateProvider,
         TransactionTemplate transactionTemplate,
         GitHubSyncProperties syncProperties,
+        SyncSchedulerProperties syncSchedulerProperties,
         GitHubExceptionClassifier exceptionClassifier
     ) {
         this.projectRepository = projectRepository;
@@ -191,6 +194,7 @@ public class GitHubProjectSyncService {
         this.backfillStateProvider = backfillStateProvider;
         this.transactionTemplate = transactionTemplate;
         this.syncProperties = syncProperties;
+        this.syncSchedulerProperties = syncSchedulerProperties;
         this.exceptionClassifier = exceptionClassifier;
     }
 
@@ -230,6 +234,7 @@ public class GitHubProjectSyncService {
 
         Set<Long> syncedProjectIds = new HashSet<>();
         int totalSynced = 0;
+        int totalSkipped = 0;
         String cursor = null;
         boolean hasMore = true;
         int pageCount = 0;
@@ -306,10 +311,19 @@ public class GitHubProjectSyncService {
                 }
 
                 // Process this page of projects in its own transaction
+                // Respect cooldown: only UPDATE projects that are new or past cooldown
+                // Respect filter: only sync projects in allowed-projects list (empty = all)
                 final Long orgId = organizationId;
+                final String orgLogin = organizationLogin;
+                final Instant cooldownThreshold = Instant.now().minusSeconds(
+                    syncSchedulerProperties.cooldownMinutes() * 60L
+                );
+                final var filters = syncSchedulerProperties.filters();
                 PageResult pageResult = transactionTemplate.execute(status -> {
                     ProcessingContext context = ProcessingContext.forSync(scopeId, null);
                     int projectsProcessed = 0;
+                    int projectsSkipped = 0;
+                    int projectsFiltered = 0;
 
                     for (var graphQlProject : response.getNodes()) {
                         GitHubProjectDTO dto = GitHubProjectDTO.fromProjectV2(graphQlProject);
@@ -317,6 +331,30 @@ public class GitHubProjectSyncService {
                             continue;
                         }
 
+                        // Check filter: skip projects not in allowed-projects list
+                        if (!filters.isProjectAllowed(orgLogin, dto.number())) {
+                            projectsFiltered++;
+                            continue;
+                        }
+
+                        // Check if project exists and was recently synced
+                        Long databaseId = dto.getDatabaseId();
+                        if (databaseId != null) {
+                            Project existing = projectRepository.findById(databaseId).orElse(null);
+                            if (existing != null) {
+                                // Track for stale removal regardless of cooldown
+                                syncedProjectIds.add(existing.getId());
+
+                                // Skip if within cooldown
+                                if (existing.getLastSyncAt() != null &&
+                                    existing.getLastSyncAt().isAfter(cooldownThreshold)) {
+                                    projectsSkipped++;
+                                    continue;
+                                }
+                            }
+                        }
+
+                        // Process project (new or past cooldown)
                         Project project = projectProcessor.process(dto, Project.OwnerType.ORGANIZATION, orgId, context);
 
                         if (project != null) {
@@ -327,11 +365,22 @@ public class GitHubProjectSyncService {
                         }
                     }
 
-                    return new PageResult(projectsProcessed);
+                    if (projectsSkipped > 0 || projectsFiltered > 0) {
+                        log.debug(
+                            "Project sync page: orgId={}, processed={}, skippedCooldown={}, filteredOut={}",
+                            orgId,
+                            projectsProcessed,
+                            projectsSkipped,
+                            projectsFiltered
+                        );
+                    }
+
+                    return new PageResult(projectsProcessed, projectsSkipped);
                 });
 
                 if (pageResult != null) {
                     totalSynced += pageResult.count;
+                    totalSkipped += pageResult.skipped;
                 }
 
                 var pageInfo = response.getPageInfo();
@@ -475,9 +524,10 @@ public class GitHubProjectSyncService {
         SyncResult.Status finalStatus = abortReason != null ? abortReason : SyncResult.Status.COMPLETED;
 
         log.info(
-            "Completed project list sync: orgLogin={}, projectCount={}, status={}, scopeId={}",
+            "Completed project list sync: orgLogin={}, synced={}, skippedCooldown={}, status={}, scopeId={}",
             safeOrgLogin,
             totalSynced,
+            totalSkipped,
             finalStatus,
             scopeId
         );
@@ -1347,14 +1397,21 @@ public class GitHubProjectSyncService {
     }
 
     /**
-     * Gets all projects for an organization that need item sync.
-     * Ordered by last sync time (oldest first) to prioritize stale projects.
+     * Gets projects for an organization that need item sync, respecting cooldown.
+     * <p>
+     * Returns all projects ordered by last sync time (oldest first) that haven't
+     * been synced within the cooldown period (from {@code SyncSchedulerProperties}).
+     * <p>
+     * This mirrors the repository sync behavior in {@code GitHubDataSyncService.shouldSync()}.
      *
      * @param organizationId the organization ID
      * @return list of projects needing item sync
      */
     public List<Project> getProjectsNeedingItemSync(Long organizationId) {
-        return projectRepository.findProjectsNeedingItemSync(organizationId);
+        Instant cooldownThreshold = Instant.now().minusSeconds(
+            syncSchedulerProperties.cooldownMinutes() * 60L
+        );
+        return projectRepository.findProjectsNeedingItemSync(organizationId, cooldownThreshold);
     }
 
     /**
@@ -1602,7 +1659,7 @@ public class GitHubProjectSyncService {
     /**
      * Result container for project list page processing.
      */
-    private record PageResult(int count) {}
+    private record PageResult(int count, int skipped) {}
 
     /**
      * Result container for project item page processing with incremental sync support.

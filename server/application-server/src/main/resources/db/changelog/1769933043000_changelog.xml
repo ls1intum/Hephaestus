@@ -294,4 +294,24 @@
         </createIndex>
     </changeSet>
 
+    <!-- ================================================================== -->
+    <!-- Cleanup: Drop orphan tables from removed entities                  -->
+    <!-- These tables were created by Hibernate auto-DDL from entities that -->
+    <!-- no longer exist (ProjectView, ProjectWorkflow). They have no JPA   -->
+    <!-- entities and will block project deletion due to FK constraints.    -->
+    <!-- ================================================================== -->
+    <changeSet id="1769933043000-7-drop-orphan-project-view" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="project_view"/>
+        </preConditions>
+        <dropTable tableName="project_view" cascadeConstraints="true"/>
+    </changeSet>
+
+    <changeSet id="1769933043000-8-drop-orphan-project-workflow" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="project_workflow"/>
+        </preConditions>
+        <dropTable tableName="project_workflow" cascadeConstraints="true"/>
+    </changeSet>
+
 </databaseChangeLog>

@@ -46,6 +46,9 @@ import org.springframework.validation.annotation.Validated;
  *         - "my-org"
  *       allowed-repositories:
  *         - "my-org/specific-repo"
+ *       allowed-projects:
+ *         - "my-org/1"    # Project #1 in my-org
+ *         - "my-org/5"    # Project #5 in my-org
  * }</pre>
  *
  * @see BackfillProperties
@@ -90,12 +93,17 @@ public record SyncSchedulerProperties(
     ) {}
 
     /**
-     * Configuration for filtering which organizations and repositories are synced.
+     * Configuration for filtering which organizations, repositories, and projects are synced.
      *
      * @param allowedOrganizations Set of organization names to include (empty = all)
      * @param allowedRepositories Set of repository names (org/repo) to include (empty = all)
+     * @param allowedProjects Set of project identifiers (org/number) to include (empty = all)
      */
-    public record FilterProperties(Set<String> allowedOrganizations, Set<String> allowedRepositories) {
+    public record FilterProperties(
+        Set<String> allowedOrganizations,
+        Set<String> allowedRepositories,
+        Set<String> allowedProjects
+    ) {
         /** Compact constructor ensuring null safety. */
         public FilterProperties {
             if (allowedOrganizations == null) {
@@ -103,6 +111,9 @@ public record SyncSchedulerProperties(
             }
             if (allowedRepositories == null) {
                 allowedRepositories = Set.of();
+            }
+            if (allowedProjects == null) {
+                allowedProjects = Set.of();
             }
         }
 
@@ -115,6 +126,21 @@ public record SyncSchedulerProperties(
         public boolean isRepositoryAllowed(String repositoryFullName) {
             return allowedRepositories.isEmpty() || allowedRepositories.contains(repositoryFullName);
         }
+
+        /**
+         * Checks if a project passes the filter.
+         *
+         * @param organizationLogin the organization login (e.g., "ls1intum")
+         * @param projectNumber the project number within the organization
+         * @return true if the project is allowed (empty filter = all allowed)
+         */
+        public boolean isProjectAllowed(String organizationLogin, int projectNumber) {
+            if (allowedProjects.isEmpty()) {
+                return true;
+            }
+            String projectKey = organizationLogin + "/" + projectNumber;
+            return allowedProjects.contains(projectKey);
+        }
     }
 
     /** Compact constructor ensuring nested records are never null. */
@@ -123,7 +149,7 @@ public record SyncSchedulerProperties(
             backfill = new BackfillProperties(false, 50, 100, 60);
         }
         if (filters == null) {
-            filters = new FilterProperties(Set.of(), Set.of());
+            filters = new FilterProperties(Set.of(), Set.of(), Set.of());
         }
     }
 }

@@ -244,22 +244,33 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
     void clearStatusUpdateSyncCursor(@Param("projectId") Long projectId);
 
     /**
-     * Finds all projects for an organization that need item sync.
+     * Finds projects for an organization that need item sync, respecting cooldown.
      * <p>
      * Returns projects ordered by last sync time (oldest first) to prioritize
-     * projects that haven't been synced recently.
+     * projects that haven't been synced recently. Only includes projects where:
+     * <ul>
+     *   <li>itemsSyncedAt is null (never synced), OR</li>
+     *   <li>itemsSyncedAt is before the cooldown threshold</li>
+     * </ul>
+     * <p>
+     * This mirrors the repository sync behavior in {@code GitHubDataSyncService.shouldSync()}.
      *
-     * @param ownerId the organization ID
+     * @param ownerId           the organization ID
+     * @param cooldownThreshold projects synced after this time are skipped
      * @return list of projects that need item sync
      */
     @Query(
         """
         SELECT p FROM Project p
         WHERE p.ownerType = 'ORGANIZATION' AND p.ownerId = :ownerId
+          AND (p.itemsSyncedAt IS NULL OR p.itemsSyncedAt < :cooldownThreshold)
         ORDER BY COALESCE(p.itemsSyncedAt, p.createdAt) ASC
         """
     )
-    List<Project> findProjectsNeedingItemSync(@Param("ownerId") Long ownerId);
+    List<Project> findProjectsNeedingItemSync(
+        @Param("ownerId") Long ownerId,
+        @Param("cooldownThreshold") Instant cooldownThreshold
+    );
 
     // ==================== Cascade Delete Operations ====================
     // These methods support application-level referential integrity for the
