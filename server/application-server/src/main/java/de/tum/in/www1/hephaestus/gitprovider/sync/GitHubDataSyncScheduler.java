@@ -12,6 +12,7 @@ import de.tum.in.www1.hephaestus.gitprovider.issuedependency.github.GitHubIssueD
 import de.tum.in.www1.hephaestus.gitprovider.issuetype.github.GitHubIssueTypeSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
+import de.tum.in.www1.hephaestus.gitprovider.organization.github.GitHubOrganizationSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.project.Project;
 import de.tum.in.www1.hephaestus.gitprovider.project.github.GitHubProjectSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.subissue.github.GitHubSubIssueSyncService;
@@ -83,6 +84,7 @@ public class GitHubDataSyncScheduler {
     private final GitHubIssueTypeSyncService issueTypeSyncService;
     private final GitHubIssueDependencySyncService issueDependencySyncService;
     private final GitHubProjectSyncService projectSyncService;
+    private final GitHubOrganizationSyncService organizationSyncService;
     private final OrganizationRepository organizationRepository;
     private final SyncSchedulerProperties syncSchedulerProperties;
     private final Executor monitoringExecutor;
@@ -95,6 +97,7 @@ public class GitHubDataSyncScheduler {
         GitHubIssueTypeSyncService issueTypeSyncService,
         GitHubIssueDependencySyncService issueDependencySyncService,
         GitHubProjectSyncService projectSyncService,
+        GitHubOrganizationSyncService organizationSyncService,
         OrganizationRepository organizationRepository,
         SyncSchedulerProperties syncSchedulerProperties,
         @Qualifier("monitoringExecutor") Executor monitoringExecutor
@@ -106,6 +109,7 @@ public class GitHubDataSyncScheduler {
         this.issueTypeSyncService = issueTypeSyncService;
         this.issueDependencySyncService = issueDependencySyncService;
         this.projectSyncService = projectSyncService;
+        this.organizationSyncService = organizationSyncService;
         this.organizationRepository = organizationRepository;
         this.syncSchedulerProperties = syncSchedulerProperties;
         this.monitoringExecutor = monitoringExecutor;
@@ -260,14 +264,14 @@ public class GitHubDataSyncScheduler {
                 // issue types exist when issues are processed during repository sync.
                 syncIssueTypes(session);
 
-                // Sync repositories, organizations, and teams (via syncSyncTarget)
+                // Sync projects BEFORE repositories so embedded project items can be linked.
+                // Ensure the organization exists before attempting project sync.
+                syncProjects(session);
+
+                // Sync repositories (issues/PRs include embedded project items)
                 for (SyncTarget target : session.syncTargets()) {
                     dataSyncService.syncSyncTarget(target);
                 }
-
-                // Sync projects AFTER repositories so that issues/PRs exist for project items
-                // to reference. Projects are organization-level entities.
-                syncProjects(session);
 
                 // Sync sub-issues and issue dependencies via GraphQL
                 // These are scope-level relationships that require issues/PRs to exist first
@@ -342,13 +346,22 @@ public class GitHubDataSyncScheduler {
                 safeAccountLogin
             );
 
-            // Sync project list for the organization
-            projectSyncService.syncProjectsForOrganization(session.scopeId(), session.accountLogin());
-
-            // Find the organization to get its ID for item sync
+            // Ensure the organization exists locally before syncing projects
             Organization organization = organizationRepository
                 .findByLoginIgnoreCase(session.accountLogin())
                 .orElse(null);
+            if (organization == null) {
+                log.info(
+                    "Organization missing before project sync, attempting sync: scopeId={}, orgLogin={}",
+                    session.scopeId(),
+                    safeAccountLogin
+                );
+                organization = organizationSyncService.syncOrganization(session.scopeId(), session.accountLogin());
+            }
+
+            // Sync project list for the organization
+            projectSyncService.syncProjectsForOrganization(session.scopeId(), session.accountLogin());
+
             if (organization == null) {
                 log.debug("Skipped project items sync: reason=organizationNotFound, orgLogin={}", safeAccountLogin);
                 return;
