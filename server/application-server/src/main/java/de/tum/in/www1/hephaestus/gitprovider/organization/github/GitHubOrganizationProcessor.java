@@ -5,6 +5,7 @@ import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
 import de.tum.in.www1.hephaestus.gitprovider.organization.github.dto.GitHubOrganizationEventDTO;
+import de.tum.in.www1.hephaestus.gitprovider.project.ProjectIntegrityService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -29,9 +30,14 @@ public class GitHubOrganizationProcessor {
     private static final Logger log = LoggerFactory.getLogger(GitHubOrganizationProcessor.class);
 
     private final OrganizationRepository organizationRepository;
+    private final ProjectIntegrityService projectIntegrityService;
 
-    public GitHubOrganizationProcessor(OrganizationRepository organizationRepository) {
+    public GitHubOrganizationProcessor(
+        OrganizationRepository organizationRepository,
+        ProjectIntegrityService projectIntegrityService
+    ) {
         this.organizationRepository = organizationRepository;
+        this.projectIntegrityService = projectIntegrityService;
     }
 
     /**
@@ -117,6 +123,15 @@ public class GitHubOrganizationProcessor {
 
     /**
      * Delete an organization by its GitHub ID.
+     * <p>
+     * This method cascades the deletion to related entities:
+     * <ul>
+     *   <li>Projects owned by this organization (via ProjectIntegrityService)</li>
+     * </ul>
+     * <p>
+     * <b>Design Note:</b> Projects use polymorphic ownership (ownerType + ownerId),
+     * which prevents database-level FK constraints. Cascade deletion is handled
+     * at the application level through ProjectIntegrityService.
      *
      * @param githubId the GitHub ID of the organization
      */
@@ -129,8 +144,24 @@ public class GitHubOrganizationProcessor {
         organizationRepository
             .findByGithubId(githubId)
             .ifPresent(org -> {
+                Long orgId = org.getId();
+                String orgLogin = org.getLogin();
+
+                // Cascade delete projects owned by this organization
+                // This must be done BEFORE deleting the organization to maintain referential integrity
+                int deletedProjects = projectIntegrityService.cascadeDeleteProjectsForOrganization(orgId);
+                if (deletedProjects > 0) {
+                    log.info(
+                        "Cascade deleted projects for organization: orgId={}, orgLogin={}, projectCount={}",
+                        orgId,
+                        sanitizeForLog(orgLogin),
+                        deletedProjects
+                    );
+                }
+
+                // Now delete the organization
                 organizationRepository.delete(org);
-                log.info("Deleted organization: orgId={}, orgLogin={}", githubId, sanitizeForLog(org.getLogin()));
+                log.info("Deleted organization: orgId={}, orgLogin={}", githubId, sanitizeForLog(orgLogin));
             });
     }
 }

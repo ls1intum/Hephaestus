@@ -78,18 +78,20 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
         value = """
         INSERT INTO project (
             id, node_id, owner_type, owner_id, number, title, short_description,
-            url, closed, closed_at, is_public, creator_id, last_sync_at,
+            readme, template, url, closed, closed_at, is_public, creator_id, last_sync_at,
             created_at, updated_at
         )
         VALUES (
             :id, :nodeId, :ownerType, :ownerId, :number, :title, :shortDescription,
-            :url, :closed, :closedAt, :isPublic, :creatorId, :lastSyncAt,
+            :readme, :template, :url, :closed, :closedAt, :isPublic, :creatorId, :lastSyncAt,
             :createdAt, :updatedAt
         )
         ON CONFLICT (owner_type, owner_id, number) DO UPDATE SET
             node_id = COALESCE(EXCLUDED.node_id, project.node_id),
             title = EXCLUDED.title,
             short_description = EXCLUDED.short_description,
+            readme = EXCLUDED.readme,
+            template = EXCLUDED.template,
             url = EXCLUDED.url,
             closed = EXCLUDED.closed,
             closed_at = EXCLUDED.closed_at,
@@ -108,6 +110,8 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
         @Param("number") int number,
         @Param("title") String title,
         @Param("shortDescription") String shortDescription,
+        @Param("readme") String readme,
+        @Param("template") boolean template,
         @Param("url") String url,
         @Param("closed") boolean closed,
         @Param("closedAt") Instant closedAt,
@@ -157,6 +161,88 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
     @Query("UPDATE Project p SET p.itemSyncCursor = NULL WHERE p.id = :projectId")
     void clearItemSyncCursor(@Param("projectId") Long projectId);
 
+    // ==================== Field Sync Cursor Management ====================
+
+    /**
+     * Updates the field sync cursor for a project.
+     * <p>
+     * Used to persist pagination state for resumable field sync.
+     * Call this after each successfully processed page of fields.
+     *
+     * @param projectId the project ID
+     * @param cursor the pagination cursor (null to clear)
+     */
+    @Modifying
+    @Transactional
+    @Query("UPDATE Project p SET p.fieldSyncCursor = :cursor WHERE p.id = :projectId")
+    void updateFieldSyncCursor(@Param("projectId") Long projectId, @Param("cursor") String cursor);
+
+    /**
+     * Updates the fields synced timestamp for a project.
+     * <p>
+     * Call this when field sync completes successfully. Also clears the cursor.
+     *
+     * @param projectId the project ID
+     * @param syncedAt the timestamp of successful sync
+     */
+    @Modifying
+    @Transactional
+    @Query("UPDATE Project p SET p.fieldsSyncedAt = :syncedAt, p.fieldSyncCursor = NULL WHERE p.id = :projectId")
+    void updateFieldsSyncedAt(@Param("projectId") Long projectId, @Param("syncedAt") Instant syncedAt);
+
+    /**
+     * Clears the field sync cursor for a project.
+     * <p>
+     * Call this when field sync completes successfully.
+     *
+     * @param projectId the project ID
+     */
+    @Modifying
+    @Transactional
+    @Query("UPDATE Project p SET p.fieldSyncCursor = NULL WHERE p.id = :projectId")
+    void clearFieldSyncCursor(@Param("projectId") Long projectId);
+
+    // ==================== Status Update Sync Cursor Management ====================
+
+    /**
+     * Updates the status update sync cursor for a project.
+     * <p>
+     * Used to persist pagination state for resumable status update sync.
+     * Call this after each successfully processed page of status updates.
+     *
+     * @param projectId the project ID
+     * @param cursor the pagination cursor (null to clear)
+     */
+    @Modifying
+    @Transactional
+    @Query("UPDATE Project p SET p.statusUpdateSyncCursor = :cursor WHERE p.id = :projectId")
+    void updateStatusUpdateSyncCursor(@Param("projectId") Long projectId, @Param("cursor") String cursor);
+
+    /**
+     * Updates the status updates synced timestamp for a project.
+     * <p>
+     * Call this when status update sync completes successfully. Also clears the cursor.
+     *
+     * @param projectId the project ID
+     * @param syncedAt the timestamp of successful sync
+     */
+    @Modifying
+    @Transactional
+    @Query("UPDATE Project p SET p.statusUpdatesSyncedAt = :syncedAt, p.statusUpdateSyncCursor = NULL WHERE p.id = :projectId")
+    void updateStatusUpdatesSyncedAt(@Param("projectId") Long projectId, @Param("syncedAt") Instant syncedAt);
+
+    /**
+     * Clears the status update sync cursor for a project.
+     * <p>
+     * Call this when status update sync completes successfully.
+     *
+     * @param projectId the project ID
+     */
+    @Modifying
+    @Transactional
+    @Query("UPDATE Project p SET p.statusUpdateSyncCursor = NULL WHERE p.id = :projectId")
+    void clearStatusUpdateSyncCursor(@Param("projectId") Long projectId);
+
     /**
      * Finds all projects for an organization that need item sync.
      * <p>
@@ -174,4 +260,58 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
         """
     )
     List<Project> findProjectsNeedingItemSync(@Param("ownerId") Long ownerId);
+
+    // ==================== Cascade Delete Operations ====================
+    // These methods support application-level referential integrity for the
+    // polymorphic owner relationship (ownerType + ownerId).
+    //
+    // DESIGN NOTE: True database-level FK constraints are not feasible because
+    // ownerId can reference Organization, Repository, or User tables depending
+    // on ownerType. This polymorphic ownership pattern is intentional to support
+    // GitHub's flexible project ownership model.
+    //
+    // Instead, we implement cascade deletes at the application level via these
+    // repository methods + event listeners. See ProjectIntegrityService for the
+    // coordinating service.
+
+    /**
+     * Deletes all projects owned by a specific owner.
+     * <p>
+     * This is used for cascade delete when an owner entity (Organization, Repository,
+     * or User) is deleted. The cascade also removes all related entities (items,
+     * fields, status updates) due to JPA cascade settings on the Project entity.
+     *
+     * @param ownerType the owner type (ORGANIZATION, REPOSITORY, USER)
+     * @param ownerId   the owner's database ID
+     * @return the number of projects deleted
+     */
+    @Modifying
+    @Transactional
+    @Query("DELETE FROM Project p WHERE p.ownerType = :ownerType AND p.ownerId = :ownerId")
+    int deleteAllByOwnerTypeAndOwnerId(
+        @Param("ownerType") Project.OwnerType ownerType,
+        @Param("ownerId") Long ownerId
+    );
+
+    /**
+     * Counts projects owned by a specific owner.
+     * <p>
+     * Useful for logging/metrics before cascade delete operations.
+     *
+     * @param ownerType the owner type
+     * @param ownerId   the owner's database ID
+     * @return the count of projects
+     */
+    long countByOwnerTypeAndOwnerId(Project.OwnerType ownerType, Long ownerId);
+
+    /**
+     * Checks if any projects exist for a specific owner.
+     * <p>
+     * More efficient than count when you only need existence check.
+     *
+     * @param ownerType the owner type
+     * @param ownerId   the owner's database ID
+     * @return true if at least one project exists for this owner
+     */
+    boolean existsByOwnerTypeAndOwnerId(Project.OwnerType ownerType, Long ownerId);
 }

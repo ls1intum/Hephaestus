@@ -7,6 +7,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.ProvisioningListener;
+import de.tum.in.www1.hephaestus.gitprovider.project.ProjectIntegrityService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.dto.GitHubRepositoryEventDTO;
@@ -37,16 +38,19 @@ public class GitHubRepositoryMessageHandler extends GitHubMessageHandler<GitHubR
 
     private final ProvisioningListener provisioningListener;
     private final RepositoryRepository repositoryRepository;
+    private final ProjectIntegrityService projectIntegrityService;
 
     GitHubRepositoryMessageHandler(
         ProvisioningListener provisioningListener,
         RepositoryRepository repositoryRepository,
+        ProjectIntegrityService projectIntegrityService,
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate
     ) {
         super(GitHubRepositoryEventDTO.class, deserializer, transactionTemplate);
         this.provisioningListener = provisioningListener;
         this.repositoryRepository = repositoryRepository;
+        this.projectIntegrityService = projectIntegrityService;
     }
 
     @Override
@@ -124,11 +128,29 @@ public class GitHubRepositoryMessageHandler extends GitHubMessageHandler<GitHubR
 
     /**
      * Fallback deletion when installation ID is not available.
+     * <p>
+     * Cascades deletion to projects owned by this repository before deleting
+     * the repository itself. This maintains referential integrity for the
+     * polymorphic project ownership model.
      */
     private void deleteRepositoryByName(String fullName, String safeFullName) {
         repositoryRepository
             .findByNameWithOwner(fullName)
             .ifPresent(repository -> {
+                Long repoId = repository.getId();
+
+                // Cascade delete projects owned by this repository
+                // This must be done BEFORE deleting the repository to maintain referential integrity
+                int deletedProjects = projectIntegrityService.cascadeDeleteProjectsForRepository(repoId);
+                if (deletedProjects > 0) {
+                    log.info(
+                        "Cascade deleted projects for repository: repoId={}, repoName={}, projectCount={}",
+                        repoId,
+                        safeFullName,
+                        deletedProjects
+                    );
+                }
+
                 repositoryRepository.delete(repository);
                 log.info("Deleted repository directly: repoName={}", safeFullName);
             });

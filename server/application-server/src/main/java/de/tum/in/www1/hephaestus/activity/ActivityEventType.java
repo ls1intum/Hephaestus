@@ -123,6 +123,10 @@ public enum ActivityEventType {
     PROJECT_ITEM_RESTORED("project_item.restored"),
     /** Item deleted - item removed from project */
     PROJECT_ITEM_DELETED("project_item.deleted"),
+    /** Item converted - draft issue converted to real issue */
+    PROJECT_ITEM_CONVERTED("project_item.converted"),
+    /** Item reordered - item position changed in project view */
+    PROJECT_ITEM_REORDERED("project_item.reordered"),
 
     // ========================================================================
     // Project Status Update Events

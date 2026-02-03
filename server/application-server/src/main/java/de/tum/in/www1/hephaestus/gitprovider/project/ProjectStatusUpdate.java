@@ -2,9 +2,21 @@ package de.tum.in.www1.hephaestus.gitprovider.project;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntity;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDate;
-import lombok.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
 import org.springframework.lang.NonNull;
 
 /**
@@ -31,6 +43,7 @@ public class ProjectStatusUpdate extends BaseGitServiceEntity {
         ON_TRACK,
         AT_RISK,
         OFF_TRACK,
+        COMPLETE,
     }
 
     /**
@@ -53,6 +66,13 @@ public class ProjectStatusUpdate extends BaseGitServiceEntity {
      */
     @Column(columnDefinition = "TEXT")
     private String body;
+
+    /**
+     * The body rendered to HTML for rich display.
+     */
+    @Column(name = "body_html", columnDefinition = "TEXT")
+    @ToString.Exclude
+    private String bodyHtml;
 
     /**
      * The start date for the status update period.

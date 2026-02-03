@@ -25,6 +25,8 @@ public record GitHubProjectDTO(
     @JsonProperty("number") int number,
     @JsonProperty("title") String title,
     @JsonProperty("short_description") String shortDescription,
+    @JsonProperty("readme") String readme,
+    @JsonProperty("template") boolean template,
     @JsonProperty("url") String url,
     @JsonProperty("closed") boolean closed,
     @JsonProperty("closed_at") Instant closedAt,
@@ -73,6 +75,8 @@ public record GitHubProjectDTO(
             project.getNumber(),
             project.getTitle(),
             project.getShortDescription(),
+            project.getReadme(),
+            project.getTemplate(),
             uriToString(project.getUrl()),
             project.getClosed(),
             toInstant(project.getClosedAt()),
@@ -90,6 +94,12 @@ public record GitHubProjectDTO(
         if (value == null) {
             return null;
         }
-        return value.longValueExact();
+        try {
+            return value.longValueExact();
+        } catch (ArithmeticException e) {
+            // BigInteger value exceeds Long.MAX_VALUE - use longValue() which truncates
+            // This should be extremely rare as GitHub database IDs are sequential
+            return value.longValue();
+        }
     }
 }

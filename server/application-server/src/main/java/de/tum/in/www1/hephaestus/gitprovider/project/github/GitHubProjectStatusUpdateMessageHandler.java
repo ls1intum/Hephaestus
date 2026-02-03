@@ -24,6 +24,17 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p>
  * This handler processes status update create, edit, and delete events.
  * Status updates track project health with ON_TRACK, AT_RISK, OFF_TRACK statuses.
+ * <p>
+ * <h2>Supported Owner Types</h2>
+ * <p>
+ * Status updates belong to projects which can be owned by organizations, repositories, or users.
+ * This handler supports all three owner types:
+ * <ul>
+ *   <li><b>ORGANIZATION:</b> Most common. Scope resolved via organization login.</li>
+ *   <li><b>REPOSITORY:</b> Scope resolved via repository fullName (e.g., "owner/repo").</li>
+ *   <li><b>USER:</b> Currently logged and skipped - user-level projects are not associated
+ *       with a monitored workspace/scope.</li>
+ * </ul>
  */
 @Component
 public class GitHubProjectStatusUpdateMessageHandler extends GitHubMessageHandler<GitHubProjectStatusUpdateEventDTO> {
@@ -75,21 +86,25 @@ public class GitHubProjectStatusUpdateMessageHandler extends GitHubMessageHandle
             return;
         }
 
-        String orgLogin = event.organization() != null ? event.organization().login() : null;
+        // Detect owner type from the webhook payload
+        Project.OwnerType ownerType = event.detectOwnerType();
+        String ownerIdentifier = event.getOwnerIdentifier();
 
         log.info(
-            "Received projects_v2_status_update event: action={}, nodeId={}, orgLogin={}",
+            "Received projects_v2_status_update event: action={}, nodeId={}, ownerType={}, owner={}",
             event.action(),
             payload.nodeId() != null ? sanitizeForLog(payload.nodeId()) : "unknown",
-            orgLogin != null ? sanitizeForLog(orgLogin) : "unknown"
+            ownerType,
+            ownerIdentifier != null ? sanitizeForLog(ownerIdentifier) : "unknown"
         );
 
-        // Resolve scope from organization login
-        Long scopeId = orgLogin != null ? scopeIdResolver.findScopeIdByOrgLogin(orgLogin).orElse(null) : null;
+        // Resolve scope based on owner type
+        Long scopeId = resolveScopeId(event, ownerType);
         if (scopeId == null) {
             log.debug(
-                "Skipped projects_v2_status_update event: reason=noAssociatedScope, orgLogin={}",
-                sanitizeForLog(orgLogin)
+                "Skipped projects_v2_status_update event: reason=noAssociatedScope, ownerType={}, owner={}",
+                ownerType,
+                sanitizeForLog(ownerIdentifier)
             );
             return;
         }
@@ -133,10 +148,11 @@ public class GitHubProjectStatusUpdateMessageHandler extends GitHubMessageHandle
             payload.id(), // databaseId same as id for webhooks
             payload.nodeId(),
             payload.body(),
+            payload.bodyHtml(),
             startDate,
             targetDate,
             payload.status(),
-            null, // creator not provided in webhook, only creatorId
+            payload.creator(),
             createdAt,
             updatedAt
         );
@@ -170,5 +186,47 @@ public class GitHubProjectStatusUpdateMessageHandler extends GitHubMessageHandle
             log.debug("Failed to parse instant: {}", instantStr);
             return null;
         }
+    }
+
+    /**
+     * Resolves the scope ID based on the owner type.
+     * <p>
+     * Resolution strategies:
+     * <ul>
+     *   <li>ORGANIZATION: Look up by organization login</li>
+     *   <li>REPOSITORY: Look up by repository fullName</li>
+     *   <li>USER: Not supported - returns null (user projects aren't associated with workspaces)</li>
+     * </ul>
+     *
+     * @param event     the webhook event
+     * @param ownerType the detected owner type
+     * @return the scope ID, or null if not found or not supported
+     */
+    private Long resolveScopeId(GitHubProjectStatusUpdateEventDTO event, Project.OwnerType ownerType) {
+        return switch (ownerType) {
+            case ORGANIZATION -> {
+                String orgLogin = event.organization() != null ? event.organization().login() : null;
+                if (orgLogin == null) {
+                    yield null;
+                }
+                yield scopeIdResolver.findScopeIdByOrgLogin(orgLogin).orElse(null);
+            }
+            case REPOSITORY -> {
+                String repoFullName = event.repository() != null ? event.repository().fullName() : null;
+                if (repoFullName == null) {
+                    yield null;
+                }
+                yield scopeIdResolver.findScopeIdByRepositoryName(repoFullName).orElse(null);
+            }
+            case USER -> {
+                // User-level projects are not associated with a monitored workspace
+                // Log at info level since this is a known limitation
+                log.info(
+                    "User-owned project status update detected - not currently supported: sender={}",
+                    event.sender() != null ? sanitizeForLog(event.sender().login()) : "unknown"
+                );
+                yield null;
+            }
+        };
     }
 }

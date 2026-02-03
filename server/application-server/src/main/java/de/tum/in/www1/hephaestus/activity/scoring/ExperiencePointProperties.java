@@ -86,11 +86,14 @@ public record ExperiencePointProperties(
      * Currently, only code reviews and review comments earn XP. PR/issue XP
      * will be introduced in a future release.
      *
-     * @param pullRequestOpened XP for opening a pull request (default: 0.0)
-     * @param pullRequestMerged XP for merging a pull request (default: 0.0)
-     * @param pullRequestReady  XP for marking a PR ready for review (default: 0.0)
-     * @param reviewComment     XP for each inline review comment (default: 0.5)
-     * @param issueCreated      XP for creating an issue (default: 0.0)
+     * @param pullRequestOpened         XP for opening a pull request (default: 0.0)
+     * @param pullRequestMerged         XP for merging a pull request (default: 0.0)
+     * @param pullRequestReady          XP for marking a PR ready for review (default: 0.0)
+     * @param reviewComment             XP for each inline review comment (default: 0.5)
+     * @param issueCreated              XP for creating an issue (default: 0.0)
+     * @param projectCreated            XP for creating a project (default: 0.0)
+     * @param projectItemCreated        XP for adding an item to a project (default: 0.0)
+     * @param projectStatusUpdateCreated XP for creating a project status update (default: 0.0)
      */
     @Validated
     public record XpAwards(
@@ -98,7 +101,10 @@ public record ExperiencePointProperties(
         @PositiveOrZero @Max(1000) @DefaultValue("0.0") double pullRequestMerged,
         @PositiveOrZero @Max(1000) @DefaultValue("0.0") double pullRequestReady,
         @PositiveOrZero @Max(1000) @DefaultValue("0.5") double reviewComment,
-        @PositiveOrZero @Max(1000) @DefaultValue("0.0") double issueCreated
+        @PositiveOrZero @Max(1000) @DefaultValue("0.0") double issueCreated,
+        @PositiveOrZero @Max(1000) @DefaultValue("0.0") double projectCreated,
+        @PositiveOrZero @Max(1000) @DefaultValue("0.0") double projectItemCreated,
+        @PositiveOrZero @Max(1000) @DefaultValue("0.0") double projectStatusUpdateCreated
     ) {}
 
     /** Compact constructor ensuring nested records are never null. */
@@ -110,8 +116,8 @@ public record ExperiencePointProperties(
             reviewWeights = new ReviewWeights(2.0, 2.5, 1.5);
         }
         if (xpAwards == null) {
-            // PR/issue activities are 0 by default; only review comments earn XP
-            xpAwards = new XpAwards(0.0, 0.0, 0.0, 0.5, 0.0);
+            // PR/issue/project activities are 0 by default; only review comments earn XP
+            xpAwards = new XpAwards(0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.0);
         }
     }
 }

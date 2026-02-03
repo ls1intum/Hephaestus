@@ -41,7 +41,7 @@ import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2Ite
  */
 @JsonTypeInfo(
     use = JsonTypeInfo.Id.NAME,
-    include = JsonTypeInfo.As.EXISTING_PROPERTY,
+    include = JsonTypeInfo.As.PROPERTY,
     property = "__typename",
     visible = true,
     defaultImpl = GHProjectV2ItemFieldTextValue.class

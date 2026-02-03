@@ -1,5 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.project.github.dto;
 
+import static de.tum.in.www1.hephaestus.gitprovider.common.DateTimeUtils.toInstant;
+
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -9,6 +11,7 @@ import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2Fie
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2IterationField;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2SingleSelectField;
 import de.tum.in.www1.hephaestus.gitprovider.project.ProjectField;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import org.slf4j.Logger;
@@ -26,7 +29,9 @@ public record GitHubProjectFieldDTO(
     @JsonProperty("id") String id,
     @JsonProperty("name") String name,
     @JsonProperty("data_type") String dataType,
-    @JsonProperty("options") List<Option> options
+    @JsonProperty("options") List<Option> options,
+    @JsonProperty("created_at") Instant createdAt,
+    @JsonProperty("updated_at") Instant updatedAt
 ) {
     private static final Logger log = LoggerFactory.getLogger(GitHubProjectFieldDTO.class);
     private static final ObjectMapper objectMapper = new ObjectMapper();
@@ -44,6 +49,7 @@ public record GitHubProjectFieldDTO(
 
     /**
      * Get the data type as an enum.
+     * Handles both custom field types and built-in system field types.
      */
     @Nullable
     public ProjectField.DataType getDataTypeEnum() {
@@ -51,11 +57,22 @@ public record GitHubProjectFieldDTO(
             return null;
         }
         return switch (dataType.toUpperCase()) {
+            // Custom field types
             case "TEXT" -> ProjectField.DataType.TEXT;
             case "NUMBER" -> ProjectField.DataType.NUMBER;
             case "DATE" -> ProjectField.DataType.DATE;
             case "SINGLE_SELECT", "SINGLESELECT" -> ProjectField.DataType.SINGLE_SELECT;
             case "ITERATION" -> ProjectField.DataType.ITERATION;
+            // Built-in system field types
+            case "TITLE" -> ProjectField.DataType.TITLE;
+            case "ASSIGNEES" -> ProjectField.DataType.ASSIGNEES;
+            case "LABELS" -> ProjectField.DataType.LABELS;
+            case "LINKED_PULL_REQUESTS" -> ProjectField.DataType.LINKED_PULL_REQUESTS;
+            case "MILESTONE" -> ProjectField.DataType.MILESTONE;
+            case "REPOSITORY" -> ProjectField.DataType.REPOSITORY;
+            case "REVIEWERS" -> ProjectField.DataType.REVIEWERS;
+            case "PARENT_ISSUE" -> ProjectField.DataType.PARENT_ISSUE;
+            case "SUB_ISSUES_PROGRESS" -> ProjectField.DataType.SUB_ISSUES_PROGRESS;
             default -> {
                 log.warn("Unknown field data type: {}, treating as TEXT", dataType);
                 yield ProjectField.DataType.TEXT;
@@ -110,7 +127,14 @@ public record GitHubProjectFieldDTO(
 
     private static GitHubProjectFieldDTO fromBasicField(GHProjectV2Field field) {
         String dataType = field.getDataType() != null ? field.getDataType().name() : "TEXT";
-        return new GitHubProjectFieldDTO(field.getId(), field.getName(), dataType, Collections.emptyList());
+        return new GitHubProjectFieldDTO(
+            field.getId(),
+            field.getName(),
+            dataType,
+            Collections.emptyList(),
+            toInstant(field.getCreatedAt()),
+            toInstant(field.getUpdatedAt())
+        );
     }
 
     private static GitHubProjectFieldDTO fromSingleSelectField(GHProjectV2SingleSelectField field) {
@@ -129,7 +153,14 @@ public record GitHubProjectFieldDTO(
                 )
                 .toList();
         }
-        return new GitHubProjectFieldDTO(field.getId(), field.getName(), "SINGLE_SELECT", options);
+        return new GitHubProjectFieldDTO(
+            field.getId(),
+            field.getName(),
+            "SINGLE_SELECT",
+            options,
+            toInstant(field.getCreatedAt()),
+            toInstant(field.getUpdatedAt())
+        );
     }
 
     private static GitHubProjectFieldDTO fromIterationField(GHProjectV2IterationField field) {
@@ -142,6 +173,13 @@ public record GitHubProjectFieldDTO(
                 .map(iter -> new Option(iter.getId(), iter.getTitle(), null, null))
                 .toList();
         }
-        return new GitHubProjectFieldDTO(field.getId(), field.getName(), "ITERATION", options);
+        return new GitHubProjectFieldDTO(
+            field.getId(),
+            field.getName(),
+            "ITERATION",
+            options,
+            toInstant(field.getCreatedAt()),
+            toInstant(field.getUpdatedAt())
+        );
     }
 }

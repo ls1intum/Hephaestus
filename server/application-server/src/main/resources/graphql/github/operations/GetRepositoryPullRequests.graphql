@@ -1,6 +1,7 @@
 # GraphQL query for fetching repository pull requests with all fields
 # Used by GraphQL-based sync services
 # Review threads and comments are embedded inline to avoid N+1 queries
+# Project items are embedded inline (first 5) - pagination for PRs in more projects
 
 query GetRepositoryPullRequests(
     $owner: String!
@@ -364,6 +365,84 @@ query GetRepositoryPullRequests(
                                 pullRequestReview {
                                     id
                                     fullDatabaseId
+                                }
+                            }
+                        }
+                    }
+                }
+
+                # Project items (embedded, first 5) - pagination for PRs in more projects
+                # Syncs project membership from the PR side for proper historical backfill
+                projectItems(first: 5, includeArchived: true) {
+                    totalCount
+                    pageInfo {
+                        hasNextPage
+                        endCursor
+                    }
+                    nodes {
+                        id
+                        fullDatabaseId
+                        type
+                        isArchived
+                        createdAt
+                        updatedAt
+
+                        # Project reference - needed to link item to correct project
+                        project {
+                            id
+                            fullDatabaseId
+                            number
+                            title
+                            url
+                            # Owner for project identification
+                            owner {
+                                __typename
+                                ... on Organization {
+                                    id
+                                    databaseId
+                                    login
+                                }
+                                ... on User {
+                                    id
+                                    databaseId
+                                    login
+                                }
+                            }
+                        }
+
+                        # Field values (embedded, first 10) - pagination for items with more
+                        fieldValues(first: 10) {
+                            totalCount
+                            pageInfo {
+                                hasNextPage
+                                endCursor
+                            }
+                            nodes {
+                                __typename
+                                ... on ProjectV2ItemFieldTextValue {
+                                    text
+                                    field { ... on ProjectV2Field { id name } }
+                                }
+                                ... on ProjectV2ItemFieldNumberValue {
+                                    number
+                                    field { ... on ProjectV2Field { id name } }
+                                }
+                                ... on ProjectV2ItemFieldDateValue {
+                                    date
+                                    field { ... on ProjectV2Field { id name } }
+                                }
+                                ... on ProjectV2ItemFieldSingleSelectValue {
+                                    optionId
+                                    name
+                                    color
+                                    field { ... on ProjectV2SingleSelectField { id name } }
+                                }
+                                ... on ProjectV2ItemFieldIterationValue {
+                                    iterationId
+                                    title
+                                    startDate
+                                    duration
+                                    field { ... on ProjectV2IterationField { id name } }
                                 }
                             }
                         }

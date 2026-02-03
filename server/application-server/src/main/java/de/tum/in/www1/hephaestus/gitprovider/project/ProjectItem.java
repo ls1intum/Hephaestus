@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.gitprovider.project;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntity;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -101,6 +102,14 @@ public class ProjectItem extends BaseGitServiceEntity {
      */
     @Column(nullable = false)
     private boolean archived = false;
+
+    /**
+     * The user who added this item to the project.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "creator_id")
+    @ToString.Exclude
+    private User creator;
 
     /**
      * Field values assigned to this item.

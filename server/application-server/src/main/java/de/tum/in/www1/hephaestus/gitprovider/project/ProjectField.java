@@ -46,13 +46,28 @@ public class ProjectField {
     /**
      * The data type of the field.
      * Maps to GitHub's ProjectV2FieldType.
+     * Includes both custom field types (TEXT, NUMBER, DATE, SINGLE_SELECT, ITERATION)
+     * and built-in system field types (TITLE, ASSIGNEES, LABELS, etc.).
      */
     public enum DataType {
+        // Custom field types
         TEXT,
         NUMBER,
         DATE,
         SINGLE_SELECT,
         ITERATION,
+        // Built-in system field types
+        TITLE,
+        ASSIGNEES,
+        LABELS,
+        LINKED_PULL_REQUESTS,
+        MILESTONE,
+        REPOSITORY,
+        REVIEWERS,
+        PARENT_ISSUE,
+        SUB_ISSUES_PROGRESS,
+        ISSUE_TYPE,
+        TRACKED_BY,
     }
 
     /**

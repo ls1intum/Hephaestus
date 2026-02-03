@@ -28,13 +28,14 @@ public interface ProjectStatusUpdateRepository extends JpaRepository<ProjectStat
     @Query(
         value = """
         INSERT INTO project_status_update (
-            id, node_id, project_id, body, start_date, target_date, status, creator_id, created_at, updated_at
+            id, node_id, project_id, body, body_html, start_date, target_date, status, creator_id, created_at, updated_at
         )
         VALUES (
-            :id, :nodeId, :projectId, :body, :startDate, :targetDate, :status, :creatorId, :createdAt, :updatedAt
+            :id, :nodeId, :projectId, :body, :bodyHtml, :startDate, :targetDate, :status, :creatorId, :createdAt, :updatedAt
         )
         ON CONFLICT (node_id) DO UPDATE SET
             body = EXCLUDED.body,
+            body_html = EXCLUDED.body_html,
             start_date = EXCLUDED.start_date,
             target_date = EXCLUDED.target_date,
             status = EXCLUDED.status,
@@ -47,6 +48,7 @@ public interface ProjectStatusUpdateRepository extends JpaRepository<ProjectStat
         @Param("nodeId") String nodeId,
         @Param("projectId") Long projectId,
         @Param("body") String body,
+        @Param("bodyHtml") String bodyHtml,
         @Param("startDate") LocalDate startDate,
         @Param("targetDate") LocalDate targetDate,
         @Param("status") String status,

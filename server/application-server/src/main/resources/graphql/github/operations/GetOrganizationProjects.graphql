@@ -1,5 +1,27 @@
 # GraphQL query for fetching organization projects (GitHub Projects V2)
 # Used by GraphQL-based sync services
+#
+# =============================================================================
+# COST ANALYSIS
+# =============================================================================
+#
+# This query has minimal nesting complexity:
+#   - projectsV2: Single-level collection
+#   - owner/creator: Inline objects (not collections), no additional cost
+#
+# Cost calculation: projectsV2(100) = 100 nodes = 1 cost point (very efficient)
+#
+# Using full page size is appropriate because:
+#   - Projects are flat records with no nested collections
+#   - Owner and creator are single objects, not paginated
+#   - Organizations typically have <100 active projects
+#
+# =============================================================================
+# FRAGMENTS
+# =============================================================================
+#
+# Uses fragments for consistent field selection. See ProjectFragments.graphql
+# for canonical fragment definitions.
 
 query GetOrganizationProjects($login: String!, $first: Int!, $after: String) {
     rateLimit {
@@ -16,47 +38,79 @@ query GetOrganizationProjects($login: String!, $first: Int!, $after: String) {
             }
             totalCount
             nodes {
-                __typename
-                id
-                fullDatabaseId
-                number
-                title
-                shortDescription
-                url
-                closed
-                closedAt
-                public
-                createdAt
-                updatedAt
+                ...ProjectV2BaseFields
                 owner {
-                    ... on Organization {
-                        id
-                        databaseId
-                        login
-                    }
-                    ... on User {
-                        id
-                        databaseId
-                        login
-                    }
+                    ...ProjectV2OwnerFields
                 }
                 creator {
-                    __typename
-                    login
-                    ... on User {
-                        id
-                        databaseId
-                        avatarUrl
-                        name
-                        email
-                    }
-                    ... on Bot {
-                        id
-                        databaseId
-                        avatarUrl
-                    }
+                    ...ActorFields
                 }
             }
         }
+    }
+}
+
+# =============================================================================
+# Fragment Definitions
+# =============================================================================
+
+# Fragment for ProjectV2 base fields - core project metadata
+fragment ProjectV2BaseFields on ProjectV2 {
+    __typename
+    id
+    fullDatabaseId
+    number
+    title
+    shortDescription
+    readme
+    template
+    url
+    closed
+    closedAt
+    public
+    createdAt
+    updatedAt
+}
+
+# Fragment for project owner (Organization or User)
+fragment ProjectV2OwnerFields on ProjectV2Owner {
+    __typename
+    ... on Organization {
+        id
+        databaseId
+        login
+    }
+    ... on User {
+        id
+        databaseId
+        login
+    }
+}
+
+# Fragment for Actor interface (full fields including email for project creators)
+fragment ActorFields on Actor {
+    __typename
+    login
+    ... on User {
+        id
+        databaseId
+        avatarUrl
+        name
+        email
+    }
+    ... on Bot {
+        id
+        databaseId
+        avatarUrl
+    }
+    ... on Mannequin {
+        id
+        databaseId
+        avatarUrl
+    }
+    ... on Organization {
+        id
+        databaseId
+        avatarUrl
     }
 }

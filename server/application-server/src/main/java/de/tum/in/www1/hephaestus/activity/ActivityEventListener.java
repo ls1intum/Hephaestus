@@ -101,21 +101,29 @@ public class ActivityEventListener {
     }
 
     /**
-     * Gets the actor (User) for an activity event, or null if the actor is unknown.
+     * Gets the actor (User) for an activity event, or null if the actor is unknown or doesn't exist.
      *
      * <p>When an author ID is null (e.g., GitHub user deleted, organization bot, etc.),
      * we return null rather than skipping the event. This preserves the activity record
      * for audit trail and repository metrics while correctly attributing no XP.
      *
+     * <p>Uses {@code findById()} to verify the user exists before returning a reference.
+     * This prevents FK constraint violations when webhook events reference users
+     * that haven't been synced to the local database (e.g., external collaborators,
+     * deleted users, or users outside the monitored scope).
+     *
      * <p>The ActivityEvent schema explicitly supports null actors for system events
      * and events where the original actor is no longer known.
      *
      * @param authorId the author ID from the event payload (nullable)
-     * @return User reference if authorId is present, null otherwise
+     * @return User reference if authorId is present and user exists, null otherwise
      */
     @Nullable
     private User getActorOrNull(@Nullable Long authorId) {
-        return authorId != null ? userRepository.getReferenceById(authorId) : null;
+        if (authorId == null) {
+            return null;
+        }
+        return userRepository.findById(authorId).orElse(null);
     }
 
     /**
@@ -1152,7 +1160,7 @@ public class ActivityEventListener {
     /**
      * Handle project created events.
      *
-     * <p>Records PROJECT_CREATED activity event with 0 XP. Project creation is
+     * <p>Records PROJECT_CREATED activity event with configurable XP. Project creation is
      * tracked for activity completeness and audit trail purposes.
      *
      * <p>The actor is the project creator if available.
@@ -1175,7 +1183,7 @@ public class ActivityEventListener {
                 getRepositoryForProject(projectData),
                 ActivityTargetType.PROJECT,
                 projectData.id(),
-                0.0 // Project management is workflow tracking, no XP reward
+                xpCalc.getXpProjectCreated()
             )
         );
     }
@@ -1185,6 +1193,9 @@ public class ActivityEventListener {
      *
      * <p>Records PROJECT_UPDATED activity event with 0 XP. Updates are tracked
      * for audit trail purposes.
+     *
+     * <p>The actor is the user who performed the update (from webhook sender),
+     * falling back to the project creator for sync operations.
      */
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -1195,12 +1206,14 @@ public class ActivityEventListener {
             return;
         }
         Instant occurredAt = Instant.now();
+        // Use actorId (webhook sender) if available, fall back to creatorId for sync
+        Long actorId = projectData.actorId() != null ? projectData.actorId() : projectData.creatorId();
         safeRecord("project updated", projectData.id(), () ->
             activityEventService.record(
                 event.context().scopeId(),
                 ActivityEventType.PROJECT_UPDATED,
                 occurredAt,
-                getActorOrNull(projectData.creatorId()),
+                getActorOrNull(actorId),
                 getRepositoryForProject(projectData),
                 ActivityTargetType.PROJECT,
                 projectData.id(),
@@ -1214,6 +1227,9 @@ public class ActivityEventListener {
      *
      * <p>Records PROJECT_CLOSED activity event with 0 XP. Closing a project
      * indicates completion or archival.
+     *
+     * <p>The actor is the user who closed the project (from webhook sender),
+     * falling back to the project creator for sync operations.
      */
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -1224,12 +1240,14 @@ public class ActivityEventListener {
             return;
         }
         Instant occurredAt = Instant.now();
+        // Use actorId (webhook sender) if available, fall back to creatorId for sync
+        Long actorId = projectData.actorId() != null ? projectData.actorId() : projectData.creatorId();
         safeRecord("project closed", projectData.id(), () ->
             activityEventService.record(
                 event.context().scopeId(),
                 ActivityEventType.PROJECT_CLOSED,
                 occurredAt,
-                getActorOrNull(projectData.creatorId()),
+                getActorOrNull(actorId),
                 getRepositoryForProject(projectData),
                 ActivityTargetType.PROJECT,
                 projectData.id(),
@@ -1243,6 +1261,9 @@ public class ActivityEventListener {
      *
      * <p>Records PROJECT_REOPENED activity event with 0 XP. Reopening indicates
      * the project is being reactivated.
+     *
+     * <p>The actor is the user who reopened the project (from webhook sender),
+     * falling back to the project creator for sync operations.
      */
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -1253,12 +1274,14 @@ public class ActivityEventListener {
             return;
         }
         Instant occurredAt = Instant.now();
+        // Use actorId (webhook sender) if available, fall back to creatorId for sync
+        Long actorId = projectData.actorId() != null ? projectData.actorId() : projectData.creatorId();
         safeRecord("project reopened", projectData.id(), () ->
             activityEventService.record(
                 event.context().scopeId(),
                 ActivityEventType.PROJECT_REOPENED,
                 occurredAt,
-                getActorOrNull(projectData.creatorId()),
+                getActorOrNull(actorId),
                 getRepositoryForProject(projectData),
                 ActivityTargetType.PROJECT,
                 projectData.id(),
@@ -1300,8 +1323,11 @@ public class ActivityEventListener {
     /**
      * Handle project item created events.
      *
-     * <p>Records PROJECT_ITEM_CREATED activity event with 0 XP. Adding items to
+     * <p>Records PROJECT_ITEM_CREATED activity event with configurable XP. Adding items to
      * a project is tracked for activity completeness.
+     *
+     * <p>The actor is the user who created the item (from webhook sender),
+     * which may be null for sync operations.
      */
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -1317,11 +1343,11 @@ public class ActivityEventListener {
                 event.context().scopeId(),
                 ActivityEventType.PROJECT_ITEM_CREATED,
                 occurredAt,
-                null, // Actor unknown for item events
+                getActorOrNull(itemData.actorId()),
                 null, // Repository resolved through project, not directly available
                 ActivityTargetType.PROJECT_ITEM,
                 itemData.id(),
-                0.0 // Item management is workflow tracking, no XP reward
+                xpForActor(itemData.actorId(), xpCalc.getXpProjectItemCreated())
             )
         );
     }
@@ -1331,6 +1357,9 @@ public class ActivityEventListener {
      *
      * <p>Records PROJECT_ITEM_UPDATED activity event with 0 XP. Updates to item
      * field values or status are tracked for audit purposes.
+     *
+     * <p>The actor is the user who updated the item (from webhook sender),
+     * which may be null for sync operations.
      */
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -1346,7 +1375,7 @@ public class ActivityEventListener {
                 event.context().scopeId(),
                 ActivityEventType.PROJECT_ITEM_UPDATED,
                 occurredAt,
-                null, // Actor unknown for item events
+                getActorOrNull(itemData.actorId()),
                 null, // Repository resolved through project, not directly available
                 ActivityTargetType.PROJECT_ITEM,
                 itemData.id(),
@@ -1360,6 +1389,9 @@ public class ActivityEventListener {
      *
      * <p>Records PROJECT_ITEM_ARCHIVED activity event with 0 XP. Archiving
      * hides items from active view.
+     *
+     * <p>The actor is the user who archived the item (from webhook sender),
+     * which may be null for sync operations.
      */
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -1375,7 +1407,7 @@ public class ActivityEventListener {
                 event.context().scopeId(),
                 ActivityEventType.PROJECT_ITEM_ARCHIVED,
                 occurredAt,
-                null, // Actor unknown for item events
+                getActorOrNull(itemData.actorId()),
                 null, // Repository resolved through project, not directly available
                 ActivityTargetType.PROJECT_ITEM,
                 itemData.id(),
@@ -1389,6 +1421,9 @@ public class ActivityEventListener {
      *
      * <p>Records PROJECT_ITEM_RESTORED activity event with 0 XP. Restoring
      * brings archived items back to active view.
+     *
+     * <p>The actor is the user who restored the item (from webhook sender),
+     * which may be null for sync operations.
      */
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -1404,7 +1439,7 @@ public class ActivityEventListener {
                 event.context().scopeId(),
                 ActivityEventType.PROJECT_ITEM_RESTORED,
                 occurredAt,
-                null, // Actor unknown for item events
+                getActorOrNull(itemData.actorId()),
                 null, // Repository resolved through project, not directly available
                 ActivityTargetType.PROJECT_ITEM,
                 itemData.id(),
@@ -1435,6 +1470,70 @@ public class ActivityEventListener {
                 Instant.now(),
                 ActivityTargetType.PROJECT_ITEM,
                 itemId
+            )
+        );
+    }
+
+    /**
+     * Handle project item converted events.
+     *
+     * <p>Records PROJECT_ITEM_CONVERTED activity event with 0 XP. Conversion
+     * occurs when a draft issue is converted to a real issue.
+     *
+     * <p>The actor is the user who converted the item (from webhook sender),
+     * which may be null for sync operations.
+     */
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onProjectItemConverted(DomainEvent.ProjectItemConverted event) {
+        var itemData = event.item();
+        if (!hasValidScopeId("Project item converted", itemData.id(), event.context().scopeId())) {
+            return;
+        }
+        Instant occurredAt = Instant.now();
+        safeRecord("project item converted", itemData.id(), () ->
+            activityEventService.record(
+                event.context().scopeId(),
+                ActivityEventType.PROJECT_ITEM_CONVERTED,
+                occurredAt,
+                getActorOrNull(itemData.actorId()),
+                null, // Repository resolved through project, not directly available
+                ActivityTargetType.PROJECT_ITEM,
+                itemData.id(),
+                0.0 // Item conversion is workflow tracking, no XP reward
+            )
+        );
+    }
+
+    /**
+     * Handle project item reordered events.
+     *
+     * <p>Records PROJECT_ITEM_REORDERED activity event with 0 XP. Reordering
+     * occurs when item position changes in the project view.
+     *
+     * <p>The actor is the user who reordered the item (from webhook sender),
+     * which may be null for sync operations.
+     */
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onProjectItemReordered(DomainEvent.ProjectItemReordered event) {
+        var itemData = event.item();
+        if (!hasValidScopeId("Project item reordered", itemData.id(), event.context().scopeId())) {
+            return;
+        }
+        Instant occurredAt = Instant.now();
+        safeRecord("project item reordered", itemData.id(), () ->
+            activityEventService.record(
+                event.context().scopeId(),
+                ActivityEventType.PROJECT_ITEM_REORDERED,
+                occurredAt,
+                getActorOrNull(itemData.actorId()),
+                null, // Repository resolved through project, not directly available
+                ActivityTargetType.PROJECT_ITEM,
+                itemData.id(),
+                0.0 // Item reordering is workflow tracking, no XP reward
             )
         );
     }
@@ -1492,7 +1591,7 @@ public class ActivityEventListener {
                 null, // Repository not directly available for org-level projects
                 ActivityTargetType.PROJECT_STATUS_UPDATE,
                 data.id(),
-                0.0 // Status updates are workflow tracking, no XP reward
+                xpCalc.getXpProjectStatusUpdateCreated()
             )
         );
     }

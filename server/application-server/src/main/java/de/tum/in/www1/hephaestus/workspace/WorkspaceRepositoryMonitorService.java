@@ -6,6 +6,7 @@ import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.ProvisioningListener;
 import de.tum.in.www1.hephaestus.gitprovider.installation.github.GitHubInstallationRepositoryEnumerationService;
+import de.tum.in.www1.hephaestus.gitprovider.project.ProjectIntegrityService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.sync.GitHubDataSyncService;
@@ -56,6 +57,7 @@ public class WorkspaceRepositoryMonitorService {
     private final GitHubInstallationRepositoryEnumerationService installationRepositoryEnumerator;
     private final WorkspaceScopeFilter workspaceScopeFilter;
     private final GitHubAppTokenService gitHubAppTokenService;
+    private final ProjectIntegrityService projectIntegrityService;
 
     // Lazy-loaded dependencies (to break circular references)
     private final ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider;
@@ -69,6 +71,7 @@ public class WorkspaceRepositoryMonitorService {
         GitHubInstallationRepositoryEnumerationService installationRepositoryEnumerator,
         WorkspaceScopeFilter workspaceScopeFilter,
         GitHubAppTokenService gitHubAppTokenService,
+        ProjectIntegrityService projectIntegrityService,
         ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider
     ) {
         this.natsProperties = natsProperties;
@@ -79,6 +82,7 @@ public class WorkspaceRepositoryMonitorService {
         this.installationRepositoryEnumerator = installationRepositoryEnumerator;
         this.workspaceScopeFilter = workspaceScopeFilter;
         this.gitHubAppTokenService = gitHubAppTokenService;
+        this.projectIntegrityService = projectIntegrityService;
         this.gitHubDataSyncServiceProvider = gitHubDataSyncServiceProvider;
     }
 
@@ -478,6 +482,9 @@ public class WorkspaceRepositoryMonitorService {
     /**
      * Deletes a repository only if no workspace is monitoring it.
      * This preserves repositories that are shared across multiple workspaces.
+     * <p>
+     * Also cascades deletion to any projects owned by this repository to maintain
+     * referential integrity for the polymorphic project ownership model.
      *
      * @param nameWithOwner the repository full name (e.g., "owner/repo")
      */
@@ -501,6 +508,19 @@ public class WorkspaceRepositoryMonitorService {
         repositoryRepository
             .findByNameWithOwner(nameWithOwner)
             .ifPresent(repository -> {
+                Long repoId = repository.getId();
+
+                // Cascade delete projects owned by this repository BEFORE deleting the repository
+                int deletedProjects = projectIntegrityService.cascadeDeleteProjectsForRepository(repoId);
+                if (deletedProjects > 0) {
+                    log.debug(
+                        "Cascade deleted projects for orphaned repository: repoId={}, repoName={}, projectCount={}",
+                        repoId,
+                        LoggingUtils.sanitizeForLog(nameWithOwner),
+                        deletedProjects
+                    );
+                }
+
                 repositoryRepository.delete(repository);
                 log.debug("Deleted orphaned repository: repoName={}", LoggingUtils.sanitizeForLog(nameWithOwner));
             });

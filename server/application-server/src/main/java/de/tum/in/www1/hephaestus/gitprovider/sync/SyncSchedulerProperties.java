@@ -16,6 +16,18 @@ import org.springframework.validation.annotation.Validated;
  * <p>This class consolidates all sync-related configuration including scheduling,
  * filtering, and backfill settings into a single, cohesive configuration namespace.
  *
+ * <h2>Sync Types</h2>
+ * <p>The system has two distinct sync modes:
+ * <ul>
+ *   <li><b>Incremental Sync:</b> Syncs recent data including repositories, issues, PRs,
+ *       labels, milestones, teams, and <b>GitHub Projects V2</b>. Controlled by
+ *       {@code run-on-startup} and {@code cron}. Always includes project sync.</li>
+ *   <li><b>Historical Backfill:</b> Fills historical issues/PRs older than the initial
+ *       sync window. Controlled by {@code backfill.enabled}. Runs on separate schedule
+ *       after incremental sync completes. <b>Does NOT include projects</b> - projects
+ *       are fully synced during incremental sync.</li>
+ * </ul>
+ *
  * <h2>YAML Configuration Example</h2>
  * <pre>{@code
  * hephaestus:
@@ -28,7 +40,7 @@ import org.springframework.validation.annotation.Validated;
  *       enabled: false
  *       batch-size: 50
  *       rate-limit-threshold: 100
- *       cooldown-minutes: 60
+ *       interval-seconds: 60
  *     filters:
  *       allowed-organizations:
  *         - "my-org"
@@ -61,6 +73,9 @@ public record SyncSchedulerProperties(
      * <p>Backfill runs on a schedule, processing repositories that have completed
      * initial sync but still have historical data to fetch. Rate limit is the
      * primary throttle - backfill pauses when remaining API points drop below threshold.
+     *
+     * <p><b>Note:</b> Backfill only handles issues and pull requests, not projects.
+     * Projects are synced via {@link ProjectsProperties} during incremental sync.
      *
      * @param enabled Whether backfill processing is enabled
      * @param batchSize Maximum pages to process per repository per cycle

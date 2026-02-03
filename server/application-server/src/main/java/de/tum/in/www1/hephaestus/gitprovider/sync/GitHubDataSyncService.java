@@ -697,7 +697,7 @@ public class GitHubDataSyncService {
 
         for (Project project : projects) {
             try {
-                SyncResult itemResult = projectSyncService.syncProjectItems(scopeId, project);
+                SyncResult itemResult = projectSyncService.syncDraftIssues(scopeId, project);
                 totalItemsSynced += itemResult.count();
                 if (itemResult.count() > 0) {
                     projectsWithItems++;

@@ -25,6 +25,7 @@ public record GitHubProjectStatusUpdateDTO(
     @JsonProperty("database_id") Long databaseId,
     @JsonProperty("node_id") String nodeId,
     @JsonProperty("body") String body,
+    @JsonProperty("body_html") String bodyHtml,
     @JsonProperty("start_date") LocalDate startDate,
     @JsonProperty("target_date") LocalDate targetDate,
     @JsonProperty("status") String status,
@@ -54,6 +55,7 @@ public record GitHubProjectStatusUpdateDTO(
             case "ON_TRACK" -> ProjectStatusUpdate.Status.ON_TRACK;
             case "AT_RISK" -> ProjectStatusUpdate.Status.AT_RISK;
             case "OFF_TRACK" -> ProjectStatusUpdate.Status.OFF_TRACK;
+            case "COMPLETE" -> ProjectStatusUpdate.Status.COMPLETE;
             default -> null;
         };
     }
@@ -77,6 +79,7 @@ public record GitHubProjectStatusUpdateDTO(
             toLong(statusUpdate.getFullDatabaseId()),
             statusUpdate.getId(),
             statusUpdate.getBody(),
+            statusUpdate.getBodyHTML(),
             statusUpdate.getStartDate(),
             statusUpdate.getTargetDate(),
             statusToString(statusUpdate.getStatus()),
@@ -93,7 +96,11 @@ public record GitHubProjectStatusUpdateDTO(
         if (value == null) {
             return null;
         }
-        return value.longValueExact();
+        try {
+            return value.longValueExact();
+        } catch (ArithmeticException e) {
+            return value.longValue();
+        }
     }
 
     @Nullable

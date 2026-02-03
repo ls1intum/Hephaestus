@@ -337,6 +337,11 @@ public final class EventPayload {
 
     /**
      * Immutable snapshot of a Project for event handling.
+     *
+     * @param actorId The user who performed the action (e.g., closed, reopened, updated the project).
+     *                This is distinct from creatorId which is the original project creator.
+     *                For webhook events, this comes from the sender field.
+     *                For sync operations, this may be null.
      */
     public record ProjectData(
         @NonNull Long id,
@@ -348,9 +353,25 @@ public final class EventPayload {
         @NonNull String url,
         @NonNull Project.OwnerType ownerType,
         @NonNull Long ownerId,
-        @Nullable Long creatorId
+        @Nullable Long creatorId,
+        @Nullable Long actorId
     ) {
+        /**
+         * Creates ProjectData from a Project entity with no actor specified.
+         * Use this for sync operations where the actor is unknown.
+         */
         public static ProjectData from(Project project) {
+            return from(project, null);
+        }
+
+        /**
+         * Creates ProjectData from a Project entity with the specified actor.
+         * Use this for webhook events where the sender is known.
+         *
+         * @param project the project entity
+         * @param actorId the ID of the user who performed the action (from webhook sender)
+         */
+        public static ProjectData from(Project project, @Nullable Long actorId) {
             return new ProjectData(
                 project.getId(),
                 project.getNumber(),
@@ -361,7 +382,8 @@ public final class EventPayload {
                 project.getUrl() != null ? project.getUrl() : "",
                 project.getOwnerType(),
                 project.getOwnerId(),
-                project.getCreator() != null ? project.getCreator().getId() : null
+                project.getCreator() != null ? project.getCreator().getId() : null,
+                actorId
             );
         }
     }
@@ -372,6 +394,10 @@ public final class EventPayload {
 
     /**
      * Immutable snapshot of a ProjectItem for event handling.
+     *
+     * @param actorId The user who performed the action (e.g., created, archived, moved the item).
+     *                For webhook events, this comes from the sender field.
+     *                For sync operations, this may be null.
      */
     public record ProjectItemData(
         @NonNull Long id,
@@ -379,16 +405,33 @@ public final class EventPayload {
         @NonNull Long projectId,
         @NonNull ProjectItem.ContentType contentType,
         @Nullable Long issueId,
-        boolean archived
+        boolean archived,
+        @Nullable Long actorId
     ) {
+        /**
+         * Creates ProjectItemData from a ProjectItem entity with no actor specified.
+         * Use this for sync operations where the actor is unknown.
+         */
         public static ProjectItemData from(ProjectItem item) {
+            return from(item, null);
+        }
+
+        /**
+         * Creates ProjectItemData from a ProjectItem entity with the specified actor.
+         * Use this for webhook events where the sender is known.
+         *
+         * @param item the project item entity
+         * @param actorId the ID of the user who performed the action (from webhook sender)
+         */
+        public static ProjectItemData from(ProjectItem item, @Nullable Long actorId) {
             return new ProjectItemData(
                 item.getId(),
                 item.getNodeId() != null ? item.getNodeId() : "",
                 item.getProject().getId(),
                 item.getContentType(),
                 item.getIssue() != null ? item.getIssue().getId() : null,
-                item.isArchived()
+                item.isArchived(),
+                actorId
             );
         }
     }
