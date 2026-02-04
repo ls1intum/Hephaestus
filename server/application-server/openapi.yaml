@@ -15,6 +15,8 @@ servers:
 security:
 - bearerAuth: []
 tags:
+- description: User achievement progress and unlocks
+  name: Achievements
 - description: Global contributor information
   name: Contributors
 - description: |-
@@ -2123,8 +2125,100 @@ paths:
       summary: List workspace users and the teams they belong to
       tags:
       - workspace
+  /workspaces/{workspaceSlug}/users/{login}/achievements:
+    get:
+      description: Returns all achievements with progress information for the specified
+        user
+      operationId: getUserAchievements
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - description: the user's GitHub login
+        in: path
+        name: login
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Achievement"
+          description: list of all achievements with user-specific progress
+      security: []
+      summary: Get user achievements
+      tags:
+      - Achievements
 components:
   schemas:
+    Achievement:
+      type: object
+      description: Achievement with user-specific progress information
+      properties:
+        category:
+          type: string
+          description: Category for grouping achievements
+          enum:
+          - PULL_REQUESTS
+          - COMMITS
+          - REVIEWS
+          - COMMENTS
+          - ISSUES
+        description:
+          type: string
+          description: Description of how to earn the achievement
+          example: Merge your first pull request
+        icon:
+          type: string
+          description: Icon identifier for UI
+          example: git-merge
+        id:
+          type: string
+          description: Unique identifier for the achievement
+          example: first_pull
+        level:
+          type: integer
+          format: int32
+          description: Visual level tier (1-7) for badge styling
+          example: 1
+        maxProgress:
+          type: integer
+          format: int64
+          description: "Required count to unlock (e.g., 5 PRs)"
+          example: 5
+        name:
+          type: string
+          description: Human-readable name
+          example: First Merge
+        parentId:
+          type: string
+          description: Parent achievement ID in progression chain
+          example: null
+        progress:
+          type: integer
+          format: int64
+          description: "Current progress count (e.g., 4 PRs merged)"
+          example: 4
+        status:
+          type: string
+          description: Current status for this user
+          enum:
+          - LOCKED
+          - AVAILABLE
+          - UNLOCKED
+          - HIDDEN
+        unlockedAt:
+          type: string
+          format: date-time
+          description: "When the achievement was unlocked, null if not unlocked"
     AssignRoleRequest:
       type: object
       description: Request to assign or update a user's role in a workspace

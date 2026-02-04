@@ -1070,6 +1070,56 @@ export type AssignRoleRequest = {
     userId: number;
 };
 
+/**
+ * Achievement with user-specific progress information
+ */
+export type Achievement = {
+    /**
+     * Category for grouping achievements
+     */
+    category?: 'PULL_REQUESTS' | 'COMMITS' | 'REVIEWS' | 'COMMENTS' | 'ISSUES';
+    /**
+     * Description of how to earn the achievement
+     */
+    description?: string;
+    /**
+     * Icon identifier for UI
+     */
+    icon?: string;
+    /**
+     * Unique identifier for the achievement
+     */
+    id?: string;
+    /**
+     * Visual level tier (1-7) for badge styling
+     */
+    level?: number;
+    /**
+     * Required count to unlock (e.g., 5 PRs)
+     */
+    maxProgress?: number;
+    /**
+     * Human-readable name
+     */
+    name?: string;
+    /**
+     * Parent achievement ID in progression chain
+     */
+    parentId?: string;
+    /**
+     * Current progress count (e.g., 4 PRs merged)
+     */
+    progress?: number;
+    /**
+     * Current status for this user
+     */
+    status?: 'LOCKED' | 'AVAILABLE' | 'UNLOCKED' | 'HIDDEN';
+    /**
+     * When the achievement was unlocked, null if not unlocked
+     */
+    unlockedAt?: Date;
+};
+
 export type ListGlobalContributorsData = {
     body?: never;
     path?: never;
@@ -2638,3 +2688,28 @@ export type GetUsersWithTeamsResponses = {
 };
 
 export type GetUsersWithTeamsResponse = GetUsersWithTeamsResponses[keyof GetUsersWithTeamsResponses];
+
+export type GetUserAchievementsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        /**
+         * the user's GitHub login
+         */
+        login: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/users/{login}/achievements';
+};
+
+export type GetUserAchievementsResponses = {
+    /**
+     * list of all achievements with user-specific progress
+     */
+    200: Array<Achievement>;
+};
+
+export type GetUserAchievementsResponse = GetUserAchievementsResponses[keyof GetUserAchievementsResponses];
