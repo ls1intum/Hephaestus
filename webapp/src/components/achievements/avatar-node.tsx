@@ -26,7 +26,7 @@ function AvatarNodeComponent({ data }: { data: AvatarNodeData }) {
 			{/* Avatar with Level Badge - Matching ProfileHeader.tsx styling */}
 			<div className="relative shrink-0 transition-transform duration-300 hover:scale-105">
 				<Avatar className="size-24 border-4 border-background shadow-[0_0_30px_rgba(var(--shadow-rgb),0.3)]">
-					<AvatarImage src={data.avatarUrl} alt={`${data.name}'s avatar`} />
+					<AvatarImage src={`https://github.com/${data.name}.png`} alt={`${data.name}'s avatar`} />
 					<AvatarFallback className="text-2xl font-bold bg-secondary/50">
 						{data.name?.slice(0, 2)?.toUpperCase() ?? "HP"}
 					</AvatarFallback>
