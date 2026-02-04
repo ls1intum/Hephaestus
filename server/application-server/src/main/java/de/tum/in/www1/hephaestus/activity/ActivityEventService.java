@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.activity;
 
+import de.tum.in.www1.hephaestus.achievement.ActivitySavedEvent;
 import de.tum.in.www1.hephaestus.activity.scoring.ExperiencePointProperties;
 import de.tum.in.www1.hephaestus.activity.scoring.XpPrecision;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
@@ -16,6 +17,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -51,6 +53,7 @@ public class ActivityEventService {
     private final ActivityEventRepository eventRepository;
     private final WorkspaceRepository workspaceRepository;
     private final ExperiencePointProperties xpProperties;
+    private final ApplicationEventPublisher eventPublisher;
     private final Counter eventsRecordedCounter;
     private final Counter eventsDuplicateCounter;
     private final Counter eventsFailedCounter;
@@ -64,11 +67,13 @@ public class ActivityEventService {
         ActivityEventRepository eventRepository,
         WorkspaceRepository workspaceRepository,
         ExperiencePointProperties xpProperties,
-        MeterRegistry meterRegistry
+        MeterRegistry meterRegistry,
+        ApplicationEventPublisher eventPublisher
     ) {
         this.eventRepository = eventRepository;
         this.workspaceRepository = workspaceRepository;
         this.xpProperties = xpProperties;
+        this.eventPublisher = eventPublisher;
         this.eventsRecordedCounter = Counter.builder("activity.events.recorded")
             .description("Number of activity events recorded")
             .register(meterRegistry);
@@ -172,6 +177,9 @@ public class ActivityEventService {
 
         eventsRecordedCounter.increment();
         xpDistribution.record(roundedXp);
+
+        // Publish event for downstream listeners (e.g., achievement system)
+        eventPublisher.publishEvent(new ActivitySavedEvent(actor, eventType, workspaceId));
 
         // Structured logging with trace context
         log.info(

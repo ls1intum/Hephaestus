@@ -469,4 +469,33 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         @Param("since") Instant since,
         @Param("until") Instant until
     );
+
+    // ========================================================================
+    // Achievement Progress Queries
+    // ========================================================================
+
+    /**
+     * Count activity events of specific types for a user across all workspaces.
+     *
+     * <p>Used by the achievement system to evaluate progress toward achievements.
+     * Counts are not workspace-scoped because achievements represent cumulative
+     * lifetime accomplishments.
+     *
+     * @param actorId the user's ID
+     * @param eventTypes set of event type names (enum names as strings)
+     * @return total count of matching events
+     */
+    @Query(
+        value = """
+        SELECT COUNT(*)
+        FROM activity_event e
+        WHERE e.actor_id = :actorId
+        AND e.event_type IN :eventTypes
+        """,
+        nativeQuery = true
+    )
+    long countByActorIdAndEventTypes(
+        @Param("actorId") Long actorId,
+        @Param("eventTypes") Set<String> eventTypes
+    );
 }
