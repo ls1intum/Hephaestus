@@ -45,13 +45,7 @@ MODEL_NAME=fake:model DETECTION_MODEL_NAME=fake:model npm run generate:api:intel
 npm run generate:api:intelligence-service:client
 ```
 
-## 4. Stage Beads
-
-```bash
-git add .beads/issues.jsonl 2>/dev/null || true
-```
-
-## 5. Create Branch (if on main)
+## 4. Create Branch (if on main)
 
 ```bash
 git branch --show-current
@@ -65,7 +59,7 @@ git checkout -b <type>/<description>
 
 Types: `feat`, `fix`, `docs`, `refactor`, `test`, `ci`, `chore`
 
-## 6. Commit
+## 5. Commit
 
 ```bash
 git add -A
@@ -78,21 +72,21 @@ git commit -m "<type>(<scope>): <description>"
 - Infra (no release): `ci`, `config`, `deps`, `deps-dev`, `docker`, `scripts`, `security`, `db`, `no-release`
 - Feature: `gitprovider`, `leaderboard`, `mentor`, `notifications`, `profile`, `teams`, `workspace`
 
-## 7. Push
+## 6. Push
 
 ```bash
 git push -u origin HEAD
 ```
 
-## 8. Check if PR Exists
+## 7. Check if PR Exists
 
 ```bash
 PAGER=cat gh pr view --json number,url 2>/dev/null && echo "PR exists - skip creation" || echo "No PR - create one"
 ```
 
-## 9. Create PR (if needed)
+## 8. Create PR (if needed)
 
-Skip if step 8 showed "PR exists".
+Skip if step 7 showed "PR exists".
 
 ```bash
 PAGER=cat gh pr create --base main \
@@ -106,22 +100,14 @@ PAGER=cat gh pr create --base main \
 <steps to verify, or 'CI covers this'>"
 ```
 
-## 10. Open in Browser
+## 9. Open in Browser
 
 ```bash
 PAGER=cat gh pr view --web
 ```
 
-## 11. Verify
+## 10. Verify
 
 ```bash
 PAGER=cat gh pr view --json url,title -q '"PR: \(.title)\nURL: \(.url)"'
-```
-
-## 12. Close Beads Issue
-
-```bash
-PR_NUM=$(PAGER=cat gh pr view --json number -q .number)
-bd list --status open
-bd close <id> --reason "PR #$PR_NUM"
 ```
