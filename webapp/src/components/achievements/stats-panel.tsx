@@ -11,18 +11,24 @@ import {
 import type React from "react";
 import { Progress, ProgressIndicator, ProgressTrack } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
-import { type AchievementCategory, achievements, calculateStats, categoryMeta } from "./data";
+import { calculateStats, categoryMeta } from "./data";
+import type { AchievementCategory, AchievementDTO } from "./types";
+import { levelToTier } from "./types";
 
 const categoryIcons: Record<AchievementCategory, React.ElementType> = {
-	commits: GitCommit,
-	pullRequests: GitPullRequest,
-	reviews: Eye,
-	issues: CircleDot,
-	comments: MessageSquare,
-	crossCategory: Layers,
+	COMMITS: GitCommit,
+	PULL_REQUESTS: GitPullRequest,
+	REVIEWS: Eye,
+	ISSUES: CircleDot,
+	COMMENTS: MessageSquare,
+	CROSS_CATEGORY: Layers,
 };
 
-export function StatsPanel() {
+export interface StatsPanelProps {
+	achievements: AchievementDTO[];
+}
+
+export function StatsPanel({ achievements }: StatsPanelProps) {
 	const stats = calculateStats(achievements);
 
 	return (
@@ -64,6 +70,8 @@ export function StatsPanel() {
 				{Object.entries(categoryMeta).map(([key, meta]) => {
 					const category = key as AchievementCategory;
 					const catStats = stats.byCategory[category];
+					// Handle case where category has no achievements
+					if (!catStats || catStats.total === 0) return null;
 					const Icon = categoryIcons[category];
 					const percentage = Math.round((catStats.unlocked / catStats.total) * 100);
 
@@ -102,37 +110,42 @@ export function StatsPanel() {
 				</h3>
 				<div className="space-y-2">
 					{achievements
-						.filter((a) => a.status === "unlocked" && a.unlockedAt)
+						.filter((a) => a.status === "UNLOCKED" && a.unlockedAt)
 						.sort(
 							(a, b) =>
 								new Date(b.unlockedAt as string).getTime() -
 								new Date(a.unlockedAt as string).getTime(),
 						)
 						.slice(0, 5)
-						.map((achievement) => (
-							<div
-								key={achievement.id}
-								className="flex items-center gap-3 p-2 rounded-lg bg-secondary/20 hover:bg-secondary/40 transition-colors"
-							>
+						.map((achievement) => {
+							const tier = levelToTier(achievement.level);
+							return (
 								<div
-									className={cn(
-										"w-6 h-6 rounded-full flex items-center justify-center",
-										achievement.tier === "legendary" && "bg-foreground text-background",
-										achievement.tier === "keystone" && "bg-foreground/80 text-background",
-										achievement.tier === "notable" && "bg-foreground/60 text-background",
-										achievement.tier === "minor" && "bg-foreground/40 text-background",
-									)}
+									key={achievement.id}
+									className="flex items-center gap-3 p-2 rounded-lg bg-secondary/20 hover:bg-secondary/40 transition-colors"
 								>
-									<Flame className="w-3 h-3" />
+									<div
+										className={cn(
+											"w-6 h-6 rounded-full flex items-center justify-center",
+											tier === "legendary" && "bg-foreground text-background",
+											tier === "keystone" && "bg-foreground/80 text-background",
+											tier === "notable" && "bg-foreground/60 text-background",
+											tier === "minor" && "bg-foreground/40 text-background",
+										)}
+									>
+										<Flame className="w-3 h-3" />
+									</div>
+									<div className="flex-1 min-w-0">
+										<p className="text-sm font-medium text-foreground truncate">
+											{achievement.name}
+										</p>
+										<p className="text-xs text-muted-foreground">
+											{new Date(achievement.unlockedAt as string).toLocaleDateString()}
+										</p>
+									</div>
 								</div>
-								<div className="flex-1 min-w-0">
-									<p className="text-sm font-medium text-foreground truncate">{achievement.name}</p>
-									<p className="text-xs text-muted-foreground">
-										{new Date(achievement.unlockedAt as string).toLocaleDateString()}
-									</p>
-								</div>
-							</div>
-						))}
+							);
+						})}
 				</div>
 			</div>
 

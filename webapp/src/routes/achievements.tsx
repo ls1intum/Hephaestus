@@ -1,12 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { ReactFlowProvider } from "@xyflow/react";
-import React from "react";
 import { getUserProfileOptions } from "@/api/@tanstack/react-query.gen";
 import { CategoryLabels } from "@/components/achievements/category-labels";
 import { Header } from "@/components/achievements/header";
 import { SkillTree } from "@/components/achievements/skill-tree";
 import { StatsPanel } from "@/components/achievements/stats-panel";
+import { useAchievements } from "@/hooks/use-achievements";
 import { useAuth } from "@/integrations/auth/AuthContext";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
@@ -26,15 +26,18 @@ function AchievementsPage() {
 		enabled: Boolean(selectedSlug) && Boolean(username),
 	});
 
-	const user = React.useMemo(
-		() => ({
-			name: profileQuery.data?.userInfo?.name || userProfile?.name || userProfile?.username,
-			avatarUrl: profileQuery.data?.userInfo?.avatarUrl || getUserGithubProfilePictureUrl(),
-			level: profileQuery.data?.xpRecord?.currentLevel ?? 1,
-			leaguePoints: profileQuery.data?.userInfo?.leaguePoints ?? 0,
-		}),
-		[userProfile, getUserGithubProfilePictureUrl, profileQuery.data],
-	);
+	// Fetch achievements from the API
+	const achievementsQuery = useAchievements(selectedSlug || "", username || "");
+
+	// Derived user data for the skill tree (React Compiler handles memoization)
+	const user = {
+		name: profileQuery.data?.userInfo?.name || userProfile?.name || userProfile?.username,
+		avatarUrl: profileQuery.data?.userInfo?.avatarUrl || getUserGithubProfilePictureUrl(),
+		level: profileQuery.data?.xpRecord?.currentLevel ?? 1,
+		leaguePoints: profileQuery.data?.userInfo?.leaguePoints ?? 0,
+	};
+
+	const achievements = achievementsQuery.data ?? [];
 
 	return (
 		<ReactFlowProvider>
@@ -60,12 +63,27 @@ function AchievementsPage() {
 						{/* Category labels */}
 						<CategoryLabels />
 
+						{/* Loading/error states */}
+						{achievementsQuery.isLoading && (
+							<div className="absolute inset-0 flex items-center justify-center z-10">
+								<div className="text-muted-foreground">Loading achievements...</div>
+							</div>
+						)}
+
+						{achievementsQuery.isError && (
+							<div className="absolute inset-0 flex items-center justify-center z-10">
+								<div className="text-destructive">
+									Failed to load achievements. Please try again.
+								</div>
+							</div>
+						)}
+
 						{/* Skill tree */}
-						<SkillTree user={user} />
+						<SkillTree user={user} achievements={achievements} />
 					</div>
 
 					{/* Stats panel */}
-					<StatsPanel />
+					<StatsPanel achievements={achievements} />
 				</div>
 			</div>
 		</ReactFlowProvider>

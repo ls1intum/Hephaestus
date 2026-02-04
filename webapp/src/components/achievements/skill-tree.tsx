@@ -14,6 +14,7 @@ import { AchievementNode } from "./achievement-node";
 import { AvatarNode } from "./avatar-node";
 import { type AchievementNodeData, generateSkillTreeData } from "./data";
 import { SkillEdge } from "./skill-edge";
+import type { AchievementDTO } from "./types";
 
 const nodeTypes: NodeTypes = {
 	achievement: AchievementNode,
@@ -44,30 +45,31 @@ function getIsDarkMode() {
 	return document.documentElement.classList.contains("dark");
 }
 
-export function SkillTree({
-	user,
-}: {
+export interface SkillTreeProps {
 	user?: {
 		name?: string;
 		avatarUrl?: string;
 		level?: number;
 		leaguePoints?: number;
 	};
-}) {
+	achievements?: AchievementDTO[];
+}
+
+export function SkillTree({ user, achievements = [] }: SkillTreeProps) {
 	const { nodes: initialNodes, edges: initialEdges } = useMemo(
-		() => generateSkillTreeData(user),
-		[user],
+		() => generateSkillTreeData(user, achievements),
+		[user, achievements],
 	);
 
 	const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
 	const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
-	// Update nodes when user prop changes (e.g. avatar loads)
+	// Update nodes when user or achievements props change
 	useEffect(() => {
-		const { nodes: newNodes, edges: newEdges } = generateSkillTreeData(user);
+		const { nodes: newNodes, edges: newEdges } = generateSkillTreeData(user, achievements);
 		setNodes(newNodes);
 		setEdges(newEdges);
-	}, [user, setNodes, setEdges]);
+	}, [user, achievements, setNodes, setEdges]);
 
 	const isDark = useSyncExternalStore(subscribeToTheme, getIsDarkMode, () => true);
 
