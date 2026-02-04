@@ -56,7 +56,8 @@ public final class DomainEvent {
             ReviewEvent,
             ReviewCommentEvent,
             ReviewThreadEvent,
-            TeamEvent {}
+            TeamEvent,
+            DiscussionEvent {}
 
     /** Events that carry context information. */
     public interface ContextualEvent {
@@ -373,6 +374,60 @@ public final class DomainEvent {
         @Override
         public Long teamId() {
             return teamId;
+        }
+    }
+
+    // ========================================================================
+    // Discussion Events
+    // ========================================================================
+
+    /** All discussion-related events. Subscribe to handle any discussion event. */
+    public sealed interface DiscussionEvent
+        extends Event, ContextualEvent
+        permits
+            DiscussionCreated,
+            DiscussionUpdated,
+            DiscussionClosed,
+            DiscussionReopened,
+            DiscussionAnswered,
+            DiscussionDeleted
+    {
+        EventPayload.DiscussionData discussion();
+    }
+
+    public record DiscussionCreated(
+        EventPayload.DiscussionData discussion,
+        EventContext context
+    ) implements DiscussionEvent {}
+
+    public record DiscussionUpdated(
+        EventPayload.DiscussionData discussion,
+        Set<String> changedFields,
+        EventContext context
+    ) implements DiscussionEvent {}
+
+    public record DiscussionClosed(
+        EventPayload.DiscussionData discussion,
+        @Nullable String stateReason,
+        EventContext context
+    ) implements DiscussionEvent {}
+
+    public record DiscussionReopened(
+        EventPayload.DiscussionData discussion,
+        EventContext context
+    ) implements DiscussionEvent {}
+
+    public record DiscussionAnswered(
+        EventPayload.DiscussionData discussion,
+        Long answerCommentId,
+        EventContext context
+    ) implements DiscussionEvent {}
+
+    /** Deleted event is separate - entity no longer exists, only ID available. */
+    public record DiscussionDeleted(Long discussionId, EventContext context) implements DiscussionEvent {
+        @Override
+        public EventPayload.DiscussionData discussion() {
+            return null; // Entity no longer exists
         }
     }
 }
