@@ -2,22 +2,23 @@ import { CheckCircle2, Clock, Lock } from "lucide-react";
 import type { ReactNode } from "react";
 import { Progress, ProgressIndicator, ProgressTrack } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
-import type { Achievement } from "./data";
+import type { AchievementNodeData } from "./data";
+import type { AchievementTier } from "./types";
 
 export interface AchievementTooltipProps {
-	achievement: Achievement;
+	achievement: AchievementNodeData;
 	children: ReactNode;
 	open: boolean;
 }
 
-const tierColors = {
+const tierColors: Record<AchievementTier, string> = {
 	minor: "border-muted-foreground/40",
 	notable: "border-foreground/40",
 	keystone: "border-foreground/60",
 	legendary: "border-foreground/80",
 };
 
-const tierLabels = {
+const tierLabels: Record<AchievementTier, string> = {
 	minor: "Minor",
 	notable: "Notable",
 	keystone: "Keystone",
@@ -83,11 +84,6 @@ export function AchievementTooltip(props: AchievementTooltipProps) {
 
 					{/* Description */}
 					<p className="text-sm text-foreground/80 mb-3">{achievement.description}</p>
-
-					{/* Requirement */}
-					<div className="text-xs text-muted-foreground mb-2">
-						<span className="font-medium">Requirement:</span> {achievement.requirement}
-					</div>
 
 					{/* Progress */}
 					{achievement.progress !== undefined && achievement.maxProgress !== undefined && (
