@@ -124,6 +124,78 @@ public enum AchievementType {
         100,
         INTEGRATION_EXPERT,
         Set.of(ActivityEventType.PULL_REQUEST_MERGED)
+    ),
+
+    // ========================================================================
+    // Review Achievements (triggered by any review activity)
+    // ========================================================================
+
+    FIRST_REVIEW(
+        "first_review",
+        "First Review",
+        "Submit your first code review",
+        "Eye",
+        AchievementCategory.REVIEWS,
+        1,
+        1,
+        null,
+        Set.of(ActivityEventType.REVIEW_APPROVED, ActivityEventType.REVIEW_CHANGES_REQUESTED, ActivityEventType.REVIEW_COMMENTED)
+    ),
+
+    REVIEW_ROOKIE(
+        "review_rookie",
+        "Review Rookie",
+        "Submit 10 code reviews",
+        "Eye",
+        AchievementCategory.REVIEWS,
+        2,
+        10,
+        FIRST_REVIEW,
+        Set.of(ActivityEventType.REVIEW_APPROVED, ActivityEventType.REVIEW_CHANGES_REQUESTED, ActivityEventType.REVIEW_COMMENTED)
+    ),
+
+    REVIEW_MASTER(
+        "review_master",
+        "Review Master",
+        "Submit 100 code reviews",
+        "Eye",
+        AchievementCategory.REVIEWS,
+        4,
+        100,
+        REVIEW_ROOKIE,
+        Set.of(ActivityEventType.REVIEW_APPROVED, ActivityEventType.REVIEW_CHANGES_REQUESTED, ActivityEventType.REVIEW_COMMENTED)
+    ),
+
+    // ========================================================================
+    // Comment Achievements (triggered by inline code review comments)
+    // ========================================================================
+
+    CODE_COMMENTER(
+        "code_commenter",
+        "Code Commenter",
+        "Post 100 code comments",
+        "MessageSquare",
+        AchievementCategory.COMMENTS,
+        3,
+        100,
+        null,
+        Set.of(ActivityEventType.REVIEW_COMMENT_CREATED)
+    ),
+
+    // ========================================================================
+    // Approval Achievements (triggered by review approvals)
+    // ========================================================================
+
+    HELPFUL_REVIEWER(
+        "helpful_reviewer",
+        "Helpful Reviewer",
+        "Approve 50 pull requests",
+        "HandHelping",
+        AchievementCategory.REVIEWS,
+        5,
+        50,
+        null,
+        Set.of(ActivityEventType.REVIEW_APPROVED)
     );
 
     @NonNull

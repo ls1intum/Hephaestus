@@ -37,7 +37,13 @@ public enum AchievementCategory {
      * Achievements related to issue management.
      * (Placeholder for future implementation)
      */
-    ISSUES("Issues");
+    ISSUES("Issues"),
+
+    /**
+     * Cross-category milestone achievements.
+     * Combines progress across multiple categories.
+     */
+    CROSS_CATEGORY("Milestones");
 
     /**
      * -- GETTER --
