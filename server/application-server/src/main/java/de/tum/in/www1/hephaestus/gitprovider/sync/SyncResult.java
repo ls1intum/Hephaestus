@@ -217,10 +217,12 @@ public record SyncResult(
      * @return true if any tracked phase failed
      */
     public boolean hasWarnings() {
-        return status == Status.COMPLETED_WITH_WARNINGS ||
+        return (
+            status == Status.COMPLETED_WITH_WARNINGS ||
             (fieldsSynced != null && !fieldsSynced) ||
             (statusUpdatesSynced != null && !statusUpdatesSynced) ||
-            (itemsSynced != null && !itemsSynced);
+            (itemsSynced != null && !itemsSynced)
+        );
     }
 
     /**

@@ -89,10 +89,18 @@ public class GitHubProjectProcessor extends BaseGitHubProcessor {
 
         if (result.isNew()) {
             eventPublisher.publishEvent(new DomainEvent.ProjectCreated(projectData, eventContext));
-            log.debug("Created project: projectId={}, projectNumber={}", result.project().getId(), result.project().getNumber());
+            log.debug(
+                "Created project: projectId={}, projectNumber={}",
+                result.project().getId(),
+                result.project().getNumber()
+            );
         } else {
             eventPublisher.publishEvent(new DomainEvent.ProjectUpdated(projectData, Set.of(), eventContext));
-            log.debug("Updated project: projectId={}, projectNumber={}", result.project().getId(), result.project().getNumber());
+            log.debug(
+                "Updated project: projectId={}, projectNumber={}",
+                result.project().getId(),
+                result.project().getNumber()
+            );
         }
 
         return result.project();

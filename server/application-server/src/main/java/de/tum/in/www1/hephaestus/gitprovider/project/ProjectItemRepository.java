@@ -125,7 +125,10 @@ public interface ProjectItemRepository extends JpaRepository<ProjectItem, Long> 
      */
     @Modifying
     @Query("DELETE FROM ProjectItem i WHERE i.project.id = :projectId AND i.contentType = :contentType")
-    int deleteByProjectIdAndContentType(@Param("projectId") Long projectId, @Param("contentType") ProjectItem.ContentType contentType);
+    int deleteByProjectIdAndContentType(
+        @Param("projectId") Long projectId,
+        @Param("contentType") ProjectItem.ContentType contentType
+    );
 
     /**
      * Atomically inserts or updates a project item (race-condition safe).

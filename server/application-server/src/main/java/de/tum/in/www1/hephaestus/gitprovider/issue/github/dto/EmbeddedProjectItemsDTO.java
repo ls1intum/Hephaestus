@@ -82,10 +82,7 @@ public record EmbeddedProjectItemsDTO(
      * This includes the project info needed to link the item to the correct project
      * without requiring additional API calls.
      */
-    public record EmbeddedProjectItem(
-        GitHubProjectItemDTO item,
-        @Nullable EmbeddedProjectReference project
-    ) {
+    public record EmbeddedProjectItem(GitHubProjectItemDTO item, @Nullable EmbeddedProjectReference project) {
         /**
          * Creates an EmbeddedProjectItem from a GraphQL GHProjectV2Item.
          *
@@ -139,9 +136,7 @@ public record EmbeddedProjectItemsDTO(
                 return null;
             }
 
-            Long databaseId = project.getFullDatabaseId() != null
-                ? project.getFullDatabaseId().longValue()
-                : null;
+            Long databaseId = project.getFullDatabaseId() != null ? project.getFullDatabaseId().longValue() : null;
 
             // Extract owner info
             String ownerLogin = null;

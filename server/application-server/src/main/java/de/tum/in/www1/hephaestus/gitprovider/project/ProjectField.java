@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.project;
 
+import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -18,8 +19,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
+import org.hibernate.annotations.Type;
 import org.springframework.lang.NonNull;
 
 /**
@@ -107,7 +107,7 @@ public class ProjectField {
      * For SINGLE_SELECT: array of {id, name, color, description}.
      * For ITERATION: array of {id, title, startDate, duration}.
      */
-    @JdbcTypeCode(SqlTypes.JSON)
+    @Type(JsonType.class)
     @Column(columnDefinition = "jsonb")
     @ToString.Exclude
     private String options;

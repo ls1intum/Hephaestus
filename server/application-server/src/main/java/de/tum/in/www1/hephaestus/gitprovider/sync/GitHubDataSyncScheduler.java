@@ -17,6 +17,7 @@ import de.tum.in.www1.hephaestus.gitprovider.project.Project;
 import de.tum.in.www1.hephaestus.gitprovider.project.github.GitHubProjectSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.subissue.github.GitHubSubIssueSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.sync.SyncResult;
+import jakarta.annotation.PostConstruct;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -24,7 +25,6 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.annotation.Order;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -407,12 +407,7 @@ public class GitHubDataSyncScheduler {
         } catch (InstallationNotFoundException e) {
             throw e;
         } catch (Exception e) {
-            log.error(
-                "Failed to sync projects: scopeId={}, scopeSlug={}",
-                session.scopeId(),
-                session.slug(),
-                e
-            );
+            log.error("Failed to sync projects: scopeId={}, scopeSlug={}", session.scopeId(), session.slug(), e);
         }
     }
 }

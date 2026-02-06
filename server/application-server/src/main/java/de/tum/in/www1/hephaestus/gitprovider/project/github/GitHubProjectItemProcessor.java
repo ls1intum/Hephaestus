@@ -457,11 +457,7 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
             return creatorId;
         }
 
-        log.debug(
-            "Project item creator not synced locally: creatorId={}, itemNodeId={}",
-            creatorId,
-            dto.nodeId()
-        );
+        log.debug("Project item creator not synced locally: creatorId={}, itemNodeId={}", creatorId, dto.nodeId());
         return null;
     }
 }

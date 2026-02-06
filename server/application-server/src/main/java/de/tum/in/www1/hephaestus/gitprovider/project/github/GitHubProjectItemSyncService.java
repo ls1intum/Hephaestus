@@ -16,8 +16,8 @@ import de.tum.in.www1.hephaestus.gitprovider.issue.github.dto.EmbeddedProjectIte
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.dto.EmbeddedProjectItemsDTO.EmbeddedProjectReference;
 import de.tum.in.www1.hephaestus.gitprovider.project.Project;
 import de.tum.in.www1.hephaestus.gitprovider.project.ProjectRepository;
-import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.project.github.dto.GitHubProjectItemDTO;
+import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.graphql.client.ClientGraphQlResponse;
@@ -207,11 +207,7 @@ public class GitHubProjectItemSyncService {
             }
         }
 
-        log.debug(
-            "Completed project item pagination: nodeId={}, additionalItems={}",
-            issueNodeId,
-            totalSynced
-        );
+        log.debug("Completed project item pagination: nodeId={}, additionalItems={}", issueNodeId, totalSynced);
         return totalSynced;
     }
 

@@ -165,7 +165,10 @@ public record GitHubProjectFieldValueDTO(
         }
         List<String> labelNames = Collections.emptyList();
         if (value.getLabels() != null && value.getLabels().getNodes() != null) {
-            labelNames = value.getLabels().getNodes().stream()
+            labelNames = value
+                .getLabels()
+                .getNodes()
+                .stream()
                 .filter(Objects::nonNull)
                 .map(GHLabel::getName)
                 .filter(Objects::nonNull)
@@ -183,7 +186,10 @@ public record GitHubProjectFieldValueDTO(
         }
         List<String> userLogins = Collections.emptyList();
         if (value.getUsers() != null && value.getUsers().getNodes() != null) {
-            userLogins = value.getUsers().getNodes().stream()
+            userLogins = value
+                .getUsers()
+                .getNodes()
+                .stream()
                 .filter(Objects::nonNull)
                 .map(GHUser::getLogin)
                 .filter(Objects::nonNull)
@@ -201,7 +207,10 @@ public record GitHubProjectFieldValueDTO(
         }
         List<String> reviewerNames = Collections.emptyList();
         if (value.getReviewers() != null && value.getReviewers().getNodes() != null) {
-            reviewerNames = value.getReviewers().getNodes().stream()
+            reviewerNames = value
+                .getReviewers()
+                .getNodes()
+                .stream()
                 .filter(Objects::nonNull)
                 .map(GitHubProjectFieldValueDTO::extractReviewerName)
                 .filter(Objects::nonNull)
@@ -257,7 +266,10 @@ public record GitHubProjectFieldValueDTO(
         }
         List<Integer> prNumbers = Collections.emptyList();
         if (value.getPullRequests() != null && value.getPullRequests().getNodes() != null) {
-            prNumbers = value.getPullRequests().getNodes().stream()
+            prNumbers = value
+                .getPullRequests()
+                .getNodes()
+                .stream()
                 .filter(Objects::nonNull)
                 .map(GHPullRequest::getNumber)
                 .toList();

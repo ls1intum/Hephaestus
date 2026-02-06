@@ -2,14 +2,18 @@ package de.tum.in.www1.hephaestus.testconfig;
 
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
+import org.springframework.aop.interceptor.AsyncUncaughtExceptionHandler;
+import org.springframework.aop.interceptor.SimpleAsyncUncaughtExceptionHandler;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.core.task.SyncTaskExecutor;
-import org.springframework.core.task.TaskExecutor;
+import org.springframework.scheduling.annotation.AsyncConfigurer;
+import org.springframework.scheduling.annotation.EnableAsync;
 
 /**
  * Test configuration that makes @Async event listeners run synchronously.
@@ -27,12 +31,10 @@ import org.springframework.core.task.TaskExecutor;
  *   <li>DEADLOCK: Async thread holds row lock, TRUNCATE needs table lock</li>
  * </ol>
  *
- * <p><b>The fix:</b> By providing a synchronous primary task executor, @Async event
- * listeners execute synchronously within the caller's thread, eliminating race conditions.
- *
- * <p><b>Note:</b> The {@code monitoringExecutor} is NOT overridden because the
- * {@code GitHubDataSyncService} uses it for sync operations that have their own
- * transactions and should continue to run asynchronously to avoid transaction issues.
+ * <p><b>The fix:</b> Implements {@link AsyncConfigurer} so Spring uses the synchronous
+ * executor for ALL @Async method dispatch, not just for beans resolved by name.
+ * The production {@link de.tum.in.www1.hephaestus.config.SpringAsyncConfig} is excluded
+ * via {@code @Profile("!test")}, so this is the sole {@code AsyncConfigurer} in tests.
  *
  * <p><b>Benefits:</b>
  * <ul>
@@ -47,23 +49,36 @@ import org.springframework.core.task.TaskExecutor;
  */
 @Configuration
 @Profile("test")
-public class TestAsyncConfiguration {
+@EnableAsync
+public class TestAsyncConfiguration implements AsyncConfigurer {
+
+    private final SyncAsyncTaskExecutor syncExecutor = new SyncAsyncTaskExecutor();
+
+    @Override
+    public Executor getAsyncExecutor() {
+        return syncExecutor;
+    }
+
+    @Override
+    public AsyncUncaughtExceptionHandler getAsyncUncaughtExceptionHandler() {
+        return new SimpleAsyncUncaughtExceptionHandler();
+    }
 
     /**
      * Primary synchronous executor that makes @Async methods run synchronously.
-     *
-     * <p>This bean has {@code @Primary} so it is used by default for @Async methods
-     * that don't specify a qualifier. The production {@code monitoringExecutor} is
-     * NOT overridden, allowing sync operations to run asynchronously with proper
-     * transaction isolation.
-     *
-     * <p>@Async event listeners (like ActivityEventListener) will execute synchronously
-     * in the calling thread, ensuring all database operations complete before test cleanup.
      */
     @Bean
     @Primary
     public AsyncTaskExecutor taskExecutor() {
-        return new SyncAsyncTaskExecutor();
+        return syncExecutor;
+    }
+
+    /**
+     * Synchronous executor for monitoring tasks in tests.
+     */
+    @Bean(name = "monitoringExecutor")
+    public AsyncTaskExecutor monitoringExecutor() {
+        return syncExecutor;
     }
 
     /**

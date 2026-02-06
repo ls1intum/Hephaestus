@@ -91,9 +91,8 @@ public class GitHubCollaboratorSyncService {
         String owner = parsedName.get().owner();
         String name = parsedName.get().name();
 
-        HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
-
         try {
+            HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
             int totalSynced = 0;
             String cursor = null;
             boolean hasNextPage = true;
