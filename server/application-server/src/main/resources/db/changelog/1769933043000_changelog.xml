@@ -292,6 +292,14 @@
         <createIndex tableName="project" indexName="idx_project_node_id">
             <column name="node_id"/>
         </createIndex>
+
+        <createIndex tableName="project" indexName="idx_project_creator_id">
+            <column name="creator_id"/>
+        </createIndex>
+
+        <createIndex tableName="project_status_update" indexName="idx_project_status_update_creator_id">
+            <column name="creator_id"/>
+        </createIndex>
     </changeSet>
 
     <!-- ================================================================== -->

@@ -1182,9 +1182,12 @@ public class ActivityEventListener {
         if (!hasValidScopeId("Project created", projectData.id(), event.context().scopeId())) {
             return;
         }
-        Instant occurredAt = projectData.createdAt() != null
-            ? projectData.createdAt()
-            : projectData.updatedAt() != null ? projectData.updatedAt() : Instant.now();
+        Instant occurredAt =
+            projectData.createdAt() != null
+                ? projectData.createdAt()
+                : projectData.updatedAt() != null
+                    ? projectData.updatedAt()
+                    : Instant.now();
         safeRecord("project created", projectData.id(), () ->
             activityEventService.record(
                 event.context().scopeId(),
@@ -1250,9 +1253,12 @@ public class ActivityEventListener {
         if (!hasValidScopeId("Project closed", projectData.id(), event.context().scopeId())) {
             return;
         }
-        Instant occurredAt = projectData.closedAt() != null
-            ? projectData.closedAt()
-            : projectData.updatedAt() != null ? projectData.updatedAt() : Instant.now();
+        Instant occurredAt =
+            projectData.closedAt() != null
+                ? projectData.closedAt()
+                : projectData.updatedAt() != null
+                    ? projectData.updatedAt()
+                    : Instant.now();
         // Use actorId (webhook sender) if available, fall back to creatorId for sync
         Long actorId = projectData.actorId() != null ? projectData.actorId() : projectData.creatorId();
         safeRecord("project closed", projectData.id(), () ->
@@ -1350,9 +1356,12 @@ public class ActivityEventListener {
         if (!hasValidScopeId("Project item created", itemData.id(), event.context().scopeId())) {
             return;
         }
-        Instant occurredAt = itemData.createdAt() != null
-            ? itemData.createdAt()
-            : itemData.updatedAt() != null ? itemData.updatedAt() : Instant.now();
+        Instant occurredAt =
+            itemData.createdAt() != null
+                ? itemData.createdAt()
+                : itemData.updatedAt() != null
+                    ? itemData.updatedAt()
+                    : Instant.now();
         User actor = getActorOrNull(itemData.actorId());
         safeRecord("project item created", itemData.id(), () ->
             activityEventService.record(
@@ -1634,9 +1643,8 @@ public class ActivityEventListener {
         if (!hasValidScopeId("Project status update created", data.id(), event.context().scopeId())) {
             return;
         }
-        Instant occurredAt = data.createdAt() != null
-            ? data.createdAt()
-            : data.updatedAt() != null ? data.updatedAt() : Instant.now();
+        Instant occurredAt =
+            data.createdAt() != null ? data.createdAt() : data.updatedAt() != null ? data.updatedAt() : Instant.now();
         safeRecord("project status update created", data.id(), () ->
             activityEventService.record(
                 event.context().scopeId(),

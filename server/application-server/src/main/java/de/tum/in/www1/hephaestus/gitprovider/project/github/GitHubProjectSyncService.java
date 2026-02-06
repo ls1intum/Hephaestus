@@ -1,9 +1,9 @@
 package de.tum.in.www1.hephaestus.gitprovider.project.github;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.FIELD_VALUES_PAGINATION_SIZE;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.LARGE_PAGE_SIZE;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.MAX_PAGINATION_PAGES;
-import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.FIELD_VALUES_PAGINATION_SIZE;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.PROJECT_FIELD_PAGE_SIZE;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.PROJECT_ITEM_PAGE_SIZE;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.STATUS_UPDATE_PAGE_SIZE;
@@ -17,7 +17,6 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassi
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.BackfillStateProvider;
-import de.tum.in.www1.hephaestus.gitprovider.sync.SyncSchedulerProperties;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2Connection;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2FieldConfiguration;
@@ -43,6 +42,7 @@ import de.tum.in.www1.hephaestus.gitprovider.project.github.dto.GitHubProjectFie
 import de.tum.in.www1.hephaestus.gitprovider.project.github.dto.GitHubProjectItemDTO;
 import de.tum.in.www1.hephaestus.gitprovider.project.github.dto.GitHubProjectStatusUpdateDTO;
 import de.tum.in.www1.hephaestus.gitprovider.sync.SyncResult;
+import de.tum.in.www1.hephaestus.gitprovider.sync.SyncSchedulerProperties;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -346,8 +346,10 @@ public class GitHubProjectSyncService {
                                 syncedProjectIds.add(existing.getId());
 
                                 // Skip if within cooldown
-                                if (existing.getLastSyncAt() != null &&
-                                    existing.getLastSyncAt().isAfter(cooldownThreshold)) {
+                                if (
+                                    existing.getLastSyncAt() != null &&
+                                    existing.getLastSyncAt().isAfter(cooldownThreshold)
+                                ) {
                                     projectsSkipped++;
                                     continue;
                                 }
@@ -605,10 +607,7 @@ public class GitHubProjectSyncService {
                     syncProperties.incrementalSyncBuffer()
                 );
             } else {
-                log.info(
-                    "Starting full project item sync (first sync): projectId={}",
-                    projectId
-                );
+                log.info("Starting full project item sync (first sync): projectId={}", projectId);
             }
         }
 
@@ -910,10 +909,7 @@ public class GitHubProjectSyncService {
             for (ItemWithFieldValueCursor itemWithCursor : itemsNeedingFieldValuePagination) {
                 // Abort if we hit rate limit during follow-up pagination
                 if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
-                    log.warn(
-                        "Aborting field value pagination due to critical rate limit: projectId={}",
-                        projectId
-                    );
+                    log.warn("Aborting field value pagination due to critical rate limit: projectId={}", projectId);
                     abortReason = SyncResult.Status.ABORTED_RATE_LIMIT;
                     break;
                 }
@@ -1067,7 +1063,11 @@ public class GitHubProjectSyncService {
                     .field("node.fields")
                     .toEntity(GHProjectV2FieldConfigurationConnection.class);
 
-                if (fieldsConnection == null || fieldsConnection.getNodes() == null || fieldsConnection.getNodes().isEmpty()) {
+                if (
+                    fieldsConnection == null ||
+                    fieldsConnection.getNodes() == null ||
+                    fieldsConnection.getNodes().isEmpty()
+                ) {
                     completedNormally = true;
                     break;
                 }
@@ -1139,7 +1139,12 @@ public class GitHubProjectSyncService {
                 updateFieldsSyncCompleted(projectId, Instant.now());
             }
 
-            log.debug("Synced project fields: projectId={}, fieldCount={}, success={}", projectId, allSyncedFieldIds.size(), completedNormally);
+            log.debug(
+                "Synced project fields: projectId={}, fieldCount={}, success={}",
+                projectId,
+                allSyncedFieldIds.size(),
+                completedNormally
+            );
             return completedNormally;
         } catch (Exception e) {
             log.warn("Failed to sync project fields: projectId={}, error={}", projectId, e.getMessage());
@@ -1410,9 +1415,7 @@ public class GitHubProjectSyncService {
      * @return list of projects needing item sync
      */
     public List<Project> getProjectsNeedingItemSync(Long organizationId) {
-        Instant cooldownThreshold = Instant.now().minusSeconds(
-            syncSchedulerProperties.cooldownMinutes() * 60L
-        );
+        Instant cooldownThreshold = Instant.now().minusSeconds(syncSchedulerProperties.cooldownMinutes() * 60L);
         return projectRepository.findProjectsNeedingItemSync(organizationId, cooldownThreshold);
     }
 
@@ -1557,10 +1560,7 @@ public class GitHubProjectSyncService {
                 graphQlClientProvider.trackRateLimit(scopeId, graphQlResponse);
 
                 if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
-                    log.warn(
-                        "Aborting field values pagination due to critical rate limit: itemId={}",
-                        itemId
-                    );
+                    log.warn("Aborting field values pagination due to critical rate limit: itemId={}", itemId);
                     break;
                 }
 
@@ -1582,15 +1582,14 @@ public class GitHubProjectSyncService {
                 transactionTemplate.executeWithoutResult(status -> {
                     // Verify the item still exists
                     if (!projectItemRepository.existsById(finalItemId)) {
-                        log.debug(
-                            "Skipped field values: reason=itemNotFound, itemId={}",
-                            finalItemId
-                        );
+                        log.debug("Skipped field values: reason=itemNotFound, itemId={}", finalItemId);
                         return;
                     }
 
                     // Convert and process field values
-                    List<GitHubProjectFieldValueDTO> fieldValueDTOs = fieldValuesConnection.getNodes().stream()
+                    List<GitHubProjectFieldValueDTO> fieldValueDTOs = fieldValuesConnection
+                        .getNodes()
+                        .stream()
                         .map(GitHubProjectFieldValueDTO::fromFieldValue)
                         .filter(dto -> dto != null && dto.fieldId() != null)
                         .toList();

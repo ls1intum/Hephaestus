@@ -643,6 +643,8 @@ export const project = pgTable(
 		number: integer().notNull(),
 		title: varchar({ length: 256 }),
 		shortDescription: text("short_description"),
+		readme: text(),
+		template: boolean().default(false).notNull(),
 		url: varchar({ length: 512 }),
 		closed: boolean().default(false).notNull(),
 		closedAt: timestamp("closed_at", { withTimezone: true, mode: "string" }),
@@ -652,10 +654,19 @@ export const project = pgTable(
 		lastSyncAt: timestamp("last_sync_at", { withTimezone: true, mode: "string" }),
 		itemSyncCursor: varchar("item_sync_cursor", { length: 256 }),
 		itemsSyncedAt: timestamp("items_synced_at", { withTimezone: true, mode: "string" }),
+		fieldSyncCursor: varchar("field_sync_cursor", { length: 256 }),
+		fieldsSyncedAt: timestamp("fields_synced_at", { withTimezone: true, mode: "string" }),
+		statusUpdateSyncCursor: varchar("status_update_sync_cursor", { length: 256 }),
+		statusUpdatesSyncedAt: timestamp("status_updates_synced_at", {
+			withTimezone: true,
+			mode: "string",
+		}),
 		createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }),
 		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }),
 	},
 	(table) => [
+		index("idx_project_creator_id").using("btree", table.creatorId.asc().nullsLast()),
+		index("idx_project_node_id").using("btree", table.nodeId.asc().nullsLast()),
 		index("idx_project_owner").using(
 			"btree",
 			table.ownerType.asc().nullsLast(),
@@ -744,10 +755,13 @@ export const projectItem = pgTable(
 		draftTitle: varchar("draft_title", { length: 1024 }),
 		draftBody: text("draft_body"),
 		archived: boolean().default(false).notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		creatorId: bigint("creator_id", { mode: "number" }),
 		createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }),
 		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }),
 	},
 	(table) => [
+		index("idx_project_item_creator_id").using("btree", table.creatorId.asc().nullsLast()),
 		index("idx_project_item_issue_id").using("btree", table.issueId.asc().nullsLast()),
 		index("idx_project_item_project_archived").using(
 			"btree",
@@ -765,7 +779,52 @@ export const projectItem = pgTable(
 			foreignColumns: [issue.id],
 			name: "fk_project_item_issue",
 		}).onDelete("cascade"),
+		foreignKey({
+			columns: [table.creatorId],
+			foreignColumns: [user.id],
+			name: "fk_project_item_creator",
+		}).onDelete("set null"),
 		unique("uk_project_item_project_nodeid").on(table.nodeId, table.projectId),
+	],
+);
+
+export const projectStatusUpdate = pgTable(
+	"project_status_update",
+	{
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		id: bigint({ mode: "number" }).primaryKey().notNull(),
+		nodeId: varchar("node_id", { length: 64 }),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		projectId: bigint("project_id", { mode: "number" }).notNull(),
+		body: text(),
+		bodyHtml: text("body_html"),
+		startDate: date("start_date"),
+		targetDate: date("target_date"),
+		status: varchar({ length: 32 }),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		creatorId: bigint("creator_id", { mode: "number" }),
+		createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }),
+		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }),
+	},
+	(table) => [
+		index("idx_project_status_update_created_at").using(
+			"btree",
+			table.projectId.asc().nullsLast(),
+			table.createdAt.desc().nullsFirst(),
+		),
+		index("idx_project_status_update_creator_id").using("btree", table.creatorId.asc().nullsLast()),
+		index("idx_project_status_update_project_id").using("btree", table.projectId.asc().nullsLast()),
+		foreignKey({
+			columns: [table.projectId],
+			foreignColumns: [project.id],
+			name: "fk_project_status_update_project",
+		}).onDelete("cascade"),
+		foreignKey({
+			columns: [table.creatorId],
+			foreignColumns: [user.id],
+			name: "fk_project_status_update_creator",
+		}).onDelete("set null"),
+		unique("uk_project_status_update_node_id").on(table.nodeId),
 	],
 );
 

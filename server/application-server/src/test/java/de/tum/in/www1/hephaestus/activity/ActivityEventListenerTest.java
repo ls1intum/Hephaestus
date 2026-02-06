@@ -10,7 +10,9 @@ import de.tum.in.www1.hephaestus.gitprovider.common.events.EventContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.EventPayload;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.RepositoryRef;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
+import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueCommentRepository;
+import de.tum.in.www1.hephaestus.gitprovider.project.ProjectRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
@@ -65,6 +67,12 @@ class ActivityEventListenerTest {
     @Mock
     private RepositoryRepository repositoryRepository;
 
+    @Mock
+    private ProjectRepository projectRepository;
+
+    @Mock
+    private IssueRepository issueRepository;
+
     private ActivityEventListener listener;
 
     private User testUser;
@@ -90,7 +98,9 @@ class ActivityEventListenerTest {
             issueCommentRepository,
             reviewThreadRepository,
             userRepository,
-            repositoryRepository
+            repositoryRepository,
+            projectRepository,
+            issueRepository
         );
 
         testUser = new User();
@@ -104,6 +114,7 @@ class ActivityEventListenerTest {
         // Set up getReferenceById mocks - these return proxy references without DB queries
         when(userRepository.getReferenceById(100L)).thenReturn(testUser);
         when(repositoryRepository.getReferenceById(200L)).thenReturn(testRepository);
+        when(userRepository.findById(100L)).thenReturn(Optional.of(testUser));
     }
 
     @Nested

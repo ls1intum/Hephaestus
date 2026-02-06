@@ -99,16 +99,9 @@ public class ProjectIntegrityService {
             return 0;
         }
 
-        log.info(
-            "Cascade deleting projects for organization: orgId={}, projectCount={}",
-            organizationId,
-            count
-        );
+        log.info("Cascade deleting projects for organization: orgId={}, projectCount={}", organizationId, count);
 
-        int deleted = projectRepository.deleteAllByOwnerTypeAndOwnerId(
-            Project.OwnerType.ORGANIZATION,
-            organizationId
-        );
+        int deleted = projectRepository.deleteAllByOwnerTypeAndOwnerId(Project.OwnerType.ORGANIZATION, organizationId);
 
         log.info(
             "Completed cascade delete of projects for organization: orgId={}, deletedCount={}",
@@ -140,16 +133,9 @@ public class ProjectIntegrityService {
             return 0;
         }
 
-        log.info(
-            "Cascade deleting projects for repository: repoId={}, projectCount={}",
-            repositoryId,
-            count
-        );
+        log.info("Cascade deleting projects for repository: repoId={}, projectCount={}", repositoryId, count);
 
-        int deleted = projectRepository.deleteAllByOwnerTypeAndOwnerId(
-            Project.OwnerType.REPOSITORY,
-            repositoryId
-        );
+        int deleted = projectRepository.deleteAllByOwnerTypeAndOwnerId(Project.OwnerType.REPOSITORY, repositoryId);
 
         log.info(
             "Completed cascade delete of projects for repository: repoId={}, deletedCount={}",
@@ -179,22 +165,11 @@ public class ProjectIntegrityService {
             return 0;
         }
 
-        log.info(
-            "Cascade deleting projects for user: userId={}, projectCount={}",
-            userId,
-            count
-        );
+        log.info("Cascade deleting projects for user: userId={}, projectCount={}", userId, count);
 
-        int deleted = projectRepository.deleteAllByOwnerTypeAndOwnerId(
-            Project.OwnerType.USER,
-            userId
-        );
+        int deleted = projectRepository.deleteAllByOwnerTypeAndOwnerId(Project.OwnerType.USER, userId);
 
-        log.info(
-            "Completed cascade delete of projects for user: userId={}, deletedCount={}",
-            userId,
-            deleted
-        );
+        log.info("Completed cascade delete of projects for user: userId={}, deletedCount={}", userId, deleted);
 
         return deleted;
     }
@@ -329,11 +304,7 @@ public class ProjectIntegrityService {
     /**
      * Record containing counts of orphaned projects by owner type.
      */
-    public record OrphanedProjectCount(
-        int organizationOwned,
-        int repositoryOwned,
-        int userOwned
-    ) {
+    public record OrphanedProjectCount(int organizationOwned, int repositoryOwned, int userOwned) {
         public int total() {
             return organizationOwned + repositoryOwned + userOwned;
         }

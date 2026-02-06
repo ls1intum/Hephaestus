@@ -228,7 +228,9 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
      */
     @Modifying
     @Transactional
-    @Query("UPDATE Project p SET p.statusUpdatesSyncedAt = :syncedAt, p.statusUpdateSyncCursor = NULL WHERE p.id = :projectId")
+    @Query(
+        "UPDATE Project p SET p.statusUpdatesSyncedAt = :syncedAt, p.statusUpdateSyncCursor = NULL WHERE p.id = :projectId"
+    )
     void updateStatusUpdatesSyncedAt(@Param("projectId") Long projectId, @Param("syncedAt") Instant syncedAt);
 
     /**
@@ -299,10 +301,7 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
     @Modifying
     @Transactional
     @Query("DELETE FROM Project p WHERE p.ownerType = :ownerType AND p.ownerId = :ownerId")
-    int deleteAllByOwnerTypeAndOwnerId(
-        @Param("ownerType") Project.OwnerType ownerType,
-        @Param("ownerId") Long ownerId
-    );
+    int deleteAllByOwnerTypeAndOwnerId(@Param("ownerType") Project.OwnerType ownerType, @Param("ownerId") Long ownerId);
 
     /**
      * Counts projects owned by a specific owner.

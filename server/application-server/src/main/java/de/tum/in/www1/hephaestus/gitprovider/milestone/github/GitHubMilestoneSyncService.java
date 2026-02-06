@@ -90,10 +90,9 @@ public class GitHubMilestoneSyncService {
         String owner = parsedName.get().owner();
         String name = parsedName.get().name();
 
-        HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
-        ProcessingContext context = ProcessingContext.forSync(scopeId, repository);
-
         try {
+            HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
+            ProcessingContext context = ProcessingContext.forSync(scopeId, repository);
             Set<Integer> syncedNumbers = new HashSet<>();
             int totalSynced = 0;
             String cursor = null;

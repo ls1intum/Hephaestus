@@ -419,7 +419,14 @@ public final class DomainEvent {
     /** All project item-related events. */
     public sealed interface ProjectItemEvent
         extends Event, ContextualEvent
-        permits ProjectItemCreated, ProjectItemUpdated, ProjectItemArchived, ProjectItemRestored, ProjectItemDeleted, ProjectItemConverted, ProjectItemReordered
+        permits
+            ProjectItemCreated,
+            ProjectItemUpdated,
+            ProjectItemArchived,
+            ProjectItemRestored,
+            ProjectItemDeleted,
+            ProjectItemConverted,
+            ProjectItemReordered
     {
         @Nullable
         EventPayload.ProjectItemData item();

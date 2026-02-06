@@ -366,8 +366,10 @@ public class WorkspaceRepositoryMonitorService {
         // Create or update the Repository entity with organization linking
         ensureRepositoryFromProvisioningSnapshot(workspace, snapshot);
 
-        // Create the RepositoryToMonitor if it doesn't exist
-        ensureRepositoryMonitorForInstallation(installationId, snapshot.nameWithOwner());
+        // Create the RepositoryToMonitor if it doesn't exist.
+        // Defer sync: provisioning creates monitors in bulk; the activation phase
+        // will trigger a full sync for all repositories in the workspace.
+        ensureRepositoryMonitorForInstallation(installationId, snapshot.nameWithOwner(), true);
     }
 
     // ========================================================================
