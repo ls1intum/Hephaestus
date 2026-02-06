@@ -2172,6 +2172,7 @@ components:
           - REVIEWS
           - COMMENTS
           - ISSUES
+          - CROSS_CATEGORY
         description:
           type: string
           description: Description of how to earn the achievement

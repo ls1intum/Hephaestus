@@ -13,6 +13,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,6 +49,12 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class AchievementService {
 
+    /**
+     * Cache name for user achievement progress.
+     * <p>Key format: user login (workspace-scoped).
+     */
+    public static final String ACHIEVEMENT_PROGRESS_CACHE = "achievementProgress";
+
     private static final Logger log = LoggerFactory.getLogger(AchievementService.class);
 
     private final UserAchievementRepository userAchievementRepository;
@@ -70,6 +78,7 @@ public class AchievementService {
      * @param eventType the activity event type that was just recorded
      * @return list of newly unlocked achievement types (empty if none)
      */
+    @CacheEvict(value = ACHIEVEMENT_PROGRESS_CACHE, key = "#user.login", condition = "#user != null")
     @Transactional
     public List<AchievementType> checkAndUnlock(User user, ActivityEventType eventType) {
         if (user == null) {
@@ -100,7 +109,7 @@ public class AchievementService {
 
             // Check if threshold met
             if (count >= achievement.getRequiredCount()) {
-                unlock(user, achievement);
+                unlock(user, achievement, count);
                 newlyUnlocked.add(achievement);
                 log.info(
                     "Achievement unlocked: userId={}, achievement={}, count={}, required={}",
@@ -128,7 +137,8 @@ public class AchievementService {
         }
 
         // Convert enum set to string set for the query
-        Set<String> eventTypeNames = eventTypes.stream()
+        Set<String> eventTypeNames = eventTypes
+            .stream()
             .map(ActivityEventType::name)
             .collect(java.util.stream.Collectors.toSet());
 
@@ -140,12 +150,14 @@ public class AchievementService {
      *
      * @param user the user
      * @param achievement the achievement to unlock
+     * @param currentCount the current event count that triggered the unlock
      */
-    private void unlock(User user, AchievementType achievement) {
+    private void unlock(User user, AchievementType achievement, long currentCount) {
         UserAchievement unlock = UserAchievement.builder()
             .user(user)
             .achievementId(achievement.getId())
             .unlockedAt(Instant.now())
+            .currentValue(currentCount)
             .build();
 
         userAchievementRepository.save(unlock);
@@ -171,10 +183,7 @@ public class AchievementService {
      */
     @Transactional(readOnly = true)
     public boolean isUnlocked(Long userId, AchievementType achievementType) {
-        return userAchievementRepository.existsByUserIdAndAchievementId(
-            userId,
-            achievementType.getId()
-        );
+        return userAchievementRepository.existsByUserIdAndAchievementId(userId, achievementType.getId());
     }
 
     /**
@@ -198,6 +207,7 @@ public class AchievementService {
      * @param user the user to get achievements for
      * @return list of all achievement DTOs with progress, ordered by category and level
      */
+    @Cacheable(value = ACHIEVEMENT_PROGRESS_CACHE, key = "#user.login")
     @Transactional(readOnly = true)
     public List<AchievementDTO> getAllAchievementsWithProgress(User user) {
         if (user == null) {

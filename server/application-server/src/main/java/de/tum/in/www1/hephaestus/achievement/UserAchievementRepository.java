@@ -17,7 +17,6 @@ import org.springframework.stereotype.Repository;
  */
 @Repository
 public interface UserAchievementRepository extends JpaRepository<UserAchievement, UUID> {
-
     /**
      * Find all achievements unlocked by a specific user.
      *
@@ -66,10 +65,7 @@ public interface UserAchievementRepository extends JpaRepository<UserAchievement
         AND ua.achievementId = :achievementId
         """
     )
-    boolean existsByUserIdAndAchievementId(
-        @Param("userId") Long userId,
-        @Param("achievementId") String achievementId
-    );
+    boolean existsByUserIdAndAchievementId(@Param("userId") Long userId, @Param("achievementId") String achievementId);
 
     /**
      * Find a specific achievement unlock for a user.
@@ -115,4 +111,26 @@ public interface UserAchievementRepository extends JpaRepository<UserAchievement
         """
     )
     List<UserAchievement> findRecentUnlocks(@Param("limit") int limit);
+
+    /**
+     * Find all achievements for a user that match any of the given achievement IDs.
+     *
+     * <p>Used to efficiently get progress for achievements triggered by a specific event type.
+     *
+     * @param userId the user's ID
+     * @param achievementIds the achievement IDs to look for
+     * @return list of matching achievements with their current progress
+     */
+    @Query(
+        """
+        SELECT ua
+        FROM UserAchievement ua
+        WHERE ua.user.id = :userId
+        AND ua.achievementId IN :achievementIds
+        """
+    )
+    List<UserAchievement> findByUserIdAndAchievementIdIn(
+        @Param("userId") Long userId,
+        @Param("achievementIds") Set<String> achievementIds
+    );
 }

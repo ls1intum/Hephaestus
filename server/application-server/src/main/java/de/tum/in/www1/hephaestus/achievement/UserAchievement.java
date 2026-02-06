@@ -42,10 +42,7 @@ import lombok.Setter;
 @Table(
     name = "user_achievement",
     uniqueConstraints = {
-        @UniqueConstraint(
-            name = "uk_user_achievement_user_achievement",
-            columnNames = { "user_id", "achievement_id" }
-        ),
+        @UniqueConstraint(name = "uk_user_achievement_user_achievement", columnNames = { "user_id", "achievement_id" }),
     },
     indexes = {
         // User achievements lookup: profile display, achievement progress
@@ -93,6 +90,21 @@ public class UserAchievement {
     @NotNull
     @Column(name = "unlocked_at", nullable = false)
     private Instant unlockedAt;
+
+    /**
+     * Current progress value for this achievement.
+     *
+     * <p>This field stores the incremental count of qualifying events,
+     * avoiding expensive COUNT(*) queries on the ActivityEvent table.
+     * When an activity event is recorded, relevant achievement counters
+     * are incremented rather than recounted from scratch.
+     *
+     * <p>For unlocked achievements, this represents the count at unlock time.
+     * For in-progress achievements, this is the current progress toward the goal.
+     */
+    @Column(name = "current_value", nullable = false)
+    @Builder.Default
+    private long currentValue = 0;
 
     @PrePersist
     protected void onCreate() {

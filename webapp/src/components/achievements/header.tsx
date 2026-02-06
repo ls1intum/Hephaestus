@@ -1,8 +1,21 @@
 import { useReactFlow } from "@xyflow/react";
-import { Maximize2, Sparkles, ZoomIn, ZoomOut } from "lucide-react";
+import { List, Map as MapIcon, Maximize2, Sparkles, ZoomIn, ZoomOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
-export function Header() {
+export type ViewMode = "tree" | "list";
+
+interface HeaderProps {
+	viewMode?: ViewMode;
+	onViewModeChange?: (mode: ViewMode) => void;
+	showZoomControls?: boolean;
+}
+
+export function Header({
+	viewMode = "tree",
+	onViewModeChange,
+	showZoomControls = true,
+}: HeaderProps) {
 	const reactFlow = useReactFlow();
 
 	const handleZoomIn = () => {
@@ -30,18 +43,50 @@ export function Header() {
 			</div>
 
 			<div className="flex items-center gap-4">
-				{/* View Controls */}
-				<div className="flex items-center gap-1 bg-secondary/50 rounded-lg p-1">
-					<Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleZoomIn}>
-						<ZoomIn className="w-4 h-4" />
-					</Button>
-					<Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleZoomOut}>
-						<ZoomOut className="w-4 h-4" />
-					</Button>
-					<Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleFitView}>
-						<Maximize2 className="w-4 h-4" />
-					</Button>
-				</div>
+				{/* View Mode Toggle */}
+				{onViewModeChange && (
+					<ToggleGroup
+						type="single"
+						value={viewMode}
+						onValueChange={(value) => {
+							if (value) onViewModeChange(value as ViewMode);
+						}}
+						aria-label="View mode"
+						className="bg-secondary/50 rounded-lg p-1"
+					>
+						<ToggleGroupItem
+							value="tree"
+							aria-label="Skill tree view"
+							className="h-8 px-3 data-[state=on]:bg-background"
+						>
+							<MapIcon className="w-4 h-4 mr-1" />
+							<span className="text-sm">Tree</span>
+						</ToggleGroupItem>
+						<ToggleGroupItem
+							value="list"
+							aria-label="List view"
+							className="h-8 px-3 data-[state=on]:bg-background"
+						>
+							<List className="w-4 h-4 mr-1" />
+							<span className="text-sm">List</span>
+						</ToggleGroupItem>
+					</ToggleGroup>
+				)}
+
+				{/* Zoom Controls - only show for tree view */}
+				{showZoomControls && viewMode === "tree" && (
+					<div className="flex items-center gap-1 bg-secondary/50 rounded-lg p-1">
+						<Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleZoomIn}>
+							<ZoomIn className="w-4 h-4" />
+						</Button>
+						<Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleZoomOut}>
+							<ZoomOut className="w-4 h-4" />
+						</Button>
+						<Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleFitView}>
+							<Maximize2 className="w-4 h-4" />
+						</Button>
+					</div>
+				)}
 			</div>
 		</header>
 	);

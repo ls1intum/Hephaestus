@@ -1077,7 +1077,7 @@ export type Achievement = {
     /**
      * Category for grouping achievements
      */
-    category?: 'PULL_REQUESTS' | 'COMMITS' | 'REVIEWS' | 'COMMENTS' | 'ISSUES';
+    category?: 'PULL_REQUESTS' | 'COMMITS' | 'REVIEWS' | 'COMMENTS' | 'ISSUES' | 'CROSS_CATEGORY';
     /**
      * Description of how to earn the achievement
      */
