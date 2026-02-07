@@ -27,7 +27,7 @@ public record AchievementDTO(
     String description,
     @Schema(description = "Icon identifier for UI", example = "git-merge") String icon,
     @Schema(description = "Category for grouping achievements") AchievementCategory category,
-    @Schema(description = "Visual level tier/rarity for badge styling", example = "common") AchievementRarity tier,
+    @Schema(description = "Visual level tier/rarity for badge styling", example = "common") AchievementRarity rarity,
     @Nullable @Schema(description = "Parent achievement ID in progression chain", example = "null") String parentId,
     @Schema(description = "Current status for this user") AchievementStatus status,
     @Schema(description = "Current progress count (e.g., 4 PRs merged)", example = "4") long progress,

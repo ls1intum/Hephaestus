@@ -1107,13 +1107,13 @@ export type Achievement = {
      */
     progress?: number;
     /**
+     * Visual level tier/rarity for badge styling
+     */
+    rarity?: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'mythic';
+    /**
      * Current status for this user
      */
     status?: 'locked' | 'available' | 'unlocked' | 'hidden';
-    /**
-     * Visual level tier/rarity for badge styling
-     */
-    tier?: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'mythic';
     /**
      * When the achievement was unlocked, null if not unlocked
      */

@@ -2202,15 +2202,7 @@ components:
           format: int64
           description: "Current progress count (e.g., 4 PRs merged)"
           example: 4
-        status:
-          type: string
-          description: Current status for this user
-          enum:
-          - locked
-          - available
-          - unlocked
-          - hidden
-        tier:
+        rarity:
           type: string
           description: Visual level tier/rarity for badge styling
           enum:
@@ -2221,6 +2213,14 @@ components:
           - legendary
           - mythic
           example: common
+        status:
+          type: string
+          description: Current status for this user
+          enum:
+          - locked
+          - available
+          - unlocked
+          - hidden
         unlockedAt:
           type: string
           format: date-time
