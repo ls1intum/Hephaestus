@@ -12,11 +12,11 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as LandingRouteImport } from './routes/landing'
 import { Route as ImprintRouteImport } from './routes/imprint'
-import { Route as AchievementsRouteImport } from './routes/achievements'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as AuthenticatedAchievementsRouteImport } from './routes/_authenticated/achievements'
 import { Route as AuthenticatedMentorMentor_accessRouteImport } from './routes/_authenticated/mentor/_mentor_access'
 import { Route as AuthenticatedWWorkspaceSlugIndexRouteImport } from './routes/_authenticated/w/$workspaceSlug/index'
 import { Route as AuthenticatedWWorkspaceSlugTeamsIndexRouteImport } from './routes/_authenticated/w/$workspaceSlug/teams/index'
@@ -44,11 +44,6 @@ const ImprintRoute = ImprintRouteImport.update({
   path: '/imprint',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AchievementsRoute = AchievementsRouteImport.update({
-  id: '/achievements',
-  path: '/achievements',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AboutRoute = AboutRouteImport.update({
   id: '/about',
   path: '/about',
@@ -68,6 +63,12 @@ const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedAchievementsRoute =
+  AuthenticatedAchievementsRouteImport.update({
+    id: '/achievements',
+    path: '/achievements',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedMentorMentor_accessRoute =
   AuthenticatedMentorMentor_accessRouteImport.update({
     id: '/mentor/_mentor_access',
@@ -138,10 +139,10 @@ const AuthenticatedWWorkspaceSlugAdminAdminMembersRoute =
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
   '/about': typeof AboutRoute
-  '/achievements': typeof AchievementsRoute
   '/imprint': typeof ImprintRoute
   '/landing': typeof LandingRoute
   '/privacy': typeof PrivacyRoute
+  '/achievements': typeof AuthenticatedAchievementsRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/mentor': typeof AuthenticatedMentorMentor_accessRoute
   '/w/$workspaceSlug/': typeof AuthenticatedWWorkspaceSlugIndexRoute
@@ -157,10 +158,10 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/about': typeof AboutRoute
-  '/achievements': typeof AchievementsRoute
   '/imprint': typeof ImprintRoute
   '/landing': typeof LandingRoute
   '/privacy': typeof PrivacyRoute
+  '/achievements': typeof AuthenticatedAchievementsRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/': typeof AuthenticatedIndexRoute
   '/mentor': typeof AuthenticatedMentorMentor_accessRoute
@@ -179,10 +180,10 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/about': typeof AboutRoute
-  '/achievements': typeof AchievementsRoute
   '/imprint': typeof ImprintRoute
   '/landing': typeof LandingRoute
   '/privacy': typeof PrivacyRoute
+  '/_authenticated/achievements': typeof AuthenticatedAchievementsRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/mentor/_mentor_access': typeof AuthenticatedMentorMentor_accessRoute
@@ -202,10 +203,10 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/about'
-    | '/achievements'
     | '/imprint'
     | '/landing'
     | '/privacy'
+    | '/achievements'
     | '/settings'
     | '/mentor'
     | '/w/$workspaceSlug/'
@@ -221,10 +222,10 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/about'
-    | '/achievements'
     | '/imprint'
     | '/landing'
     | '/privacy'
+    | '/achievements'
     | '/settings'
     | '/'
     | '/mentor'
@@ -242,10 +243,10 @@ export interface FileRouteTypes {
     | '__root__'
     | '/_authenticated'
     | '/about'
-    | '/achievements'
     | '/imprint'
     | '/landing'
     | '/privacy'
+    | '/_authenticated/achievements'
     | '/_authenticated/settings'
     | '/_authenticated/'
     | '/_authenticated/mentor/_mentor_access'
@@ -264,7 +265,6 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   AboutRoute: typeof AboutRoute
-  AchievementsRoute: typeof AchievementsRoute
   ImprintRoute: typeof ImprintRoute
   LandingRoute: typeof LandingRoute
   PrivacyRoute: typeof PrivacyRoute
@@ -293,13 +293,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ImprintRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/achievements': {
-      id: '/achievements'
-      path: '/achievements'
-      fullPath: '/achievements'
-      preLoaderRoute: typeof AchievementsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/about': {
       id: '/about'
       path: '/about'
@@ -326,6 +319,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof AuthenticatedSettingsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/achievements': {
+      id: '/_authenticated/achievements'
+      path: '/achievements'
+      fullPath: '/achievements'
+      preLoaderRoute: typeof AuthenticatedAchievementsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/mentor/_mentor_access': {
@@ -430,6 +430,7 @@ const AuthenticatedWWorkspaceSlugAdminAdminRouteWithChildren =
   )
 
 interface AuthenticatedRouteChildren {
+  AuthenticatedAchievementsRoute: typeof AuthenticatedAchievementsRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedMentorMentor_accessRoute: typeof AuthenticatedMentorMentor_accessRoute
@@ -443,6 +444,7 @@ interface AuthenticatedRouteChildren {
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedAchievementsRoute: AuthenticatedAchievementsRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedMentorMentor_accessRoute: AuthenticatedMentorMentor_accessRoute,
@@ -468,7 +470,6 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   AboutRoute: AboutRoute,
-  AchievementsRoute: AchievementsRoute,
   ImprintRoute: ImprintRoute,
   LandingRoute: LandingRoute,
   PrivacyRoute: PrivacyRoute,
