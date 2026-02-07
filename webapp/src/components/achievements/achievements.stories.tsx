@@ -1,26 +1,26 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { ReactFlowProvider } from "@xyflow/react";
+import type { Achievement } from "@/api/types.gen";
 import { AchievementNode } from "./achievement-node";
 import type { AchievementNodeData } from "./data";
 import { Header } from "./header";
 import { SkillTree } from "./skill-tree";
 import { StatsPanel } from "./stats-panel";
-import type { AchievementDTO } from "./types";
 
 // Mock achievements data for stories
-const mockAchievements: AchievementDTO[] = [
+const mockAchievements: Achievement[] = [
 	{
 		id: "commit-1",
 		name: "First Commit",
 		description: "Make your first commit to the repository",
 		category: "COMMITS",
 		level: 1,
-		parentId: null,
+		parentId: undefined,
 		status: "UNLOCKED",
 		icon: "GitCommit",
 		progress: 1,
 		maxProgress: 1,
-		unlockedAt: "2024-01-15",
+		unlockedAt: new Date("2024-01-15"),
 	},
 	{
 		id: "commit-5",
@@ -33,7 +33,7 @@ const mockAchievements: AchievementDTO[] = [
 		icon: "GitCommit",
 		progress: 5,
 		maxProgress: 5,
-		unlockedAt: "2024-01-18",
+		unlockedAt: new Date("2024-01-18"),
 	},
 	{
 		id: "commit-10",
@@ -46,7 +46,7 @@ const mockAchievements: AchievementDTO[] = [
 		icon: "GitCommit",
 		progress: 8,
 		maxProgress: 10,
-		unlockedAt: null,
+		unlockedAt: undefined,
 	},
 	{
 		id: "pr-1",
@@ -54,12 +54,12 @@ const mockAchievements: AchievementDTO[] = [
 		description: "Open your first pull request",
 		category: "PULL_REQUESTS",
 		level: 1,
-		parentId: null,
+		parentId: undefined,
 		status: "UNLOCKED",
 		icon: "GitPullRequest",
 		progress: 1,
 		maxProgress: 1,
-		unlockedAt: "2024-01-16",
+		unlockedAt: new Date("2024-01-16"),
 	},
 	{
 		id: "review-1",
@@ -67,12 +67,12 @@ const mockAchievements: AchievementDTO[] = [
 		description: "Submit your first code review",
 		category: "REVIEWS",
 		level: 1,
-		parentId: null,
+		parentId: undefined,
 		status: "UNLOCKED",
 		icon: "Eye",
 		progress: 1,
 		maxProgress: 1,
-		unlockedAt: "2024-01-18",
+		unlockedAt: new Date("2024-01-18"),
 	},
 	{
 		id: "issue-1",
@@ -80,12 +80,12 @@ const mockAchievements: AchievementDTO[] = [
 		description: "Create your first issue",
 		category: "ISSUES",
 		level: 1,
-		parentId: null,
+		parentId: undefined,
 		status: "LOCKED",
 		icon: "CircleDot",
 		progress: 0,
 		maxProgress: 1,
-		unlockedAt: null,
+		unlockedAt: undefined,
 	},
 	{
 		id: "comment-1",
@@ -93,12 +93,12 @@ const mockAchievements: AchievementDTO[] = [
 		description: "Leave your first comment on a PR or issue",
 		category: "COMMENTS",
 		level: 1,
-		parentId: null,
+		parentId: undefined,
 		status: "AVAILABLE",
 		icon: "MessageSquare",
 		progress: 0,
 		maxProgress: 1,
-		unlockedAt: null,
+		unlockedAt: undefined,
 	},
 ];
 
@@ -152,7 +152,7 @@ const mockUnlockedAchievement: AchievementNodeData = {
 	progress: 1,
 	maxProgress: 1,
 	level: 1,
-	unlockedAt: "2024-01-15",
+	unlockedAt: new Date("2024-01-15"),
 	angle: 270,
 	ring: 1,
 };

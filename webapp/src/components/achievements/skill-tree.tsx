@@ -10,11 +10,11 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useEffect, useMemo, useSyncExternalStore } from "react";
+import type { Achievement } from "@/api/types.gen";
 import { AchievementNode } from "./achievement-node";
 import { AvatarNode } from "./avatar-node";
 import { type AchievementNodeData, generateSkillTreeData } from "./data";
 import { SkillEdge } from "./skill-edge";
-import type { AchievementDTO } from "./types";
 
 const nodeTypes: NodeTypes = {
 	achievement: AchievementNode,
@@ -52,7 +52,7 @@ export interface SkillTreeProps {
 		level?: number;
 		leaguePoints?: number;
 	};
-	achievements?: AchievementDTO[];
+	achievements?: Achievement[];
 }
 
 export function SkillTree({ user, achievements = [] }: SkillTreeProps) {
@@ -83,7 +83,7 @@ export function SkillTree({ user, achievements = [] }: SkillTreeProps) {
 				nodeTypes={nodeTypes}
 				edgeTypes={edgeTypes}
 				onInit={(instance) => instance.fitView({ padding: 0.15 })}
-				fitView
+				fitView={true}
 				fitViewOptions={{ padding: 0.15 }}
 				minZoom={0.15}
 				maxZoom={2.5}
@@ -127,8 +127,8 @@ export function SkillTree({ user, achievements = [] }: SkillTreeProps) {
 					}}
 					maskColor={isDark ? "rgba(0, 0, 0, 0.85)" : "rgba(255, 255, 255, 0.85)"}
 					className="!bg-card/80 !border-border !rounded-lg"
-					pannable
-					zoomable
+					pannable={true}
+					zoomable={true}
 				/>
 			</ReactFlow>
 		</div>

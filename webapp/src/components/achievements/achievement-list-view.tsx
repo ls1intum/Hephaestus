@@ -39,6 +39,7 @@ import {
 	Zap,
 } from "lucide-react";
 import type React from "react";
+import type { Achievement } from "@/api/types.gen";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -50,8 +51,7 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import type { AchievementCategory, AchievementDTO, AchievementStatus } from "./types";
-import { levelToTier, normalizeStatus } from "./types";
+import { type AchievementCategory, type AchievementStatus, compareByRarity } from "./types";
 
 const iconMap: Record<string, React.ElementType> = {
 	GitCommit,
@@ -94,16 +94,15 @@ const iconMap: Record<string, React.ElementType> = {
 };
 
 const categoryLabels: Record<AchievementCategory, string> = {
-	COMMITS: "Commits",
-	PULL_REQUESTS: "Pull Requests",
-	REVIEWS: "Reviews",
-	ISSUES: "Issues",
-	COMMENTS: "Comments",
-	CROSS_CATEGORY: "Cross-Category",
+	pull_requests: "Pull Requests",
+	commits: "Commits",
+	communication: "Communication",
+	issues: "Issues",
+	milestones: "Milestones",
 };
 
 interface AchievementListViewProps {
-	achievements: AchievementDTO[];
+	achievements: Achievement[];
 }
 
 /**
@@ -115,30 +114,29 @@ export function AchievementListView({ achievements }: AchievementListViewProps) 
 	const groupedAchievements = achievements.reduce(
 		(acc, achievement) => {
 			const category = achievement.category;
+			if (!category) return acc;
 			if (!acc[category]) {
 				acc[category] = [];
 			}
 			acc[category].push(achievement);
 			return acc;
 		},
-		{} as Record<AchievementCategory, AchievementDTO[]>,
+		{} as Record<AchievementCategory, Achievement[]>,
 	);
 
 	// Sort categories in a logical order
 	const categoryOrder: AchievementCategory[] = [
-		"COMMITS",
-		"PULL_REQUESTS",
-		"REVIEWS",
-		"ISSUES",
-		"COMMENTS",
-		"CROSS_CATEGORY",
+		"pull_requests",
+		"commits",
+		"communication",
+		"issues",
+		"milestones",
 	];
 
 	const sortedCategories = categoryOrder.filter((cat) => groupedAchievements[cat]?.length > 0);
 
-	const getStatusBadge = (status: AchievementStatus) => {
-		const normalizedStatus = normalizeStatus(status);
-		switch (normalizedStatus) {
+	const getStatusBadge = (status: AchievementStatus | undefined) => {
+		switch (status) {
 			case "unlocked":
 				return (
 					<Badge variant="default" className="bg-green-600 hover:bg-green-700">
@@ -148,25 +146,15 @@ export function AchievementListView({ achievements }: AchievementListViewProps) 
 				);
 			case "available":
 				return <Badge variant="secondary">Available</Badge>;
-			default:
+			case "locked":
 				return (
 					<Badge variant="outline" className="text-muted-foreground">
 						<Lock className="w-3 h-3 mr-1" />
 						Locked
 					</Badge>
 				);
+			default: // case "hidden"
 		}
-	};
-
-	const getTierLabel = (level: number) => {
-		const tier = levelToTier(level);
-		const tierLabels = {
-			minor: "Minor",
-			notable: "Notable",
-			keystone: "Keystone",
-			legendary: "Legendary",
-		};
-		return tierLabels[tier];
 	};
 
 	return (
@@ -180,13 +168,8 @@ export function AchievementListView({ achievements }: AchievementListViewProps) 
 						>
 							{categoryLabels[category]}
 							<span className="text-sm font-normal text-muted-foreground">
-								(
-								{
-									groupedAchievements[category].filter(
-										(a) => normalizeStatus(a.status) === "unlocked",
-									).length
-								}
-								/{groupedAchievements[category].length})
+								({groupedAchievements[category].filter((a) => a.status === "unlocked").length}/
+								{groupedAchievements[category].length})
 							</span>
 						</h2>
 
@@ -202,14 +185,15 @@ export function AchievementListView({ achievements }: AchievementListViewProps) 
 							</TableHeader>
 							<TableBody>
 								{groupedAchievements[category]
-									.sort((a, b) => a.level - b.level)
+									.filter((a) => a.rarity !== undefined)
+									.sort(compareByRarity)
 									.map((achievement) => {
-										const Icon = iconMap[achievement.icon] || GitCommit;
-										const status = normalizeStatus(achievement.status);
+										const Icon = iconMap[achievement.icon ?? ""] || GitCommit;
+										const status = achievement.status ?? "hidden";
+										const progress = achievement.progress ?? 0;
+										const maxProgress = achievement.maxProgress ?? 0;
 										const progressPercent =
-											achievement.maxProgress > 0
-												? Math.round((achievement.progress / achievement.maxProgress) * 100)
-												: 0;
+											maxProgress > 0 ? Math.round((progress / maxProgress) * 100) : 0;
 
 										return (
 											<TableRow
@@ -230,24 +214,24 @@ export function AchievementListView({ achievements }: AchievementListViewProps) 
 												</TableCell>
 												<TableCell>
 													<div>
-														<div className="font-medium">{achievement.name}</div>
+														<div className="font-medium">{achievement.name ?? "Unknown"}</div>
 														<div className="text-sm text-muted-foreground">
-															{achievement.description}
+															{achievement.description ?? ""}
 														</div>
 													</div>
 												</TableCell>
 												<TableCell>
-													<span className="text-sm">{getTierLabel(achievement.level)}</span>
+													<span className="text-sm capitalize">{achievement.rarity}</span>
 												</TableCell>
 												<TableCell>
 													<div className="space-y-1">
 														<Progress
 															value={progressPercent}
 															className="h-2"
-															aria-label={`Progress: ${achievement.progress} of ${achievement.maxProgress}`}
+															aria-label={`Progress: ${progress} of ${maxProgress}`}
 														/>
 														<div className="text-xs text-muted-foreground">
-															{achievement.progress}/{achievement.maxProgress}
+															{progress}/{maxProgress}
 														</div>
 													</div>
 												</TableCell>

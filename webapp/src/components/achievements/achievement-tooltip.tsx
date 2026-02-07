@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { Progress, ProgressIndicator, ProgressTrack } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import type { AchievementNodeData } from "./data";
-import type { AchievementTier } from "./types";
+import type { AchievementRarity } from "./types";
 
 export interface AchievementTooltipProps {
 	achievement: AchievementNodeData;
@@ -11,14 +11,14 @@ export interface AchievementTooltipProps {
 	open: boolean;
 }
 
-const tierColors: Record<AchievementTier, string> = {
+const tierColors: Record<AchievementRarity, string> = {
 	minor: "border-muted-foreground/40",
 	notable: "border-foreground/40",
 	keystone: "border-foreground/60",
 	legendary: "border-foreground/80",
 };
 
-const tierLabels: Record<AchievementTier, string> = {
+const tierLabels: Record<AchievementRarity, string> = {
 	minor: "Minor",
 	notable: "Notable",
 	keystone: "Keystone",

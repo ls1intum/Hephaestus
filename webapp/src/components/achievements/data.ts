@@ -1,27 +1,27 @@
 import type { Edge, Node } from "@xyflow/react";
+import type { Achievement } from "@/api/types.gen";
 import {
 	type AchievementCategory,
-	type AchievementDTO,
-	type AchievementTier,
+	type AchievementRarity,
 	levelToTier,
 	normalizeStatus,
 } from "./types";
 
 /**
  * Node data structure for the skill tree visualization.
- * Extends AchievementDTO with positioning information.
+ * Extends Achievement with positioning and UI-specific information.
  */
 export interface AchievementNodeData {
 	id: string;
 	name: string;
 	description: string;
 	category: AchievementCategory;
-	tier: AchievementTier;
+	tier: AchievementRarity;
 	status: "locked" | "available" | "unlocked";
 	icon: string;
 	progress?: number;
 	maxProgress?: number;
-	unlockedAt?: string | null;
+	unlockedAt?: Date | null;
 	level: number;
 	angle: number;
 	ring: number;
@@ -96,7 +96,7 @@ const MAIN_CATEGORIES: AchievementCategory[] = [
  * Generates React Flow nodes and edges for the skill tree visualization.
  *
  * @param user - User information for the central avatar node
- * @param achievements - Array of achievement DTOs from the API
+ * @param achievements - Array of achievements from the API
  * @returns Nodes and edges for React Flow
  */
 export function generateSkillTreeData(
@@ -106,7 +106,7 @@ export function generateSkillTreeData(
 		level?: number;
 		leaguePoints?: number;
 	},
-	achievements: AchievementDTO[] = [],
+	achievements: Achievement[] = [],
 ): {
 	nodes: Node<AchievementNodeData>[];
 	edges: Edge[];
@@ -145,44 +145,46 @@ export function generateSkillTreeData(
 	for (const category of MAIN_CATEGORIES) {
 		const categoryAchievements = achievements
 			.filter((a) => a.category === category)
-			.sort((a, b) => a.level - b.level);
+			.sort((a, b) => (a.level ?? 0) - (b.level ?? 0));
 		const baseAngle = categoryMeta[category].angle;
 
 		for (const achievement of categoryAchievements) {
-			const distance = levelDistances[achievement.level] || 400;
+			const level = achievement.level ?? 1;
+			const distance = levelDistances[level] || 400;
 			const radians = (baseAngle * Math.PI) / 180;
 			const x = centerX + distance * Math.cos(radians);
 			const y = centerY + distance * Math.sin(radians);
+			const achievementId = achievement.id ?? `unknown-${Math.random()}`;
 
 			nodes.push({
-				id: achievement.id,
+				id: achievementId,
 				type: "achievement",
 				position: { x, y },
 				data: {
-					id: achievement.id,
-					name: achievement.name,
-					description: achievement.description,
-					category: achievement.category,
-					tier: levelToTier(achievement.level),
+					id: achievementId,
+					name: achievement.name ?? "Unknown",
+					description: achievement.description ?? "",
+					category: achievement.category ?? "CROSS_CATEGORY",
+					tier: levelToTier(level),
 					status: normalizeStatus(achievement.status),
-					icon: achievement.icon,
+					icon: achievement.icon ?? "GitCommit",
 					progress: achievement.progress,
 					maxProgress: achievement.maxProgress,
 					unlockedAt: achievement.unlockedAt,
-					level: achievement.level,
+					level,
 					angle: baseAngle,
-					ring: achievement.level,
+					ring: level,
 				},
 			});
 
 			// Create edge based on parentId
-			if (achievement.parentId !== null) {
+			if (achievement.parentId != null) {
 				const parent = achievementMap.get(achievement.parentId);
 				if (parent) {
 					edges.push({
-						id: `${achievement.parentId}-${achievement.id}`,
+						id: `${achievement.parentId}-${achievementId}`,
 						source: achievement.parentId,
-						target: achievement.id,
+						target: achievementId,
 						type: "skill",
 						data: {
 							active:
@@ -191,12 +193,12 @@ export function generateSkillTreeData(
 						},
 					});
 				}
-			} else if (achievement.level === 1) {
+			} else if (level === 1) {
 				// Level 1 achievements with no parent connect to root avatar
 				edges.push({
-					id: `root-${achievement.id}`,
+					id: `root-${achievementId}`,
 					source: "root-avatar",
-					target: achievement.id,
+					target: achievementId,
 					type: "skill",
 					data: {
 						active: normalizeStatus(achievement.status) !== "locked",
@@ -212,7 +214,8 @@ export function generateSkillTreeData(
 	for (const achievement of crossAchievements) {
 		// Position cross-category achievements based on level and a computed angle
 		// Use level to determine distance and spread them around
-		const distance = levelDistances[achievement.level] || 400;
+		const level = achievement.level ?? 1;
+		const distance = levelDistances[level] || 400;
 		// Spread cross-category achievements between main branches
 		const crossIndex = crossAchievements.indexOf(achievement);
 		const baseAngle = (crossIndex * 72 + 36) % 360; // Offset from main branch angles
@@ -220,36 +223,37 @@ export function generateSkillTreeData(
 		const radians = (baseAngle * Math.PI) / 180;
 		const x = centerX + distance * Math.cos(radians);
 		const y = centerY + distance * Math.sin(radians);
+		const achievementId = achievement.id ?? `unknown-cross-${Math.random()}`;
 
 		nodes.push({
-			id: achievement.id,
+			id: achievementId,
 			type: "achievement",
 			position: { x, y },
 			data: {
-				id: achievement.id,
-				name: achievement.name,
-				description: achievement.description,
-				category: achievement.category,
-				tier: levelToTier(achievement.level),
+				id: achievementId,
+				name: achievement.name ?? "Unknown",
+				description: achievement.description ?? "",
+				category: achievement.category ?? "CROSS_CATEGORY",
+				tier: levelToTier(level),
 				status: normalizeStatus(achievement.status),
-				icon: achievement.icon,
+				icon: achievement.icon ?? "Zap",
 				progress: achievement.progress,
 				maxProgress: achievement.maxProgress,
 				unlockedAt: achievement.unlockedAt,
-				level: achievement.level,
+				level,
 				angle: baseAngle,
 				ring: Math.floor(distance / 150),
 			},
 		});
 
 		// Create edges for cross-category achievements
-		if (achievement.parentId !== null) {
+		if (achievement.parentId != null) {
 			const parent = achievementMap.get(achievement.parentId);
 			if (parent) {
 				edges.push({
-					id: `${achievement.parentId}-${achievement.id}`,
+					id: `${achievement.parentId}-${achievementId}`,
 					source: achievement.parentId,
-					target: achievement.id,
+					target: achievementId,
 					type: "skill",
 					data: {
 						active:
@@ -267,10 +271,10 @@ export function generateSkillTreeData(
 /**
  * Calculates achievement statistics for the stats panel.
  *
- * @param achievementList - Array of achievement DTOs
+ * @param achievementList - Array of achievements from the API
  * @returns Statistics including totals and per-category breakdowns
  */
-export function calculateStats(achievementList: AchievementDTO[]) {
+export function calculateStats(achievementList: Achievement[]) {
 	const total = achievementList.length;
 	const unlocked = achievementList.filter((a) => a.status === "UNLOCKED").length;
 	const available = achievementList.filter((a) => a.status === "AVAILABLE").length;

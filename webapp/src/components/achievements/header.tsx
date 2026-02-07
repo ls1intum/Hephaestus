@@ -46,17 +46,18 @@ export function Header({
 				{/* View Mode Toggle */}
 				{onViewModeChange && (
 					<ToggleGroup
-						type="single"
-						value={viewMode}
+						value={[viewMode]}
 						onValueChange={(value) => {
-							if (value) onViewModeChange(value as ViewMode);
+							// Base UI returns an array; take the last selected value for single-select behavior
+							const newValue = value[value.length - 1] as ViewMode | undefined;
+							if (newValue) onViewModeChange(newValue);
 						}}
 						aria-label="View mode"
 						className="bg-secondary/50 rounded-lg p-1"
 					>
 						<ToggleGroupItem
 							value="tree"
-							aria-label="Skill tree view"
+							aria-label="achievements tree view"
 							className="h-8 px-3 data-[state=on]:bg-background"
 						>
 							<MapIcon className="w-4 h-4 mr-1" />
@@ -64,7 +65,7 @@ export function Header({
 						</ToggleGroupItem>
 						<ToggleGroupItem
 							value="list"
-							aria-label="List view"
+							aria-label="achievements list view"
 							className="h-8 px-3 data-[state=on]:bg-background"
 						>
 							<List className="w-4 h-4 mr-1" />

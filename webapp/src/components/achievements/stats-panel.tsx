@@ -1,6 +1,5 @@
 import {
 	CircleDot,
-	Eye,
 	Flame,
 	GitCommit,
 	GitPullRequest,
@@ -9,23 +8,22 @@ import {
 	Trophy,
 } from "lucide-react";
 import type React from "react";
+import type { Achievement } from "@/api/types.gen";
 import { Progress, ProgressIndicator, ProgressTrack } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { calculateStats, categoryMeta } from "./data";
-import type { AchievementCategory, AchievementDTO } from "./types";
-import { levelToTier } from "./types";
+import type { AchievementCategory } from "./types";
 
 const categoryIcons: Record<AchievementCategory, React.ElementType> = {
-	COMMITS: GitCommit,
-	PULL_REQUESTS: GitPullRequest,
-	REVIEWS: Eye,
-	ISSUES: CircleDot,
-	COMMENTS: MessageSquare,
-	CROSS_CATEGORY: Layers,
+	pull_requests: GitPullRequest,
+	commits: GitCommit,
+	communication: MessageSquare,
+	issues: CircleDot,
+	milestones: Layers,
 };
 
 export interface StatsPanelProps {
-	achievements: AchievementDTO[];
+	achievements: Achievement[];
 }
 
 export function StatsPanel({ achievements }: StatsPanelProps) {
@@ -110,27 +108,33 @@ export function StatsPanel({ achievements }: StatsPanelProps) {
 				</h3>
 				<div className="space-y-2">
 					{achievements
-						.filter((a) => a.status === "UNLOCKED" && a.unlockedAt)
-						.sort(
-							(a, b) =>
-								new Date(b.unlockedAt as string).getTime() -
-								new Date(a.unlockedAt as string).getTime(),
-						)
+						.filter((a) => a.status === "unlocked" && a.unlockedAt)
+						.sort((a, b) => {
+							const rawDateA = a.unlockedAt;
+							const rawDateB = b.unlockedAt;
+							const dateA = rawDateA instanceof Date ? rawDateA : new Date(String(rawDateA));
+							const dateB = rawDateB instanceof Date ? rawDateB : new Date(String(rawDateB));
+							return dateB.getTime() - dateA.getTime();
+						})
 						.slice(0, 5)
 						.map((achievement) => {
-							const tier = levelToTier(achievement.level);
+							const rarity = achievement.rarity ?? "common";
+							const rawDate = achievement.unlockedAt;
+							const unlockedDate = rawDate instanceof Date ? rawDate : new Date(String(rawDate));
 							return (
 								<div
 									key={achievement.id}
 									className="flex items-center gap-3 p-2 rounded-lg bg-secondary/20 hover:bg-secondary/40 transition-colors"
 								>
+									{/* TODO: Rethink rarity styling here*/}
 									<div
 										className={cn(
 											"w-6 h-6 rounded-full flex items-center justify-center",
-											tier === "legendary" && "bg-foreground text-background",
-											tier === "keystone" && "bg-foreground/80 text-background",
-											tier === "notable" && "bg-foreground/60 text-background",
-											tier === "minor" && "bg-foreground/40 text-background",
+											rarity === "legendary" && "bg-foreground text-background",
+											rarity === "epic" && "bg-foreground/80 text-background",
+											rarity === "rare" && "bg-foreground/60 text-background",
+											rarity === "uncommon" && "bg-foreground/40 text-background",
+											rarity === "common" && "bg-foreground/20 text-background",
 										)}
 									>
 										<Flame className="w-3 h-3" />
@@ -140,7 +144,7 @@ export function StatsPanel({ achievements }: StatsPanelProps) {
 											{achievement.name}
 										</p>
 										<p className="text-xs text-muted-foreground">
-											{new Date(achievement.unlockedAt as string).toLocaleDateString()}
+											{unlockedDate.toLocaleDateString()}
 										</p>
 									</div>
 								</div>
@@ -150,6 +154,7 @@ export function StatsPanel({ achievements }: StatsPanelProps) {
 			</div>
 
 			{/* Legend */}
+			{/*TODO: Rethink legend definitions here*/}
 			<div className="mt-8 pt-6 border-t border-border">
 				<h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-3">
 					Legend
