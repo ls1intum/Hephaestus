@@ -747,9 +747,13 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             Long organizationId = 42L;
             Project project1 = createProject(1L, "PVT_1", 1);
             Project project2 = createProject(2L, "PVT_2", 2);
-            when(projectRepository.findProjectsNeedingItemSync(eq(organizationId), any(Instant.class))).thenReturn(
-                List.of(project1, project2)
-            );
+            when(
+                projectRepository.findProjectsNeedingItemSync(
+                    eq(Project.OwnerType.ORGANIZATION),
+                    eq(organizationId),
+                    any(Instant.class)
+                )
+            ).thenReturn(List.of(project1, project2));
 
             // Act
             List<Project> result = service.getProjectsNeedingItemSync(organizationId);
@@ -757,7 +761,11 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             // Assert
             assertThat(result).hasSize(2);
             var instantCaptor = ArgumentCaptor.forClass(Instant.class);
-            verify(projectRepository).findProjectsNeedingItemSync(eq(organizationId), instantCaptor.capture());
+            verify(projectRepository).findProjectsNeedingItemSync(
+                eq(Project.OwnerType.ORGANIZATION),
+                eq(organizationId),
+                instantCaptor.capture()
+            );
             Instant capturedThreshold = instantCaptor.getValue();
             // The threshold should be approximately now minus the cooldown period
             assertThat(capturedThreshold).isBefore(Instant.now());
@@ -771,9 +779,13 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         void shouldReturnEmptyListWhenNoProjectsNeedSync() {
             // Arrange
             Long organizationId = 42L;
-            when(projectRepository.findProjectsNeedingItemSync(eq(organizationId), any(Instant.class))).thenReturn(
-                List.of()
-            );
+            when(
+                projectRepository.findProjectsNeedingItemSync(
+                    eq(Project.OwnerType.ORGANIZATION),
+                    eq(organizationId),
+                    any(Instant.class)
+                )
+            ).thenReturn(List.of());
 
             // Act
             List<Project> result = service.getProjectsNeedingItemSync(organizationId);

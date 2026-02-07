@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHLabel;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHMilestone;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2Field;
@@ -62,7 +63,7 @@ public record GitHubProjectFieldValueDTO(
     @JsonProperty("iteration_id") String iterationId
 ) {
     private static final Logger log = LoggerFactory.getLogger(GitHubProjectFieldValueDTO.class);
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper().registerModule(new JavaTimeModule());
 
     // ========== STATIC FACTORY METHODS FOR GRAPHQL RESPONSES ==========
 

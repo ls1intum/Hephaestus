@@ -6,6 +6,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2Field;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2FieldConfiguration;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2IterationField;
@@ -34,7 +35,7 @@ public record GitHubProjectFieldDTO(
     @JsonProperty("updated_at") Instant updatedAt
 ) {
     private static final Logger log = LoggerFactory.getLogger(GitHubProjectFieldDTO.class);
-    private static final ObjectMapper objectMapper = new ObjectMapper();
+    private static final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
 
     /**
      * Option for single-select fields.
@@ -73,6 +74,8 @@ public record GitHubProjectFieldDTO(
             case "REVIEWERS" -> ProjectField.DataType.REVIEWERS;
             case "PARENT_ISSUE" -> ProjectField.DataType.PARENT_ISSUE;
             case "SUB_ISSUES_PROGRESS" -> ProjectField.DataType.SUB_ISSUES_PROGRESS;
+            case "ISSUE_TYPE" -> ProjectField.DataType.ISSUE_TYPE;
+            case "TRACKED_BY" -> ProjectField.DataType.TRACKED_BY;
             default -> {
                 log.warn("Unknown field data type: {}, treating as TEXT", dataType);
                 yield ProjectField.DataType.TEXT;

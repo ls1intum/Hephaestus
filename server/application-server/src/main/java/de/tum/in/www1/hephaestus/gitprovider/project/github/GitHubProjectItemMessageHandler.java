@@ -109,10 +109,9 @@ public class GitHubProjectItemMessageHandler extends GitHubMessageHandler<GitHub
         switch (actionType) {
             case DELETED -> {
                 Long itemId = itemDto.getDatabaseId();
-                // We don't have project ID in delete events, but we can try to find the item
+                // Delete events lack a project ID, so we look up the item by its database ID
                 if (itemId != null) {
-                    // The item might still exist if we haven't processed the delete yet
-                    // Try to find the associated project before deletion
+                    // Look up the item's project association before removing it
                     itemProcessor.delete(itemId, null, context);
                 }
             }

@@ -31,7 +31,7 @@ query GetOrganizationProjects($login: String!, $first: Int!, $after: String) {
         resetAt
     }
     organization(login: $login) {
-        projectsV2(first: $first, after: $after, orderBy: {field: UPDATED_AT, direction: DESC}) {
+        projectsV2(first: $first, after: $after, orderBy: { field: UPDATED_AT, direction: DESC }) {
             pageInfo {
                 hasNextPage
                 endCursor
@@ -49,68 +49,5 @@ query GetOrganizationProjects($login: String!, $first: Int!, $after: String) {
         }
     }
 }
-
-# =============================================================================
-# Fragment Definitions
-# =============================================================================
-
-# Fragment for ProjectV2 base fields - core project metadata
-fragment ProjectV2BaseFields on ProjectV2 {
-    __typename
-    id
-    fullDatabaseId
-    number
-    title
-    shortDescription
-    readme
-    template
-    url
-    closed
-    closedAt
-    public
-    createdAt
-    updatedAt
-}
-
-# Fragment for project owner (Organization or User)
-fragment ProjectV2OwnerFields on ProjectV2Owner {
-    __typename
-    ... on Organization {
-        id
-        databaseId
-        login
-    }
-    ... on User {
-        id
-        databaseId
-        login
-    }
-}
-
-# Fragment for Actor interface (full fields including email for project creators)
-fragment ActorFields on Actor {
-    __typename
-    login
-    ... on User {
-        id
-        databaseId
-        avatarUrl
-        name
-        email
-    }
-    ... on Bot {
-        id
-        databaseId
-        avatarUrl
-    }
-    ... on Mannequin {
-        id
-        databaseId
-        avatarUrl
-    }
-    ... on Organization {
-        id
-        databaseId
-        avatarUrl
-    }
-}
+# Fragments (ProjectV2BaseFields, ProjectV2OwnerFields, ActorFields) are
+# resolved from ProjectFragments.graphql via ResourceDocumentSource.

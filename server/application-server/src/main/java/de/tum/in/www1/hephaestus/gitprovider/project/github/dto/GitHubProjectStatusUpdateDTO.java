@@ -11,6 +11,8 @@ import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
 import java.math.BigInteger;
 import java.time.Instant;
 import java.time.LocalDate;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.lang.Nullable;
 
 /**
@@ -33,6 +35,8 @@ public record GitHubProjectStatusUpdateDTO(
     @JsonProperty("created_at") Instant createdAt,
     @JsonProperty("updated_at") Instant updatedAt
 ) {
+    private static final Logger log = LoggerFactory.getLogger(GitHubProjectStatusUpdateDTO.class);
+
     /**
      * Get the database ID, preferring databaseId over id for GraphQL responses.
      */
@@ -99,6 +103,7 @@ public record GitHubProjectStatusUpdateDTO(
         try {
             return value.longValueExact();
         } catch (ArithmeticException e) {
+            log.error("GitHub database ID {} exceeds Long.MAX_VALUE, truncating to {}", value, value.longValue());
             return value.longValue();
         }
     }

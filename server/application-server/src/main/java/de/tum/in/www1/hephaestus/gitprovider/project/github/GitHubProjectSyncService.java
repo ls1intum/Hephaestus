@@ -1074,6 +1074,11 @@ public class GitHubProjectSyncService {
 
                 // Process this page of fields in a transaction
                 transactionTemplate.executeWithoutResult(status -> {
+                    Project managedProject = projectRepository.findById(projectId).orElse(null);
+                    if (managedProject == null) {
+                        return;
+                    }
+
                     for (GHProjectV2FieldConfiguration fieldConfig : fieldsConnection.getNodes()) {
                         GitHubProjectFieldDTO fieldDto = GitHubProjectFieldDTO.fromFieldConfiguration(fieldConfig);
                         if (fieldDto == null || fieldDto.id() == null) {
@@ -1147,7 +1152,7 @@ public class GitHubProjectSyncService {
             );
             return completedNormally;
         } catch (Exception e) {
-            log.warn("Failed to sync project fields: projectId={}, error={}", projectId, e.getMessage());
+            log.warn("Failed to sync project fields: projectId={}, error={}", projectId, e.getMessage(), e);
             return false;
         }
     }
@@ -1262,6 +1267,11 @@ public class GitHubProjectSyncService {
 
                 // Process this page of status updates in a transaction
                 transactionTemplate.executeWithoutResult(status -> {
+                    Project managedProject = projectRepository.findById(projectId).orElse(null);
+                    if (managedProject == null) {
+                        return;
+                    }
+
                     ProcessingContext context = ProcessingContext.forSync(scopeId, null);
 
                     for (GHProjectV2StatusUpdate graphQlStatusUpdate : statusUpdatesConnection.getNodes()) {
@@ -1273,7 +1283,7 @@ public class GitHubProjectSyncService {
                         }
 
                         syncedStatusUpdateNodeIds.add(dto.nodeId());
-                        statusUpdateProcessor.process(dto, project, context);
+                        statusUpdateProcessor.process(dto, managedProject, context);
                     }
                 });
 
@@ -1326,7 +1336,7 @@ public class GitHubProjectSyncService {
             );
             return completedNormally;
         } catch (Exception e) {
-            log.warn("Failed to sync project status updates: projectId={}, error={}", projectId, e.getMessage());
+            log.warn("Failed to sync project status updates: projectId={}, error={}", projectId, e.getMessage(), e);
             return false;
         }
     }
@@ -1416,7 +1426,11 @@ public class GitHubProjectSyncService {
      */
     public List<Project> getProjectsNeedingItemSync(Long organizationId) {
         Instant cooldownThreshold = Instant.now().minusSeconds(syncSchedulerProperties.cooldownMinutes() * 60L);
-        return projectRepository.findProjectsNeedingItemSync(organizationId, cooldownThreshold);
+        return projectRepository.findProjectsNeedingItemSync(
+            Project.OwnerType.ORGANIZATION,
+            organizationId,
+            cooldownThreshold
+        );
     }
 
     /**
@@ -1640,7 +1654,8 @@ public class GitHubProjectSyncService {
                     "Failed to sync remaining field values: itemId={}, projectId={}, error={}",
                     itemId,
                     projectId,
-                    e.getMessage()
+                    e.getMessage(),
+                    e
                 );
                 break;
             }
