@@ -36,26 +36,27 @@ query GetProjectStatusUpdates($nodeId: ID!, $first: Int!, $after: String) {
     node(id: $nodeId) {
         ... on ProjectV2 {
             id
-            statusUpdates(first: $first, after: $after, orderBy: {field: CREATED_AT, direction: DESC}) {
+            statusUpdates(first: $first, after: $after, orderBy: { field: CREATED_AT, direction: DESC }) {
                 pageInfo {
                     hasNextPage
                     endCursor
                 }
                 totalCount
                 nodes {
-                    ...ProjectV2StatusUpdateFields
+                    ...ProjectV2StatusUpdateFieldsCompact
                 }
             }
         }
     }
 }
 
-# =============================================================================
-# Fragment Definitions
-# =============================================================================
+# NOTE: This file defines its own ProjectV2StatusUpdateFields that uses
+# ActorFieldsCompact (without email) instead of ActorFields (with email)
+# as in ProjectFragments.graphql. This is intentional for status updates
+# where email is not needed.
 
-# Fragment for project status updates
-fragment ProjectV2StatusUpdateFields on ProjectV2StatusUpdate {
+# Fragment for project status updates (local override — uses ActorFieldsCompact)
+fragment ProjectV2StatusUpdateFieldsCompact on ProjectV2StatusUpdate {
     __typename
     id
     fullDatabaseId
@@ -70,30 +71,4 @@ fragment ProjectV2StatusUpdateFields on ProjectV2StatusUpdate {
         ...ActorFieldsCompact
     }
 }
-
-# Compact actor fields (without email, appropriate for nested contexts)
-fragment ActorFieldsCompact on Actor {
-    __typename
-    login
-    ... on User {
-        id
-        databaseId
-        avatarUrl
-        name
-    }
-    ... on Bot {
-        id
-        databaseId
-        avatarUrl
-    }
-    ... on Mannequin {
-        id
-        databaseId
-        avatarUrl
-    }
-    ... on Organization {
-        id
-        databaseId
-        avatarUrl
-    }
-}
+# ActorFieldsCompact is resolved from ProjectFragments.graphql via ResourceDocumentSource.

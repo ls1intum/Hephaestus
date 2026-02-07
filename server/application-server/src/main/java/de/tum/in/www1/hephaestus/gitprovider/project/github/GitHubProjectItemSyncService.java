@@ -18,13 +18,18 @@ import de.tum.in.www1.hephaestus.gitprovider.project.Project;
 import de.tum.in.www1.hephaestus.gitprovider.project.ProjectRepository;
 import de.tum.in.www1.hephaestus.gitprovider.project.github.dto.GitHubProjectItemDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
+import java.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.graphql.client.ClientGraphQlResponse;
+import org.springframework.graphql.client.GraphQlTransportException;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
+import reactor.core.publisher.Mono;
+import reactor.util.retry.Retry;
 
 /**
  * Service for synchronizing GitHub project items from the issue/PR side.
@@ -52,24 +57,39 @@ public class GitHubProjectItemSyncService {
     private static final String ISSUE_PROJECT_ITEMS_QUERY = "GetIssueProjectItems";
     private static final String PR_PROJECT_ITEMS_QUERY = "GetPullRequestProjectItems";
 
+    /**
+     * Retry configuration for transport-level errors during body streaming.
+     * <p>
+     * CRITICAL: WebClient ExchangeFilterFunction retries DO NOT cover body streaming errors.
+     * PrematureCloseException occurs AFTER HTTP headers are received, during body consumption.
+     * We must retry at this level using Mono.defer() to wrap the entire execute() call.
+     */
+    private static final int TRANSPORT_MAX_RETRIES = 3;
+    private static final Duration TRANSPORT_INITIAL_BACKOFF = Duration.ofSeconds(2);
+    private static final Duration TRANSPORT_MAX_BACKOFF = Duration.ofSeconds(15);
+    private static final double JITTER_FACTOR = 0.5;
+
     private final ProjectRepository projectRepository;
     private final GitHubProjectItemProcessor projectItemProcessor;
     private final GitHubGraphQlClientProvider graphQlClientProvider;
     private final GitHubSyncProperties syncProperties;
     private final GitHubExceptionClassifier exceptionClassifier;
+    private final TransactionTemplate transactionTemplate;
 
     public GitHubProjectItemSyncService(
         ProjectRepository projectRepository,
         GitHubProjectItemProcessor projectItemProcessor,
         GitHubGraphQlClientProvider graphQlClientProvider,
         GitHubSyncProperties syncProperties,
-        GitHubExceptionClassifier exceptionClassifier
+        GitHubExceptionClassifier exceptionClassifier,
+        TransactionTemplate transactionTemplate
     ) {
         this.projectRepository = projectRepository;
         this.projectItemProcessor = projectItemProcessor;
         this.graphQlClientProvider = graphQlClientProvider;
         this.syncProperties = syncProperties;
         this.exceptionClassifier = exceptionClassifier;
+        this.transactionTemplate = transactionTemplate;
     }
 
     /**
@@ -111,7 +131,6 @@ public class GitHubProjectItemSyncService {
      * @param startCursor the pagination cursor to start from
      * @return number of additional items synced
      */
-    @Transactional
     public int syncRemainingProjectItems(
         Long scopeId,
         String issueNodeId,
@@ -124,7 +143,6 @@ public class GitHubProjectItemSyncService {
             return 0;
         }
 
-        ProcessingContext context = ProcessingContext.forSync(scopeId, repository);
         HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
 
         int totalSynced = 0;
@@ -155,12 +173,32 @@ public class GitHubProjectItemSyncService {
             }
 
             try {
-                ClientGraphQlResponse response = client
-                    .documentName(queryDocument)
-                    .variable(variableName, issueNodeId)
-                    .variable("first", DEFAULT_PAGE_SIZE)
-                    .variable("after", cursor)
-                    .execute()
+                final String currentCursor = cursor;
+                final int currentPage = pageCount;
+
+                ClientGraphQlResponse response = Mono.defer(() ->
+                    client
+                        .documentName(queryDocument)
+                        .variable(variableName, issueNodeId)
+                        .variable("first", DEFAULT_PAGE_SIZE)
+                        .variable("after", currentCursor)
+                        .execute()
+                )
+                    .retryWhen(
+                        Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                            .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                            .jitter(JITTER_FACTOR)
+                            .filter(this::isTransportError)
+                            .doBeforeRetry(signal ->
+                                log.warn(
+                                    "Retrying project item pagination after transport error: nodeId={}, page={}, attempt={}, error={}",
+                                    issueNodeId,
+                                    currentPage,
+                                    signal.totalRetries() + 1,
+                                    signal.failure().getMessage()
+                                )
+                            )
+                    )
                     .block(syncProperties.graphqlTimeout());
 
                 if (response == null || !response.isValid()) {
@@ -183,11 +221,21 @@ public class GitHubProjectItemSyncService {
                     break;
                 }
 
-                for (GHProjectV2Item graphQlItem : connection.getNodes()) {
-                    EmbeddedProjectItem embeddedItem = EmbeddedProjectItem.fromProjectV2Item(graphQlItem);
-                    if (embeddedItem != null && processEmbeddedItem(embeddedItem, context)) {
-                        totalSynced++;
+                // Process this page of items in its own transaction
+                Integer pageSynced = transactionTemplate.execute(status -> {
+                    ProcessingContext context = ProcessingContext.forSync(scopeId, repository);
+                    int synced = 0;
+                    for (GHProjectV2Item graphQlItem : connection.getNodes()) {
+                        EmbeddedProjectItem embeddedItem = EmbeddedProjectItem.fromProjectV2Item(graphQlItem);
+                        if (embeddedItem != null && processEmbeddedItem(embeddedItem, context)) {
+                            synced++;
+                        }
                     }
+                    return synced;
+                });
+
+                if (pageSynced != null) {
+                    totalSynced += pageSynced;
                 }
 
                 var pageInfo = connection.getPageInfo();
@@ -242,7 +290,8 @@ public class GitHubProjectItemSyncService {
                 "Failed to process embedded project item: projectId={}, itemNodeId={}, error={}",
                 project.getId(),
                 embeddedItem.item().nodeId(),
-                e.getMessage()
+                e.getMessage(),
+                e
             );
             return false;
         }
@@ -264,5 +313,45 @@ public class GitHubProjectItemSyncService {
         }
 
         return projectRepository.findByNodeId(projectRef.nodeId()).orElse(null);
+    }
+
+    /**
+     * Determines if an exception is a transport-level error that should be retried.
+     */
+    private boolean isTransportError(Throwable throwable) {
+        if (throwable instanceof GraphQlTransportException) {
+            return true;
+        }
+
+        Throwable cause = throwable;
+        while (cause != null) {
+            String className = cause.getClass().getName();
+
+            if (className.contains("PrematureCloseException")) {
+                return true;
+            }
+            if (className.contains("AbortedException") || className.contains("ConnectionResetException")) {
+                return true;
+            }
+
+            if (cause instanceof java.io.IOException) {
+                String message = cause.getMessage();
+                if (message != null) {
+                    String lower = message.toLowerCase();
+                    if (
+                        lower.contains("connection reset") ||
+                        lower.contains("broken pipe") ||
+                        lower.contains("connection abort") ||
+                        lower.contains("premature") ||
+                        lower.contains("stream closed")
+                    ) {
+                        return true;
+                    }
+                }
+            }
+
+            cause = cause.getCause();
+        }
+        return false;
     }
 }

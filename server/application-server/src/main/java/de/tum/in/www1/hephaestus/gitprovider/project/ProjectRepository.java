@@ -264,12 +264,13 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
     @Query(
         """
         SELECT p FROM Project p
-        WHERE p.ownerType = 'ORGANIZATION' AND p.ownerId = :ownerId
+        WHERE p.ownerType = :ownerType AND p.ownerId = :ownerId
           AND (p.itemsSyncedAt IS NULL OR p.itemsSyncedAt < :cooldownThreshold)
         ORDER BY COALESCE(p.itemsSyncedAt, p.createdAt) ASC
         """
     )
     List<Project> findProjectsNeedingItemSync(
+        @Param("ownerType") Project.OwnerType ownerType,
         @Param("ownerId") Long ownerId,
         @Param("cooldownThreshold") Instant cooldownThreshold
     );
@@ -324,4 +325,26 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
      * @return true if at least one project exists for this owner
      */
     boolean existsByOwnerTypeAndOwnerId(Project.OwnerType ownerType, Long ownerId);
+
+    /**
+     * Finds all orphaned projects (projects whose owner entity no longer exists).
+     * <p>
+     * Uses LEFT JOINs against all owner tables to detect missing owners in a single query,
+     * avoiding the N+1 problem of checking each project individually.
+     *
+     * @return list of orphaned projects
+     */
+    @Query(
+        value = """
+        SELECT p.* FROM project p
+        LEFT JOIN organization o ON p.owner_type = 'ORGANIZATION' AND p.owner_id = o.id
+        LEFT JOIN repository r ON p.owner_type = 'REPOSITORY' AND p.owner_id = r.id
+        LEFT JOIN "user" u ON p.owner_type = 'USER' AND p.owner_id = u.id
+        WHERE (p.owner_type = 'ORGANIZATION' AND o.id IS NULL)
+           OR (p.owner_type = 'REPOSITORY' AND r.id IS NULL)
+           OR (p.owner_type = 'USER' AND u.id IS NULL)
+        """,
+        nativeQuery = true
+    )
+    List<Project> findOrphanedProjects();
 }

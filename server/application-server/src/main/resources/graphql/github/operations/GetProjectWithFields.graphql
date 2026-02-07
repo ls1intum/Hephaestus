@@ -59,48 +59,5 @@ query GetProjectWithFields($nodeId: ID!, $fieldsFirst: Int = 50, $fieldsAfter: S
         }
     }
 }
-
-# =============================================================================
-# Fragment Definitions
-# =============================================================================
-
-# Fragment for project field definitions
-# Covers all field types: standard fields, single-select, and iteration fields
-fragment ProjectV2FieldConfigFields on ProjectV2FieldConfiguration {
-    __typename
-    ... on ProjectV2Field {
-        id
-        name
-        dataType
-        createdAt
-        updatedAt
-    }
-    ... on ProjectV2SingleSelectField {
-        id
-        name
-        dataType
-        createdAt
-        updatedAt
-        options {
-            id
-            name
-            color
-            description
-        }
-    }
-    ... on ProjectV2IterationField {
-        id
-        name
-        dataType
-        createdAt
-        updatedAt
-        configuration {
-            iterations {
-                id
-                title
-                startDate
-                duration
-            }
-        }
-    }
-}
+# Fragment (ProjectV2FieldConfigFields) is resolved from ProjectFragments.graphql
+# via ResourceDocumentSource.

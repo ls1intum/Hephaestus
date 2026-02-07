@@ -9,6 +9,8 @@ import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
 import java.math.BigInteger;
 import java.time.Instant;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.lang.Nullable;
 
 /**
@@ -35,6 +37,8 @@ public record GitHubProjectDTO(
     @JsonProperty("created_at") Instant createdAt,
     @JsonProperty("updated_at") Instant updatedAt
 ) {
+    private static final Logger log = LoggerFactory.getLogger(GitHubProjectDTO.class);
+
     /**
      * Get the database ID, preferring databaseId over id for GraphQL responses.
      */
@@ -97,8 +101,7 @@ public record GitHubProjectDTO(
         try {
             return value.longValueExact();
         } catch (ArithmeticException e) {
-            // BigInteger value exceeds Long.MAX_VALUE - use longValue() which truncates
-            // This should be extremely rare as GitHub database IDs are sequential
+            log.error("GitHub database ID {} exceeds Long.MAX_VALUE, truncating to {}", value, value.longValue());
             return value.longValue();
         }
     }

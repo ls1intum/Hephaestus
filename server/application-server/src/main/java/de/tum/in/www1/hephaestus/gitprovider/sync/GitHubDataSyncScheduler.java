@@ -380,20 +380,32 @@ public class GitHubDataSyncScheduler {
             int projectsWithItems = 0;
 
             for (Project project : projects) {
-                SyncResult itemResult = projectSyncService.syncDraftIssues(session.scopeId(), project);
-                totalItemsSynced += itemResult.count();
-                if (itemResult.count() > 0) {
-                    projectsWithItems++;
-                }
+                try {
+                    SyncResult itemResult = projectSyncService.syncDraftIssues(session.scopeId(), project);
+                    totalItemsSynced += itemResult.count();
+                    if (itemResult.count() > 0) {
+                        projectsWithItems++;
+                    }
 
-                // If rate limited, stop processing more projects
-                if (itemResult.status() == SyncResult.Status.ABORTED_RATE_LIMIT) {
-                    log.info(
-                        "Stopping project items sync: reason=rateLimited, scopeId={}, projectsProcessed={}",
+                    // If rate limited, stop processing more projects
+                    if (itemResult.status() == SyncResult.Status.ABORTED_RATE_LIMIT) {
+                        log.info(
+                            "Stopping project items sync: reason=rateLimited, scopeId={}, projectsProcessed={}",
+                            session.scopeId(),
+                            projectsWithItems
+                        );
+                        break;
+                    }
+                } catch (InstallationNotFoundException e) {
+                    throw e;
+                } catch (Exception e) {
+                    log.warn(
+                        "Failed to sync project items: projectId={}, scopeId={}, error={}",
+                        project.getId(),
                         session.scopeId(),
-                        projectsWithItems
+                        e.getMessage()
                     );
-                    break;
+                    // Continue with next project on error
                 }
             }
 

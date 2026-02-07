@@ -6,6 +6,7 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import java.util.List;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -281,20 +282,11 @@ public class ProjectIntegrityService {
         int orphanedRepoProjects = 0;
         int orphanedUserProjects = 0;
 
-        // Check organization-owned projects
-        for (Project project : projectRepository.findAllByOwnerTypeAndOwnerId(Project.OwnerType.ORGANIZATION, null)) {
-            // This won't work with null - need a different approach
-        }
-
-        // More efficient approach: query for projects whose owners don't exist
-        // This requires a native query or iterating through all projects
-        for (Project project : projectRepository.findAll()) {
-            if (!validateOwnerExists(project.getOwnerType(), project.getOwnerId())) {
-                switch (project.getOwnerType()) {
-                    case ORGANIZATION -> orphanedOrgProjects++;
-                    case REPOSITORY -> orphanedRepoProjects++;
-                    case USER -> orphanedUserProjects++;
-                }
+        for (Project project : projectRepository.findOrphanedProjects()) {
+            switch (project.getOwnerType()) {
+                case ORGANIZATION -> orphanedOrgProjects++;
+                case REPOSITORY -> orphanedRepoProjects++;
+                case USER -> orphanedUserProjects++;
             }
         }
 
@@ -324,25 +316,22 @@ public class ProjectIntegrityService {
      */
     @Transactional
     public int deleteOrphanedProjects() {
-        int deleted = 0;
+        List<Project> orphaned = projectRepository.findOrphanedProjects();
 
-        for (Project project : projectRepository.findAll()) {
-            if (!validateOwnerExists(project.getOwnerType(), project.getOwnerId())) {
-                log.warn(
-                    "Deleting orphaned project: projectId={}, ownerType={}, ownerId={}",
-                    project.getId(),
-                    project.getOwnerType(),
-                    project.getOwnerId()
-                );
-                projectRepository.delete(project);
-                deleted++;
-            }
+        for (Project project : orphaned) {
+            log.warn(
+                "Deleting orphaned project: projectId={}, ownerType={}, ownerId={}",
+                project.getId(),
+                project.getOwnerType(),
+                project.getOwnerId()
+            );
+            projectRepository.delete(project);
         }
 
-        if (deleted > 0) {
-            log.info("Deleted orphaned projects: count={}", deleted);
+        if (!orphaned.isEmpty()) {
+            log.info("Deleted orphaned projects: count={}", orphaned.size());
         }
 
-        return deleted;
+        return orphaned.size();
     }
 }

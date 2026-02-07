@@ -19,6 +19,8 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.lang.Nullable;
 
 /**
@@ -49,6 +51,8 @@ public record GitHubProjectItemDTO(
     @JsonProperty("created_at") Instant createdAt,
     @JsonProperty("updated_at") Instant updatedAt
 ) {
+    private static final Logger log = LoggerFactory.getLogger(GitHubProjectItemDTO.class);
+
     /**
      * Get the database ID, preferring databaseId over id for GraphQL responses.
      */
@@ -181,6 +185,7 @@ public record GitHubProjectItemDTO(
         try {
             return value.longValueExact();
         } catch (ArithmeticException e) {
+            log.error("GitHub database ID {} exceeds Long.MAX_VALUE, truncating to {}", value, value.longValue());
             return value.longValue();
         }
     }
