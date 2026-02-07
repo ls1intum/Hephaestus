@@ -59,5 +59,3 @@ query GetProjectWithFields($nodeId: ID!, $fieldsFirst: Int = 50, $fieldsAfter: S
         }
     }
 }
-# Fragment (ProjectV2FieldConfigFields) is resolved from ProjectFragments.graphql
-# via ResourceDocumentSource.

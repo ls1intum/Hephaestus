@@ -12,6 +12,7 @@ import de.tum.in.www1.hephaestus.gitprovider.project.ProjectRepository;
 import de.tum.in.www1.hephaestus.gitprovider.project.github.dto.GitHubProjectDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserProcessor;
 import java.time.Instant;
 import java.util.Set;
 import org.slf4j.Logger;
@@ -39,9 +40,10 @@ public class GitHubProjectProcessor extends BaseGitHubProcessor {
         UserRepository userRepository,
         LabelRepository labelRepository,
         MilestoneRepository milestoneRepository,
+        GitHubUserProcessor gitHubUserProcessor,
         ApplicationEventPublisher eventPublisher
     ) {
-        super(userRepository, labelRepository, milestoneRepository);
+        super(userRepository, labelRepository, milestoneRepository, gitHubUserProcessor);
         this.projectRepository = projectRepository;
         this.eventPublisher = eventPublisher;
     }

@@ -20,6 +20,7 @@ import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
 import java.time.Instant;
 import java.util.HashSet;
@@ -77,9 +78,10 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
         UserRepository userRepository,
         OrganizationRepository organizationRepository,
         GitHubIssueTypeSyncService issueTypeSyncService,
+        GitHubUserProcessor gitHubUserProcessor,
         ApplicationEventPublisher eventPublisher
     ) {
-        super(userRepository, labelRepository, milestoneRepository);
+        super(userRepository, labelRepository, milestoneRepository, gitHubUserProcessor);
         this.issueRepository = issueRepository;
         this.organizationRepository = organizationRepository;
         this.issueTypeSyncService = issueTypeSyncService;

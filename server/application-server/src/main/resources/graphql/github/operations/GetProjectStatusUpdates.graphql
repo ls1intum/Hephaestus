@@ -71,4 +71,3 @@ fragment ProjectV2StatusUpdateFieldsCompact on ProjectV2StatusUpdate {
         ...ActorFieldsCompact
     }
 }
-# ActorFieldsCompact is resolved from ProjectFragments.graphql via ResourceDocumentSource.

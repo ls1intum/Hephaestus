@@ -179,7 +179,8 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
             base_ref_name = EXCLUDED.base_ref_name,
             head_ref_oid = EXCLUDED.head_ref_oid,
             base_ref_oid = EXCLUDED.base_ref_oid,
-            merged_by_id = COALESCE(EXCLUDED.merged_by_id, issue.merged_by_id)
+            merged_by_id = COALESCE(EXCLUDED.merged_by_id, issue.merged_by_id),
+            issue_type = EXCLUDED.issue_type
         """,
         nativeQuery = true
     )

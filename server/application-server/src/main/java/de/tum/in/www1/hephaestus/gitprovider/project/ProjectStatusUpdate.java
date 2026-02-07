@@ -27,10 +27,7 @@ import org.springframework.lang.NonNull;
 @Table(
     name = "project_status_update",
     uniqueConstraints = { @UniqueConstraint(name = "uk_project_status_update_node_id", columnNames = { "node_id" }) },
-    indexes = {
-        @Index(name = "idx_project_status_update_project_id", columnList = "project_id"),
-        @Index(name = "idx_project_status_update_created_at", columnList = "project_id, created_at DESC"),
-    }
+    indexes = { @Index(name = "idx_project_status_update_created_at", columnList = "project_id, created_at DESC") }
 )
 @Getter
 @Setter

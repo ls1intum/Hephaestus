@@ -666,7 +666,6 @@ export const project = pgTable(
 	},
 	(table) => [
 		index("idx_project_creator_id").using("btree", table.creatorId.asc().nullsLast()),
-		index("idx_project_node_id").using("btree", table.nodeId.asc().nullsLast()),
 		index("idx_project_owner").using(
 			"btree",
 			table.ownerType.asc().nullsLast(),
@@ -677,6 +676,7 @@ export const project = pgTable(
 			foreignColumns: [user.id],
 			name: "fk_project_creator",
 		}).onDelete("set null"),
+		unique("uk_project_node_id").on(table.nodeId),
 		unique("uk_project_owner_number").on(table.ownerType, table.ownerId, table.number),
 	],
 );
@@ -752,6 +752,8 @@ export const projectItem = pgTable(
 		contentType: varchar("content_type", { length: 32 }).notNull(),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		issueId: bigint("issue_id", { mode: "number" }),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		contentDatabaseId: bigint("content_database_id", { mode: "number" }),
 		draftTitle: varchar("draft_title", { length: 1024 }),
 		draftBody: text("draft_body"),
 		archived: boolean().default(false).notNull(),
@@ -768,7 +770,6 @@ export const projectItem = pgTable(
 			table.projectId.asc().nullsLast(),
 			table.archived.asc().nullsLast(),
 		),
-		index("idx_project_item_project_id").using("btree", table.projectId.asc().nullsLast()),
 		foreignKey({
 			columns: [table.projectId],
 			foreignColumns: [project.id],
@@ -778,7 +779,7 @@ export const projectItem = pgTable(
 			columns: [table.issueId],
 			foreignColumns: [issue.id],
 			name: "fk_project_item_issue",
-		}).onDelete("cascade"),
+		}).onDelete("set null"),
 		foreignKey({
 			columns: [table.creatorId],
 			foreignColumns: [user.id],
@@ -813,7 +814,6 @@ export const projectStatusUpdate = pgTable(
 			table.createdAt.desc().nullsFirst(),
 		),
 		index("idx_project_status_update_creator_id").using("btree", table.creatorId.asc().nullsLast()),
-		index("idx_project_status_update_project_id").using("btree", table.projectId.asc().nullsLast()),
 		foreignKey({
 			columns: [table.projectId],
 			foreignColumns: [project.id],

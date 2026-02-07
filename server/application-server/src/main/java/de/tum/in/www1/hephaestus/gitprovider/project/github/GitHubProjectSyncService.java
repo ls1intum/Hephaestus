@@ -199,6 +199,19 @@ public class GitHubProjectSyncService {
     }
 
     /**
+     * Relinks orphaned project items whose issue_id is NULL but content_database_id
+     * points to an issue that now exists locally.
+     * <p>
+     * Should be called AFTER repository/issue sync completes so that newly synced
+     * issues can be matched to their project items.
+     *
+     * @return number of items relinked
+     */
+    public int relinkOrphanedProjectItems() {
+        return itemProcessor.relinkOrphanedItems();
+    }
+
+    /**
      * Synchronizes all projects for an organization using GraphQL.
      * <p>
      * This method syncs only the project list (metadata). Draft Issue sync should be
@@ -620,6 +633,8 @@ public class GitHubProjectSyncService {
         }
 
         List<String> syncedItemNodeIds = new ArrayList<>();
+        // Track Issue/PR item node IDs seen during full sync for stale removal (Bug 5)
+        List<String> syncedIssuePrNodeIds = new ArrayList<>();
         // Track items needing follow-up field value pagination (items with >20 field values)
         List<ItemWithFieldValueCursor> itemsNeedingFieldValuePagination = new ArrayList<>();
         int totalSynced = 0;
@@ -731,7 +746,42 @@ public class GitHubProjectSyncService {
                         // (embedded in issue/PR GraphQL queries) for better efficiency.
                         ProjectItem.ContentType contentType = itemDto.getContentTypeEnum();
                         if (contentType != ProjectItem.ContentType.DRAFT_ISSUE) {
-                            // Skip Issue/PR items - they're synced from the issue/PR side
+                            // Track Issue/PR node IDs for stale removal (Bug 5)
+                            // even though we don't process them from the project side
+                            syncedIssuePrNodeIds.add(itemDto.nodeId());
+
+                            // Apply incremental sync skip for unchanged items
+                            if (
+                                incrementalSync &&
+                                syncThreshold != null &&
+                                itemDto.updatedAt() != null &&
+                                itemDto.updatedAt().isBefore(syncThreshold)
+                            ) {
+                                itemsSkipped++;
+                                continue;
+                            }
+
+                            // Process field values for Issue/PR items (zero additional API cost).
+                            // The item entity is synced from the issue/PR side, but field values
+                            // from the project items query cover all 11 types (vs 5 from the
+                            // embedded issue/PR queries), so this serves as authoritative backfill.
+                            ProjectItem existingItem = projectItemRepository
+                                .findByProjectIdAndNodeId(projId, itemDto.nodeId())
+                                .orElse(null);
+                            if (existingItem != null) {
+                                processFieldValues(existingItem.getId(), itemDto.fieldValues());
+
+                                if (itemDto.fieldValuesTruncated() && itemDto.fieldValuesEndCursor() != null) {
+                                    itemsNeedingFieldValuePagination.add(
+                                        new ItemWithFieldValueCursor(
+                                            existingItem.getId(),
+                                            itemDto.nodeId(),
+                                            itemDto.fieldValuesEndCursor()
+                                        )
+                                    );
+                                }
+                            }
+
                             continue;
                         }
 
@@ -923,12 +973,28 @@ public class GitHubProjectSyncService {
             // Clear cursor and update sync timestamp
             updateItemsSyncCompleted(projectId, Instant.now());
 
-            // Remove stale Draft Issues only on complete sync
-            // Note: Issue/PR items are NOT removed here - they are synced from the issue/PR side
-            ProcessingContext context = ProcessingContext.forSync(scopeId, null);
-            int removed = itemProcessor.removeStaleDraftIssues(projectId, syncedItemNodeIds, context);
-            if (removed > 0) {
-                log.debug("Removed stale Draft Issues: projectId={}, count={}", projectId, removed);
+            // Remove stale items only on complete, non-resumed sync.
+            // Resumed syncs only cover a subset of items, so removal would incorrectly
+            // delete items that simply weren't re-fetched.
+            if (!resuming) {
+                ProcessingContext context = ProcessingContext.forSync(scopeId, null);
+                int removedDrafts = itemProcessor.removeStaleDraftIssues(projectId, syncedItemNodeIds, context);
+                if (removedDrafts > 0) {
+                    log.debug("Removed stale Draft Issues: projectId={}, count={}", projectId, removedDrafts);
+                }
+
+                // Remove stale Issue/PR items that were removed from the project on GitHub (Bug 5).
+                int removedIssuePr = itemProcessor.removeStaleIssuePrItems(projectId, syncedIssuePrNodeIds, context);
+                if (removedIssuePr > 0) {
+                    log.debug("Removed stale Issue/PR items: projectId={}, count={}", projectId, removedIssuePr);
+                }
+            } else {
+                log.debug(
+                    "Skipped stale item removal: reason=resumedSync, projectId={}, trackedDraftNodeIds={}, trackedIssuePrNodeIds={}",
+                    projectId,
+                    syncedItemNodeIds.size(),
+                    syncedIssuePrNodeIds.size()
+                );
             }
         } else {
             log.warn(

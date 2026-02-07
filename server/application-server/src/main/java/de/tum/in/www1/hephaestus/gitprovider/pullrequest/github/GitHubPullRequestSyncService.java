@@ -667,7 +667,8 @@ public class GitHubPullRequestSyncService {
                     prWithCursor.nodeId(),
                     true, // This is a pull request
                     pr.getRepository(),
-                    prWithCursor.projectItemCursor()
+                    prWithCursor.projectItemCursor(),
+                    pr.getId()
                 );
                 totalProjectItemsSynced += additionalItems;
             }
@@ -769,7 +770,11 @@ public class GitHubPullRequestSyncService {
 
             // Process embedded project items
             EmbeddedProjectItemsDTO embeddedProjectItems = prWithReviews.embeddedProjectItems();
-            projectItemsSynced += projectItemSyncService.processEmbeddedItems(embeddedProjectItems, context);
+            projectItemsSynced += projectItemSyncService.processEmbeddedItems(
+                embeddedProjectItems,
+                context,
+                entity.getId()
+            );
 
             // Track PRs that need additional project item pagination
             // Store PR ID instead of entity reference to survive transaction rollbacks

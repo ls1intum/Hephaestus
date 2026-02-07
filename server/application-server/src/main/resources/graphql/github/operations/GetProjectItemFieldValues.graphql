@@ -47,5 +47,3 @@ query GetProjectItemFieldValues($itemId: ID!, $first: Int!, $after: String) {
         }
     }
 }
-# Fragments (FieldValueFields, RequestedReviewerFields) are resolved from
-# ProjectFragments.graphql via ResourceDocumentSource.

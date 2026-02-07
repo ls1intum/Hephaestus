@@ -71,6 +71,7 @@ public class GitHubProjectItemSyncService {
 
     private final ProjectRepository projectRepository;
     private final GitHubProjectItemProcessor projectItemProcessor;
+    private final GitHubProjectItemFieldValueSyncService fieldValueSyncService;
     private final GitHubGraphQlClientProvider graphQlClientProvider;
     private final GitHubSyncProperties syncProperties;
     private final GitHubExceptionClassifier exceptionClassifier;
@@ -79,6 +80,7 @@ public class GitHubProjectItemSyncService {
     public GitHubProjectItemSyncService(
         ProjectRepository projectRepository,
         GitHubProjectItemProcessor projectItemProcessor,
+        GitHubProjectItemFieldValueSyncService fieldValueSyncService,
         GitHubGraphQlClientProvider graphQlClientProvider,
         GitHubSyncProperties syncProperties,
         GitHubExceptionClassifier exceptionClassifier,
@@ -86,6 +88,7 @@ public class GitHubProjectItemSyncService {
     ) {
         this.projectRepository = projectRepository;
         this.projectItemProcessor = projectItemProcessor;
+        this.fieldValueSyncService = fieldValueSyncService;
         this.graphQlClientProvider = graphQlClientProvider;
         this.syncProperties = syncProperties;
         this.exceptionClassifier = exceptionClassifier;
@@ -93,24 +96,34 @@ public class GitHubProjectItemSyncService {
     }
 
     /**
-     * Processes embedded project items from an issue sync.
+     * Processes embedded project items from an issue/PR sync.
      * <p>
      * For each embedded item, looks up the project by node ID and creates the item link.
      * Items referencing projects not yet synced are skipped with a debug log.
+     * <p>
+     * The {@code parentIssueId} is critical: embedded project items are fetched inline with
+     * their parent issue/PR, so the GraphQL query does NOT include the {@code content} block
+     * (which would redundantly return the parent's own ID). Instead, we propagate the parent's
+     * database ID so the processor can set both {@code issue_id} and {@code content_database_id}.
      *
      * @param embeddedItems the embedded project items from the issue query
      * @param context the processing context
+     * @param parentIssueId the database ID of the parent issue/PR that owns these project items
      * @return number of items successfully processed
      */
     @Transactional
-    public int processEmbeddedItems(EmbeddedProjectItemsDTO embeddedItems, ProcessingContext context) {
+    public int processEmbeddedItems(
+        EmbeddedProjectItemsDTO embeddedItems,
+        ProcessingContext context,
+        Long parentIssueId
+    ) {
         if (embeddedItems == null || embeddedItems.items().isEmpty()) {
             return 0;
         }
 
         int processed = 0;
         for (EmbeddedProjectItem embeddedItem : embeddedItems.items()) {
-            if (processEmbeddedItem(embeddedItem, context)) {
+            if (processEmbeddedItem(embeddedItem, context, parentIssueId)) {
                 processed++;
             }
         }
@@ -129,6 +142,7 @@ public class GitHubProjectItemSyncService {
      * @param isPullRequest true if this is a pull request, false for a regular issue
      * @param repository the repository containing the issue/PR
      * @param startCursor the pagination cursor to start from
+     * @param parentIssueId the database ID of the parent issue/PR that owns these project items
      * @return number of additional items synced
      */
     public int syncRemainingProjectItems(
@@ -136,7 +150,8 @@ public class GitHubProjectItemSyncService {
         String issueNodeId,
         boolean isPullRequest,
         Repository repository,
-        String startCursor
+        String startCursor,
+        Long parentIssueId
     ) {
         if (issueNodeId == null || issueNodeId.isBlank()) {
             log.warn("Skipped project item pagination: reason=missingNodeId");
@@ -227,7 +242,7 @@ public class GitHubProjectItemSyncService {
                     int synced = 0;
                     for (GHProjectV2Item graphQlItem : connection.getNodes()) {
                         EmbeddedProjectItem embeddedItem = EmbeddedProjectItem.fromProjectV2Item(graphQlItem);
-                        if (embeddedItem != null && processEmbeddedItem(embeddedItem, context)) {
+                        if (embeddedItem != null && processEmbeddedItem(embeddedItem, context, parentIssueId)) {
                             synced++;
                         }
                     }
@@ -261,12 +276,22 @@ public class GitHubProjectItemSyncService {
 
     /**
      * Processes a single embedded project item.
+     * <p>
+     * If the item's DTO has no {@code issueId} set (because the GraphQL query omitted
+     * the {@code content} block), the {@code parentIssueId} is injected as both
+     * {@code issueId} and {@code contentDatabaseId} via
+     * {@link GitHubProjectItemDTO#withIssueId(Long)}.
      *
      * @param embeddedItem the embedded item with project reference
      * @param context the processing context
+     * @param parentIssueId the database ID of the parent issue/PR
      * @return true if the item was successfully processed
      */
-    private boolean processEmbeddedItem(EmbeddedProjectItem embeddedItem, ProcessingContext context) {
+    private boolean processEmbeddedItem(
+        EmbeddedProjectItem embeddedItem,
+        ProcessingContext context,
+        Long parentIssueId
+    ) {
         if (embeddedItem == null || embeddedItem.item() == null) {
             return false;
         }
@@ -282,9 +307,21 @@ public class GitHubProjectItemSyncService {
         }
 
         try {
-            GitHubProjectItemDTO itemDto = embeddedItem.item();
+            GitHubProjectItemDTO itemDto = embeddedItem.item().withIssueId(parentIssueId);
             var result = projectItemProcessor.process(itemDto, project, context);
-            return result != null;
+            if (result == null) {
+                return false;
+            }
+
+            // Process inline field values for this item
+            fieldValueSyncService.processFieldValues(
+                result.getId(),
+                itemDto.fieldValues(),
+                itemDto.fieldValuesTruncated(),
+                itemDto.fieldValuesEndCursor()
+            );
+
+            return true;
         } catch (Exception e) {
             log.warn(
                 "Failed to process embedded project item: projectId={}, itemNodeId={}, error={}",

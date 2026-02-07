@@ -273,6 +273,12 @@ public class GitHubDataSyncScheduler {
                     dataSyncService.syncSyncTarget(target);
                 }
 
+                // Relink orphaned project items now that issues/PRs have been synced.
+                // Project items created before their referenced issues were synced locally
+                // will have NULL issue_id but a valid content_database_id. This fills
+                // in the FK for any items whose issues now exist.
+                projectSyncService.relinkOrphanedProjectItems();
+
                 // Sync sub-issues and issue dependencies via GraphQL
                 // These are scope-level relationships that require issues/PRs to exist first
                 syncSubIssues(session);

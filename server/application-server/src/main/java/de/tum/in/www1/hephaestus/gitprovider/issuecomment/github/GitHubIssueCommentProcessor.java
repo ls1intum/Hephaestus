@@ -22,6 +22,7 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
 import java.time.Instant;
 import java.util.HashSet;
@@ -65,9 +66,10 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
         UserRepository userRepository,
         LabelRepository labelRepository,
         MilestoneRepository milestoneRepository,
+        GitHubUserProcessor gitHubUserProcessor,
         ApplicationEventPublisher eventPublisher
     ) {
-        super(userRepository, labelRepository, milestoneRepository);
+        super(userRepository, labelRepository, milestoneRepository, gitHubUserProcessor);
         this.commentRepository = commentRepository;
         this.issueRepository = issueRepository;
         this.pullRequestRepository = pullRequestRepository;

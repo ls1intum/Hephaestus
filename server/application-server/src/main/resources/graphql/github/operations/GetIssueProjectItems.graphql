@@ -51,6 +51,7 @@ query GetIssueProjectItems($issueId: ID!, $first: Int!, $after: String) {
                     }
 
                     # Field values (embedded, first 10)
+                    # Uses shared FieldValueFieldsCostOptimized fragment (all 11 field value types)
                     fieldValues(first: 10) {
                         totalCount
                         pageInfo {
@@ -58,32 +59,7 @@ query GetIssueProjectItems($issueId: ID!, $first: Int!, $after: String) {
                             endCursor
                         }
                         nodes {
-                            __typename
-                            ... on ProjectV2ItemFieldTextValue {
-                                text
-                                field { ... on ProjectV2Field { id name } }
-                            }
-                            ... on ProjectV2ItemFieldNumberValue {
-                                number
-                                field { ... on ProjectV2Field { id name } }
-                            }
-                            ... on ProjectV2ItemFieldDateValue {
-                                date
-                                field { ... on ProjectV2Field { id name } }
-                            }
-                            ... on ProjectV2ItemFieldSingleSelectValue {
-                                optionId
-                                name
-                                color
-                                field { ... on ProjectV2SingleSelectField { id name } }
-                            }
-                            ... on ProjectV2ItemFieldIterationValue {
-                                iterationId
-                                title
-                                startDate
-                                duration
-                                field { ... on ProjectV2IterationField { id name } }
-                            }
+                            ...FieldValueFieldsCostOptimized
                         }
                     }
                 }

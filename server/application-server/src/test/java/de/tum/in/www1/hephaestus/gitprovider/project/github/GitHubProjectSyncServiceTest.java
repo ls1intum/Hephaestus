@@ -21,17 +21,24 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassi
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.BackfillStateProvider;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHIssue;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPageInfo;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2Connection;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2Field;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2FieldConfigurationConnection;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2Item;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2ItemConnection;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2ItemFieldTextValue;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2ItemFieldValueConnection;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2ItemType;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2StatusUpdateConnection;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
 import de.tum.in.www1.hephaestus.gitprovider.project.Project;
 import de.tum.in.www1.hephaestus.gitprovider.project.ProjectFieldRepository;
 import de.tum.in.www1.hephaestus.gitprovider.project.ProjectFieldValueRepository;
+import de.tum.in.www1.hephaestus.gitprovider.project.ProjectItem;
 import de.tum.in.www1.hephaestus.gitprovider.project.ProjectItemRepository;
 import de.tum.in.www1.hephaestus.gitprovider.project.ProjectRepository;
 import de.tum.in.www1.hephaestus.gitprovider.project.ProjectStatusUpdateRepository;
@@ -44,6 +51,7 @@ import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import java.math.BigInteger;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -729,6 +737,314 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             assertThat(result.fieldsSynced()).isFalse();
             assertThat(result.statusUpdatesSynced()).isTrue();
             assertThat(result.itemsSynced()).isTrue();
+        }
+
+        // ═══════════════════════════════════════════════════
+        // Issue/PR field value backfill tests
+        // ═══════════════════════════════════════════════════
+
+        /**
+         * Creates a GHProjectV2Item of ISSUE type with optional field values.
+         */
+        private GHProjectV2Item createIssueItem(
+            String nodeId,
+            long fullDbId,
+            OffsetDateTime updatedAt,
+            List<GHProjectV2ItemFieldTextValue> fieldValues,
+            boolean hasNextPage,
+            String endCursor
+        ) {
+            GHIssue ghIssue = new GHIssue();
+            ghIssue.setFullDatabaseId(BigInteger.valueOf(fullDbId));
+            ghIssue.setNumber(42);
+
+            GHPageInfo fvPageInfo = new GHPageInfo();
+            fvPageInfo.setHasNextPage(hasNextPage);
+            fvPageInfo.setEndCursor(endCursor);
+
+            GHProjectV2ItemFieldValueConnection fvConnection = new GHProjectV2ItemFieldValueConnection();
+            fvConnection.setNodes(fieldValues != null ? new java.util.ArrayList<>(fieldValues) : List.of());
+            fvConnection.setPageInfo(fvPageInfo);
+            fvConnection.setTotalCount(fieldValues != null ? fieldValues.size() : 0);
+
+            GHProjectV2Item item = new GHProjectV2Item();
+            item.setId(nodeId);
+            item.setFullDatabaseId(BigInteger.valueOf(9000 + fullDbId));
+            item.setType(GHProjectV2ItemType.ISSUE);
+            item.setContent(ghIssue);
+            item.setIsArchived(false);
+            item.setCreatedAt(OffsetDateTime.now());
+            item.setUpdatedAt(updatedAt);
+            item.setFieldValues(fvConnection);
+            return item;
+        }
+
+        /**
+         * Creates a text field value with the given field ID and text.
+         */
+        private GHProjectV2ItemFieldTextValue createTextFieldValue(String fieldNodeId, String text) {
+            GHProjectV2Field field = new GHProjectV2Field();
+            field.setId(fieldNodeId);
+
+            GHProjectV2ItemFieldTextValue textValue = new GHProjectV2ItemFieldTextValue();
+            textValue.setField(field);
+            textValue.setText(text);
+            return textValue;
+        }
+
+        /**
+         * Creates a GHProjectV2ItemConnection with the given items and no next page.
+         */
+        private GHProjectV2ItemConnection createItemConnection(List<GHProjectV2Item> items) {
+            GHPageInfo pageInfo = new GHPageInfo();
+            pageInfo.setHasNextPage(false);
+            pageInfo.setEndCursor(null);
+
+            GHProjectV2ItemConnection connection = new GHProjectV2ItemConnection();
+            connection.setNodes(items);
+            connection.setPageInfo(pageInfo);
+            connection.setTotalCount(items.size());
+            return connection;
+        }
+
+        /**
+         * Mocks the three sequential GraphQL phases (fields, status updates, items)
+         * that syncDraftIssues calls. Returns the mocked responses for assertion setup.
+         */
+        private void mockThreePhasesWithItems(Long projectId, GHProjectV2ItemConnection itemsConnection) {
+            mockGraphQlClientForScope();
+            mockGraphQlRequestChain();
+
+            // Phase 1: Fields - empty success
+            ClientGraphQlResponse fieldsResponse = mockValidGraphQlResponse("node.fields", null);
+            // Phase 2: Status updates - empty success
+            ClientGraphQlResponse statusUpdatesResponse = mockValidGraphQlResponse("node.statusUpdates", null);
+            // Phase 3: Items - return the provided connection
+            ClientGraphQlResponse itemsResponse = mockValidGraphQlResponse("node.items", itemsConnection);
+
+            when(requestSpec.execute())
+                .thenReturn(Mono.just(fieldsResponse))
+                .thenReturn(Mono.just(statusUpdatesResponse))
+                .thenReturn(Mono.just(itemsResponse));
+
+            when(backfillStateProvider.getProjectItemSyncCursor(projectId)).thenReturn(Optional.empty());
+            when(backfillStateProvider.getProjectItemsSyncedAt(projectId)).thenReturn(Optional.empty());
+        }
+
+        @Test
+        @DisplayName("should process field values for Issue/PR items when item exists locally")
+        void shouldProcessFieldValuesForIssuePrItems() {
+            // Arrange
+            Long projectId = 10L;
+            Project project = createProject(projectId, "PVT_node10", 1);
+
+            GHProjectV2ItemFieldTextValue textFv = createTextFieldValue("PVTF_status", "In Progress");
+            GHProjectV2Item issueItem = createIssueItem(
+                "PVTI_issue1",
+                12345L,
+                OffsetDateTime.now(),
+                List.of(textFv),
+                false,
+                null
+            );
+
+            GHProjectV2ItemConnection itemsConnection = createItemConnection(List.of(issueItem));
+            mockThreePhasesWithItems(projectId, itemsConnection);
+
+            // The transaction lambda calls findById to get the project
+            when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+
+            // The Issue/PR branch looks up the existing ProjectItem by nodeId
+            ProjectItem existingItem = new ProjectItem();
+            existingItem.setId(500L);
+            existingItem.setNodeId("PVTI_issue1");
+            when(projectItemRepository.findByProjectIdAndNodeId(projectId, "PVTI_issue1")).thenReturn(
+                Optional.of(existingItem)
+            );
+
+            // processFieldValues checks if the field exists
+            when(projectFieldRepository.existsById("PVTF_status")).thenReturn(true);
+
+            // Act
+            SyncResult result = service.syncDraftIssues(SCOPE_ID, project);
+
+            // Assert
+            assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED);
+            // Verify field value was upserted with the correct item ID and field ID
+            verify(projectFieldValueRepository).upsertCore(
+                eq(500L),
+                eq("PVTF_status"),
+                eq("In Progress"),
+                eq(null),
+                eq(null),
+                eq(null),
+                eq(null),
+                any(Instant.class)
+            );
+            // Verify stale field value cleanup was called
+            verify(projectFieldValueRepository).deleteByItemIdAndFieldIdNotIn(eq(500L), eq(List.of("PVTF_status")));
+            // Verify itemProcessor.process was NOT called (Issue/PR items skip item processing)
+            verify(itemProcessor, never()).process(any(), any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("should skip Issue/PR items below incremental sync threshold")
+        void shouldSkipIssuePrItemsBelowIncrementalSyncThreshold() {
+            // Arrange
+            Long projectId = 10L;
+            Project project = createProject(projectId, "PVT_node10", 1);
+
+            // Item updated 2 hours ago — will be before the threshold
+            GHProjectV2Item oldItem = createIssueItem(
+                "PVTI_old_issue",
+                12345L,
+                OffsetDateTime.now().minusHours(2),
+                List.of(createTextFieldValue("PVTF_field1", "value")),
+                false,
+                null
+            );
+
+            GHProjectV2ItemConnection itemsConnection = createItemConnection(List.of(oldItem));
+            mockGraphQlClientForScope();
+            mockGraphQlRequestChain();
+
+            ClientGraphQlResponse fieldsResponse = mockValidGraphQlResponse("node.fields", null);
+            ClientGraphQlResponse statusUpdatesResponse = mockValidGraphQlResponse("node.statusUpdates", null);
+            ClientGraphQlResponse itemsResponse = mockValidGraphQlResponse("node.items", itemsConnection);
+
+            when(requestSpec.execute())
+                .thenReturn(Mono.just(fieldsResponse))
+                .thenReturn(Mono.just(statusUpdatesResponse))
+                .thenReturn(Mono.just(itemsResponse));
+
+            when(backfillStateProvider.getProjectItemSyncCursor(projectId)).thenReturn(Optional.empty());
+            // Previous sync was 10 minutes ago → threshold = 10min - 5min buffer = 5 min ago
+            // Item updated 2 hours ago → well before threshold → should be skipped
+            when(backfillStateProvider.getProjectItemsSyncedAt(projectId)).thenReturn(
+                Optional.of(Instant.now().minusSeconds(10 * 60))
+            );
+
+            when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+
+            // Act
+            SyncResult result = service.syncDraftIssues(SCOPE_ID, project);
+
+            // Assert
+            assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED);
+            // Field values should NOT be processed because the item was skipped
+            verify(projectItemRepository, never()).findByProjectIdAndNodeId(any(), any());
+            verify(projectFieldValueRepository, never()).upsertCore(
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any()
+            );
+            verify(itemProcessor, never()).process(any(), any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("should queue Issue/PR items with truncated field values for pagination")
+        void shouldQueueIssuePrItemsWithTruncatedFieldValuesForPagination() {
+            // Arrange
+            Long projectId = 10L;
+            Project project = createProject(projectId, "PVT_node10", 1);
+
+            // Item with truncated field values (hasNextPage=true, endCursor set)
+            GHProjectV2Item truncatedItem = createIssueItem(
+                "PVTI_truncated",
+                12345L,
+                OffsetDateTime.now(),
+                List.of(createTextFieldValue("PVTF_field1", "value1")),
+                true, // truncated
+                "cursor_fv_page2"
+            );
+
+            GHProjectV2ItemConnection itemsConnection = createItemConnection(List.of(truncatedItem));
+            mockThreePhasesWithItems(projectId, itemsConnection);
+
+            when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+
+            ProjectItem existingItem = new ProjectItem();
+            existingItem.setId(600L);
+            existingItem.setNodeId("PVTI_truncated");
+            when(projectItemRepository.findByProjectIdAndNodeId(projectId, "PVTI_truncated")).thenReturn(
+                Optional.of(existingItem)
+            );
+
+            when(projectFieldRepository.existsById("PVTF_field1")).thenReturn(true);
+
+            // Act
+            SyncResult result = service.syncDraftIssues(SCOPE_ID, project);
+
+            // Assert
+            assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED);
+            // Verify field values were still processed for the first page
+            verify(projectFieldValueRepository).upsertCore(
+                eq(600L),
+                eq("PVTF_field1"),
+                eq("value1"),
+                eq(null),
+                eq(null),
+                eq(null),
+                eq(null),
+                any(Instant.class)
+            );
+            // The truncated item should trigger syncRemainingFieldValues (GetProjectItemFieldValues query).
+            // Since we don't mock the follow-up pagination query, we verify the initial field values
+            // were processed AND the requestSpec was called more than 3 times (3 phases + pagination).
+            // Verifying exactly 4 execute() calls: fields, statusUpdates, items, + follow-up fieldValues
+            verify(requestSpec, times(4)).execute();
+        }
+
+        @Test
+        @DisplayName("should gracefully skip field value processing when item not yet synced locally")
+        void shouldSkipFieldValuesWhenItemNotYetSyncedLocally() {
+            // Arrange
+            Long projectId = 10L;
+            Project project = createProject(projectId, "PVT_node10", 1);
+
+            GHProjectV2Item unsyncedItem = createIssueItem(
+                "PVTI_not_synced",
+                99999L,
+                OffsetDateTime.now(),
+                List.of(createTextFieldValue("PVTF_field1", "value")),
+                false,
+                null
+            );
+
+            GHProjectV2ItemConnection itemsConnection = createItemConnection(List.of(unsyncedItem));
+            mockThreePhasesWithItems(projectId, itemsConnection);
+
+            when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+
+            // Item does NOT exist locally yet
+            when(projectItemRepository.findByProjectIdAndNodeId(projectId, "PVTI_not_synced")).thenReturn(
+                Optional.empty()
+            );
+
+            // Act
+            SyncResult result = service.syncDraftIssues(SCOPE_ID, project);
+
+            // Assert
+            assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED);
+            // No field value processing should occur
+            verify(projectFieldValueRepository, never()).upsertCore(
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any()
+            );
+            verify(projectFieldValueRepository, never()).deleteByItemIdAndFieldIdNotIn(any(), any());
+            // No item processing should occur either (Issue/PR items are not processed from project side)
+            verify(itemProcessor, never()).process(any(), any(), any(), any());
         }
     }
 
