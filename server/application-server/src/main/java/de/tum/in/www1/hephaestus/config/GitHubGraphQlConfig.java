@@ -3,9 +3,21 @@ package de.tum.in.www1.hephaestus.config;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.config.jackson.GitHubActorMixin;
+import de.tum.in.www1.hephaestus.config.jackson.GitHubIssueMixin;
+import de.tum.in.www1.hephaestus.config.jackson.GitHubProjectV2FieldConfigurationMixin;
+import de.tum.in.www1.hephaestus.config.jackson.GitHubProjectV2ItemContentMixin;
+import de.tum.in.www1.hephaestus.config.jackson.GitHubProjectV2ItemFieldValueMixin;
+import de.tum.in.www1.hephaestus.config.jackson.GitHubProjectV2OwnerMixin;
+import de.tum.in.www1.hephaestus.config.jackson.GitHubPullRequestMixin;
 import de.tum.in.www1.hephaestus.config.jackson.GitHubRepositoryOwnerMixin;
 import de.tum.in.www1.hephaestus.config.jackson.GitHubRequestedReviewerMixin;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHActor;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHIssue;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2FieldConfiguration;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2ItemContent;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2ItemFieldValue;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2Owner;
+import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHRepositoryOwner;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHRequestedReviewer;
 import io.micrometer.core.instrument.Gauge;
@@ -18,8 +30,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.Resource;
 import org.springframework.graphql.client.HttpGraphQlClient;
-import org.springframework.graphql.support.ResourceDocumentSource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
@@ -111,7 +123,13 @@ public class GitHubGraphQlConfig {
             .configure(DeserializationFeature.USE_LONG_FOR_INTS, true)
             .addMixIn(GHActor.class, GitHubActorMixin.class)
             .addMixIn(GHRequestedReviewer.class, GitHubRequestedReviewerMixin.class)
-            .addMixIn(GHRepositoryOwner.class, GitHubRepositoryOwnerMixin.class);
+            .addMixIn(GHRepositoryOwner.class, GitHubRepositoryOwnerMixin.class)
+            .addMixIn(GHProjectV2Owner.class, GitHubProjectV2OwnerMixin.class)
+            .addMixIn(GHProjectV2FieldConfiguration.class, GitHubProjectV2FieldConfigurationMixin.class)
+            .addMixIn(GHProjectV2ItemContent.class, GitHubProjectV2ItemContentMixin.class)
+            .addMixIn(GHProjectV2ItemFieldValue.class, GitHubProjectV2ItemFieldValueMixin.class)
+            .addMixIn(GHIssue.class, GitHubIssueMixin.class)
+            .addMixIn(GHPullRequest.class, GitHubPullRequestMixin.class);
 
         ExchangeStrategies strategies = ExchangeStrategies.builder()
             .codecs(config -> {
@@ -157,11 +175,20 @@ public class GitHubGraphQlConfig {
 
     @Bean
     public HttpGraphQlClient gitHubGraphQlClient(WebClient gitHubGraphQlWebClient) {
-        // Configure document source to load operations from the correct location
-        // Operations are colocated with the GitHub schema at graphql/github/operations/
-        ResourceDocumentSource documentSource = new ResourceDocumentSource(
-            List.of(new ClassPathResource("graphql/github/operations/")),
-            List.of(".graphql", ".gql")
+        // Operations are loaded from graphql/github/operations/ by name.
+        // Shared fragments from graphql/github/fragments/ProjectFragments.graphql are
+        // selectively appended by FragmentMergingDocumentSource: only fragments that are
+        // actually referenced (transitively via ...FragmentName spreads) are included.
+        // This satisfies GraphQL spec §5.5.1.4 (fragments must be used) while keeping
+        // fragment definitions DRY in a single file.
+        Resource fragmentFile = new ClassPathResource("graphql/github/fragments/ProjectFragments.graphql");
+        FragmentMergingDocumentSource documentSource = new FragmentMergingDocumentSource(
+            List.of(
+                new ClassPathResource("graphql/github/operations/"),
+                new ClassPathResource("graphql/github/fragments/")
+            ),
+            List.of(".graphql", ".gql"),
+            List.of(fragmentFile)
         );
         return HttpGraphQlClient.builder(gitHubGraphQlWebClient).documentSource(documentSource).build();
     }

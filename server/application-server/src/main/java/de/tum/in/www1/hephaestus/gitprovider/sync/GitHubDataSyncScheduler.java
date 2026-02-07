@@ -10,7 +10,14 @@ import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncS
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncTarget;
 import de.tum.in.www1.hephaestus.gitprovider.issuedependency.github.GitHubIssueDependencySyncService;
 import de.tum.in.www1.hephaestus.gitprovider.issuetype.github.GitHubIssueTypeSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
+import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
+import de.tum.in.www1.hephaestus.gitprovider.organization.github.GitHubOrganizationSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.project.Project;
+import de.tum.in.www1.hephaestus.gitprovider.project.github.GitHubProjectSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.subissue.github.GitHubSubIssueSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.sync.SyncResult;
+import jakarta.annotation.PostConstruct;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -76,6 +83,10 @@ public class GitHubDataSyncScheduler {
     private final GitHubSubIssueSyncService subIssueSyncService;
     private final GitHubIssueTypeSyncService issueTypeSyncService;
     private final GitHubIssueDependencySyncService issueDependencySyncService;
+    private final GitHubProjectSyncService projectSyncService;
+    private final GitHubOrganizationSyncService organizationSyncService;
+    private final OrganizationRepository organizationRepository;
+    private final SyncSchedulerProperties syncSchedulerProperties;
     private final Executor monitoringExecutor;
 
     public GitHubDataSyncScheduler(
@@ -85,6 +96,10 @@ public class GitHubDataSyncScheduler {
         GitHubSubIssueSyncService subIssueSyncService,
         GitHubIssueTypeSyncService issueTypeSyncService,
         GitHubIssueDependencySyncService issueDependencySyncService,
+        GitHubProjectSyncService projectSyncService,
+        GitHubOrganizationSyncService organizationSyncService,
+        OrganizationRepository organizationRepository,
+        SyncSchedulerProperties syncSchedulerProperties,
         @Qualifier("monitoringExecutor") Executor monitoringExecutor
     ) {
         this.syncTargetProvider = syncTargetProvider;
@@ -93,7 +108,44 @@ public class GitHubDataSyncScheduler {
         this.subIssueSyncService = subIssueSyncService;
         this.issueTypeSyncService = issueTypeSyncService;
         this.issueDependencySyncService = issueDependencySyncService;
+        this.projectSyncService = projectSyncService;
+        this.organizationSyncService = organizationSyncService;
+        this.organizationRepository = organizationRepository;
+        this.syncSchedulerProperties = syncSchedulerProperties;
         this.monitoringExecutor = monitoringExecutor;
+    }
+
+    /**
+     * Logs the sync configuration at startup for visibility.
+     * Clarifies the difference between incremental sync and historical backfill.
+     */
+    @PostConstruct
+    void logSyncConfiguration() {
+        log.info(
+            "Incremental sync config: runOnStartup={}, cron={}, timeframeDays={}, cooldownMinutes={} " +
+                "(syncs repos, issues, PRs, labels, milestones, teams, AND projects)",
+            syncSchedulerProperties.runOnStartup(),
+            syncSchedulerProperties.cron(),
+            syncSchedulerProperties.timeframeDays(),
+            syncSchedulerProperties.cooldownMinutes()
+        );
+        log.info(
+            "Historical backfill config: enabled={}, batchSize={}, intervalSeconds={} " +
+                "(backfills old issues/PRs only - does NOT affect projects)",
+            syncSchedulerProperties.backfill().enabled(),
+            syncSchedulerProperties.backfill().batchSize(),
+            syncSchedulerProperties.backfill().intervalSeconds()
+        );
+
+        // Log filter configuration if active
+        var filters = syncSchedulerProperties.filters();
+        if (!filters.allowedOrganizations().isEmpty() || !filters.allowedRepositories().isEmpty()) {
+            log.info(
+                "Sync filters active: allowedOrganizations={}, allowedRepositories={}",
+                filters.allowedOrganizations(),
+                filters.allowedRepositories()
+            );
+        }
     }
 
     /**
@@ -212,10 +264,20 @@ public class GitHubDataSyncScheduler {
                 // issue types exist when issues are processed during repository sync.
                 syncIssueTypes(session);
 
-                // Sync repositories, organizations, and teams (via syncSyncTarget)
+                // Sync projects BEFORE repositories so embedded project items can be linked.
+                // Ensure the organization exists before attempting project sync.
+                syncProjects(session);
+
+                // Sync repositories (issues/PRs include embedded project items)
                 for (SyncTarget target : session.syncTargets()) {
                     dataSyncService.syncSyncTarget(target);
                 }
+
+                // Relink orphaned project items now that issues/PRs have been synced.
+                // Project items created before their referenced issues were synced locally
+                // will have NULL issue_id but a valid content_database_id. This fills
+                // in the FK for any items whose issues now exist.
+                projectSyncService.relinkOrphanedProjectItems();
 
                 // Sync sub-issues and issue dependencies via GraphQL
                 // These are scope-level relationships that require issues/PRs to exist first
@@ -277,6 +339,93 @@ public class GitHubDataSyncScheduler {
                 session.slug(),
                 e
             );
+        }
+    }
+
+    private void syncProjects(SyncSession session) {
+        String safeAccountLogin = sanitizeForLog(session.accountLogin());
+        try {
+            log.debug(
+                "Starting projects sync: scopeId={}, scopeSlug={}, accountLogin={}",
+                session.scopeId(),
+                session.slug(),
+                safeAccountLogin
+            );
+
+            // Ensure the organization exists locally before syncing projects
+            Organization organization = organizationRepository
+                .findByLoginIgnoreCase(session.accountLogin())
+                .orElse(null);
+            if (organization == null) {
+                log.info(
+                    "Organization missing before project sync, attempting sync: scopeId={}, orgLogin={}",
+                    session.scopeId(),
+                    safeAccountLogin
+                );
+                organization = organizationSyncService.syncOrganization(session.scopeId(), session.accountLogin());
+            }
+
+            // Sync project list for the organization
+            projectSyncService.syncProjectsForOrganization(session.scopeId(), session.accountLogin());
+
+            if (organization == null) {
+                log.debug("Skipped project items sync: reason=organizationNotFound, orgLogin={}", safeAccountLogin);
+                return;
+            }
+
+            // Sync project items for each project that needs it
+            // This is done separately because project items can be large and
+            // benefit from resumable pagination via cursor persistence
+            List<Project> projects = projectSyncService.getProjectsNeedingItemSync(organization.getId());
+            if (projects.isEmpty()) {
+                log.debug("Skipped project items sync: reason=noProjects, orgLogin={}", safeAccountLogin);
+                return;
+            }
+
+            int totalItemsSynced = 0;
+            int projectsWithItems = 0;
+
+            for (Project project : projects) {
+                try {
+                    SyncResult itemResult = projectSyncService.syncDraftIssues(session.scopeId(), project);
+                    totalItemsSynced += itemResult.count();
+                    if (itemResult.count() > 0) {
+                        projectsWithItems++;
+                    }
+
+                    // If rate limited, stop processing more projects
+                    if (itemResult.status() == SyncResult.Status.ABORTED_RATE_LIMIT) {
+                        log.info(
+                            "Stopping project items sync: reason=rateLimited, scopeId={}, projectsProcessed={}",
+                            session.scopeId(),
+                            projectsWithItems
+                        );
+                        break;
+                    }
+                } catch (InstallationNotFoundException e) {
+                    throw e;
+                } catch (Exception e) {
+                    log.warn(
+                        "Failed to sync project items: projectId={}, scopeId={}, error={}",
+                        project.getId(),
+                        session.scopeId(),
+                        e.getMessage()
+                    );
+                    // Continue with next project on error
+                }
+            }
+
+            log.debug(
+                "Completed projects sync: scopeId={}, orgLogin={}, projectCount={}, itemsSynced={}",
+                session.scopeId(),
+                safeAccountLogin,
+                projects.size(),
+                totalItemsSynced
+            );
+        } catch (InstallationNotFoundException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Failed to sync projects: scopeId={}, scopeSlug={}", session.scopeId(), session.slug(), e);
         }
     }
 }
