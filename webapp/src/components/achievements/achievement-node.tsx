@@ -86,17 +86,21 @@ const iconMap: Record<string, React.ElementType> = {
 };
 
 const tierSizes = {
-	minor: "w-10 h-10",
-	notable: "w-12 h-12",
-	keystone: "w-14 h-14",
+	common: "w-10 h-10",
+	uncommon: "w-11 h-11",
+	rare: "w-12 h-12",
+	epic: "w-14 h-14",
 	legendary: "w-16 h-16",
+	mythic: "w-20 h-20",
 };
 
 const tierIconSizes = {
-	minor: 14,
-	notable: 18,
-	keystone: 22,
+	common: 14,
+	uncommon: 16,
+	rare: 18,
+	epic: 22,
 	legendary: 26,
+	mythic: 32,
 };
 
 function AchievementNodeComponent(props: NodeProps) {
@@ -108,11 +112,14 @@ function AchievementNodeComponent(props: NodeProps) {
 	const getStatusClasses = () => {
 		switch (achievementData.status) {
 			case "unlocked":
+				if (achievementData.tier === "mythic") {
+					return "bg-node-mythic border-node-mythic shadow-[0_0_30px_rgba(var(--shadow-rgb),0.6),0_0_60px_rgba(var(--shadow-rgb),0.3),inset_0_0_20px_rgba(var(--shadow-rgb),0.2)]";
+				}
 				if (achievementData.tier === "legendary") {
 					return "bg-node-legendary border-node-legendary shadow-[0_0_30px_rgba(var(--shadow-rgb),0.6),0_0_60px_rgba(var(--shadow-rgb),0.3),inset_0_0_20px_rgba(var(--shadow-rgb),0.2)]";
 				}
-				if (achievementData.tier === "keystone") {
-					return "bg-node-unlocked border-node-unlocked shadow-[0_0_25px_rgba(var(--shadow-rgb),0.4),0_0_50px_rgba(var(--shadow-rgb),0.2),inset_0_0_15px_rgba(var(--shadow-rgb),0.15)]";
+				if (achievementData.tier === "epic") {
+					return "bg-node-epic border-node-epic shadow-[0_0_25px_rgba(var(--shadow-rgb),0.4),0_0_50px_rgba(var(--shadow-rgb),0.2),inset_0_0_15px_rgba(var(--shadow-rgb),0.15)]";
 				}
 				return "bg-node-unlocked border-node-unlocked shadow-[0_0_15px_rgba(var(--shadow-rgb),0.3),0_0_30px_rgba(var(--shadow-rgb),0.15)]";
 			case "available":
@@ -160,9 +167,10 @@ function AchievementNodeComponent(props: NodeProps) {
 					)}
 
 					{/* Outer decorative ring for notable+ */}
-					{(achievementData.tier === "notable" ||
-						achievementData.tier === "keystone" ||
-						achievementData.tier === "legendary") && (
+					{(achievementData.tier === "rare" ||
+						achievementData.tier === "epic" ||
+						achievementData.tier === "legendary" ||
+						achievementData.tier === "mythic") && (
 						<div
 							className={cn(
 								"absolute -inset-1 rounded-full border border-dashed opacity-20",

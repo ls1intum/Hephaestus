@@ -1,23 +1,21 @@
-import { CircleDot, Eye, GitCommit, GitPullRequest, Layers, MessageSquare } from "lucide-react";
+import { CircleDot, GitCommit, GitPullRequest, Layers, MessageSquare } from "lucide-react";
 import type React from "react";
 import { categoryMeta } from "./data";
 import type { AchievementCategory } from "./types";
 
 const categoryIcons: Record<AchievementCategory, React.ElementType> = {
-	COMMITS: GitCommit,
-	PULL_REQUESTS: GitPullRequest,
-	REVIEWS: Eye,
-	ISSUES: CircleDot,
-	COMMENTS: MessageSquare,
-	CROSS_CATEGORY: Layers,
+	commits: GitCommit,
+	pull_requests: GitPullRequest,
+	communication: MessageSquare,
+	issues: CircleDot,
+	milestones: Layers,
 };
 
 export function CategoryLabels() {
 	// Position labels around the outer edge of the skill tree
 	const labelRadius = 850;
 
-	// Filter out CROSS_CATEGORY as those achievements are positioned between main lines
-	const mainCategories = Object.entries(categoryMeta).filter(([key]) => key !== "CROSS_CATEGORY");
+	const mainCategories = Object.entries(categoryMeta);
 
 	return (
 		<div className="absolute inset-0 pointer-events-none">

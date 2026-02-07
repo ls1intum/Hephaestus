@@ -1,4 +1,4 @@
-import { CheckCircle2, Clock, Lock } from "lucide-react";
+import { CheckCircle2, Clock, EyeOff, Lock } from "lucide-react";
 import type { ReactNode } from "react";
 import { Progress, ProgressIndicator, ProgressTrack } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
@@ -12,23 +12,28 @@ export interface AchievementTooltipProps {
 }
 
 const tierColors: Record<AchievementRarity, string> = {
-	minor: "border-muted-foreground/40",
-	notable: "border-foreground/40",
-	keystone: "border-foreground/60",
-	legendary: "border-foreground/80",
+	common: "border-muted-foreground/40",
+	uncommon: "border-foreground/30",
+	rare: "border-foreground/50",
+	epic: "border-foreground/70",
+	legendary: "border-foreground/90",
+	mythic: "border-purple-500/90",
 };
 
 const tierLabels: Record<AchievementRarity, string> = {
-	minor: "Minor",
-	notable: "Notable",
-	keystone: "Keystone",
+	common: "Common",
+	uncommon: "Uncommon",
+	rare: "Rare",
+	epic: "Epic",
 	legendary: "Legendary",
+	mythic: "Mythic",
 };
 
 const statusIcons = {
 	locked: Lock,
 	available: Clock,
 	unlocked: CheckCircle2,
+	hidden: EyeOff,
 };
 
 export function AchievementTooltip(props: AchievementTooltipProps) {
@@ -61,8 +66,9 @@ export function AchievementTooltip(props: AchievementTooltipProps) {
 							<h3
 								className={cn(
 									"font-bold text-sm",
+									achievement.tier === "mythic" && "text-purple-500",
 									achievement.tier === "legendary" && "text-foreground",
-									achievement.tier === "keystone" && "text-foreground/90",
+									achievement.tier === "epic" && "text-foreground/90",
 									achievement.status === "locked" && "text-muted-foreground",
 								)}
 							>
@@ -74,7 +80,7 @@ export function AchievementTooltip(props: AchievementTooltipProps) {
 						</div>
 						<StatusIcon
 							className={cn(
-								"w-5 h-5 flex-shrink-0",
+								"w-5 h-5 shrink-0",
 								achievement.status === "unlocked" && "text-foreground",
 								achievement.status === "available" && "text-foreground/60",
 								achievement.status === "locked" && "text-muted-foreground",

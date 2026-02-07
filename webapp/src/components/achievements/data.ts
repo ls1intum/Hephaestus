@@ -1,11 +1,6 @@
 import type { Edge, Node } from "@xyflow/react";
 import type { Achievement } from "@/api/types.gen";
-import {
-	type AchievementCategory,
-	type AchievementRarity,
-	levelToTier,
-	normalizeStatus,
-} from "./types";
+import type { AchievementCategory, AchievementRarity, AchievementStatus } from "./types";
 
 /**
  * Node data structure for the skill tree visualization.
@@ -17,7 +12,7 @@ export interface AchievementNodeData {
 	description: string;
 	category: AchievementCategory;
 	tier: AchievementRarity;
-	status: "locked" | "available" | "unlocked";
+	status: AchievementStatus;
 	icon: string;
 	progress?: number;
 	maxProgress?: number;
@@ -34,40 +29,35 @@ export interface AchievementNodeData {
 
 /**
  * Category metadata for positioning achievements on the skill tree.
- * Keys match backend enum values (uppercase).
+ * Keys match backend enum values (lowercase).
  */
 export const categoryMeta: Record<
 	AchievementCategory,
 	{ name: string; angle: number; description: string }
 > = {
-	COMMITS: {
+	commits: {
 		name: "Commits",
 		angle: 270, // Top (12 o'clock)
 		description: "Track your code contributions",
 	},
-	PULL_REQUESTS: {
+	pull_requests: {
 		name: "Pull Requests",
 		angle: 342, // Top-right (2 o'clock)
 		description: "Submit and merge code changes",
 	},
-	REVIEWS: {
-		name: "Reviews",
+	communication: {
+		name: "Communication",
 		angle: 54, // Right (4 o'clock)
-		description: "Help improve code quality",
+		description: "Reviews, comments, and discussions",
 	},
-	ISSUES: {
+	issues: {
 		name: "Issues",
 		angle: 126, // Bottom-right (7 o'clock)
 		description: "Report and track work items",
 	},
-	COMMENTS: {
-		name: "Comments",
-		angle: 198, // Bottom-left (9 o'clock)
-		description: "Engage in discussions",
-	},
-	CROSS_CATEGORY: {
+	milestones: {
 		name: "Milestones",
-		angle: 0, // Distributed between branches
+		angle: 198, // Bottom-left (9 o'clock)
 		description: "Combined achievements",
 	},
 };
@@ -85,11 +75,11 @@ const levelDistances: Record<number, number> = {
 
 /** Main categories for the skill tree branches */
 const MAIN_CATEGORIES: AchievementCategory[] = [
-	"COMMITS",
-	"PULL_REQUESTS",
-	"REVIEWS",
-	"ISSUES",
-	"COMMENTS",
+	"commits",
+	"pull_requests",
+	"communication",
+	"issues",
+	"milestones",
 ];
 
 /**
@@ -112,7 +102,6 @@ export function generateSkillTreeData(
 	edges: Edge[];
 } {
 	const nodes: Node<AchievementNodeData>[] = [];
-	const edges: Edge[] = [];
 	const centerX = 0;
 	const centerY = 0;
 
@@ -128,7 +117,7 @@ export function generateSkillTreeData(
 			id: "root-avatar",
 			name: user?.name || "User",
 			description: "You",
-			category: "CROSS_CATEGORY",
+			category: "milestones", // Default to milestones (was CROSS_CATEGORY)
 			tier: "legendary",
 			status: "unlocked",
 			icon: "User",
@@ -141,15 +130,33 @@ export function generateSkillTreeData(
 		zIndex: 10,
 	});
 
-	// Process main category achievements (non-cross-category)
+	// Process all categories
+	const processedEdges: Edge[] = [];
+
 	for (const category of MAIN_CATEGORIES) {
 		const categoryAchievements = achievements
-			.filter((a) => a.category === category)
-			.sort((a, b) => (a.level ?? 0) - (b.level ?? 0));
+			.filter((a) => (a.category ?? "milestones") === category)
+			.sort((a, b) => {
+				const levelA = a.rarity ? RARITY_TO_LEVEL[a.rarity] : 0;
+				const levelB = b.rarity ? RARITY_TO_LEVEL[b.rarity] : 0;
+				// Fallback to progress or just ID if no level
+				return levelA - levelB;
+			});
+
+		// Calculate basic level if not present, or use rarity
+		// The API doesn't provide a numeric 'level' field directly in Achievement type
+		// but 'rarity' maps to it. Or we use the 'parentId' chain depth.
+		// For now, let's assume we can derive a visual 'level' from rarity or use a default.
+		// data.ts used `achievement.level`. If that property is missing from the generated type,
+		// we need to compute it.
+		// Generated Achievement type does NOT have 'level'. It has 'rarity'.
+		// We can map Rarity -> Level (Common=1, Mythic=6).
+
 		const baseAngle = categoryMeta[category].angle;
 
 		for (const achievement of categoryAchievements) {
-			const level = achievement.level ?? 1;
+			const rarity = achievement.rarity ?? "common";
+			const level = RARITY_TO_LEVEL[rarity] || 1;
 			const distance = levelDistances[level] || 400;
 			const radians = (baseAngle * Math.PI) / 180;
 			const x = centerX + distance * Math.cos(radians);
@@ -164,13 +171,13 @@ export function generateSkillTreeData(
 					id: achievementId,
 					name: achievement.name ?? "Unknown",
 					description: achievement.description ?? "",
-					category: achievement.category ?? "CROSS_CATEGORY",
-					tier: levelToTier(level),
-					status: normalizeStatus(achievement.status),
+					category: achievement.category ?? "milestones",
+					tier: rarity,
+					status: achievement.status ?? "locked",
 					icon: achievement.icon ?? "GitCommit",
 					progress: achievement.progress,
 					maxProgress: achievement.maxProgress,
-					unlockedAt: achievement.unlockedAt,
+					unlockedAt: achievement.unlockedAt ? new Date(achievement.unlockedAt) : null,
 					level,
 					angle: baseAngle,
 					ring: level,
@@ -181,91 +188,32 @@ export function generateSkillTreeData(
 			if (achievement.parentId != null) {
 				const parent = achievementMap.get(achievement.parentId);
 				if (parent) {
-					edges.push({
+					processedEdges.push({
 						id: `${achievement.parentId}-${achievementId}`,
 						source: achievement.parentId,
 						target: achievementId,
 						type: "skill",
 						data: {
-							active:
-								normalizeStatus(parent.status) === "unlocked" &&
-								normalizeStatus(achievement.status) !== "locked",
+							active: parent.status === "unlocked" && achievement.status !== "locked",
 						},
 					});
 				}
 			} else if (level === 1) {
 				// Level 1 achievements with no parent connect to root avatar
-				edges.push({
+				processedEdges.push({
 					id: `root-${achievementId}`,
 					source: "root-avatar",
 					target: achievementId,
 					type: "skill",
 					data: {
-						active: normalizeStatus(achievement.status) !== "locked",
+						active: achievement.status !== "locked",
 					},
 				});
 			}
 		}
 	}
 
-	// Process cross-category achievements
-	const crossAchievements = achievements.filter((a) => a.category === "CROSS_CATEGORY");
-
-	for (const achievement of crossAchievements) {
-		// Position cross-category achievements based on level and a computed angle
-		// Use level to determine distance and spread them around
-		const level = achievement.level ?? 1;
-		const distance = levelDistances[level] || 400;
-		// Spread cross-category achievements between main branches
-		const crossIndex = crossAchievements.indexOf(achievement);
-		const baseAngle = (crossIndex * 72 + 36) % 360; // Offset from main branch angles
-
-		const radians = (baseAngle * Math.PI) / 180;
-		const x = centerX + distance * Math.cos(radians);
-		const y = centerY + distance * Math.sin(radians);
-		const achievementId = achievement.id ?? `unknown-cross-${Math.random()}`;
-
-		nodes.push({
-			id: achievementId,
-			type: "achievement",
-			position: { x, y },
-			data: {
-				id: achievementId,
-				name: achievement.name ?? "Unknown",
-				description: achievement.description ?? "",
-				category: achievement.category ?? "CROSS_CATEGORY",
-				tier: levelToTier(level),
-				status: normalizeStatus(achievement.status),
-				icon: achievement.icon ?? "Zap",
-				progress: achievement.progress,
-				maxProgress: achievement.maxProgress,
-				unlockedAt: achievement.unlockedAt,
-				level,
-				angle: baseAngle,
-				ring: Math.floor(distance / 150),
-			},
-		});
-
-		// Create edges for cross-category achievements
-		if (achievement.parentId != null) {
-			const parent = achievementMap.get(achievement.parentId);
-			if (parent) {
-				edges.push({
-					id: `${achievement.parentId}-${achievementId}`,
-					source: achievement.parentId,
-					target: achievementId,
-					type: "skill",
-					data: {
-						active:
-							normalizeStatus(parent.status) === "unlocked" &&
-							normalizeStatus(achievement.status) !== "locked",
-					},
-				});
-			}
-		}
-	}
-
-	return { nodes, edges };
+	return { nodes, edges: processedEdges };
 }
 
 /**
@@ -276,17 +224,15 @@ export function generateSkillTreeData(
  */
 export function calculateStats(achievementList: Achievement[]) {
 	const total = achievementList.length;
-	const unlocked = achievementList.filter((a) => a.status === "UNLOCKED").length;
-	const available = achievementList.filter((a) => a.status === "AVAILABLE").length;
+	const unlocked = achievementList.filter((a) => a.status === "unlocked").length;
+	const available = achievementList.filter((a) => a.status === "available").length;
 
-	const allCategories: AchievementCategory[] = [...MAIN_CATEGORIES, "CROSS_CATEGORY"];
-
-	const byCategory = allCategories.reduce(
+	const byCategory = MAIN_CATEGORIES.reduce(
 		(acc, cat) => {
-			const catAchievements = achievementList.filter((a) => a.category === cat);
+			const catAchievements = achievementList.filter((a) => (a.category ?? "milestones") === cat);
 			acc[cat] = {
 				total: catAchievements.length,
-				unlocked: catAchievements.filter((a) => a.status === "UNLOCKED").length,
+				unlocked: catAchievements.filter((a) => a.status === "unlocked").length,
 			};
 			return acc;
 		},
@@ -301,3 +247,13 @@ export function calculateStats(achievementList: Achievement[]) {
 		byCategory,
 	};
 }
+
+// Helper for mapping rarity to visual level (since 'level' property is missing in API)
+const RARITY_TO_LEVEL: Record<string, number> = {
+	common: 1,
+	uncommon: 2,
+	rare: 3,
+	epic: 4,
+	legendary: 5,
+	mythic: 6,
+};
