@@ -10,7 +10,7 @@
     <!-- ================================================================== -->
 
     <!-- Project table - GitHub Projects V2 -->
-    <changeSet id="1769933043000-1-create-project" author="claude">
+    <changeSet id="1769933043000-1-create-project" author="hephaestus">
         <createTable tableName="project">
             <column name="id" type="BIGINT">
                 <constraints nullable="false" primaryKey="true" primaryKeyName="project_pkey"/>
@@ -78,7 +78,7 @@
     </changeSet>
 
     <!-- Project Field table - Custom fields configuration -->
-    <changeSet id="1769933043000-2-create-project-field" author="claude">
+    <changeSet id="1769933043000-2-create-project-field" author="hephaestus">
         <createTable tableName="project_field">
             <column name="id" type="VARCHAR(64)">
                 <constraints nullable="false" primaryKey="true" primaryKeyName="project_field_pkey"/>
@@ -116,7 +116,7 @@
     </changeSet>
 
     <!-- Project Item table - Items in a project (Issue, PR, or Draft) -->
-    <changeSet id="1769933043000-3-create-project-item" author="claude">
+    <changeSet id="1769933043000-3-create-project-item" author="hephaestus">
         <createTable tableName="project_item">
             <column name="id" type="BIGINT">
                 <constraints nullable="false" primaryKey="true" primaryKeyName="project_item_pkey"/>
@@ -187,7 +187,7 @@
     </changeSet>
 
     <!-- Project Field Value table - Field values for items -->
-    <changeSet id="1769933043000-4-create-project-field-value" author="claude">
+    <changeSet id="1769933043000-4-create-project-field-value" author="hephaestus">
         <createTable tableName="project_field_value">
             <column name="id" type="BIGINT" autoIncrement="true">
                 <constraints nullable="false" primaryKey="true" primaryKeyName="project_field_value_pkey"/>
