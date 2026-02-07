@@ -49,5 +49,3 @@ query GetOrganizationProjects($login: String!, $first: Int!, $after: String) {
         }
     }
 }
-# Fragments (ProjectV2BaseFields, ProjectV2OwnerFields, ActorFields) are
-# resolved from ProjectFragments.graphql via ResourceDocumentSource.

@@ -143,16 +143,17 @@ public interface ProjectItemRepository extends JpaRepository<ProjectItem, Long> 
     @Query(
         value = """
         INSERT INTO project_item (
-            id, node_id, project_id, content_type, issue_id,
+            id, node_id, project_id, content_type, issue_id, content_database_id,
             draft_title, draft_body, archived, creator_id, created_at, updated_at
         )
         VALUES (
-            :id, :nodeId, :projectId, :contentType, :issueId,
+            :id, :nodeId, :projectId, :contentType, :issueId, :contentDatabaseId,
             :draftTitle, :draftBody, :archived, :creatorId, :createdAt, :updatedAt
         )
         ON CONFLICT (project_id, node_id) DO UPDATE SET
             content_type = EXCLUDED.content_type,
             issue_id = COALESCE(EXCLUDED.issue_id, project_item.issue_id),
+            content_database_id = COALESCE(EXCLUDED.content_database_id, project_item.content_database_id),
             draft_title = EXCLUDED.draft_title,
             draft_body = EXCLUDED.draft_body,
             archived = EXCLUDED.archived,
@@ -167,11 +168,72 @@ public interface ProjectItemRepository extends JpaRepository<ProjectItem, Long> 
         @Param("projectId") Long projectId,
         @Param("contentType") String contentType,
         @Param("issueId") Long issueId,
+        @Param("contentDatabaseId") Long contentDatabaseId,
         @Param("draftTitle") String draftTitle,
         @Param("draftBody") String draftBody,
         @Param("archived") boolean archived,
         @Param("creatorId") Long creatorId,
         @Param("createdAt") Instant createdAt,
         @Param("updatedAt") Instant updatedAt
+    );
+
+    /**
+     * Relinks orphaned project items to their issues after issue sync completes.
+     * <p>
+     * Project items for ISSUE/PULL_REQUEST content may have NULL issue_id when the
+     * referenced issue hasn't been synced locally yet (e.g., webhook-created items
+     * arriving before the full issue sync). This query fills in the FK using the
+     * stored content_database_id which maps directly to the issue table's primary key.
+     *
+     * @return number of items relinked
+     */
+    @Modifying
+    @Transactional
+    @Query(
+        value = """
+        UPDATE project_item pi
+        SET issue_id = pi.content_database_id
+        WHERE pi.issue_id IS NULL
+          AND pi.content_database_id IS NOT NULL
+          AND pi.content_type IN ('ISSUE', 'PULL_REQUEST')
+          AND EXISTS (SELECT 1 FROM issue i WHERE i.id = pi.content_database_id)
+        """,
+        nativeQuery = true
+    )
+    int relinkOrphanedItems();
+
+    /**
+     * Deletes all items of specific content types for a project that are not in the given list of node IDs.
+     * Used during full sync to remove stale ISSUE/PULL_REQUEST items that were removed from the project
+     * on GitHub but still persist locally.
+     *
+     * @param projectId the project's ID
+     * @param contentTypes the content types to filter by (e.g., ISSUE, PULL_REQUEST)
+     * @param nodeIds the node IDs to keep
+     * @return number of deleted items
+     */
+    @Modifying
+    @Query(
+        "DELETE FROM ProjectItem i WHERE i.project.id = :projectId AND i.contentType IN :contentTypes AND i.nodeId NOT IN :nodeIds"
+    )
+    int deleteByProjectIdAndContentTypeInAndNodeIdNotIn(
+        @Param("projectId") Long projectId,
+        @Param("contentTypes") List<ProjectItem.ContentType> contentTypes,
+        @Param("nodeIds") List<String> nodeIds
+    );
+
+    /**
+     * Deletes all items of specific content types for a project.
+     * Used when no items of those types were synced (meaning all were removed from the project).
+     *
+     * @param projectId the project's ID
+     * @param contentTypes the content types to filter by
+     * @return number of deleted items
+     */
+    @Modifying
+    @Query("DELETE FROM ProjectItem i WHERE i.project.id = :projectId AND i.contentType IN :contentTypes")
+    int deleteByProjectIdAndContentTypeIn(
+        @Param("projectId") Long projectId,
+        @Param("contentTypes") List<ProjectItem.ContentType> contentTypes
     );
 }

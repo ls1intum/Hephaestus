@@ -61,6 +61,41 @@ public record GitHubProjectItemDTO(
     }
 
     /**
+     * Returns a copy of this DTO with the given issue ID set.
+     * <p>
+     * Used by the embedded sync path where the parent issue/PR's database ID is known
+     * from the enclosing query but the DTO's {@code issueId} is null because the GraphQL
+     * query did not include the {@code content} block (it would be redundant).
+     *
+     * @param parentIssueId the GitHub database ID of the parent issue/PR
+     * @return a new DTO with the issue ID set, or this DTO if issueId is already set
+     */
+    public GitHubProjectItemDTO withIssueId(Long parentIssueId) {
+        if (this.issueId != null || parentIssueId == null) {
+            return this;
+        }
+        return new GitHubProjectItemDTO(
+            id,
+            databaseId,
+            nodeId,
+            projectNodeId,
+            contentType,
+            parentIssueId,
+            issueNumber,
+            draftTitle,
+            draftBody,
+            archived,
+            creator,
+            fieldValues,
+            fieldValuesTruncated,
+            fieldValuesTotalCount,
+            fieldValuesEndCursor,
+            createdAt,
+            updatedAt
+        );
+    }
+
+    /**
      * Get the content type as an enum.
      */
     @Nullable

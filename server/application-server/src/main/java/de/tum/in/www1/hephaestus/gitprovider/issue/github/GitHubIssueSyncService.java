@@ -539,7 +539,8 @@ public class GitHubIssueSyncService {
                     issueWithCursor.nodeId(),
                     false, // Not a pull request
                     issueWithCursor.issue().getRepository(),
-                    issueWithCursor.projectItemCursor()
+                    issueWithCursor.projectItemCursor(),
+                    issueWithCursor.issue().getId()
                 );
                 totalProjectItemsSynced += additionalItems;
             }
@@ -620,7 +621,11 @@ public class GitHubIssueSyncService {
 
             // Process embedded project items
             EmbeddedProjectItemsDTO embeddedProjectItems = issueWithComments.embeddedProjectItems();
-            projectItemsSynced += projectItemSyncService.processEmbeddedItems(embeddedProjectItems, context);
+            projectItemsSynced += projectItemSyncService.processEmbeddedItems(
+                embeddedProjectItems,
+                context,
+                entity.getId()
+            );
 
             // Track issues that need additional project item pagination
             if (embeddedProjectItems.needsPagination()) {

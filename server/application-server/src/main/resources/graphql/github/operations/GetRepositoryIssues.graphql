@@ -4,7 +4,14 @@
 # Project items are embedded inline (first 5) - pagination handles issues in more projects
 # Supports incremental sync via filterBy.since parameter (filters by updatedAt >= since)
 
-query GetRepositoryIssues($owner: String!, $name: String!, $first: Int!, $after: String, $states: [IssueState!], $since: DateTime) {
+query GetRepositoryIssues(
+    $owner: String!
+    $name: String!
+    $first: Int!
+    $after: String
+    $states: [IssueState!]
+    $since: DateTime
+) {
     rateLimit {
         cost
         limit
@@ -12,7 +19,13 @@ query GetRepositoryIssues($owner: String!, $name: String!, $first: Int!, $after:
         resetAt
     }
     repository(owner: $owner, name: $name) {
-        issues(first: $first, after: $after, states: $states, filterBy: { since: $since }, orderBy: { field: UPDATED_AT, direction: DESC }) {
+        issues(
+            first: $first
+            after: $after
+            states: $states
+            filterBy: { since: $since }
+            orderBy: { field: UPDATED_AT, direction: DESC }
+        ) {
             pageInfo {
                 hasNextPage
                 endCursor
@@ -202,6 +215,7 @@ query GetRepositoryIssues($owner: String!, $name: String!, $first: Int!, $after:
                         }
 
                         # Field values (embedded, first 10) - pagination for items with more
+                        # Uses shared FieldValueFieldsCostOptimized fragment (all 11 field value types)
                         fieldValues(first: 10) {
                             totalCount
                             pageInfo {
@@ -209,32 +223,7 @@ query GetRepositoryIssues($owner: String!, $name: String!, $first: Int!, $after:
                                 endCursor
                             }
                             nodes {
-                                __typename
-                                ... on ProjectV2ItemFieldTextValue {
-                                    text
-                                    field { ... on ProjectV2Field { id name } }
-                                }
-                                ... on ProjectV2ItemFieldNumberValue {
-                                    number
-                                    field { ... on ProjectV2Field { id name } }
-                                }
-                                ... on ProjectV2ItemFieldDateValue {
-                                    date
-                                    field { ... on ProjectV2Field { id name } }
-                                }
-                                ... on ProjectV2ItemFieldSingleSelectValue {
-                                    optionId
-                                    name
-                                    color
-                                    field { ... on ProjectV2SingleSelectField { id name } }
-                                }
-                                ... on ProjectV2ItemFieldIterationValue {
-                                    iterationId
-                                    title
-                                    startDate
-                                    duration
-                                    field { ... on ProjectV2IterationField { id name } }
-                                }
+                                ...FieldValueFieldsCostOptimized
                             }
                         }
                     }

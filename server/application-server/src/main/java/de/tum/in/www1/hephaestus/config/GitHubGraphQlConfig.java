@@ -30,8 +30,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.Resource;
 import org.springframework.graphql.client.HttpGraphQlClient;
-import org.springframework.graphql.support.ResourceDocumentSource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
@@ -175,15 +175,20 @@ public class GitHubGraphQlConfig {
 
     @Bean
     public HttpGraphQlClient gitHubGraphQlClient(WebClient gitHubGraphQlWebClient) {
-        // Configure document source to load operations and fragments from the correct locations
-        // Operations are colocated with the GitHub schema at graphql/github/operations/
-        // Reusable fragments are stored in graphql/github/fragments/
-        ResourceDocumentSource documentSource = new ResourceDocumentSource(
+        // Operations are loaded from graphql/github/operations/ by name.
+        // Shared fragments from graphql/github/fragments/ProjectFragments.graphql are
+        // selectively appended by FragmentMergingDocumentSource: only fragments that are
+        // actually referenced (transitively via ...FragmentName spreads) are included.
+        // This satisfies GraphQL spec §5.5.1.4 (fragments must be used) while keeping
+        // fragment definitions DRY in a single file.
+        Resource fragmentFile = new ClassPathResource("graphql/github/fragments/ProjectFragments.graphql");
+        FragmentMergingDocumentSource documentSource = new FragmentMergingDocumentSource(
             List.of(
                 new ClassPathResource("graphql/github/operations/"),
                 new ClassPathResource("graphql/github/fragments/")
             ),
-            List.of(".graphql", ".gql")
+            List.of(".graphql", ".gql"),
+            List.of(fragmentFile)
         );
         return HttpGraphQlClient.builder(gitHubGraphQlWebClient).documentSource(documentSource).build();
     }

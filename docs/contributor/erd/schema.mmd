@@ -208,7 +208,7 @@ erDiagram
 
     Project {
         BIGINT id PK
-        VARCHAR(64) node_id
+        VARCHAR(64) node_id UK
         VARCHAR(32) owner_type UK "NOT NULL"
         BIGINT owner_id UK "NOT NULL"
         INTEGER number UK "NOT NULL"
@@ -260,6 +260,7 @@ erDiagram
         BIGINT project_id FK,UK "NOT NULL"
         VARCHAR(32) content_type "NOT NULL"
         BIGINT issue_id FK
+        BIGINT content_database_id
         VARCHAR(1024) draft_title
         TEXT draft_body
         BOOLEAN archived "NOT NULL"

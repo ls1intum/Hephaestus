@@ -10,7 +10,7 @@ import de.tum.in.www1.hephaestus.gitprovider.milestone.MilestoneRepository;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.github.dto.GitHubMilestoneDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
-import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
 import java.time.Instant;
 import java.util.Optional;
@@ -40,18 +40,18 @@ public class GitHubMilestoneProcessor {
 
     private final MilestoneRepository milestoneRepository;
     private final IssueRepository issueRepository;
-    private final UserRepository userRepository;
+    private final GitHubUserProcessor gitHubUserProcessor;
     private final ApplicationEventPublisher eventPublisher;
 
     public GitHubMilestoneProcessor(
         MilestoneRepository milestoneRepository,
         IssueRepository issueRepository,
-        UserRepository userRepository,
+        GitHubUserProcessor gitHubUserProcessor,
         ApplicationEventPublisher eventPublisher
     ) {
         this.milestoneRepository = milestoneRepository;
         this.issueRepository = issueRepository;
-        this.userRepository = userRepository;
+        this.gitHubUserProcessor = gitHubUserProcessor;
         this.eventPublisher = eventPublisher;
     }
 
@@ -281,23 +281,6 @@ public class GitHubMilestoneProcessor {
 
     @Nullable
     private User findOrCreateUser(GitHubUserDTO dto) {
-        if (dto == null) {
-            return null;
-        }
-        Long userId = dto.getDatabaseId();
-        if (userId == null) {
-            return null;
-        }
-        return userRepository
-            .findById(userId)
-            .orElseGet(() -> {
-                User user = new User();
-                user.setId(userId);
-                user.setLogin(dto.login());
-                user.setAvatarUrl(dto.avatarUrl());
-                // Use login as fallback for name if null (name is @NonNull)
-                user.setName(dto.name() != null ? dto.name() : dto.login());
-                return userRepository.save(user);
-            });
+        return gitHubUserProcessor.findOrCreate(dto);
     }
 }

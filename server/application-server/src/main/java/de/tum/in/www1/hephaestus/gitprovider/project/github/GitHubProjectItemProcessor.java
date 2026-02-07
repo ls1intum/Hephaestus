@@ -13,6 +13,7 @@ import de.tum.in.www1.hephaestus.gitprovider.project.ProjectItem;
 import de.tum.in.www1.hephaestus.gitprovider.project.ProjectItemRepository;
 import de.tum.in.www1.hephaestus.gitprovider.project.github.dto.GitHubProjectItemDTO;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserProcessor;
 import java.util.List;
 import java.util.Set;
 import org.slf4j.Logger;
@@ -45,9 +46,10 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
         UserRepository userRepository,
         LabelRepository labelRepository,
         MilestoneRepository milestoneRepository,
+        GitHubUserProcessor gitHubUserProcessor,
         ApplicationEventPublisher eventPublisher
     ) {
-        super(userRepository, labelRepository, milestoneRepository);
+        super(userRepository, labelRepository, milestoneRepository, gitHubUserProcessor);
         this.projectItemRepository = projectItemRepository;
         this.issueRepository = issueRepository;
         this.eventPublisher = eventPublisher;
@@ -110,8 +112,12 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
 
         // Resolve linked issue if applicable
         Long issueId = null;
+        Long contentDatabaseId = null;
         if (contentType == ProjectItem.ContentType.ISSUE || contentType == ProjectItem.ContentType.PULL_REQUEST) {
             issueId = resolveIssueId(dto);
+            // Always store the content database ID so orphaned items can be relinked
+            // after the issue sync completes (even if the issue doesn't exist locally yet)
+            contentDatabaseId = dto.issueId();
         }
 
         // Resolve creator if applicable
@@ -124,6 +130,7 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
             project.getId(),
             contentType.name(),
             issueId,
+            contentDatabaseId,
             sanitize(dto.draftTitle()),
             sanitize(dto.draftBody()),
             dto.archived(),
@@ -403,6 +410,66 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
             log.info("Removed stale Draft Issues: projectId={}, count={}", projectId, removed);
         }
         return removed;
+    }
+
+    /**
+     * Removes stale Issue/PR items that no longer exist in the project.
+     * <p>
+     * This method is called after a full project-side sync that iterated through ALL items.
+     * The project-side sync sees Issue/PR items (but doesn't process them) and tracks their
+     * node IDs. Items not in the tracked list were removed from the project on GitHub.
+     *
+     * @param projectId the project ID
+     * @param syncedIssuePrNodeIds list of Issue/PR node IDs seen during full project sync
+     * @param context processing context
+     * @return number of Issue/PR items removed
+     */
+    @Transactional
+    public int removeStaleIssuePrItems(Long projectId, List<String> syncedIssuePrNodeIds, ProcessingContext context) {
+        if (projectId == null) {
+            return 0;
+        }
+
+        List<ProjectItem.ContentType> issuePrTypes = List.of(
+            ProjectItem.ContentType.ISSUE,
+            ProjectItem.ContentType.PULL_REQUEST
+        );
+
+        int removed;
+        if (syncedIssuePrNodeIds == null || syncedIssuePrNodeIds.isEmpty()) {
+            // No Issue/PR items were seen - remove all Issue/PR items for this project
+            removed = projectItemRepository.deleteByProjectIdAndContentTypeIn(projectId, issuePrTypes);
+        } else {
+            // Remove only Issue/PR items not in the synced list
+            removed = projectItemRepository.deleteByProjectIdAndContentTypeInAndNodeIdNotIn(
+                projectId,
+                issuePrTypes,
+                syncedIssuePrNodeIds
+            );
+        }
+
+        if (removed > 0) {
+            log.info("Removed stale Issue/PR items: projectId={}, count={}", projectId, removed);
+        }
+        return removed;
+    }
+
+    /**
+     * Relinks orphaned project items to their issues after issue sync completes.
+     * <p>
+     * Project items for ISSUE/PULL_REQUEST content may have NULL issue_id when the
+     * referenced issue hasn't been synced locally yet. This uses the stored
+     * content_database_id to fill in the FK once the issue exists.
+     *
+     * @return number of items relinked
+     */
+    @Transactional
+    public int relinkOrphanedItems() {
+        int relinked = projectItemRepository.relinkOrphanedItems();
+        if (relinked > 0) {
+            log.info("Relinked orphaned project items to issues: count={}", relinked);
+        }
+        return relinked;
     }
 
     /**

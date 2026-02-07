@@ -77,12 +77,25 @@ public class ProjectItem extends BaseGitServiceEntity {
 
     /**
      * The linked issue/pull request, if content type is ISSUE or PULL_REQUEST.
-     * Null for DRAFT_ISSUE content type.
+     * Null for DRAFT_ISSUE content type or when the issue hasn't been synced locally yet.
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "issue_id")
     @ToString.Exclude
     private Issue issue;
+
+    /**
+     * The GitHub database ID of the content (issue or pull request).
+     * <p>
+     * Stored independently of the {@link #issue} FK so that orphaned project items
+     * (where the issue hasn't been synced locally yet) can be relinked after the
+     * issue sync completes. This is common when project item webhooks arrive before
+     * the full issue sync runs.
+     * <p>
+     * Null for DRAFT_ISSUE content type.
+     */
+    @Column(name = "content_database_id")
+    private Long contentDatabaseId;
 
     /**
      * Title for draft issues. Only used when contentType is DRAFT_ISSUE.

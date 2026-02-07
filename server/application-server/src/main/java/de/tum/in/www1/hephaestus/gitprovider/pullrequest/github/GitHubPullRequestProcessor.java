@@ -6,6 +6,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.events.EventContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.EventPayload;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.BaseGitHubProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
+import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.label.github.dto.GitHubLabelDTO;
@@ -17,6 +18,7 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.dto.GitHubPullRe
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
 import java.time.Instant;
 import java.util.HashSet;
@@ -51,17 +53,21 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
     private static final Logger log = LoggerFactory.getLogger(GitHubPullRequestProcessor.class);
 
     private final PullRequestRepository pullRequestRepository;
+    private final IssueRepository issueRepository;
     private final ApplicationEventPublisher eventPublisher;
 
     public GitHubPullRequestProcessor(
         PullRequestRepository pullRequestRepository,
+        IssueRepository issueRepository,
         LabelRepository labelRepository,
         MilestoneRepository milestoneRepository,
         UserRepository userRepository,
+        GitHubUserProcessor gitHubUserProcessor,
         ApplicationEventPublisher eventPublisher
     ) {
-        super(userRepository, labelRepository, milestoneRepository);
+        super(userRepository, labelRepository, milestoneRepository, gitHubUserProcessor);
         this.pullRequestRepository = pullRequestRepository;
+        this.issueRepository = issueRepository;
         this.eventPublisher = eventPublisher;
     }
 
@@ -98,6 +104,22 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
             dto.number()
         );
         boolean isNew = existingOpt.isEmpty();
+
+        // Detect issue_type mismatch: entity exists as ISSUE but we're processing it as a PR.
+        // The upsertCore native SQL will correct the discriminator, so we just log here.
+        if (isNew) {
+            Optional<Issue> existingIssue = issueRepository.findByRepositoryIdAndNumber(
+                repository.getId(),
+                dto.number()
+            );
+            if (existingIssue.isPresent()) {
+                log.warn(
+                    "Updating issue_type from ISSUE to PULL_REQUEST: repositoryId={}, number={}",
+                    repository.getId(),
+                    dto.number()
+                );
+            }
+        }
 
         // Skip update if existing data is newer (prevents stale webhooks from overwriting)
         if (!isNew) {
