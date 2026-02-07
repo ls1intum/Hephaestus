@@ -2167,12 +2167,11 @@ components:
           type: string
           description: Category for grouping achievements
           enum:
-          - PULL_REQUESTS
-          - COMMITS
-          - REVIEWS
-          - COMMENTS
-          - ISSUES
-          - CROSS_CATEGORY
+          - pull_requests
+          - commits
+          - communication
+          - issues
+          - milestones
         description:
           type: string
           description: Description of how to earn the achievement
@@ -2185,11 +2184,6 @@ components:
           type: string
           description: Unique identifier for the achievement
           example: first_pull
-        level:
-          type: integer
-          format: int32
-          description: Visual level tier (1-7) for badge styling
-          example: 1
         maxProgress:
           type: integer
           format: int64
@@ -2212,10 +2206,21 @@ components:
           type: string
           description: Current status for this user
           enum:
-          - LOCKED
-          - AVAILABLE
-          - UNLOCKED
-          - HIDDEN
+          - locked
+          - available
+          - unlocked
+          - hidden
+        tier:
+          type: string
+          description: Visual level tier/rarity for badge styling
+          enum:
+          - common
+          - uncommon
+          - rare
+          - epic
+          - legendary
+          - mythic
+          example: common
         unlockedAt:
           type: string
           format: date-time

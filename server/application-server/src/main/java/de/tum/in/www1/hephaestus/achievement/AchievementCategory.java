@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.achievement;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Getter;
 
 /**
@@ -10,40 +11,35 @@ import lombok.Getter;
  */
 @Getter
 public enum AchievementCategory {
+
     /**
      * Achievements related to creating and merging pull requests.
      */
-    PULL_REQUESTS("Pull Requests"),
+    @JsonProperty("pull_requests") PULL_REQUESTS("Pull Requests"),
 
     /**
      * Achievements related to committing code.
      * (Placeholder for future implementation)
      */
-    COMMITS("Commits"),
+    @JsonProperty("commits") COMMITS("Commits"),
 
     /**
-     * Achievements related to code review activity.
+     * Achievements related to reviews, commenting and discussions.
      * (Placeholder for future implementation)
      */
-    REVIEWS("Reviews"),
-
-    /**
-     * Achievements related to commenting and discussions.
-     * (Placeholder for future implementation)
-     */
-    COMMENTS("Comments"),
+    @JsonProperty("communication") COMMUNICATION("Communication"),
 
     /**
      * Achievements related to issue management.
      * (Placeholder for future implementation)
      */
-    ISSUES("Issues"),
+    @JsonProperty("issues") ISSUES("Issues"),
 
     /**
      * Cross-category milestone achievements.
      * Combines progress across multiple categories.
      */
-    CROSS_CATEGORY("Milestones");
+    @JsonProperty("milestones") MILESTONES("Milestones");
 
     /**
      * -- GETTER --

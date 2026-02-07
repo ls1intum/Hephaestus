@@ -1,13 +1,17 @@
 package de.tum.in.www1.hephaestus.achievement;
 
 import de.tum.in.www1.hephaestus.activity.ActivityEventType;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Set;
-
 import lombok.Getter;
 import org.springframework.lang.NonNull;
 import org.springframework.lang.Nullable;
+
+
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Set;
+
+// TODO: Consider refactoring this using a "Registry Pattern" and json serialization for the data.
 
 /**
  * The source of truth for all achievement definitions.
@@ -19,7 +23,7 @@ import org.springframework.lang.Nullable;
  *   <li>{@code description} - Explanation of how to earn it</li>
  *   <li>{@code icon} - Icon identifier (e.g., "git-merge", "star")</li>
  *   <li>{@code category} - Grouping category</li>
- *   <li>{@code level} - Visual tier (1-7, for UI ring/badge styling)</li>
+ *   <li>{@code rarity} - Visual tier for UI ring/badge styling</li>
  *   <li>{@code requiredCount} - Number of events needed to unlock</li>
  *   <li>{@code parent} - Previous achievement in the progression chain (nullable)</li>
  *   <li>{@code triggerEvents} - Activity event types that contribute to this achievement</li>
@@ -48,7 +52,7 @@ public enum AchievementType {
         "Merge your first pull request",
         "git-merge",
         AchievementCategory.PULL_REQUESTS,
-        1,
+        AchievementRarity.COMMON,
         1,
         null,
         Set.of(ActivityEventType.PULL_REQUEST_MERGED)
@@ -60,7 +64,7 @@ public enum AchievementType {
         "Merge 3 pull requests",
         "git-merge",
         AchievementCategory.PULL_REQUESTS,
-        2,
+        AchievementRarity.COMMON,
         3,
         FIRST_PULL,
         Set.of(ActivityEventType.PULL_REQUEST_MERGED)
@@ -72,7 +76,7 @@ public enum AchievementType {
         "Merge 5 pull requests",
         "git-merge",
         AchievementCategory.PULL_REQUESTS,
-        3,
+        AchievementRarity.UNCOMMON,
         5,
         PR_BEGINNER,
         Set.of(ActivityEventType.PULL_REQUEST_MERGED)
@@ -84,7 +88,7 @@ public enum AchievementType {
         "Merge 10 pull requests",
         "git-merge",
         AchievementCategory.PULL_REQUESTS,
-        4,
+        AchievementRarity.UNCOMMON,
         10,
         PR_APPRENTICE,
         Set.of(ActivityEventType.PULL_REQUEST_MERGED)
@@ -96,7 +100,7 @@ public enum AchievementType {
         "Merge 25 pull requests",
         "git-merge",
         AchievementCategory.PULL_REQUESTS,
-        5,
+        AchievementRarity.RARE,
         25,
         INTEGRATION_REGULAR,
         Set.of(ActivityEventType.PULL_REQUEST_MERGED)
@@ -108,7 +112,7 @@ public enum AchievementType {
         "Merge 50 pull requests",
         "git-merge",
         AchievementCategory.PULL_REQUESTS,
-        6,
+        AchievementRarity.EPIC,
         50,
         PR_SPECIALIST,
         Set.of(ActivityEventType.PULL_REQUEST_MERGED)
@@ -120,7 +124,7 @@ public enum AchievementType {
         "Merge 100 pull requests",
         "git-merge",
         AchievementCategory.PULL_REQUESTS,
-        7,
+        AchievementRarity.LEGENDARY,
         100,
         INTEGRATION_EXPERT,
         Set.of(ActivityEventType.PULL_REQUEST_MERGED)
@@ -135,8 +139,8 @@ public enum AchievementType {
         "First Review",
         "Submit your first code review",
         "Eye",
-        AchievementCategory.REVIEWS,
-        1,
+        AchievementCategory.COMMUNICATION,
+        AchievementRarity.COMMON,
         1,
         null,
         Set.of(ActivityEventType.REVIEW_APPROVED, ActivityEventType.REVIEW_CHANGES_REQUESTED, ActivityEventType.REVIEW_COMMENTED)
@@ -147,8 +151,8 @@ public enum AchievementType {
         "Review Rookie",
         "Submit 10 code reviews",
         "Eye",
-        AchievementCategory.REVIEWS,
-        2,
+        AchievementCategory.COMMUNICATION,
+        AchievementRarity.COMMON,
         10,
         FIRST_REVIEW,
         Set.of(ActivityEventType.REVIEW_APPROVED, ActivityEventType.REVIEW_CHANGES_REQUESTED, ActivityEventType.REVIEW_COMMENTED)
@@ -159,8 +163,8 @@ public enum AchievementType {
         "Review Master",
         "Submit 100 code reviews",
         "Eye",
-        AchievementCategory.REVIEWS,
-        4,
+        AchievementCategory.COMMUNICATION,
+        AchievementRarity.EPIC,
         100,
         REVIEW_ROOKIE,
         Set.of(ActivityEventType.REVIEW_APPROVED, ActivityEventType.REVIEW_CHANGES_REQUESTED, ActivityEventType.REVIEW_COMMENTED)
@@ -175,8 +179,8 @@ public enum AchievementType {
         "Code Commenter",
         "Post 100 code comments",
         "MessageSquare",
-        AchievementCategory.COMMENTS,
-        3,
+        AchievementCategory.COMMUNICATION,
+        AchievementRarity.EPIC,
         100,
         null,
         Set.of(ActivityEventType.REVIEW_COMMENT_CREATED)
@@ -191,8 +195,8 @@ public enum AchievementType {
         "Helpful Reviewer",
         "Approve 50 pull requests",
         "HandHelping",
-        AchievementCategory.REVIEWS,
-        5,
+        AchievementCategory.COMMUNICATION,
+        AchievementRarity.LEGENDARY,
         50,
         null,
         Set.of(ActivityEventType.REVIEW_APPROVED)
@@ -206,20 +210,20 @@ public enum AchievementType {
     private final AchievementCategory category;
     /**
      * -- GETTER --
-     *  Visual level (1-7) for UI styling.
-     *  Higher levels have more prestigious ring/badge designs.
+     * Visual rarity for UI styling.
+     * Higher rarities have more prestigious ring/badge designs.
      */
-    private final int level;
+    private final AchievementRarity rarity;
     /**
      * -- GETTER --
-     *  Number of qualifying events required to unlock this achievement.
+     * Number of qualifying events required to unlock this achievement.
      */
     private final long requiredCount;
     @Nullable
     private final AchievementType parent;
     /**
      * -- GETTER --
-     *  Activity event types that contribute to unlocking this achievement.
+     * Activity event types that contribute to unlocking this achievement.
      */
     private final Set<ActivityEventType> triggerEvents;
 
@@ -229,7 +233,7 @@ public enum AchievementType {
         String description,
         String icon,
         AchievementCategory category,
-        int level,
+        AchievementRarity rarity,
         long requiredCount,
         @Nullable AchievementType parent,
         Set<ActivityEventType> triggerEvents
@@ -239,7 +243,7 @@ public enum AchievementType {
         this.description = description;
         this.icon = icon;
         this.category = category;
-        this.level = level;
+        this.rarity = rarity;
         this.requiredCount = requiredCount;
         this.parent = parent;
         this.triggerEvents = triggerEvents;
@@ -277,12 +281,12 @@ public enum AchievementType {
      * Get all achievements in a specific category.
      *
      * @param category the category to filter by
-     * @return list of achievements in that category, ordered by level
+     * @return list of achievements in that category, ordered by rarity
      */
     public static List<AchievementType> getByCategory(AchievementCategory category) {
         return Arrays.stream(values())
             .filter(a -> a.category == category)
-            .sorted((a, b) -> Integer.compare(a.level, b.level))
+            .sorted(Comparator.comparing(AchievementType::getRarity, AchievementRarity.RARITY_COMPARATOR))
             .toList();
     }
 

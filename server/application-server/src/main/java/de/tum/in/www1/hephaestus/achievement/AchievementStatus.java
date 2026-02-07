@@ -1,6 +1,8 @@
 package de.tum.in.www1.hephaestus.achievement;
 
-    /**
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+/**
      * Status of an achievement relative to a user's progress.
      *
      * <p>The status determines how the achievement is displayed in the UI:
@@ -16,23 +18,23 @@ package de.tum.in.www1.hephaestus.achievement;
          * The achievement is locked because its parent has not been unlocked yet.
          * Displayed with a lock icon or dimmed in the UI.
          */
-        LOCKED,
+        @JsonProperty("locked") LOCKED,
 
         /**
          * The achievement is available to work towards.
          * Either it has no parent, or its parent is already unlocked.
          */
-        AVAILABLE,
+        @JsonProperty("available") AVAILABLE,
 
         /**
          * The achievement has been unlocked by the user.
          * Shows the unlock date and completed visual state.
          */
-        UNLOCKED,
+        @JsonProperty("unlocked") UNLOCKED,
 
         /**
          * The achievement is hidden and not presented to users in the UI.
          * It represents a hidden or secret unlockable achievement.
          */
-        HIDDEN
+        @JsonProperty("hidden") HIDDEN
     }

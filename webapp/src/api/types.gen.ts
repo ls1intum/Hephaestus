@@ -1077,7 +1077,7 @@ export type Achievement = {
     /**
      * Category for grouping achievements
      */
-    category?: 'PULL_REQUESTS' | 'COMMITS' | 'REVIEWS' | 'COMMENTS' | 'ISSUES' | 'CROSS_CATEGORY';
+    category?: 'pull_requests' | 'commits' | 'communication' | 'issues' | 'milestones';
     /**
      * Description of how to earn the achievement
      */
@@ -1090,10 +1090,6 @@ export type Achievement = {
      * Unique identifier for the achievement
      */
     id?: string;
-    /**
-     * Visual level tier (1-7) for badge styling
-     */
-    level?: number;
     /**
      * Required count to unlock (e.g., 5 PRs)
      */
@@ -1113,7 +1109,11 @@ export type Achievement = {
     /**
      * Current status for this user
      */
-    status?: 'LOCKED' | 'AVAILABLE' | 'UNLOCKED' | 'HIDDEN';
+    status?: 'locked' | 'available' | 'unlocked' | 'hidden';
+    /**
+     * Visual level tier/rarity for badge styling
+     */
+    tier?: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'mythic';
     /**
      * When the achievement was unlocked, null if not unlocked
      */
