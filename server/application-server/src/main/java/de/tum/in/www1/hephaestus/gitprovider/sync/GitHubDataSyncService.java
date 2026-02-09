@@ -10,6 +10,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenSer
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.InstallationTokenProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.OrganizationMembershipListener;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.OrganizationMembershipListener.OrganizationSyncedEvent;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.RateLimitTracker;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncMetadata;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncTarget;
@@ -93,6 +94,7 @@ public class GitHubDataSyncService {
     private final GitHubExceptionClassifier exceptionClassifier;
     private final InstallationTokenProvider tokenProvider;
     private final GitHubAppTokenService gitHubAppTokenService;
+    private final RateLimitTracker rateLimitTracker;
 
     private final AsyncTaskExecutor monitoringExecutor;
 
@@ -117,6 +119,7 @@ public class GitHubDataSyncService {
         GitHubExceptionClassifier exceptionClassifier,
         InstallationTokenProvider tokenProvider,
         GitHubAppTokenService gitHubAppTokenService,
+        RateLimitTracker rateLimitTracker,
         @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor
     ) {
         this.syncSchedulerProperties = syncSchedulerProperties;
@@ -139,6 +142,7 @@ public class GitHubDataSyncService {
         this.exceptionClassifier = exceptionClassifier;
         this.tokenProvider = tokenProvider;
         this.gitHubAppTokenService = gitHubAppTokenService;
+        this.rateLimitTracker = rateLimitTracker;
         this.monitoringExecutor = monitoringExecutor;
     }
 
@@ -409,6 +413,17 @@ public class GitHubDataSyncService {
                 // Check if installation became suspended mid-sync - abort remaining syncs
                 if (installationId != null && gitHubAppTokenService.isInstallationMarkedSuspended(installationId)) {
                     log.info("Aborting remaining syncs: reason=installationSuspended, scopeId={}", scopeId);
+                    break;
+                }
+                // Check if rate limit is critically low - abort remaining repo syncs
+                // to avoid wasting API calls that will all fail with rate limit errors
+                if (rateLimitTracker.isCritical(scopeId)) {
+                    log.warn(
+                        "Aborting remaining repository syncs: reason=rateLimitCritical, scopeId={}, remaining={}, reposRemaining={}",
+                        scopeId,
+                        rateLimitTracker.getRemaining(scopeId),
+                        syncTargets.size()
+                    );
                     break;
                 }
                 if (shouldSync(target)) {
