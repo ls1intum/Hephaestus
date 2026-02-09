@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.sync;
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.RateLimitTracker;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncContextProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncSession;
@@ -87,6 +88,7 @@ public class GitHubDataSyncScheduler {
     private final GitHubOrganizationSyncService organizationSyncService;
     private final OrganizationRepository organizationRepository;
     private final SyncSchedulerProperties syncSchedulerProperties;
+    private final RateLimitTracker rateLimitTracker;
     private final Executor monitoringExecutor;
 
     public GitHubDataSyncScheduler(
@@ -100,6 +102,7 @@ public class GitHubDataSyncScheduler {
         GitHubOrganizationSyncService organizationSyncService,
         OrganizationRepository organizationRepository,
         SyncSchedulerProperties syncSchedulerProperties,
+        RateLimitTracker rateLimitTracker,
         @Qualifier("monitoringExecutor") Executor monitoringExecutor
     ) {
         this.syncTargetProvider = syncTargetProvider;
@@ -112,6 +115,7 @@ public class GitHubDataSyncScheduler {
         this.organizationSyncService = organizationSyncService;
         this.organizationRepository = organizationRepository;
         this.syncSchedulerProperties = syncSchedulerProperties;
+        this.rateLimitTracker = rateLimitTracker;
         this.monitoringExecutor = monitoringExecutor;
     }
 
@@ -270,6 +274,17 @@ public class GitHubDataSyncScheduler {
 
                 // Sync repositories (issues/PRs include embedded project items)
                 for (SyncTarget target : session.syncTargets()) {
+                    // Check if rate limit is critically low - abort remaining repo syncs
+                    // to avoid wasting API calls that will all fail with rate limit errors
+                    if (rateLimitTracker.isCritical(session.scopeId())) {
+                        log.warn(
+                            "Aborting remaining repository syncs: reason=rateLimitCritical, scopeId={}, scopeSlug={}, remaining={}",
+                            session.scopeId(),
+                            session.slug(),
+                            rateLimitTracker.getRemaining(session.scopeId())
+                        );
+                        break;
+                    }
                     dataSyncService.syncSyncTarget(target);
                 }
 
