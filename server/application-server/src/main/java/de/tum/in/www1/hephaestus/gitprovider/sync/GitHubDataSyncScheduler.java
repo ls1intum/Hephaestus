@@ -387,7 +387,7 @@ public class GitHubDataSyncScheduler {
 
             for (Project project : projects) {
                 try {
-                    SyncResult itemResult = projectSyncService.syncDraftIssues(session.scopeId(), project);
+                    SyncResult itemResult = projectSyncService.syncProjectItems(session.scopeId(), project);
                     totalItemsSynced += itemResult.count();
                     if (itemResult.count() > 0) {
                         projectsWithItems++;

@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -638,18 +639,18 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // syncDraftIssues tests
+    // syncProjectItems tests
     // ═══════════════════════════════════════════════════════════════
 
     @Nested
-    @DisplayName("syncDraftIssues")
-    class SyncDraftIssues {
+    @DisplayName("syncProjectItems")
+    class SyncProjectItems {
 
         @Test
         @DisplayName("should return completed(0) when project is null")
         void shouldReturnCompletedZeroWhenProjectIsNull() {
             // Act
-            SyncResult result = service.syncDraftIssues(SCOPE_ID, null);
+            SyncResult result = service.syncProjectItems(SCOPE_ID, null);
 
             // Assert
             assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED);
@@ -665,7 +666,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             project.setNodeId(null);
 
             // Act
-            SyncResult result = service.syncDraftIssues(SCOPE_ID, project);
+            SyncResult result = service.syncProjectItems(SCOPE_ID, project);
 
             // Assert
             assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED);
@@ -696,7 +697,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             when(backfillStateProvider.getProjectItemsSyncedAt(10L)).thenReturn(Optional.empty());
 
             // Act
-            SyncResult result = service.syncDraftIssues(SCOPE_ID, project);
+            SyncResult result = service.syncProjectItems(SCOPE_ID, project);
 
             // Assert
             assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED);
@@ -730,7 +731,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             when(backfillStateProvider.getProjectItemsSyncedAt(10L)).thenReturn(Optional.empty());
 
             // Act
-            SyncResult result = service.syncDraftIssues(SCOPE_ID, project);
+            SyncResult result = service.syncProjectItems(SCOPE_ID, project);
 
             // Assert
             assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED_WITH_WARNINGS);
@@ -809,7 +810,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
 
         /**
          * Mocks the three sequential GraphQL phases (fields, status updates, items)
-         * that syncDraftIssues calls. Returns the mocked responses for assertion setup.
+         * that syncProjectItems calls. Returns the mocked responses for assertion setup.
          */
         private void mockThreePhasesWithItems(Long projectId, GHProjectV2ItemConnection itemsConnection) {
             mockGraphQlClientForScope();
@@ -832,8 +833,8 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should process field values for Issue/PR items when item exists locally")
-        void shouldProcessFieldValuesForIssuePrItems() {
+        @DisplayName("should process Issue/PR items including field values via itemProcessor")
+        void shouldProcessIssuePrItemsViaItemProcessor() {
             // Arrange
             Long projectId = 10L;
             Project project = createProject(projectId, "PVT_node10", 1);
@@ -854,22 +855,22 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             // The transaction lambda calls findById to get the project
             when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
 
-            // The Issue/PR branch looks up the existing ProjectItem by nodeId
-            ProjectItem existingItem = new ProjectItem();
-            existingItem.setId(500L);
-            existingItem.setNodeId("PVTI_issue1");
-            when(projectItemRepository.findByProjectIdAndNodeId(projectId, "PVTI_issue1")).thenReturn(
-                Optional.of(existingItem)
-            );
+            // itemProcessor.process() creates/updates the item and returns it
+            ProjectItem processedItem = new ProjectItem();
+            processedItem.setId(500L);
+            processedItem.setNodeId("PVTI_issue1");
+            when(itemProcessor.process(any(), eq(project), any(), isNull())).thenReturn(processedItem);
 
             // processFieldValues checks if the field exists
             when(projectFieldRepository.existsById("PVTF_status")).thenReturn(true);
 
             // Act
-            SyncResult result = service.syncDraftIssues(SCOPE_ID, project);
+            SyncResult result = service.syncProjectItems(SCOPE_ID, project);
 
             // Assert
             assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED);
+            // Verify itemProcessor.process was called for the Issue/PR item
+            verify(itemProcessor).process(any(), eq(project), any(), isNull());
             // Verify field value was upserted with the correct item ID and field ID
             verify(projectFieldValueRepository).upsertCore(
                 eq(500L),
@@ -883,13 +884,11 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             );
             // Verify stale field value cleanup was called
             verify(projectFieldValueRepository).deleteByItemIdAndFieldIdNotIn(eq(500L), eq(List.of("PVTF_status")));
-            // Verify itemProcessor.process was NOT called (Issue/PR items skip item processing)
-            verify(itemProcessor, never()).process(any(), any(), any(), any());
         }
 
         @Test
-        @DisplayName("should skip Issue/PR items below incremental sync threshold")
-        void shouldSkipIssuePrItemsBelowIncrementalSyncThreshold() {
+        @DisplayName("should skip items below incremental sync threshold")
+        void shouldSkipItemsBelowIncrementalSyncThreshold() {
             // Arrange
             Long projectId = 10L;
             Project project = createProject(projectId, "PVT_node10", 1);
@@ -927,7 +926,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
 
             // Act
-            SyncResult result = service.syncDraftIssues(SCOPE_ID, project);
+            SyncResult result = service.syncProjectItems(SCOPE_ID, project);
 
             // Assert
             assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED);
@@ -947,8 +946,8 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should queue Issue/PR items with truncated field values for pagination")
-        void shouldQueueIssuePrItemsWithTruncatedFieldValuesForPagination() {
+        @DisplayName("should queue items with truncated field values for pagination")
+        void shouldQueueItemsWithTruncatedFieldValuesForPagination() {
             // Arrange
             Long projectId = 10L;
             Project project = createProject(projectId, "PVT_node10", 1);
@@ -968,20 +967,21 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
 
             when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
 
-            ProjectItem existingItem = new ProjectItem();
-            existingItem.setId(600L);
-            existingItem.setNodeId("PVTI_truncated");
-            when(projectItemRepository.findByProjectIdAndNodeId(projectId, "PVTI_truncated")).thenReturn(
-                Optional.of(existingItem)
-            );
+            // itemProcessor.process() returns the processed item
+            ProjectItem processedItem = new ProjectItem();
+            processedItem.setId(600L);
+            processedItem.setNodeId("PVTI_truncated");
+            when(itemProcessor.process(any(), eq(project), any(), isNull())).thenReturn(processedItem);
 
             when(projectFieldRepository.existsById("PVTF_field1")).thenReturn(true);
 
             // Act
-            SyncResult result = service.syncDraftIssues(SCOPE_ID, project);
+            SyncResult result = service.syncProjectItems(SCOPE_ID, project);
 
             // Assert
             assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED);
+            // Verify itemProcessor.process was called
+            verify(itemProcessor).process(any(), eq(project), any(), isNull());
             // Verify field values were still processed for the first page
             verify(projectFieldValueRepository).upsertCore(
                 eq(600L),
@@ -1001,13 +1001,13 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should gracefully skip field value processing when item not yet synced locally")
-        void shouldSkipFieldValuesWhenItemNotYetSyncedLocally() {
+        @DisplayName("should create Issue/PR items that don't exist locally via itemProcessor")
+        void shouldCreateIssuePrItemsThatDontExistLocally() {
             // Arrange
             Long projectId = 10L;
             Project project = createProject(projectId, "PVT_node10", 1);
 
-            GHProjectV2Item unsyncedItem = createIssueItem(
+            GHProjectV2Item newItem = createIssueItem(
                 "PVTI_not_synced",
                 99999L,
                 OffsetDateTime.now(),
@@ -1016,35 +1016,37 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
                 null
             );
 
-            GHProjectV2ItemConnection itemsConnection = createItemConnection(List.of(unsyncedItem));
+            GHProjectV2ItemConnection itemsConnection = createItemConnection(List.of(newItem));
             mockThreePhasesWithItems(projectId, itemsConnection);
 
             when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
 
-            // Item does NOT exist locally yet
-            when(projectItemRepository.findByProjectIdAndNodeId(projectId, "PVTI_not_synced")).thenReturn(
-                Optional.empty()
-            );
+            // itemProcessor.process() creates the new item
+            ProjectItem createdItem = new ProjectItem();
+            createdItem.setId(700L);
+            createdItem.setNodeId("PVTI_not_synced");
+            when(itemProcessor.process(any(), eq(project), any(), isNull())).thenReturn(createdItem);
+
+            when(projectFieldRepository.existsById("PVTF_field1")).thenReturn(true);
 
             // Act
-            SyncResult result = service.syncDraftIssues(SCOPE_ID, project);
+            SyncResult result = service.syncProjectItems(SCOPE_ID, project);
 
             // Assert
             assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED);
-            // No field value processing should occur
-            verify(projectFieldValueRepository, never()).upsertCore(
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any()
+            // Verify itemProcessor.process was called to create the item
+            verify(itemProcessor).process(any(), eq(project), any(), isNull());
+            // Verify field values were processed on the newly created item
+            verify(projectFieldValueRepository).upsertCore(
+                eq(700L),
+                eq("PVTF_field1"),
+                eq("value"),
+                eq(null),
+                eq(null),
+                eq(null),
+                eq(null),
+                any(Instant.class)
             );
-            verify(projectFieldValueRepository, never()).deleteByItemIdAndFieldIdNotIn(any(), any());
-            // No item processing should occur either (Issue/PR items are not processed from project side)
-            verify(itemProcessor, never()).process(any(), any(), any(), any());
         }
     }
 

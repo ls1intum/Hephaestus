@@ -84,18 +84,6 @@ public interface ProjectItemRepository extends JpaRepository<ProjectItem, Long> 
     boolean existsByProjectIdAndNodeId(Long projectId, String nodeId);
 
     /**
-     * Deletes all items for a project that are not in the given list of node IDs.
-     * Used during sync to remove items that no longer exist in GitHub.
-     *
-     * @param projectId the project's ID
-     * @param nodeIds the node IDs to keep
-     * @return number of deleted items
-     */
-    @Modifying
-    @Query("DELETE FROM ProjectItem i WHERE i.project.id = :projectId AND i.nodeId NOT IN :nodeIds")
-    int deleteByProjectIdAndNodeIdNotIn(@Param("projectId") Long projectId, @Param("nodeIds") List<String> nodeIds);
-
-    /**
      * Deletes all items of a specific content type for a project that are not in the given list of node IDs.
      * Used during Draft Issue sync to remove stale Draft Issues without affecting Issue/PR items
      * (which are synced from the issue/PR side).
