@@ -350,30 +350,6 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
     }
 
     /**
-     * Removes items from a project that are no longer present in the synced list.
-     * <p>
-     * This should only be called after a complete sync to avoid deleting items
-     * that simply weren't fetched due to pagination limits or rate limiting.
-     *
-     * @param projectId the project ID
-     * @param syncedNodeIds list of item node IDs that were synced
-     * @param context processing context
-     * @return number of items removed
-     */
-    @Transactional
-    public int removeStaleItems(Long projectId, List<String> syncedNodeIds, ProcessingContext context) {
-        if (projectId == null || syncedNodeIds == null || syncedNodeIds.isEmpty()) {
-            return 0;
-        }
-
-        int removed = projectItemRepository.deleteByProjectIdAndNodeIdNotIn(projectId, syncedNodeIds);
-        if (removed > 0) {
-            log.info("Removed stale project items: projectId={}, count={}", projectId, removed);
-        }
-        return removed;
-    }
-
-    /**
      * Removes stale Draft Issues that no longer exist in the project.
      * <p>
      * This method is used by the project-side sync which only handles Draft Issues.

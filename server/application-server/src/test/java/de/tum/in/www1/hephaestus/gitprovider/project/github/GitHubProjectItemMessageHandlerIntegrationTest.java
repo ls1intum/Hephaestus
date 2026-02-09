@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.project.github;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
@@ -18,11 +19,16 @@ import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Import;
+import org.springframework.context.event.EventListener;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.stereotype.Component;
 
 /**
  * Integration tests for GitHubProjectItemMessageHandler.
@@ -32,7 +38,18 @@ import org.springframework.core.io.ClassPathResource;
  * parsed directly into DTOs for complete isolation.
  */
 @DisplayName("GitHub Project Item Message Handler")
+@Import(GitHubProjectItemMessageHandlerIntegrationTest.TestProjectItemEventListener.class)
 class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest {
+
+    // Fixture values from projects_v2_item.created.json
+    private static final Long FIXTURE_ITEM_ID = 136779200L;
+    private static final String FIXTURE_ITEM_NODE_ID = "PVTI_lADODNYmp84BHA5ozggnFcA";
+    private static final Instant FIXTURE_ITEM_CREATED_AT = Instant.parse("2025-11-01T23:54:51Z");
+    private static final Instant FIXTURE_ITEM_UPDATED_AT = Instant.parse("2025-11-01T23:54:51Z");
+
+    // Fixture values from projects_v2_item.archived/restored/reordered/deleted.json (second item)
+    private static final Long FIXTURE_ITEM2_ID = 136779223L;
+    private static final String FIXTURE_ITEM2_NODE_ID = "PVTI_lADODNYmp84BHA5ozggnFdc";
 
     @Autowired
     private GitHubProjectItemMessageHandler handler;
@@ -52,12 +69,16 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private TestProjectItemEventListener eventListener;
+
     private Organization testOrganization;
     private Project testProject;
 
     @BeforeEach
     void setUp() {
         databaseTestUtils.cleanDatabase();
+        eventListener.clear();
         setupTestData();
     }
 
@@ -135,12 +156,13 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
     void shouldHandleItemDeletedEvent() throws Exception {
         // Given
         ProjectItem item = createAndSaveTestItem(
-            136779223L,
-            "PVTI_lADODNYmp84BHA5ozggnFdc",
+            FIXTURE_ITEM2_ID,
+            FIXTURE_ITEM2_NODE_ID,
             ProjectItem.ContentType.DRAFT_ISSUE,
             false
         );
         assertThat(projectItemRepository.findById(item.getId())).isPresent();
+        eventListener.clear();
 
         GitHubProjectItemEventDTO deletedEvent = loadPayload("projects_v2_item.deleted");
 
@@ -149,13 +171,18 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
 
         // Then
         assertThat(projectItemRepository.findById(item.getId())).isEmpty();
+
+        // Verify ProjectItemDeleted domain event
+        assertThat(eventListener.getDeletedEvents()).hasSize(1);
+        assertThat(eventListener.getDeletedEvents().getFirst().itemId()).isEqualTo(FIXTURE_ITEM2_ID);
     }
 
     @Test
     @DisplayName("Should process project item archived event")
     void shouldHandleItemArchivedEvent() throws Exception {
         // Given
-        createAndSaveTestItem(136779223L, "PVTI_lADODNYmp84BHA5ozggnFdc", ProjectItem.ContentType.DRAFT_ISSUE, false);
+        createAndSaveTestItem(FIXTURE_ITEM2_ID, FIXTURE_ITEM2_NODE_ID, ProjectItem.ContentType.DRAFT_ISSUE, false);
+        eventListener.clear();
 
         GitHubProjectItemEventDTO archivedEvent = loadPayload("projects_v2_item.archived");
 
@@ -164,18 +191,22 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
 
         // Then — webhook DTO lacks an explicit "archived" boolean; the primitive defaults to false.
         // The processor passes through the DTO value, so archived remains false after upsert.
-        var result = projectItemRepository.findByProjectIdAndNodeId(
-            testProject.getId(),
-            "PVTI_lADODNYmp84BHA5ozggnFdc"
-        );
+        var result = projectItemRepository.findByProjectIdAndNodeId(testProject.getId(), FIXTURE_ITEM2_NODE_ID);
         assertThat(result)
             .isPresent()
             .get()
             .satisfies(i -> {
-                assertThat(i.getId()).isEqualTo(136779223L);
+                assertThat(i.getId()).isEqualTo(FIXTURE_ITEM2_ID);
                 assertThat(i.getContentType()).isEqualTo(ProjectItem.ContentType.DRAFT_ISSUE);
                 assertThat(i.getProject().getId()).isEqualTo(testProject.getId());
             });
+
+        // Verify domain events: processArchived() calls process() first (Updated since item exists),
+        // then publishes ProjectItemArchived
+        assertThat(eventListener.getUpdatedEvents()).hasSize(1);
+        assertThat(eventListener.getArchivedEvents()).hasSize(1);
+        assertThat(eventListener.getArchivedEvents().getFirst().projectId()).isEqualTo(testProject.getId());
+        assertThat(eventListener.getArchivedEvents().getFirst().item().id()).isEqualTo(FIXTURE_ITEM2_ID);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -187,14 +218,16 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
     void shouldSkipEventWhenOrganizationNotFound() throws Exception {
         // Given - clean database so no org exists
         databaseTestUtils.cleanDatabase();
+        eventListener.clear();
 
         GitHubProjectItemEventDTO event = loadPayload("projects_v2_item.created");
 
         // When
         handler.handleEvent(event);
 
-        // Then
+        // Then - no item should be created and no events published
         assertThat(projectItemRepository.count()).isZero();
+        assertThat(eventListener.getCreatedEvents()).isEmpty();
     }
 
     @Test
@@ -203,14 +236,16 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
         // Given — org/workspace exist but project does not
         projectItemRepository.deleteAll();
         projectRepository.deleteAll();
+        eventListener.clear();
 
         GitHubProjectItemEventDTO event = loadPayload("projects_v2_item.created");
 
         // When
         handler.handleEvent(event);
 
-        // Then — no item should be created
+        // Then — no item should be created and no events published
         assertThat(projectItemRepository.count()).isZero();
+        assertThat(eventListener.getCreatedEvents()).isEmpty();
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -218,7 +253,7 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
     // ═══════════════════════════════════════════════════════════════
 
     @Test
-    @DisplayName("Should create project item from created event")
+    @DisplayName("Should create project item from created event and publish ProjectItemCreated event")
     void shouldHandleItemCreatedEvent() throws Exception {
         // Given
         GitHubProjectItemEventDTO event = loadPayload("projects_v2_item.created");
@@ -227,19 +262,24 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
         handler.handleEvent(event);
 
         // Then
-        var item = projectItemRepository.findByProjectIdAndNodeId(testProject.getId(), "PVTI_lADODNYmp84BHA5ozggnFcA");
+        var item = projectItemRepository.findByProjectIdAndNodeId(testProject.getId(), FIXTURE_ITEM_NODE_ID);
         assertThat(item)
             .isPresent()
             .get()
             .satisfies(i -> {
-                assertThat(i.getId()).isEqualTo(136779200L);
-                assertThat(i.getNodeId()).isEqualTo("PVTI_lADODNYmp84BHA5ozggnFcA");
+                assertThat(i.getId()).isEqualTo(FIXTURE_ITEM_ID);
+                assertThat(i.getNodeId()).isEqualTo(FIXTURE_ITEM_NODE_ID);
                 assertThat(i.getContentType()).isEqualTo(ProjectItem.ContentType.DRAFT_ISSUE);
                 assertThat(i.getProject().getId()).isEqualTo(testProject.getId());
                 assertThat(i.isArchived()).isFalse();
-                assertThat(i.getCreatedAt()).isEqualTo(Instant.parse("2025-11-01T23:54:51Z"));
-                assertThat(i.getUpdatedAt()).isEqualTo(Instant.parse("2025-11-01T23:54:51Z"));
+                assertThat(i.getCreatedAt()).isEqualTo(FIXTURE_ITEM_CREATED_AT);
+                assertThat(i.getUpdatedAt()).isEqualTo(FIXTURE_ITEM_UPDATED_AT);
             });
+
+        // Verify ProjectItemCreated domain event
+        assertThat(eventListener.getCreatedEvents()).hasSize(1);
+        assertThat(eventListener.getCreatedEvents().getFirst().item().id()).isEqualTo(FIXTURE_ITEM_ID);
+        assertThat(eventListener.getCreatedEvents().getFirst().projectId()).isEqualTo(testProject.getId());
     }
 
     @Test
@@ -254,13 +294,18 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
 
         // Then — only one item should exist (upsert is idempotent)
         assertThat(projectItemRepository.findAllByProjectId(testProject.getId())).hasSize(1);
+
+        // First call publishes ProjectItemCreated, second publishes ProjectItemUpdated
+        assertThat(eventListener.getCreatedEvents()).hasSize(1);
+        assertThat(eventListener.getUpdatedEvents()).hasSize(1);
     }
 
     @Test
-    @DisplayName("Should update project item from edited event")
+    @DisplayName("Should update project item from edited event and publish ProjectItemUpdated event")
     void shouldHandleItemEditedEvent() throws Exception {
         // Given — pre-create the item
-        createAndSaveTestItem(136779200L, "PVTI_lADODNYmp84BHA5ozggnFcA", ProjectItem.ContentType.DRAFT_ISSUE, false);
+        createAndSaveTestItem(FIXTURE_ITEM_ID, FIXTURE_ITEM_NODE_ID, ProjectItem.ContentType.DRAFT_ISSUE, false);
+        eventListener.clear();
 
         GitHubProjectItemEventDTO event = loadPayload("projects_v2_item.edited");
 
@@ -269,25 +314,32 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
 
         // Then — updated_at should reflect the edited fixture timestamp;
         // created_at is NOT overwritten on conflict (upsert only updates updated_at).
-        var item = projectItemRepository.findByProjectIdAndNodeId(testProject.getId(), "PVTI_lADODNYmp84BHA5ozggnFcA");
+        var item = projectItemRepository.findByProjectIdAndNodeId(testProject.getId(), FIXTURE_ITEM_NODE_ID);
         assertThat(item)
             .isPresent()
             .get()
             .satisfies(i -> {
-                assertThat(i.getId()).isEqualTo(136779200L);
-                assertThat(i.getNodeId()).isEqualTo("PVTI_lADODNYmp84BHA5ozggnFcA");
+                assertThat(i.getId()).isEqualTo(FIXTURE_ITEM_ID);
+                assertThat(i.getNodeId()).isEqualTo(FIXTURE_ITEM_NODE_ID);
                 assertThat(i.getContentType()).isEqualTo(ProjectItem.ContentType.DRAFT_ISSUE);
                 assertThat(i.getProject().getId()).isEqualTo(testProject.getId());
                 assertThat(i.isArchived()).isFalse();
                 assertThat(i.getUpdatedAt()).isEqualTo(Instant.parse("2025-11-01T23:55:09Z"));
             });
+
+        // Verify ProjectItemUpdated domain event (not Created, since item already existed)
+        assertThat(eventListener.getCreatedEvents()).isEmpty();
+        assertThat(eventListener.getUpdatedEvents()).hasSize(1);
+        assertThat(eventListener.getUpdatedEvents().getFirst().item().id()).isEqualTo(FIXTURE_ITEM_ID);
+        assertThat(eventListener.getUpdatedEvents().getFirst().projectId()).isEqualTo(testProject.getId());
     }
 
     @Test
-    @DisplayName("Should process project item restored event")
+    @DisplayName("Should process project item restored event and publish ProjectItemRestored event")
     void shouldHandleItemRestoredEvent() throws Exception {
         // Given — pre-create item as archived
-        createAndSaveTestItem(136779223L, "PVTI_lADODNYmp84BHA5ozggnFdc", ProjectItem.ContentType.DRAFT_ISSUE, true);
+        createAndSaveTestItem(FIXTURE_ITEM2_ID, FIXTURE_ITEM2_NODE_ID, ProjectItem.ContentType.DRAFT_ISSUE, true);
+        eventListener.clear();
 
         GitHubProjectItemEventDTO event = loadPayload("projects_v2_item.restored");
 
@@ -295,26 +347,31 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
         handler.handleEvent(event);
 
         // Then
-        var result = projectItemRepository.findByProjectIdAndNodeId(
-            testProject.getId(),
-            "PVTI_lADODNYmp84BHA5ozggnFdc"
-        );
+        var result = projectItemRepository.findByProjectIdAndNodeId(testProject.getId(), FIXTURE_ITEM2_NODE_ID);
         assertThat(result)
             .isPresent()
             .get()
             .satisfies(i -> {
-                assertThat(i.getId()).isEqualTo(136779223L);
+                assertThat(i.getId()).isEqualTo(FIXTURE_ITEM2_ID);
                 assertThat(i.getContentType()).isEqualTo(ProjectItem.ContentType.DRAFT_ISSUE);
                 assertThat(i.getProject().getId()).isEqualTo(testProject.getId());
                 assertThat(i.isArchived()).isFalse();
             });
+
+        // Verify domain events: processRestored() calls process() first (Updated since item exists),
+        // then publishes ProjectItemRestored
+        assertThat(eventListener.getUpdatedEvents()).hasSize(1);
+        assertThat(eventListener.getRestoredEvents()).hasSize(1);
+        assertThat(eventListener.getRestoredEvents().getFirst().projectId()).isEqualTo(testProject.getId());
+        assertThat(eventListener.getRestoredEvents().getFirst().item().id()).isEqualTo(FIXTURE_ITEM2_ID);
     }
 
     @Test
-    @DisplayName("Should update content type when item is converted")
+    @DisplayName("Should update content type when item is converted and publish ProjectItemConverted event")
     void shouldHandleItemConvertedEvent() throws Exception {
         // Given — pre-create item as DRAFT_ISSUE
-        createAndSaveTestItem(136779200L, "PVTI_lADODNYmp84BHA5ozggnFcA", ProjectItem.ContentType.DRAFT_ISSUE, false);
+        createAndSaveTestItem(FIXTURE_ITEM_ID, FIXTURE_ITEM_NODE_ID, ProjectItem.ContentType.DRAFT_ISSUE, false);
+        eventListener.clear();
 
         GitHubProjectItemEventDTO event = loadPayload("projects_v2_item.converted");
 
@@ -322,26 +379,31 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
         handler.handleEvent(event);
 
         // Then — content type should be updated to ISSUE
-        var result = projectItemRepository.findByProjectIdAndNodeId(
-            testProject.getId(),
-            "PVTI_lADODNYmp84BHA5ozggnFcA"
-        );
+        var result = projectItemRepository.findByProjectIdAndNodeId(testProject.getId(), FIXTURE_ITEM_NODE_ID);
         assertThat(result)
             .isPresent()
             .get()
             .satisfies(i -> {
-                assertThat(i.getId()).isEqualTo(136779200L);
+                assertThat(i.getId()).isEqualTo(FIXTURE_ITEM_ID);
                 assertThat(i.getContentType()).isEqualTo(ProjectItem.ContentType.ISSUE);
                 assertThat(i.getProject().getId()).isEqualTo(testProject.getId());
                 assertThat(i.isArchived()).isFalse();
             });
+
+        // Verify domain events: processConverted() calls process() first (Updated since item exists),
+        // then publishes ProjectItemConverted
+        assertThat(eventListener.getUpdatedEvents()).hasSize(1);
+        assertThat(eventListener.getConvertedEvents()).hasSize(1);
+        assertThat(eventListener.getConvertedEvents().getFirst().projectId()).isEqualTo(testProject.getId());
+        assertThat(eventListener.getConvertedEvents().getFirst().item().id()).isEqualTo(FIXTURE_ITEM_ID);
     }
 
     @Test
-    @DisplayName("Should process project item reordered event")
+    @DisplayName("Should process project item reordered event and publish ProjectItemReordered event")
     void shouldHandleItemReorderedEvent() throws Exception {
         // Given — pre-create the item
-        createAndSaveTestItem(136779223L, "PVTI_lADODNYmp84BHA5ozggnFdc", ProjectItem.ContentType.DRAFT_ISSUE, false);
+        createAndSaveTestItem(FIXTURE_ITEM2_ID, FIXTURE_ITEM2_NODE_ID, ProjectItem.ContentType.DRAFT_ISSUE, false);
+        eventListener.clear();
 
         GitHubProjectItemEventDTO event = loadPayload("projects_v2_item.reordered");
 
@@ -349,24 +411,116 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
         handler.handleEvent(event);
 
         // Then
-        var result = projectItemRepository.findByProjectIdAndNodeId(
-            testProject.getId(),
-            "PVTI_lADODNYmp84BHA5ozggnFdc"
-        );
+        var result = projectItemRepository.findByProjectIdAndNodeId(testProject.getId(), FIXTURE_ITEM2_NODE_ID);
         assertThat(result)
             .isPresent()
             .get()
             .satisfies(i -> {
-                assertThat(i.getId()).isEqualTo(136779223L);
+                assertThat(i.getId()).isEqualTo(FIXTURE_ITEM2_ID);
                 assertThat(i.getContentType()).isEqualTo(ProjectItem.ContentType.DRAFT_ISSUE);
                 assertThat(i.getProject().getId()).isEqualTo(testProject.getId());
                 assertThat(i.isArchived()).isFalse();
             });
+
+        // Verify domain events: processReordered() calls process() first (Updated since item exists),
+        // then publishes ProjectItemReordered
+        assertThat(eventListener.getUpdatedEvents()).hasSize(1);
+        assertThat(eventListener.getReorderedEvents()).hasSize(1);
+        assertThat(eventListener.getReorderedEvents().getFirst().projectId()).isEqualTo(testProject.getId());
+        assertThat(eventListener.getReorderedEvents().getFirst().item().id()).isEqualTo(FIXTURE_ITEM2_ID);
     }
 
     private GitHubProjectItemEventDTO loadPayload(String filename) throws IOException {
         ClassPathResource resource = new ClassPathResource("github/" + filename + ".json");
         String json = resource.getContentAsString(StandardCharsets.UTF_8);
         return objectMapper.readValue(json, GitHubProjectItemEventDTO.class);
+    }
+
+    /**
+     * Test event listener that captures project item domain events for assertion.
+     */
+    @Component
+    static class TestProjectItemEventListener {
+
+        private final List<DomainEvent.ProjectItemCreated> createdEvents = new ArrayList<>();
+        private final List<DomainEvent.ProjectItemUpdated> updatedEvents = new ArrayList<>();
+        private final List<DomainEvent.ProjectItemArchived> archivedEvents = new ArrayList<>();
+        private final List<DomainEvent.ProjectItemRestored> restoredEvents = new ArrayList<>();
+        private final List<DomainEvent.ProjectItemDeleted> deletedEvents = new ArrayList<>();
+        private final List<DomainEvent.ProjectItemConverted> convertedEvents = new ArrayList<>();
+        private final List<DomainEvent.ProjectItemReordered> reorderedEvents = new ArrayList<>();
+
+        @EventListener
+        public void onCreated(DomainEvent.ProjectItemCreated event) {
+            createdEvents.add(event);
+        }
+
+        @EventListener
+        public void onUpdated(DomainEvent.ProjectItemUpdated event) {
+            updatedEvents.add(event);
+        }
+
+        @EventListener
+        public void onArchived(DomainEvent.ProjectItemArchived event) {
+            archivedEvents.add(event);
+        }
+
+        @EventListener
+        public void onRestored(DomainEvent.ProjectItemRestored event) {
+            restoredEvents.add(event);
+        }
+
+        @EventListener
+        public void onDeleted(DomainEvent.ProjectItemDeleted event) {
+            deletedEvents.add(event);
+        }
+
+        @EventListener
+        public void onConverted(DomainEvent.ProjectItemConverted event) {
+            convertedEvents.add(event);
+        }
+
+        @EventListener
+        public void onReordered(DomainEvent.ProjectItemReordered event) {
+            reorderedEvents.add(event);
+        }
+
+        public List<DomainEvent.ProjectItemCreated> getCreatedEvents() {
+            return new ArrayList<>(createdEvents);
+        }
+
+        public List<DomainEvent.ProjectItemUpdated> getUpdatedEvents() {
+            return new ArrayList<>(updatedEvents);
+        }
+
+        public List<DomainEvent.ProjectItemArchived> getArchivedEvents() {
+            return new ArrayList<>(archivedEvents);
+        }
+
+        public List<DomainEvent.ProjectItemRestored> getRestoredEvents() {
+            return new ArrayList<>(restoredEvents);
+        }
+
+        public List<DomainEvent.ProjectItemDeleted> getDeletedEvents() {
+            return new ArrayList<>(deletedEvents);
+        }
+
+        public List<DomainEvent.ProjectItemConverted> getConvertedEvents() {
+            return new ArrayList<>(convertedEvents);
+        }
+
+        public List<DomainEvent.ProjectItemReordered> getReorderedEvents() {
+            return new ArrayList<>(reorderedEvents);
+        }
+
+        public void clear() {
+            createdEvents.clear();
+            updatedEvents.clear();
+            archivedEvents.clear();
+            restoredEvents.clear();
+            deletedEvents.clear();
+            convertedEvents.clear();
+            reorderedEvents.clear();
+        }
     }
 }

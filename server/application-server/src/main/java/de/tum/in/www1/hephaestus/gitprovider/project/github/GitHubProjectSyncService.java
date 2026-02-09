@@ -69,16 +69,11 @@ import reactor.util.retry.Retry;
  * <p>
  * <h2>Architecture Note: Issue/PR Items vs Draft Issues</h2>
  * <p>
- * Project items linking to Issues and Pull Requests are synced <b>from the issue/PR side</b>
- * (embedded in issue/PR GraphQL queries), NOT from the project side. This enables:
- * <ul>
- *   <li>Historical backfill: Items naturally backfilled with their parent issues/PRs</li>
- *   <li>Efficient sync: {@code filterBy.since} on issues propagates to item updates</li>
- *   <li>Proper pagination: Uses issue's {@code projectItems(first:, after:)} connection</li>
- * </ul>
- * <p>
- * <b>Draft Issues</b> have no parent Issue/PR, so they must still be synced from the project side.
- * The {@link #syncDraftIssues} method handles this case.
+ * All project item types (Draft Issues, Issues, and Pull Requests) are synced from the
+ * project side via {@link #syncProjectItems}. This ensures complete coverage regardless
+ * of which repositories have been individually synced. The embedded issue/PR sync path
+ * ({@link GitHubProjectItemSyncService}) supplements this with additional context such as
+ * linking items to locally-synced issue entities.
  * <p>
  * <h2>Supported Owner Types</h2>
  * <p>
@@ -109,11 +104,11 @@ import reactor.util.retry.Retry;
  * <p>
  * <h2>Phase Tracking</h2>
  * <p>
- * The {@link #syncDraftIssues} method tracks three phases:
+ * The {@link #syncProjectItems} method tracks three phases:
  * <ol>
  *   <li><b>Fields:</b> Project field definitions (custom fields like Status, Priority)</li>
  *   <li><b>Status Updates:</b> Project health status updates (ON_TRACK, AT_RISK, OFF_TRACK)</li>
- *   <li><b>Draft Issues:</b> Project items that are draft issues (no parent issue)</li>
+ *   <li><b>Items:</b> All project items (Draft Issues, Issues, Pull Requests) with field values</li>
  * </ol>
  * <p>
  * Each phase has independent cursor persistence for resumability. If one phase fails (e.g., rate limit),
@@ -215,7 +210,7 @@ public class GitHubProjectSyncService {
      * Synchronizes all projects for an organization using GraphQL.
      * <p>
      * This method syncs only the project list (metadata). Draft Issue sync should be
-     * called separately via {@link #syncDraftIssues} for each project.
+     * called separately via {@link #syncProjectItems} for each project.
      * <p>
      * Note: This method intentionally does NOT use @Transactional to avoid long-running
      * transactions. Each page of projects is processed in its own transaction.
@@ -553,10 +548,11 @@ public class GitHubProjectSyncService {
     /**
      * Synchronizes Draft Issues for a single project with cursor persistence for resumability.
      * <p>
-     * <b>Important:</b> This method only syncs <b>Draft Issues</b> from the project side.
-     * Items that link to Issues or Pull Requests are synced from the issue/PR side
-     * (via embedded projectItems in issue/PR GraphQL queries) for better efficiency
-     * and historical backfill support.
+     * <b>Important:</b> This method syncs <b>all item types</b> (Draft Issues, Issues, and Pull Requests)
+     * from the project side. The project-side sync is the authoritative source for project items,
+     * ensuring complete coverage even for items referencing issues/PRs in repositories that
+     * haven't been individually synced yet. The embedded issue/PR sync path supplements this
+     * with additional context (e.g., linking items to locally-synced issue entities).
      * <p>
      * Uses the project's {@code itemSyncCursor} field for resumable pagination.
      * Each page is processed in its own transaction to avoid long-running locks.
@@ -569,15 +565,15 @@ public class GitHubProjectSyncService {
      *   <li>All items are fetched (full pagination required)</li>
      *   <li>Items where updatedAt &lt; lastSyncTimestamp are skipped during processing</li>
      *   <li>This saves database writes but not API calls</li>
-     *   <li>All Draft Issue node IDs are still tracked for stale item removal</li>
+     *   <li>All node IDs are still tracked for stale item removal</li>
      * </ul>
      *
      * @param scopeId the scope ID for authentication
-     * @param project the project to sync Draft Issues for
-     * @return sync result containing status and count of Draft Issues synced
-     * @see GitHubProjectItemSyncService for Issue/PR item sync from the issue/PR side
+     * @param project the project to sync items for
+     * @return sync result containing status and count of items synced
+     * @see GitHubProjectItemSyncService for supplementary Issue/PR item sync from the issue/PR side
      */
-    public SyncResult syncDraftIssues(Long scopeId, Project project) {
+    public SyncResult syncProjectItems(Long scopeId, Project project) {
         if (project == null || project.getNodeId() == null) {
             log.debug("Skipped project item sync: reason=invalidProject");
             return SyncResult.completed(0);
@@ -722,7 +718,7 @@ public class GitHubProjectSyncService {
                 }
 
                 // Process this page of items in its own transaction
-                // Only Draft Issues are processed - Issue/PR items are synced from the issue/PR side
+                // All item types (Draft Issue, Issue, PR) are created/updated from the project side
                 // For incremental sync, items unchanged since last sync are tracked but not processed
                 final Long projId = projectId;
                 ItemPageResult pageResult = transactionTemplate.execute(status -> {
@@ -741,52 +737,13 @@ public class GitHubProjectSyncService {
                             continue;
                         }
 
-                        // Only process Draft Issues from the project side.
-                        // Issue and Pull Request items are synced from the issue/PR side
-                        // (embedded in issue/PR GraphQL queries) for better efficiency.
+                        // Determine content type and track node IDs for stale removal
                         ProjectItem.ContentType contentType = itemDto.getContentTypeEnum();
-                        if (contentType != ProjectItem.ContentType.DRAFT_ISSUE) {
-                            // Track Issue/PR node IDs for stale removal (Bug 5)
-                            // even though we don't process them from the project side
+                        if (contentType == ProjectItem.ContentType.DRAFT_ISSUE) {
+                            syncedItemNodeIds.add(itemDto.nodeId());
+                        } else {
                             syncedIssuePrNodeIds.add(itemDto.nodeId());
-
-                            // Apply incremental sync skip for unchanged items
-                            if (
-                                incrementalSync &&
-                                syncThreshold != null &&
-                                itemDto.updatedAt() != null &&
-                                itemDto.updatedAt().isBefore(syncThreshold)
-                            ) {
-                                itemsSkipped++;
-                                continue;
-                            }
-
-                            // Process field values for Issue/PR items (zero additional API cost).
-                            // The item entity is synced from the issue/PR side, but field values
-                            // from the project items query cover all 11 types (vs 5 from the
-                            // embedded issue/PR queries), so this serves as authoritative backfill.
-                            ProjectItem existingItem = projectItemRepository
-                                .findByProjectIdAndNodeId(projId, itemDto.nodeId())
-                                .orElse(null);
-                            if (existingItem != null) {
-                                processFieldValues(existingItem.getId(), itemDto.fieldValues());
-
-                                if (itemDto.fieldValuesTruncated() && itemDto.fieldValuesEndCursor() != null) {
-                                    itemsNeedingFieldValuePagination.add(
-                                        new ItemWithFieldValueCursor(
-                                            existingItem.getId(),
-                                            itemDto.nodeId(),
-                                            itemDto.fieldValuesEndCursor()
-                                        )
-                                    );
-                                }
-                            }
-
-                            continue;
                         }
-
-                        // Track the node ID for stale Draft Issue removal
-                        syncedItemNodeIds.add(itemDto.nodeId());
 
                         // Client-side incremental sync: skip items that haven't changed
                         // This saves database writes while still tracking all items for deletion detection
@@ -803,22 +760,30 @@ public class GitHubProjectSyncService {
                             itemsProcessed++;
 
                             // Process inline field values for this item
-                            processFieldValues(processedItem.getId(), itemDto.fieldValues());
+                            boolean fieldValuesTruncated =
+                                itemDto.fieldValuesTruncated() && itemDto.fieldValuesEndCursor() != null;
+                            List<String> initialFieldIds = processFieldValues(
+                                processedItem.getId(),
+                                itemDto.fieldValues(),
+                                fieldValuesTruncated
+                            );
 
                             // Track items needing follow-up pagination for field values
                             // This follows the IssueWithCommentCursor pattern from GitHubIssueSyncService
-                            if (itemDto.fieldValuesTruncated() && itemDto.fieldValuesEndCursor() != null) {
+                            if (fieldValuesTruncated) {
                                 itemsNeedingFieldValuePagination.add(
                                     new ItemWithFieldValueCursor(
                                         processedItem.getId(),
                                         itemDto.nodeId(),
-                                        itemDto.fieldValuesEndCursor()
+                                        itemDto.fieldValuesEndCursor(),
+                                        initialFieldIds
                                     )
                                 );
                                 log.debug(
-                                    "Draft Issue queued for field value pagination: itemNodeId={}, projectId={}, fetched={}, total={}",
+                                    "Item queued for field value pagination: itemNodeId={}, projectId={}, type={}, fetched={}, total={}",
                                     itemDto.nodeId(),
                                     projId,
+                                    contentType,
                                     itemDto.fieldValues() != null ? itemDto.fieldValues().size() : 0,
                                     itemDto.fieldValuesTotalCount()
                                 );
@@ -1503,13 +1468,33 @@ public class GitHubProjectSyncService {
      * Processes field values for a project item.
      * <p>
      * Uses atomic upsert to handle concurrent updates and removes stale values.
+     * When field values are truncated (more than inline page size), stale removal
+     * is deferred to {@link #syncRemainingFieldValues} which tracks all processed
+     * field IDs across both inline and paginated phases.
      *
      * @param itemId      the item's database ID
      * @param fieldValues the field values from the GraphQL response
+     * @param truncated   whether the inline field values were truncated (more pages exist)
+     * @return list of processed field IDs (for tracking across pagination phases)
      */
-    private void processFieldValues(Long itemId, List<GitHubProjectFieldValueDTO> fieldValues) {
-        if (itemId == null || fieldValues == null || fieldValues.isEmpty()) {
-            return;
+    private List<String> processFieldValues(
+        Long itemId,
+        List<GitHubProjectFieldValueDTO> fieldValues,
+        boolean truncated
+    ) {
+        if (itemId == null) {
+            return List.of();
+        }
+
+        if (fieldValues == null || fieldValues.isEmpty()) {
+            if (!truncated) {
+                // All field values were removed on GitHub — delete all local values
+                int removed = projectFieldValueRepository.deleteAllByItemId(itemId);
+                if (removed > 0) {
+                    log.debug("Removed all field values (none on GitHub): itemId={}, count={}", itemId, removed);
+                }
+            }
+            return List.of();
         }
 
         List<String> processedFieldIds = new ArrayList<>();
@@ -1544,13 +1529,25 @@ public class GitHubProjectSyncService {
             );
         }
 
-        // Remove field values that are no longer present
-        if (!processedFieldIds.isEmpty()) {
-            int removed = projectFieldValueRepository.deleteByItemIdAndFieldIdNotIn(itemId, processedFieldIds);
-            if (removed > 0) {
-                log.debug("Removed stale field values: itemId={}, count={}", itemId, removed);
+        // Remove stale field values only when data is NOT truncated (complete picture).
+        // When truncated, stale removal is deferred to syncRemainingFieldValues which
+        // accumulates processedFieldIds across all pages before removing stale values.
+        if (!truncated) {
+            if (!processedFieldIds.isEmpty()) {
+                int removed = projectFieldValueRepository.deleteByItemIdAndFieldIdNotIn(itemId, processedFieldIds);
+                if (removed > 0) {
+                    log.debug("Removed stale field values: itemId={}, count={}", itemId, removed);
+                }
+            } else {
+                // All field values failed validation (e.g., field not found) — remove all
+                int removed = projectFieldValueRepository.deleteAllByItemId(itemId);
+                if (removed > 0) {
+                    log.debug("Removed all field values (none valid): itemId={}, count={}", itemId, removed);
+                }
             }
         }
+
+        return processedFieldIds;
     }
 
     /**
@@ -1560,6 +1557,11 @@ public class GitHubProjectSyncService {
      * {@code GetProjectItemFieldValues} GraphQL query, starting from the cursor
      * where the inline data was truncated.
      * <p>
+     * Tracks all processed field IDs (from both the initial inline phase and
+     * paginated phases) and removes stale field values when pagination completes
+     * normally. This matches the behavior in
+     * {@link GitHubProjectItemFieldValueSyncService#syncRemainingFieldValues}.
+     * <p>
      * This follows the same nested pagination pattern used in:
      * <ul>
      *   <li>{@code GitHubIssueSyncService.syncRemainingComments()} for issue comments</li>
@@ -1568,7 +1570,7 @@ public class GitHubProjectSyncService {
      *
      * @param scopeId        the scope ID for authentication
      * @param projectId      the project database ID (for logging)
-     * @param itemWithCursor the item with cursor information
+     * @param itemWithCursor the item with cursor information and initial field IDs
      * @param client         the GraphQL client
      * @param timeout        the timeout for GraphQL requests
      */
@@ -1586,6 +1588,13 @@ public class GitHubProjectSyncService {
         boolean hasMore = true;
         int pageCount = 0;
         int totalFieldValuesSynced = 0;
+        boolean completedNormally = false;
+
+        // Track all processed field IDs across inline + paginated phases
+        List<String> processedFieldIds = new ArrayList<>();
+        if (itemWithCursor.initialFieldIds() != null) {
+            processedFieldIds.addAll(itemWithCursor.initialFieldIds());
+        }
 
         while (hasMore) {
             pageCount++;
@@ -1649,11 +1658,7 @@ public class GitHubProjectSyncService {
                     .field("node.fieldValues")
                     .toEntity(GHProjectV2ItemFieldValueConnection.class);
 
-                if (
-                    fieldValuesConnection == null ||
-                    fieldValuesConnection.getNodes() == null ||
-                    fieldValuesConnection.getNodes().isEmpty()
-                ) {
+                if (fieldValuesConnection == null || fieldValuesConnection.getNodes() == null) {
                     break;
                 }
 
@@ -1674,7 +1679,7 @@ public class GitHubProjectSyncService {
                         .filter(dto -> dto != null && dto.fieldId() != null)
                         .toList();
 
-                    // Process each field value (append mode - don't remove stale values yet)
+                    // Process each field value (append mode - stale removal happens after all pages)
                     for (GitHubProjectFieldValueDTO fieldValue : fieldValueDTOs) {
                         // Verify the field exists before attempting to insert
                         if (!projectFieldRepository.existsById(fieldValue.fieldId())) {
@@ -1685,6 +1690,8 @@ public class GitHubProjectSyncService {
                             );
                             continue;
                         }
+
+                        processedFieldIds.add(fieldValue.fieldId());
 
                         projectFieldValueRepository.upsertCore(
                             finalItemId,
@@ -1704,6 +1711,14 @@ public class GitHubProjectSyncService {
                 var pageInfo = fieldValuesConnection.getPageInfo();
                 hasMore = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
                 cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
+                if (!hasMore) {
+                    completedNormally = true;
+                }
+
+                if (fieldValuesConnection.getNodes().isEmpty()) {
+                    completedNormally = true;
+                    break;
+                }
 
                 // Apply pagination throttle
                 if (hasMore && !syncProperties.paginationThrottle().isZero()) {
@@ -1724,6 +1739,14 @@ public class GitHubProjectSyncService {
                     e
                 );
                 break;
+            }
+        }
+
+        // Remove stale field values only when all pages were fetched successfully
+        if (completedNormally && !processedFieldIds.isEmpty()) {
+            int removed = projectFieldValueRepository.deleteByItemIdAndFieldIdNotIn(itemId, processedFieldIds);
+            if (removed > 0) {
+                log.debug("Removed stale field values after pagination: itemId={}, count={}", itemId, removed);
             }
         }
 
@@ -1759,8 +1782,14 @@ public class GitHubProjectSyncService {
      * @param itemId           the database ID of the item
      * @param itemNodeId       the GraphQL node ID of the item (used in follow-up query)
      * @param fieldValueCursor the cursor to resume field value pagination from
+     * @param initialFieldIds  field IDs already processed from the inline data (for stale removal)
      */
-    private record ItemWithFieldValueCursor(Long itemId, String itemNodeId, String fieldValueCursor) {}
+    private record ItemWithFieldValueCursor(
+        Long itemId,
+        String itemNodeId,
+        String fieldValueCursor,
+        List<String> initialFieldIds
+    ) {}
 
     /**
      * Determines if an exception is a transport-level error that should be retried.

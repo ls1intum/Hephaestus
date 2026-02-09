@@ -48,7 +48,7 @@ import reactor.util.retry.Retry;
  * <p>
  * <b>Note:</b> Draft Issues have no parent Issue and must still be synced from the project side.
  *
- * @see GitHubProjectSyncService#syncDraftIssues(Long, Project)
+ * @see GitHubProjectSyncService#syncProjectItems(Long, Project)
  */
 @Service
 public class GitHubProjectItemSyncService {
