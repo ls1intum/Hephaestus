@@ -394,6 +394,11 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
      * This method is called after a full project-side sync that iterated through ALL items.
      * The project-side sync sees Issue/PR items (but doesn't process them) and tracks their
      * node IDs. Items not in the tracked list were removed from the project on GitHub.
+     * <p>
+     * <b>Archived items are preserved:</b> GitHub's {@code ProjectV2.items} connection excludes
+     * archived items, so they would always appear "stale" even though they still exist on GitHub.
+     * Archived items are synced from the issue/PR-side embedded {@code projectItems} connection
+     * (which supports {@code includeArchived: true}) and via {@code projects_v2_item} webhooks.
      *
      * @param projectId the project ID
      * @param syncedIssuePrNodeIds list of Issue/PR node IDs seen during full project sync
