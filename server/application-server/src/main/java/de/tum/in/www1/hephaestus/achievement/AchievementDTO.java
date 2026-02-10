@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.Instant;
 
+import org.springframework.lang.NonNull;
 import org.springframework.lang.Nullable;
 
 /**
@@ -21,17 +22,17 @@ import org.springframework.lang.Nullable;
  */
 @Schema(description = "Achievement with user-specific progress information")
 public record AchievementDTO(
-    @Schema(description = "Unique identifier for the achievement", example = "first_pull") String id,
-    @Schema(description = "Human-readable name", example = "First Merge") String name,
-    @Schema(description = "Description of how to earn the achievement", example = "Merge your first pull request")
+    @NonNull @Schema(description = "Unique identifier for the achievement", example = "first_pull") String id,
+    @NonNull @Schema(description = "Human-readable name", example = "First Merge") String name,
+    @NonNull @Schema(description = "Description of how to earn the achievement", example = "Merge your first pull request")
     String description,
-    @Schema(description = "Icon identifier for UI", example = "git-merge") String icon,
-    @Schema(description = "Category for grouping achievements") AchievementCategory category,
-    @Schema(description = "Visual level tier/rarity for badge styling", example = "common") AchievementRarity rarity,
+    @NonNull @Schema(description = "Icon identifier for UI", example = "git-merge") String icon,
+    @NonNull @Schema(description = "Category for grouping achievements") AchievementCategory category,
+    @NonNull @Schema(description = "Visual level tier/rarity for badge styling", example = "common") AchievementRarity rarity,
     @Nullable @Schema(description = "Parent achievement ID in progression chain", example = "null") String parentId,
-    @Schema(description = "Current status for this user") AchievementStatus status,
-    @Schema(description = "Current progress count (e.g., 4 PRs merged)", example = "4") long progress,
-    @Schema(description = "Required count to unlock (e.g., 5 PRs)", example = "5") long maxProgress,
+    @NonNull @Schema(description = "Current status for this user") AchievementStatus status,
+    @NonNull @Schema(description = "Current progress count (e.g., 4 PRs merged)", example = "4") long progress,
+    @NonNull @Schema(description = "Required count to unlock (e.g., 5 PRs)", example = "5") long maxProgress,
     @Nullable
     @Schema(description = "When the achievement was unlocked, null if not unlocked")
     Instant unlockedAt

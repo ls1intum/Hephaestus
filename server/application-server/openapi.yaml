@@ -2225,6 +2225,16 @@ components:
           type: string
           format: date-time
           description: "When the achievement was unlocked, null if not unlocked"
+      required:
+      - category
+      - description
+      - icon
+      - id
+      - maxProgress
+      - name
+      - progress
+      - rarity
+      - status
     AssignRoleRequest:
       type: object
       description: Request to assign or update a user's role in a workspace

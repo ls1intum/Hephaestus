@@ -1077,27 +1077,27 @@ export type Achievement = {
     /**
      * Category for grouping achievements
      */
-    category?: 'pull_requests' | 'commits' | 'communication' | 'issues' | 'milestones';
+    category: 'pull_requests' | 'commits' | 'communication' | 'issues' | 'milestones';
     /**
      * Description of how to earn the achievement
      */
-    description?: string;
+    description: string;
     /**
      * Icon identifier for UI
      */
-    icon?: string;
+    icon: string;
     /**
      * Unique identifier for the achievement
      */
-    id?: string;
+    id: string;
     /**
      * Required count to unlock (e.g., 5 PRs)
      */
-    maxProgress?: number;
+    maxProgress: number;
     /**
      * Human-readable name
      */
-    name?: string;
+    name: string;
     /**
      * Parent achievement ID in progression chain
      */
@@ -1105,15 +1105,15 @@ export type Achievement = {
     /**
      * Current progress count (e.g., 4 PRs merged)
      */
-    progress?: number;
+    progress: number;
     /**
      * Visual level tier/rarity for badge styling
      */
-    rarity?: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'mythic';
+    rarity: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'mythic';
     /**
      * Current status for this user
      */
-    status?: 'locked' | 'available' | 'unlocked' | 'hidden';
+    status: 'locked' | 'available' | 'unlocked' | 'hidden';
     /**
      * When the achievement was unlocked, null if not unlocked
      */
