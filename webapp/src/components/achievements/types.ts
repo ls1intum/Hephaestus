@@ -3,17 +3,17 @@ import type { Achievement } from "@/api/types.gen";
 /**
  * Achievement category type derived from the generated Achievement type.
  */
-export type AchievementCategory = NonNullable<Achievement["category"]>;
+export type AchievementCategory = Achievement["category"];
 
 /**
  * Achievement status type derived from the generated Achievement type.
  */
-export type AchievementStatus = NonNullable<Achievement["status"]>;
+export type AchievementStatus = Achievement["status"];
 
 /**
  * Tier type for visual representation.
  */
-export type AchievementRarity = NonNullable<Achievement["rarity"]>;
+export type AchievementRarity = Achievement["rarity"];
 
 export const RARITY_WEIGHT: Record<AchievementRarity, number> = {
 	common: 0,
