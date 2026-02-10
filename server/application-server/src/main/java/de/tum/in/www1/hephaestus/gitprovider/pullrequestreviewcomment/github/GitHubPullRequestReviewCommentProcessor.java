@@ -221,7 +221,7 @@ public class GitHubPullRequestReviewCommentProcessor {
                 return saved;
             })
             .orElseGet(() -> {
-                log.warn("Skipped comment edit: reason=commentNotFound, commentId={}", dto.id());
+                log.debug("Skipped comment edit: reason=commentNotFound, commentId={}", dto.id());
                 return null;
             });
     }

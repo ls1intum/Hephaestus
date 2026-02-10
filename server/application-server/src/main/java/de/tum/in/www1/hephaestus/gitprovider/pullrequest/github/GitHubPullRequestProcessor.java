@@ -113,7 +113,7 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
                 dto.number()
             );
             if (existingIssue.isPresent()) {
-                log.warn(
+                log.info(
                     "Updating issue_type from ISSUE to PULL_REQUEST: repositoryId={}, number={}",
                     repository.getId(),
                     dto.number()

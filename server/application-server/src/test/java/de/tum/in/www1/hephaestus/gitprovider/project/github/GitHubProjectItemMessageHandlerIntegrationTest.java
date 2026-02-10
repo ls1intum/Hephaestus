@@ -189,8 +189,8 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
         // When
         handler.handleEvent(archivedEvent);
 
-        // Then — webhook DTO lacks an explicit "archived" boolean; the primitive defaults to false.
-        // The processor passes through the DTO value, so archived remains false after upsert.
+        // Then — processArchived() forces archived=true on the DTO before upserting,
+        // compensating for GitHub's webhook payload using "archived_at" instead of "archived".
         var result = projectItemRepository.findByProjectIdAndNodeId(testProject.getId(), FIXTURE_ITEM2_NODE_ID);
         assertThat(result)
             .isPresent()
@@ -199,6 +199,7 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
                 assertThat(i.getId()).isEqualTo(FIXTURE_ITEM2_ID);
                 assertThat(i.getContentType()).isEqualTo(ProjectItem.ContentType.DRAFT_ISSUE);
                 assertThat(i.getProject().getId()).isEqualTo(testProject.getId());
+                assertThat(i.isArchived()).isTrue();
             });
 
         // Verify domain events: processArchived() calls process() first (Updated since item exists),

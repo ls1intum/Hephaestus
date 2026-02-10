@@ -96,6 +96,42 @@ public record GitHubProjectItemDTO(
     }
 
     /**
+     * Returns a copy of this DTO with the archived flag overridden.
+     * <p>
+     * Used by webhook handlers where GitHub sends {@code archived_at} (a timestamp)
+     * but no {@code archived} boolean. The primitive {@code boolean} defaults to
+     * {@code false} during JSON deserialization, so {@code processArchived()} must
+     * explicitly set it to {@code true}.
+     *
+     * @param archived the desired archived state
+     * @return a new DTO with the archived flag set
+     */
+    public GitHubProjectItemDTO withArchived(boolean archived) {
+        if (this.archived == archived) {
+            return this;
+        }
+        return new GitHubProjectItemDTO(
+            id,
+            databaseId,
+            nodeId,
+            projectNodeId,
+            contentType,
+            issueId,
+            issueNumber,
+            draftTitle,
+            draftBody,
+            archived,
+            creator,
+            fieldValues,
+            fieldValuesTruncated,
+            fieldValuesTotalCount,
+            fieldValuesEndCursor,
+            createdAt,
+            updatedAt
+        );
+    }
+
+    /**
      * Get the content type as an enum.
      */
     @Nullable

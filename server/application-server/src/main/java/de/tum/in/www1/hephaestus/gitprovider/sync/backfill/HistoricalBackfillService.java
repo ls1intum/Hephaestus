@@ -351,10 +351,11 @@ public class HistoricalBackfillService {
         int remainingPoints = graphQlClientProvider.getRateLimitRemaining(scopeId);
         if (remainingPoints < backfillProps.rateLimitThreshold()) {
             log.debug(
-                "Skipping backfill for scope: reason=rateLimitLow, scopeId={}, remaining={}, threshold={}",
+                "Skipping backfill for scope: reason=rateLimitLow, scopeId={}, remaining={}, threshold={}, resetsAt={}",
                 scopeId,
                 remainingPoints,
-                backfillProps.rateLimitThreshold()
+                backfillProps.rateLimitThreshold(),
+                graphQlClientProvider.getRateLimitResetAt(scopeId)
             );
             // Count pending repos in this scope for reporting
             for (SyncTarget target : targets) {

@@ -273,19 +273,24 @@ public class GitHubDataSyncScheduler {
                 syncProjects(session);
 
                 // Sync repositories (issues/PRs include embedded project items)
+                int reposProcessed = 0;
                 for (SyncTarget target : session.syncTargets()) {
                     // Check if rate limit is critically low - abort remaining repo syncs
                     // to avoid wasting API calls that will all fail with rate limit errors
                     if (rateLimitTracker.isCritical(session.scopeId())) {
                         log.warn(
-                            "Aborting remaining repository syncs: reason=rateLimitCritical, scopeId={}, scopeSlug={}, remaining={}",
+                            "Aborting remaining repository syncs: reason=rateLimitCritical, scopeId={}, scopeSlug={}, remaining={}, totalRepos={}, reposProcessed={}, reposSkipped={}",
                             session.scopeId(),
                             session.slug(),
-                            rateLimitTracker.getRemaining(session.scopeId())
+                            rateLimitTracker.getRemaining(session.scopeId()),
+                            session.syncTargets().size(),
+                            reposProcessed,
+                            session.syncTargets().size() - reposProcessed
                         );
                         break;
                     }
                     dataSyncService.syncSyncTarget(target);
+                    reposProcessed++;
                 }
 
                 // Relink orphaned project items now that issues/PRs have been synced.
@@ -296,8 +301,17 @@ public class GitHubDataSyncScheduler {
 
                 // Sync sub-issues and issue dependencies via GraphQL
                 // These are scope-level relationships that require issues/PRs to exist first
-                syncSubIssues(session);
-                syncIssueDependencies(session);
+                // Skip if rate limit is critically low to avoid wasting API calls
+                if (!rateLimitTracker.isCritical(session.scopeId())) {
+                    syncSubIssues(session);
+                    syncIssueDependencies(session);
+                } else {
+                    log.warn(
+                        "Skipped sub-issue and dependency sync: reason=rateLimitCritical, scopeId={}, remaining={}",
+                        session.scopeId(),
+                        rateLimitTracker.getRemaining(session.scopeId())
+                    );
+                }
             });
 
             // Execute synchronously in the scheduler thread
