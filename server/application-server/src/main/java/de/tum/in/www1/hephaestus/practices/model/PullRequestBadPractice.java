@@ -13,7 +13,11 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.Objects;
-import lombok.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
+import org.springframework.lang.NonNull;
 
 /**
  * Entity representing a detected bad practice in a pull request.
