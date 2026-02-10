@@ -4,8 +4,9 @@ import { ReactFlowProvider } from "@xyflow/react";
 import { useState } from "react";
 import { getUserProfileOptions } from "@/api/@tanstack/react-query.gen";
 import { AchievementListView } from "@/components/achievements/achievement-list-view";
+import type { ViewMode } from "@/components/achievements/achievements.config.ts";
 import { CategoryLabels } from "@/components/achievements/category-labels";
-import { Header, type ViewMode } from "@/components/achievements/header";
+import { Header } from "@/components/achievements/header";
 import { SkillTree } from "@/components/achievements/skill-tree";
 import { StatsPanel } from "@/components/achievements/stats-panel";
 import { useAchievementNotifications } from "@/hooks/use-achievement-notifications";
@@ -61,16 +62,16 @@ function AchievementsPage() {
 						{viewMode === "tree" ? (
 							<>
 								{/* Radial gradient background */}
-								<div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/5 via-background to-background" />
+								<div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,var(--tw-gradient-stops))] from-primary/5 via-background to-background" />
 
 								{/* Decorative rings */}
 								<div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-									<div className="w-[400px] h-[400px] rounded-full border border-primary/10" />
-									<div className="absolute w-[600px] h-[600px] rounded-full border border-primary/10" />
-									<div className="absolute w-[800px] h-[800px] rounded-full border border-primary/10" />
-									<div className="absolute w-[1000px] h-[1000px] rounded-full border border-primary/5" />
-									<div className="absolute w-[1200px] h-[1200px] rounded-full border border-primary/5" />
-									<div className="absolute w-[1500px] h-[1500px] rounded-full border border-primary/5" />
+									<div className="w-100 h-100 rounded-full border border-primary/10" />
+									<div className="absolute w-150 h-150 rounded-full border border-primary/10" />
+									<div className="absolute w-200 h-200 rounded-full border border-primary/10" />
+									<div className="absolute w-250 h-250 rounded-full border border-primary/5" />
+									<div className="absolute w-300 h-300 rounded-full border border-primary/5" />
+									<div className="absolute w-375 h-375 rounded-full border border-primary/5" />
 								</div>
 
 								{/* Category labels */}
