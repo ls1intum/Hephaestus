@@ -6,11 +6,11 @@ import de.tum.in.www1.hephaestus.gitprovider.team.Team;
 import de.tum.in.www1.hephaestus.gitprovider.team.TeamRepository;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.settings.WorkspaceTeamSettingsService;
-import jakarta.annotation.Nonnull;
 import java.util.*;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 
 /**
@@ -45,7 +45,7 @@ public class TeamPathResolver {
      * @param path the team path (e.g., "Engineering / Backend / Core")
      * @return the matching team, or empty if not found
      */
-    public Optional<Team> resolveByPath(Workspace workspace, @Nonnull String path) {
+    public Optional<Team> resolveByPath(Workspace workspace, @NonNull String path) {
         if (workspace == null || workspace.getAccountLogin() == null || path.isBlank()) {
             return Optional.empty();
         }
