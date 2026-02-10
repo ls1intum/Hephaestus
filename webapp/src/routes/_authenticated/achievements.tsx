@@ -1,3 +1,4 @@
+import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { ReactFlowProvider } from "@xyflow/react";
 import { useState } from "react";
@@ -11,7 +12,6 @@ import { useAchievementNotifications } from "@/hooks/use-achievement-notificatio
 import { useAchievements } from "@/hooks/use-achievements";
 import { useAuth } from "@/integrations/auth/AuthContext";
 import { useWorkspaceStore } from "@/stores/workspace-store";
-import { useQuery } from "@tanstack/react-query";
 
 export const Route = createFileRoute("/_authenticated/achievements")({
 	component: AchievementsPage,

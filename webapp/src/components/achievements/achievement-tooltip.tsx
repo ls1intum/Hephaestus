@@ -2,8 +2,8 @@ import { CheckCircle2, Clock, EyeOff, Lock } from "lucide-react";
 import type { ReactNode } from "react";
 import { Progress, ProgressIndicator, ProgressTrack } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
+import type { AchievementRarity } from "./achievements.config.ts";
 import type { AchievementNodeData } from "./data";
-import type { AchievementRarity } from "./types";
 
 export interface AchievementTooltipProps {
 	achievement: AchievementNodeData;

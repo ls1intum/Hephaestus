@@ -1,9 +1,8 @@
 import { useReactFlow } from "@xyflow/react";
 import { List, Map as MapIcon, Maximize2, Sparkles, ZoomIn, ZoomOut } from "lucide-react";
+import type { ViewMode } from "@/components/achievements/achievements.config.ts";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-
-export type ViewMode = "tree" | "list";
 
 interface HeaderProps {
 	viewMode?: ViewMode;

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import type { Achievement } from "@/api/types.gen";
-import type { AchievementStatus } from "@/components/achievements/types";
+import type { AchievementStatus } from "@/components/achievements/achievements.config.ts";
 
 /**
  * Hook to display toast notifications when achievements are unlocked.
@@ -49,8 +49,8 @@ export function useAchievementNotifications(achievements: Achievement[], enabled
 				notifiedIdsRef.current.add(achievement.id);
 			}
 
-			toast.success(`Achievement Unlocked: ${achievement.name ?? "Unknown"}`, {
-				description: achievement.description ?? "",
+			toast.success(`Achievement Unlocked: ${achievement.name}`, {
+				description: achievement.description,
 				duration: 5000,
 				icon: "🏆",
 			});

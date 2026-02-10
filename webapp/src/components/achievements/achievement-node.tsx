@@ -43,6 +43,7 @@ import type React from "react";
 import { memo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { AchievementTooltip } from "./achievement-tooltip";
+import { tierIconSizes, tierSizes } from "./achievements.config";
 import type { AchievementNodeData } from "./data";
 
 const iconMap: Record<string, React.ElementType> = {
@@ -85,24 +86,6 @@ const iconMap: Record<string, React.ElementType> = {
 	Timer,
 };
 
-const tierSizes = {
-	common: "w-10 h-10",
-	uncommon: "w-11 h-11",
-	rare: "w-12 h-12",
-	epic: "w-14 h-14",
-	legendary: "w-16 h-16",
-	mythic: "w-20 h-20",
-};
-
-const tierIconSizes = {
-	common: 14,
-	uncommon: 16,
-	rare: 18,
-	epic: 22,
-	legendary: 26,
-	mythic: 32,
-};
-
 function AchievementNodeComponent(props: NodeProps) {
 	const { data } = props;
 	const achievementData = data as unknown as AchievementNodeData;
@@ -124,6 +107,7 @@ function AchievementNodeComponent(props: NodeProps) {
 				return "bg-node-unlocked border-node-unlocked shadow-[0_0_15px_rgba(var(--shadow-rgb),0.3),0_0_30px_rgba(var(--shadow-rgb),0.15)]";
 			case "available":
 				return "bg-node-available/80 border-node-available/70 shadow-[0_0_12px_rgba(var(--shadow-rgb),0.15)]";
+			// TODO: Add locked state here!!
 			default:
 				return "bg-node-locked border-node-locked/50 opacity-40";
 		}
@@ -145,7 +129,7 @@ function AchievementNodeComponent(props: NodeProps) {
 			<Handle
 				type="target"
 				position={Position.Top}
-				className="!bg-transparent !border-0 !w-0 !h-0"
+				className="bg-transparent! border-0! w-0! h-0!"
 				style={{ top: "50%", left: "50%", transform: "translate(-50%, -50%)" }}
 			/>
 			<AchievementTooltip achievement={achievementData} open={isHovered}>
@@ -227,7 +211,7 @@ function AchievementNodeComponent(props: NodeProps) {
 			<Handle
 				type="source"
 				position={Position.Bottom}
-				className="!bg-transparent !border-0 !w-0 !h-0"
+				className="bg-transparent! border-0! w-0! h-0!"
 				style={{ top: "50%", left: "50%", transform: "translate(-50%, -50%)" }}
 			/>
 		</>

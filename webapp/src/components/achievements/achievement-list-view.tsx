@@ -51,7 +51,11 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { type AchievementCategory, type AchievementStatus, compareByRarity } from "./types";
+import {
+	type AchievementCategory,
+	type AchievementStatus,
+	compareByRarity,
+} from "./achievements.config.ts";
 
 const iconMap: Record<string, React.ElementType> = {
 	GitCommit,
@@ -125,17 +129,17 @@ export function AchievementListView({ achievements }: AchievementListViewProps) 
 	);
 
 	// Sort categories in a logical order
-	const categoryOrder: AchievementCategory[] = [
+	const categoryOrder: readonly AchievementCategory[] = [
 		"pull_requests",
 		"commits",
 		"communication",
 		"issues",
 		"milestones",
-	];
+	] as const satisfies ReadonlyArray<AchievementCategory>;
 
 	const sortedCategories = categoryOrder.filter((cat) => groupedAchievements[cat]?.length > 0);
 
-	const getStatusBadge = (status: AchievementStatus | undefined) => {
+	const getStatusBadge = (status: AchievementStatus) => {
 		switch (status) {
 			case "unlocked":
 				return (
@@ -184,61 +188,58 @@ export function AchievementListView({ achievements }: AchievementListViewProps) 
 								</TableRow>
 							</TableHeader>
 							<TableBody>
-								{groupedAchievements[category]
-									.filter((a) => a.rarity !== undefined)
-									.sort(compareByRarity)
-									.map((achievement) => {
-										const Icon = iconMap[achievement.icon ?? ""] || GitCommit;
-										const status = achievement.status ?? "hidden";
-										const progress = achievement.progress ?? 0;
-										const maxProgress = achievement.maxProgress ?? 0;
-										const progressPercent =
-											maxProgress > 0 ? Math.round((progress / maxProgress) * 100) : 0;
+								{groupedAchievements[category].sort(compareByRarity).map((achievement) => {
+									const Icon = iconMap[achievement.icon] || GitCommit;
+									const status = achievement.status;
+									const progress = achievement.progress;
+									const maxProgress = achievement.maxProgress;
+									const progressPercent =
+										maxProgress > 0 ? Math.round((progress / maxProgress) * 100) : 0;
 
-										return (
-											<TableRow
-												key={achievement.id}
-												className={cn(status === "locked" && "opacity-60")}
-											>
-												<TableCell>
-													<div
-														className={cn(
-															"w-8 h-8 rounded-full flex items-center justify-center",
-															status === "unlocked" && "bg-green-600 text-white",
-															status === "available" && "bg-secondary",
-															status === "locked" && "bg-muted",
-														)}
-													>
-														<Icon className="w-4 h-4" />
+									return (
+										<TableRow
+											key={achievement.id}
+											className={cn(status === "locked" && "opacity-60")}
+										>
+											<TableCell>
+												<div
+													className={cn(
+														"w-8 h-8 rounded-full flex items-center justify-center",
+														status === "unlocked" && "bg-green-600 text-white",
+														status === "available" && "bg-secondary",
+														status === "locked" && "bg-muted",
+													)}
+												>
+													<Icon className="w-4 h-4" />
+												</div>
+											</TableCell>
+											<TableCell>
+												<div>
+													<div className="font-medium">{achievement.name ?? "Unknown"}</div>
+													<div className="text-sm text-muted-foreground">
+														{achievement.description}
 													</div>
-												</TableCell>
-												<TableCell>
-													<div>
-														<div className="font-medium">{achievement.name ?? "Unknown"}</div>
-														<div className="text-sm text-muted-foreground">
-															{achievement.description ?? ""}
-														</div>
+												</div>
+											</TableCell>
+											<TableCell>
+												<span className="text-sm capitalize">{achievement.rarity}</span>
+											</TableCell>
+											<TableCell>
+												<div className="space-y-1">
+													<Progress
+														value={progressPercent}
+														className="h-2"
+														aria-label={`Progress: ${progress} of ${maxProgress}`}
+													/>
+													<div className="text-xs text-muted-foreground">
+														{progress}/{maxProgress}
 													</div>
-												</TableCell>
-												<TableCell>
-													<span className="text-sm capitalize">{achievement.rarity}</span>
-												</TableCell>
-												<TableCell>
-													<div className="space-y-1">
-														<Progress
-															value={progressPercent}
-															className="h-2"
-															aria-label={`Progress: ${progress} of ${maxProgress}`}
-														/>
-														<div className="text-xs text-muted-foreground">
-															{progress}/{maxProgress}
-														</div>
-													</div>
-												</TableCell>
-												<TableCell>{getStatusBadge(achievement.status)}</TableCell>
-											</TableRow>
-										);
-									})}
+												</div>
+											</TableCell>
+											<TableCell>{getStatusBadge(achievement.status)}</TableCell>
+										</TableRow>
+									);
+								})}
 							</TableBody>
 						</Table>
 					</section>

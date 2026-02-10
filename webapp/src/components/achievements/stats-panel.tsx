@@ -11,8 +11,8 @@ import type React from "react";
 import type { Achievement } from "@/api/types.gen";
 import { Progress, ProgressIndicator, ProgressTrack } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
+import type { AchievementCategory } from "./achievements.config.ts";
 import { calculateStats, categoryMeta } from "./data";
-import type { AchievementCategory } from "./types";
 
 const categoryIcons: Record<AchievementCategory, React.ElementType> = {
 	pull_requests: GitPullRequest,

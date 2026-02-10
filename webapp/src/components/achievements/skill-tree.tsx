@@ -106,7 +106,7 @@ export function SkillTree({ user, achievements = [] }: SkillTreeProps) {
 
 				{/* Controls */}
 				<Controls
-					className="!bg-card !border-border !rounded-lg overflow-hidden [&>button]:!bg-card [&>button]:!border-border [&>button]:!text-foreground [&>button:hover]:!bg-secondary"
+					className="bg-card! border-border! rounded-lg! overflow-hidden [&>button]:bg-card! [&>button]:border-border! [&>button]:text-foreground! [&>button:hover]:bg-secondary!"
 					showInteractive={false}
 				/>
 
@@ -126,7 +126,7 @@ export function SkillTree({ user, achievements = [] }: SkillTreeProps) {
 						return "rgba(0, 0, 0, 0.15)";
 					}}
 					maskColor={isDark ? "rgba(0, 0, 0, 0.85)" : "rgba(255, 255, 255, 0.85)"}
-					className="!bg-card/80 !border-border !rounded-lg"
+					className="bg-card/80! border-border! rounded-lg!"
 					pannable={true}
 					zoomable={true}
 				/>
