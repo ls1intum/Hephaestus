@@ -409,6 +409,7 @@ public class GitHubDataSyncService {
             syncProjects(scopeId);
 
             // Sync each repository (creates repository records, issues, PRs)
+            int reposProcessed = 0;
             for (SyncTarget target : syncTargets) {
                 // Check if installation became suspended mid-sync - abort remaining syncs
                 if (installationId != null && gitHubAppTokenService.isInstallationMarkedSuspended(installationId)) {
@@ -419,16 +420,19 @@ public class GitHubDataSyncService {
                 // to avoid wasting API calls that will all fail with rate limit errors
                 if (rateLimitTracker.isCritical(scopeId)) {
                     log.warn(
-                        "Aborting remaining repository syncs: reason=rateLimitCritical, scopeId={}, remaining={}, reposRemaining={}",
+                        "Aborting remaining repository syncs: reason=rateLimitCritical, scopeId={}, remaining={}, totalRepos={}, reposProcessed={}, reposSkipped={}",
                         scopeId,
                         rateLimitTracker.getRemaining(scopeId),
-                        syncTargets.size()
+                        syncTargets.size(),
+                        reposProcessed,
+                        syncTargets.size() - reposProcessed
                     );
                     break;
                 }
                 if (shouldSync(target)) {
                     syncSyncTarget(target);
                 }
+                reposProcessed++;
             }
 
             // Sync teams AFTER repositories exist (team repo permissions need repos to exist)
@@ -767,6 +771,17 @@ public class GitHubDataSyncService {
      * @param scopeId the scope ID
      */
     private void syncScopeLevelRelationships(Long scopeId) {
+        // Skip if rate limit is critically low to avoid wasting API calls
+        // that will all fail with rate limit errors
+        if (rateLimitTracker.isCritical(scopeId)) {
+            log.warn(
+                "Skipped scope-level relationship sync: reason=rateLimitCritical, scopeId={}, remaining={}",
+                scopeId,
+                rateLimitTracker.getRemaining(scopeId)
+            );
+            return;
+        }
+
         try {
             // Sync issue dependencies (has internal cooldown check)
             int dependenciesCount = issueDependencySyncService.syncDependenciesForScope(scopeId);

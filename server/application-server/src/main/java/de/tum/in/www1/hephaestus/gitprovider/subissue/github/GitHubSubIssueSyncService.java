@@ -259,6 +259,16 @@ public class GitHubSubIssueSyncService {
         int failedRepoCount = 0;
 
         for (String repoNameWithOwner : repositoryNames) {
+            // Check if rate limit is critically low before making API calls for next repo
+            if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
+                log.warn(
+                    "Aborting sub-issue sync: reason=rateLimitCritical, scopeId={}, remainingRepos={}",
+                    scopeId,
+                    repositoryNames.size() - repositoryNames.indexOf(repoNameWithOwner)
+                );
+                break;
+            }
+
             Optional<Repository> repoOpt = repositoryRepository.findByNameWithOwnerWithOrganization(repoNameWithOwner);
             if (repoOpt.isEmpty()) {
                 log.debug(

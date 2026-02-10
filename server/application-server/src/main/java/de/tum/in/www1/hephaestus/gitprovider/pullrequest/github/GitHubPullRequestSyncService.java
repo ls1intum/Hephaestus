@@ -260,7 +260,10 @@ public class GitHubPullRequestSyncService {
         RepositoryOwnerAndName ownerAndName = parsedName.get();
 
         HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
-        Duration timeout = syncProperties.graphqlTimeout();
+        // Use extended timeout for PR sync — PR queries are complex (nested reviews,
+        // labels, assignees) and large repositories like Artemis consistently hit the
+        // standard 30s timeout, triggering retries that waste rate limit budget.
+        Duration timeout = syncProperties.extendedGraphqlTimeout();
 
         // Determine if incremental sync is enabled and compute the effective timestamp
         // For first sync (lastSyncTimestamp == null), use configured timeframe as fallback
