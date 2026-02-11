@@ -324,7 +324,7 @@ public class HistoricalBackfillService {
         // their own incremental sync are skipped individually (per-repo gate below).
         long pendingIncrementalSync = targets
             .stream()
-            .filter(t -> t.lastIssuesAndPullRequestsSyncedAt() == null)
+            .filter(t -> t.lastIssuesSyncedAt() == null || t.lastPullRequestsSyncedAt() == null)
             .count();
 
         if (pendingIncrementalSync > 0) {
@@ -366,7 +366,7 @@ public class HistoricalBackfillService {
 
             // Skip repos that haven't completed their own incremental sync yet.
             // Backfill should only run for repos that have their baseline data.
-            if (target.lastIssuesAndPullRequestsSyncedAt() == null) {
+            if (target.lastIssuesSyncedAt() == null || target.lastPullRequestsSyncedAt() == null) {
                 log.trace(
                     "Skipping backfill: reason=incrementalSyncPending, repo={}",
                     sanitizeForLog(target.repositoryNameWithOwner())

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
+
+    <!-- ================================================================== -->
+    <!-- Split Issue/PR Sync Timestamps                                     -->
+    <!--                                                                    -->
+    <!-- Replaces the combined issues_and_pull_requests_synced_at column    -->
+    <!-- with separate issues_synced_at and pull_requests_synced_at columns -->
+    <!-- so each sync type can independently track progress. This prevents  -->
+    <!-- wasting issue sync work when PR sync hits rate limits.             -->
+    <!-- ================================================================== -->
+
+    <!-- 1. Add the two new columns -->
+    <changeSet id="1770818956382-1" author="FelixTJDietrich">
+        <addColumn tableName="repository_to_monitor">
+            <column name="issues_synced_at" type="TIMESTAMP WITH TIME ZONE"/>
+        </addColumn>
+        <addColumn tableName="repository_to_monitor">
+            <column name="pull_requests_synced_at" type="TIMESTAMP WITH TIME ZONE"/>
+        </addColumn>
+    </changeSet>
+
+    <!-- 2. Copy existing data into both new columns -->
+    <changeSet id="1770818956382-2" author="FelixTJDietrich">
+        <sql>
+            UPDATE repository_to_monitor
+            SET issues_synced_at = issues_and_pull_requests_synced_at,
+                pull_requests_synced_at = issues_and_pull_requests_synced_at
+            WHERE issues_and_pull_requests_synced_at IS NOT NULL
+        </sql>
+    </changeSet>
+
+    <!-- 3. Drop the old combined column -->
+    <changeSet id="1770818956382-3" author="FelixTJDietrich">
+        <dropColumn tableName="repository_to_monitor" columnName="issues_and_pull_requests_synced_at"/>
+    </changeSet>
+
+</databaseChangeLog>

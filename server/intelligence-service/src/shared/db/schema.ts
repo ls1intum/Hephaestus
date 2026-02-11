@@ -1106,10 +1106,6 @@ export const repositoryToMonitor = pgTable(
 			increment: 1,
 			cache: 1,
 		}),
-		issuesAndPullRequestsSyncedAt: timestamp("issues_and_pull_requests_synced_at", {
-			withTimezone: true,
-			mode: "string",
-		}),
 		labelsSyncedAt: timestamp("labels_synced_at", { withTimezone: true, mode: "string" }),
 		milestonesSyncedAt: timestamp("milestones_synced_at", { withTimezone: true, mode: "string" }),
 		nameWithOwner: varchar("name_with_owner", { length: 255 }),
@@ -1132,6 +1128,11 @@ export const repositoryToMonitor = pgTable(
 		issueBackfillCheckpoint: integer("issue_backfill_checkpoint"),
 		pullRequestBackfillHighWaterMark: integer("pull_request_backfill_high_water_mark"),
 		pullRequestBackfillCheckpoint: integer("pull_request_backfill_checkpoint"),
+		issuesSyncedAt: timestamp("issues_synced_at", { withTimezone: true, mode: "string" }),
+		pullRequestsSyncedAt: timestamp("pull_requests_synced_at", {
+			withTimezone: true,
+			mode: "string",
+		}),
 	},
 	(table) => [
 		foreignKey({
