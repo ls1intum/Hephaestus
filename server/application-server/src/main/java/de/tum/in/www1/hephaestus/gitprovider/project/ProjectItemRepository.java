@@ -84,9 +84,13 @@ public interface ProjectItemRepository extends JpaRepository<ProjectItem, Long> 
     boolean existsByProjectIdAndNodeId(Long projectId, String nodeId);
 
     /**
-     * Deletes all items of a specific content type for a project that are not in the given list of node IDs.
+     * Deletes non-archived items of a specific content type for a project that are not in the given list of node IDs.
      * Used during Draft Issue sync to remove stale Draft Issues without affecting Issue/PR items
      * (which are synced from the issue/PR side).
+     * <p>
+     * Archived items are excluded from deletion because GitHub's {@code ProjectV2.items} connection
+     * does not return archived items, so they would always appear "stale" even though they still
+     * exist on GitHub. See {@link #deleteByProjectIdAndContentTypeInAndNodeIdNotIn} for full rationale.
      *
      * @param projectId the project's ID
      * @param contentType the content type to filter by (e.g., "DRAFT_ISSUE")
@@ -95,7 +99,7 @@ public interface ProjectItemRepository extends JpaRepository<ProjectItem, Long> 
      */
     @Modifying
     @Query(
-        "DELETE FROM ProjectItem i WHERE i.project.id = :projectId AND i.contentType = :contentType AND i.nodeId NOT IN :nodeIds"
+        "DELETE FROM ProjectItem i WHERE i.project.id = :projectId AND i.contentType = :contentType AND i.nodeId NOT IN :nodeIds AND i.archived = false"
     )
     int deleteByProjectIdAndContentTypeAndNodeIdNotIn(
         @Param("projectId") Long projectId,
@@ -104,15 +108,21 @@ public interface ProjectItemRepository extends JpaRepository<ProjectItem, Long> 
     );
 
     /**
-     * Deletes all items of a specific content type for a project.
-     * Used when no items of that type were synced (empty sync means all items of that type were deleted).
+     * Deletes all non-archived items of a specific content type for a project.
+     * Used when no items of that type were synced (empty sync means all non-archived items of that type were deleted).
+     * <p>
+     * Archived items are excluded from deletion because GitHub's {@code ProjectV2.items} connection
+     * does not return archived items. See {@link #deleteByProjectIdAndContentTypeInAndNodeIdNotIn}
+     * for full rationale.
      *
      * @param projectId the project's ID
      * @param contentType the content type to filter by (e.g., "DRAFT_ISSUE")
      * @return number of deleted items
      */
     @Modifying
-    @Query("DELETE FROM ProjectItem i WHERE i.project.id = :projectId AND i.contentType = :contentType")
+    @Query(
+        "DELETE FROM ProjectItem i WHERE i.project.id = :projectId AND i.contentType = :contentType AND i.archived = false"
+    )
     int deleteByProjectIdAndContentType(
         @Param("projectId") Long projectId,
         @Param("contentType") ProjectItem.ContentType contentType

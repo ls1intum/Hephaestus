@@ -6,14 +6,18 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncCons
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2ItemFieldValueConnection;
+import de.tum.in.www1.hephaestus.gitprovider.project.ProjectField;
 import de.tum.in.www1.hephaestus.gitprovider.project.ProjectFieldRepository;
 import de.tum.in.www1.hephaestus.gitprovider.project.ProjectFieldValueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.project.ProjectItemRepository;
+import de.tum.in.www1.hephaestus.gitprovider.project.github.dto.GitHubProjectFieldDTO;
 import de.tum.in.www1.hephaestus.gitprovider.project.github.dto.GitHubProjectFieldValueDTO;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.graphql.client.ClientGraphQlResponse;
@@ -277,6 +281,47 @@ public class GitHubProjectItemFieldValueSyncService {
         }
 
         return totalSynced;
+    }
+
+    /**
+     * Upserts a project field definition from a DTO.
+     * <p>
+     * Delegates to {@link ProjectFieldRepository#upsertCore} so callers do not need
+     * a direct dependency on the field repository.
+     *
+     * @param fieldDto  the field DTO containing id, name, data type, options, and timestamps
+     * @param projectId the owning project's database ID
+     */
+    @Transactional
+    public void upsertFieldDefinition(GitHubProjectFieldDTO fieldDto, Long projectId) {
+        ProjectField.DataType dataType = fieldDto.getDataTypeEnum();
+        if (dataType == null) {
+            dataType = ProjectField.DataType.TEXT;
+        }
+        Instant createdAt = fieldDto.createdAt() != null ? fieldDto.createdAt() : Instant.now();
+        Instant updatedAt = fieldDto.updatedAt() != null ? fieldDto.updatedAt() : Instant.now();
+
+        projectFieldRepository.upsertCore(
+            fieldDto.id(),
+            projectId,
+            fieldDto.name(),
+            dataType.name(),
+            fieldDto.getOptionsJson(),
+            createdAt,
+            updatedAt
+        );
+    }
+
+    /**
+     * Removes project field definitions that were not seen during the current sync cycle.
+     *
+     * @param projectId      the project whose fields to clean up
+     * @param syncedFieldIds IDs of fields that were synced (should be kept)
+     * @return the number of stale fields removed
+     */
+    @Transactional
+    public int removeStaleFieldDefinitions(Long projectId, Collection<String> syncedFieldIds) {
+        return projectFieldRepository.deleteByProjectIdAndIdNotIn(projectId, List.copyOf(syncedFieldIds));
     }
 
     private void deleteAllFieldValues(Long itemId) {

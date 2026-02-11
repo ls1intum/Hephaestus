@@ -1,7 +1,9 @@
 # Fetches project items with field values. Cost-optimized page sizes for nested queries.
 # See GitHubSyncConstants.java for page size rationale.
+# The optional $filterQuery parameter supports GitHub Projects search syntax (e.g. "updated:>2025-01-01")
+# to enable server-side incremental filtering.
 
-query GetProjectItems($nodeId: ID!, $first: Int!, $after: String) {
+query GetProjectItems($nodeId: ID!, $first: Int!, $after: String, $filterQuery: String) {
     rateLimit {
         cost
         limit
@@ -13,7 +15,7 @@ query GetProjectItems($nodeId: ID!, $first: Int!, $after: String) {
             id
             fullDatabaseId
             number
-            items(first: $first, after: $after) {
+            items(first: $first, after: $after, query: $filterQuery) {
                 pageInfo {
                     hasNextPage
                     endCursor

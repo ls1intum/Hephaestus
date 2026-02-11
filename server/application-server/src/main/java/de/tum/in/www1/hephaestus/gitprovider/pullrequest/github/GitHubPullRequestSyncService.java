@@ -25,7 +25,6 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.dto.EmbeddedRevi
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.dto.EmbeddedReviewsDTO;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.dto.GitHubReviewThreadDTO;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.dto.PullRequestWithReviewThreads;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.github.GitHubPullRequestReviewProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.github.GitHubPullRequestReviewSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.github.dto.GitHubPullRequestReviewEventDTO.GitHubReviewDTO;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.github.GitHubPullRequestReviewCommentSyncService;
@@ -79,7 +78,6 @@ public class GitHubPullRequestSyncService {
     private final PullRequestRepository pullRequestRepository;
     private final GitHubGraphQlClientProvider graphQlClientProvider;
     private final GitHubPullRequestProcessor pullRequestProcessor;
-    private final GitHubPullRequestReviewProcessor reviewProcessor;
     private final GitHubPullRequestReviewSyncService reviewSyncService;
     private final GitHubPullRequestReviewCommentSyncService reviewCommentSyncService;
     private final GitHubProjectItemSyncService projectItemSyncService;
@@ -133,7 +131,6 @@ public class GitHubPullRequestSyncService {
         PullRequestRepository pullRequestRepository,
         GitHubGraphQlClientProvider graphQlClientProvider,
         GitHubPullRequestProcessor pullRequestProcessor,
-        GitHubPullRequestReviewProcessor reviewProcessor,
         GitHubPullRequestReviewSyncService reviewSyncService,
         GitHubPullRequestReviewCommentSyncService reviewCommentSyncService,
         GitHubProjectItemSyncService projectItemSyncService,
@@ -147,7 +144,6 @@ public class GitHubPullRequestSyncService {
         this.pullRequestRepository = pullRequestRepository;
         this.graphQlClientProvider = graphQlClientProvider;
         this.pullRequestProcessor = pullRequestProcessor;
-        this.reviewProcessor = reviewProcessor;
         this.reviewSyncService = reviewSyncService;
         this.reviewCommentSyncService = reviewCommentSyncService;
         this.projectItemSyncService = projectItemSyncService;
@@ -743,7 +739,7 @@ public class GitHubPullRequestSyncService {
             // Process embedded reviews (pass context to enable activity event creation)
             EmbeddedReviewsDTO embeddedReviews = prWithReviews.embeddedReviews();
             for (GitHubReviewDTO reviewDTO : embeddedReviews.reviews()) {
-                if (reviewProcessor.process(reviewDTO, entity.getId(), context) != null) {
+                if (reviewSyncService.processInlineReview(reviewDTO, entity.getId(), context) != null) {
                     reviewsSynced++;
                 }
             }

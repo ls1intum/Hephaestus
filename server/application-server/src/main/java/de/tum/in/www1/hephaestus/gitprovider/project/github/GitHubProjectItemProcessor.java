@@ -194,6 +194,9 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
         ProcessingContext context,
         Long actorId
     ) {
+        if (dto == null) {
+            return null;
+        }
         // GitHub webhooks send "archived_at" (timestamp) but no "archived" boolean,
         // so the primitive defaults to false during deserialization. Force it to true.
         ProjectItem item = process(dto.withArchived(true), project, context, actorId);
@@ -236,6 +239,9 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
         ProcessingContext context,
         Long actorId
     ) {
+        if (dto == null) {
+            return null;
+        }
         // Explicitly force archived=false for clarity, even though webhook deserialization
         // defaults to false. This makes the intent unambiguous.
         ProjectItem item = process(dto.withArchived(false), project, context, actorId);

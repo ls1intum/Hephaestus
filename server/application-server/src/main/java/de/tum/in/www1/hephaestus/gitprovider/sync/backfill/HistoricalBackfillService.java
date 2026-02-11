@@ -320,9 +320,8 @@ public class HistoricalBackfillService {
         Long scopeId = session.scopeId();
         List<SyncTarget> targets = session.syncTargets();
 
-        // Check if ALL repos have completed incremental sync before starting any backfill.
-        // This prevents backfill from consuming rate limit points that are needed for
-        // incremental sync of remaining repos, which would delay the initial sync.
+        // Log incremental sync progress for visibility. Repos that haven't completed
+        // their own incremental sync are skipped individually (per-repo gate below).
         long pendingIncrementalSync = targets
             .stream()
             .filter(t -> t.lastIssuesAndPullRequestsSyncedAt() == null)
@@ -331,20 +330,13 @@ public class HistoricalBackfillService {
         if (pendingIncrementalSync > 0) {
             long completed = targets.size() - pendingIncrementalSync;
             log.debug(
-                "Skipping backfill for scope: reason=incrementalSyncPending, scopeId={}, scopeSlug={}, " +
-                    "incrementalComplete={}, incrementalPending={}",
+                "Some repos pending incremental sync (backfill proceeds for completed repos): " +
+                    "scopeId={}, scopeSlug={}, incrementalComplete={}, incrementalPending={}",
                 scopeId,
                 session.slug(),
                 completed,
                 pendingIncrementalSync
             );
-            // Count repos that would need backfill once incremental sync completes
-            for (SyncTarget target : targets) {
-                if (!target.isBackfillComplete()) {
-                    pendingRepositories.incrementAndGet();
-                }
-            }
-            return;
         }
 
         // Check rate limit for this scope before processing its repositories
@@ -372,8 +364,16 @@ public class HistoricalBackfillService {
                 continue;
             }
 
-            // Note: No need to check lastIssuesAndPullRequestsSyncedAt() here because we
-            // already verified ALL repos have completed incremental sync at the top of this method.
+            // Skip repos that haven't completed their own incremental sync yet.
+            // Backfill should only run for repos that have their baseline data.
+            if (target.lastIssuesAndPullRequestsSyncedAt() == null) {
+                log.trace(
+                    "Skipping backfill: reason=incrementalSyncPending, repo={}",
+                    sanitizeForLog(target.repositoryNameWithOwner())
+                );
+                pendingRepositories.incrementAndGet();
+                continue;
+            }
 
             // Skip if repository is in cooldown after recent failures
             if (isInCooldown(target.id())) {
