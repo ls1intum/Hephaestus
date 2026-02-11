@@ -241,7 +241,7 @@ public class GitHubDataSyncService {
                 repositoryId,
                 syncTarget.id(),
                 syncTarget.issueSyncCursor(),
-                syncTarget.lastIssuesAndPullRequestsSyncedAt()
+                syncTarget.lastIssuesSyncedAt()
             );
 
             // Sync pull requests (with cursor persistence for resumability)
@@ -251,24 +251,28 @@ public class GitHubDataSyncService {
                 repositoryId,
                 syncTarget.id(),
                 syncTarget.pullRequestSyncCursor(),
-                syncTarget.lastIssuesAndPullRequestsSyncedAt()
+                syncTarget.lastPullRequestsSyncedAt()
             );
 
-            // Only update sync timestamp if BOTH syncs completed successfully
-            // If either was aborted (rate limit or error), keep the old timestamp
-            // so the next sync retries from the same point
-            if (issueResult.isCompleted() && prResult.isCompleted()) {
-                syncTargetProvider.updateSyncTimestamp(
-                    syncTarget.id(),
-                    SyncType.ISSUES_AND_PULL_REQUESTS,
-                    Instant.now()
-                );
+            // Update timestamps independently — each sync type tracks its own progress
+            // so completed work isn't wasted when the other sync type hits rate limits
+            if (issueResult.isCompleted()) {
+                syncTargetProvider.updateSyncTimestamp(syncTarget.id(), SyncType.ISSUES, Instant.now());
             } else {
                 log.info(
-                    "Skipped timestamp update due to incomplete sync: scopeId={}, repoId={}, issueStatus={}, prStatus={}",
+                    "Skipped issue timestamp update due to incomplete sync: scopeId={}, repoId={}, issueStatus={}",
                     scopeId,
                     repositoryId,
-                    issueResult.status(),
+                    issueResult.status()
+                );
+            }
+            if (prResult.isCompleted()) {
+                syncTargetProvider.updateSyncTimestamp(syncTarget.id(), SyncType.PULL_REQUESTS, Instant.now());
+            } else {
+                log.info(
+                    "Skipped PR timestamp update due to incomplete sync: scopeId={}, repoId={}, prStatus={}",
+                    scopeId,
+                    repositoryId,
                     prResult.status()
                 );
             }
@@ -857,12 +861,12 @@ public class GitHubDataSyncService {
     }
 
     private boolean shouldSync(SyncTarget target) {
-        if (target.lastIssuesAndPullRequestsSyncedAt() == null) {
-            return true;
-        }
-        return target
-            .lastIssuesAndPullRequestsSyncedAt()
-            .isBefore(Instant.now().minusSeconds(syncSchedulerProperties.cooldownMinutes() * 60L));
+        Instant staleThreshold = Instant.now().minusSeconds(syncSchedulerProperties.cooldownMinutes() * 60L);
+        boolean issuesStale =
+            target.lastIssuesSyncedAt() == null || target.lastIssuesSyncedAt().isBefore(staleThreshold);
+        boolean prsStale =
+            target.lastPullRequestsSyncedAt() == null || target.lastPullRequestsSyncedAt().isBefore(staleThreshold);
+        return issuesStale || prsStale;
     }
 
     /**

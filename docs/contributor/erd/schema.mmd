@@ -380,7 +380,6 @@ erDiagram
 
     RepositoryToMonitor {
         BIGINT id PK
-        TIMESTAMPTZ issues_and_pull_requests_synced_at
         TIMESTAMPTZ labels_synced_at
         TIMESTAMPTZ milestones_synced_at
         VARCHAR(255) name_with_owner
@@ -394,6 +393,8 @@ erDiagram
         INTEGER issue_backfill_checkpoint
         INTEGER pull_request_backfill_high_water_mark
         INTEGER pull_request_backfill_checkpoint
+        TIMESTAMPTZ issues_synced_at
+        TIMESTAMPTZ pull_requests_synced_at
     }
 
     Team {

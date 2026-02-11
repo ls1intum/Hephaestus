@@ -175,7 +175,8 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             repoName,
             Instant.now(), // lastLabelsSyncedAt
             Instant.now(), // lastMilestonesSyncedAt
-            Instant.now(), // lastIssuesAndPullRequestsSyncedAt (completed)
+            Instant.now(), // lastIssuesSyncedAt (completed)
+            Instant.now(), // lastPullRequestsSyncedAt (completed)
             Instant.now(), // lastCollaboratorsSyncedAt
             Instant.now(), // lastFullSyncAt
             null, // issueBackfillHighWaterMark (not initialized)
@@ -201,7 +202,8 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             repoName,
             null, // lastLabelsSyncedAt
             null, // lastMilestonesSyncedAt
-            null, // lastIssuesAndPullRequestsSyncedAt (NOT completed)
+            null, // lastIssuesSyncedAt (NOT completed)
+            null, // lastPullRequestsSyncedAt (NOT completed)
             null, // lastCollaboratorsSyncedAt
             null, // lastFullSyncAt
             null,
@@ -225,11 +227,12 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             null,
             AuthMode.GITHUB_APP,
             repoName,
-            Instant.now(),
-            Instant.now(),
-            Instant.now(),
-            Instant.now(),
-            Instant.now(),
+            Instant.now(), // lastLabelsSyncedAt
+            Instant.now(), // lastMilestonesSyncedAt
+            Instant.now(), // lastIssuesSyncedAt
+            Instant.now(), // lastPullRequestsSyncedAt
+            Instant.now(), // lastCollaboratorsSyncedAt
+            Instant.now(), // lastFullSyncAt
             100, // issueBackfillHighWaterMark
             0, // issueBackfillCheckpoint = 0 means complete
             50, // pullRequestBackfillHighWaterMark
@@ -251,11 +254,12 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             null,
             AuthMode.GITHUB_APP,
             repoName,
-            Instant.now(),
-            Instant.now(),
-            Instant.now(), // incremental completed
-            Instant.now(),
-            Instant.now(),
+            Instant.now(), // lastLabelsSyncedAt
+            Instant.now(), // lastMilestonesSyncedAt
+            Instant.now(), // lastIssuesSyncedAt (completed)
+            Instant.now(), // lastPullRequestsSyncedAt (completed)
+            Instant.now(), // lastCollaboratorsSyncedAt
+            Instant.now(), // lastFullSyncAt
             100, // issueBackfillHighWaterMark
             42, // issueBackfillCheckpoint (in progress)
             50, // pullRequestBackfillHighWaterMark
@@ -495,7 +499,8 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
                 "invalid-repo-name", // no owner/name separator
                 null,
                 null,
-                Instant.now(),
+                Instant.now(), // lastIssuesSyncedAt
+                Instant.now(), // lastPullRequestsSyncedAt
                 null,
                 null,
                 null,
@@ -725,11 +730,12 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
                 null,
                 AuthMode.GITHUB_APP,
                 "org/empty-repo",
-                null,
-                null,
-                Instant.now(),
-                null,
-                null,
+                null, // lastLabelsSyncedAt
+                null, // lastMilestonesSyncedAt
+                Instant.now(), // lastIssuesSyncedAt
+                Instant.now(), // lastPullRequestsSyncedAt
+                null, // lastCollaboratorsSyncedAt
+                null, // lastFullSyncAt
                 0, // issueBackfillHighWaterMark = 0 (no issues)
                 0, // issueBackfillCheckpoint = 0
                 0, // pullRequestBackfillHighWaterMark = 0 (no PRs)
@@ -757,11 +763,12 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
                 null,
                 AuthMode.GITHUB_APP,
                 "org/repo-a",
-                null,
-                null,
-                Instant.now(),
-                null,
-                null,
+                null, // lastLabelsSyncedAt
+                null, // lastMilestonesSyncedAt
+                Instant.now(), // lastIssuesSyncedAt
+                Instant.now(), // lastPullRequestsSyncedAt
+                null, // lastCollaboratorsSyncedAt
+                null, // lastFullSyncAt
                 200, // issueBackfillHighWaterMark
                 null, // issueBackfillCheckpoint (not yet set)
                 80, // pullRequestBackfillHighWaterMark
@@ -843,7 +850,8 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
                 "org2/repo-b",
                 null,
                 null,
-                null,
+                null, // lastIssuesSyncedAt
+                null, // lastPullRequestsSyncedAt
                 null,
                 null,
                 null,

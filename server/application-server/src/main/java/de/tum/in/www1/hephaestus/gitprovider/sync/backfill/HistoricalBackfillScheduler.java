@@ -25,7 +25,7 @@ import org.springframework.stereotype.Component;
  *   <li><b>API respect:</b> Doesn't hammer GitHub right after sync depletes rate limit</li>
  *   <li><b>Historical data isn't urgent:</b> Data sitting for months/years can wait 15 minutes</li>
  *   <li><b>Built-in guards:</b> The scheduler already checks rate limits, cooldowns, and
- *       {@code lastIssuesAndPullRequestsSyncedAt} to skip repos that haven't synced yet</li>
+ *       {@code lastIssuesSyncedAt}/{@code lastPullRequestsSyncedAt} to skip repos that haven't synced yet</li>
  * </ul>
  *
  * <h2>Configuration</h2>
