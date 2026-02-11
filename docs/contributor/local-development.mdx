@@ -51,6 +51,22 @@ Never commit `application-local.yml`. It may contain secrets and machine-specifi
 
 3. Access the API at `http://localhost:8080` or explore `http://localhost:8080/swagger-ui/index.html`.
 
+### Port overrides
+
+If another service on your machine already uses port 5432 (PostgreSQL) or 8081 (Keycloak), override the host-side port via environment variables in your `.env` file:
+
+```bash
+# server/application-server/.env
+POSTGRES_PORT=15432
+KEYCLOAK_PORT=18081
+```
+
+Spring Boot reads the same variables, so the application server connects to the right port automatically. Update the GitHub OAuth callback URL when changing `KEYCLOAK_PORT`:
+
+```
+http://localhost:18081/realms/hephaestus/broker/github/endpoint
+```
+
 ### GitHub configuration
 
 Hephaestus supports two GitHub authentication modes. Pick the one that fits your workflow:

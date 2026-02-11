@@ -237,7 +237,7 @@ apply_migrations() {
     cd "$APP_SERVER_DIR"
     # Explicitly set Spring profiles to avoid specs profile (which uses H2)
     # Use local,dev profiles for database operations
-    SPRING_PROFILES_ACTIVE=local,dev ./mvnw liquibase:update
+    SPRING_PROFILES_ACTIVE=local,dev ./mvnw liquibase:update -Dpostgres.port="$POSTGRES_PORT"
 }
 
 # Database credentials (configurable via environment variables)
@@ -291,7 +291,7 @@ generate_changelog_diff() {
         
         # Generate changelog diff
         log_info "Generating changelog diff..."
-        SPRING_PROFILES_ACTIVE=local,dev ./mvnw liquibase:diff
+        SPRING_PROFILES_ACTIVE=local,dev ./mvnw liquibase:diff -Dpostgres.port="$POSTGRES_PORT"
     else
         # Local development - backup and restore database state
         log_info "Backing up current database state..."
@@ -329,7 +329,7 @@ generate_changelog_diff() {
         log_info "Generating changelog diff..."
         # Explicitly set Spring profiles to avoid specs profile (which uses H2)
         # Use local,dev profiles for database operations
-        SPRING_PROFILES_ACTIVE=local,dev ./mvnw liquibase:diff
+        SPRING_PROFILES_ACTIVE=local,dev ./mvnw liquibase:diff -Dpostgres.port="$POSTGRES_PORT"
         
         # Restore original database state
         log_info "Restoring original database state..."
