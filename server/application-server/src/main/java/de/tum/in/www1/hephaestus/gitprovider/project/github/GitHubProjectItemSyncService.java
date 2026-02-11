@@ -1,7 +1,11 @@
 package de.tum.in.www1.hephaestus.gitprovider.project.github;
 
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.DEFAULT_PAGE_SIZE;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.JITTER_FACTOR;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.MAX_PAGINATION_PAGES;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_INITIAL_BACKOFF;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
@@ -9,6 +13,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassi
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubTransportErrors;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2Item;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2ItemConnection;
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.dto.EmbeddedProjectItemsDTO;
@@ -22,7 +27,6 @@ import java.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.graphql.client.ClientGraphQlResponse;
-import org.springframework.graphql.client.GraphQlTransportException;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
@@ -56,18 +60,6 @@ public class GitHubProjectItemSyncService {
     private static final Logger log = LoggerFactory.getLogger(GitHubProjectItemSyncService.class);
     private static final String ISSUE_PROJECT_ITEMS_QUERY = "GetIssueProjectItems";
     private static final String PR_PROJECT_ITEMS_QUERY = "GetPullRequestProjectItems";
-
-    /**
-     * Retry configuration for transport-level errors during body streaming.
-     * <p>
-     * CRITICAL: WebClient ExchangeFilterFunction retries DO NOT cover body streaming errors.
-     * PrematureCloseException occurs AFTER HTTP headers are received, during body consumption.
-     * We must retry at this level using Mono.defer() to wrap the entire execute() call.
-     */
-    private static final int TRANSPORT_MAX_RETRIES = 3;
-    private static final Duration TRANSPORT_INITIAL_BACKOFF = Duration.ofSeconds(2);
-    private static final Duration TRANSPORT_MAX_BACKOFF = Duration.ofSeconds(15);
-    private static final double JITTER_FACTOR = 0.5;
 
     private final ProjectRepository projectRepository;
     private final GitHubProjectItemProcessor projectItemProcessor;
@@ -203,7 +195,7 @@ public class GitHubProjectItemSyncService {
                         Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
                             .maxBackoff(TRANSPORT_MAX_BACKOFF)
                             .jitter(JITTER_FACTOR)
-                            .filter(this::isTransportError)
+                            .filter(GitHubTransportErrors::isTransportError)
                             .doBeforeRetry(signal ->
                                 log.warn(
                                     "Retrying project item pagination after transport error: nodeId={}, page={}, attempt={}, error={}",
@@ -350,45 +342,5 @@ public class GitHubProjectItemSyncService {
         }
 
         return projectRepository.findByNodeId(projectRef.nodeId()).orElse(null);
-    }
-
-    /**
-     * Determines if an exception is a transport-level error that should be retried.
-     */
-    private boolean isTransportError(Throwable throwable) {
-        if (throwable instanceof GraphQlTransportException) {
-            return true;
-        }
-
-        Throwable cause = throwable;
-        while (cause != null) {
-            String className = cause.getClass().getName();
-
-            if (className.contains("PrematureCloseException")) {
-                return true;
-            }
-            if (className.contains("AbortedException") || className.contains("ConnectionResetException")) {
-                return true;
-            }
-
-            if (cause instanceof java.io.IOException) {
-                String message = cause.getMessage();
-                if (message != null) {
-                    String lower = message.toLowerCase();
-                    if (
-                        lower.contains("connection reset") ||
-                        lower.contains("broken pipe") ||
-                        lower.contains("connection abort") ||
-                        lower.contains("premature") ||
-                        lower.contains("stream closed")
-                    ) {
-                        return true;
-                    }
-                }
-            }
-
-            cause = cause.getCause();
-        }
-        return false;
     }
 }

@@ -49,7 +49,6 @@ import org.springframework.lang.NonNull;
  * <ul>
  *   <li>Organization deletion: {@code GitHubOrganizationProcessor.delete()} cascades to projects</li>
  *   <li>Repository deletion: {@code GitHubRepositoryMessageHandler} cascades to projects</li>
- *   <li>User deletion: {@code ProjectIntegrityService.cascadeDeleteProjectsForUser()}</li>
  *   <li>Orphan detection: {@code ProjectIntegrityService.findOrphanedProjects()}</li>
  * </ul>
  *
@@ -163,7 +162,6 @@ public class Project extends BaseGitServiceEntity {
      *
      * @see ProjectIntegrityService#cascadeDeleteProjectsForOrganization(Long)
      * @see ProjectIntegrityService#cascadeDeleteProjectsForRepository(Long)
-     * @see ProjectIntegrityService#cascadeDeleteProjectsForUser(Long)
      */
     @Column(nullable = false)
     private Long ownerId;

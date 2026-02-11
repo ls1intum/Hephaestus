@@ -1,5 +1,9 @@
 package de.tum.in.www1.hephaestus.config;
 
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_INITIAL_BACKOFF;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
+
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.config.jackson.GitHubActorMixin;
@@ -11,6 +15,7 @@ import de.tum.in.www1.hephaestus.config.jackson.GitHubProjectV2OwnerMixin;
 import de.tum.in.www1.hephaestus.config.jackson.GitHubPullRequestMixin;
 import de.tum.in.www1.hephaestus.config.jackson.GitHubRepositoryOwnerMixin;
 import de.tum.in.www1.hephaestus.config.jackson.GitHubRequestedReviewerMixin;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubTransportErrors;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHActor;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHIssue;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2FieldConfiguration;
@@ -44,7 +49,6 @@ import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import reactor.netty.http.client.HttpClient;
-import reactor.netty.http.client.PrematureCloseException;
 import reactor.netty.resources.ConnectionProvider;
 import reactor.util.retry.Retry;
 
@@ -79,13 +83,6 @@ public class GitHubGraphQlConfig {
     private static final Duration INITIAL_BACKOFF = Duration.ofSeconds(5);
     private static final Duration MAX_BACKOFF = Duration.ofSeconds(60);
     private static final double JITTER_FACTOR = 0.5;
-
-    // Transport-level retry configuration for connection-level errors
-    // (PrematureCloseException, connection resets during response streaming)
-    // Uses fewer retries with shorter backoff since these are network-level issues
-    private static final int TRANSPORT_MAX_RETRIES = 3;
-    private static final Duration TRANSPORT_INITIAL_BACKOFF = Duration.ofSeconds(2);
-    private static final Duration TRANSPORT_MAX_BACKOFF = Duration.ofSeconds(15);
 
     // GitHub rate limit headers
     private static final String HEADER_RATE_LIMIT = "x-ratelimit-limit";
@@ -336,7 +333,7 @@ public class GitHubGraphQlConfig {
                     Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
                         .maxBackoff(TRANSPORT_MAX_BACKOFF)
                         .jitter(JITTER_FACTOR)
-                        .filter(this::isTransportError)
+                        .filter(GitHubTransportErrors::isTransportError)
                         .doBeforeRetry(signal -> {
                             Throwable failure = signal.failure();
                             log.warn(
@@ -364,62 +361,6 @@ public class GitHubGraphQlConfig {
                             );
                         })
                 );
-    }
-
-    /**
-     * Determines if an exception is a transport-level error that should be retried.
-     * <p>
-     * Transport errors occur at the network/connection level, distinct from HTTP errors:
-     * <ul>
-     *   <li>{@code PrematureCloseException}: Connection closed during response streaming</li>
-     *   <li>{@code IOException}: General I/O failures during communication</li>
-     *   <li>Connection reset/abort exceptions</li>
-     * </ul>
-     *
-     * @param throwable the exception to check
-     * @return true if this is a retryable transport error
-     */
-    private boolean isTransportError(Throwable throwable) {
-        // Unwrap common wrapper exceptions
-        Throwable cause = throwable;
-        while (cause != null) {
-            // PrematureCloseException: Connection closed during response streaming
-            // This is the specific error we're targeting
-            if (cause instanceof PrematureCloseException) {
-                return true;
-            }
-
-            // Check for connection-related exceptions by class name
-            // (to avoid hard dependencies on internal reactor-netty classes)
-            String className = cause.getClass().getName();
-            if (
-                className.contains("PrematureCloseException") ||
-                className.contains("AbortedException") ||
-                className.contains("ConnectionResetException")
-            ) {
-                return true;
-            }
-
-            // Check for specific IOException subclasses indicating connection issues
-            if (cause instanceof java.io.IOException) {
-                String message = cause.getMessage();
-                if (message != null) {
-                    String lowerMessage = message.toLowerCase();
-                    if (
-                        lowerMessage.contains("connection reset") ||
-                        lowerMessage.contains("broken pipe") ||
-                        lowerMessage.contains("connection abort") ||
-                        lowerMessage.contains("premature") ||
-                        lowerMessage.contains("stream closed")
-                    ) {
-                        return true;
-                    }
-                }
-            }
-
-            cause = cause.getCause();
-        }
-        return false;
     }
 
     /**

@@ -156,6 +156,7 @@ public interface ProjectItemRepository extends JpaRepository<ProjectItem, Long> 
             draft_body = EXCLUDED.draft_body,
             archived = EXCLUDED.archived,
             creator_id = COALESCE(EXCLUDED.creator_id, project_item.creator_id),
+            created_at = COALESCE(project_item.created_at, EXCLUDED.created_at),
             updated_at = EXCLUDED.updated_at
         """,
         nativeQuery = true

@@ -1,11 +1,15 @@
 package de.tum.in.www1.hephaestus.gitprovider.project.github;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.JITTER_FACTOR;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.LARGE_PAGE_SIZE;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.MAX_PAGINATION_PAGES;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.PROJECT_FIELD_PAGE_SIZE;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.PROJECT_ITEM_PAGE_SIZE;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.STATUS_UPDATE_PAGE_SIZE;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_INITIAL_BACKOFF;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
@@ -15,6 +19,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassi
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubTransportErrors;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.BackfillStateProvider;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2Connection;
@@ -47,7 +52,6 @@ import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.graphql.client.ClientGraphQlResponse;
-import org.springframework.graphql.client.GraphQlTransportException;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.TransactionDefinition;
@@ -137,18 +141,6 @@ public class GitHubProjectSyncService {
 
     /** Maximum number of retry attempts for transient failures. */
     private static final int MAX_RETRY_ATTEMPTS = 3;
-
-    /**
-     * Retry configuration for transport-level errors during body streaming.
-     * <p>
-     * CRITICAL: WebClient ExchangeFilterFunction retries DO NOT cover body streaming errors.
-     * PrematureCloseException occurs AFTER HTTP headers are received, during body consumption.
-     * We must retry at this level using Mono.defer() to wrap the entire execute() call.
-     */
-    private static final int TRANSPORT_MAX_RETRIES = 3;
-    private static final Duration TRANSPORT_INITIAL_BACKOFF = Duration.ofSeconds(2);
-    private static final Duration TRANSPORT_MAX_BACKOFF = Duration.ofSeconds(15);
-    private static final double JITTER_FACTOR = 0.5;
 
     private final ProjectRepository projectRepository;
     private final OrganizationRepository organizationRepository;
@@ -275,7 +267,7 @@ public class GitHubProjectSyncService {
                         Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
                             .maxBackoff(TRANSPORT_MAX_BACKOFF)
                             .jitter(JITTER_FACTOR)
-                            .filter(this::isTransportError)
+                            .filter(GitHubTransportErrors::isTransportError)
                             .doBeforeRetry(signal ->
                                 log.warn(
                                     "Retrying project sync after transport error: orgLogin={}, page={}, attempt={}, error={}",
@@ -708,7 +700,7 @@ public class GitHubProjectSyncService {
                         Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
                             .maxBackoff(TRANSPORT_MAX_BACKOFF)
                             .jitter(JITTER_FACTOR)
-                            .filter(this::isTransportError)
+                            .filter(GitHubTransportErrors::isTransportError)
                             .doBeforeRetry(signal ->
                                 log.warn(
                                     "Retrying project item sync after transport error: projectId={}, page={}, attempt={}, error={}",
@@ -978,7 +970,7 @@ public class GitHubProjectSyncService {
                     abortReason = SyncResult.Status.ABORTED_RATE_LIMIT;
                     break;
                 }
-                syncRemainingFieldValues(scopeId, projectId, itemWithCursor, client, timeout);
+                syncRemainingFieldValues(scopeId, itemWithCursor);
             }
         }
 
@@ -1115,7 +1107,7 @@ public class GitHubProjectSyncService {
                         Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
                             .maxBackoff(TRANSPORT_MAX_BACKOFF)
                             .jitter(JITTER_FACTOR)
-                            .filter(this::isTransportError)
+                            .filter(GitHubTransportErrors::isTransportError)
                             .doBeforeRetry(signal ->
                                 log.warn(
                                     "Retrying project fields sync after transport error: projectId={}, attempt={}, error={}",
@@ -1301,7 +1293,7 @@ public class GitHubProjectSyncService {
                         Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
                             .maxBackoff(TRANSPORT_MAX_BACKOFF)
                             .jitter(JITTER_FACTOR)
-                            .filter(this::isTransportError)
+                            .filter(GitHubTransportErrors::isTransportError)
                             .doBeforeRetry(signal ->
                                 log.warn(
                                     "Retrying status updates sync after transport error: projectId={}, attempt={}, error={}",
@@ -1550,18 +1542,9 @@ public class GitHubProjectSyncService {
      * </ul>
      *
      * @param scopeId        the scope ID for authentication
-     * @param projectId      the project database ID (for logging)
      * @param itemWithCursor the item with cursor information and initial field IDs
-     * @param client         the GraphQL client
-     * @param timeout        the timeout for GraphQL requests
      */
-    private void syncRemainingFieldValues(
-        Long scopeId,
-        Long projectId,
-        ItemWithFieldValueCursor itemWithCursor,
-        HttpGraphQlClient client,
-        Duration timeout
-    ) {
+    private void syncRemainingFieldValues(Long scopeId, ItemWithFieldValueCursor itemWithCursor) {
         fieldValueSyncService.syncRemainingFieldValues(
             scopeId,
             itemWithCursor.itemNodeId(),
@@ -1600,44 +1583,4 @@ public class GitHubProjectSyncService {
         String fieldValueCursor,
         List<String> initialFieldIds
     ) {}
-
-    /**
-     * Determines if an exception is a transport-level error that should be retried.
-     */
-    private boolean isTransportError(Throwable throwable) {
-        if (throwable instanceof GraphQlTransportException) {
-            return true;
-        }
-
-        Throwable cause = throwable;
-        while (cause != null) {
-            String className = cause.getClass().getName();
-
-            if (className.contains("PrematureCloseException")) {
-                return true;
-            }
-            if (className.contains("AbortedException") || className.contains("ConnectionResetException")) {
-                return true;
-            }
-
-            if (cause instanceof java.io.IOException) {
-                String message = cause.getMessage();
-                if (message != null) {
-                    String lower = message.toLowerCase();
-                    if (
-                        lower.contains("connection reset") ||
-                        lower.contains("broken pipe") ||
-                        lower.contains("connection abort") ||
-                        lower.contains("premature") ||
-                        lower.contains("stream closed")
-                    ) {
-                        return true;
-                    }
-                }
-            }
-
-            cause = cause.getCause();
-        }
-        return false;
-    }
 }

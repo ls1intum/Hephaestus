@@ -1,10 +1,15 @@
 package de.tum.in.www1.hephaestus.gitprovider.project.github;
 
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.FIELD_VALUES_PAGINATION_SIZE;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.JITTER_FACTOR;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.MAX_PAGINATION_PAGES;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_INITIAL_BACKOFF;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubTransportErrors;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2ItemFieldValueConnection;
 import de.tum.in.www1.hephaestus.gitprovider.project.ProjectField;
 import de.tum.in.www1.hephaestus.gitprovider.project.ProjectFieldRepository;
@@ -33,11 +38,6 @@ public class GitHubProjectItemFieldValueSyncService {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubProjectItemFieldValueSyncService.class);
     private static final String GET_PROJECT_ITEM_FIELD_VALUES_DOCUMENT = "GetProjectItemFieldValues";
-
-    private static final int TRANSPORT_MAX_RETRIES = 3;
-    private static final Duration TRANSPORT_INITIAL_BACKOFF = Duration.ofSeconds(2);
-    private static final Duration TRANSPORT_MAX_BACKOFF = Duration.ofSeconds(15);
-    private static final double JITTER_FACTOR = 0.5;
 
     private final ProjectFieldRepository projectFieldRepository;
     private final ProjectFieldValueRepository projectFieldValueRepository;
@@ -168,7 +168,7 @@ public class GitHubProjectItemFieldValueSyncService {
                         Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
                             .maxBackoff(TRANSPORT_MAX_BACKOFF)
                             .jitter(JITTER_FACTOR)
-                            .filter(this::isTransportError)
+                            .filter(GitHubTransportErrors::isTransportError)
                             .doBeforeRetry(signal ->
                                 log.warn(
                                     "Retrying field values pagination after transport error: itemId={}, page={}, attempt={}, error={}",
@@ -341,35 +341,5 @@ public class GitHubProjectItemFieldValueSyncService {
         if (removed > 0) {
             log.debug("Removed stale field values: itemId={}, count={}", itemId, removed);
         }
-    }
-
-    private boolean isTransportError(Throwable throwable) {
-        Throwable cause = throwable;
-        while (cause != null) {
-            String className = cause.getClass().getName();
-            if (className.contains("PrematureCloseException")) {
-                return true;
-            }
-            if (className.contains("AbortedException") || className.contains("ConnectionResetException")) {
-                return true;
-            }
-            if (cause instanceof java.io.IOException) {
-                String message = cause.getMessage();
-                if (message != null) {
-                    String lower = message.toLowerCase();
-                    if (
-                        lower.contains("connection reset") ||
-                        lower.contains("broken pipe") ||
-                        lower.contains("connection abort") ||
-                        lower.contains("premature") ||
-                        lower.contains("stream closed")
-                    ) {
-                        return true;
-                    }
-                }
-            }
-            cause = cause.getCause();
-        }
-        return false;
     }
 }

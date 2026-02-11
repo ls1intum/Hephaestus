@@ -1,6 +1,10 @@
 package de.tum.in.www1.hephaestus.gitprovider.common.github;
 
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.JITTER_FACTOR;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.MAX_PAGINATION_PAGES;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_INITIAL_BACKOFF;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPageInfo;
 import java.time.Duration;
@@ -10,7 +14,6 @@ import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.graphql.client.ClientGraphQlResponse;
-import org.springframework.graphql.client.GraphQlTransportException;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
@@ -74,18 +77,6 @@ public final class GraphQlPaginationHelper {
 
     private static final Logger log = LoggerFactory.getLogger(GraphQlPaginationHelper.class);
 
-    /**
-     * Retry configuration for transport-level errors during body streaming.
-     * <p>
-     * CRITICAL: WebClient ExchangeFilterFunction retries DO NOT cover body streaming errors.
-     * PrematureCloseException occurs AFTER HTTP headers are received, during body consumption.
-     * We must retry at this level using Mono.defer() to wrap the entire execute() call.
-     */
-    private static final int TRANSPORT_MAX_RETRIES = 3;
-    private static final Duration TRANSPORT_INITIAL_BACKOFF = Duration.ofSeconds(2);
-    private static final Duration TRANSPORT_MAX_BACKOFF = Duration.ofSeconds(15);
-    private static final double JITTER_FACTOR = 0.5;
-
     private final GitHubGraphQlClientProvider graphQlClientProvider;
 
     public GraphQlPaginationHelper(GitHubGraphQlClientProvider graphQlClientProvider) {
@@ -148,7 +139,7 @@ public final class GraphQlPaginationHelper {
                     Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
                         .maxBackoff(TRANSPORT_MAX_BACKOFF)
                         .jitter(JITTER_FACTOR)
-                        .filter(this::isTransportError)
+                        .filter(GitHubTransportErrors::isTransportError)
                         .doBeforeRetry(signal ->
                             log.warn(
                                 "Retrying GraphQL request after transport error: context={}, page={}, attempt={}, error={}",
@@ -480,68 +471,5 @@ public final class GraphQlPaginationHelper {
         TRANSIENT_ERROR,
         /** Thread was interrupted (e.g., during application shutdown). */
         INTERRUPTED,
-    }
-
-    // ========================================================================
-    // Transport Error Detection
-    // ========================================================================
-
-    /**
-     * Determines if an exception is a transport-level error that should be retried.
-     * <p>
-     * Transport errors occur at the network/connection level during body streaming:
-     * <ul>
-     *   <li>{@code GraphQlTransportException}: Spring GraphQL wrapper for transport failures</li>
-     *   <li>{@code PrematureCloseException}: Connection closed during response body streaming</li>
-     *   <li>Connection reset/abort exceptions</li>
-     * </ul>
-     * <p>
-     * IMPORTANT: These errors occur AFTER HTTP headers are received (200 OK) but DURING
-     * body consumption. WebClient ExchangeFilterFunction retries do NOT catch these.
-     *
-     * @param throwable the exception to check
-     * @return true if this is a retryable transport error
-     */
-    private boolean isTransportError(Throwable throwable) {
-        // GraphQlTransportException is Spring GraphQL's wrapper for transport failures
-        if (throwable instanceof GraphQlTransportException) {
-            return true;
-        }
-
-        // Walk the cause chain for wrapped transport errors
-        Throwable cause = throwable;
-        while (cause != null) {
-            String className = cause.getClass().getName();
-
-            // PrematureCloseException: Connection closed during response streaming
-            if (className.contains("PrematureCloseException")) {
-                return true;
-            }
-
-            // Other reactor-netty transport errors
-            if (className.contains("AbortedException") || className.contains("ConnectionResetException")) {
-                return true;
-            }
-
-            // Check for IOException indicating connection issues
-            if (cause instanceof java.io.IOException) {
-                String message = cause.getMessage();
-                if (message != null) {
-                    String lower = message.toLowerCase();
-                    if (
-                        lower.contains("connection reset") ||
-                        lower.contains("broken pipe") ||
-                        lower.contains("connection abort") ||
-                        lower.contains("premature") ||
-                        lower.contains("stream closed")
-                    ) {
-                        return true;
-                    }
-                }
-            }
-
-            cause = cause.getCause();
-        }
-        return false;
     }
 }

@@ -98,6 +98,7 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
             is_public = EXCLUDED.is_public,
             creator_id = COALESCE(EXCLUDED.creator_id, project.creator_id),
             last_sync_at = EXCLUDED.last_sync_at,
+            created_at = COALESCE(project.created_at, EXCLUDED.created_at),
             updated_at = EXCLUDED.updated_at
         """,
         nativeQuery = true

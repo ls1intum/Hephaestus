@@ -1,5 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.common.github;
 
+import java.time.Duration;
+
 /**
  * Constants used across GitHub synchronization services.
  * <p>
@@ -168,4 +170,10 @@ public final class GitHubSyncConstants {
      * If this limit is reached, a warning is logged and the loop exits gracefully.
      */
     public static final int MAX_PAGINATION_PAGES = 1000;
+
+    // Transport retry configuration
+    public static final int TRANSPORT_MAX_RETRIES = 3;
+    public static final Duration TRANSPORT_INITIAL_BACKOFF = Duration.ofSeconds(2);
+    public static final Duration TRANSPORT_MAX_BACKOFF = Duration.ofSeconds(15);
+    public static final double JITTER_FACTOR = 0.5;
 }
