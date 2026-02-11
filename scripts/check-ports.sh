@@ -3,7 +3,7 @@
 #
 # Usage:
 #   ./scripts/check-ports.sh          # Check all default ports
-#   ./scripts/check-ports.sh --quiet  # Exit code only (0 = all free, 1 = conflict)
+#   ./scripts/check-ports.sh --quiet  # Exit code only (0 = all free, 1 = conflicts found)
 #
 # Reads the same environment variables as the rest of the stack:
 #   POSTGRES_PORT, KEYCLOAK_PORT, SERVER_PORT, INTELLIGENCE_SERVICE_PORT, WEBAPP_PORT
@@ -27,12 +27,13 @@ if [[ "${1:-}" == "--quiet" || "${1:-}" == "-q" ]]; then
     QUIET=true
 fi
 
-# Define all ports to check as "name:port" pairs
-SERVICES="PostgreSQL:${POSTGRES_PORT:-5432}
-Keycloak:${KEYCLOAK_PORT:-8081}
-Application server:${SERVER_PORT:-8080}
-Intelligence service:${INTELLIGENCE_SERVICE_PORT:-8000}
-Webapp (Vite):${WEBAPP_PORT:-4200}"
+# Define all ports to check as "name|port" pairs (pipe-delimited to avoid
+# issues with colons in service names or port values)
+SERVICES="PostgreSQL|${POSTGRES_PORT:-5432}
+Keycloak|${KEYCLOAK_PORT:-8081}
+Application server|${SERVER_PORT:-8080}
+Intelligence service|${INTELLIGENCE_SERVICE_PORT:-8000}
+Webapp (Vite)|${WEBAPP_PORT:-4200}"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -44,11 +45,11 @@ conflicts=0
 check_port() {
     local name="$1"
     local port="$2"
+    local pids
 
-    if lsof -iTCP:"$port" -sTCP:LISTEN -t >/dev/null 2>&1; then
+    pids=$(lsof -iTCP:"$port" -sTCP:LISTEN -t 2>/dev/null | head -3 | tr '\n' ',' | sed 's/,$//' || true)
+    if [[ -n "$pids" ]]; then
         if [[ "$QUIET" == false ]]; then
-            local pids
-            pids=$(lsof -iTCP:"$port" -sTCP:LISTEN -t 2>/dev/null | head -3 | tr '\n' ',' | sed 's/,$//')
             echo -e "  ${RED}OCCUPIED${NC}  :${port}  ${name}  (PIDs: ${pids})"
         fi
         conflicts=$((conflicts + 1))
@@ -66,30 +67,33 @@ if [[ "$QUIET" == false ]]; then
     echo ""
 fi
 
-# Check for duplicate port assignments (portable — no associative arrays)
+# Check for duplicate port assignments.
+# Uses parallel arrays (space-separated) — portable to Bash 3.2 (no associative arrays).
 duplicates=0
-seen_ports=""
-seen_names=""
-while IFS=':' read -r name port; do
-    case "$seen_ports" in
-        *":${port}:"*)
+all_ports=""
+all_names=""
+while IFS='|' read -r name port; do
+    # Walk previously seen ports to find duplicates
+    _remaining_ports="$all_ports"
+    _remaining_names="$all_names"
+    while [[ -n "$_remaining_ports" ]]; do
+        _p="${_remaining_ports%% *}"
+        _n="${_remaining_names%%|*}"
+        _remaining_ports="${_remaining_ports#* }"
+        _remaining_names="${_remaining_names#*|}"
+        # Stop when we've exhausted the list (last element repeats after strip)
+        if [[ "$_p" == "$port" ]]; then
             if [[ "$QUIET" == false ]]; then
-                # Find which service already claimed this port
-                prev_name=""
-                _sp="$seen_ports"
-                _sn="$seen_names"
-                while [[ -n "$_sp" ]]; do
-                    _p="${_sp%%:*}"; _sp="${_sp#*:}"; _sp="${_sp#*:}"
-                    _n="${_sn%%|*}"; _sn="${_sn#*|}"
-                    if [[ "$_p" == "$port" ]]; then prev_name="$_n"; break; fi
-                done
-                echo -e "  ${YELLOW}DUPLICATE${NC} :${port}  ${name} conflicts with ${prev_name}"
+                echo -e "  ${YELLOW}DUPLICATE${NC} :${port}  ${name} conflicts with ${_n}"
             fi
             duplicates=$((duplicates + 1))
-            ;;
-    esac
-    seen_ports="${seen_ports}:${port}:"
-    seen_names="${seen_names}${name}|"
+            break
+        fi
+        # Break if we've consumed everything (no more spaces means last item)
+        [[ "$_remaining_ports" == "$_p" ]] && break
+    done
+    all_ports="${all_ports:+$all_ports }${port}"
+    all_names="${all_names:+$all_names|}${name}"
 done <<< "$SERVICES"
 
 if [[ "$duplicates" -gt 0 && "$QUIET" == false ]]; then
@@ -98,7 +102,7 @@ if [[ "$duplicates" -gt 0 && "$QUIET" == false ]]; then
     echo ""
 fi
 
-while IFS=':' read -r name port; do
+while IFS='|' read -r name port; do
     check_port "$name" "$port"
 done <<< "$SERVICES"
 
@@ -114,4 +118,8 @@ if [[ "$QUIET" == false ]]; then
     fi
 fi
 
-exit "$conflicts"
+if [[ "$conflicts" -gt 0 ]]; then
+    exit 1
+else
+    exit 0
+fi
