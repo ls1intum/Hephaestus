@@ -35,6 +35,8 @@ import de.tum.in.www1.hephaestus.gitprovider.sync.exception.SyncInterruptedExcep
 import de.tum.in.www1.hephaestus.gitprovider.team.github.GitHubTeamSyncService;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -391,13 +393,27 @@ public class GitHubDataSyncService {
             return;
         }
 
-        var syncTargets = syncTargetProvider.getSyncTargetsForScope(scopeId);
+        var syncTargets = new ArrayList<>(syncTargetProvider.getSyncTargetsForScope(scopeId));
         if (syncTargets.isEmpty()) {
             // DEBUG level: empty sync targets is expected for newly created or PAT workspaces
             // without repositories configured yet. Not an error condition.
             log.debug("Skipped scope sync: reason=noSyncTargets, scopeId={}", scopeId);
             return;
         }
+
+        // Prioritize repos by staleness: never-synced first, then oldest sync timestamp.
+        // When rate limit budget runs out mid-sync, the most stale repos have already been handled.
+        syncTargets.sort(
+            Comparator.comparing((SyncTarget t) -> {
+                Instant issues = t.lastIssuesSyncedAt();
+                Instant prs = t.lastPullRequestsSyncedAt();
+                if (issues == null || prs == null) {
+                    return Instant.MIN; // never-synced repos go first
+                }
+                // Use the older of the two timestamps (the more stale dimension)
+                return issues.isBefore(prs) ? issues : prs;
+            })
+        );
 
         log.info("Starting scope sync: scopeId={}, repoCount={}", scopeId, syncTargets.size());
 
