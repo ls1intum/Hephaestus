@@ -56,6 +56,7 @@ export default defineConfig(({ command }) => {
 			}
 		},
 		server: {
+			port: parseInt(process.env.WEBAPP_PORT ?? "", 10) || 4200,
 			fs: {
 				// Allow serving files from the monorepo root and sibling server directory
 				allow: [

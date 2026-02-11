@@ -305,7 +305,7 @@ hephaestus:
                 - ls1intum/Artemis
 
     intelligence-service:
-        url: http://localhost:8000
+        url: http://localhost:${INTELLIGENCE_SERVICE_PORT:8000}
 
     cache:
         contributors:
