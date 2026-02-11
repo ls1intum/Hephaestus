@@ -91,6 +91,7 @@ spring:
         timeout-per-shutdown-phase: ${SHUTDOWN_TIMEOUT:20s}
 
 server:
+    port: ${SERVER_PORT:8080}
     shutdown: graceful
 
 # ═══════════════════════════════════════════════════════════════════════════

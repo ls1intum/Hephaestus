@@ -106,7 +106,8 @@ wait_for_postgres_ready() {
                 return 0
             fi
         elif [[ "$DB_MODE" == "docker" ]]; then
-            if (cd "$APP_SERVER_DIR" && docker compose exec postgres pg_isready -h localhost -p "$POSTGRES_PORT" >/dev/null 2>&1); then
+            # Use port 5432 inside the container — POSTGRES_PORT is the host-side mapping only
+            if (cd "$APP_SERVER_DIR" && docker compose exec postgres pg_isready -h localhost -p 5432 >/dev/null 2>&1); then
                 log_success "PostgreSQL is ready!"
                 return 0
             fi
