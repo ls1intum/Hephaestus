@@ -18,17 +18,20 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface UserAchievementRepository extends JpaRepository<UserAchievement, UUID> {
     /**
-     * Find all achievements unlocked by a specific user.
+     * Find all achievement progress records for a specific user.
+     *
+     * <p>Returns both in-progress (unlockedAt is null) and unlocked records.
+     * Unlocked achievements appear first, followed by in-progress ones.
      *
      * @param userId the user's ID
-     * @return list of achievements ordered by unlock time (newest first)
+     * @return list of all achievement progress records for the user
      */
     @Query(
         """
         SELECT ua
         FROM UserAchievement ua
         WHERE ua.user.id = :userId
-        ORDER BY ua.unlockedAt DESC
+        ORDER BY ua.unlockedAt DESC NULLS LAST
         """
     )
     List<UserAchievement> findByUserId(@Param("userId") Long userId);
@@ -96,7 +99,8 @@ public interface UserAchievementRepository extends JpaRepository<UserAchievement
     /**
      * Find recent achievement unlocks across all users.
      *
-     * <p>Useful for activity feeds showing recent achievements.
+     * <p>Only returns fully unlocked achievements (unlockedAt is non-null).
+     * Useful for activity feeds showing recent achievements.
      *
      * @param limit maximum number of results
      * @return recent achievements ordered by unlock time (newest first)
@@ -106,6 +110,7 @@ public interface UserAchievementRepository extends JpaRepository<UserAchievement
         SELECT ua
         FROM UserAchievement ua
         JOIN FETCH ua.user
+        WHERE ua.unlockedAt IS NOT NULL
         ORDER BY ua.unlockedAt DESC
         LIMIT :limit
         """

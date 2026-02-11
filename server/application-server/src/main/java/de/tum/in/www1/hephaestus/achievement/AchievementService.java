@@ -1,11 +1,9 @@
 package de.tum.in.www1.hephaestus.achievement;
 
-import de.tum.in.www1.hephaestus.activity.ActivityEventRepository;
 import de.tum.in.www1.hephaestus.activity.ActivityEventType;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -19,32 +17,34 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Service for evaluating and unlocking achievements.
+ * Service for evaluating and unlocking achievements via incremental progress updates.
  *
  * <p>This service is the core of the achievement system. It:
  * <ul>
- *   <li>Queries activity event counts from the ledger</li>
- *   <li>Compares counts against achievement thresholds</li>
- *   <li>Unlocks achievements that haven't been unlocked yet</li>
+ *   <li>Increments progress counters on {@link UserAchievement} entities when qualifying
+ *       activity events occur</li>
+ *   <li>Compares current progress against achievement thresholds</li>
+ *   <li>Unlocks achievements by setting {@code unlockedAt} when the threshold is met</li>
  * </ul>
  *
- * <h3>Achievement Evaluation Flow</h3>
+ * <h3>Achievement Evaluation Flow (Incremental)</h3>
  * <pre>
  * 1. Receive event type that was just recorded
  * 2. Find all achievements triggered by that event type
- * 3. For each achievement:
- *    a. Skip if already unlocked
- *    b. Count relevant events for user
- *    c. If count >= threshold, unlock
+ * 3. Fetch (or create) UserAchievement progress records
+ * 4. Increment currentValue via {@link AchievementEvaluator}
+ * 5. If currentValue >= requiredCount AND not yet unlocked, set unlockedAt
+ * 6. Save the progress record
  * </pre>
  *
  * <h3>Thread Safety</h3>
- * <p>Achievement unlocks are idempotent due to the unique constraint on
- * (user_id, achievement_id). Concurrent unlock attempts will result in
- * one success and others being silently ignored.
+ * <p>Achievement progress updates are idempotent in structure due to the unique
+ * constraint on (user_id, achievement_id). Concurrent increment attempts are
+ * serialized by the {@code @Transactional} boundary.
  *
  * @see AchievementEventListener
  * @see AchievementType
+ * @see AchievementEvaluator
  */
 @Service
 public class AchievementService {
@@ -58,21 +58,18 @@ public class AchievementService {
     private static final Logger log = LoggerFactory.getLogger(AchievementService.class);
 
     private final UserAchievementRepository userAchievementRepository;
-    private final ActivityEventRepository activityEventRepository;
+    private final AchievementEvaluator achievementEvaluator;
 
-    public AchievementService(
-        UserAchievementRepository userAchievementRepository,
-        ActivityEventRepository activityEventRepository
-    ) {
+    public AchievementService(UserAchievementRepository userAchievementRepository) {
         this.userAchievementRepository = userAchievementRepository;
-        this.activityEventRepository = activityEventRepository;
+        this.achievementEvaluator = new StandardCountEvaluator();
     }
 
     /**
      * Check and unlock any achievements triggered by the given event type.
      *
-     * <p>This method evaluates all achievements that are triggered by the
-     * specified event type and unlocks any that the user has earned.
+     * <p>This method increments progress on all achievements triggered by the
+     * specified event type and unlocks any that have reached their threshold.
      *
      * @param user the user to check achievements for
      * @param eventType the activity event type that was just recorded
@@ -93,74 +90,52 @@ public class AchievementService {
             return List.of();
         }
 
-        // Get user's existing achievements to avoid re-checking
-        Set<String> existingAchievements = userAchievementRepository.findAchievementIdsByUserId(user.getId());
+        // Fetch existing progress records for the triggered achievement types
+        Set<String> candidateIds = candidates.stream().map(AchievementType::getId).collect(Collectors.toSet());
+
+        Map<String, UserAchievement> existingMap = userAchievementRepository
+            .findByUserIdAndAchievementIdIn(user.getId(), candidateIds)
+            .stream()
+            .collect(Collectors.toMap(UserAchievement::getAchievementId, Function.identity()));
 
         List<AchievementType> newlyUnlocked = new ArrayList<>();
 
         for (AchievementType achievement : candidates) {
+            // Get existing progress or create a new record
+            UserAchievement progress = existingMap.get(achievement.getId());
+            if (progress == null) {
+                progress = UserAchievement.builder()
+                    .user(user)
+                    .achievementId(achievement.getId())
+                    .currentValue(0)
+                    .build();
+            }
+
             // Skip if already unlocked
-            if (existingAchievements.contains(achievement.getId())) {
+            if (progress.getUnlockedAt() != null) {
                 continue;
             }
 
-            // Count events for this achievement's trigger events
-            long count = countEventsForUser(user.getId(), achievement.getTriggerEvents());
+            // Increment progress
+            achievementEvaluator.updateProgress(progress, eventType);
 
-            // Check if threshold met
-            if (count >= achievement.getRequiredCount()) {
-                unlock(user, achievement, count);
+            // Check if threshold is now met
+            if (progress.getCurrentValue() >= achievement.getRequiredCount()) {
+                progress.setUnlockedAt(Instant.now());
                 newlyUnlocked.add(achievement);
                 log.info(
                     "Achievement unlocked: userId={}, achievement={}, count={}, required={}",
                     user.getId(),
                     achievement.getId(),
-                    count,
+                    progress.getCurrentValue(),
                     achievement.getRequiredCount()
                 );
             }
+
+            userAchievementRepository.save(progress);
         }
 
         return newlyUnlocked;
-    }
-
-    /**
-     * Count activity events of specified types for a user.
-     *
-     * @param userId the user's ID
-     * @param eventTypes the event types to count
-     * @return total count of matching events
-     */
-    private long countEventsForUser(Long userId, Set<ActivityEventType> eventTypes) {
-        if (eventTypes.isEmpty()) {
-            return 0;
-        }
-
-        // Convert enum set to string set for the query
-        Set<String> eventTypeNames = eventTypes
-            .stream()
-            .map(ActivityEventType::name)
-            .collect(java.util.stream.Collectors.toSet());
-
-        return activityEventRepository.countByActorIdAndEventTypes(userId, eventTypeNames);
-    }
-
-    /**
-     * Unlock an achievement for a user.
-     *
-     * @param user the user
-     * @param achievement the achievement to unlock
-     * @param currentCount the current event count that triggered the unlock
-     */
-    private void unlock(User user, AchievementType achievement, long currentCount) {
-        UserAchievement unlock = UserAchievement.builder()
-            .user(user)
-            .achievementId(achievement.getId())
-            .unlockedAt(Instant.now())
-            .currentValue(currentCount)
-            .build();
-
-        userAchievementRepository.save(unlock);
     }
 
     /**
@@ -171,7 +146,11 @@ public class AchievementService {
      */
     @Transactional(readOnly = true)
     public List<UserAchievement> getUnlockedAchievements(Long userId) {
-        return userAchievementRepository.findByUserId(userId);
+        return userAchievementRepository
+            .findByUserId(userId)
+            .stream()
+            .filter(ua -> ua.getUnlockedAt() != null)
+            .toList();
     }
 
     /**
@@ -183,23 +162,21 @@ public class AchievementService {
      */
     @Transactional(readOnly = true)
     public boolean isUnlocked(Long userId, AchievementType achievementType) {
-        return userAchievementRepository.existsByUserIdAndAchievementId(userId, achievementType.getId());
+        return userAchievementRepository
+            .findByUserIdAndAchievementId(userId, achievementType.getId())
+            .map(ua -> ua.getUnlockedAt() != null)
+            .orElse(false);
     }
 
     /**
      * Get all achievements with progress information for a user.
      *
-     * <p>This method efficiently aggregates achievement data by:
-     * <ol>
-     *   <li>Fetching all user's unlocked achievements in a single query</li>
-     *   <li>Identifying unique trigger event sets across all achievements</li>
-     *   <li>Performing one count query per unique trigger set (not per achievement)</li>
-     *   <li>Computing status based on unlock state and parent chain</li>
-     * </ol>
+     * <p>This method reads progress directly from {@link UserAchievement} records
+     * without performing any count queries on the activity event table.
      *
      * <h3>Status Logic</h3>
      * <ul>
-     *   <li>{@code UNLOCKED} - Achievement exists in UserAchievement table</li>
+     *   <li>{@code UNLOCKED} - {@code unlockedAt} is non-null on UserAchievement</li>
      *   <li>{@code AVAILABLE} - Not unlocked, but parent is unlocked (or no parent)</li>
      *   <li>{@code LOCKED} - Parent achievement is not yet unlocked</li>
      * </ul>
@@ -217,79 +194,39 @@ public class AchievementService {
 
         Long userId = user.getId();
 
-        // Step 1: Fetch all unlocked achievements for this user (single query)
-        Map<String, UserAchievement> unlockedMap = userAchievementRepository
+        // Fetch all progress records for this user (both in-progress and unlocked)
+        Map<String, UserAchievement> progressMap = userAchievementRepository
             .findByUserId(userId)
             .stream()
             .collect(Collectors.toMap(UserAchievement::getAchievementId, Function.identity()));
 
-        // Step 2: Identify unique trigger event sets and batch count
-        Map<Set<ActivityEventType>, Long> countsByTriggerSet = batchCountByTriggerSets(userId);
-
-        // Step 3: Build DTOs for all achievements
+        // Build DTOs for all achievements
         List<AchievementDTO> result = new ArrayList<>();
         for (AchievementType type : AchievementType.values()) {
-            UserAchievement unlocked = unlockedMap.get(type.getId());
-            long progress = getProgressFromCounts(type, countsByTriggerSet);
-            AchievementStatus status = computeStatus(type, unlockedMap);
-            Instant unlockedAt = unlocked != null ? unlocked.getUnlockedAt() : null;
+            UserAchievement progress = progressMap.get(type.getId());
+            long currentProgress = progress != null ? progress.getCurrentValue() : 0;
+            Instant unlockedAt = progress != null ? progress.getUnlockedAt() : null;
+            AchievementStatus status = computeStatus(type, progressMap);
 
-            result.add(AchievementDTO.fromType(type, progress, status, unlockedAt));
+            result.add(AchievementDTO.fromType(type, currentProgress, status, unlockedAt));
         }
 
         return result;
     }
 
     /**
-     * Batch count events by unique trigger event sets.
-     *
-     * <p>Many achievements share the same trigger events (e.g., all PR achievements
-     * use PULL_REQUEST_MERGED). This method identifies unique sets and performs
-     * one count query per unique set, avoiding redundant database calls.
-     *
-     * @param userId the user's ID
-     * @return map from trigger event set to count
-     */
-    private Map<Set<ActivityEventType>, Long> batchCountByTriggerSets(Long userId) {
-        // Collect unique trigger sets
-        Set<Set<ActivityEventType>> uniqueTriggerSets = java.util.Arrays.stream(AchievementType.values())
-            .map(AchievementType::getTriggerEvents)
-            .filter(set -> !set.isEmpty())
-            .collect(Collectors.toSet());
-
-        Map<Set<ActivityEventType>, Long> counts = new HashMap<>();
-
-        for (Set<ActivityEventType> triggerSet : uniqueTriggerSets) {
-            long count = countEventsForUser(userId, triggerSet);
-            counts.put(triggerSet, count);
-        }
-
-        return counts;
-    }
-
-    /**
-     * Get progress count for an achievement from the pre-computed counts map.
-     */
-    private long getProgressFromCounts(AchievementType type, Map<Set<ActivityEventType>, Long> countsByTriggerSet) {
-        Set<ActivityEventType> triggers = type.getTriggerEvents();
-        if (triggers.isEmpty()) {
-            return 0;
-        }
-        return countsByTriggerSet.getOrDefault(triggers, 0L);
-    }
-
-    /**
      * Compute the status of an achievement based on unlock state and parent chain.
      *
      * <ul>
-     *   <li>UNLOCKED if present in unlockedMap</li>
+     *   <li>UNLOCKED if {@code unlockedAt} is non-null in progressMap</li>
      *   <li>AVAILABLE if not unlocked and (no parent OR parent is unlocked)</li>
      *   <li>LOCKED if not unlocked and parent is not unlocked</li>
      * </ul>
      */
-    private AchievementStatus computeStatus(AchievementType type, Map<String, UserAchievement> unlockedMap) {
-        // Already unlocked
-        if (unlockedMap.containsKey(type.getId())) {
+    private AchievementStatus computeStatus(AchievementType type, Map<String, UserAchievement> progressMap) {
+        // Check if this achievement is unlocked
+        UserAchievement progress = progressMap.get(type.getId());
+        if (progress != null && progress.getUnlockedAt() != null) {
             return AchievementStatus.UNLOCKED;
         }
 
@@ -301,7 +238,8 @@ public class AchievementService {
         }
 
         // Parent must be unlocked for this to be available
-        if (unlockedMap.containsKey(parent.getId())) {
+        UserAchievement parentProgress = progressMap.get(parent.getId());
+        if (parentProgress != null && parentProgress.getUnlockedAt() != null) {
             return AchievementStatus.AVAILABLE;
         }
 

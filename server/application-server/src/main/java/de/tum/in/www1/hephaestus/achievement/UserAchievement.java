@@ -19,17 +19,24 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.springframework.lang.Nullable;
 
 /**
- * Tracks achievement unlocks per user.
+ * Tracks achievement progress and unlocks per user.
  *
- * <p>Each record represents a single achievement unlocked by a specific user.
- * The combination of user + achievementId is unique (users can only unlock
- * each achievement once).
+ * <p>Each record represents a user's progress toward a specific achievement.
+ * The combination of user + achievementId is unique (one progress record per
+ * user per achievement).
+ *
+ * <h3>Lifecycle</h3>
+ * <p>A record is created when a user first triggers a relevant event for an
+ * achievement (with {@code currentValue = 1} and {@code unlockedAt = null}).
+ * The {@code currentValue} is incremented on each subsequent qualifying event.
+ * When the threshold is met, {@code unlockedAt} is set to the current timestamp.
  *
  * <h3>Idempotency</h3>
  * <p>The unique constraint on (user_id, achievement_id) ensures that duplicate
- * unlock attempts are safely ignored at the database level.
+ * progress records cannot be created at the database level.
  *
  * <h3>Achievement Lookup</h3>
  * <p>The {@code achievementId} stores the string ID from {@link AchievementType}.
@@ -85,10 +92,11 @@ public class UserAchievement {
     private String achievementId;
 
     /**
-     * When the achievement was unlocked.
+     * When the achievement was unlocked. {@code null} for achievements that are
+     * in progress but not yet completed.
      */
-    @NotNull
-    @Column(name = "unlocked_at", nullable = false)
+    @Nullable
+    @Column(name = "unlocked_at")
     private Instant unlockedAt;
 
     /**
@@ -110,9 +118,6 @@ public class UserAchievement {
     protected void onCreate() {
         if (id == null) {
             id = UUID.randomUUID();
-        }
-        if (unlockedAt == null) {
-            unlockedAt = Instant.now();
         }
     }
 

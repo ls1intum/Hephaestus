@@ -1,9 +1,7 @@
 package de.tum.in.www1.hephaestus.achievement;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-
 import java.time.Instant;
-
 import org.springframework.lang.NonNull;
 import org.springframework.lang.Nullable;
 
@@ -17,25 +15,26 @@ import org.springframework.lang.Nullable;
  *   <li>Status indicating if it's locked, available, or unlocked</li>
  * </ul>
  *
- * <p>Progress is calculated from activity event counts at query time,
- * while unlock status is stored in the UserAchievement table.
+ * <p>Progress is read directly from the {@link UserAchievement} progress table,
+ * which is updated incrementally when activity events occur.
  */
 @Schema(description = "Achievement with user-specific progress information")
 public record AchievementDTO(
     @NonNull @Schema(description = "Unique identifier for the achievement", example = "first_pull") String id,
     @NonNull @Schema(description = "Human-readable name", example = "First Merge") String name,
-    @NonNull @Schema(description = "Description of how to earn the achievement", example = "Merge your first pull request")
+    @NonNull
+    @Schema(description = "Description of how to earn the achievement", example = "Merge your first pull request")
     String description,
     @NonNull @Schema(description = "Icon identifier for UI", example = "git-merge") String icon,
     @NonNull @Schema(description = "Category for grouping achievements") AchievementCategory category,
-    @NonNull @Schema(description = "Visual level tier/rarity for badge styling", example = "common") AchievementRarity rarity,
+    @NonNull
+    @Schema(description = "Visual level tier/rarity for badge styling", example = "common")
+    AchievementRarity rarity,
     @Nullable @Schema(description = "Parent achievement ID in progression chain", example = "null") String parentId,
     @NonNull @Schema(description = "Current status for this user") AchievementStatus status,
     @NonNull @Schema(description = "Current progress count (e.g., 4 PRs merged)", example = "4") long progress,
     @NonNull @Schema(description = "Required count to unlock (e.g., 5 PRs)", example = "5") long maxProgress,
-    @Nullable
-    @Schema(description = "When the achievement was unlocked, null if not unlocked")
-    Instant unlockedAt
+    @Nullable @Schema(description = "When the achievement was unlocked, null if not unlocked") Instant unlockedAt
 ) {
     /**
      * Creates an AchievementDTO from an AchievementType with progress information.
@@ -46,7 +45,12 @@ public record AchievementDTO(
      * @param unlockedAt when the achievement was unlocked, or null if not unlocked
      * @return populated DTO
      */
-    public static AchievementDTO fromType(AchievementType type, long progress, AchievementStatus status, Instant unlockedAt) {
+    public static AchievementDTO fromType(
+        AchievementType type,
+        long progress,
+        AchievementStatus status,
+        Instant unlockedAt
+    ) {
         return new AchievementDTO(
             type.getId(),
             type.getName(),
