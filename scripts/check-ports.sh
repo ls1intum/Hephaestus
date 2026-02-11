@@ -13,12 +13,13 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_FILE="${SCRIPT_DIR}/../server/application-server/.env"
 
-# Source .env if it exists (same file Docker Compose and Spring Boot read)
+# Source .env if it exists (same file Docker Compose and Spring Boot read).
+# Uses eval instead of process substitution because `source <(...)` does not
+# retain variables in Bash 3.2 (macOS default).
 if [[ -f "$ENV_FILE" ]]; then
-    # Export only lines that look like VAR=VALUE (skip comments and blank lines)
     set -a
     # shellcheck disable=SC1090
-    source <(grep -E '^\s*[A-Z_]+=.+' "$ENV_FILE" 2>/dev/null || true)
+    eval "$(grep -E '^\s*[A-Z_]+=.+' "$ENV_FILE" 2>/dev/null || true)"
     set +a
 fi
 
