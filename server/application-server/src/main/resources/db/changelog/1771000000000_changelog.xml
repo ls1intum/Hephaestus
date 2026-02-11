@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
+
+    <!-- ================================================================== -->
+    <!-- Performance indexes for GitHub Projects V2 queries                 -->
+    <!--                                                                    -->
+    <!-- Adds indexes to optimize:                                          -->
+    <!--   1. Stale item removal queries (content_type + archived filter)   -->
+    <!--   2. Orphaned item relinking (content_database_id lookup)          -->
+    <!-- ================================================================== -->
+
+    <!-- 1. Composite index for stale removal queries -->
+    <!-- Optimizes: deleteByProjectIdAndContentTypeAndNodeIdNotIn,          -->
+    <!--            deleteByProjectIdAndContentTypeInAndNodeIdNotIn,        -->
+    <!--            deleteByProjectIdAndContentType,                        -->
+    <!--            deleteByProjectIdAndContentTypeIn                       -->
+    <!-- These queries filter on (project_id, content_type, archived=false) -->
+    <changeSet id="1771000000000-1" author="FelixTJDietrich">
+        <createIndex tableName="project_item" indexName="idx_project_item_content_type_archived">
+            <column name="project_id"/>
+            <column name="content_type"/>
+            <column name="archived"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- 2. Partial index for orphaned item relinking -->
+    <!-- Optimizes: relinkOrphanedItems() which filters on                 -->
+    <!--   issue_id IS NULL AND content_database_id IS NOT NULL            -->
+    <!--   AND content_type IN ('ISSUE', 'PULL_REQUEST')                   -->
+    <!-- Using a partial index to only index rows that actually need       -->
+    <!-- relinking, keeping the index small and efficient.                 -->
+    <changeSet id="1771000000000-2" author="FelixTJDietrich">
+        <sql>
+            CREATE INDEX idx_project_item_orphaned_relink
+            ON project_item (content_database_id)
+            WHERE issue_id IS NULL
+              AND content_database_id IS NOT NULL
+              AND content_type IN ('ISSUE', 'PULL_REQUEST');
+        </sql>
+        <rollback>
+            <sql>DROP INDEX IF EXISTS idx_project_item_orphaned_relink;</sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

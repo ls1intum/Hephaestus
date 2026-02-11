@@ -2,6 +2,10 @@ package de.tum.in.www1.hephaestus.gitprovider.sync.backfill;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.DEFAULT_PAGE_SIZE;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.JITTER_FACTOR;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_INITIAL_BACKOFF;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
@@ -9,6 +13,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlErrorUti
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubTransportErrors;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.BackfillStateProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncSession;
@@ -47,7 +52,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.graphql.client.ClientGraphQlResponse;
-import org.springframework.graphql.client.GraphQlTransportException;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -118,18 +122,6 @@ public class HistoricalBackfillService {
      * Extended cooldown period after max consecutive failures.
      */
     private static final Duration EXTENDED_COOLDOWN = Duration.ofMinutes(15);
-
-    /**
-     * Retry configuration for transport-level errors during body streaming.
-     * <p>
-     * CRITICAL: WebClient ExchangeFilterFunction retries DO NOT cover body streaming errors.
-     * PrematureCloseException occurs AFTER HTTP headers are received, during body consumption.
-     * We must retry at this level using Mono.defer() to wrap the entire execute() call.
-     */
-    private static final int TRANSPORT_MAX_RETRIES = 3;
-    private static final Duration TRANSPORT_INITIAL_BACKOFF = Duration.ofSeconds(2);
-    private static final Duration TRANSPORT_MAX_BACKOFF = Duration.ofSeconds(15);
-    private static final double JITTER_FACTOR = 0.5;
 
     /**
      * Tracks repository cooldown state to prevent hammering failing endpoints.
@@ -1488,7 +1480,7 @@ public class HistoricalBackfillService {
         return Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
             .maxBackoff(TRANSPORT_MAX_BACKOFF)
             .jitter(JITTER_FACTOR)
-            .filter(this::isTransportError)
+            .filter(GitHubTransportErrors::isTransportError)
             .doBeforeRetry(signal ->
                 log.warn(
                     "Retrying {} after transport error: repo={}, page={}, attempt={}, error={}",
@@ -1499,70 +1491,6 @@ public class HistoricalBackfillService {
                     signal.failure().getMessage()
                 )
             );
-    }
-
-    /**
-     * Determines if an exception is a transport-level error that should be retried.
-     * <p>
-     * Transport errors occur at the network/connection level during body streaming:
-     * <ul>
-     *   <li>{@code GraphQlTransportException}: Spring GraphQL wrapper for transport failures</li>
-     *   <li>{@code PrematureCloseException}: Connection closed during response body streaming</li>
-     *   <li>Connection reset/abort exceptions</li>
-     *   <li>Timeouts during body consumption</li>
-     * </ul>
-     *
-     * @param throwable the exception to check
-     * @return true if this is a retryable transport error
-     */
-    private boolean isTransportError(Throwable throwable) {
-        // GraphQlTransportException is Spring GraphQL's wrapper for transport failures
-        if (throwable instanceof GraphQlTransportException) {
-            return true;
-        }
-
-        // Walk the cause chain for wrapped transport errors
-        Throwable cause = throwable;
-        while (cause != null) {
-            String className = cause.getClass().getName();
-            String message = cause.getMessage();
-
-            // PrematureCloseException: Connection closed during response streaming
-            if (className.contains("PrematureCloseException")) {
-                return true;
-            }
-
-            // Other reactor-netty transport errors
-            if (className.contains("AbortedException") || className.contains("ConnectionResetException")) {
-                return true;
-            }
-
-            // Timeout during blocking read (body consumption timeout)
-            if (
-                cause instanceof IllegalStateException &&
-                message != null &&
-                message.toLowerCase().contains("timeout on blocking read")
-            ) {
-                return true;
-            }
-
-            // Check for IOException indicating connection issues
-            if (cause instanceof java.io.IOException && message != null) {
-                String lower = message.toLowerCase();
-                if (
-                    lower.contains("connection reset") ||
-                    lower.contains("broken pipe") ||
-                    lower.contains("connection abort") ||
-                    lower.contains("premature") ||
-                    lower.contains("stream closed")
-                ) {
-                    return true;
-                }
-            }
-
-            cause = cause.getCause();
-        }
-        return false;
     }
 
     // ========================================================================

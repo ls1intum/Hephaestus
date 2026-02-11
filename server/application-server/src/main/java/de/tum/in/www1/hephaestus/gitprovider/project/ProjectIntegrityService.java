@@ -44,7 +44,6 @@ import org.springframework.transaction.annotation.Transactional;
  * <ul>
  *   <li>{@link #cascadeDeleteProjectsForOrganization} - Delete projects when org is deleted</li>
  *   <li>{@link #cascadeDeleteProjectsForRepository} - Delete projects when repo is deleted</li>
- *   <li>{@link #cascadeDeleteProjectsForUser} - Delete projects when user is deleted</li>
  *   <li>{@link #validateOwnerExists} - Validate owner before project creation</li>
  *   <li>{@link #findOrphanedProjects} - Detect projects with missing owners</li>
  * </ul>
@@ -147,33 +146,7 @@ public class ProjectIntegrityService {
         return deleted;
     }
 
-    /**
-     * Deletes all projects owned by the specified user.
-     * <p>
-     * Call this method when a user is being deleted to prevent orphaned projects.
-     *
-     * @param userId the user's database ID
-     * @return the number of projects deleted
-     */
-    @Transactional
-    public int cascadeDeleteProjectsForUser(Long userId) {
-        if (userId == null) {
-            return 0;
-        }
-
-        long count = projectRepository.countByOwnerTypeAndOwnerId(Project.OwnerType.USER, userId);
-        if (count == 0) {
-            return 0;
-        }
-
-        log.info("Cascade deleting projects for user: userId={}, projectCount={}", userId, count);
-
-        int deleted = projectRepository.deleteAllByOwnerTypeAndOwnerId(Project.OwnerType.USER, userId);
-
-        log.info("Completed cascade delete of projects for user: userId={}, deletedCount={}", userId, deleted);
-
-        return deleted;
-    }
+    // TODO: Add cascadeDeleteProjectsForUser() when user-scoped project sync is implemented and the User entity deletion lifecycle exists
 
     // ==================== Validation Operations ====================
 
