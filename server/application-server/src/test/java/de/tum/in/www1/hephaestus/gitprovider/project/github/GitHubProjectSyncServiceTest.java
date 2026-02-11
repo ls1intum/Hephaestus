@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.project.github;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -37,12 +38,8 @@ import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2Sta
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
 import de.tum.in.www1.hephaestus.gitprovider.project.Project;
-import de.tum.in.www1.hephaestus.gitprovider.project.ProjectFieldRepository;
-import de.tum.in.www1.hephaestus.gitprovider.project.ProjectFieldValueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.project.ProjectItem;
-import de.tum.in.www1.hephaestus.gitprovider.project.ProjectItemRepository;
 import de.tum.in.www1.hephaestus.gitprovider.project.ProjectRepository;
-import de.tum.in.www1.hephaestus.gitprovider.project.ProjectStatusUpdateRepository;
 import de.tum.in.www1.hephaestus.gitprovider.project.github.dto.GitHubProjectDTO;
 import de.tum.in.www1.hephaestus.gitprovider.sync.SyncResult;
 import de.tum.in.www1.hephaestus.gitprovider.sync.SyncSchedulerProperties;
@@ -79,18 +76,6 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
     private ProjectRepository projectRepository;
 
     @Mock
-    private ProjectItemRepository projectItemRepository;
-
-    @Mock
-    private ProjectFieldRepository projectFieldRepository;
-
-    @Mock
-    private ProjectFieldValueRepository projectFieldValueRepository;
-
-    @Mock
-    private ProjectStatusUpdateRepository statusUpdateRepository;
-
-    @Mock
     private OrganizationRepository organizationRepository;
 
     @Mock
@@ -104,6 +89,9 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
 
     @Mock
     private GitHubProjectStatusUpdateProcessor statusUpdateProcessor;
+
+    @Mock
+    private GitHubProjectItemFieldValueSyncService fieldValueSyncService;
 
     @Mock
     private BackfillStateProvider backfillStateProvider;
@@ -172,17 +160,19 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             .executeWithoutResult(any());
         lenient().when(transactionTemplate.getTransactionManager()).thenReturn(transactionManager);
 
+        // Default exception classifier stub to prevent NPEs on unexpected exceptions
+        lenient()
+            .when(exceptionClassifier.classifyWithDetails(any()))
+            .thenReturn(ClassificationResult.of(Category.UNKNOWN, "test error"));
+
         service = new GitHubProjectSyncService(
             projectRepository,
-            projectItemRepository,
-            projectFieldRepository,
-            projectFieldValueRepository,
-            statusUpdateRepository,
             organizationRepository,
             graphQlClientProvider,
             projectProcessor,
             itemProcessor,
             statusUpdateProcessor,
+            fieldValueSyncService,
             backfillStateProvider,
             transactionTemplate,
             syncProperties,
@@ -247,6 +237,12 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         lenient().when(response.isValid()).thenReturn(true);
         lenient().when(response.field(fieldPath)).thenReturn(field);
         lenient().when(field.toEntity(any(Class.class))).thenReturn(entity);
+        // Mock the parent "node" field for deleted-project detection checks
+        if (fieldPath.startsWith("node.")) {
+            ClientResponseField nodeField = mock(ClientResponseField.class);
+            lenient().when(nodeField.getValue()).thenReturn(new Object());
+            lenient().when(response.field("node")).thenReturn(nodeField);
+        }
         return response;
     }
 
@@ -537,15 +533,12 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             );
             service = new GitHubProjectSyncService(
                 projectRepository,
-                projectItemRepository,
-                projectFieldRepository,
-                projectFieldValueRepository,
-                statusUpdateRepository,
                 organizationRepository,
                 graphQlClientProvider,
                 projectProcessor,
                 itemProcessor,
                 statusUpdateProcessor,
+                fieldValueSyncService,
                 backfillStateProvider,
                 transactionTemplate,
                 syncProperties,
@@ -816,7 +809,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             mockGraphQlClientForScope();
             mockGraphQlRequestChain();
 
-            // Phase 1: Fields - empty success
+            // Phase 1: Fields - empty success (node exists but fields connection is null)
             ClientGraphQlResponse fieldsResponse = mockValidGraphQlResponse("node.fields", null);
             // Phase 2: Status updates - empty success
             ClientGraphQlResponse statusUpdatesResponse = mockValidGraphQlResponse("node.statusUpdates", null);
@@ -861,8 +854,10 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             processedItem.setNodeId("PVTI_issue1");
             when(itemProcessor.process(any(), eq(project), any(), isNull())).thenReturn(processedItem);
 
-            // processFieldValues checks if the field exists
-            when(projectFieldRepository.existsById("PVTF_status")).thenReturn(true);
+            // processFieldValues is now delegated to fieldValueSyncService
+            when(fieldValueSyncService.processFieldValues(eq(500L), any(), eq(false), isNull())).thenReturn(
+                List.of("PVTF_status")
+            );
 
             // Act
             SyncResult result = service.syncProjectItems(SCOPE_ID, project);
@@ -871,19 +866,8 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED);
             // Verify itemProcessor.process was called for the Issue/PR item
             verify(itemProcessor).process(any(), eq(project), any(), isNull());
-            // Verify field value was upserted with the correct item ID and field ID
-            verify(projectFieldValueRepository).upsertCore(
-                eq(500L),
-                eq("PVTF_status"),
-                eq("In Progress"),
-                eq(null),
-                eq(null),
-                eq(null),
-                eq(null),
-                any(Instant.class)
-            );
-            // Verify stale field value cleanup was called
-            verify(projectFieldValueRepository).deleteByItemIdAndFieldIdNotIn(eq(500L), eq(List.of("PVTF_status")));
+            // Verify field values were delegated to fieldValueSyncService
+            verify(fieldValueSyncService).processFieldValues(eq(500L), any(), eq(false), isNull());
         }
 
         @Test
@@ -931,18 +915,162 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             // Assert
             assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED);
             // Field values should NOT be processed because the item was skipped
-            verify(projectItemRepository, never()).findByProjectIdAndNodeId(any(), any());
-            verify(projectFieldValueRepository, never()).upsertCore(
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any()
-            );
+            verify(fieldValueSyncService, never()).processFieldValues(any(), any(), anyBoolean(), any());
             verify(itemProcessor, never()).process(any(), any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("should pass filterQuery variable during incremental sync")
+        void shouldPassFilterQueryVariableDuringIncrementalSync() {
+            // Arrange
+            Long projectId = 10L;
+            Project project = createProject(projectId, "PVT_node10", 1);
+
+            GHProjectV2Item recentItem = createIssueItem(
+                "PVTI_recent",
+                12345L,
+                OffsetDateTime.now(),
+                List.of(createTextFieldValue("PVTF_field1", "value")),
+                false,
+                null
+            );
+
+            GHProjectV2ItemConnection itemsConnection = createItemConnection(List.of(recentItem));
+            mockGraphQlClientForScope();
+            mockGraphQlRequestChain();
+
+            ClientGraphQlResponse fieldsResponse = mockValidGraphQlResponse("node.fields", null);
+            ClientGraphQlResponse statusUpdatesResponse = mockValidGraphQlResponse("node.statusUpdates", null);
+            ClientGraphQlResponse itemsResponse = mockValidGraphQlResponse("node.items", itemsConnection);
+
+            when(requestSpec.execute())
+                .thenReturn(Mono.just(fieldsResponse))
+                .thenReturn(Mono.just(statusUpdatesResponse))
+                .thenReturn(Mono.just(itemsResponse));
+
+            when(backfillStateProvider.getProjectItemSyncCursor(projectId)).thenReturn(Optional.empty());
+            // Previous sync was 10 minutes ago → filterQuery should be set with a date
+            when(backfillStateProvider.getProjectItemsSyncedAt(projectId)).thenReturn(
+                Optional.of(Instant.now().minusSeconds(10 * 60))
+            );
+
+            when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+
+            ProjectItem processedItem = new ProjectItem();
+            processedItem.setId(800L);
+            processedItem.setNodeId("PVTI_recent");
+            when(itemProcessor.process(any(), eq(project), any(), isNull())).thenReturn(processedItem);
+
+            when(fieldValueSyncService.processFieldValues(eq(800L), any(), eq(false), isNull())).thenReturn(
+                List.of("PVTF_field1")
+            );
+
+            // Act
+            service.syncProjectItems(SCOPE_ID, project);
+
+            // Assert - verify that filterQuery variable was passed (should start with "updated:>")
+            var filterQueryCaptor = ArgumentCaptor.forClass(String.class);
+            // The variable("filterQuery", ...) call is made during the items phase (3rd execute call)
+            // Since mockGraphQlRequestChain stubs variable(anyString(), any()), we capture via ArgumentCaptor
+            verify(requestSpec).variable(eq("filterQuery"), filterQueryCaptor.capture());
+            String capturedFilterQuery = filterQueryCaptor.getValue();
+            assertThat(capturedFilterQuery).isNotNull();
+            assertThat(capturedFilterQuery).startsWith("updated:>");
+        }
+
+        @Test
+        @DisplayName("should skip stale removal when server-side filtering is active")
+        void shouldSkipStaleRemovalWhenServerSideFilteringIsActive() {
+            // Arrange
+            Long projectId = 10L;
+            Project project = createProject(projectId, "PVT_node10", 1);
+
+            GHProjectV2Item recentItem = createIssueItem(
+                "PVTI_recent",
+                12345L,
+                OffsetDateTime.now(),
+                List.of(createTextFieldValue("PVTF_field1", "value")),
+                false,
+                null
+            );
+
+            GHProjectV2ItemConnection itemsConnection = createItemConnection(List.of(recentItem));
+            mockGraphQlClientForScope();
+            mockGraphQlRequestChain();
+
+            ClientGraphQlResponse fieldsResponse = mockValidGraphQlResponse("node.fields", null);
+            ClientGraphQlResponse statusUpdatesResponse = mockValidGraphQlResponse("node.statusUpdates", null);
+            ClientGraphQlResponse itemsResponse = mockValidGraphQlResponse("node.items", itemsConnection);
+
+            when(requestSpec.execute())
+                .thenReturn(Mono.just(fieldsResponse))
+                .thenReturn(Mono.just(statusUpdatesResponse))
+                .thenReturn(Mono.just(itemsResponse));
+
+            when(backfillStateProvider.getProjectItemSyncCursor(projectId)).thenReturn(Optional.empty());
+            // Set previous sync timestamp → triggers server-side filtering
+            when(backfillStateProvider.getProjectItemsSyncedAt(projectId)).thenReturn(
+                Optional.of(Instant.now().minusSeconds(10 * 60))
+            );
+
+            when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+
+            ProjectItem processedItem = new ProjectItem();
+            processedItem.setId(900L);
+            processedItem.setNodeId("PVTI_recent");
+            when(itemProcessor.process(any(), eq(project), any(), isNull())).thenReturn(processedItem);
+
+            when(fieldValueSyncService.processFieldValues(eq(900L), any(), eq(false), isNull())).thenReturn(
+                List.of("PVTF_field1")
+            );
+
+            // Act
+            SyncResult result = service.syncProjectItems(SCOPE_ID, project);
+
+            // Assert - sync should complete but stale removal should NOT run
+            assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED);
+            verify(itemProcessor, never()).removeStaleDraftIssues(anyLong(), any(), any());
+            verify(itemProcessor, never()).removeStaleIssuePrItems(anyLong(), any(), any());
+        }
+
+        @Test
+        @DisplayName("should not pass filterQuery on first sync when no previous sync timestamp exists")
+        void shouldNotPassFilterQueryOnFirstSync() {
+            // Arrange
+            Long projectId = 10L;
+            Project project = createProject(projectId, "PVT_node10", 1);
+
+            GHProjectV2Item item = createIssueItem(
+                "PVTI_item1",
+                12345L,
+                OffsetDateTime.now(),
+                List.of(createTextFieldValue("PVTF_field1", "value")),
+                false,
+                null
+            );
+
+            GHProjectV2ItemConnection itemsConnection = createItemConnection(List.of(item));
+            mockThreePhasesWithItems(projectId, itemsConnection);
+
+            when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+
+            ProjectItem processedItem = new ProjectItem();
+            processedItem.setId(1000L);
+            processedItem.setNodeId("PVTI_item1");
+            when(itemProcessor.process(any(), eq(project), any(), isNull())).thenReturn(processedItem);
+
+            when(fieldValueSyncService.processFieldValues(eq(1000L), any(), eq(false), isNull())).thenReturn(
+                List.of("PVTF_field1")
+            );
+
+            // Act
+            SyncResult result = service.syncProjectItems(SCOPE_ID, project);
+
+            // Assert - filterQuery should be null (no previous sync), stale removal SHOULD run
+            assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED);
+            verify(requestSpec).variable(eq("filterQuery"), isNull());
+            verify(itemProcessor).removeStaleDraftIssues(eq(projectId), any(), any());
+            verify(itemProcessor).removeStaleIssuePrItems(eq(projectId), any(), any());
         }
 
         @Test
@@ -973,7 +1101,9 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             processedItem.setNodeId("PVTI_truncated");
             when(itemProcessor.process(any(), eq(project), any(), isNull())).thenReturn(processedItem);
 
-            when(projectFieldRepository.existsById("PVTF_field1")).thenReturn(true);
+            when(fieldValueSyncService.processFieldValues(eq(600L), any(), eq(true), isNull())).thenReturn(
+                List.of("PVTF_field1")
+            );
 
             // Act
             SyncResult result = service.syncProjectItems(SCOPE_ID, project);
@@ -982,22 +1112,19 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED);
             // Verify itemProcessor.process was called
             verify(itemProcessor).process(any(), eq(project), any(), isNull());
-            // Verify field values were still processed for the first page
-            verify(projectFieldValueRepository).upsertCore(
+            // Verify field values were processed for the first page via delegation
+            verify(fieldValueSyncService).processFieldValues(eq(600L), any(), eq(true), isNull());
+            // The truncated item should trigger syncRemainingFieldValues on the fieldValueSyncService.
+            // Only 3 execute() calls happen from the main service: fields, statusUpdates, items.
+            // The follow-up pagination is handled inside fieldValueSyncService (which is mocked).
+            verify(requestSpec, times(3)).execute();
+            verify(fieldValueSyncService).syncRemainingFieldValues(
+                eq(SCOPE_ID),
+                eq("PVTI_truncated"),
                 eq(600L),
-                eq("PVTF_field1"),
-                eq("value1"),
-                eq(null),
-                eq(null),
-                eq(null),
-                eq(null),
-                any(Instant.class)
+                eq("cursor_fv_page2"),
+                eq(List.of("PVTF_field1"))
             );
-            // The truncated item should trigger syncRemainingFieldValues (GetProjectItemFieldValues query).
-            // Since we don't mock the follow-up pagination query, we verify the initial field values
-            // were processed AND the requestSpec was called more than 3 times (3 phases + pagination).
-            // Verifying exactly 4 execute() calls: fields, statusUpdates, items, + follow-up fieldValues
-            verify(requestSpec, times(4)).execute();
         }
 
         @Test
@@ -1027,7 +1154,9 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             createdItem.setNodeId("PVTI_not_synced");
             when(itemProcessor.process(any(), eq(project), any(), isNull())).thenReturn(createdItem);
 
-            when(projectFieldRepository.existsById("PVTF_field1")).thenReturn(true);
+            when(fieldValueSyncService.processFieldValues(eq(700L), any(), eq(false), isNull())).thenReturn(
+                List.of("PVTF_field1")
+            );
 
             // Act
             SyncResult result = service.syncProjectItems(SCOPE_ID, project);
@@ -1036,17 +1165,8 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             assertThat(result.status()).isEqualTo(SyncResult.Status.COMPLETED);
             // Verify itemProcessor.process was called to create the item
             verify(itemProcessor).process(any(), eq(project), any(), isNull());
-            // Verify field values were processed on the newly created item
-            verify(projectFieldValueRepository).upsertCore(
-                eq(700L),
-                eq("PVTF_field1"),
-                eq("value"),
-                eq(null),
-                eq(null),
-                eq(null),
-                eq(null),
-                any(Instant.class)
-            );
+            // Verify field values were delegated to fieldValueSyncService
+            verify(fieldValueSyncService).processFieldValues(eq(700L), any(), eq(false), isNull());
         }
     }
 

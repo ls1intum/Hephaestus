@@ -343,6 +343,26 @@ public class GitHubPullRequestReviewSyncService {
     }
 
     /**
+     * Processes a single inline review DTO during pull request sync.
+     * <p>
+     * This delegation method allows the PR sync service to process embedded reviews
+     * without depending directly on the review processor.
+     *
+     * @param reviewDTO    the review DTO to process
+     * @param pullRequestId the database ID of the owning pull request
+     * @param context       the processing context for activity event creation
+     * @return the persisted review entity, or null if processing was skipped
+     */
+    @Transactional
+    public PullRequestReview processInlineReview(
+        GitHubReviewDTO reviewDTO,
+        Long pullRequestId,
+        ProcessingContext context
+    ) {
+        return reviewProcessor.process(reviewDTO, pullRequestId, context);
+    }
+
+    /**
      * Fetches all remaining comments for a review when the initial query hit the pagination limit.
      * This method modifies the graphQlReview's comments list in place by adding all fetched comments.
      *
