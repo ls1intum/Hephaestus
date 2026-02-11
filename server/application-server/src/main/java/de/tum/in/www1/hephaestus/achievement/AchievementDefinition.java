@@ -1,17 +1,10 @@
 package de.tum.in.www1.hephaestus.achievement;
 
 import de.tum.in.www1.hephaestus.activity.ActivityEventType;
+import java.util.*;
 import lombok.Getter;
 import org.springframework.lang.NonNull;
 import org.springframework.lang.Nullable;
-
-
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Set;
-
-// TODO: Consider refactoring this using a "Registry Pattern" and json serialization for the data.
 
 /**
  * The source of truth for all achievement definitions.
@@ -29,6 +22,12 @@ import java.util.Set;
  *   <li>{@code triggerEvents} - Activity event types that contribute to this achievement</li>
  * </ul>
  *
+ * <h3>Enum-Strategy Pattern</h3>
+ * <p>Each constant declares an {@code evaluatorClass} linking it to a Spring-managed
+ * {@link AchievementEvaluator} implementation. This lets the {@link AchievementService}
+ * resolve the correct evaluation strategy at runtime without switch/if logic, keeping
+ * the system open for extension (new evaluators) without modification.
+ *
  * <h3>Pull Request Achievement Chain</h3>
  * <pre>
  * Level 1: FIRST_PULL      (1 PR)   - "First Merge"
@@ -41,7 +40,7 @@ import java.util.Set;
  * </pre>
  */
 @Getter
-public enum AchievementType {
+public enum AchievementDefinition {
     // ========================================================================
     // Pull Request Achievements (Level 1-7)
     // ========================================================================
@@ -53,9 +52,10 @@ public enum AchievementType {
         "git-merge",
         AchievementCategory.PULL_REQUESTS,
         AchievementRarity.COMMON,
-        1,
+        Map.of("count", 1),
         null,
-        Set.of(ActivityEventType.PULL_REQUEST_MERGED)
+        Set.of(ActivityEventType.PULL_REQUEST_MERGED),
+        StandardCountEvaluator.class
     ),
 
     PR_BEGINNER(
@@ -65,9 +65,10 @@ public enum AchievementType {
         "git-merge",
         AchievementCategory.PULL_REQUESTS,
         AchievementRarity.COMMON,
-        3,
+        Map.of("count", 3),
         FIRST_PULL,
-        Set.of(ActivityEventType.PULL_REQUEST_MERGED)
+        Set.of(ActivityEventType.PULL_REQUEST_MERGED),
+        StandardCountEvaluator.class
     ),
 
     PR_APPRENTICE(
@@ -77,9 +78,10 @@ public enum AchievementType {
         "git-merge",
         AchievementCategory.PULL_REQUESTS,
         AchievementRarity.UNCOMMON,
-        5,
+        Map.of("count", 5),
         PR_BEGINNER,
-        Set.of(ActivityEventType.PULL_REQUEST_MERGED)
+        Set.of(ActivityEventType.PULL_REQUEST_MERGED),
+        StandardCountEvaluator.class
     ),
 
     INTEGRATION_REGULAR(
@@ -89,9 +91,10 @@ public enum AchievementType {
         "git-merge",
         AchievementCategory.PULL_REQUESTS,
         AchievementRarity.UNCOMMON,
-        10,
+        Map.of("count", 10),
         PR_APPRENTICE,
-        Set.of(ActivityEventType.PULL_REQUEST_MERGED)
+        Set.of(ActivityEventType.PULL_REQUEST_MERGED),
+        StandardCountEvaluator.class
     ),
 
     PR_SPECIALIST(
@@ -101,9 +104,10 @@ public enum AchievementType {
         "git-merge",
         AchievementCategory.PULL_REQUESTS,
         AchievementRarity.RARE,
-        25,
+        Map.of("count", 25),
         INTEGRATION_REGULAR,
-        Set.of(ActivityEventType.PULL_REQUEST_MERGED)
+        Set.of(ActivityEventType.PULL_REQUEST_MERGED),
+        StandardCountEvaluator.class
     ),
 
     INTEGRATION_EXPERT(
@@ -113,9 +117,10 @@ public enum AchievementType {
         "git-merge",
         AchievementCategory.PULL_REQUESTS,
         AchievementRarity.EPIC,
-        50,
+        Map.of("count", 50),
         PR_SPECIALIST,
-        Set.of(ActivityEventType.PULL_REQUEST_MERGED)
+        Set.of(ActivityEventType.PULL_REQUEST_MERGED),
+        StandardCountEvaluator.class
     ),
 
     MASTER_INTEGRATOR(
@@ -125,9 +130,10 @@ public enum AchievementType {
         "git-merge",
         AchievementCategory.PULL_REQUESTS,
         AchievementRarity.LEGENDARY,
-        100,
+        Map.of("count", 100),
         INTEGRATION_EXPERT,
-        Set.of(ActivityEventType.PULL_REQUEST_MERGED)
+        Set.of(ActivityEventType.PULL_REQUEST_MERGED),
+        StandardCountEvaluator.class
     ),
 
     // ========================================================================
@@ -141,9 +147,14 @@ public enum AchievementType {
         "Eye",
         AchievementCategory.COMMUNICATION,
         AchievementRarity.COMMON,
-        1,
+        Map.of("count", 1),
         null,
-        Set.of(ActivityEventType.REVIEW_APPROVED, ActivityEventType.REVIEW_CHANGES_REQUESTED, ActivityEventType.REVIEW_COMMENTED)
+        Set.of(
+            ActivityEventType.REVIEW_APPROVED,
+            ActivityEventType.REVIEW_CHANGES_REQUESTED,
+            ActivityEventType.REVIEW_COMMENTED
+        ),
+        StandardCountEvaluator.class
     ),
 
     REVIEW_ROOKIE(
@@ -153,9 +164,14 @@ public enum AchievementType {
         "Eye",
         AchievementCategory.COMMUNICATION,
         AchievementRarity.COMMON,
-        10,
+        Map.of("count", 10),
         FIRST_REVIEW,
-        Set.of(ActivityEventType.REVIEW_APPROVED, ActivityEventType.REVIEW_CHANGES_REQUESTED, ActivityEventType.REVIEW_COMMENTED)
+        Set.of(
+            ActivityEventType.REVIEW_APPROVED,
+            ActivityEventType.REVIEW_CHANGES_REQUESTED,
+            ActivityEventType.REVIEW_COMMENTED
+        ),
+        StandardCountEvaluator.class
     ),
 
     REVIEW_MASTER(
@@ -165,9 +181,14 @@ public enum AchievementType {
         "Eye",
         AchievementCategory.COMMUNICATION,
         AchievementRarity.EPIC,
-        100,
+        Map.of("count", 100),
         REVIEW_ROOKIE,
-        Set.of(ActivityEventType.REVIEW_APPROVED, ActivityEventType.REVIEW_CHANGES_REQUESTED, ActivityEventType.REVIEW_COMMENTED)
+        Set.of(
+            ActivityEventType.REVIEW_APPROVED,
+            ActivityEventType.REVIEW_CHANGES_REQUESTED,
+            ActivityEventType.REVIEW_COMMENTED
+        ),
+        StandardCountEvaluator.class
     ),
 
     // ========================================================================
@@ -181,9 +202,10 @@ public enum AchievementType {
         "MessageSquare",
         AchievementCategory.COMMUNICATION,
         AchievementRarity.EPIC,
-        100,
+        Map.of("count", 100),
         null,
-        Set.of(ActivityEventType.REVIEW_COMMENT_CREATED)
+        Set.of(ActivityEventType.REVIEW_COMMENT_CREATED),
+        StandardCountEvaluator.class
     ),
 
     // ========================================================================
@@ -197,13 +219,15 @@ public enum AchievementType {
         "HandHelping",
         AchievementCategory.COMMUNICATION,
         AchievementRarity.LEGENDARY,
-        50,
+        Map.of("count", 50),
         null,
-        Set.of(ActivityEventType.REVIEW_APPROVED)
+        Set.of(ActivityEventType.REVIEW_APPROVED),
+        StandardCountEvaluator.class
     );
 
     @NonNull
     private final String id;
+
     private final String name;
     private final String description;
     private final String icon;
@@ -218,25 +242,35 @@ public enum AchievementType {
      * -- GETTER --
      * Number of qualifying events required to unlock this achievement.
      */
-    private final long requiredCount;
+    private final Map<String, Object> parameters;
+
     @Nullable
-    private final AchievementType parent;
+    private final AchievementDefinition parent;
+
     /**
      * -- GETTER --
      * Activity event types that contribute to unlocking this achievement.
      */
     private final Set<ActivityEventType> triggerEvents;
+    /**
+     * -- GETTER --
+     * The {@link AchievementEvaluator} implementation class used to evaluate
+     * progress for this achievement. Resolved at runtime via the Spring-managed
+     * evaluator strategy map in {@link AchievementService}.
+     */
+    private final Class<? extends AchievementEvaluator> evaluatorClass;
 
-    AchievementType(
+    AchievementDefinition(
         String id,
         String name,
         String description,
         String icon,
         AchievementCategory category,
         AchievementRarity rarity,
-        long requiredCount,
-        @Nullable AchievementType parent,
-        Set<ActivityEventType> triggerEvents
+        Map<String, Object> parameters,
+        @Nullable AchievementDefinition parent,
+        Set<ActivityEventType> triggerEvents,
+        Class<? extends AchievementEvaluator> evaluatorClass
     ) {
         this.id = id;
         this.name = name;
@@ -244,9 +278,10 @@ public enum AchievementType {
         this.icon = icon;
         this.category = category;
         this.rarity = rarity;
-        this.requiredCount = requiredCount;
+        this.parameters = parameters;
         this.parent = parent;
         this.triggerEvents = triggerEvents;
+        this.evaluatorClass = evaluatorClass;
     }
 
     /**
@@ -254,7 +289,7 @@ public enum AchievementType {
      * Returns null if this is the first achievement in the chain.
      */
     @Nullable
-    public AchievementType getParent() {
+    public AchievementDefinition getParent() {
         return parent;
     }
 
@@ -265,11 +300,11 @@ public enum AchievementType {
      * @return the matching achievement type
      * @throws IllegalArgumentException if ID is unknown
      */
-    public static AchievementType fromId(String id) {
+    public static AchievementDefinition fromId(String id) {
         if (id == null) {
             throw new IllegalArgumentException("Achievement ID cannot be null");
         }
-        for (AchievementType type : values()) {
+        for (AchievementDefinition type : values()) {
             if (type.id.equals(id)) {
                 return type;
             }
@@ -283,10 +318,10 @@ public enum AchievementType {
      * @param category the category to filter by
      * @return list of achievements in that category, ordered by rarity
      */
-    public static List<AchievementType> getByCategory(AchievementCategory category) {
+    public static List<AchievementDefinition> getByCategory(AchievementCategory category) {
         return Arrays.stream(values())
             .filter(a -> a.category == category)
-            .sorted(Comparator.comparing(AchievementType::getRarity, AchievementRarity.RARITY_COMPARATOR))
+            .sorted(Comparator.comparing(AchievementDefinition::getRarity, AchievementRarity.RARITY_COMPARATOR))
             .toList();
     }
 
@@ -296,7 +331,7 @@ public enum AchievementType {
      * @param eventType the activity event type
      * @return list of achievements that this event contributes to
      */
-    public static List<AchievementType> getByTriggerEvent(ActivityEventType eventType) {
+    public static List<AchievementDefinition> getByTriggerEvent(ActivityEventType eventType) {
         return Arrays.stream(values())
             .filter(a -> a.triggerEvents.contains(eventType))
             .toList();

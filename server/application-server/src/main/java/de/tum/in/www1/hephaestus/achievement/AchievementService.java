@@ -27,14 +27,23 @@ import org.springframework.transaction.annotation.Transactional;
  *   <li>Unlocks achievements by setting {@code unlockedAt} when the threshold is met</li>
  * </ul>
  *
+ * <h3>Enum-Strategy Pattern</h3>
+ * <p>Each {@link AchievementDefinition} declares its evaluator class via
+ * {@link AchievementDefinition#getEvaluatorClass()}. This service builds a strategy map from
+ * all Spring-managed {@link AchievementEvaluator} beans at startup, keyed by their
+ * concrete class. At evaluation time, the correct evaluator is resolved from this map
+ * without any switch/if logic — ensuring the system is open for extension (add a new
+ * {@code @Component} implementing {@link AchievementEvaluator}) without modifying this service.
+ *
  * <h3>Achievement Evaluation Flow (Incremental)</h3>
  * <pre>
  * 1. Receive event type that was just recorded
  * 2. Find all achievements triggered by that event type
  * 3. Fetch (or create) UserAchievement progress records
- * 4. Increment currentValue via {@link AchievementEvaluator}
- * 5. If currentValue >= requiredCount AND not yet unlocked, set unlockedAt
- * 6. Save the progress record
+ * 4. Resolve the evaluator for each achievement via type.getEvaluatorClass()
+ * 5. Increment currentValue via the resolved {@link AchievementEvaluator}
+ * 6. If currentValue &gt;= requiredCount AND not yet unlocked, set unlockedAt
+ * 7. Save the progress record
  * </pre>
  *
  * <h3>Thread Safety</h3>
@@ -43,7 +52,7 @@ import org.springframework.transaction.annotation.Transactional;
  * serialized by the {@code @Transactional} boundary.
  *
  * @see AchievementEventListener
- * @see AchievementType
+ * @see AchievementDefinition
  * @see AchievementEvaluator
  */
 @Service
@@ -58,11 +67,47 @@ public class AchievementService {
     private static final Logger log = LoggerFactory.getLogger(AchievementService.class);
 
     private final UserAchievementRepository userAchievementRepository;
-    private final AchievementEvaluator achievementEvaluator;
 
-    public AchievementService(UserAchievementRepository userAchievementRepository) {
+    /**
+     * Strategy map: maps each evaluator's concrete class to its Spring-managed bean instance.
+     * Built once at construction from all {@link AchievementEvaluator} beans in the context.
+     */
+    private final Map<Class<? extends AchievementEvaluator>, AchievementEvaluator> evaluatorMap;
+
+    public AchievementService(
+        UserAchievementRepository userAchievementRepository,
+        List<AchievementEvaluator> evaluators
+    ) {
         this.userAchievementRepository = userAchievementRepository;
-        this.achievementEvaluator = new StandardCountEvaluator();
+        this.evaluatorMap = evaluators
+            .stream()
+            .collect(Collectors.toMap(AchievementEvaluator::getClass, Function.identity()));
+        log.info(
+            "Registered {} achievement evaluator(s): {}",
+            evaluatorMap.size(),
+            evaluatorMap.keySet().stream().map(Class::getSimpleName).toList()
+        );
+    }
+
+    /**
+     * Resolve the evaluator bean for the given achievement definition.
+     *
+     * @param definition the achievement definition whose evaluator to resolve
+     * @return the Spring-managed evaluator instance
+     * @throws IllegalStateException if no evaluator bean is registered for the definition's evaluatorClass
+     */
+    private AchievementEvaluator resolveEvaluator(AchievementDefinition definition) {
+        AchievementEvaluator evaluator = evaluatorMap.get(definition.getEvaluatorClass());
+        if (evaluator == null) {
+            throw new IllegalStateException(
+                "No AchievementEvaluator bean registered for class: " +
+                    definition.getEvaluatorClass().getName() +
+                    " (required by achievement " +
+                    definition.getId() +
+                    ")"
+            );
+        }
+        return evaluator;
     }
 
     /**
@@ -77,36 +122,36 @@ public class AchievementService {
      */
     @CacheEvict(value = ACHIEVEMENT_PROGRESS_CACHE, key = "#user.login", condition = "#user != null")
     @Transactional
-    public List<AchievementType> checkAndUnlock(User user, ActivityEventType eventType) {
+    public List<AchievementDefinition> checkAndUnlock(User user, ActivityEventType eventType) {
         if (user == null) {
             log.debug("Skipping achievement check: user is null");
             return List.of();
         }
 
         // Find achievements triggered by this event type
-        List<AchievementType> candidates = AchievementType.getByTriggerEvent(eventType);
+        List<AchievementDefinition> candidates = AchievementDefinition.getByTriggerEvent(eventType);
         if (candidates.isEmpty()) {
             log.debug("No achievements triggered by event type: {}", eventType);
             return List.of();
         }
 
         // Fetch existing progress records for the triggered achievement types
-        Set<String> candidateIds = candidates.stream().map(AchievementType::getId).collect(Collectors.toSet());
+        Set<String> candidateIds = candidates.stream().map(AchievementDefinition::getId).collect(Collectors.toSet());
 
         Map<String, UserAchievement> existingMap = userAchievementRepository
             .findByUserIdAndAchievementIdIn(user.getId(), candidateIds)
             .stream()
             .collect(Collectors.toMap(UserAchievement::getAchievementId, Function.identity()));
 
-        List<AchievementType> newlyUnlocked = new ArrayList<>();
+        List<AchievementDefinition> newlyUnlocked = new ArrayList<>();
 
-        for (AchievementType achievement : candidates) {
+        for (AchievementDefinition achievementDefinition : candidates) {
             // Get existing progress or create a new record
-            UserAchievement progress = existingMap.get(achievement.getId());
+            UserAchievement progress = existingMap.get(achievementDefinition.getId());
             if (progress == null) {
                 progress = UserAchievement.builder()
                     .user(user)
-                    .achievementId(achievement.getId())
+                    .achievementId(achievementDefinition.getId())
                     .currentValue(0)
                     .build();
             }
@@ -116,19 +161,23 @@ public class AchievementService {
                 continue;
             }
 
-            // Increment progress
-            achievementEvaluator.updateProgress(progress, eventType);
+            // Resolve evaluator and increment progress
+            AchievementEvaluator evaluator = resolveEvaluator(achievementDefinition);
+            evaluator.updateProgress(progress, eventType);
 
             // Check if threshold is now met
-            if (progress.getCurrentValue() >= achievement.getRequiredCount()) {
+            // TODO: This should be moved to the specific evaluator function
+            Number countVal = (Number) achievementDefinition.getParameters().get("count");
+            long target = countVal != null ? countVal.longValue() : 0;
+            if (progress.getCurrentValue() >= target) {
                 progress.setUnlockedAt(Instant.now());
-                newlyUnlocked.add(achievement);
+                newlyUnlocked.add(achievementDefinition);
                 log.info(
                     "Achievement unlocked: userId={}, achievement={}, count={}, required={}",
                     user.getId(),
-                    achievement.getId(),
+                    achievementDefinition.getId(),
                     progress.getCurrentValue(),
-                    achievement.getRequiredCount()
+                    target
                 );
             }
 
@@ -157,13 +206,13 @@ public class AchievementService {
      * Check if a specific achievement is unlocked for a user.
      *
      * @param userId the user's ID
-     * @param achievementType the achievement to check
+     * @param achievement the achievement to check
      * @return true if the achievement is unlocked
      */
     @Transactional(readOnly = true)
-    public boolean isUnlocked(Long userId, AchievementType achievementType) {
+    public boolean isUnlocked(Long userId, AchievementDefinition achievement) {
         return userAchievementRepository
-            .findByUserIdAndAchievementId(userId, achievementType.getId())
+            .findByUserIdAndAchievementId(userId, achievement.getId())
             .map(ua -> ua.getUnlockedAt() != null)
             .orElse(false);
     }
@@ -202,13 +251,13 @@ public class AchievementService {
 
         // Build DTOs for all achievements
         List<AchievementDTO> result = new ArrayList<>();
-        for (AchievementType type : AchievementType.values()) {
+        for (AchievementDefinition type : AchievementDefinition.values()) {
             UserAchievement progress = progressMap.get(type.getId());
             long currentProgress = progress != null ? progress.getCurrentValue() : 0;
             Instant unlockedAt = progress != null ? progress.getUnlockedAt() : null;
             AchievementStatus status = computeStatus(type, progressMap);
 
-            result.add(AchievementDTO.fromType(type, currentProgress, status, unlockedAt));
+            result.add(AchievementDTO.fromDefinition(type, currentProgress, status, unlockedAt));
         }
 
         return result;
@@ -223,7 +272,7 @@ public class AchievementService {
      *   <li>LOCKED if not unlocked and parent is not unlocked</li>
      * </ul>
      */
-    private AchievementStatus computeStatus(AchievementType type, Map<String, UserAchievement> progressMap) {
+    private AchievementStatus computeStatus(AchievementDefinition type, Map<String, UserAchievement> progressMap) {
         // Check if this achievement is unlocked
         UserAchievement progress = progressMap.get(type.getId());
         if (progress != null && progress.getUnlockedAt() != null) {
@@ -231,7 +280,7 @@ public class AchievementService {
         }
 
         // Check parent
-        AchievementType parent = type.getParent();
+        AchievementDefinition parent = type.getParent();
         if (parent == null) {
             // Root achievement with no parent is always available
             return AchievementStatus.AVAILABLE;

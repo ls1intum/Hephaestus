@@ -39,10 +39,10 @@ import org.springframework.lang.Nullable;
  * progress records cannot be created at the database level.
  *
  * <h3>Achievement Lookup</h3>
- * <p>The {@code achievementId} stores the string ID from {@link AchievementType}.
- * To get the full achievement metadata, use {@link AchievementType#fromId(String)}.
+ * <p>The {@code achievementId} stores the string ID from {@link AchievementDefinition}.
+ * To get the full achievement metadata, use {@link AchievementDefinition#fromId(String)}.
  *
- * @see AchievementType
+ * @see AchievementDefinition
  * @see AchievementService#checkAndUnlock
  */
 @Entity
@@ -78,7 +78,7 @@ public class UserAchievement {
     private User user;
 
     /**
-     * The achievement ID (references {@link AchievementType#getId()}).
+     * The achievement ID (references {@link AchievementDefinition#getId()}).
      *
      * <p>We store the string ID rather than the enum directly because:
      * <ul>
@@ -122,12 +122,12 @@ public class UserAchievement {
     }
 
     /**
-     * Get the full achievement type metadata.
+     * Get the full achievement definition metadata.
      *
-     * @return the achievement type, or throws if the ID is unknown
-     * @throws IllegalArgumentException if achievementId is not a valid AchievementType
+     * @return the achievement definition, or throws if the ID is unknown
+     * @throws IllegalArgumentException if achievementId is not a valid AchievementDefinition
      */
-    public AchievementType getAchievementType() {
-        return AchievementType.fromId(achievementId);
+    public AchievementDefinition getAchievementDefinition() {
+        return AchievementDefinition.fromId(achievementId);
     }
 }

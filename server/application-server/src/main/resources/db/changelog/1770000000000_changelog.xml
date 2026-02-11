@@ -10,14 +10,14 @@
     =======================================================================================
 
     This changelog adds the current_value column to user_achievement table to support
-    incremental achievement progress tracking. This avoids expensive COUNT(*) queries
-    on the ActivityEvent table when checking achievement progress.
+    incremental achievementDefinition progress tracking. This avoids expensive COUNT(*) queries
+    on the ActivityEvent table when checking achievementDefinition progress.
 
     See: plans.md item #2 (Performance Optimization)
     =======================================================================================
     -->
 
-    <changeSet id="1770000000000-add-current-value-to-user-achievement" author="Hephaestus">
+    <changeSet id="1770000000000-add-current-value-to-user-achievementDefinition" author="Hephaestus">
         <preConditions onFail="MARK_RAN">
             <tableExists tableName="user_achievement"/>
             <not>
@@ -37,19 +37,19 @@
 
     <!--
     Backfill current_value from existing activity events.
-    This ensures existing achievement records have accurate progress counts.
+    This ensures existing achievementDefinition records have accurate progress counts.
     -->
     <changeSet id="1770000000000-backfill-current-value" author="Hephaestus">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="user_achievement" columnName="current_value"/>
         </preConditions>
         <comment>
-            Backfill current_value based on the required count from the achievement definition.
+            Backfill current_value based on the required count from the achievementDefinition definition.
             For unlocked achievements, set current_value to match the threshold at unlock time.
         </comment>
         <!--
         Note: We cannot easily backfill from ActivityEvent without knowing the exact
-        achievement -> event type mapping at database level. For unlocked achievements,
+        achievementDefinition -> event type mapping at database level. For unlocked achievements,
         we set current_value to the required count (since threshold was met to unlock).
         New achievements going forward will use incremental counting.
 

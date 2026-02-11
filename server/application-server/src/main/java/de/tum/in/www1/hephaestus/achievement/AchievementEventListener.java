@@ -56,25 +56,19 @@ public class AchievementEventListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onActivitySaved(ActivitySavedEvent event) {
         if (!event.hasUser()) {
-            log.debug(
-                "Skipping achievement check for system event: eventType={}",
-                event.eventType()
-            );
+            log.debug("Skipping achievement check for system event: eventType={}", event.eventType());
             return;
         }
 
         try {
-            List<AchievementType> unlocked = achievementService.checkAndUnlock(
-                event.user(),
-                event.eventType()
-            );
+            List<AchievementDefinition> unlocked = achievementService.checkAndUnlock(event.user(), event.eventType());
 
             if (!unlocked.isEmpty()) {
                 log.info(
                     "User {} unlocked {} achievement(s): {}",
                     event.user().getLogin(),
                     unlocked.size(),
-                    unlocked.stream().map(AchievementType::getId).toList()
+                    unlocked.stream().map(AchievementDefinition::getId).toList()
                 );
             }
         } catch (Exception e) {

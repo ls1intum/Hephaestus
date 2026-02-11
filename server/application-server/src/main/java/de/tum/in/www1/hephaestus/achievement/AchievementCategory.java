@@ -11,35 +11,39 @@ import lombok.Getter;
  */
 @Getter
 public enum AchievementCategory {
-
     /**
      * Achievements related to creating and merging pull requests.
      */
-    @JsonProperty("pull_requests") PULL_REQUESTS("Pull Requests"),
+    @JsonProperty("pull_requests")
+    PULL_REQUESTS("Pull Requests"),
 
     /**
      * Achievements related to committing code.
      * (Placeholder for future implementation)
      */
-    @JsonProperty("commits") COMMITS("Commits"),
+    @JsonProperty("commits")
+    COMMITS("Commits"),
 
     /**
      * Achievements related to reviews, commenting and discussions.
      * (Placeholder for future implementation)
      */
-    @JsonProperty("communication") COMMUNICATION("Communication"),
+    @JsonProperty("communication")
+    COMMUNICATION("Communication"),
 
     /**
      * Achievements related to issue management.
      * (Placeholder for future implementation)
      */
-    @JsonProperty("issues") ISSUES("Issues"),
+    @JsonProperty("issues")
+    ISSUES("Issues"),
 
     /**
      * Cross-category milestone achievements.
      * Combines progress across multiple categories.
      */
-    @JsonProperty("milestones") MILESTONES("Milestones");
+    @JsonProperty("milestones")
+    MILESTONES("Milestones");
 
     /**
      * -- GETTER --
@@ -50,5 +54,4 @@ public enum AchievementCategory {
     AchievementCategory(String displayName) {
         this.displayName = displayName;
     }
-
 }

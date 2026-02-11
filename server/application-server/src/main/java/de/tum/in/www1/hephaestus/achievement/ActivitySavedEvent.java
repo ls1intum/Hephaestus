@@ -17,11 +17,7 @@ import de.tum.in.www1.hephaestus.gitprovider.user.User;
  * @see AchievementEventListener
  * @see de.tum.in.www1.hephaestus.activity.ActivityEventService
  */
-public record ActivitySavedEvent(
-    User user,
-    ActivityEventType eventType,
-    Long workspaceId
-) {
+public record ActivitySavedEvent(User user, ActivityEventType eventType, Long workspaceId) {
     /**
      * Check if this event has a valid user for achievement evaluation.
      *

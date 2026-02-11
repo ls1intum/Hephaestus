@@ -37,31 +37,35 @@ public record AchievementDTO(
     @Nullable @Schema(description = "When the achievement was unlocked, null if not unlocked") Instant unlockedAt
 ) {
     /**
-     * Creates an AchievementDTO from an AchievementType with progress information.
+     * Creates an AchievementDTO from an AchievementDefinition with progress information.
      *
-     * @param type       the achievement type definition
+     * @param definition the achievement definition
      * @param progress   the user's current progress count
      * @param status     the computed status for this user
      * @param unlockedAt when the achievement was unlocked, or null if not unlocked
      * @return populated DTO
      */
-    public static AchievementDTO fromType(
-        AchievementType type,
+    public static AchievementDTO fromDefinition(
+        AchievementDefinition definition,
         long progress,
         AchievementStatus status,
         Instant unlockedAt
     ) {
+        // TODO: This here is nor correct yet!
+        Number countVal = (Number) definition.getParameters().get("count");
+        long maxProgressValue = countVal != null ? countVal.longValue() : 0;
+
         return new AchievementDTO(
-            type.getId(),
-            type.getName(),
-            type.getDescription(),
-            type.getIcon(),
-            type.getCategory(),
-            type.getRarity(),
-            type.getParent() != null ? type.getParent().getId() : null,
+            definition.getId(),
+            definition.getName(),
+            definition.getDescription(),
+            definition.getIcon(),
+            definition.getCategory(),
+            definition.getRarity(),
+            definition.getParent() != null ? definition.getParent().getId() : null,
             status,
             progress,
-            type.getRequiredCount(),
+            maxProgressValue,
             unlockedAt
         );
     }

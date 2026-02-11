@@ -66,9 +66,7 @@ public class AchievementController {
     ) {
         log.debug("Getting achievements for user: {} in workspace: {}", login, workspaceContext.slug());
 
-        User user = userRepository
-            .findByLogin(login)
-            .orElseThrow(() -> new EntityNotFoundException("User", login));
+        User user = userRepository.findByLogin(login).orElseThrow(() -> new EntityNotFoundException("User", login));
 
         List<AchievementDTO> achievements = achievementService.getAllAchievementsWithProgress(user);
         return ResponseEntity.ok(achievements);
