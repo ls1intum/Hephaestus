@@ -2,7 +2,8 @@ package de.tum.in.www1.hephaestus.achievement.evaluator;
 
 import de.tum.in.www1.hephaestus.achievement.AchievementService;
 import de.tum.in.www1.hephaestus.achievement.UserAchievement;
-import de.tum.in.www1.hephaestus.activity.ActivityEventType;
+
+import java.util.Map;
 
 /**
  * Strategy interface for updating achievement progress.
@@ -19,14 +20,12 @@ public interface AchievementEvaluator {
     /**
      * Update the progress on a user achievement in response to an activity event.
      *
-     * <p>Implementations should modify {@link UserAchievement#setCurrentValue(int)}
+     * <p>Implementations should modify {@link UserAchievement#setProgressData(Map)}
      * as appropriate. The caller is responsible for checking the unlock threshold
      * and persisting the entity.
      *
      * @param userAchievement the achievement progress record to update
-     * @param eventType the activity event type that triggered the evaluation
-     * @return {@code true} if the achievement conditions are met and the achievement should be unlocked
-     * (else {@code false})
+     * @return {@code true} if the achievement was unlocked during update, else {@code false}
      */
-    boolean updateProgress(UserAchievement userAchievement, ActivityEventType eventType);
+    boolean updateProgress(UserAchievement userAchievement);
 }

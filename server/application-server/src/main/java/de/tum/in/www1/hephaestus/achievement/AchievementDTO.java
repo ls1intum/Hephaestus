@@ -1,9 +1,12 @@
 package de.tum.in.www1.hephaestus.achievement;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import java.time.Instant;
 import org.springframework.lang.NonNull;
 import org.springframework.lang.Nullable;
+
+import java.time.Instant;
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * DTO representing an achievement with user-specific progress.
@@ -21,51 +24,50 @@ import org.springframework.lang.Nullable;
 @Schema(description = "Achievement with user-specific progress information")
 public record AchievementDTO(
     @NonNull @Schema(description = "Unique identifier for the achievement", example = "first_pull") String id,
-    @NonNull @Schema(description = "Human-readable name", example = "First Merge") String name,
-    @NonNull
-    @Schema(description = "Description of how to earn the achievement", example = "Merge your first pull request")
-    String description,
-    @NonNull @Schema(description = "Icon identifier for UI", example = "git-merge") String icon,
-    @NonNull @Schema(description = "Category for grouping achievements") AchievementCategory category,
+//    @NonNull @Schema(description = "Human-readable name", example = "First Merge") String name,
+//    @NonNull
+//    @Schema(description = "Description of how to earn the achievement", example = "Merge your first pull request")
+//    String description,
+//    @NonNull @Schema(description = "Icon identifier for UI", example = "git-merge") String icon,
+    @NonNull @Schema(description = "Category for grouping achievements", example = "pull_requests") AchievementCategory category,
     @NonNull
     @Schema(description = "Visual level tier/rarity for badge styling", example = "common")
     AchievementRarity rarity,
-    @Nullable @Schema(description = "Parent achievement ID in progression chain", example = "null") String parentId,
-    @NonNull @Schema(description = "Current status for this user") AchievementStatus status,
-    @NonNull @Schema(description = "Current progress count (e.g., 4 PRs merged)", example = "4") long progress,
-    @NonNull @Schema(description = "Required count to unlock (e.g., 5 PRs)", example = "5") long maxProgress,
-    @Nullable @Schema(description = "When the achievement was unlocked, null if not unlocked") Instant unlockedAt
+    @Nullable @Schema(description = "Parent achievement ID in progression chain", example = "first_pull") String parentId,
+    @NonNull @Schema(description = "Current status of the achievement for this user", example = "unlocked") AchievementStatus status,
+//    @NonNull @Schema(description = "Current progress count (e.g., 4 PRs merged)", example = "4") long progress,
+//    @NonNull @Schema(description = "Required count to unlock (e.g., 5 PRs)", example = "5") long maxProgress,
+    @NonNull
+    @Schema(description = "The progress data for the achievement (key:value paired just like the achievements progress definitions are as well)",
+        example = "{\"current\": 4, \"count\": 5}")
+    Map<String, Object> progressData,
+    @NonNull @Schema(description = "Optional of when the achievement was unlocked, empty() if not unlocked") Optional<Instant> unlockedAt
 ) {
     /**
      * Creates an AchievementDTO from an AchievementDefinition with progress information.
      *
-     * @param definition the achievement definition
-     * @param progress   the user's current progress count
-     * @param status     the computed status for this user
-     * @param unlockedAt when the achievement was unlocked, or null if not unlocked
+     * @param definition   the achievement definition
+     * @param progressData the data associated with this achievements progress
+     * @param status       the computed status for this user
+     * @param unlockedAt   Optional of when the achievement was unlocked, or {@link Optional#empty()} if not unlocked
      * @return populated DTO
      */
     public static AchievementDTO fromDefinition(
         AchievementDefinition definition,
-        long progress,
         AchievementStatus status,
-        Instant unlockedAt
+        Map<String, Object> progressData,
+        Optional<Instant> unlockedAt
     ) {
-        // TODO: This here is nor correct yet!
-        Number countVal = (Number) definition.getParameters().get("count");
-        long maxProgressValue = countVal != null ? countVal.longValue() : 0;
-
         return new AchievementDTO(
             definition.getId(),
-            definition.getName(),
-            definition.getDescription(),
-            definition.getIcon(),
+//            definition.getName(),
+//            definition.getDescription(),
+//            definition.getIcon(),
             definition.getCategory(),
             definition.getRarity(),
             definition.getParent() != null ? definition.getParent().getId() : null,
             status,
-            progress,
-            maxProgressValue,
+            progressData,
             unlockedAt
         );
     }

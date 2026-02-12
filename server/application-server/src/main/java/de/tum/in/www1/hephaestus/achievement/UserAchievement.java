@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.achievement;
 
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -13,12 +14,14 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import jakarta.validation.constraints.NotNull;
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.Type;
 import org.springframework.lang.Nullable;
 
 /**
@@ -110,9 +113,9 @@ public class UserAchievement {
      * <p>For unlocked achievements, this represents the count at unlock time.
      * For in-progress achievements, this is the current progress toward the goal.
      */
-    @Column(name = "current_value", nullable = false)
-    @Builder.Default
-    private int currentValue = 0;
+    @Type(JsonType.class)
+    @Column(name = "progress_data", columnDefinition = "jsonb", nullable = false)
+    private Map<String, Object> progressData;
 
     @PrePersist
     protected void onCreate() {

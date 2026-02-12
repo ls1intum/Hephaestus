@@ -11,10 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -154,7 +151,7 @@ public class AchievementService {
                 progress = UserAchievement.builder()
                     .user(user)
                     .achievementId(achievementDefinition.getId())
-                    .currentValue(0)
+                    .progressData(achievementDefinition.getParameters())
                     .build();
             }
 
@@ -165,17 +162,16 @@ public class AchievementService {
 
             // Resolve evaluator and increment progress
             AchievementEvaluator evaluator = resolveEvaluator(achievementDefinition);
-            boolean wasUnlocked = evaluator.updateProgress(progress, eventType);
-
+            boolean wasUnlocked = evaluator.updateProgress(progress);
 
             if (wasUnlocked) {
                 progress.setUnlockedAt(Instant.now());
                 newlyUnlocked.add(achievementDefinition);
                 log.info(
-                    "Achievement unlocked: userId={}, achievement={}, count={}",
+                    "Achievement unlocked: userId={}, achievement={}, progress={}",
                     user.getId(),
                     achievementDefinition.getId(),
-                    progress.getCurrentValue()
+                    progress.getProgressData()
                 );
             }
 
@@ -249,13 +245,12 @@ public class AchievementService {
 
         // Build DTOs for all achievements
         List<AchievementDTO> result = new ArrayList<>();
-        for (AchievementDefinition type : AchievementDefinition.values()) {
-            UserAchievement progress = progressMap.get(type.getId());
-            long currentProgress = progress != null ? progress.getCurrentValue() : 0;
-            Instant unlockedAt = progress != null ? progress.getUnlockedAt() : null;
-            AchievementStatus status = computeStatus(type, progressMap);
-
-            result.add(AchievementDTO.fromDefinition(type, currentProgress, status, unlockedAt));
+        for (AchievementDefinition achievement : AchievementDefinition.values()) {
+            UserAchievement progress = progressMap.get(achievement.getId());
+            AchievementStatus status = computeStatus(achievement, progressMap);
+            Map<String, Object> progressData = progress.getProgressData();
+            Optional<Instant> unlockedAt = Optional.ofNullable(progress.getUnlockedAt());
+            result.add(AchievementDTO.fromDefinition(achievement, status, progressData, unlockedAt));
         }
 
         return result;
@@ -270,15 +265,15 @@ public class AchievementService {
      *   <li>LOCKED if not unlocked and parent is not unlocked</li>
      * </ul>
      */
-    private AchievementStatus computeStatus(AchievementDefinition type, Map<String, UserAchievement> progressMap) {
+    private AchievementStatus computeStatus(AchievementDefinition achievement, Map<String, UserAchievement> progressMap) {
         // Check if this achievement is unlocked
-        UserAchievement progress = progressMap.get(type.getId());
+        UserAchievement progress = progressMap.get(achievement.getId());
         if (progress != null && progress.getUnlockedAt() != null) {
             return AchievementStatus.UNLOCKED;
         }
 
         // Check parent
-        AchievementDefinition parent = type.getParent();
+        AchievementDefinition parent = achievement.getParent();
         if (parent == null) {
             // Root achievement with no parent is always available
             return AchievementStatus.AVAILABLE;

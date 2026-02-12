@@ -3,22 +3,20 @@ package de.tum.in.www1.hephaestus.achievement;
 import de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator;
 import de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator;
 import de.tum.in.www1.hephaestus.activity.ActivityEventType;
-import java.util.*;
 import lombok.Getter;
 import org.springframework.lang.NonNull;
 import org.springframework.lang.Nullable;
+
+import java.util.*;
 
 /**
  * The source of truth for all achievement definitions.
  *
  * <p>Each achievement is defined by:
  * <ul>
- *   <li>{@code id} - Unique identifier (stored in database)</li>
- *   <li>{@code name} - Human-readable name for UI</li>
- *   <li>{@code description} - Explanation of how to earn it</li>
- *   <li>{@code icon} - Icon identifier (e.g., "git-merge", "star")</li>
+ *   <li>{@code id} - Unique identifier string (used for storage in database)</li>
  *   <li>{@code category} - Grouping category</li>
- *   <li>{@code rarity} - Visual tier for UI ring/badge styling</li>
+ *   <li>{@code rarity} - intended difficulty parameter (also used for styling)</li>
  *   <li>{@code requiredCount} - Number of events needed to unlock</li>
  *   <li>{@code parent} - Previous achievement in the progression chain (nullable)</li>
  *   <li>{@code triggerEvents} - Activity event types that contribute to this achievement</li>
@@ -27,31 +25,33 @@ import org.springframework.lang.Nullable;
  * <h3>Enum-Strategy Pattern</h3>
  * <p>Each constant declares an {@code evaluatorClass} linking it to a Spring-managed
  * {@link AchievementEvaluator} implementation. This lets the {@link AchievementService}
- * resolve the correct evaluation strategy at runtime without switch/if logic, keeping
- * the system open for extension (new evaluators) without modification.
- *
- * <h3>Pull Request Achievement Chain</h3>
- * <pre>
- * Level 1: FIRST_PULL      (1 PR)   - "First Merge"
- * Level 2: PR_BEGINNER     (3 PRs)  - "Beginner Integrator"
- * Level 3: PR_APPRENTICE   (5 PRs)  - "Apprentice Integrator"
- * Level 4: INTEGRATION_REGULAR (10 PRs) - "Integration Regular"
- * Level 5: PR_SPECIALIST   (25 PRs) - "Integration Specialist"
- * Level 6: INTEGRATION_EXPERT (50 PRs) - "Integration Expert"
- * Level 7: MASTER_INTEGRATOR (100 PRs) - "Master Integrator"
- * </pre>
+ * resolve the correct evaluation strategy at runtime, keeping the system open for extensions
+ * (like new evaluators) without modification.
  */
 @Getter
 public enum AchievementDefinition {
-    // ========================================================================
-    // Pull Request Achievements (Level 1-7)
-    // ========================================================================
+
+    /* ========================================================================
+     * Pull Request Achievements (Level 1-7)
+     *
+     * <h3>Pull Request Achievement Chain</h3>
+     * <pre>
+     * Level 1: FIRST_PULL      (1 PR)   - "First Merge"
+     * Level 2: PR_BEGINNER     (3 PRs)  - "Beginner Integrator"
+     * Level 3: PR_APPRENTICE   (5 PRs)  - "Apprentice Integrator"
+     * Level 4: INTEGRATION_REGULAR (10 PRs) - "Integration Regular"
+     * Level 5: PR_SPECIALIST   (25 PRs) - "Integration Specialist"
+     * Level 6: INTEGRATION_EXPERT (50 PRs) - "Integration Expert"
+     * Level 7: MASTER_INTEGRATOR (100 PRs) - "Master Integrator"
+     * </pre>
+     * ======================================================================== */
+
 
     FIRST_PULL(
         "first_pull",
-        "First Merge",
-        "Merge your first pull request",
-        "git-merge",
+//        "First Merge",
+//        "Merge your first pull request",
+//        "git-merge",
         AchievementCategory.PULL_REQUESTS,
         AchievementRarity.COMMON,
         Map.of("count", 1),
@@ -62,9 +62,9 @@ public enum AchievementDefinition {
 
     PR_BEGINNER(
         "pr_beginner",
-        "Beginner Integrator",
-        "Merge 3 pull requests",
-        "git-merge",
+//        "Beginner Integrator",
+//        "Merge 3 pull requests",
+//        "git-merge",
         AchievementCategory.PULL_REQUESTS,
         AchievementRarity.COMMON,
         Map.of("count", 3),
@@ -75,9 +75,9 @@ public enum AchievementDefinition {
 
     PR_APPRENTICE(
         "pr_apprentice",
-        "Apprentice Integrator",
-        "Merge 5 pull requests",
-        "git-merge",
+//        "Apprentice Integrator",
+//        "Merge 5 pull requests",
+//        "git-merge",
         AchievementCategory.PULL_REQUESTS,
         AchievementRarity.UNCOMMON,
         Map.of("count", 5),
@@ -88,9 +88,9 @@ public enum AchievementDefinition {
 
     INTEGRATION_REGULAR(
         "integration_regular",
-        "Integration Regular",
-        "Merge 10 pull requests",
-        "git-merge",
+//        "Integration Regular",
+//        "Merge 10 pull requests",
+//        "git-merge",
         AchievementCategory.PULL_REQUESTS,
         AchievementRarity.UNCOMMON,
         Map.of("count", 10),
@@ -101,9 +101,9 @@ public enum AchievementDefinition {
 
     PR_SPECIALIST(
         "pr_specialist",
-        "Integration Specialist",
-        "Merge 25 pull requests",
-        "git-merge",
+//        "Integration Specialist",
+//        "Merge 25 pull requests",
+//        "git-merge",
         AchievementCategory.PULL_REQUESTS,
         AchievementRarity.RARE,
         Map.of("count", 25),
@@ -114,9 +114,9 @@ public enum AchievementDefinition {
 
     INTEGRATION_EXPERT(
         "integration_expert",
-        "Integration Expert",
-        "Merge 50 pull requests",
-        "git-merge",
+//        "Integration Expert",
+//        "Merge 50 pull requests",
+//        "git-merge",
         AchievementCategory.PULL_REQUESTS,
         AchievementRarity.EPIC,
         Map.of("count", 50),
@@ -127,9 +127,9 @@ public enum AchievementDefinition {
 
     MASTER_INTEGRATOR(
         "master_integrator",
-        "Master Integrator",
-        "Merge 100 pull requests",
-        "git-merge",
+//        "Master Integrator",
+//        "Merge 100 pull requests",
+//        "git-merge",
         AchievementCategory.PULL_REQUESTS,
         AchievementRarity.LEGENDARY,
         Map.of("count", 100),
@@ -144,9 +144,9 @@ public enum AchievementDefinition {
 
     FIRST_REVIEW(
         "first_review",
-        "First Review",
-        "Submit your first code review",
-        "Eye",
+//        "First Review",
+//        "Submit your first code review",
+//        "Eye",
         AchievementCategory.COMMUNICATION,
         AchievementRarity.COMMON,
         Map.of("count", 1),
@@ -161,9 +161,9 @@ public enum AchievementDefinition {
 
     REVIEW_ROOKIE(
         "review_rookie",
-        "Review Rookie",
-        "Submit 10 code reviews",
-        "Eye",
+//        "Review Rookie",
+//        "Submit 10 code reviews",
+//        "Eye",
         AchievementCategory.COMMUNICATION,
         AchievementRarity.COMMON,
         Map.of("count", 10),
@@ -178,9 +178,9 @@ public enum AchievementDefinition {
 
     REVIEW_MASTER(
         "review_master",
-        "Review Master",
-        "Submit 100 code reviews",
-        "Eye",
+//        "Review Master",
+//        "Submit 100 code reviews",
+//        "Eye",
         AchievementCategory.COMMUNICATION,
         AchievementRarity.EPIC,
         Map.of("count", 100),
@@ -199,9 +199,9 @@ public enum AchievementDefinition {
 
     CODE_COMMENTER(
         "code_commenter",
-        "Code Commenter",
-        "Post 100 code comments",
-        "MessageSquare",
+//        "Code Commenter",
+//        "Post 100 code comments",
+//        "MessageSquare",
         AchievementCategory.COMMUNICATION,
         AchievementRarity.EPIC,
         Map.of("count", 100),
@@ -216,9 +216,9 @@ public enum AchievementDefinition {
 
     HELPFUL_REVIEWER(
         "helpful_reviewer",
-        "Helpful Reviewer",
-        "Approve 50 pull requests",
-        "HandHelping",
+//        "Helpful Reviewer",
+//        "Approve 50 pull requests",
+//        "HandHelping",
         AchievementCategory.COMMUNICATION,
         AchievementRarity.LEGENDARY,
         Map.of("count", 50),
@@ -230,9 +230,12 @@ public enum AchievementDefinition {
     @NonNull
     private final String id;
 
-    private final String name;
-    private final String description;
-    private final String icon;
+    /* TODO: Moving the Achievements display characteristics to the frontend
+        as it is part of the client and potentially useful for localization */
+
+    //    private final String name;
+//    private final String description;
+//    private final String icon;
     private final AchievementCategory category;
     /**
      * -- GETTER --
@@ -264,9 +267,9 @@ public enum AchievementDefinition {
 
     AchievementDefinition(
         String id,
-        String name,
-        String description,
-        String icon,
+//        String name,
+//        String description,
+//        String icon,
         AchievementCategory category,
         AchievementRarity rarity,
         Map<String, Object> parameters,
@@ -275,9 +278,9 @@ public enum AchievementDefinition {
         Class<? extends AchievementEvaluator> evaluatorClass
     ) {
         this.id = id;
-        this.name = name;
-        this.description = description;
-        this.icon = icon;
+//        this.name = name;
+//        this.description = description;
+//        this.icon = icon;
         this.category = category;
         this.rarity = rarity;
         this.parameters = parameters;
