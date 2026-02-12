@@ -1,5 +1,7 @@
 package de.tum.in.www1.hephaestus.achievement;
 
+import de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator;
+import de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator;
 import de.tum.in.www1.hephaestus.activity.ActivityEventType;
 import java.util.*;
 import lombok.Getter;
