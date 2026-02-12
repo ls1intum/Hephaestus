@@ -19,12 +19,14 @@ public interface AchievementEvaluator {
     /**
      * Update the progress on a user achievement in response to an activity event.
      *
-     * <p>Implementations should modify {@link UserAchievement#setCurrentValue(long)}
+     * <p>Implementations should modify {@link UserAchievement#setCurrentValue(int)}
      * as appropriate. The caller is responsible for checking the unlock threshold
      * and persisting the entity.
      *
      * @param userAchievement the achievement progress record to update
      * @param eventType the activity event type that triggered the evaluation
+     * @return {@code true} if the achievement conditions are met and the achievement should be unlocked
+     * (else {@code false})
      */
-    void updateProgress(UserAchievement userAchievement, ActivityEventType eventType);
+    boolean updateProgress(UserAchievement userAchievement, ActivityEventType eventType);
 }

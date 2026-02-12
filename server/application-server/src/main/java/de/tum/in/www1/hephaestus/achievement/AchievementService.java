@@ -3,6 +3,13 @@ package de.tum.in.www1.hephaestus.achievement;
 import de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator;
 import de.tum.in.www1.hephaestus.activity.ActivityEventType;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -10,12 +17,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Service for evaluating and unlocking achievements via incremental progress updates.
@@ -117,7 +118,7 @@ public class AchievementService {
      * <p>This method increments progress on all achievements triggered by the
      * specified event type and unlocks any that have reached their threshold.
      *
-     * @param user the user to check achievements for
+     * @param user      the user to check achievements for
      * @param eventType the activity event type that was just recorded
      * @return list of newly unlocked achievement types (empty if none)
      */
@@ -164,21 +165,17 @@ public class AchievementService {
 
             // Resolve evaluator and increment progress
             AchievementEvaluator evaluator = resolveEvaluator(achievementDefinition);
-            evaluator.updateProgress(progress, eventType);
+            boolean wasUnlocked = evaluator.updateProgress(progress, eventType);
 
-            // Check if threshold is now met
-            // TODO: This should be moved to the specific evaluator function
-            Number countVal = (Number) achievementDefinition.getParameters().get("count");
-            long target = countVal != null ? countVal.longValue() : 0;
-            if (progress.getCurrentValue() >= target) {
+
+            if (wasUnlocked) {
                 progress.setUnlockedAt(Instant.now());
                 newlyUnlocked.add(achievementDefinition);
                 log.info(
-                    "Achievement unlocked: userId={}, achievement={}, count={}, required={}",
+                    "Achievement unlocked: userId={}, achievement={}, count={}",
                     user.getId(),
                     achievementDefinition.getId(),
-                    progress.getCurrentValue(),
-                    target
+                    progress.getCurrentValue()
                 );
             }
 
@@ -206,7 +203,7 @@ public class AchievementService {
     /**
      * Check if a specific achievement is unlocked for a user.
      *
-     * @param userId the user's ID
+     * @param userId      the user's ID
      * @param achievement the achievement to check
      * @return true if the achievement is unlocked
      */

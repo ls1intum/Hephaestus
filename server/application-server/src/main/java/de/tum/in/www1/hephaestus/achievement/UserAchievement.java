@@ -112,7 +112,7 @@ public class UserAchievement {
      */
     @Column(name = "current_value", nullable = false)
     @Builder.Default
-    private long currentValue = 0;
+    private int currentValue = 0;
 
     @PrePersist
     protected void onCreate() {
