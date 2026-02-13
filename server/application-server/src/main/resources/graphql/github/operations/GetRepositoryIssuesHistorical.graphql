@@ -23,6 +23,7 @@ query GetRepositoryIssuesHistorical($owner: String!, $name: String!, $first: Int
             }
             totalCount
             nodes {
+                __typename
                 id
                 fullDatabaseId
                 number

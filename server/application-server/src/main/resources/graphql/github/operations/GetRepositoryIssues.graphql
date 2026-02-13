@@ -1,9 +1,17 @@
 # GraphQL query for fetching repository issues with all fields including issue type
 # Used by GitHubIssueSyncService for GraphQL-based sync
 # Comments are embedded inline (first 10) to avoid N+1 queries - pagination handles issues with more
+# Project items are embedded inline (first 5) - pagination handles issues in more projects
 # Supports incremental sync via filterBy.since parameter (filters by updatedAt >= since)
 
-query GetRepositoryIssues($owner: String!, $name: String!, $first: Int!, $after: String, $states: [IssueState!], $since: DateTime) {
+query GetRepositoryIssues(
+    $owner: String!
+    $name: String!
+    $first: Int!
+    $after: String
+    $states: [IssueState!]
+    $since: DateTime
+) {
     rateLimit {
         cost
         limit
@@ -11,13 +19,20 @@ query GetRepositoryIssues($owner: String!, $name: String!, $first: Int!, $after:
         resetAt
     }
     repository(owner: $owner, name: $name) {
-        issues(first: $first, after: $after, states: $states, filterBy: { since: $since }, orderBy: { field: UPDATED_AT, direction: DESC }) {
+        issues(
+            first: $first
+            after: $after
+            states: $states
+            filterBy: { since: $since }
+            orderBy: { field: UPDATED_AT, direction: DESC }
+        ) {
             pageInfo {
                 hasNextPage
                 endCursor
             }
             totalCount
             nodes {
+                __typename
                 id
                 fullDatabaseId
                 number
@@ -158,6 +173,60 @@ query GetRepositoryIssues($owner: String!, $name: String!, $first: Int!, $after:
                     state
                     dueOn
                     url
+                }
+
+                # Project items (embedded, first 5) - pagination for issues in more projects
+                # Syncs project membership from the issue side for proper historical backfill
+                projectItems(first: 5, includeArchived: true) {
+                    totalCount
+                    pageInfo {
+                        hasNextPage
+                        endCursor
+                    }
+                    nodes {
+                        id
+                        fullDatabaseId
+                        type
+                        isArchived
+                        createdAt
+                        updatedAt
+
+                        # Project reference - needed to link item to correct project
+                        project {
+                            id
+                            fullDatabaseId
+                            number
+                            title
+                            url
+                            # Owner for project identification
+                            owner {
+                                __typename
+                                ... on Organization {
+                                    id
+                                    databaseId
+                                    login
+                                }
+                                ... on User {
+                                    id
+                                    databaseId
+                                    login
+                                }
+                            }
+                        }
+
+                        # Field values (embedded, first 10) - pagination for items with more
+                        # Uses shared FieldValueFieldsCostOptimized fragment (all 11 field value types)
+                        fieldValues(first: 10) {
+                            totalCount
+                            pageInfo {
+                                hasNextPage
+                                endCursor
+                            }
+                            nodes {
+                                ...FieldValueFieldsCostOptimized
+                            }
+                        }
+                    }
                 }
             }
         }

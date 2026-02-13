@@ -1,6 +1,7 @@
 # GraphQL query for fetching repository pull requests with all fields
 # Used by GraphQL-based sync services
 # Review threads and comments are embedded inline to avoid N+1 queries
+# Project items are embedded inline (first 5) - pagination for PRs in more projects
 
 query GetRepositoryPullRequests(
     $owner: String!
@@ -23,6 +24,7 @@ query GetRepositoryPullRequests(
             }
             totalCount
             nodes {
+                __typename
                 id
                 fullDatabaseId
                 number
@@ -364,6 +366,60 @@ query GetRepositoryPullRequests(
                                     id
                                     fullDatabaseId
                                 }
+                            }
+                        }
+                    }
+                }
+
+                # Project items (embedded, first 5) - pagination for PRs in more projects
+                # Syncs project membership from the PR side for proper historical backfill
+                projectItems(first: 5, includeArchived: true) {
+                    totalCount
+                    pageInfo {
+                        hasNextPage
+                        endCursor
+                    }
+                    nodes {
+                        id
+                        fullDatabaseId
+                        type
+                        isArchived
+                        createdAt
+                        updatedAt
+
+                        # Project reference - needed to link item to correct project
+                        project {
+                            id
+                            fullDatabaseId
+                            number
+                            title
+                            url
+                            # Owner for project identification
+                            owner {
+                                __typename
+                                ... on Organization {
+                                    id
+                                    databaseId
+                                    login
+                                }
+                                ... on User {
+                                    id
+                                    databaseId
+                                    login
+                                }
+                            }
+                        }
+
+                        # Field values (embedded, first 10) - pagination for items with more
+                        # Uses shared FieldValueFieldsCostOptimized fragment (all 11 field value types)
+                        fieldValues(first: 10) {
+                            totalCount
+                            pageInfo {
+                                hasNextPage
+                                endCursor
+                            }
+                            nodes {
+                                ...FieldValueFieldsCostOptimized
                             }
                         }
                     }

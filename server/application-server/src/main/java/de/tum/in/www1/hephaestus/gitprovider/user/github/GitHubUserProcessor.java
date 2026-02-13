@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.user.github;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
+import jakarta.persistence.EntityManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.CannotAcquireLockException;
@@ -32,9 +33,11 @@ public class GitHubUserProcessor {
     private static final Logger log = LoggerFactory.getLogger(GitHubUserProcessor.class);
 
     private final UserRepository userRepository;
+    private final EntityManager entityManager;
 
-    public GitHubUserProcessor(UserRepository userRepository) {
+    public GitHubUserProcessor(UserRepository userRepository, EntityManager entityManager) {
         this.userRepository = userRepository;
+        this.entityManager = entityManager;
     }
 
     /**
@@ -89,6 +92,8 @@ public class GitHubUserProcessor {
                 // 2. User B (new) took login "alice"
                 // 3. We're processing User B but User A still has "alice" in our DB
                 //
+                // Also happens with GitHub Apps vs Users sharing a login (e.g., "Copilot")
+                //
                 // Solution: Free up the login by renaming the old user
                 if (isLoginConflict(e)) {
                     handleLoginConflict(userId, login, name, avatarUrl, htmlUrl, userType.name());
@@ -110,48 +115,124 @@ public class GitHubUserProcessor {
         // Fetch the entity and update any fields that may have changed
         return userRepository
             .findById(userId)
-            .map(user -> {
-                boolean changed = false;
-                // Update core fields if they've changed
-                if (!login.equals(user.getLogin())) {
-                    user.setLogin(login);
-                    changed = true;
-                }
-                if (!name.equals(user.getName())) {
-                    user.setName(name);
-                    changed = true;
-                }
-                if (!avatarUrl.equals(user.getAvatarUrl())) {
-                    user.setAvatarUrl(avatarUrl);
-                    changed = true;
-                }
-                if (!htmlUrl.equals(user.getHtmlUrl())) {
-                    user.setHtmlUrl(htmlUrl);
-                    changed = true;
-                }
-                if (userType != user.getType()) {
-                    user.setType(userType);
-                    changed = true;
-                }
-                // Update additional profile fields
-                if (dto.email() != null && !dto.email().equals(user.getEmail())) {
-                    user.setEmail(dto.email());
-                    changed = true;
-                }
-                if (dto.createdAt() != null && !dto.createdAt().equals(user.getCreatedAt())) {
-                    user.setCreatedAt(dto.createdAt());
-                    changed = true;
-                }
-                if (dto.updatedAt() != null && !dto.updatedAt().equals(user.getUpdatedAt())) {
-                    user.setUpdatedAt(dto.updatedAt());
-                    changed = true;
-                }
-                if (changed) {
-                    return userRepository.save(user);
-                }
-                return user;
-            })
+            .map(user -> updateUserFields(user, login, name, avatarUrl, htmlUrl, userType, dto))
             .orElse(null);
+    }
+
+    /**
+     * Update user fields from the DTO, handling login conflicts gracefully.
+     * <p>
+     * If the login has changed, this method first frees up the login from any other
+     * user who currently holds it (via native SQL to avoid L1 cache issues). If the
+     * save still fails due to a login constraint violation (race condition between
+     * freeLogin and save), it retries once after freeing the login again and
+     * refreshing the entity from the database.
+     * <p>
+     * This handles cases like:
+     * <ul>
+     *   <li>GitHub Apps and Users sharing a login (e.g., "Copilot" AI user vs
+     *       copilot-pull-request-reviewer bot)</li>
+     *   <li>Users renaming accounts and another user taking the old name</li>
+     *   <li>Concurrent webhook processing for entities with the same login</li>
+     * </ul>
+     */
+    private User updateUserFields(
+        User user,
+        String login,
+        String name,
+        String avatarUrl,
+        String htmlUrl,
+        User.Type userType,
+        GitHubUserDTO dto
+    ) {
+        boolean changed = applyFieldUpdates(user, login, name, avatarUrl, htmlUrl, userType, dto);
+        if (!changed) {
+            return user;
+        }
+
+        try {
+            return userRepository.save(user);
+        } catch (DataIntegrityViolationException e) {
+            if (!isLoginConflict(e)) {
+                throw e;
+            }
+            // Login conflict during save: another user holds this login.
+            // This can happen when:
+            // 1. freeLogin ran but a concurrent transaction inserted a new user with
+            //    the same login between freeLogin and save
+            // 2. The conflicting entity was in the Hibernate L1 cache and its stale
+            //    state was flushed, reverting the native SQL rename
+            //
+            // Fix: free the login again, clear the persistence context to evict stale
+            // entities, re-fetch our user, re-apply fields, and retry the save.
+            log.info("Login conflict during user update, retrying: userId={}, login={}", user.getId(), login);
+            freeLoginIfOwnedByOtherUser(user.getId(), login);
+            entityManager.clear();
+
+            User refreshedUser = userRepository.findById(user.getId()).orElse(null);
+            if (refreshedUser == null) {
+                log.warn("User disappeared after login conflict retry: userId={}", user.getId());
+                return null;
+            }
+            applyFieldUpdates(refreshedUser, login, name, avatarUrl, htmlUrl, userType, dto);
+            return userRepository.save(refreshedUser);
+        }
+    }
+
+    /**
+     * Apply field updates to a user entity, returning whether any field changed.
+     * <p>
+     * If the login is changing, preemptively frees the login from any other user
+     * via {@link #freeLoginIfOwnedByOtherUser} before setting it on this entity.
+     */
+    private boolean applyFieldUpdates(
+        User user,
+        String login,
+        String name,
+        String avatarUrl,
+        String htmlUrl,
+        User.Type userType,
+        GitHubUserDTO dto
+    ) {
+        boolean changed = false;
+        if (!login.equals(user.getLogin())) {
+            // Before changing the login, check if another user already owns it.
+            // This handles GitHub entities that share a login across different IDs
+            // (e.g., Copilot AI user vs copilot-pull-request-reviewer bot), or
+            // users who renamed and another took their old username.
+            freeLoginIfOwnedByOtherUser(user.getId(), login);
+            user.setLogin(login);
+            changed = true;
+        }
+        if (!name.equals(user.getName())) {
+            user.setName(name);
+            changed = true;
+        }
+        if (!avatarUrl.equals(user.getAvatarUrl())) {
+            user.setAvatarUrl(avatarUrl);
+            changed = true;
+        }
+        if (!htmlUrl.equals(user.getHtmlUrl())) {
+            user.setHtmlUrl(htmlUrl);
+            changed = true;
+        }
+        if (userType != user.getType()) {
+            user.setType(userType);
+            changed = true;
+        }
+        if (dto.email() != null && !dto.email().equals(user.getEmail())) {
+            user.setEmail(dto.email());
+            changed = true;
+        }
+        if (dto.createdAt() != null && !dto.createdAt().equals(user.getCreatedAt())) {
+            user.setCreatedAt(dto.createdAt());
+            changed = true;
+        }
+        if (dto.updatedAt() != null && !dto.updatedAt().equals(user.getUpdatedAt())) {
+            user.setUpdatedAt(dto.updatedAt());
+            changed = true;
+        }
+        return changed;
     }
 
     /**
@@ -170,6 +251,32 @@ public class GitHubUserProcessor {
     }
 
     /**
+     * Free up a login if it's currently owned by a different user.
+     * <p>
+     * This handles the case where an existing user's login needs to change to a value
+     * that another row already has. For example, GitHub bot accounts like "Copilot" may
+     * appear with different internal IDs across installations, or a user renames and
+     * another user takes the old name.
+     * <p>
+     * Uses an atomic native query to rename the conflicting user without loading it
+     * into the Hibernate session, avoiding stale-entity issues during flush.
+     *
+     * @param currentUserId the ID of the user we're updating (should keep the login)
+     * @param login the desired login value
+     */
+    private void freeLoginIfOwnedByOtherUser(Long currentUserId, String login) {
+        int updated = userRepository.freeLogin(login, currentUserId);
+        if (updated > 0) {
+            log.info(
+                "Freed up login during update: login={}, targetUserId={}, conflictsResolved={}",
+                login,
+                currentUserId,
+                updated
+            );
+        }
+    }
+
+    /**
      * Check if the exception is a login unique constraint violation.
      */
     private boolean isLoginConflict(DataIntegrityViolationException e) {
@@ -182,13 +289,15 @@ public class GitHubUserProcessor {
     }
 
     /**
-     * Handle a login conflict by freeing up the login from the old user.
+     * Handle a login conflict during INSERT by freeing up the login from the old user.
      * <p>
      * When a user renames their GitHub account, another user can take their old username.
-     * This method handles that case by:
-     * 1. Finding the user who currently has the conflicting login
-     * 2. Renaming that user's login to a placeholder (RENAMED_&lt;id&gt;)
-     * 3. Retrying the insert for the new user
+     * Also handles cases where GitHub entities share a login across different IDs (e.g.,
+     * the Copilot AI user and the copilot-pull-request-reviewer bot both use "Copilot").
+     * <p>
+     * Uses {@link UserRepository#freeLogin} (native SQL) instead of loading the
+     * conflicting entity via findByLogin to avoid polluting the Hibernate L1 cache
+     * with a stale entity that could interfere with subsequent flush operations.
      */
     private void handleLoginConflict(
         Long userId,
@@ -198,30 +307,22 @@ public class GitHubUserProcessor {
         String htmlUrl,
         String type
     ) {
-        // Find the user who has this login
-        User oldUser = userRepository.findByLogin(login).orElse(null);
-        if (oldUser == null) {
-            // Concurrent modification - the conflict may have been resolved
+        // Free up the login atomically via native SQL without loading the conflicting
+        // entity into the Hibernate session. This avoids the stale-entity problem where
+        // findByLogin would cache the old user, updateLogin would rename it at SQL level,
+        // but Hibernate's flush would try to sync the stale cached state back.
+        int freed = userRepository.freeLogin(login, userId);
+        if (freed > 0) {
+            log.info(
+                "Freed up login for new user insert: login={}, newUserId={}, conflictsResolved={}",
+                login,
+                userId,
+                freed
+            );
+        } else {
+            // Concurrent modification - the conflict may have been resolved by another thread
             log.debug("Login conflict resolved concurrently: login={}", login);
-            return;
         }
-
-        if (oldUser.getId().equals(userId)) {
-            // Same user - this shouldn't happen but handle it gracefully
-            log.debug("Login conflict was for same user: userId={}, login={}", userId, login);
-            return;
-        }
-
-        // Rename the old user's login to free up the username
-        String renamedLogin = "RENAMED_" + oldUser.getId();
-        log.info(
-            "Freeing up login for renamed user: oldUserId={}, oldLogin={}, newLogin={}, newUserId={}",
-            oldUser.getId(),
-            login,
-            renamedLogin,
-            userId
-        );
-        userRepository.updateLogin(oldUser.getId(), renamedLogin);
 
         // Retry the insert
         try {

@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -25,6 +26,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.graphql.ResponseError;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.ClientResponseField;
 import org.springframework.graphql.client.HttpGraphQlClient;
@@ -367,6 +369,87 @@ class GraphQlPaginationHelperTest {
             assertThat(new PaginationResult(1, TerminationReason.PROCESSOR_STOP).isAborted()).isFalse();
             assertThat(new PaginationResult(1, TerminationReason.MAX_PAGES_REACHED).isAborted()).isTrue();
             assertThat(new PaginationResult(1, TerminationReason.RATE_LIMIT_CRITICAL).isAborted()).isTrue();
+        }
+    }
+
+    @Nested
+    @DisplayName("Error handling and edge cases")
+    class ErrorHandlingTests {
+
+        @Test
+        @DisplayName("should return INTERRUPTED when thread is interrupted")
+        void shouldReturnInterruptedWhenThreadIsInterrupted() {
+            // Given - set interrupt flag before paginate
+            Thread.currentThread().interrupt();
+
+            // When
+            PaginationResult result = helper.paginate(createRequest(conn -> true));
+
+            // Then
+            assertThat(result.terminationReason()).isEqualTo(TerminationReason.INTERRUPTED);
+            assertThat(result.pagesProcessed()).isZero();
+            assertThat(result.isAborted()).isTrue();
+        }
+
+        @Test
+        @DisplayName("should return TRANSIENT_ERROR when timeout error detected")
+        void shouldReturnTransientErrorWhenTimeoutErrorDetected() {
+            // Given - response with transient timeout error
+            ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
+            ResponseError timeoutError = mock(ResponseError.class);
+            when(timeoutError.getMessage()).thenReturn("couldn't respond in time");
+            when(timeoutError.getExtensions()).thenReturn(null);
+            when(response.getErrors()).thenReturn(List.of(timeoutError));
+            // detectTransientError is called BEFORE isValid(), so isValid() is never reached
+            mockClientExecution(response);
+
+            // When
+            PaginationResult result = helper.paginate(createRequest(conn -> true));
+
+            // Then
+            assertThat(result.terminationReason()).isEqualTo(TerminationReason.TRANSIENT_ERROR);
+            assertThat(result.pagesProcessed()).isEqualTo(1);
+            assertThat(result.isAborted()).isTrue();
+        }
+
+        @Test
+        @DisplayName("should return INVALID_RESPONSE when response is null (Mono.empty())")
+        void shouldReturnInvalidResponseWhenResponseIsNull() {
+            // Given - execute() returns Mono.empty() which blocks to null
+            when(client.documentName(DOCUMENT_NAME)).thenReturn(requestSpec);
+            when(requestSpec.variable(any(), any())).thenReturn(requestSpec);
+            when(requestSpec.execute()).thenReturn(Mono.empty());
+
+            // When
+            PaginationResult result = helper.paginate(createRequest(conn -> true));
+
+            // Then
+            assertThat(result.terminationReason()).isEqualTo(TerminationReason.INVALID_RESPONSE);
+            assertThat(result.pagesProcessed()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("should track rate limit even when processor stops")
+        void shouldTrackRateLimitEvenWhenProcessorStops() {
+            // Given - processor returns false (stop) on first page
+            GHPageInfo pageInfo = new GHPageInfo("cursor1", true, false, null);
+            TestConnection connection = new TestConnection(List.of("item1"), pageInfo);
+            ClientGraphQlResponse response = mockValidResponse(connection);
+            mockClientExecution(response);
+
+            // When
+            PaginationResult result = helper.paginate(createRequest(conn -> false));
+
+            // Then
+            assertThat(result.terminationReason()).isEqualTo(TerminationReason.PROCESSOR_STOP);
+            // Rate limit tracking should still have been called
+            verify(graphQlClientProvider).trackRateLimit(eq(SCOPE_ID), any(ClientGraphQlResponse.class));
+        }
+
+        @AfterEach
+        void clearInterruptFlag() {
+            // Always clear interrupt flag to avoid contaminating other tests
+            Thread.interrupted();
         }
     }
 

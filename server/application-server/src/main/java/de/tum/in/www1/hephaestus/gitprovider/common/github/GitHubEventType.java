@@ -43,6 +43,11 @@ public enum GitHubEventType {
     TEAM("team"),
     MEMBERSHIP("membership"),
 
+    // GitHub Projects V2 events
+    PROJECTS_V2("projects_v2"),
+    PROJECTS_V2_ITEM("projects_v2_item"),
+    PROJECTS_V2_STATUS_UPDATE("projects_v2_status_update"),
+
     // Installation events
     INSTALLATION("installation"),
     INSTALLATION_REPOSITORIES("installation_repositories"),

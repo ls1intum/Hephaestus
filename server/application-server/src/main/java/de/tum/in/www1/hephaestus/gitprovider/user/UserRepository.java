@@ -218,4 +218,32 @@ public interface UserRepository extends JpaRepository<User, Long> {
         nativeQuery = true
     )
     void updateLogin(@Param("id") Long id, @Param("newLogin") String newLogin);
+
+    /**
+     * Atomically free up a login by renaming any user who currently holds it,
+     * excluding the specified user.
+     * <p>
+     * This is used during user updates when the target login is already taken by
+     * a different user row (e.g., GitHub bot accounts like "Copilot" that appear
+     * with different internal IDs, or users who renamed their accounts).
+     * <p>
+     * The conflicting user's login is changed to "RENAMED_&lt;their_id&gt;" to free
+     * the login for the target user. Uses a native query to avoid loading the
+     * conflicting entity into the Hibernate session (which could cause stale-state
+     * issues during flush).
+     *
+     * @param login the login to free up
+     * @param excludeId the user ID that should keep the login (excluded from rename)
+     * @return the number of rows updated (0 or 1)
+     */
+    @Modifying(flushAutomatically = true)
+    @Transactional
+    @Query(
+        value = """
+        UPDATE "user" SET login = 'RENAMED_' || id
+        WHERE LOWER(login) = LOWER(:login) AND id != :excludeId
+        """,
+        nativeQuery = true
+    )
+    int freeLogin(@Param("login") String login, @Param("excludeId") Long excludeId);
 }

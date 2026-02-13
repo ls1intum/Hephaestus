@@ -116,6 +116,27 @@ public class ExperiencePointCalculator implements ExperiencePointStrategy {
         return properties.xpAwards().issueCreated();
     }
 
+    /**
+     * Get XP for project created (configurable).
+     */
+    public double getXpProjectCreated() {
+        return properties.xpAwards().projectCreated();
+    }
+
+    /**
+     * Get XP for project item created (configurable).
+     */
+    public double getXpProjectItemCreated() {
+        return properties.xpAwards().projectItemCreated();
+    }
+
+    /**
+     * Get XP for project status update created (configurable).
+     */
+    public double getXpProjectStatusUpdateCreated() {
+        return properties.xpAwards().projectStatusUpdateCreated();
+    }
+
     // ========================================================================
     // Review Experience Points
     // ========================================================================
