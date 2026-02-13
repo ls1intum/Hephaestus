@@ -60,6 +60,7 @@
 		"db:draft-changelog": "scripts/db-utils.sh draft-changelog",
 		"db:generate-erd-docs": "scripts/db-utils.sh generate-erd",
 		"db:generate-models:intelligence-service": "npm -w server/intelligence-service run db:introspect",
+		"check:ports": "scripts/check-ports.sh",
 		"github:update-schema": "npx tsx scripts/update-github-schema.ts",
 		"gitlab:update-schema": "npx tsx scripts/update-gitlab-schema.ts",
 		"docs:dev": "cd docs && npm run start",

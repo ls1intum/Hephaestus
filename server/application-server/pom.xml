@@ -58,6 +58,9 @@
 
         <!-- Maven wrapper version -->
         <maven.wrapper.version>3.9.12</maven.wrapper.version>
+
+        <!-- Local development port for Liquibase plugin (override via -Dpostgres.port=XXXX) -->
+        <postgres.port>5432</postgres.port>
     </properties>
     <dependencies>
         <dependency>
@@ -791,7 +794,7 @@
                     <diffChangeLogFile>src/main/resources/db/changelog_new.xml</diffChangeLogFile>
                     <searchPath>${project.basedir}/src/main/resources</searchPath>
                     <driver>org.postgresql.Driver</driver>
-                    <url>jdbc:postgresql://localhost:5432/hephaestus</url>
+                    <url>jdbc:postgresql://localhost:${postgres.port}/hephaestus</url>
                     <username>root</username>
                     <password>root</password>
                     <!-- Hibernate URL for reference schema using the Hibernate 6 dialect -->

@@ -7,7 +7,7 @@ spring:
         import: optional:file:.env[.properties]
 
     datasource:
-        url: jdbc:postgresql://localhost:5432/hephaestus
+        url: jdbc:postgresql://localhost:${POSTGRES_PORT:5432}/hephaestus
         username: ${DB_USERNAME:root}
         password: ${DB_PASSWORD:}
         hikari:
@@ -52,7 +52,7 @@ spring:
         oauth2:
             resourceserver:
                 jwt:
-                    issuer-uri: http://localhost:8081/realms/hephaestus
+                    issuer-uri: http://localhost:${KEYCLOAK_PORT:8081}/realms/hephaestus
 
     thymeleaf:
         prefix: ${MAIL_TEMPLATE_FOLDER:classpath:/mail-templates/}
@@ -91,6 +91,7 @@ spring:
         timeout-per-shutdown-phase: ${SHUTDOWN_TIMEOUT:20s}
 
 server:
+    port: ${SERVER_PORT:8080}
     shutdown: graceful
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -305,7 +306,7 @@ hephaestus:
                 - ls1intum/Artemis
 
     intelligence-service:
-        url: http://localhost:8000
+        url: http://localhost:${INTELLIGENCE_SERVICE_PORT:8000}
 
     cache:
         contributors:
@@ -352,7 +353,7 @@ hephaestus:
     # KEYCLOAK IDENTITY PROVIDER
     # ═══════════════════════════════════════════════════════════════════════════
     keycloak:
-        url: http://localhost:8081
+        url: http://localhost:${KEYCLOAK_PORT:8081}
         realm: hephaestus
         client-id: hephaestus-confidential
         # SECURITY: Never commit secrets. Use environment variables in production.
