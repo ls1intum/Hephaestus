@@ -1,4 +1,12 @@
-import type { AchievementRarity } from "@/components/achievements/types";
+import {
+	CommentIcon,
+	GitCommitIcon,
+	GitPullRequestIcon,
+	IssueOpenedIcon,
+} from "@primer/octicons-react";
+import { MilestoneIcon } from "lucide-react";
+import type React from "react";
+import type { AchievementCategory, AchievementRarity } from "@/components/achievements/types";
 
 export const tierSizes = {
 	common: "w-10 h-10",
@@ -17,3 +25,19 @@ export const tierIconSizes = {
 	legendary: 26,
 	mythic: 32,
 } as const satisfies Record<AchievementRarity, number>;
+
+export const categoryLabels = {
+	pull_requests: "Pull Requests",
+	commits: "Commits",
+	communication: "Communication",
+	issues: "Issues",
+	milestones: "Milestones",
+} as const satisfies Record<AchievementCategory, string>;
+
+export const defaultCategoryIcons = {
+	pull_requests: GitPullRequestIcon,
+	commits: GitCommitIcon,
+	communication: CommentIcon,
+	issues: IssueOpenedIcon,
+	milestones: MilestoneIcon,
+} as const satisfies Record<AchievementCategory, React.ElementType>;

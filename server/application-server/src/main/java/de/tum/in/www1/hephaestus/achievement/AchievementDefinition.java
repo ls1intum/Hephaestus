@@ -50,9 +50,6 @@ public enum AchievementDefinition {
 
     FIRST_PULL(
         "first_pull",
-//        "First Merge",
-//        "Merge your first pull request",
-//        "git-merge",
         AchievementCategory.PULL_REQUESTS,
         AchievementRarity.COMMON,
         Map.of("count", 1),
@@ -63,9 +60,6 @@ public enum AchievementDefinition {
 
     PR_BEGINNER(
         "pr_beginner",
-//        "Beginner Integrator",
-//        "Merge 3 pull requests",
-//        "git-merge",
         AchievementCategory.PULL_REQUESTS,
         AchievementRarity.COMMON,
         Map.of("count", 3),
@@ -76,9 +70,6 @@ public enum AchievementDefinition {
 
     PR_APPRENTICE(
         "pr_apprentice",
-//        "Apprentice Integrator",
-//        "Merge 5 pull requests",
-//        "git-merge",
         AchievementCategory.PULL_REQUESTS,
         AchievementRarity.UNCOMMON,
         Map.of("count", 5),
@@ -89,9 +80,6 @@ public enum AchievementDefinition {
 
     INTEGRATION_REGULAR(
         "integration_regular",
-//        "Integration Regular",
-//        "Merge 10 pull requests",
-//        "git-merge",
         AchievementCategory.PULL_REQUESTS,
         AchievementRarity.UNCOMMON,
         Map.of("count", 10),
@@ -102,9 +90,6 @@ public enum AchievementDefinition {
 
     PR_SPECIALIST(
         "pr_specialist",
-//        "Integration Specialist",
-//        "Merge 25 pull requests",
-//        "git-merge",
         AchievementCategory.PULL_REQUESTS,
         AchievementRarity.RARE,
         Map.of("count", 25),
@@ -115,9 +100,6 @@ public enum AchievementDefinition {
 
     INTEGRATION_EXPERT(
         "integration_expert",
-//        "Integration Expert",
-//        "Merge 50 pull requests",
-//        "git-merge",
         AchievementCategory.PULL_REQUESTS,
         AchievementRarity.EPIC,
         Map.of("count", 50),
@@ -128,9 +110,6 @@ public enum AchievementDefinition {
 
     MASTER_INTEGRATOR(
         "master_integrator",
-//        "Master Integrator",
-//        "Merge 100 pull requests",
-//        "git-merge",
         AchievementCategory.PULL_REQUESTS,
         AchievementRarity.LEGENDARY,
         Map.of("count", 100),
@@ -145,9 +124,6 @@ public enum AchievementDefinition {
 
     FIRST_REVIEW(
         "first_review",
-//        "First Review",
-//        "Submit your first code review",
-//        "Eye",
         AchievementCategory.COMMUNICATION,
         AchievementRarity.COMMON,
         Map.of("count", 1),
@@ -162,9 +138,6 @@ public enum AchievementDefinition {
 
     REVIEW_ROOKIE(
         "review_rookie",
-//        "Review Rookie",
-//        "Submit 10 code reviews",
-//        "Eye",
         AchievementCategory.COMMUNICATION,
         AchievementRarity.COMMON,
         Map.of("count", 10),
@@ -179,9 +152,6 @@ public enum AchievementDefinition {
 
     REVIEW_MASTER(
         "review_master",
-//        "Review Master",
-//        "Submit 100 code reviews",
-//        "Eye",
         AchievementCategory.COMMUNICATION,
         AchievementRarity.EPIC,
         Map.of("count", 100),
@@ -200,9 +170,6 @@ public enum AchievementDefinition {
 
     CODE_COMMENTER(
         "code_commenter",
-//        "Code Commenter",
-//        "Post 100 code comments",
-//        "MessageSquare",
         AchievementCategory.COMMUNICATION,
         AchievementRarity.EPIC,
         Map.of("count", 100),
@@ -217,9 +184,6 @@ public enum AchievementDefinition {
 
     HELPFUL_REVIEWER(
         "helpful_reviewer",
-//        "Helpful Reviewer",
-//        "Approve 50 pull requests",
-//        "HandHelping",
         AchievementCategory.COMMUNICATION,
         AchievementRarity.LEGENDARY,
         Map.of("count", 50),

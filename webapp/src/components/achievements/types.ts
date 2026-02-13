@@ -1,4 +1,10 @@
+import type React from "react";
 import type { Achievement } from "@/api/types.gen";
+
+/**
+ * Achievement id type derived from the backend AchievementDefinition enum.
+ */
+export type AchievementId = Achievement["id"];
 
 /**
  * Achievement category type derived from the generated Achievement type.
@@ -20,7 +26,7 @@ export type AchievementStatus = Achievement["status"];
  */
 export type ViewMode = "tree" | "list";
 
-export const RARITY_WEIGHT = {
+export const rarityWeights = {
 	common: 0,
 	uncommon: 1,
 	rare: 2,
@@ -28,3 +34,11 @@ export const RARITY_WEIGHT = {
 	legendary: 4,
 	mythic: 5,
 } as const satisfies Record<AchievementRarity, number>;
+
+export type AchievementDisplay = {
+	name: string;
+	description: string;
+	icon: React.ElementType;
+};
+
+export type UIAchievement = Achievement & AchievementDisplay;
