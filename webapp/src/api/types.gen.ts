@@ -1079,45 +1079,31 @@ export type Achievement = {
      */
     category: 'pull_requests' | 'commits' | 'communication' | 'issues' | 'milestones';
     /**
-     * Description of how to earn the achievement
-     */
-    description: string;
-    /**
-     * Icon identifier for UI
-     */
-    icon: string;
-    /**
      * Unique identifier for the achievement
      */
     id: string;
-    /**
-     * Required count to unlock (e.g., 5 PRs)
-     */
-    maxProgress: number;
-    /**
-     * Human-readable name
-     */
-    name: string;
     /**
      * Parent achievement ID in progression chain
      */
     parentId?: string;
     /**
-     * Current progress count (e.g., 4 PRs merged)
+     * The progress data for the achievement (key:value paired just like the achievements progress definitions are as well)
      */
-    progress: number;
+    progressData: {
+        [key: string]: unknown;
+    };
     /**
      * Visual level tier/rarity for badge styling
      */
     rarity: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'mythic';
     /**
-     * Current status for this user
+     * Current status of the achievement for this user
      */
     status: 'locked' | 'available' | 'unlocked' | 'hidden';
     /**
-     * When the achievement was unlocked, null if not unlocked
+     * Optional of when the achievement was unlocked, empty() if not unlocked
      */
-    unlockedAt?: Date;
+    unlockedAt: Date;
 };
 
 export type ListGlobalContributorsData = {

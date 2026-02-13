@@ -2172,36 +2172,23 @@ components:
           - communication
           - issues
           - milestones
-        description:
-          type: string
-          description: Description of how to earn the achievement
-          example: Merge your first pull request
-        icon:
-          type: string
-          description: Icon identifier for UI
-          example: git-merge
+          example: pull_requests
         id:
           type: string
           description: Unique identifier for the achievement
           example: first_pull
-        maxProgress:
-          type: integer
-          format: int64
-          description: "Required count to unlock (e.g., 5 PRs)"
-          example: 5
-        name:
-          type: string
-          description: Human-readable name
-          example: First Merge
         parentId:
           type: string
           description: Parent achievement ID in progression chain
-          example: null
-        progress:
-          type: integer
-          format: int64
-          description: "Current progress count (e.g., 4 PRs merged)"
-          example: 4
+          example: first_pull
+        progressData:
+          type: object
+          additionalProperties: {}
+          description: The progress data for the achievement (key:value paired just
+            like the achievements progress definitions are as well)
+          example:
+            current: 4
+            count: 5
         rarity:
           type: string
           description: Visual level tier/rarity for badge styling
@@ -2215,26 +2202,25 @@ components:
           example: common
         status:
           type: string
-          description: Current status for this user
+          description: Current status of the achievement for this user
           enum:
           - locked
           - available
           - unlocked
           - hidden
+          example: unlocked
         unlockedAt:
           type: string
           format: date-time
-          description: "When the achievement was unlocked, null if not unlocked"
+          description: "Optional of when the achievement was unlocked, empty() if\
+            \ not unlocked"
       required:
       - category
-      - description
-      - icon
       - id
-      - maxProgress
-      - name
-      - progress
+      - progressData
       - rarity
       - status
+      - unlockedAt
     AssignRoleRequest:
       type: object
       description: Request to assign or update a user's role in a workspace
