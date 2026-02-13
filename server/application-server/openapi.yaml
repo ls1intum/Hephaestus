@@ -2176,10 +2176,36 @@ components:
         id:
           type: string
           description: Unique identifier for the achievement
+          enum:
+          - first_pull
+          - pr_beginner
+          - pr_apprentice
+          - integration_regular
+          - pr_specialist
+          - integration_expert
+          - master_integrator
+          - first_review
+          - review_rookie
+          - review_master
+          - code_commenter
+          - helpful_reviewer
           example: first_pull
-        parentId:
+        parent:
           type: string
-          description: Parent achievement ID in progression chain
+          description: Parent achievement in progression chain
+          enum:
+          - first_pull
+          - pr_beginner
+          - pr_apprentice
+          - integration_regular
+          - pr_specialist
+          - integration_expert
+          - master_integrator
+          - first_review
+          - review_rookie
+          - review_master
+          - code_commenter
+          - helpful_reviewer
           example: first_pull
         progressData:
           type: object

@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.achievement;
 
+import com.fasterxml.jackson.annotation.JsonValue;
 import de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator;
 import de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator;
 import de.tum.in.www1.hephaestus.activity.ActivityEventType;
@@ -228,12 +229,13 @@ public enum AchievementDefinition {
     );
 
     @NonNull
+    @Getter(onMethod_ = @JsonValue)
     private final String id;
 
     /* TODO: Moving the Achievements display characteristics to the frontend
         as it is part of the client and potentially useful for localization */
 
-    //    private final String name;
+//    private final String name;
 //    private final String description;
 //    private final String icon;
     private final AchievementCategory category;

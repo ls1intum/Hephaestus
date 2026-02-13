@@ -1081,11 +1081,11 @@ export type Achievement = {
     /**
      * Unique identifier for the achievement
      */
-    id: string;
+    id: 'first_pull' | 'pr_beginner' | 'pr_apprentice' | 'integration_regular' | 'pr_specialist' | 'integration_expert' | 'master_integrator' | 'first_review' | 'review_rookie' | 'review_master' | 'code_commenter' | 'helpful_reviewer';
     /**
-     * Parent achievement ID in progression chain
+     * Parent achievement in progression chain
      */
-    parentId?: string;
+    parent?: 'first_pull' | 'pr_beginner' | 'pr_apprentice' | 'integration_regular' | 'pr_specialist' | 'integration_expert' | 'master_integrator' | 'first_review' | 'review_rookie' | 'review_master' | 'code_commenter' | 'helpful_reviewer';
     /**
      * The progress data for the achievement (key:value paired just like the achievements progress definitions are as well)
      */

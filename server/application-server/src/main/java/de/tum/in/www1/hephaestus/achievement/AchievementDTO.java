@@ -23,7 +23,7 @@ import java.util.Optional;
  */
 @Schema(description = "Achievement with user-specific progress information")
 public record AchievementDTO(
-    @NonNull @Schema(description = "Unique identifier for the achievement", example = "first_pull") String id,
+    @NonNull @Schema(description = "Unique identifier for the achievement", example = "first_pull") AchievementDefinition id,
 //    @NonNull @Schema(description = "Human-readable name", example = "First Merge") String name,
 //    @NonNull
 //    @Schema(description = "Description of how to earn the achievement", example = "Merge your first pull request")
@@ -33,7 +33,7 @@ public record AchievementDTO(
     @NonNull
     @Schema(description = "Visual level tier/rarity for badge styling", example = "common")
     AchievementRarity rarity,
-    @Nullable @Schema(description = "Parent achievement ID in progression chain", example = "first_pull") String parentId,
+    @Nullable @Schema(description = "Parent achievement in progression chain", example = "first_pull") AchievementDefinition parent,
     @NonNull @Schema(description = "Current status of the achievement for this user", example = "unlocked") AchievementStatus status,
 //    @NonNull @Schema(description = "Current progress count (e.g., 4 PRs merged)", example = "4") long progress,
 //    @NonNull @Schema(description = "Required count to unlock (e.g., 5 PRs)", example = "5") long maxProgress,
@@ -59,13 +59,13 @@ public record AchievementDTO(
         Optional<Instant> unlockedAt
     ) {
         return new AchievementDTO(
-            definition.getId(),
+            definition,
 //            definition.getName(),
 //            definition.getDescription(),
 //            definition.getIcon(),
             definition.getCategory(),
             definition.getRarity(),
-            definition.getParent() != null ? definition.getParent().getId() : null,
+            definition.getParent(),
             status,
             progressData,
             unlockedAt
