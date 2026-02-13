@@ -2,7 +2,11 @@ package de.tum.in.www1.hephaestus.practices.model;
 
 import jakarta.persistence.*;
 import java.time.Instant;
-import lombok.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
+import org.springframework.lang.NonNull;
 
 @Entity
 @Getter
