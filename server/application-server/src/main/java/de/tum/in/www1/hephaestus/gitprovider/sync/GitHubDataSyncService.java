@@ -6,6 +6,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFou
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.Category;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.InstallationTokenProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.OrganizationMembershipListener;
@@ -14,6 +15,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncMetadata;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncTarget;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncType;
+import de.tum.in.www1.hephaestus.gitprovider.discussion.github.GitHubDiscussionSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.GitHubIssueSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.issuedependency.github.GitHubIssueDependencySyncService;
 import de.tum.in.www1.hephaestus.gitprovider.issuetype.github.GitHubIssueTypeSyncService;
@@ -67,6 +69,7 @@ public class GitHubDataSyncService {
     private static final Logger log = LoggerFactory.getLogger(GitHubDataSyncService.class);
 
     private final SyncSchedulerProperties syncSchedulerProperties;
+    private final GitHubSyncProperties gitHubSyncProperties;
 
     private final SyncTargetProvider syncTargetProvider;
     private final OrganizationMembershipListener organizationMembershipListener;
@@ -79,6 +82,7 @@ public class GitHubDataSyncService {
     private final GitHubIssueTypeSyncService issueTypeSyncService;
     private final GitHubSubIssueSyncService subIssueSyncService;
     private final GitHubPullRequestSyncService pullRequestSyncService;
+    private final GitHubDiscussionSyncService discussionSyncService;
     private final GitHubTeamSyncService teamSyncService;
     private final GitHubOrganizationSyncService organizationSyncService;
     private final GitHubRepositorySyncService repositorySyncService;
@@ -91,6 +95,7 @@ public class GitHubDataSyncService {
 
     public GitHubDataSyncService(
         SyncSchedulerProperties syncSchedulerProperties,
+        GitHubSyncProperties gitHubSyncProperties,
         SyncTargetProvider syncTargetProvider,
         OrganizationMembershipListener organizationMembershipListener,
         RepositoryRepository repositoryRepository,
@@ -101,6 +106,7 @@ public class GitHubDataSyncService {
         GitHubIssueTypeSyncService issueTypeSyncService,
         GitHubSubIssueSyncService subIssueSyncService,
         GitHubPullRequestSyncService pullRequestSyncService,
+        GitHubDiscussionSyncService discussionSyncService,
         GitHubTeamSyncService teamSyncService,
         GitHubOrganizationSyncService organizationSyncService,
         GitHubRepositorySyncService repositorySyncService,
@@ -111,6 +117,7 @@ public class GitHubDataSyncService {
         @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor
     ) {
         this.syncSchedulerProperties = syncSchedulerProperties;
+        this.gitHubSyncProperties = gitHubSyncProperties;
         this.syncTargetProvider = syncTargetProvider;
         this.organizationMembershipListener = organizationMembershipListener;
         this.repositoryRepository = repositoryRepository;
@@ -121,6 +128,7 @@ public class GitHubDataSyncService {
         this.issueTypeSyncService = issueTypeSyncService;
         this.subIssueSyncService = subIssueSyncService;
         this.pullRequestSyncService = pullRequestSyncService;
+        this.discussionSyncService = discussionSyncService;
         this.teamSyncService = teamSyncService;
         this.organizationSyncService = organizationSyncService;
         this.repositorySyncService = repositorySyncService;
@@ -258,8 +266,11 @@ public class GitHubDataSyncService {
                 );
             }
 
+            // Sync discussions and comments (with cooldown check and cursor persistence)
+            SyncResult discussionResult = syncDiscussionsIfNeeded(syncTarget, scopeId, repositoryId);
+
             log.info(
-                "Completed repository sync: scopeId={}, repoId={}, collaborators={}, labels={}, milestones={}, issues={}, prs={}, issueStatus={}, prStatus={}",
+                "Completed repository sync: scopeId={}, repoId={}, collaborators={}, labels={}, milestones={}, issues={}, prs={}, discussions={}, issueStatus={}, prStatus={}",
                 scopeId,
                 repositoryId,
                 collaboratorsCount >= 0 ? collaboratorsCount : "skipped",
@@ -267,6 +278,7 @@ public class GitHubDataSyncService {
                 milestonesCount,
                 issueResult.count(),
                 prResult.count(),
+                discussionResult.count(),
                 issueResult.status(),
                 prResult.status()
             );
@@ -659,6 +671,70 @@ public class GitHubDataSyncService {
         syncTargetProvider.updateSyncTimestamp(syncTarget.id(), SyncType.COLLABORATORS, Instant.now());
 
         return count;
+    }
+
+    /**
+     * Syncs discussions for a repository if cooldown has expired.
+     * <p>
+     * Discussions sync uses cursor-based pagination with checkpoint persistence
+     * for resumability. Incremental sync only fetches discussions updated since
+     * the last successful sync.
+     *
+     * @param syncTarget   the sync target configuration
+     * @param scopeId      the scope ID
+     * @param repositoryId the repository ID
+     * @return sync result, or a COMPLETED result with 0 count if skipped due to cooldown
+     */
+    private SyncResult syncDiscussionsIfNeeded(SyncTarget syncTarget, Long scopeId, Long repositoryId) {
+        Instant cooldownThreshold = Instant.now().minusSeconds(syncSchedulerProperties.cooldownMinutes() * 60L);
+        boolean shouldSync =
+            syncTarget.lastDiscussionsSyncedAt() == null ||
+            syncTarget.lastDiscussionsSyncedAt().isBefore(cooldownThreshold);
+
+        if (!shouldSync) {
+            log.debug(
+                "Skipped discussion sync: reason=cooldownActive, repoId={}, lastSyncedAt={}",
+                repositoryId,
+                syncTarget.lastDiscussionsSyncedAt()
+            );
+            return SyncResult.completed(0);
+        }
+
+        // For incremental sync, apply safety buffer to handle clock skew and race conditions
+        // This ensures we re-fetch discussions that may have been updated during the previous sync
+        Instant stopAfterTimestamp = null;
+        if (syncTarget.lastDiscussionsSyncedAt() != null) {
+            stopAfterTimestamp = syncTarget.lastDiscussionsSyncedAt()
+                .minus(gitHubSyncProperties.incrementalSyncBuffer());
+            log.debug(
+                "Incremental discussion sync with buffer: lastSyncedAt={}, buffer={}, effectiveStopTime={}",
+                syncTarget.lastDiscussionsSyncedAt(),
+                gitHubSyncProperties.incrementalSyncBuffer(),
+                stopAfterTimestamp
+            );
+        }
+
+        SyncResult result = discussionSyncService.syncForRepository(
+            scopeId,
+            repositoryId,
+            syncTarget.id(),
+            syncTarget.discussionSyncCursor(),
+            stopAfterTimestamp
+        );
+
+        // Update discussions sync timestamp if sync completed successfully
+        if (result.isCompleted()) {
+            syncTargetProvider.updateSyncTimestamp(syncTarget.id(), SyncType.DISCUSSIONS, Instant.now());
+        } else {
+            log.info(
+                "Skipped discussions timestamp update due to incomplete sync: scopeId={}, repoId={}, status={}",
+                scopeId,
+                repositoryId,
+                result.status()
+            );
+        }
+
+        return result;
     }
 
     private boolean shouldSync(SyncTarget target) {

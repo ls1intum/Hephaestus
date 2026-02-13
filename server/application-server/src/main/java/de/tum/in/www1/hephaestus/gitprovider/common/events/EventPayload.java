@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.common.events;
 
+import de.tum.in.www1.hephaestus.gitprovider.discussion.Discussion;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
 import de.tum.in.www1.hephaestus.gitprovider.issuetype.IssueType;
@@ -324,6 +325,53 @@ public final class EventPayload {
     public record UserData(@NonNull Long id, @NonNull String login, @Nullable String name, @Nullable String avatarUrl) {
         public static UserData from(User user) {
             return new UserData(user.getId(), user.getLogin(), user.getName(), user.getAvatarUrl());
+        }
+    }
+
+    // ========================================================================
+    // Discussion Event Payload
+    // ========================================================================
+
+    /**
+     * Immutable snapshot of a Discussion for event handling.
+     */
+    public record DiscussionData(
+        @NonNull Long id,
+        int number,
+        @NonNull String title,
+        @Nullable String body,
+        @NonNull Discussion.State state,
+        @Nullable String stateReason,
+        boolean isLocked,
+        int commentsCount,
+        @NonNull String htmlUrl,
+        @NonNull RepositoryRef repository,
+        @Nullable Long authorId,
+        @Nullable String categoryName,
+        @Nullable Instant createdAt,
+        @Nullable Instant updatedAt,
+        @Nullable Instant closedAt,
+        @Nullable Instant answerChosenAt
+    ) {
+        public static DiscussionData from(Discussion discussion) {
+            return new DiscussionData(
+                discussion.getId(),
+                discussion.getNumber(),
+                discussion.getTitle(),
+                discussion.getBody(),
+                discussion.getState(),
+                discussion.getStateReason() != null ? discussion.getStateReason().name() : null,
+                discussion.isLocked(),
+                discussion.getCommentsCount(),
+                discussion.getHtmlUrl(),
+                RepositoryRef.from(discussion.getRepository()),
+                discussion.getAuthor() != null ? discussion.getAuthor().getId() : null,
+                discussion.getCategory() != null ? discussion.getCategory().getName() : null,
+                discussion.getCreatedAt(),
+                discussion.getUpdatedAt(),
+                discussion.getClosedAt(),
+                discussion.getAnswerChosenAt()
+            );
         }
     }
 }
