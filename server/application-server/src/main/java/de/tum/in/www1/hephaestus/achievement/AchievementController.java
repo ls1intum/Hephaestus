@@ -71,4 +71,10 @@ public class AchievementController {
         List<AchievementDTO> achievements = achievementService.getAllAchievementsWithProgress(user);
         return ResponseEntity.ok(achievements);
     }
+
+    @SecurityRequirements
+    public ResponseEntity<List<String>> getAllAchievementDefinitionIds() {
+        List<String> achievementIdList = achievementService.getAllAchievementDefinitionIds();
+        return ResponseEntity.ok(achievementIdList);
+    }
 }

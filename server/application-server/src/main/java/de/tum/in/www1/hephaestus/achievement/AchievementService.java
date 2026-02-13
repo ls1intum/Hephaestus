@@ -287,4 +287,8 @@ public class AchievementService {
 
         return AchievementStatus.LOCKED;
     }
+
+    public List<String> getAllAchievementDefinitionIds() {
+        return Arrays.stream(AchievementDefinition.values()).map(AchievementDefinition::getId).toList();
+    }
 }
