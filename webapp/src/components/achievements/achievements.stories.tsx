@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { ReactFlowProvider } from "@xyflow/react";
 import type { Achievement } from "@/api/types.gen";
-import { AchievementNode } from "./achievement-node";
+import { AchievementNode } from "./AchievementNode.tsx";
 import type { AchievementNodeData } from "./data";
 import { Header } from "./header";
 import { SkillTree } from "./skill-tree";

@@ -1,7 +1,7 @@
-import type { Meta, StoryObj } from "@storybook/react";
 import { CheckCircleIcon, XCircleIcon } from "@primer/octicons-react";
-import { Button } from "@/components/ui/button";
+import type { Meta, StoryObj } from "@storybook/react";
 import type { UIAchievement } from "@/components/achievements/types";
+import { Button } from "@/components/ui/button";
 import { AchievementTooltip } from "./AchievementTooltip";
 
 /**
