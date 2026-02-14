@@ -5,6 +5,14 @@ import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import io.swagger.v3.oas.annotations.media.Schema;
 
+/**
+ * Strategy Interface for persisting achievement progress for the evaluator in the database.
+ * <p>Implementations define how the achievements progress is structured.
+ * @implNote Subclasses should follow the naming convention of {@code <ProgressStructureType>AchievementProgress}
+ * (e.g. {@link LinearAchievementProgress}) to be included by OpenAPIs type schema generation.
+ *
+ */
+
 @JsonTypeInfo(
     use = JsonTypeInfo.Id.NAME,
     include = JsonTypeInfo.As.PROPERTY,
@@ -16,10 +24,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 })
 @Schema(
     name = "AchievementProgress",
-    description = "Polymorphic progress data",
-    oneOf = {
-        LinearAchievementProgress.class,
-        BinaryAchievementProgress.class
-    }
+    description = "Polymorphic progress data"
 )
-public interface AchievementProgress {}
+public interface AchievementProgress {
+}

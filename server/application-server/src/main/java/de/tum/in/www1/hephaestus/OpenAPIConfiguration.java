@@ -14,28 +14,24 @@ import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.media.StringSchema;
 import io.swagger.v3.oas.models.parameters.Parameter;
 import io.swagger.v3.parser.OpenAPIV3Parser;
-import java.io.File;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.io.File;
+import java.util.*;
+import java.util.stream.Collectors;
+
 /**
  * OpenAPI configuration that:
  * 1. Processes application-server DTOs (removes "DTO" suffix)
  * 2. Imports tagged schemas and paths from intelligence-service
- *
+ * <p>
  * Intelligence-service schemas/paths are included if they have:
- *   x-hephaestus:
- *     export: true
+ * x-hephaestus:
+ * export: true
  */
 @Configuration
 @OpenAPIDefinition(
@@ -46,8 +42,8 @@ import org.springframework.context.annotation.Configuration;
         contact = @Contact(name = "Felix T.J. Dietrich", email = "felixtj.dietrich@tum.de"),
         license = @License(name = "MIT License", url = "https://github.com/ls1intum/Hephaestus/blob/develop/LICENSE")
     ),
-    servers = { @Server(url = "/", description = "Default Server URL") },
-    security = { @SecurityRequirement(name = "bearerAuth") }
+    servers = {@Server(url = "/", description = "Default Server URL")},
+    security = {@SecurityRequirement(name = "bearerAuth")}
 )
 @SecurityScheme(
     name = "bearerAuth",
@@ -62,8 +58,14 @@ public class OpenAPIConfiguration {
     private static final String INTELLIGENCE_SERVICE_SPEC = "../intelligence-service/openapi.yaml";
     private static final String WORKSPACE_PATH_PREFIX = "/workspaces/{workspaceSlug}";
 
-    /** Domain objects to include even without DTO suffix */
+    /**
+     * Domain objects to include even without DTO suffix
+     */
     private static final List<String> ALLOWED_DOMAIN_OBJECTS = List.of("PageableObject", "SortObject");
+    /**
+     * Domain objects to include by specific suffix (like AchievementProgress records)
+     */
+    private static final List<String> SAFE_DOMAIN_SUFFIXES = List.of("AchievementProgress");
 
     @Bean
     public OpenApiCustomizer schemaCustomizer() {
@@ -104,7 +106,10 @@ public class OpenAPIConfiguration {
             .getSchemas()
             .entrySet()
             .stream()
-            .filter(e -> ALLOWED_DOMAIN_OBJECTS.contains(e.getKey()))
+            .filter(
+                e -> ALLOWED_DOMAIN_OBJECTS.contains(e.getKey())
+                || SAFE_DOMAIN_SUFFIXES.stream().anyMatch(s -> e.getKey().endsWith(s))
+            )
             .forEach(e -> filteredSchemas.put(e.getKey(), e.getValue()));
 
         // Update $ref to remove DTO suffix
@@ -282,7 +287,7 @@ public class OpenAPIConfiguration {
     /**
      * Collect $ref names from a schema.
      */
-    @SuppressWarnings({ "rawtypes", "unchecked" })
+    @SuppressWarnings({"rawtypes", "unchecked"})
     private void collectRefs(Schema schema, Set<String> out) {
         if (schema == null) return;
 
@@ -421,7 +426,7 @@ public class OpenAPIConfiguration {
         }
     }
 
-    @SuppressWarnings({ "rawtypes", "unchecked" })
+    @SuppressWarnings({"rawtypes", "unchecked"})
     private void removeDtoSuffixFromRefs(Schema schema) {
         if (schema == null) return;
 

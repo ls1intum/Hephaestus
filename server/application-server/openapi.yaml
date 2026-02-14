@@ -2208,13 +2208,10 @@ components:
           - helpful_reviewer
           example: first_pull
         progressData:
-          type: object
-          additionalProperties: {}
-          description: The progress data for the achievement (key:value paired just
-            like the achievements progress definitions are as well)
-          example:
-            current: 4
-            count: 5
+          description: The structured progress data based on the achievements evaluator
+          oneOf:
+          - $ref: "#/components/schemas/BinaryAchievementProgress"
+          - $ref: "#/components/schemas/LinearAchievementProgress"
         rarity:
           type: string
           description: Visual level tier/rarity for badge styling
@@ -2247,6 +2244,15 @@ components:
       - rarity
       - status
       - unlockedAt
+    AchievementProgress:
+      description: Polymorphic progress data
+      discriminator:
+        propertyName: type
+      properties:
+        type:
+          type: string
+      required:
+      - type
     AssignRoleRequest:
       type: object
       description: Request to assign or update a user's role in a workspace
@@ -2284,6 +2290,14 @@ components:
       required:
       - explanation
       - type
+    BinaryAchievementProgress:
+      allOf:
+      - $ref: "#/components/schemas/AchievementProgress"
+      - type: object
+        properties:
+          unlocked:
+            type: boolean
+      description: Binary progress indicating unlocked state
     ChatMessageVote:
       type: object
       properties:
@@ -2593,6 +2607,21 @@ components:
       required:
       - leaguePointsChange
       - login
+    LinearAchievementProgress:
+      allOf:
+      - $ref: "#/components/schemas/AchievementProgress"
+      - type: object
+        properties:
+          current:
+            type: integer
+            format: int32
+          target:
+            type: integer
+            format: int32
+      description: Linear progress with current and target counts
+      required:
+      - current
+      - target
     Profile:
       type: object
       description: Complete user profile including contribution history and activity

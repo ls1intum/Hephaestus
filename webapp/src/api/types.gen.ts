@@ -873,6 +873,22 @@ export type Profile = {
     xpRecord: ProfileXpRecord;
 };
 
+/**
+ * Linear progress with current and target counts
+ */
+export type LinearAchievementProgress = Omit<AchievementProgress, 'type'> & {
+    current: number;
+    target: number;
+    type: 'LinearAchievementProgress';
+};
+
+/**
+ * Polymorphic progress data
+ */
+export type AchievementProgress = {
+    type: string;
+};
+
 export type LeagueChange = {
     leaguePointsChange: number;
     login: string;
@@ -1043,6 +1059,14 @@ export type ChatMessageVote = {
 };
 
 /**
+ * Binary progress indicating unlocked state
+ */
+export type BinaryAchievementProgress = Omit<AchievementProgress, 'type'> & {
+    unlocked?: boolean;
+    type: 'BinaryAchievementProgress';
+};
+
+/**
  * User feedback on a detected bad practice
  */
 export type BadPracticeFeedback = {
@@ -1087,11 +1111,9 @@ export type Achievement = {
      */
     parent?: 'first_pull' | 'pr_beginner' | 'pr_apprentice' | 'integration_regular' | 'pr_specialist' | 'integration_expert' | 'master_integrator' | 'first_review' | 'review_rookie' | 'review_master' | 'code_commenter' | 'helpful_reviewer';
     /**
-     * The progress data for the achievement (key:value paired just like the achievements progress definitions are as well)
+     * The structured progress data based on the achievements evaluator
      */
-    progressData: {
-        [key: string]: unknown;
-    };
+    progressData: BinaryAchievementProgress | LinearAchievementProgress;
     /**
      * Visual level tier/rarity for badge styling
      */
