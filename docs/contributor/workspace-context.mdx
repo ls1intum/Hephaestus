@@ -43,7 +43,7 @@ That's it. The filter handles slug resolution, membership checks, and 403/404 re
 
 ## Authorization
 
-Global admins (users with the Keycloak `admin` realm role, configured via `KEYCLOAK_GITHUB_ADMIN_USERNAME`) are automatically elevated to workspace ADMIN level for workspaces where they have membership. They must be members of the workspace (any role) to access it, but their permissions are elevated to ADMIN. They cannot perform OWNER-only operations (ownership transfer remains explicit).
+Super admins (users with the Keycloak `admin` realm role, configured via `KEYCLOAK_GITHUB_ADMIN_USERNAME`) are automatically elevated to workspace ADMIN level for workspaces where they have membership. They must be members of the workspace (any role) to access it, but their permissions are elevated to ADMIN. They cannot perform OWNER-only operations (ownership transfer remains explicit).
 
 Check roles via the context:
 
@@ -54,7 +54,7 @@ if (ctx.hasRole(WorkspaceRole.OWNER)) {
 
 if (!ctx.hasMembership()) {
     // user has no role in this workspace
-    // Note: global admins still need workspace membership
+    // Note: super admins still need workspace membership
 }
 ```
 
@@ -66,7 +66,7 @@ Or use method-level annotations that fail fast with 403:
 public void delete(WorkspaceContext ctx, @PathVariable Long id) { ... }
 
 @PatchMapping("/settings")
-@RequireAtLeastWorkspaceAdmin  // Also allows global admins
+@RequireAtLeastWorkspaceAdmin  // Also allows super admins
 public void updateSettings(WorkspaceContext ctx, @RequestBody SettingsDTO dto) { ... }
 ```
 

@@ -27,7 +27,7 @@ public class WorkspaceAccessService {
     /**
      * Check if the current user has at least the specified role in the current workspace.
      * Uses role hierarchy: if user has OWNER, they also satisfy ADMIN and MEMBER checks.
-     * Global admins (Keycloak admin realm role) are automatically elevated to ADMIN level
+     * Super admins (Keycloak admin realm role) are automatically elevated to ADMIN level
      * for workspaces where they have membership, but cannot satisfy OWNER checks (ownership remains explicit).
      *
      * @param requiredRole Minimum required role
@@ -53,10 +53,10 @@ public class WorkspaceAccessService {
             }
         }
 
-        // Global admins with membership are automatically elevated to ADMIN level (but not OWNER)
-        if (requiredRole != WorkspaceRole.OWNER && SecurityUtils.isGlobalAdmin()) {
+        // Super admins with membership are automatically elevated to ADMIN level (but not OWNER)
+        if (requiredRole != WorkspaceRole.OWNER && SecurityUtils.isSuperAdmin()) {
             log.debug(
-                "Granted role check: reason=globalAdminElevation, requiredRole={}, workspaceSlug={}",
+                "Granted role check: reason=superAdminElevation, requiredRole={}, workspaceSlug={}",
                 requiredRole,
                 context.slug()
             );
@@ -113,7 +113,7 @@ public class WorkspaceAccessService {
     /**
      * Check if user can assign or revoke the specified role.
      * OWNER can manage all roles.
-     * ADMIN (including global admins with membership) can manage ADMIN and MEMBER roles (but not OWNER).
+     * ADMIN (including super admins with membership) can manage ADMIN and MEMBER roles (but not OWNER).
      *
      * @param targetRole Role to assign/revoke
      * @return true if user has permission to manage this role
@@ -139,8 +139,8 @@ public class WorkspaceAccessService {
             return targetRole != WorkspaceRole.OWNER;
         }
 
-        // Global admins with membership can manage ADMIN and MEMBER roles (but not OWNER)
-        if (targetRole != WorkspaceRole.OWNER && SecurityUtils.isGlobalAdmin()) {
+        // Super admins with membership can manage ADMIN and MEMBER roles (but not OWNER)
+        if (targetRole != WorkspaceRole.OWNER && SecurityUtils.isSuperAdmin()) {
             return true;
         }
 

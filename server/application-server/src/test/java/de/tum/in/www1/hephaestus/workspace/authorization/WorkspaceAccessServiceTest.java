@@ -316,14 +316,14 @@ class WorkspaceAccessServiceTest {
     }
 
     @Test
-    void hasRole_WithGlobalAdminButNoWorkspaceMembership_DeniesAccess() {
+    void hasRole_WithSuperAdminButNoWorkspaceMembership_DeniesAccess() {
         // Given: Global admin user with no workspace membership
         SecurityContextHolder.setContext(
             de.tum.in.www1.hephaestus.testconfig.MockSecurityContextUtils.createSecurityContext(
                 "admin-user",
                 "admin-123",
                 new String[] { "admin" },
-                "global-admin-token"
+                "super-admin-token"
             )
         );
 
@@ -348,14 +348,14 @@ class WorkspaceAccessServiceTest {
     }
 
     @Test
-    void hasRole_WithGlobalAdminAndMemberRole_AllowsAdminAccess() {
+    void hasRole_WithSuperAdminAndMemberRole_AllowsAdminAccess() {
         // Given: Global admin user who is also a MEMBER of the workspace
         SecurityContextHolder.setContext(
             de.tum.in.www1.hephaestus.testconfig.MockSecurityContextUtils.createSecurityContext(
                 "admin-user",
                 "admin-123",
                 new String[] { "admin" },
-                "global-admin-token"
+                "super-admin-token"
             )
         );
 
@@ -377,14 +377,14 @@ class WorkspaceAccessServiceTest {
     }
 
     @Test
-    void hasRole_WithGlobalAdminAndOwnerRole_KeepsOwnerPermissions() {
+    void hasRole_WithSuperAdminAndOwnerRole_KeepsOwnerPermissions() {
         // Given: Global admin user who is also OWNER of the workspace
         SecurityContextHolder.setContext(
             de.tum.in.www1.hephaestus.testconfig.MockSecurityContextUtils.createSecurityContext(
                 "admin-user",
                 "admin-123",
                 new String[] { "admin" },
-                "global-admin-token"
+                "super-admin-token"
             )
         );
 
@@ -406,14 +406,14 @@ class WorkspaceAccessServiceTest {
     }
 
     @Test
-    void canManageRole_WithGlobalAdminAndMembership_CanManageAdminAndMember() {
+    void canManageRole_WithSuperAdminAndMembership_CanManageAdminAndMember() {
         // Given: Global admin user with MEMBER workspace role
         SecurityContextHolder.setContext(
             de.tum.in.www1.hephaestus.testconfig.MockSecurityContextUtils.createSecurityContext(
                 "admin-user",
                 "admin-123",
                 new String[] { "admin" },
-                "global-admin-token"
+                "super-admin-token"
             )
         );
 

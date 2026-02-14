@@ -78,7 +78,7 @@ The sync scheduler fetches recent GitHub activity (issues, PRs, reviews) for mon
 5. **Run database migrations:** The application server runs Liquibase migrations on startup; monitor logs to confirm success.
 6. **Verify integrations:**
    - Sign in via GitHub with the account configured in `KEYCLOAK_GITHUB_ADMIN_USERNAME` and confirm it lands in Keycloak with both the `admin` realm role and the `realm-management` → `realm-admin` client role automatically applied.
-   - Verify that the global admin user can access workspace admin endpoints for workspaces where they have membership (they are automatically elevated to workspace ADMIN level for those workspaces).
+   - Verify that the super admin user can access workspace admin endpoints for workspaces where they have membership (they are automatically elevated to workspace ADMIN level for those workspaces).
    - Trigger a test webhook from GitHub to validate the ingest pipeline.
    - Send a test best-practice email using the application server.
 
