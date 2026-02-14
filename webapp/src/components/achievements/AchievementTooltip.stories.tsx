@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import type { AchievementNodeData } from "@/components/achievements/data";
+import { CheckCircleIcon, XCircleIcon } from "@primer/octicons-react";
 import { Button } from "@/components/ui/button";
+import type { UIAchievement } from "@/components/achievements/types";
 import { AchievementTooltip } from "./AchievementTooltip";
 
 /**
@@ -39,82 +40,84 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-// Mock achievement node data with digital mythology theme
-const zeusThunderCommits: AchievementNodeData = {
+// Mock achievements with digital mythology theme
+const zeusThunderCommits: UIAchievement = {
 	id: "pr_beginner",
 	name: "Zeus's Thunder Commits",
 	description: "Channel the power of lightning to commit code with godly precision",
+	icon: CheckCircleIcon,
 	category: "commits",
-	tier: "common",
+	rarity: "common",
 	status: "available",
-	icon: "GitCommit",
-	progress: 75,
-	maxProgress: 100,
 	unlockedAt: null,
-	level: 1,
-	angle: 270,
-	ring: 1,
-} as unknown as AchievementNodeData;
+	progressData: {
+		type: "LinearAchievementProgress",
+		current: 75,
+		target: 100,
+	},
+} as unknown as UIAchievement;
 
-const poseidonCodeStreams: AchievementNodeData = {
+const poseidonCodeStreams: UIAchievement = {
 	id: "integration_regular",
 	name: "Poseidon's Code Streams",
 	description: "Master the tides of continuous integration and deployment",
+	icon: CheckCircleIcon,
 	category: "issues",
-	tier: "rare",
+	rarity: "rare",
 	status: "unlocked",
-	icon: "Workflow",
-	progress: 50,
-	maxProgress: 50,
 	unlockedAt: new Date("2026-02-14T12:00:00Z"),
-	level: 3,
-	angle: 126,
-	ring: 3,
-} as unknown as AchievementNodeData;
+	progressData: {
+		type: "LinearAchievementProgress",
+		current: 50,
+		target: 50,
+	},
+} as unknown as UIAchievement;
 
-const athenaWisdomReviews: AchievementNodeData = {
+const athenaWisdomReviews: UIAchievement = {
 	id: "first_review",
 	name: "Athena's Wisdom Reviews",
 	description: "Gain strategic insights through comprehensive code reviews",
+	icon: XCircleIcon,
 	category: "pull_requests",
-	tier: "epic",
+	rarity: "epic",
 	status: "available",
-	icon: "GitPullRequest",
-	progress: 0,
-	maxProgress: 20,
 	unlockedAt: null,
-	level: 4,
-	angle: 342,
-	ring: 4,
-} as unknown as AchievementNodeData;
+	progressData: {
+		type: "LinearAchievementProgress",
+		current: 0,
+		target: 20,
+	},
+} as unknown as UIAchievement;
 
-const hermesSwiftDeploys: AchievementNodeData = {
+const hermesSwiftDeploys: UIAchievement = {
 	id: "review_master",
 	name: "Hermes' Swift Deploys",
 	description: "Achieve messenger-like speed in deployment cycles",
+	icon: CheckCircleIcon,
 	category: "milestones",
-	tier: "legendary",
+	rarity: "legendary",
 	status: "unlocked",
-	icon: "Rocket",
 	unlockedAt: new Date("2026-02-14T13:00:00Z"),
-	level: 5,
-	angle: 198,
-	ring: 5,
-} as unknown as AchievementNodeData;
+	progressData: {
+		type: "BinaryAchievementProgress",
+		unlocked: true,
+	},
+} as unknown as UIAchievement;
 
-const apolloBugFixes: AchievementNodeData = {
+const apolloBugFixes: UIAchievement = {
 	id: "code_commenter",
 	name: "Apollo's Bug Fixes",
 	description: "Harness the sun god's clarity to eliminate all software defects",
+	icon: XCircleIcon,
 	category: "communication",
-	tier: "mythic",
+	rarity: "mythic",
 	status: "locked",
-	icon: "Bug",
 	unlockedAt: null,
-	level: 6,
-	angle: 54,
-	ring: 6,
-} as unknown as AchievementNodeData;
+	progressData: {
+		type: "BinaryAchievementProgress",
+		unlocked: false,
+	},
+} as unknown as UIAchievement;
 
 /**
  * Tooltip for an available achievement with zero progress.
