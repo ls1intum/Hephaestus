@@ -9,9 +9,9 @@ import {
 } from "lucide-react";
 import type React from "react";
 import type { Achievement } from "@/api/types.gen";
+import type { AchievementCategory } from "@/components/achievements/types";
 import { Progress, ProgressIndicator, ProgressTrack } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
-import type { AchievementCategory } from "./achievements.config.ts";
 import { calculateStats, categoryMeta } from "./data";
 
 const categoryIcons: Record<AchievementCategory, React.ElementType> = {
@@ -109,18 +109,11 @@ export function StatsPanel({ achievements }: StatsPanelProps) {
 				<div className="space-y-2">
 					{achievements
 						.filter((a) => a.status === "unlocked" && a.unlockedAt)
-						.sort((a, b) => {
-							const rawDateA = a.unlockedAt;
-							const rawDateB = b.unlockedAt;
-							const dateA = rawDateA instanceof Date ? rawDateA : new Date(String(rawDateA));
-							const dateB = rawDateB instanceof Date ? rawDateB : new Date(String(rawDateB));
-							return dateB.getTime() - dateA.getTime();
-						})
+						.sort((a, b) => b.unlockedAt.getTime() - a.unlockedAt.getTime())
 						.slice(0, 5)
 						.map((achievement) => {
 							const rarity = achievement.rarity ?? "common";
-							const rawDate = achievement.unlockedAt;
-							const unlockedDate = rawDate instanceof Date ? rawDate : new Date(String(rawDate));
+							const unlockedDate = achievement.unlockedAt;
 							return (
 								<div
 									key={achievement.id}

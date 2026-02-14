@@ -1,7 +1,7 @@
 import { CircleDot, GitCommit, GitPullRequest, Layers, MessageSquare } from "lucide-react";
 import type React from "react";
-import type { AchievementCategory } from "./achievements.config.ts";
 import { categoryMeta } from "./data";
+import type { AchievementCategory } from "./styles.ts";
 
 const categoryIcons: Record<AchievementCategory, React.ElementType> = {
 	commits: GitCommit,

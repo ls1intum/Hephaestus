@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import type { Achievement } from "@/api/types.gen";
-import type { AchievementStatus } from "@/components/achievements/achievements.config.ts";
+import type { AchievementStatus } from "@/components/achievements/styles.ts";
 
 /**
  * Hook to display toast notifications when achievements are unlocked.

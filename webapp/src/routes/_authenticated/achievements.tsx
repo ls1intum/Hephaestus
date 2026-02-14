@@ -3,12 +3,12 @@ import { createFileRoute } from "@tanstack/react-router";
 import { ReactFlowProvider } from "@xyflow/react";
 import { useState } from "react";
 import { getUserProfileOptions } from "@/api/@tanstack/react-query.gen";
-import { AchievementListView } from "@/components/achievements/achievement-list-view";
-import type { ViewMode } from "@/components/achievements/achievements.config.ts";
+import { AchievementsListView } from "@/components/achievements/AchievementsListView.tsx";
 import { CategoryLabels } from "@/components/achievements/category-labels";
 import { Header } from "@/components/achievements/header";
 import { SkillTree } from "@/components/achievements/skill-tree";
 import { StatsPanel } from "@/components/achievements/stats-panel";
+import type { ViewMode } from "@/components/achievements/styles.ts";
 import { useAchievementNotifications } from "@/hooks/use-achievement-notifications";
 import { useAchievements } from "@/hooks/use-achievements";
 import { useAuth } from "@/integrations/auth/AuthContext";
@@ -114,7 +114,7 @@ function AchievementsPage() {
 
 								{/* List view */}
 								{!achievementsQuery.isLoading && !achievementsQuery.isError && (
-									<AchievementListView achievements={achievements} />
+									<AchievementsListView achievements={achievements} />
 								)}
 							</>
 						)}

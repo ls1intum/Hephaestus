@@ -4,7 +4,7 @@ import type {
 	AchievementCategory,
 	AchievementRarity,
 	AchievementStatus,
-} from "./achievements.config.ts";
+} from "@/components/achievements/types";
 
 /**
  * Node data structure for the skill tree visualization.
