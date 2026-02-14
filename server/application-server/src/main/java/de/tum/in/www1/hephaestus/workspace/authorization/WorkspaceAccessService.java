@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.workspace.authorization;
 
+import de.tum.in.www1.hephaestus.SecurityUtils;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContextHolder;
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Service;
 /**
  * Service for evaluating workspace-level access permissions based on user roles.
  * Uses role hierarchy: OWNER > ADMIN > MEMBER
+ * Global admins (users with Keycloak 'admin' realm role) are automatically elevated to workspace ADMIN level.
  */
 @Service
 public class WorkspaceAccessService {
@@ -25,11 +27,19 @@ public class WorkspaceAccessService {
     /**
      * Check if the current user has at least the specified role in the current workspace.
      * Uses role hierarchy: if user has OWNER, they also satisfy ADMIN and MEMBER checks.
+     * Global admins (Keycloak admin realm role) are automatically elevated to ADMIN level
+     * for all workspaces, but cannot satisfy OWNER checks (ownership remains explicit).
      *
      * @param requiredRole Minimum required role
      * @return true if user has the required role or higher
      */
     public boolean hasRole(WorkspaceRole requiredRole) {
+        // Global admins are automatically elevated to ADMIN level (but not OWNER)
+        if (requiredRole != WorkspaceRole.OWNER && SecurityUtils.isGlobalAdmin()) {
+            log.debug("Granted role check: reason=globalAdmin, requiredRole={}", requiredRole);
+            return true;
+        }
+
         WorkspaceContext context = WorkspaceContextHolder.getContext();
         if (context == null) {
             log.warn("Denied role check: reason=noWorkspaceContext, requiredRole={}", requiredRole);
@@ -99,12 +109,17 @@ public class WorkspaceAccessService {
     /**
      * Check if user can assign or revoke the specified role.
      * OWNER can manage all roles.
-     * ADMIN can manage ADMIN and MEMBER roles (but not OWNER).
+     * ADMIN (including global admins) can manage ADMIN and MEMBER roles (but not OWNER).
      *
      * @param targetRole Role to assign/revoke
      * @return true if user has permission to manage this role
      */
     public boolean canManageRole(WorkspaceRole targetRole) {
+        // Global admins can manage ADMIN and MEMBER roles (but not OWNER)
+        if (targetRole != WorkspaceRole.OWNER && SecurityUtils.isGlobalAdmin()) {
+            return true;
+        }
+
         WorkspaceContext context = WorkspaceContextHolder.getContext();
         if (context == null) {
             return false;

@@ -1,5 +1,7 @@
 package de.tum.in.www1.hephaestus;
 
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -54,5 +56,35 @@ public final class SecurityUtils {
             return Optional.of(givenName);
         }
         return Optional.empty();
+    }
+
+    /**
+     * Check if the current user has the global admin realm role.
+     * Users with the admin realm role (configured via KEYCLOAK_GITHUB_ADMIN_USERNAME)
+     * are automatically granted workspace admin privileges across all workspaces.
+     *
+     * @return true if the current user has the admin realm role
+     */
+    @SuppressWarnings("unchecked")
+    public static boolean isGlobalAdmin() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !(authentication.getPrincipal() instanceof Jwt jwt)) {
+            return false;
+        }
+
+        // Extract realm_access.roles from JWT claims (following SecurityConfig pattern)
+        Object realmAccessObj = jwt.getClaims().get("realm_access");
+        if (!(realmAccessObj instanceof Map)) {
+            return false;
+        }
+
+        Map<String, Object> realmAccess = (Map<String, Object>) realmAccessObj;
+        Object rolesObj = realmAccess.get("roles");
+        if (!(rolesObj instanceof List)) {
+            return false;
+        }
+
+        List<String> roles = (List<String>) rolesObj;
+        return roles.contains("admin");
     }
 }

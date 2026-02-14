@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.workspace.context;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.tum.in.www1.hephaestus.SecurityUtils;
 import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
@@ -19,6 +20,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -185,8 +187,10 @@ public class WorkspaceContextFilter implements Filter {
 
     /**
      * Fetch workspace roles for the current authenticated user.
+     * Global admins (users with Keycloak 'admin' realm role) are automatically granted ADMIN role.
      *
-     * @param workspaceId Workspace ID
+     * @param workspace Workspace entity
+     * @param userOpt Optional user
      * @return Set of workspace roles (empty if user has no membership or not authenticated)
      */
     private Set<WorkspaceRole> fetchUserRoles(
@@ -204,38 +208,53 @@ public class WorkspaceContextFilter implements Filter {
                 userOpt.get().getId()
             );
 
+            Set<WorkspaceRole> roles = new HashSet<>();
+
             if (membershipOpt.isPresent()) {
+                roles.add(membershipOpt.get().getRole());
                 log.debug("Resolved user role: role={}", membershipOpt.get().getRole());
-                return Set.of(membershipOpt.get().getRole());
+            } else {
+                // Auto-heal only when workspace has zero memberships (fresh dev DB)
+                if (workspaceMembershipRepository.findByWorkspace_Id(workspace.getId()).isEmpty()) {
+                    try {
+                        var created = workspaceMembershipService.createMembership(
+                            workspace,
+                            userOpt.get().getId(),
+                            WorkspaceRole.ADMIN
+                        );
+                        log.info(
+                            "Auto-added user to workspace: userLogin={}, workspaceSlug={}, role={}",
+                            LoggingUtils.sanitizeForLog(userOpt.get().getLogin()),
+                            LoggingUtils.sanitizeForLog(workspace.getWorkspaceSlug()),
+                            created.getRole()
+                        );
+                        roles.add(created.getRole());
+                    } catch (IllegalArgumentException ex) {
+                        log.debug(
+                            "Skipped membership auto-add: userLogin={}, workspaceSlug={}",
+                            LoggingUtils.sanitizeForLog(userOpt.get().getLogin()),
+                            LoggingUtils.sanitizeForLog(workspace.getWorkspaceSlug()),
+                            ex
+                        );
+                    }
+                }
             }
 
-            // Auto-heal only when workspace has zero memberships (fresh dev DB)
-            if (workspaceMembershipRepository.findByWorkspace_Id(workspace.getId()).isEmpty()) {
-                try {
-                    var created = workspaceMembershipService.createMembership(
-                        workspace,
-                        userOpt.get().getId(),
-                        WorkspaceRole.ADMIN
-                    );
-                    log.info(
-                        "Auto-added user to workspace: userLogin={}, workspaceSlug={}, role={}",
-                        LoggingUtils.sanitizeForLog(userOpt.get().getLogin()),
-                        LoggingUtils.sanitizeForLog(workspace.getWorkspaceSlug()),
-                        created.getRole()
-                    );
-                    return Set.of(created.getRole());
-                } catch (IllegalArgumentException ex) {
+            // Global admins are automatically granted ADMIN role for all workspaces
+            if (SecurityUtils.isGlobalAdmin()) {
+                if (roles.add(WorkspaceRole.ADMIN)) {
                     log.debug(
-                        "Skipped membership auto-add: userLogin={}, workspaceSlug={}",
-                        LoggingUtils.sanitizeForLog(userOpt.get().getLogin()),
-                        LoggingUtils.sanitizeForLog(workspace.getWorkspaceSlug()),
-                        ex
+                        "Auto-elevated global admin: workspaceSlug={}",
+                        LoggingUtils.sanitizeForLog(workspace.getWorkspaceSlug())
                     );
                 }
             }
 
-            log.debug("Returning empty roles: reason=noMembership, workspaceId={}", workspace.getId());
-            return Set.of();
+            if (roles.isEmpty()) {
+                log.debug("Returning empty roles: reason=noMembership, workspaceId={}", workspace.getId());
+            }
+
+            return roles;
         } catch (Exception e) {
             log.warn("Failed to fetch user roles: workspaceId={}", workspace.getId(), e);
             return Set.of();
