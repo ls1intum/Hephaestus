@@ -187,7 +187,7 @@ public class WorkspaceContextFilter implements Filter {
 
     /**
      * Fetch workspace roles for the current authenticated user.
-     * Global admins (users with Keycloak 'admin' realm role) are automatically granted ADMIN role.
+     * Global admins (users with the Keycloak 'admin' realm role) are automatically granted workspace ADMIN role.
      *
      * @param workspace Workspace entity
      * @param userOpt Optional user

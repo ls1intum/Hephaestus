@@ -318,12 +318,6 @@ class WorkspaceAccessServiceTest {
     @Test
     void hasRole_WithGlobalAdminButNoWorkspaceMembership_AllowsAdminAccess() {
         // Given: Global admin user with no workspace membership
-        de.tum.in.www1.hephaestus.testconfig.MockSecurityContextUtils.createSecurityContext(
-            "admin-user",
-            "admin-123",
-            new String[] { "admin" },
-            "global-admin-token"
-        );
         SecurityContextHolder.setContext(
             de.tum.in.www1.hephaestus.testconfig.MockSecurityContextUtils.createSecurityContext(
                 "admin-user",
