@@ -46,13 +46,13 @@ jobs:
 
       - name: Upload Trivy results
         if: matrix.scan-type == 'dependencies'
-        uses: github/codeql-action/upload-sarif@b20883b0cd1f46c72ae0ba6d1090936928f9fa30 # v4
+        uses: github/codeql-action/upload-sarif@9e907b5e64f6b83e7804b09294d44122997950d6 # v4
         with:
           sarif_file: "trivy-results.sarif"
 
       - name: Secret detection
         if: matrix.scan-type == 'secrets'
-        uses: trufflesecurity/trufflehog@116e7171542d2f1dad8810f00dcfacbe0b809183 # v3.92.5
+        uses: trufflesecurity/trufflehog@4158734f234bd8770128deae2e2975cfab4b66a6 # v3.93.2
         with:
           path: ./
           base: ${{ github.event_name == 'pull_request' && github.base_ref || '' }}
