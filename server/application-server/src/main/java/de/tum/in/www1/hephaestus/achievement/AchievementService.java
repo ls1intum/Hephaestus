@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.achievement;
 
 import de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator;
+import de.tum.in.www1.hephaestus.achievement.progress.AchievementProgress;
 import de.tum.in.www1.hephaestus.activity.ActivityEventType;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import org.slf4j.Logger;
@@ -146,36 +147,36 @@ public class AchievementService {
 
         for (AchievementDefinition achievementDefinition : candidates) {
             // Get existing progress or create a new record
-            UserAchievement progress = existingMap.get(achievementDefinition.getId());
-            if (progress == null) {
-                progress = UserAchievement.builder()
+            UserAchievement uaProgress = existingMap.get(achievementDefinition.getId());
+            if (uaProgress == null) {
+                uaProgress = UserAchievement.builder()
                     .user(user)
                     .achievementId(achievementDefinition.getId())
-                    .progressData(achievementDefinition.getParameters())
+                    .progressData(achievementDefinition.getRequirements())
                     .build();
             }
 
             // Skip if already unlocked
-            if (progress.getUnlockedAt() != null) {
+            if (uaProgress.getUnlockedAt() != null) {
                 continue;
             }
 
             // Resolve evaluator and increment progress
             AchievementEvaluator evaluator = resolveEvaluator(achievementDefinition);
-            boolean wasUnlocked = evaluator.updateProgress(progress);
+            boolean wasUnlocked = evaluator.updateProgress(uaProgress);
 
             if (wasUnlocked) {
-                progress.setUnlockedAt(Instant.now());
+                uaProgress.setUnlockedAt(Instant.now());
                 newlyUnlocked.add(achievementDefinition);
                 log.info(
                     "Achievement unlocked: userId={}, achievement={}, progress={}",
                     user.getId(),
                     achievementDefinition.getId(),
-                    progress.getProgressData()
+                    uaProgress.getProgressData()
                 );
             }
 
-            userAchievementRepository.save(progress);
+            userAchievementRepository.save(uaProgress);
         }
 
         return newlyUnlocked;
@@ -248,7 +249,7 @@ public class AchievementService {
         for (AchievementDefinition achievement : AchievementDefinition.values()) {
             UserAchievement progress = progressMap.get(achievement.getId());
             AchievementStatus status = computeStatus(achievement, progressMap);
-            Map<String, Object> progressData = progress.getProgressData();
+            AchievementProgress progressData = progress.getProgressData();
             Optional<Instant> unlockedAt = Optional.ofNullable(progress.getUnlockedAt());
             result.add(AchievementDTO.fromDefinition(achievement, status, progressData, unlockedAt));
         }

@@ -1,11 +1,11 @@
 package de.tum.in.www1.hephaestus.achievement;
 
+import de.tum.in.www1.hephaestus.achievement.progress.AchievementProgress;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.springframework.lang.NonNull;
 import org.springframework.lang.Nullable;
 
 import java.time.Instant;
-import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -38,9 +38,8 @@ public record AchievementDTO(
 //    @NonNull @Schema(description = "Current progress count (e.g., 4 PRs merged)", example = "4") long progress,
 //    @NonNull @Schema(description = "Required count to unlock (e.g., 5 PRs)", example = "5") long maxProgress,
     @NonNull
-    @Schema(description = "The progress data for the achievement (key:value paired just like the achievements progress definitions are as well)",
-        example = "{\"current\": 4, \"count\": 5}")
-    Map<String, Object> progressData,
+    @Schema(description = "The structured progress data based on the achievements evaluator")
+    AchievementProgress progressData,
     @NonNull @Schema(description = "Optional of when the achievement was unlocked, empty() if not unlocked") Optional<Instant> unlockedAt
 ) {
     /**
@@ -55,7 +54,7 @@ public record AchievementDTO(
     public static AchievementDTO fromDefinition(
         AchievementDefinition definition,
         AchievementStatus status,
-        Map<String, Object> progressData,
+        AchievementProgress progressData,
         Optional<Instant> unlockedAt
     ) {
         return new AchievementDTO(

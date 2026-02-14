@@ -1,26 +1,18 @@
 package de.tum.in.www1.hephaestus.achievement.evaluator;
 
 import de.tum.in.www1.hephaestus.achievement.AchievementDefinition;
-import de.tum.in.www1.hephaestus.achievement.AchievementService;
 import de.tum.in.www1.hephaestus.achievement.UserAchievement;
-import de.tum.in.www1.hephaestus.activity.ActivityEventType;
+import de.tum.in.www1.hephaestus.achievement.progress.LinearAchievementProgress;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.util.Map;
-
 /**
- * Default achievement evaluator that increments progress by one.
+ * Simple evaluator that increments a {@link LinearAchievementProgress} by 1.
  *
- * <p>This is the standard strategy: each qualifying activity event adds
- * exactly 1 to the achievement's progress {@code "current"} value. Most achievements
- * (e.g., "Merge N pull requests") use this simple counting approach.
- *
- * <p>The target count is read from the {@link AchievementDefinition} parameters
- * map under the {@code "count"} key. The "count" key should contain an {@link Integer}.
- *
- * <p>Registered as a Spring {@link Component} so that {@link AchievementService}
- * can resolve it from the evaluator strategy map at runtime.
+ * <p>Expects {@link UserAchievement#getProgressData()} to be a
+ * {@link LinearAchievementProgress}. If the type differs the evaluator logs a
+ * warning and returns {@code false}. Returns {@code true} when the update
+ * causes the achievement to unlock (current == target).
  *
  * @see AchievementEvaluator
  * @see AchievementDefinition#getEvaluatorClass()
@@ -31,23 +23,17 @@ public class StandardCountEvaluator implements AchievementEvaluator {
 
     @Override
     public boolean updateProgress(UserAchievement userAchievement) {
-        AchievementDefinition def = userAchievement.getAchievementDefinition();
-        Integer count = (Integer) def.getParameters().get("count");
-        if (count == null) {
-            log.debug("Configuration parameter missmatch for Achievement: {}. Parameter \"count\" was null but should exist as Integer!", def);
+        if (!(userAchievement.getProgressData() instanceof LinearAchievementProgress(int current, int target))) {
+            log.warn("Expected LinearAchievementProgress but received {} for achievement: {}",
+                userAchievement.getProgressData(),
+                userAchievement.getAchievementId());
             return false;
         }
 
-        // Only increment if the current value has not yet reached the count threshold
-        int current = (Integer) userAchievement.getProgressData().getOrDefault("current", 0);
-        if (current < count)
+        if (current < target)
             current++;
-        boolean wasUnlocked = current == count;
-        Map<String, Object> progressData = Map.of(
-            "current", current,
-            "count", count
-        );
-        userAchievement.setProgressData(progressData);
+        boolean wasUnlocked = current == target;
+        userAchievement.setProgressData(new LinearAchievementProgress(current, target));
         return wasUnlocked;
     }
 }

@@ -3,6 +3,8 @@ package de.tum.in.www1.hephaestus.achievement;
 import com.fasterxml.jackson.annotation.JsonValue;
 import de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator;
 import de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator;
+import de.tum.in.www1.hephaestus.achievement.progress.AchievementProgress;
+import de.tum.in.www1.hephaestus.achievement.progress.LinearAchievementProgress;
 import de.tum.in.www1.hephaestus.activity.ActivityEventType;
 import lombok.Getter;
 import org.springframework.lang.NonNull;
@@ -52,7 +54,7 @@ public enum AchievementDefinition {
         "first_pull",
         AchievementCategory.PULL_REQUESTS,
         AchievementRarity.COMMON,
-        Map.of("count", 1),
+        new LinearAchievementProgress(1),
         null,
         Set.of(ActivityEventType.PULL_REQUEST_MERGED),
         StandardCountEvaluator.class
@@ -62,7 +64,7 @@ public enum AchievementDefinition {
         "pr_beginner",
         AchievementCategory.PULL_REQUESTS,
         AchievementRarity.COMMON,
-        Map.of("count", 3),
+        new LinearAchievementProgress(3),
         FIRST_PULL,
         Set.of(ActivityEventType.PULL_REQUEST_MERGED),
         StandardCountEvaluator.class
@@ -72,7 +74,7 @@ public enum AchievementDefinition {
         "pr_apprentice",
         AchievementCategory.PULL_REQUESTS,
         AchievementRarity.UNCOMMON,
-        Map.of("count", 5),
+        new LinearAchievementProgress(5),
         PR_BEGINNER,
         Set.of(ActivityEventType.PULL_REQUEST_MERGED),
         StandardCountEvaluator.class
@@ -82,7 +84,7 @@ public enum AchievementDefinition {
         "integration_regular",
         AchievementCategory.PULL_REQUESTS,
         AchievementRarity.UNCOMMON,
-        Map.of("count", 10),
+        new LinearAchievementProgress( 10),
         PR_APPRENTICE,
         Set.of(ActivityEventType.PULL_REQUEST_MERGED),
         StandardCountEvaluator.class
@@ -92,7 +94,7 @@ public enum AchievementDefinition {
         "pr_specialist",
         AchievementCategory.PULL_REQUESTS,
         AchievementRarity.RARE,
-        Map.of("count", 25),
+        new LinearAchievementProgress( 25),
         INTEGRATION_REGULAR,
         Set.of(ActivityEventType.PULL_REQUEST_MERGED),
         StandardCountEvaluator.class
@@ -102,7 +104,7 @@ public enum AchievementDefinition {
         "integration_expert",
         AchievementCategory.PULL_REQUESTS,
         AchievementRarity.EPIC,
-        Map.of("count", 50),
+        new LinearAchievementProgress( 50),
         PR_SPECIALIST,
         Set.of(ActivityEventType.PULL_REQUEST_MERGED),
         StandardCountEvaluator.class
@@ -112,7 +114,7 @@ public enum AchievementDefinition {
         "master_integrator",
         AchievementCategory.PULL_REQUESTS,
         AchievementRarity.LEGENDARY,
-        Map.of("count", 100),
+        new LinearAchievementProgress( 100),
         INTEGRATION_EXPERT,
         Set.of(ActivityEventType.PULL_REQUEST_MERGED),
         StandardCountEvaluator.class
@@ -126,7 +128,7 @@ public enum AchievementDefinition {
         "first_review",
         AchievementCategory.COMMUNICATION,
         AchievementRarity.COMMON,
-        Map.of("count", 1),
+        new LinearAchievementProgress( 1),
         null,
         Set.of(
             ActivityEventType.REVIEW_APPROVED,
@@ -140,7 +142,7 @@ public enum AchievementDefinition {
         "review_rookie",
         AchievementCategory.COMMUNICATION,
         AchievementRarity.COMMON,
-        Map.of("count", 10),
+        new LinearAchievementProgress( 10),
         FIRST_REVIEW,
         Set.of(
             ActivityEventType.REVIEW_APPROVED,
@@ -154,7 +156,7 @@ public enum AchievementDefinition {
         "review_master",
         AchievementCategory.COMMUNICATION,
         AchievementRarity.EPIC,
-        Map.of("count", 100),
+        new LinearAchievementProgress( 100),
         REVIEW_ROOKIE,
         Set.of(
             ActivityEventType.REVIEW_APPROVED,
@@ -172,7 +174,7 @@ public enum AchievementDefinition {
         "code_commenter",
         AchievementCategory.COMMUNICATION,
         AchievementRarity.EPIC,
-        Map.of("count", 100),
+        new LinearAchievementProgress( 100),
         null,
         Set.of(ActivityEventType.REVIEW_COMMENT_CREATED),
         StandardCountEvaluator.class
@@ -186,7 +188,7 @@ public enum AchievementDefinition {
         "helpful_reviewer",
         AchievementCategory.COMMUNICATION,
         AchievementRarity.LEGENDARY,
-        Map.of("count", 50),
+        new LinearAchievementProgress( 50),
         null,
         Set.of(ActivityEventType.REVIEW_APPROVED),
         StandardCountEvaluator.class
@@ -199,9 +201,7 @@ public enum AchievementDefinition {
     /* TODO: Moving the Achievements display characteristics to the frontend
         as it is part of the client and potentially useful for localization */
 
-//    private final String name;
-//    private final String description;
-//    private final String icon;
+
     private final AchievementCategory category;
     /**
      * -- GETTER --
@@ -212,8 +212,9 @@ public enum AchievementDefinition {
     /**
      * -- GETTER --
      * Number of qualifying events required to unlock this achievement.
+     * Requirements are initialized as a subclass of an {@link AchievementProgress} object.
      */
-    private final Map<String, Object> parameters;
+    private final AchievementProgress requirements;
 
     @Nullable
     private final AchievementDefinition parent;
@@ -233,23 +234,17 @@ public enum AchievementDefinition {
 
     AchievementDefinition(
         String id,
-//        String name,
-//        String description,
-//        String icon,
         AchievementCategory category,
         AchievementRarity rarity,
-        Map<String, Object> parameters,
+        AchievementProgress requirements,
         @Nullable AchievementDefinition parent,
         Set<ActivityEventType> triggerEvents,
         Class<? extends AchievementEvaluator> evaluatorClass
     ) {
         this.id = id;
-//        this.name = name;
-//        this.description = description;
-//        this.icon = icon;
         this.category = category;
         this.rarity = rarity;
-        this.parameters = parameters;
+        this.requirements = requirements;
         this.parent = parent;
         this.triggerEvents = triggerEvents;
         this.evaluatorClass = evaluatorClass;
