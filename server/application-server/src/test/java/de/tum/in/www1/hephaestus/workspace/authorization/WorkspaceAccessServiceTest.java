@@ -316,7 +316,7 @@ class WorkspaceAccessServiceTest {
     }
 
     @Test
-    void hasRole_WithGlobalAdminButNoWorkspaceMembership_AllowsAdminAccess() {
+    void hasRole_WithGlobalAdminButNoWorkspaceMembership_DeniesAccess() {
         // Given: Global admin user with no workspace membership
         SecurityContextHolder.setContext(
             de.tum.in.www1.hephaestus.testconfig.MockSecurityContextUtils.createSecurityContext(
@@ -334,17 +334,15 @@ class WorkspaceAccessServiceTest {
             AccountType.ORG,
             123L,
             false,
-            Set.of() // No workspace roles
+            Set.of() // No workspace roles - not a member
         );
         WorkspaceContextHolder.setContext(context);
 
-        // When & Then: Global admin can access ADMIN and MEMBER endpoints
-        assertThat(accessService.hasRole(WorkspaceRole.MEMBER)).isTrue();
-        assertThat(accessService.hasRole(WorkspaceRole.ADMIN)).isTrue();
-        assertThat(accessService.isMember()).isTrue();
-        assertThat(accessService.isAdmin()).isTrue();
-
-        // But cannot access OWNER endpoints
+        // When & Then: Global admin without membership cannot access workspace
+        assertThat(accessService.hasRole(WorkspaceRole.MEMBER)).isFalse();
+        assertThat(accessService.hasRole(WorkspaceRole.ADMIN)).isFalse();
+        assertThat(accessService.isMember()).isFalse();
+        assertThat(accessService.isAdmin()).isFalse();
         assertThat(accessService.hasRole(WorkspaceRole.OWNER)).isFalse();
         assertThat(accessService.isOwner()).isFalse();
     }
@@ -408,8 +406,8 @@ class WorkspaceAccessServiceTest {
     }
 
     @Test
-    void canManageRole_WithGlobalAdmin_CanManageAdminAndMember() {
-        // Given: Global admin user
+    void canManageRole_WithGlobalAdminAndMembership_CanManageAdminAndMember() {
+        // Given: Global admin user with MEMBER workspace role
         SecurityContextHolder.setContext(
             de.tum.in.www1.hephaestus.testconfig.MockSecurityContextUtils.createSecurityContext(
                 "admin-user",
@@ -426,11 +424,11 @@ class WorkspaceAccessServiceTest {
             AccountType.ORG,
             123L,
             false,
-            Set.of() // No workspace roles
+            Set.of(WorkspaceRole.MEMBER) // Has workspace membership
         );
         WorkspaceContextHolder.setContext(context);
 
-        // When & Then: Global admin can manage ADMIN and MEMBER roles but not OWNER
+        // When & Then: Global admin with membership can manage ADMIN and MEMBER roles but not OWNER
         assertThat(accessService.canManageRole(WorkspaceRole.MEMBER)).isTrue();
         assertThat(accessService.canManageRole(WorkspaceRole.ADMIN)).isTrue();
         assertThat(accessService.canManageRole(WorkspaceRole.OWNER)).isFalse();

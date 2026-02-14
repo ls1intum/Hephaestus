@@ -43,7 +43,7 @@ That's it. The filter handles slug resolution, membership checks, and 403/404 re
 
 ## Authorization
 
-Global admins (users with the Keycloak `admin` realm role, configured via `KEYCLOAK_GITHUB_ADMIN_USERNAME`) are automatically elevated to workspace ADMIN level across all workspaces. They can perform all ADMIN and MEMBER operations but cannot perform OWNER-only operations (ownership transfer remains explicit).
+Global admins (users with the Keycloak `admin` realm role, configured via `KEYCLOAK_GITHUB_ADMIN_USERNAME`) are automatically elevated to workspace ADMIN level for workspaces where they have membership. They must be members of the workspace (any role) to access it, but their permissions are elevated to ADMIN. They cannot perform OWNER-only operations (ownership transfer remains explicit).
 
 Check roles via the context:
 
@@ -54,7 +54,7 @@ if (ctx.hasRole(WorkspaceRole.OWNER)) {
 
 if (!ctx.hasMembership()) {
     // user has no role in this workspace
-    // Note: global admins always have implicit membership
+    // Note: global admins still need workspace membership
 }
 ```
 

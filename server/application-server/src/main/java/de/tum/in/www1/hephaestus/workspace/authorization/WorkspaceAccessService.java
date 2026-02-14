@@ -28,18 +28,12 @@ public class WorkspaceAccessService {
      * Check if the current user has at least the specified role in the current workspace.
      * Uses role hierarchy: if user has OWNER, they also satisfy ADMIN and MEMBER checks.
      * Global admins (Keycloak admin realm role) are automatically elevated to ADMIN level
-     * for all workspaces, but cannot satisfy OWNER checks (ownership remains explicit).
+     * for workspaces where they have membership, but cannot satisfy OWNER checks (ownership remains explicit).
      *
      * @param requiredRole Minimum required role
      * @return true if user has the required role or higher
      */
     public boolean hasRole(WorkspaceRole requiredRole) {
-        // Global admins are automatically elevated to ADMIN level (but not OWNER)
-        if (requiredRole != WorkspaceRole.OWNER && SecurityUtils.isGlobalAdmin()) {
-            log.debug("Granted role check: reason=globalAdmin, requiredRole={}", requiredRole);
-            return true;
-        }
-
         WorkspaceContext context = WorkspaceContextHolder.getContext();
         if (context == null) {
             log.warn("Denied role check: reason=noWorkspaceContext, requiredRole={}", requiredRole);
@@ -52,11 +46,21 @@ public class WorkspaceAccessService {
             return false;
         }
 
-        // Check role hierarchy
+        // Check role hierarchy based on database roles
         for (WorkspaceRole userRole : userRoles) {
             if (satisfiesRoleRequirement(userRole, requiredRole)) {
                 return true;
             }
+        }
+
+        // Global admins with membership are automatically elevated to ADMIN level (but not OWNER)
+        if (requiredRole != WorkspaceRole.OWNER && SecurityUtils.isGlobalAdmin()) {
+            log.debug(
+                "Granted role check: reason=globalAdminElevation, requiredRole={}, workspaceSlug={}",
+                requiredRole,
+                context.slug()
+            );
+            return true;
         }
 
         log.debug(
@@ -109,17 +113,12 @@ public class WorkspaceAccessService {
     /**
      * Check if user can assign or revoke the specified role.
      * OWNER can manage all roles.
-     * ADMIN (including global admins) can manage ADMIN and MEMBER roles (but not OWNER).
+     * ADMIN (including global admins with membership) can manage ADMIN and MEMBER roles (but not OWNER).
      *
      * @param targetRole Role to assign/revoke
      * @return true if user has permission to manage this role
      */
     public boolean canManageRole(WorkspaceRole targetRole) {
-        // Global admins can manage ADMIN and MEMBER roles (but not OWNER)
-        if (targetRole != WorkspaceRole.OWNER && SecurityUtils.isGlobalAdmin()) {
-            return true;
-        }
-
         WorkspaceContext context = WorkspaceContextHolder.getContext();
         if (context == null) {
             return false;
@@ -138,6 +137,11 @@ public class WorkspaceAccessService {
         // ADMIN can manage ADMIN and MEMBER, but not OWNER
         if (userRoles.contains(WorkspaceRole.ADMIN)) {
             return targetRole != WorkspaceRole.OWNER;
+        }
+
+        // Global admins with membership can manage ADMIN and MEMBER roles (but not OWNER)
+        if (targetRole != WorkspaceRole.OWNER && SecurityUtils.isGlobalAdmin()) {
+            return true;
         }
 
         return false;
