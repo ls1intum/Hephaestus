@@ -61,7 +61,8 @@ public final class SecurityUtils {
     /**
      * Check if the current user has the super admin realm role.
      * Users with the admin realm role (configured via KEYCLOAK_GITHUB_ADMIN_USERNAME)
-     * are automatically granted workspace admin privileges for workspaces where they have membership.
+     * can be elevated to workspace admin level by the authorization layer, but only for workspaces
+     * where they are members. This method itself only checks for the presence of the realm role.
      *
      * @return true if the current user has the admin realm role
      */
