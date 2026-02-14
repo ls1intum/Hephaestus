@@ -1,47 +1,13 @@
-import {
-	ArrowLeftRight,
-	Bug,
-	Building,
-	Check,
-	Circle,
-	CircleDot,
-	Crown,
-	Eye,
-	FileText,
-	Flag,
-	Flame,
-	GitCommit,
-	GitMerge,
-	GitPullRequest,
-	GraduationCap,
-	HandHelping,
-	HelpCircle,
-	Layers,
-	Lightbulb,
-	ListChecks,
-	Lock,
-	Megaphone,
-	MessageSquare,
-	MessagesSquare,
-	Pentagon,
-	Radar,
-	Radio,
-	Rocket,
-	RotateCcw,
-	ScrollText,
-	Shield,
-	Sparkles,
-	Star,
-	Target,
-	Timer,
-	Triangle,
-	Wrench,
-	Zap,
-} from "lucide-react";
-import type React from "react";
-import type { Achievement } from "@/api/types.gen";
+import { Check, Lock } from "lucide-react";
+import { AchievementProgressDisplay } from "@/components/achievements/AchievementProgressDisplay.tsx";
+import { categoryLabels } from "@/components/achievements/styles.ts";
+import type {
+	AchievementCategory,
+	AchievementStatus,
+	UIAchievement,
+} from "@/components/achievements/types";
+import { compareByRarity } from "@/components/achievements/utils";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import {
 	Table,
 	TableBody,
@@ -51,69 +17,16 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import {
-	type AchievementCategory,
-	type AchievementStatus,
-	compareByRarity,
-} from "./achievements.config.ts";
-
-const iconMap: Record<string, React.ElementType> = {
-	GitCommit,
-	GitPullRequest,
-	GitMerge,
-	Eye,
-	Shield,
-	Sparkles,
-	Bug,
-	Target,
-	Flag,
-	MessageSquare,
-	MessagesSquare,
-	Zap,
-	Crown,
-	Flame,
-	Rocket,
-	Building,
-	Lock,
-	CircleDot,
-	Radar,
-	Megaphone,
-	Radio,
-	Layers,
-	RotateCcw,
-	ArrowLeftRight,
-	Circle,
-	ListChecks,
-	ScrollText,
-	GraduationCap,
-	Wrench,
-	HelpCircle,
-	Lightbulb,
-	FileText,
-	Triangle,
-	Pentagon,
-	Star,
-	HandHelping,
-	Timer,
-};
-
-const categoryLabels: Record<AchievementCategory, string> = {
-	pull_requests: "Pull Requests",
-	commits: "Commits",
-	communication: "Communication",
-	issues: "Issues",
-	milestones: "Milestones",
-};
 
 interface AchievementListViewProps {
-	achievements: Achievement[];
+	achievements: UIAchievement[];
 }
 
 /**
  * Accessible list/table view of achievements.
  * Provides a screen-reader friendly alternative to the skill tree visualization.
  */
-export function AchievementListView({ achievements }: AchievementListViewProps) {
+export function AchievementsListView({ achievements }: AchievementListViewProps) {
 	// Group achievements by category for better organization
 	const groupedAchievements = achievements.reduce(
 		(acc, achievement) => {
@@ -125,7 +38,7 @@ export function AchievementListView({ achievements }: AchievementListViewProps) 
 			acc[category].push(achievement);
 			return acc;
 		},
-		{} as Record<AchievementCategory, Achievement[]>,
+		{} as Record<AchievementCategory, UIAchievement[]>,
 	);
 
 	// Sort categories in a logical order
@@ -189,12 +102,8 @@ export function AchievementListView({ achievements }: AchievementListViewProps) 
 							</TableHeader>
 							<TableBody>
 								{groupedAchievements[category].sort(compareByRarity).map((achievement) => {
-									const Icon = iconMap[achievement.icon] || GitCommit;
+									const Icon = achievement.icon;
 									const status = achievement.status;
-									const progress = achievement.progress;
-									const maxProgress = achievement.maxProgress;
-									const progressPercent =
-										maxProgress > 0 ? Math.round((progress / maxProgress) * 100) : 0;
 
 									return (
 										<TableRow
@@ -225,16 +134,7 @@ export function AchievementListView({ achievements }: AchievementListViewProps) 
 												<span className="text-sm capitalize">{achievement.rarity}</span>
 											</TableCell>
 											<TableCell>
-												<div className="space-y-1">
-													<Progress
-														value={progressPercent}
-														className="h-2"
-														aria-label={`Progress: ${progress} of ${maxProgress}`}
-													/>
-													<div className="text-xs text-muted-foreground">
-														{progress}/{maxProgress}
-													</div>
-												</div>
+												<AchievementProgressDisplay achievement={achievement} />
 											</TableCell>
 											<TableCell>{getStatusBadge(achievement.status)}</TableCell>
 										</TableRow>
