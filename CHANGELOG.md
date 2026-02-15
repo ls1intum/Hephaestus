@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.16.0](https://github.com/ls1intum/Hephaestus/compare/v0.15.0...v0.16.0) (2026-02-15)
+
+### 🚀 Features
+
+* **workspace:** auto-elevate super admins with membership to workspace ADMIN ([#759](https://github.com/ls1intum/Hephaestus/issues/759)) ([ca82899](https://github.com/ls1intum/Hephaestus/commit/ca82899ac39e046fb3b918ac842035ea609d5e77))
+* **config:** configurable host ports for local development ([#758](https://github.com/ls1intum/Hephaestus/issues/758)) ([19e7393](https://github.com/ls1intum/Hephaestus/commit/19e7393816fce4ca2fe5d997f8ff40123baf2ab1))
+
 ## [0.15.0](https://github.com/ls1intum/Hephaestus/compare/v0.14.0...v0.15.0) (2026-02-01)
 
 ### 🚀 Features
