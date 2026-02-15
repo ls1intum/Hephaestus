@@ -9,7 +9,8 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.ExponentialBackoff;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
-import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncHelper;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoordinator;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoordinator.GraphQlClassificationContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncMetadata;
@@ -48,7 +49,7 @@ public class GitHubIssueTypeSyncService {
     private final GitHubSyncProperties syncProperties;
     private final GitHubExceptionClassifier exceptionClassifier;
     private final SyncSchedulerProperties syncSchedulerProperties;
-    private final GitHubGraphQlSyncHelper graphQlSyncHelper;
+    private final GitHubGraphQlSyncCoordinator graphQlSyncHelper;
     private static final int MAX_RETRY_ATTEMPTS = 3;
 
     public GitHubIssueTypeSyncService(
@@ -59,7 +60,7 @@ public class GitHubIssueTypeSyncService {
         GitHubSyncProperties syncProperties,
         GitHubExceptionClassifier exceptionClassifier,
         SyncSchedulerProperties syncSchedulerProperties,
-        GitHubGraphQlSyncHelper graphQlSyncHelper
+        GitHubGraphQlSyncCoordinator graphQlSyncHelper
     ) {
         this.issueTypeRepository = issueTypeRepository;
         this.organizationRepository = organizationRepository;
@@ -141,13 +142,15 @@ public class GitHubIssueTypeSyncService {
                     if (classification != null) {
                         if (
                             graphQlSyncHelper.handleGraphQlClassification(
-                                classification,
-                                retryAttempt,
-                                MAX_RETRY_ATTEMPTS,
-                                "issue type sync",
-                                "orgLogin",
-                                safeOrgLogin,
-                                log
+                                new GraphQlClassificationContext(
+                                    classification,
+                                    retryAttempt,
+                                    MAX_RETRY_ATTEMPTS,
+                                    "issue type sync",
+                                    "orgLogin",
+                                    safeOrgLogin,
+                                    log
+                                )
                             )
                         ) {
                             retryAttempt++;
@@ -218,13 +221,15 @@ public class GitHubIssueTypeSyncService {
             ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
             if (
                 !graphQlSyncHelper.handleGraphQlClassification(
-                    classification,
-                    0,
-                    MAX_RETRY_ATTEMPTS,
-                    "issue type sync",
-                    "orgLogin",
-                    safeOrgLogin,
-                    log
+                    new GraphQlClassificationContext(
+                        classification,
+                        0,
+                        MAX_RETRY_ATTEMPTS,
+                        "issue type sync",
+                        "orgLogin",
+                        safeOrgLogin,
+                        log
+                    )
                 )
             ) {
                 return 0;

@@ -14,7 +14,8 @@ import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFou
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
-import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncHelper;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoordinator;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoordinator.GraphQlClassificationContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
@@ -61,7 +62,7 @@ public class GitHubIssueCommentSyncService {
     private final GitHubIssueCommentProcessor commentProcessor;
     private final GitHubSyncProperties syncProperties;
     private final GitHubExceptionClassifier exceptionClassifier;
-    private final GitHubGraphQlSyncHelper graphQlSyncHelper;
+    private final GitHubGraphQlSyncCoordinator graphQlSyncHelper;
     private static final int MAX_RETRY_ATTEMPTS = 3;
 
     public GitHubIssueCommentSyncService(
@@ -69,7 +70,7 @@ public class GitHubIssueCommentSyncService {
         GitHubIssueCommentProcessor commentProcessor,
         GitHubSyncProperties syncProperties,
         GitHubExceptionClassifier exceptionClassifier,
-        GitHubGraphQlSyncHelper graphQlSyncHelper
+        GitHubGraphQlSyncCoordinator graphQlSyncHelper
     ) {
         this.graphQlClientProvider = graphQlClientProvider;
         this.commentProcessor = commentProcessor;
@@ -171,13 +172,15 @@ public class GitHubIssueCommentSyncService {
                     if (classification != null) {
                         if (
                             graphQlSyncHelper.handleGraphQlClassification(
-                                classification,
-                                retryAttempt,
-                                MAX_RETRY_ATTEMPTS,
-                                "comment sync",
-                                "issueNumber",
-                                issue.getNumber(),
-                                log
+                                new GraphQlClassificationContext(
+                                    classification,
+                                    retryAttempt,
+                                    MAX_RETRY_ATTEMPTS,
+                                    "comment sync",
+                                    "issueNumber",
+                                    issue.getNumber(),
+                                    log
+                                )
                             )
                         ) {
                             retryAttempt++;
@@ -258,13 +261,15 @@ public class GitHubIssueCommentSyncService {
                 ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
                 if (
                     !graphQlSyncHelper.handleGraphQlClassification(
-                        classification,
-                        retryAttempt,
-                        MAX_RETRY_ATTEMPTS,
-                        "comment sync",
-                        "issueNumber",
-                        issue.getNumber(),
-                        log
+                        new GraphQlClassificationContext(
+                            classification,
+                            retryAttempt,
+                            MAX_RETRY_ATTEMPTS,
+                            "comment sync",
+                            "issueNumber",
+                            issue.getNumber(),
+                            log
+                        )
                     )
                 ) {
                     break;
@@ -386,13 +391,15 @@ public class GitHubIssueCommentSyncService {
                     if (classification != null) {
                         if (
                             graphQlSyncHelper.handleGraphQlClassification(
-                                classification,
-                                retryAttempt,
-                                MAX_RETRY_ATTEMPTS,
-                                "remaining comment sync",
-                                "issueNumber",
-                                issue.getNumber(),
-                                log
+                                new GraphQlClassificationContext(
+                                    classification,
+                                    retryAttempt,
+                                    MAX_RETRY_ATTEMPTS,
+                                    "remaining comment sync",
+                                    "issueNumber",
+                                    issue.getNumber(),
+                                    log
+                                )
                             )
                         ) {
                             retryAttempt++;
@@ -470,13 +477,15 @@ public class GitHubIssueCommentSyncService {
                 ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
                 if (
                     !graphQlSyncHelper.handleGraphQlClassification(
-                        classification,
-                        retryAttempt,
-                        MAX_RETRY_ATTEMPTS,
-                        "remaining comment sync",
-                        "issueNumber",
-                        issue.getNumber(),
-                        log
+                        new GraphQlClassificationContext(
+                            classification,
+                            retryAttempt,
+                            MAX_RETRY_ATTEMPTS,
+                            "remaining comment sync",
+                            "issueNumber",
+                            issue.getNumber(),
+                            log
+                        )
                     )
                 ) {
                     break;

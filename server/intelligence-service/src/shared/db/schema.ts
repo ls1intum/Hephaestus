@@ -763,8 +763,19 @@ export const projectItem = pgTable(
 		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }),
 	},
 	(table) => [
+		index("idx_project_item_content_type_archived").using(
+			"btree",
+			table.projectId.asc().nullsLast(),
+			table.contentType.asc().nullsLast(),
+			table.archived.asc().nullsLast(),
+		),
 		index("idx_project_item_creator_id").using("btree", table.creatorId.asc().nullsLast()),
 		index("idx_project_item_issue_id").using("btree", table.issueId.asc().nullsLast()),
+		index("idx_project_item_orphaned_relink")
+			.using("btree", table.contentDatabaseId.asc().nullsLast())
+			.where(
+				sql`((issue_id IS NULL) AND (content_database_id IS NOT NULL) AND ((content_type)::text = ANY ((ARRAY['ISSUE'::character varying, 'PULL_REQUEST'::character varying])::text[])))`,
+			),
 		index("idx_project_item_project_archived").using(
 			"btree",
 			table.projectId.asc().nullsLast(),
@@ -1229,7 +1240,7 @@ export const user = pgTable(
 		name: varchar({ length: 255 }),
 		type: varchar({ length: 255 }),
 	},
-	(table) => [unique("uk_user_login").on(table.login)],
+	(table) => [uniqueIndex("uk_user_login_lower").using("btree", sql`lower((login)::text)`)],
 );
 
 export const userPreferences = pgTable(

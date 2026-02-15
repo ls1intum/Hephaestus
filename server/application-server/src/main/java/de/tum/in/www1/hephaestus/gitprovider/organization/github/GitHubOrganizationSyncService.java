@@ -9,7 +9,8 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.ExponentialBackoff;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
-import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncHelper;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoordinator;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoordinator.GraphQlClassificationContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHOrganization;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHOrganizationMemberConnection;
@@ -59,7 +60,7 @@ public class GitHubOrganizationSyncService {
     private final OrganizationMembershipRepository organizationMembershipRepository;
     private final GitHubSyncProperties syncProperties;
     private final GitHubExceptionClassifier exceptionClassifier;
-    private final GitHubGraphQlSyncHelper graphQlSyncHelper;
+    private final GitHubGraphQlSyncCoordinator graphQlSyncHelper;
     private static final int MAX_RETRY_ATTEMPTS = 3;
 
     public GitHubOrganizationSyncService(
@@ -69,7 +70,7 @@ public class GitHubOrganizationSyncService {
         OrganizationMembershipRepository organizationMembershipRepository,
         GitHubSyncProperties syncProperties,
         GitHubExceptionClassifier exceptionClassifier,
-        GitHubGraphQlSyncHelper graphQlSyncHelper
+        GitHubGraphQlSyncCoordinator graphQlSyncHelper
     ) {
         this.graphQlClientProvider = graphQlClientProvider;
         this.organizationProcessor = organizationProcessor;
@@ -112,13 +113,15 @@ public class GitHubOrganizationSyncService {
                 if (classification != null) {
                     if (
                         graphQlSyncHelper.handleGraphQlClassification(
-                            classification,
-                            0,
-                            MAX_RETRY_ATTEMPTS,
-                            "organization sync",
-                            "orgLogin",
-                            sanitizeForLog(organizationLogin),
-                            log
+                            new GraphQlClassificationContext(
+                                classification,
+                                0,
+                                MAX_RETRY_ATTEMPTS,
+                                "organization sync",
+                                "orgLogin",
+                                sanitizeForLog(organizationLogin),
+                                log
+                            )
                         )
                     ) {
                         return syncOrganization(scopeId, organizationLogin);
@@ -185,13 +188,15 @@ public class GitHubOrganizationSyncService {
             ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
             if (
                 !graphQlSyncHelper.handleGraphQlClassification(
-                    classification,
-                    0,
-                    MAX_RETRY_ATTEMPTS,
-                    "organization sync",
-                    "orgLogin",
-                    sanitizeForLog(organizationLogin),
-                    log
+                    new GraphQlClassificationContext(
+                        classification,
+                        0,
+                        MAX_RETRY_ATTEMPTS,
+                        "organization sync",
+                        "orgLogin",
+                        sanitizeForLog(organizationLogin),
+                        log
+                    )
                 )
             ) {
                 return null;
@@ -280,13 +285,15 @@ public class GitHubOrganizationSyncService {
                 if (classification != null) {
                     if (
                         graphQlSyncHelper.handleGraphQlClassification(
-                            classification,
-                            retryAttempt,
-                            MAX_RETRY_ATTEMPTS,
-                            "organization members sync",
-                            "orgLogin",
-                            sanitizeForLog(organization.getLogin()),
-                            log
+                            new GraphQlClassificationContext(
+                                classification,
+                                retryAttempt,
+                                MAX_RETRY_ATTEMPTS,
+                                "organization members sync",
+                                "orgLogin",
+                                sanitizeForLog(organization.getLogin()),
+                                log
+                            )
                         )
                     ) {
                         retryAttempt++;

@@ -12,7 +12,8 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.ExponentialBackoff;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
-import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncHelper;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoordinator;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoordinator.GraphQlClassificationContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
@@ -80,7 +81,7 @@ public class GitHubPullRequestReviewCommentSyncService {
     private final GitHubUserProcessor userProcessor;
     private final GitHubSyncProperties syncProperties;
     private final GitHubExceptionClassifier exceptionClassifier;
-    private final GitHubGraphQlSyncHelper graphQlSyncHelper;
+    private final GitHubGraphQlSyncCoordinator graphQlSyncHelper;
     private static final int MAX_RETRY_ATTEMPTS = 3;
 
     public GitHubPullRequestReviewCommentSyncService(
@@ -90,7 +91,7 @@ public class GitHubPullRequestReviewCommentSyncService {
         GitHubUserProcessor userProcessor,
         GitHubSyncProperties syncProperties,
         GitHubExceptionClassifier exceptionClassifier,
-        GitHubGraphQlSyncHelper graphQlSyncHelper
+        GitHubGraphQlSyncCoordinator graphQlSyncHelper
     ) {
         this.threadRepository = threadRepository;
         this.graphQlClientProvider = graphQlClientProvider;
@@ -178,13 +179,15 @@ public class GitHubPullRequestReviewCommentSyncService {
                     if (classification != null) {
                         if (
                             graphQlSyncHelper.handleGraphQlClassification(
-                                classification,
-                                retryAttempt,
-                                MAX_RETRY_ATTEMPTS,
-                                "review comment sync",
-                                "prNumber",
-                                pullRequest.getNumber(),
-                                log
+                                new GraphQlClassificationContext(
+                                    classification,
+                                    retryAttempt,
+                                    MAX_RETRY_ATTEMPTS,
+                                    "review comment sync",
+                                    "prNumber",
+                                    pullRequest.getNumber(),
+                                    log
+                                )
                             )
                         ) {
                             retryAttempt++;
@@ -269,13 +272,15 @@ public class GitHubPullRequestReviewCommentSyncService {
             ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
             if (
                 !graphQlSyncHelper.handleGraphQlClassification(
-                    classification,
-                    retryAttempt,
-                    MAX_RETRY_ATTEMPTS,
-                    "review comment sync",
-                    "prNumber",
-                    pullRequest.getNumber(),
-                    log
+                    new GraphQlClassificationContext(
+                        classification,
+                        retryAttempt,
+                        MAX_RETRY_ATTEMPTS,
+                        "review comment sync",
+                        "prNumber",
+                        pullRequest.getNumber(),
+                        log
+                    )
                 )
             ) {
                 return 0;
@@ -452,13 +457,15 @@ public class GitHubPullRequestReviewCommentSyncService {
                     if (classification != null) {
                         if (
                             graphQlSyncHelper.handleGraphQlClassification(
-                                classification,
-                                retryAttempt,
-                                MAX_RETRY_ATTEMPTS,
-                                "thread comments fetch",
-                                "threadId",
-                                threadNodeId,
-                                log
+                                new GraphQlClassificationContext(
+                                    classification,
+                                    retryAttempt,
+                                    MAX_RETRY_ATTEMPTS,
+                                    "thread comments fetch",
+                                    "threadId",
+                                    threadNodeId,
+                                    log
+                                )
                             )
                         ) {
                             retryAttempt++;
@@ -510,13 +517,15 @@ public class GitHubPullRequestReviewCommentSyncService {
                 ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
                 if (
                     !graphQlSyncHelper.handleGraphQlClassification(
-                        classification,
-                        retryAttempt,
-                        MAX_RETRY_ATTEMPTS,
-                        "thread comments fetch",
-                        "threadId",
-                        threadNodeId,
-                        log
+                        new GraphQlClassificationContext(
+                            classification,
+                            retryAttempt,
+                            MAX_RETRY_ATTEMPTS,
+                            "thread comments fetch",
+                            "threadId",
+                            threadNodeId,
+                            log
+                        )
                     )
                 ) {
                     break;

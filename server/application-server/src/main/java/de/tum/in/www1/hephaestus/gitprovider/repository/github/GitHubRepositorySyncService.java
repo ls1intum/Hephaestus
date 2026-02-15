@@ -7,7 +7,8 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.ExponentialBackoff;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
-import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncHelper;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoordinator;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoordinator.GraphQlClassificationContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
@@ -47,7 +48,7 @@ public class GitHubRepositorySyncService {
     private final OrganizationRepository organizationRepository;
     private final GitHubSyncProperties syncProperties;
     private final GitHubExceptionClassifier exceptionClassifier;
-    private final GitHubGraphQlSyncHelper graphQlSyncHelper;
+    private final GitHubGraphQlSyncCoordinator graphQlSyncHelper;
     private static final int MAX_RETRY_ATTEMPTS = 3;
 
     public GitHubRepositorySyncService(
@@ -56,7 +57,7 @@ public class GitHubRepositorySyncService {
         OrganizationRepository organizationRepository,
         GitHubSyncProperties syncProperties,
         GitHubExceptionClassifier exceptionClassifier,
-        GitHubGraphQlSyncHelper graphQlSyncHelper
+        GitHubGraphQlSyncCoordinator graphQlSyncHelper
     ) {
         this.graphQlClientProvider = graphQlClientProvider;
         this.repositoryRepository = repositoryRepository;
@@ -102,13 +103,15 @@ public class GitHubRepositorySyncService {
                 if (classification != null) {
                     if (
                         graphQlSyncHelper.handleGraphQlClassification(
-                            classification,
-                            0,
-                            MAX_RETRY_ATTEMPTS,
-                            "repository sync",
-                            "repoName",
-                            safeNameWithOwner,
-                            log
+                            new GraphQlClassificationContext(
+                                classification,
+                                0,
+                                MAX_RETRY_ATTEMPTS,
+                                "repository sync",
+                                "repoName",
+                                safeNameWithOwner,
+                                log
+                            )
                         )
                     ) {
                         return syncRepository(scopeId, nameWithOwner);
@@ -232,13 +235,15 @@ public class GitHubRepositorySyncService {
         } catch (Exception e) {
             ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
             graphQlSyncHelper.handleGraphQlClassification(
-                classification,
-                0,
-                MAX_RETRY_ATTEMPTS,
-                "repository sync",
-                "repoName",
-                safeNameWithOwner,
-                log
+                new GraphQlClassificationContext(
+                    classification,
+                    0,
+                    MAX_RETRY_ATTEMPTS,
+                    "repository sync",
+                    "repoName",
+                    safeNameWithOwner,
+                    log
+                )
             );
             return Optional.empty();
         }

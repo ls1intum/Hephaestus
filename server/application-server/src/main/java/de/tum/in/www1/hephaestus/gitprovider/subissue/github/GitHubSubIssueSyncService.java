@@ -10,7 +10,8 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.ExponentialBackoff;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
-import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncHelper;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoordinator;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoordinator.GraphQlClassificationContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
@@ -84,7 +85,7 @@ public class GitHubSubIssueSyncService {
     private final SyncSchedulerProperties syncSchedulerProperties;
     private final GitHubIssueProcessor issueProcessor;
     private final GitHubSubIssueSyncService self;
-    private final GitHubGraphQlSyncHelper graphQlSyncHelper;
+    private final GitHubGraphQlSyncCoordinator graphQlSyncHelper;
     private static final int MAX_RETRY_ATTEMPTS = 3;
 
     public GitHubSubIssueSyncService(
@@ -97,7 +98,7 @@ public class GitHubSubIssueSyncService {
         SyncSchedulerProperties syncSchedulerProperties,
         GitHubIssueProcessor issueProcessor,
         @Lazy GitHubSubIssueSyncService self,
-        GitHubGraphQlSyncHelper graphQlSyncHelper
+        GitHubGraphQlSyncCoordinator graphQlSyncHelper
     ) {
         this.issueRepository = issueRepository;
         this.repositoryRepository = repositoryRepository;
@@ -290,13 +291,15 @@ public class GitHubSubIssueSyncService {
                 failedRepoCount++;
                 ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
                 graphQlSyncHelper.handleGraphQlClassification(
-                    classification,
-                    0,
-                    MAX_RETRY_ATTEMPTS,
-                    "sub-issue sync",
-                    "repoName",
-                    sanitizeForLog(repoNameWithOwner),
-                    log
+                    new GraphQlClassificationContext(
+                        classification,
+                        0,
+                        MAX_RETRY_ATTEMPTS,
+                        "sub-issue sync",
+                        "repoName",
+                        sanitizeForLog(repoNameWithOwner),
+                        log
+                    )
                 );
             }
         }
@@ -366,13 +369,15 @@ public class GitHubSubIssueSyncService {
                     if (classification != null) {
                         if (
                             graphQlSyncHelper.handleGraphQlClassification(
-                                classification,
-                                retryAttempt,
-                                MAX_RETRY_ATTEMPTS,
-                                "sub-issue repository sync",
-                                "repoName",
-                                sanitizeForLog(repository.getNameWithOwner()),
-                                log
+                                new GraphQlClassificationContext(
+                                    classification,
+                                    retryAttempt,
+                                    MAX_RETRY_ATTEMPTS,
+                                    "sub-issue repository sync",
+                                    "repoName",
+                                    sanitizeForLog(repository.getNameWithOwner()),
+                                    log
+                                )
                             )
                         ) {
                             retryAttempt++;
@@ -438,13 +443,15 @@ public class GitHubSubIssueSyncService {
                 ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
                 if (
                     !graphQlSyncHelper.handleGraphQlClassification(
-                        classification,
-                        retryAttempt,
-                        MAX_RETRY_ATTEMPTS,
-                        "sub-issue repository sync",
-                        "repoName",
-                        sanitizeForLog(repository.getNameWithOwner()),
-                        log
+                        new GraphQlClassificationContext(
+                            classification,
+                            retryAttempt,
+                            MAX_RETRY_ATTEMPTS,
+                            "sub-issue repository sync",
+                            "repoName",
+                            sanitizeForLog(repository.getNameWithOwner()),
+                            log
+                        )
                     )
                 ) {
                     break;

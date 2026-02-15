@@ -10,7 +10,8 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.ExponentialBackoff;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
-import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncHelper;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoordinator;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoordinator.GraphQlClassificationContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
@@ -90,7 +91,7 @@ public class GitHubIssueDependencySyncService {
     private final SyncSchedulerProperties syncSchedulerProperties;
     private final GitHubIssueProcessor issueProcessor;
     private final GitHubIssueDependencySyncService self;
-    private final GitHubGraphQlSyncHelper graphQlSyncHelper;
+    private final GitHubGraphQlSyncCoordinator graphQlSyncHelper;
     private static final int MAX_RETRY_ATTEMPTS = 3;
 
     public GitHubIssueDependencySyncService(
@@ -103,7 +104,7 @@ public class GitHubIssueDependencySyncService {
         SyncSchedulerProperties syncSchedulerProperties,
         GitHubIssueProcessor issueProcessor,
         @Lazy GitHubIssueDependencySyncService self,
-        GitHubGraphQlSyncHelper graphQlSyncHelper
+        GitHubGraphQlSyncCoordinator graphQlSyncHelper
     ) {
         this.issueRepository = issueRepository;
         this.repositoryRepository = repositoryRepository;
@@ -234,13 +235,15 @@ public class GitHubIssueDependencySyncService {
                 failedRepoCount++;
                 ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
                 graphQlSyncHelper.handleGraphQlClassification(
-                    classification,
-                    0,
-                    MAX_RETRY_ATTEMPTS,
-                    "dependency sync",
-                    "repoName",
-                    sanitizeForLog(repoNameWithOwner),
-                    log
+                    new GraphQlClassificationContext(
+                        classification,
+                        0,
+                        MAX_RETRY_ATTEMPTS,
+                        "dependency sync",
+                        "repoName",
+                        sanitizeForLog(repoNameWithOwner),
+                        log
+                    )
                 );
             }
         }
@@ -316,13 +319,15 @@ public class GitHubIssueDependencySyncService {
                 if (classification != null) {
                     if (
                         graphQlSyncHelper.handleGraphQlClassification(
-                            classification,
-                            retryAttempt,
-                            MAX_RETRY_ATTEMPTS,
-                            "dependency repository sync",
-                            "repoName",
-                            safeNameWithOwner,
-                            log
+                            new GraphQlClassificationContext(
+                                classification,
+                                retryAttempt,
+                                MAX_RETRY_ATTEMPTS,
+                                "dependency repository sync",
+                                "repoName",
+                                safeNameWithOwner,
+                                log
+                            )
                         )
                     ) {
                         retryAttempt++;

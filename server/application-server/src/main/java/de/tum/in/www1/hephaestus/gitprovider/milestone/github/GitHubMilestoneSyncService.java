@@ -13,7 +13,8 @@ import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFou
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
-import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncHelper;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoordinator;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoordinator.GraphQlClassificationContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
@@ -57,7 +58,7 @@ public class GitHubMilestoneSyncService {
     private final GitHubMilestoneProcessor milestoneProcessor;
     private final GitHubSyncProperties syncProperties;
     private final GitHubExceptionClassifier exceptionClassifier;
-    private final GitHubGraphQlSyncHelper graphQlSyncHelper;
+    private final GitHubGraphQlSyncCoordinator graphQlSyncHelper;
     private static final int MAX_RETRY_ATTEMPTS = 3;
 
     public GitHubMilestoneSyncService(
@@ -67,7 +68,7 @@ public class GitHubMilestoneSyncService {
         GitHubMilestoneProcessor milestoneProcessor,
         GitHubSyncProperties syncProperties,
         GitHubExceptionClassifier exceptionClassifier,
-        GitHubGraphQlSyncHelper graphQlSyncHelper
+        GitHubGraphQlSyncCoordinator graphQlSyncHelper
     ) {
         this.milestoneRepository = milestoneRepository;
         this.repositoryRepository = repositoryRepository;
@@ -157,13 +158,15 @@ public class GitHubMilestoneSyncService {
                     if (classification != null) {
                         if (
                             graphQlSyncHelper.handleGraphQlClassification(
-                                classification,
-                                retryAttempt,
-                                MAX_RETRY_ATTEMPTS,
-                                "milestone sync",
-                                "repoName",
-                                safeNameWithOwner,
-                                log
+                                new GraphQlClassificationContext(
+                                    classification,
+                                    retryAttempt,
+                                    MAX_RETRY_ATTEMPTS,
+                                    "milestone sync",
+                                    "repoName",
+                                    safeNameWithOwner,
+                                    log
+                                )
                             )
                         ) {
                             retryAttempt++;
@@ -252,13 +255,15 @@ public class GitHubMilestoneSyncService {
             ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
             if (
                 !graphQlSyncHelper.handleGraphQlClassification(
-                    classification,
-                    0,
-                    MAX_RETRY_ATTEMPTS,
-                    "milestone sync",
-                    "repoName",
-                    safeNameWithOwner,
-                    log
+                    new GraphQlClassificationContext(
+                        classification,
+                        0,
+                        MAX_RETRY_ATTEMPTS,
+                        "milestone sync",
+                        "repoName",
+                        safeNameWithOwner,
+                        log
+                    )
                 )
             ) {
                 return 0;

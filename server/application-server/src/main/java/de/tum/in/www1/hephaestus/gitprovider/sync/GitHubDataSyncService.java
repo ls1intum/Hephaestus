@@ -33,6 +33,7 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.collaborator.github.GitH
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.GitHubRepositorySyncService;
 import de.tum.in.www1.hephaestus.gitprovider.subissue.github.GitHubSubIssueSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.sync.exception.SyncInterruptedException;
+import de.tum.in.www1.hephaestus.gitprovider.sync.exception.SyncRetriesExhaustedException;
 import de.tum.in.www1.hephaestus.gitprovider.team.github.GitHubTeamSyncService;
 import java.time.Duration;
 import java.time.Instant;
@@ -1114,7 +1115,7 @@ public class GitHubDataSyncService {
             }
         }
         // All retries exhausted — throw the last exception so the outer catch can classify it
-        throw new RuntimeException(
+        throw new SyncRetriesExhaustedException(
             "All " + TRANSIENT_RETRY_MAX_ATTEMPTS + " retries exhausted for " + description,
             lastException
         );

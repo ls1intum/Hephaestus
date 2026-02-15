@@ -8,20 +8,41 @@ import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
 @Component
-public class GitHubGraphQlSyncHelper {
+public class GitHubGraphQlSyncCoordinator {
 
     private static final long MAX_RATE_LIMIT_WAIT_MS = 300_000;
 
     private final GitHubGraphQlClientProvider graphQlClientProvider;
     private final GitHubExceptionClassifier exceptionClassifier;
 
-    public GitHubGraphQlSyncHelper(
+    public GitHubGraphQlSyncCoordinator(
         GitHubGraphQlClientProvider graphQlClientProvider,
         GitHubExceptionClassifier exceptionClassifier
     ) {
         this.graphQlClientProvider = graphQlClientProvider;
         this.exceptionClassifier = exceptionClassifier;
     }
+
+    /**
+     * Context for handling a GraphQL classification result.
+     *
+     * @param classification   the classification result to handle
+     * @param retryAttempt     current retry attempt number
+     * @param maxRetryAttempts maximum number of retry attempts
+     * @param phase            description of the sync phase (e.g. "pull request sync")
+     * @param scopeLabel       label for the scope identifier (e.g. "repoName")
+     * @param scopeValue       value of the scope identifier
+     * @param log              logger to use for messages
+     */
+    public record GraphQlClassificationContext(
+        ClassificationResult classification,
+        int retryAttempt,
+        int maxRetryAttempts,
+        String phase,
+        String scopeLabel,
+        Object scopeValue,
+        Logger log
+    ) {}
 
     @Nullable
     public ClassificationResult classifyGraphQlErrors(@Nullable ClientGraphQlResponse response) {
@@ -51,15 +72,21 @@ public class GitHubGraphQlSyncHelper {
         };
     }
 
-    public boolean handleGraphQlClassification(
-        ClassificationResult classification,
-        int retryAttempt,
-        int maxRetryAttempts,
-        String phase,
-        String scopeLabel,
-        Object scopeValue,
-        Logger log
-    ) {
+    /**
+     * Handles a GraphQL classification result, performing retries or logging errors as appropriate.
+     *
+     * @param ctx the classification context containing all parameters
+     * @return {@code true} if the caller should retry the operation, {@code false} to abort
+     */
+    public boolean handleGraphQlClassification(GraphQlClassificationContext ctx) {
+        ClassificationResult classification = ctx.classification();
+        int retryAttempt = ctx.retryAttempt();
+        int maxRetryAttempts = ctx.maxRetryAttempts();
+        String phase = ctx.phase();
+        String scopeLabel = ctx.scopeLabel();
+        Object scopeValue = ctx.scopeValue();
+        Logger log = ctx.log();
+
         Category category = classification.category();
 
         switch (category) {

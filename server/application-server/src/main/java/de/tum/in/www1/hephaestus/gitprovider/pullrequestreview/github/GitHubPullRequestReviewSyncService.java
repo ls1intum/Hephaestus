@@ -12,7 +12,8 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.ExponentialBackoff;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
-import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncHelper;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoordinator;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoordinator.GraphQlClassificationContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
@@ -65,7 +66,7 @@ public class GitHubPullRequestReviewSyncService {
     private final GitHubPullRequestReviewProcessor reviewProcessor;
     private final GitHubSyncProperties syncProperties;
     private final GitHubExceptionClassifier exceptionClassifier;
-    private final GitHubGraphQlSyncHelper graphQlSyncHelper;
+    private final GitHubGraphQlSyncCoordinator graphQlSyncHelper;
     private final GitHubPullRequestReviewSyncService self;
     private static final int MAX_RETRY_ATTEMPTS = 3;
     private static final int MAX_DEADLOCK_RETRIES = 3;
@@ -77,7 +78,7 @@ public class GitHubPullRequestReviewSyncService {
         GitHubPullRequestReviewProcessor reviewProcessor,
         GitHubSyncProperties syncProperties,
         GitHubExceptionClassifier exceptionClassifier,
-        GitHubGraphQlSyncHelper graphQlSyncHelper,
+        GitHubGraphQlSyncCoordinator graphQlSyncHelper,
         @Lazy GitHubPullRequestReviewSyncService self
     ) {
         this.repositoryRepository = repositoryRepository;
@@ -234,13 +235,15 @@ public class GitHubPullRequestReviewSyncService {
                     if (classification != null) {
                         if (
                             graphQlSyncHelper.handleGraphQlClassification(
-                                classification,
-                                retryAttempt,
-                                MAX_RETRY_ATTEMPTS,
-                                "review sync",
-                                "prNumber",
-                                pullRequest.getNumber(),
-                                log
+                                new GraphQlClassificationContext(
+                                    classification,
+                                    retryAttempt,
+                                    MAX_RETRY_ATTEMPTS,
+                                    "review sync",
+                                    "prNumber",
+                                    pullRequest.getNumber(),
+                                    log
+                                )
                             )
                         ) {
                             retryAttempt++;
@@ -333,13 +336,15 @@ public class GitHubPullRequestReviewSyncService {
                 ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
                 if (
                     !graphQlSyncHelper.handleGraphQlClassification(
-                        classification,
-                        retryAttempt,
-                        MAX_RETRY_ATTEMPTS,
-                        "review sync",
-                        "prNumber",
-                        pullRequest.getNumber(),
-                        log
+                        new GraphQlClassificationContext(
+                            classification,
+                            retryAttempt,
+                            MAX_RETRY_ATTEMPTS,
+                            "review sync",
+                            "prNumber",
+                            pullRequest.getNumber(),
+                            log
+                        )
                     )
                 ) {
                     break;
@@ -535,13 +540,15 @@ public class GitHubPullRequestReviewSyncService {
                     if (classification != null) {
                         if (
                             graphQlSyncHelper.handleGraphQlClassification(
-                                classification,
-                                retryAttempt,
-                                MAX_RETRY_ATTEMPTS,
-                                "review comments fetch",
-                                "reviewId",
-                                reviewId,
-                                log
+                                new GraphQlClassificationContext(
+                                    classification,
+                                    retryAttempt,
+                                    MAX_RETRY_ATTEMPTS,
+                                    "review comments fetch",
+                                    "reviewId",
+                                    reviewId,
+                                    log
+                                )
                             )
                         ) {
                             retryAttempt++;
@@ -593,13 +600,15 @@ public class GitHubPullRequestReviewSyncService {
                 ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
                 if (
                     !graphQlSyncHelper.handleGraphQlClassification(
-                        classification,
-                        retryAttempt,
-                        MAX_RETRY_ATTEMPTS,
-                        "review comments fetch",
-                        "reviewId",
-                        reviewId,
-                        log
+                        new GraphQlClassificationContext(
+                            classification,
+                            retryAttempt,
+                            MAX_RETRY_ATTEMPTS,
+                            "review comments fetch",
+                            "reviewId",
+                            reviewId,
+                            log
+                        )
                     )
                 ) {
                     break;

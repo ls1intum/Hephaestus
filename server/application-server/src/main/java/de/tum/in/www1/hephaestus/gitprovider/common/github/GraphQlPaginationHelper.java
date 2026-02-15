@@ -80,11 +80,11 @@ public final class GraphQlPaginationHelper {
     private static final int MAX_RETRY_ATTEMPTS = 3;
 
     private final GitHubGraphQlClientProvider graphQlClientProvider;
-    private final GitHubGraphQlSyncHelper graphQlSyncHelper;
+    private final GitHubGraphQlSyncCoordinator graphQlSyncHelper;
 
     public GraphQlPaginationHelper(
         GitHubGraphQlClientProvider graphQlClientProvider,
-        GitHubGraphQlSyncHelper graphQlSyncHelper
+        GitHubGraphQlSyncCoordinator graphQlSyncHelper
     ) {
         this.graphQlClientProvider = graphQlClientProvider;
         this.graphQlSyncHelper = graphQlSyncHelper;
@@ -169,13 +169,15 @@ public final class GraphQlPaginationHelper {
                 var classification = graphQlSyncHelper.classifyGraphQlErrors(response);
                 if (classification != null) {
                     boolean shouldRetry = graphQlSyncHelper.handleGraphQlClassification(
-                        classification,
-                        retryAttempt,
-                        MAX_RETRY_ATTEMPTS,
-                        request.contextDescription(),
-                        "context",
-                        request.contextDescription(),
-                        log
+                        new GitHubGraphQlSyncCoordinator.GraphQlClassificationContext(
+                            classification,
+                            retryAttempt,
+                            MAX_RETRY_ATTEMPTS,
+                            request.contextDescription(),
+                            "context",
+                            request.contextDescription(),
+                            log
+                        )
                     );
                     if (shouldRetry) {
                         retryAttempt++;
