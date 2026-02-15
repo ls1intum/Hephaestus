@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Processor for GitHub users.
@@ -21,8 +22,9 @@ import org.springframework.stereotype.Service;
  * <li>Single processing path for all data sources (sync and webhooks)</li>
  * <li>Idempotent operations via native SQL upsert (INSERT ON CONFLICT DO UPDATE)</li>
  * <li>Works exclusively with DTOs for complete field coverage</li>
- * <li>All operations run in the caller's transaction — no REQUIRES_NEW to avoid
- *     cross-connection self-deadlocks</li>
+ * <li>All operations use default REQUIRED propagation — joins the caller's
+ *     transaction if one exists, or creates a new one when called from
+ *     non-transactional contexts (e.g., webhook message handlers)</li>
  * </ul>
  *
  * <b>Concurrency Strategy:</b>
@@ -40,6 +42,7 @@ import org.springframework.stereotype.Service;
  * the results of the previous statement within the same transaction.
  */
 @Service
+@Transactional
 public class GitHubUserProcessor {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubUserProcessor.class);
@@ -56,8 +59,9 @@ public class GitHubUserProcessor {
      * Find an existing user or create a new one from the DTO.
      * <p>
      * This method is idempotent — calling it multiple times with the same DTO
-     * will return the same user entity. It runs in the caller's transaction
-     * (no separate transaction boundary).
+     * will return the same user entity. Uses default REQUIRED propagation:
+     * joins the caller's transaction if one exists, or creates a new one
+     * (e.g., when called from non-transactional message handlers).
      * <p>
      * Uses three separate SQL statements (not a CTE) within the caller's transaction:
      * <ol>
