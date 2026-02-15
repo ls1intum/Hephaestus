@@ -79,10 +79,6 @@ public final class SecurityUtils {
         }
 
         var rolesObj = realmAccess.get("roles");
-        if (!(rolesObj instanceof List<?> roles)) {
-            return false;
-        }
-
-        return roles.contains("admin");
+        return rolesObj instanceof List<?> roles && roles.contains("admin");
     }
 }
