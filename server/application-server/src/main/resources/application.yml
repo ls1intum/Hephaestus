@@ -19,8 +19,10 @@ spring:
 
     jpa:
         hibernate:
-            # We use update for development and none for production, as we use liquibase
-            ddl-auto: update
+            # Liquibase handles all DDL; Hibernate should not touch the schema.
+            # 'update' triggers a Hibernate 6.6.x NPE in EnumHelper.getEnumeratedValues
+            # during DDL introspection. 'none' is correct for both dev and prod.
+            ddl-auto: none
         # Disable open-in-view to prevent lazy loading during view rendering
         # and avoid the warning. Database queries should be completed in the service layer.
         open-in-view: false

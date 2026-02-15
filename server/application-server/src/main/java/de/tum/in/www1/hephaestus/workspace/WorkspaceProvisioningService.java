@@ -380,20 +380,28 @@ public class WorkspaceProvisioningService {
                     );
                 }
 
-                User newUser = new User();
-                newUser.setId(userInfo.id());
-                newUser.setLogin(userInfo.login() != null ? userInfo.login() : accountLogin);
-                newUser.setName(userInfo.name() != null ? userInfo.name() : accountLogin);
-                newUser.setAvatarUrl(userInfo.avatarUrl() != null ? userInfo.avatarUrl() : "");
-                newUser.setHtmlUrl(userInfo.htmlUrl() != null ? userInfo.htmlUrl() : "");
-                newUser.setType(User.Type.USER);
-                newUser = userRepository.save(newUser);
-                log.info(
-                    "Created user for PAT workspace bootstrap: userLogin={}, userId={}",
-                    newUser.getLogin(),
-                    newUser.getId()
+                String login = userInfo.login() != null ? userInfo.login() : accountLogin;
+                String name = userInfo.name() != null ? userInfo.name() : accountLogin;
+                String avatar = userInfo.avatarUrl() != null ? userInfo.avatarUrl() : "";
+                String htmlUrl = userInfo.htmlUrl() != null ? userInfo.htmlUrl() : "";
+
+                // Use the three-step upsert (lock, free conflicts, insert)
+                // to avoid uk_user_login_lower violations under concurrency.
+                userRepository.acquireLoginLock(login);
+                userRepository.freeLoginConflicts(login, userInfo.id());
+                userRepository.upsertUser(
+                    userInfo.id(),
+                    login,
+                    name,
+                    avatar,
+                    htmlUrl,
+                    User.Type.USER.name(),
+                    null, // email
+                    null, // createdAt
+                    null // updatedAt
                 );
-                return newUser.getId();
+                log.info("Upserted user for PAT workspace bootstrap: userLogin={}, userId={}", login, userInfo.id());
+                return userInfo.id();
             });
     }
 

@@ -376,7 +376,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
 
         @Test
         @DisplayName("should abort with ABORTED_RATE_LIMIT when rate limit is critical")
-        void shouldAbortWhenRateLimitCritical() {
+        void shouldAbortWhenRateLimitCritical() throws InterruptedException {
             // Arrange
             Organization org = createOrganization();
             when(organizationRepository.findByLoginIgnoreCase(ORG_LOGIN)).thenReturn(Optional.of(org));
@@ -388,8 +388,9 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             ClientGraphQlResponse response = mockValidGraphQlResponse("organization.projectsV2", connection);
             when(requestSpec.execute()).thenReturn(Mono.just(response));
 
-            // Rate limit becomes critical after first response
+            // Rate limit becomes critical after first response and wait fails
             when(graphQlClientProvider.isRateLimitCritical(SCOPE_ID)).thenReturn(true);
+            when(graphQlClientProvider.waitIfRateLimitLow(SCOPE_ID)).thenThrow(new InterruptedException("rate limit"));
 
             // Act
             SyncResult result = service.syncProjectsForOrganization(SCOPE_ID, ORG_LOGIN);
@@ -475,7 +476,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
 
         @Test
         @DisplayName("should not remove stale projects when sync was aborted")
-        void shouldNotRemoveStaleProjectsOnAbortedSync() {
+        void shouldNotRemoveStaleProjectsOnAbortedSync() throws InterruptedException {
             // Arrange
             Organization org = createOrganization();
             when(organizationRepository.findByLoginIgnoreCase(ORG_LOGIN)).thenReturn(Optional.of(org));
@@ -488,6 +489,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
             ClientGraphQlResponse response = mockValidGraphQlResponse("organization.projectsV2", connection);
             when(requestSpec.execute()).thenReturn(Mono.just(response));
             when(graphQlClientProvider.isRateLimitCritical(SCOPE_ID)).thenReturn(true);
+            when(graphQlClientProvider.waitIfRateLimitLow(SCOPE_ID)).thenThrow(new InterruptedException("rate limit"));
 
             // Act
             SyncResult result = service.syncProjectsForOrganization(SCOPE_ID, ORG_LOGIN);

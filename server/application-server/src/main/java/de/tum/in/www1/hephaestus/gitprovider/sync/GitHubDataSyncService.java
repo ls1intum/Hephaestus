@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.sync;
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.ExponentialBackoff;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.Category;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
@@ -39,6 +40,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -210,10 +212,16 @@ public class GitHubDataSyncService {
         );
 
         try {
+            // P3 optimization: capture the previously-stored GitHub updatedAt before re-syncing
+            // metadata. If updatedAt hasn't changed after re-sync, the repository has no new
+            // activity (pushes, issues, PRs, labels, etc.) — we can skip all sub-syncs.
+            Instant previousUpdatedAt = repository.getUpdatedAt();
+
             // Sync repository metadata (skip if we just created it above)
             if (!repositoryCreatedDuringSync) {
                 var syncedRepository = repositorySyncService.syncRepository(scopeId, nameWithOwner);
                 if (syncedRepository.isPresent()) {
+                    repository = syncedRepository.get();
                     log.debug("Synced repository metadata: scopeId={}, repoId={}", scopeId, repositoryId);
                     syncTargetProvider.updateSyncTimestamp(syncTarget.id(), SyncType.FULL_REPOSITORY, Instant.now());
                 } else {
@@ -225,16 +233,34 @@ public class GitHubDataSyncService {
                 }
             }
 
-            // Sync collaborators
+            // P3 optimization: skip sub-syncs when the repository has no new activity.
+            // GitHub's repository.updatedAt changes on any activity (pushes, issues, PRs, labels, etc.).
+            // If the freshly-fetched updatedAt equals what we previously stored, nothing has changed.
+            // Only apply this skip when we have a previous timestamp (not on first sync).
+            boolean repoUnchanged =
+                !repositoryCreatedDuringSync &&
+                previousUpdatedAt != null &&
+                repository.getUpdatedAt() != null &&
+                !repository.getUpdatedAt().isAfter(previousUpdatedAt);
+
+            if (repoUnchanged) {
+                log.info(
+                    "Skipped sub-syncs: reason=repoUnchanged, repoId={}, repoName={}, updatedAt={}",
+                    repositoryId,
+                    safeNameWithOwner,
+                    repository.getUpdatedAt()
+                );
+                return;
+            }
+
+            // Sync collaborators (with cooldown)
             int collaboratorsCount = syncCollaboratorsIfNeeded(syncTarget, scopeId, repositoryId);
 
-            // Sync labels
-            int labelsCount = labelSyncService.syncLabelsForRepository(scopeId, repositoryId);
-            syncTargetProvider.updateSyncTimestamp(syncTarget.id(), SyncType.LABELS, Instant.now());
+            // Sync labels (with cooldown — labels rarely change)
+            int labelsCount = syncLabelsIfNeeded(syncTarget, scopeId, repositoryId);
 
-            // Sync milestones
-            int milestonesCount = milestoneSyncService.syncMilestonesForRepository(scopeId, repositoryId);
-            syncTargetProvider.updateSyncTimestamp(syncTarget.id(), SyncType.MILESTONES, Instant.now());
+            // Sync milestones (with cooldown — milestones rarely change)
+            int milestonesCount = syncMilestonesIfNeeded(syncTarget, scopeId, repositoryId);
 
             // Sync issues (with cursor persistence for resumability)
             // Comments are synced inline with issues via the GraphQL query
@@ -284,8 +310,8 @@ public class GitHubDataSyncService {
                 scopeId,
                 repositoryId,
                 collaboratorsCount >= 0 ? collaboratorsCount : "skipped",
-                labelsCount,
-                milestonesCount,
+                labelsCount >= 0 ? labelsCount : "skipped",
+                milestonesCount >= 0 ? milestonesCount : "skipped",
                 issueResult.count(),
                 prResult.count(),
                 issueResult.status(),
@@ -436,18 +462,32 @@ public class GitHubDataSyncService {
                     log.info("Aborting remaining syncs: reason=installationSuspended, scopeId={}", scopeId);
                     break;
                 }
-                // Check if rate limit is critically low - abort remaining repo syncs
-                // to avoid wasting API calls that will all fail with rate limit errors
+                // Wait for rate limit reset instead of aborting — ensures all repos
+                // get their initial sync even when rate limit is exhausted mid-loop.
+                // Without this, repos skipped here would have NULL issues_synced_at/
+                // pull_requests_synced_at and be ineligible for historical backfill
+                // until the next daily cron run.
                 if (rateLimitTracker.isCritical(scopeId)) {
-                    log.warn(
-                        "Aborting remaining repository syncs: reason=rateLimitCritical, scopeId={}, remaining={}, totalRepos={}, reposProcessed={}, reposSkipped={}",
+                    log.info(
+                        "Rate limit critical during startup sync, waiting for reset: scopeId={}, remaining={}, totalRepos={}, reposProcessed={}, reposRemaining={}",
                         scopeId,
                         rateLimitTracker.getRemaining(scopeId),
                         syncTargets.size(),
                         reposProcessed,
                         syncTargets.size() - reposProcessed
                     );
-                    break;
+                    try {
+                        waitForRateLimitReset(scopeId);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        log.info(
+                            "Startup sync interrupted while waiting for rate limit: scopeId={}, reposProcessed={}, reposRemaining={}",
+                            scopeId,
+                            reposProcessed,
+                            syncTargets.size() - reposProcessed
+                        );
+                        break;
+                    }
                 }
                 if (shouldSync(target)) {
                     syncSyncTarget(target);
@@ -547,7 +587,12 @@ public class GitHubDataSyncService {
     private void syncIssueTypes(Long scopeId) {
         try {
             // Sync issue types (has internal cooldown check)
-            int issueTypesCount = issueTypeSyncService.syncIssueTypesForScope(scopeId);
+            // Wrapped with retry because the method is @Transactional and a deadlock
+            // would poison the transaction, requiring a fresh invocation.
+            int issueTypesCount = retryOnTransientFailure(
+                () -> issueTypeSyncService.syncIssueTypesForScope(scopeId),
+                "issue type sync for scopeId=" + scopeId
+            );
             if (issueTypesCount >= 0) {
                 log.debug("Synced issue types: scopeId={}, issueTypeCount={}", scopeId, issueTypesCount);
             } else {
@@ -593,7 +638,10 @@ public class GitHubDataSyncService {
         String safeOrgLogin = sanitizeForLog(organizationLogin);
 
         try {
-            int teamsCount = teamSyncService.syncTeamsForOrganization(scopeId, organizationLogin);
+            int teamsCount = retryOnTransientFailure(
+                () -> teamSyncService.syncTeamsForOrganization(scopeId, organizationLogin),
+                "team sync for scopeId=" + scopeId
+            );
             log.debug("Synced teams: scopeId={}, orgLogin={}, teamCount={}", scopeId, safeOrgLogin, teamsCount);
             syncTargetProvider.updateTeamsSyncTimestamp(scopeId, Instant.now());
         } catch (InstallationNotFoundException e) {
@@ -868,10 +916,78 @@ public class GitHubDataSyncService {
             return -1;
         }
 
-        int count = collaboratorSyncService.syncCollaboratorsForRepository(scopeId, repositoryId);
+        int count = retryOnTransientFailure(
+            () -> collaboratorSyncService.syncCollaboratorsForRepository(scopeId, repositoryId),
+            "collaborator sync for repoId=" + repositoryId
+        );
 
         // Update sync timestamp
         syncTargetProvider.updateSyncTimestamp(syncTarget.id(), SyncType.COLLABORATORS, Instant.now());
+
+        return count;
+    }
+
+    /**
+     * Syncs labels for a repository if the cooldown has expired.
+     *
+     * @param syncTarget   the sync target containing cooldown timestamps
+     * @param scopeId      the scope ID
+     * @param repositoryId the repository ID
+     * @return number of labels synced, or -1 if skipped due to cooldown
+     */
+    private int syncLabelsIfNeeded(SyncTarget syncTarget, Long scopeId, Long repositoryId) {
+        Instant cooldownThreshold = Instant.now().minusSeconds(syncSchedulerProperties.cooldownMinutes() * 60L);
+        boolean shouldSync =
+            syncTarget.lastLabelsSyncedAt() == null || syncTarget.lastLabelsSyncedAt().isBefore(cooldownThreshold);
+
+        if (!shouldSync) {
+            log.debug(
+                "Skipped label sync: reason=cooldownActive, repoId={}, lastSyncedAt={}",
+                repositoryId,
+                syncTarget.lastLabelsSyncedAt()
+            );
+            return -1;
+        }
+
+        int count = retryOnTransientFailure(
+            () -> labelSyncService.syncLabelsForRepository(scopeId, repositoryId),
+            "label sync for repoId=" + repositoryId
+        );
+
+        syncTargetProvider.updateSyncTimestamp(syncTarget.id(), SyncType.LABELS, Instant.now());
+
+        return count;
+    }
+
+    /**
+     * Syncs milestones for a repository if the cooldown has expired.
+     *
+     * @param syncTarget   the sync target containing cooldown timestamps
+     * @param scopeId      the scope ID
+     * @param repositoryId the repository ID
+     * @return number of milestones synced, or -1 if skipped due to cooldown
+     */
+    private int syncMilestonesIfNeeded(SyncTarget syncTarget, Long scopeId, Long repositoryId) {
+        Instant cooldownThreshold = Instant.now().minusSeconds(syncSchedulerProperties.cooldownMinutes() * 60L);
+        boolean shouldSync =
+            syncTarget.lastMilestonesSyncedAt() == null ||
+            syncTarget.lastMilestonesSyncedAt().isBefore(cooldownThreshold);
+
+        if (!shouldSync) {
+            log.debug(
+                "Skipped milestone sync: reason=cooldownActive, repoId={}, lastSyncedAt={}",
+                repositoryId,
+                syncTarget.lastMilestonesSyncedAt()
+            );
+            return -1;
+        }
+
+        int count = retryOnTransientFailure(
+            () -> milestoneSyncService.syncMilestonesForRepository(scopeId, repositoryId),
+            "milestone sync for repoId=" + repositoryId
+        );
+
+        syncTargetProvider.updateSyncTimestamp(syncTarget.id(), SyncType.MILESTONES, Instant.now());
 
         return count;
     }
@@ -914,5 +1030,143 @@ public class GitHubDataSyncService {
                 cleanupException.getMessage()
             );
         }
+    }
+
+    /**
+     * Maximum number of retry attempts for transient failures (e.g. deadlocks).
+     * Retries happen at the caller level so each attempt starts a new transaction.
+     */
+    private static final int TRANSIENT_RETRY_MAX_ATTEMPTS = 3;
+
+    /**
+     * Retries a transactional sync operation on transient failures such as database deadlocks.
+     * <p>
+     * When a deadlock occurs inside a {@code @Transactional} service method, PostgreSQL kills
+     * the deadlock victim and Spring marks the transaction rollback-only. The transaction cannot
+     * be salvaged from within the transactional boundary. This method retries from the
+     * <em>caller</em> level (outside the {@code @Transactional} proxy), so each retry attempt
+     * starts a fresh transaction.
+     * <p>
+     * Non-transient exceptions (auth errors, not-found, etc.) are NOT retried and propagate
+     * immediately.
+     *
+     * @param operation   the sync operation to execute (must be a call through a Spring proxy)
+     * @param description human-readable label for logging (e.g. "collaborator sync")
+     * @return the result of the operation
+     * @throws InstallationNotFoundException if the installation is not found (propagated immediately)
+     * @throws RuntimeException if all retry attempts are exhausted or a non-retryable error occurs
+     */
+    private int retryOnTransientFailure(Supplier<Integer> operation, String description) {
+        Exception lastException = null;
+        for (int attempt = 0; attempt < TRANSIENT_RETRY_MAX_ATTEMPTS; attempt++) {
+            try {
+                return operation.get();
+            } catch (InstallationNotFoundException e) {
+                // Never retry auth/installation errors
+                throw e;
+            } catch (Exception e) {
+                // Determine if this failure is retryable.
+                // UnexpectedRollbackException deserves special treatment: when a deadlock
+                // (or any other transient DB error) occurs inside a @Transactional method,
+                // PostgreSQL aborts the victim and Spring marks the transaction rollback-only.
+                // The original cause is consumed by the transaction manager, so the classifier
+                // cannot find the deadlock in the cause chain. Since this wrapper ONLY calls
+                // @Transactional service methods, an UnexpectedRollbackException always means
+                // a poisoned transaction that should be retried with a fresh one.
+                boolean retryable;
+                String errorDetail;
+                if (e instanceof org.springframework.transaction.UnexpectedRollbackException) {
+                    retryable = true;
+                    errorDetail = "Transaction rolled back (likely deadlock): " + e.getMessage();
+                } else {
+                    ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
+                    retryable = classification.category() == Category.RETRYABLE;
+                    errorDetail = classification.message();
+                }
+
+                if (!retryable) {
+                    // Non-transient error — don't retry, propagate immediately
+                    throw e;
+                }
+                lastException = e;
+                if (attempt + 1 < TRANSIENT_RETRY_MAX_ATTEMPTS) {
+                    log.warn(
+                        "Transient failure in {}, retrying: attempt={}/{}, error={}",
+                        description,
+                        attempt + 1,
+                        TRANSIENT_RETRY_MAX_ATTEMPTS,
+                        errorDetail
+                    );
+                    try {
+                        ExponentialBackoff.sleep(attempt);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw new SyncInterruptedException("Interrupted while retrying " + description, ie);
+                    }
+                } else {
+                    log.error(
+                        "Transient failure in {} after all retries exhausted: attempts={}, error={}",
+                        description,
+                        TRANSIENT_RETRY_MAX_ATTEMPTS,
+                        errorDetail
+                    );
+                }
+            }
+        }
+        // All retries exhausted — throw the last exception so the outer catch can classify it
+        throw new RuntimeException(
+            "All " + TRANSIENT_RETRY_MAX_ATTEMPTS + " retries exhausted for " + description,
+            lastException
+        );
+    }
+
+    /**
+     * Maximum number of rate limit wait cycles before giving up.
+     * At ~5 minutes per cycle, this allows up to ~75 minutes of waiting (enough for
+     * one full GitHub rate limit window of 60 minutes plus buffer).
+     */
+    private static final int MAX_RATE_LIMIT_WAIT_CYCLES = 15;
+
+    /**
+     * Waits for the rate limit to reset before continuing sync.
+     * <p>
+     * Uses {@link RateLimitTracker#waitIfNeeded(Long)} which blocks until the reset
+     * time passes. If the rate limit is still critical after waiting (e.g. due to
+     * clock skew or stale cached values), retries up to {@link #MAX_RATE_LIMIT_WAIT_CYCLES}
+     * times before giving up.
+     * <p>
+     * Package-visible so {@link GitHubDataSyncScheduler} can also use it.
+     *
+     * @param scopeId the scope to wait for
+     * @throws InterruptedException if the thread is interrupted while waiting
+     */
+    void waitForRateLimitReset(Long scopeId) throws InterruptedException {
+        for (int cycle = 0; cycle < MAX_RATE_LIMIT_WAIT_CYCLES; cycle++) {
+            rateLimitTracker.waitIfNeeded(scopeId);
+            if (!rateLimitTracker.isCritical(scopeId)) {
+                log.info(
+                    "Rate limit recovered, resuming sync: scopeId={}, remaining={}, waitCycles={}",
+                    scopeId,
+                    rateLimitTracker.getRemaining(scopeId),
+                    cycle + 1
+                );
+                return;
+            }
+            // Still critical — wait a bit and retry (handles edge cases like
+            // clock skew or API returning lower-than-expected remaining)
+            log.debug(
+                "Rate limit still critical after wait, retrying: scopeId={}, remaining={}, cycle={}/{}",
+                scopeId,
+                rateLimitTracker.getRemaining(scopeId),
+                cycle + 1,
+                MAX_RATE_LIMIT_WAIT_CYCLES
+            );
+        }
+        log.warn(
+            "Rate limit wait cycles exhausted, proceeding anyway: scopeId={}, remaining={}, maxCycles={}",
+            scopeId,
+            rateLimitTracker.getRemaining(scopeId),
+            MAX_RATE_LIMIT_WAIT_CYCLES
+        );
     }
 }

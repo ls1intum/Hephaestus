@@ -7,12 +7,16 @@ import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.Category;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPageInfo;
@@ -69,6 +73,9 @@ class GitHubProjectItemFieldValueSyncServiceTest extends BaseUnitTest {
     private TransactionTemplate transactionTemplate;
 
     @Mock
+    private GitHubExceptionClassifier exceptionClassifier;
+
+    @Mock
     private HttpGraphQlClient graphQlClient;
 
     @Mock
@@ -84,13 +91,19 @@ class GitHubProjectItemFieldValueSyncServiceTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
+        // Default exception classifier stub to prevent NPEs on unexpected exceptions
+        lenient()
+            .when(exceptionClassifier.classifyWithDetails(any()))
+            .thenReturn(ClassificationResult.of(Category.UNKNOWN, "test error"));
+
         service = new GitHubProjectItemFieldValueSyncService(
             projectFieldRepository,
             projectFieldValueRepository,
             projectItemRepository,
             graphQlClientProvider,
             syncProperties,
-            transactionTemplate
+            transactionTemplate,
+            exceptionClassifier
         );
     }
 
@@ -865,7 +878,7 @@ class GitHubProjectItemFieldValueSyncServiceTest extends BaseUnitTest {
 
         @Test
         @DisplayName("should skip stale cleanup when pagination is aborted")
-        void shouldSkipStaleCleanupWhenPaginationAborted() {
+        void shouldSkipStaleCleanupWhenPaginationAborted() throws InterruptedException {
             // Arrange — rate limit becomes critical immediately
             when(graphQlClientProvider.forScope(123L)).thenReturn(graphQlClient);
             when(syncProperties.graphqlTimeout()).thenReturn(Duration.ofSeconds(5));
@@ -876,6 +889,7 @@ class GitHubProjectItemFieldValueSyncServiceTest extends BaseUnitTest {
             when(requestSpec.execute()).thenReturn(Mono.just(clientGraphQlResponse));
 
             when(graphQlClientProvider.isRateLimitCritical(123L)).thenReturn(true);
+            when(graphQlClientProvider.waitIfRateLimitLow(123L)).thenThrow(new InterruptedException("rate limit"));
 
             // Act
             service.syncRemainingFieldValues(123L, "item-node", 42L, null, List.of());

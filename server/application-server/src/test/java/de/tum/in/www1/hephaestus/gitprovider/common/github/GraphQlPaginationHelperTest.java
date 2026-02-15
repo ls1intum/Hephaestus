@@ -42,6 +42,9 @@ class GraphQlPaginationHelperTest {
     private GitHubGraphQlClientProvider graphQlClientProvider;
 
     @Mock
+    private GitHubGraphQlSyncHelper graphQlSyncHelper;
+
+    @Mock
     private HttpGraphQlClient client;
 
     @Mock
@@ -56,7 +59,7 @@ class GraphQlPaginationHelperTest {
 
     @BeforeEach
     void setUp() {
-        helper = new GraphQlPaginationHelper(graphQlClientProvider);
+        helper = new GraphQlPaginationHelper(graphQlClientProvider, graphQlSyncHelper);
     }
 
     /**

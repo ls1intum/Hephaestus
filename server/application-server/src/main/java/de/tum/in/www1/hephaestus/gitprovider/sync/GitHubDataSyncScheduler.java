@@ -275,11 +275,13 @@ public class GitHubDataSyncScheduler {
                 // Sync repositories (issues/PRs include embedded project items)
                 int reposProcessed = 0;
                 for (SyncTarget target : session.syncTargets()) {
-                    // Check if rate limit is critically low - abort remaining repo syncs
-                    // to avoid wasting API calls that will all fail with rate limit errors
+                    // Wait for rate limit reset instead of aborting — ensures all repos
+                    // get synced even when rate limit is exhausted mid-loop. Without this,
+                    // skipped repos would have stale/NULL sync timestamps and miss both
+                    // incremental updates and historical backfill eligibility.
                     if (rateLimitTracker.isCritical(session.scopeId())) {
-                        log.warn(
-                            "Aborting remaining repository syncs: reason=rateLimitCritical, scopeId={}, scopeSlug={}, remaining={}, totalRepos={}, reposProcessed={}, reposSkipped={}",
+                        log.info(
+                            "Rate limit critical during scheduled sync, waiting for reset: scopeId={}, scopeSlug={}, remaining={}, totalRepos={}, reposProcessed={}, reposRemaining={}",
                             session.scopeId(),
                             session.slug(),
                             rateLimitTracker.getRemaining(session.scopeId()),
@@ -287,7 +289,18 @@ public class GitHubDataSyncScheduler {
                             reposProcessed,
                             session.syncTargets().size() - reposProcessed
                         );
-                        break;
+                        try {
+                            dataSyncService.waitForRateLimitReset(session.scopeId());
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            log.info(
+                                "Scheduled sync interrupted while waiting for rate limit: scopeId={}, reposProcessed={}, reposRemaining={}",
+                                session.scopeId(),
+                                reposProcessed,
+                                session.syncTargets().size() - reposProcessed
+                            );
+                            break;
+                        }
                     }
                     dataSyncService.syncSyncTarget(target);
                     reposProcessed++;

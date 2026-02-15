@@ -6,9 +6,11 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncCons
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.ExponentialBackoff;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncHelper;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
@@ -82,6 +84,8 @@ public class GitHubSubIssueSyncService {
     private final SyncSchedulerProperties syncSchedulerProperties;
     private final GitHubIssueProcessor issueProcessor;
     private final GitHubSubIssueSyncService self;
+    private final GitHubGraphQlSyncHelper graphQlSyncHelper;
+    private static final int MAX_RETRY_ATTEMPTS = 3;
 
     public GitHubSubIssueSyncService(
         IssueRepository issueRepository,
@@ -92,7 +96,8 @@ public class GitHubSubIssueSyncService {
         GitHubExceptionClassifier exceptionClassifier,
         SyncSchedulerProperties syncSchedulerProperties,
         GitHubIssueProcessor issueProcessor,
-        @Lazy GitHubSubIssueSyncService self
+        @Lazy GitHubSubIssueSyncService self,
+        GitHubGraphQlSyncHelper graphQlSyncHelper
     ) {
         this.issueRepository = issueRepository;
         this.repositoryRepository = repositoryRepository;
@@ -103,6 +108,7 @@ public class GitHubSubIssueSyncService {
         this.syncSchedulerProperties = syncSchedulerProperties;
         this.issueProcessor = issueProcessor;
         this.self = self;
+        this.graphQlSyncHelper = graphQlSyncHelper;
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -261,12 +267,9 @@ public class GitHubSubIssueSyncService {
         for (String repoNameWithOwner : repositoryNames) {
             // Check if rate limit is critically low before making API calls for next repo
             if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
-                log.warn(
-                    "Aborting sub-issue sync: reason=rateLimitCritical, scopeId={}, remainingRepos={}",
-                    scopeId,
-                    repositoryNames.size() - repositoryNames.indexOf(repoNameWithOwner)
-                );
-                break;
+                if (!graphQlSyncHelper.waitForRateLimitIfNeeded(scopeId, "sub-issue sync", "scopeId", scopeId, log)) {
+                    break;
+                }
             }
 
             Optional<Repository> repoOpt = repositoryRepository.findByNameWithOwnerWithOrganization(repoNameWithOwner);
@@ -286,42 +289,15 @@ public class GitHubSubIssueSyncService {
             } catch (Exception e) {
                 failedRepoCount++;
                 ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
-                switch (classification.category()) {
-                    case RATE_LIMITED -> log.warn(
-                        "Rate limited during sub-issue sync: repoName={}, scopeId={}, message={}",
-                        sanitizeForLog(repoNameWithOwner),
-                        scopeId,
-                        classification.message()
-                    );
-                    case NOT_FOUND -> log.warn(
-                        "Resource not found during sub-issue sync: repoName={}, scopeId={}, message={}",
-                        sanitizeForLog(repoNameWithOwner),
-                        scopeId,
-                        classification.message()
-                    );
-                    case AUTH_ERROR -> {
-                        log.error(
-                            "Authentication error during sub-issue sync: repoName={}, scopeId={}, message={}",
-                            sanitizeForLog(repoNameWithOwner),
-                            scopeId,
-                            classification.message()
-                        );
-                        throw e;
-                    }
-                    case RETRYABLE -> log.warn(
-                        "Retryable error during sub-issue sync: repoName={}, scopeId={}, message={}",
-                        sanitizeForLog(repoNameWithOwner),
-                        scopeId,
-                        classification.message()
-                    );
-                    default -> log.error(
-                        "Unexpected error during sub-issue sync: repoName={}, scopeId={}, message={}",
-                        sanitizeForLog(repoNameWithOwner),
-                        scopeId,
-                        classification.message(),
-                        e
-                    );
-                }
+                graphQlSyncHelper.handleGraphQlClassification(
+                    classification,
+                    0,
+                    MAX_RETRY_ATTEMPTS,
+                    "sub-issue sync",
+                    "repoName",
+                    sanitizeForLog(repoNameWithOwner),
+                    log
+                );
             }
         }
 
@@ -361,6 +337,7 @@ public class GitHubSubIssueSyncService {
         int linkedCount = 0;
 
         int pageCount = 0;
+        int retryAttempt = 0;
 
         while (hasNextPage) {
             pageCount++;
@@ -385,6 +362,24 @@ public class GitHubSubIssueSyncService {
                     .block(syncProperties.graphqlTimeout());
 
                 if (graphQlResponse == null || !graphQlResponse.isValid()) {
+                    ClassificationResult classification = graphQlSyncHelper.classifyGraphQlErrors(graphQlResponse);
+                    if (classification != null) {
+                        if (
+                            graphQlSyncHelper.handleGraphQlClassification(
+                                classification,
+                                retryAttempt,
+                                MAX_RETRY_ATTEMPTS,
+                                "sub-issue repository sync",
+                                "repoName",
+                                sanitizeForLog(repository.getNameWithOwner()),
+                                log
+                            )
+                        ) {
+                            retryAttempt++;
+                            continue;
+                        }
+                        break;
+                    }
                     log.warn(
                         "Received invalid GraphQL response: repoName={}, errors={}",
                         sanitizeForLog(repository.getNameWithOwner()),
@@ -398,11 +393,17 @@ public class GitHubSubIssueSyncService {
 
                 // Check if we should pause due to rate limiting
                 if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
-                    log.warn(
-                        "Aborting sub-issue sync due to critical rate limit: repoName={}",
-                        sanitizeForLog(repository.getNameWithOwner())
-                    );
-                    break;
+                    if (
+                        !graphQlSyncHelper.waitForRateLimitIfNeeded(
+                            scopeId,
+                            "sub-issue repository sync",
+                            "repoName",
+                            sanitizeForLog(repository.getNameWithOwner()),
+                            log
+                        )
+                    ) {
+                        break;
+                    }
                 }
 
                 GHIssueConnection issueConnection = graphQlResponse
@@ -426,6 +427,7 @@ public class GitHubSubIssueSyncService {
                 }
                 hasNextPage = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
                 cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
+                retryAttempt = 0;
 
                 // Process each page in its own transaction (call through proxy for @Transactional)
                 linkedCount += self.processIssueNodesInTransaction(issueConnection, repository, scopeId);
@@ -434,38 +436,20 @@ public class GitHubSubIssueSyncService {
                 throw e;
             } catch (Exception e) {
                 ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
-                switch (classification.category()) {
-                    case RATE_LIMITED -> log.warn(
-                        "Rate limited during sub-issue sync: repoName={}, message={}",
+                if (
+                    !graphQlSyncHelper.handleGraphQlClassification(
+                        classification,
+                        retryAttempt,
+                        MAX_RETRY_ATTEMPTS,
+                        "sub-issue repository sync",
+                        "repoName",
                         sanitizeForLog(repository.getNameWithOwner()),
-                        classification.message()
-                    );
-                    case NOT_FOUND -> log.warn(
-                        "Resource not found during sub-issue sync: repoName={}, message={}",
-                        sanitizeForLog(repository.getNameWithOwner()),
-                        classification.message()
-                    );
-                    case AUTH_ERROR -> {
-                        log.error(
-                            "Authentication error during sub-issue sync: repoName={}, message={}",
-                            sanitizeForLog(repository.getNameWithOwner()),
-                            classification.message()
-                        );
-                        throw e;
-                    }
-                    case RETRYABLE -> log.warn(
-                        "Retryable error during sub-issue sync: repoName={}, message={}",
-                        sanitizeForLog(repository.getNameWithOwner()),
-                        classification.message()
-                    );
-                    default -> log.error(
-                        "Unexpected error during sub-issue sync: repoName={}, message={}",
-                        sanitizeForLog(repository.getNameWithOwner()),
-                        classification.message(),
-                        e
-                    );
+                        log
+                    )
+                ) {
+                    break;
                 }
-                break;
+                retryAttempt++;
             }
         }
 

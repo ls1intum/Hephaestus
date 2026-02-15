@@ -942,53 +942,6 @@
 
     <!-- ==================== SECTION 19: PullRequestBadPractice Enum Migration ==================== -->
 
-    <changeSet id="1767900000000-14-migrate-enum-columns" author="FelixTJDietrich">
-        <preConditions onFail="MARK_RAN">
-            <tableExists tableName="pullrequestbadpractice"/>
-            <columnExists tableName="pullrequestbadpractice" columnName="state"/>
-        </preConditions>
-        <comment>Convert enum columns from ordinal (smallint) to string (varchar) using direct ALTER TYPE</comment>
-        <sql>
-            -- Migrate state column (PullRequestBadPracticeState enum)
-            ALTER TABLE pullrequestbadpractice
-            ALTER COLUMN state TYPE VARCHAR(32) USING CASE state::integer
-                WHEN 0 THEN 'GOOD_PRACTICE'
-                WHEN 1 THEN 'MINOR_ISSUE'
-                WHEN 2 THEN 'NORMAL_ISSUE'
-                WHEN 3 THEN 'CRITICAL_ISSUE'
-                WHEN 4 THEN 'FIXED'
-                WHEN 5 THEN 'WONT_FIX'
-                WHEN 6 THEN 'WRONG'
-                ELSE 'NORMAL_ISSUE'
-            END;
-
-            -- Migrate user_state column (PullRequestBadPracticeState enum)
-            ALTER TABLE pullrequestbadpractice
-            ALTER COLUMN user_state TYPE VARCHAR(32) USING CASE user_state::integer
-                WHEN 0 THEN 'GOOD_PRACTICE'
-                WHEN 1 THEN 'MINOR_ISSUE'
-                WHEN 2 THEN 'NORMAL_ISSUE'
-                WHEN 3 THEN 'CRITICAL_ISSUE'
-                WHEN 4 THEN 'FIXED'
-                WHEN 5 THEN 'WONT_FIX'
-                WHEN 6 THEN 'WRONG'
-                ELSE NULL
-            END;
-
-            -- Migrate detection_pullrequest_lifecycle_state column (PullRequestLifecycleState enum)
-            ALTER TABLE pullrequestbadpractice
-            ALTER COLUMN detection_pullrequest_lifecycle_state TYPE VARCHAR(32) USING CASE detection_pullrequest_lifecycle_state::integer
-                WHEN 0 THEN 'DRAFT'
-                WHEN 1 THEN 'OPEN'
-                WHEN 2 THEN 'READY_FOR_REVIEW'
-                WHEN 3 THEN 'READY_TO_MERGE'
-                WHEN 4 THEN 'MERGED'
-                WHEN 5 THEN 'CLOSED'
-                ELSE NULL
-            END;
-        </sql>
-    </changeSet>
-
     <!-- ==================== SECTION 20: User Preferences Extraction ==================== -->
 
     <changeSet id="1768100000000-create-user-preferences-table" author="FelixTJDietrich">
@@ -1642,6 +1595,53 @@
         <comment>Rename pullrequestbadpractice to pull_request_bad_practice for naming consistency</comment>
         <renameTable oldTableName="pullrequestbadpractice"
                      newTableName="pull_request_bad_practice"/>
+    </changeSet>
+
+    <changeSet id="1767900000000-14-migrate-enum-columns" author="FelixTJDietrich">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="pull_request_bad_practice"/>
+            <columnExists tableName="pull_request_bad_practice" columnName="state"/>
+        </preConditions>
+        <comment>Convert enum columns from ordinal (smallint) to string (varchar) using direct ALTER TYPE</comment>
+        <sql>
+            -- Migrate state column (PullRequestBadPracticeState enum)
+            ALTER TABLE pull_request_bad_practice
+            ALTER COLUMN state TYPE VARCHAR(32) USING CASE state::integer
+                WHEN 0 THEN 'GOOD_PRACTICE'
+                WHEN 1 THEN 'MINOR_ISSUE'
+                WHEN 2 THEN 'NORMAL_ISSUE'
+                WHEN 3 THEN 'CRITICAL_ISSUE'
+                WHEN 4 THEN 'FIXED'
+                WHEN 5 THEN 'WONT_FIX'
+                WHEN 6 THEN 'WRONG'
+                ELSE 'NORMAL_ISSUE'
+            END;
+
+            -- Migrate user_state column (PullRequestBadPracticeState enum)
+            ALTER TABLE pull_request_bad_practice
+            ALTER COLUMN user_state TYPE VARCHAR(32) USING CASE user_state::integer
+                WHEN 0 THEN 'GOOD_PRACTICE'
+                WHEN 1 THEN 'MINOR_ISSUE'
+                WHEN 2 THEN 'NORMAL_ISSUE'
+                WHEN 3 THEN 'CRITICAL_ISSUE'
+                WHEN 4 THEN 'FIXED'
+                WHEN 5 THEN 'WONT_FIX'
+                WHEN 6 THEN 'WRONG'
+                ELSE NULL
+            END;
+
+            -- Migrate detection_pullrequest_lifecycle_state column (PullRequestLifecycleState enum)
+            ALTER TABLE pull_request_bad_practice
+            ALTER COLUMN detection_pullrequest_lifecycle_state TYPE VARCHAR(32) USING CASE detection_pullrequest_lifecycle_state::integer
+                WHEN 0 THEN 'DRAFT'
+                WHEN 1 THEN 'OPEN'
+                WHEN 2 THEN 'READY_FOR_REVIEW'
+                WHEN 3 THEN 'READY_TO_MERGE'
+                WHEN 4 THEN 'MERGED'
+                WHEN 5 THEN 'CLOSED'
+                ELSE NULL
+            END;
+        </sql>
     </changeSet>
 
     <!-- ==================== SECTION 29: Timestamp Column Naming Standardization ==================== -->

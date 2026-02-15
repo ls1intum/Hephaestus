@@ -295,9 +295,10 @@ public class GitHubProjectSyncService {
 
                 // Check if we should pause due to rate limiting
                 if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
-                    log.warn("Aborting project sync due to critical rate limit: orgLogin={}", safeOrgLogin);
-                    abortReason = SyncResult.Status.ABORTED_RATE_LIMIT;
-                    break;
+                    if (!waitForRateLimitIfNeeded(scopeId, "project list", "orgLogin", safeOrgLogin)) {
+                        abortReason = SyncResult.Status.ABORTED_RATE_LIMIT;
+                        break;
+                    }
                 }
 
                 GHProjectV2Connection response = graphQlResponse
@@ -580,8 +581,25 @@ public class GitHubProjectSyncService {
         HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
         Duration timeout = syncProperties.graphqlTimeout();
 
-        // Phase 1: Sync fields (separate phase with independent cursor)
-        PhaseResult fieldsResult = syncProjectFields(client, project, scopeId);
+        // P2 optimization: skip field and status update syncs when within cooldown.
+        // Fields and status updates rarely change, but were previously re-synced on every run
+        // for all projects (106 projects × 2 queries = 212 wasted calls in the audit).
+        Instant cooldownThreshold = Instant.now().minusSeconds(syncSchedulerProperties.cooldownMinutes() * 60L);
+
+        // Phase 1: Sync fields (with cooldown — field definitions rarely change)
+        boolean fieldsCooldownActive =
+            project.getFieldsSyncedAt() != null && project.getFieldsSyncedAt().isAfter(cooldownThreshold);
+        PhaseResult fieldsResult;
+        if (fieldsCooldownActive) {
+            log.debug(
+                "Skipped project fields sync: reason=cooldownActive, projectId={}, lastSyncedAt={}",
+                projectId,
+                project.getFieldsSyncedAt()
+            );
+            fieldsResult = PhaseResult.SUCCESS;
+        } else {
+            fieldsResult = syncProjectFields(client, project, scopeId);
+        }
 
         // If the project was deleted from GitHub, clean it up and return immediately
         if (fieldsResult == PhaseResult.PROJECT_NOT_FOUND) {
@@ -598,8 +616,20 @@ public class GitHubProjectSyncService {
         }
         boolean fieldsSynced = fieldsResult == PhaseResult.SUCCESS;
 
-        // Phase 2: Sync status updates (separate phase with independent cursor)
-        boolean statusUpdatesSynced = syncProjectStatusUpdates(client, project, scopeId);
+        // Phase 2: Sync status updates (with cooldown — status updates change infrequently)
+        boolean statusUpdatesCooldownActive =
+            project.getStatusUpdatesSyncedAt() != null && project.getStatusUpdatesSyncedAt().isAfter(cooldownThreshold);
+        boolean statusUpdatesSynced;
+        if (statusUpdatesCooldownActive) {
+            log.debug(
+                "Skipped project status updates sync: reason=cooldownActive, projectId={}, lastSyncedAt={}",
+                projectId,
+                project.getStatusUpdatesSyncedAt()
+            );
+            statusUpdatesSynced = true;
+        } else {
+            statusUpdatesSynced = syncProjectStatusUpdates(client, project, scopeId);
+        }
 
         // Resume from cursor if present (via SPI for consistency)
         String cursor = backfillStateProvider.getProjectItemSyncCursor(projectId).orElse(null);
@@ -726,9 +756,10 @@ public class GitHubProjectSyncService {
                 graphQlClientProvider.trackRateLimit(scopeId, graphQlResponse);
 
                 if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
-                    log.warn("Aborting project items sync due to critical rate limit: projectId={}", projectId);
-                    abortReason = SyncResult.Status.ABORTED_RATE_LIMIT;
-                    break;
+                    if (!waitForRateLimitIfNeeded(scopeId, "project items", "projectId", projectId)) {
+                        abortReason = SyncResult.Status.ABORTED_RATE_LIMIT;
+                        break;
+                    }
                 }
 
                 GHProjectV2ItemConnection itemsConnection = graphQlResponse
@@ -966,9 +997,10 @@ public class GitHubProjectSyncService {
             for (ItemWithFieldValueCursor itemWithCursor : itemsNeedingFieldValuePagination) {
                 // Abort if we hit rate limit during follow-up pagination
                 if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
-                    log.warn("Aborting field value pagination due to critical rate limit: projectId={}", projectId);
-                    abortReason = SyncResult.Status.ABORTED_RATE_LIMIT;
-                    break;
+                    if (!waitForRateLimitIfNeeded(scopeId, "field value pagination", "projectId", projectId)) {
+                        abortReason = SyncResult.Status.ABORTED_RATE_LIMIT;
+                        break;
+                    }
                 }
                 syncRemainingFieldValues(scopeId, itemWithCursor);
             }
@@ -1131,8 +1163,9 @@ public class GitHubProjectSyncService {
                 graphQlClientProvider.trackRateLimit(scopeId, graphQlResponse);
 
                 if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
-                    log.warn("Aborting project fields sync due to critical rate limit: projectId={}", projectId);
-                    return PhaseResult.FAILED;
+                    if (!waitForRateLimitIfNeeded(scopeId, "project fields", "projectId", projectId)) {
+                        return PhaseResult.FAILED;
+                    }
                 }
 
                 GHProjectV2FieldConfigurationConnection fieldsConnection = graphQlResponse
@@ -1317,8 +1350,9 @@ public class GitHubProjectSyncService {
                 graphQlClientProvider.trackRateLimit(scopeId, graphQlResponse);
 
                 if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
-                    log.warn("Aborting status updates sync due to critical rate limit: projectId={}", projectId);
-                    return false;
+                    if (!waitForRateLimitIfNeeded(scopeId, "status updates", "projectId", projectId)) {
+                        return false;
+                    }
                 }
 
                 GHProjectV2StatusUpdateConnection statusUpdatesConnection = graphQlResponse
@@ -1552,6 +1586,20 @@ public class GitHubProjectSyncService {
             itemWithCursor.fieldValueCursor(),
             itemWithCursor.initialFieldIds()
         );
+    }
+
+    private boolean waitForRateLimitIfNeeded(Long scopeId, String phase, String scopeLabel, Object scopeValue) {
+        try {
+            boolean waited = graphQlClientProvider.waitIfRateLimitLow(scopeId);
+            if (waited) {
+                log.info("Paused due to critical rate limit: phase={}, {}={}", phase, scopeLabel, scopeValue);
+            }
+            return true;
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            log.warn("Interrupted while waiting for rate limit reset: phase={}, {}={}", phase, scopeLabel, scopeValue);
+            return false;
+        }
     }
 
     /**

@@ -9,9 +9,12 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncCons
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.ExponentialBackoff;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.Category;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlErrorUtils;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubTransportErrors;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2Item;
@@ -60,6 +63,7 @@ public class GitHubProjectItemSyncService {
     private static final Logger log = LoggerFactory.getLogger(GitHubProjectItemSyncService.class);
     private static final String ISSUE_PROJECT_ITEMS_QUERY = "GetIssueProjectItems";
     private static final String PR_PROJECT_ITEMS_QUERY = "GetPullRequestProjectItems";
+    private static final int MAX_RETRY_ATTEMPTS = 3;
 
     private final ProjectRepository projectRepository;
     private final GitHubProjectItemProcessor projectItemProcessor;
@@ -156,6 +160,7 @@ public class GitHubProjectItemSyncService {
         String cursor = startCursor;
         boolean hasMore = true;
         int pageCount = 0;
+        int retryAttempt = 0;
 
         // Determine query based on issue type (PR vs Issue)
         String queryDocument = isPullRequest ? PR_PROJECT_ITEMS_QUERY : ISSUE_PROJECT_ITEMS_QUERY;
@@ -209,6 +214,22 @@ public class GitHubProjectItemSyncService {
                     .block(syncProperties.graphqlTimeout());
 
                 if (response == null || !response.isValid()) {
+                    ClassificationResult classification = classifyGraphQlErrors(response);
+                    if (classification != null) {
+                        if (
+                            handleClassification(
+                                classification,
+                                "project item pagination",
+                                "nodeId",
+                                issueNodeId,
+                                retryAttempt
+                            )
+                        ) {
+                            retryAttempt++;
+                            continue;
+                        }
+                        break;
+                    }
                     log.warn("Invalid GraphQL response for project item pagination: nodeId={}", issueNodeId);
                     break;
                 }
@@ -216,8 +237,9 @@ public class GitHubProjectItemSyncService {
                 graphQlClientProvider.trackRateLimit(scopeId, response);
 
                 if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
-                    log.warn("Aborting project item pagination due to rate limit: nodeId={}", issueNodeId);
-                    break;
+                    if (!waitForRateLimitIfNeeded(scopeId, "project item pagination", "nodeId", issueNodeId)) {
+                        break;
+                    }
                 }
 
                 GHProjectV2ItemConnection connection = response
@@ -248,17 +270,23 @@ public class GitHubProjectItemSyncService {
                 var pageInfo = connection.getPageInfo();
                 hasMore = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
                 cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
+                retryAttempt = 0;
             } catch (InstallationNotFoundException e) {
                 throw e;
             } catch (Exception e) {
                 ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
-                log.warn(
-                    "Error during project item pagination: nodeId={}, category={}, message={}",
-                    issueNodeId,
-                    classification.category(),
-                    classification.message()
-                );
-                break;
+                if (
+                    !handleClassification(
+                        classification,
+                        "project item pagination",
+                        "nodeId",
+                        issueNodeId,
+                        retryAttempt
+                    )
+                ) {
+                    break;
+                }
+                retryAttempt++;
             }
         }
 
@@ -342,5 +370,155 @@ public class GitHubProjectItemSyncService {
         }
 
         return projectRepository.findByNodeId(projectRef.nodeId()).orElse(null);
+    }
+
+    private ClassificationResult classifyGraphQlErrors(ClientGraphQlResponse response) {
+        ClassificationResult classification = exceptionClassifier.classifyGraphQlResponse(response);
+        if (classification != null) {
+            return classification;
+        }
+
+        GitHubGraphQlErrorUtils.TransientError transientError = GitHubGraphQlErrorUtils.detectTransientError(response);
+        if (transientError == null) {
+            return null;
+        }
+
+        return switch (transientError.type()) {
+            case RATE_LIMIT -> ClassificationResult.rateLimited(
+                transientError.getRecommendedWait(),
+                "GraphQL rate limit: " + transientError.message()
+            );
+            case TIMEOUT, SERVER_ERROR -> ClassificationResult.of(
+                Category.RETRYABLE,
+                "GraphQL transient error: " + transientError.message()
+            );
+            case RESOURCE_LIMIT -> ClassificationResult.of(
+                Category.CLIENT_ERROR,
+                "GraphQL resource limit: " + transientError.message()
+            );
+        };
+    }
+
+    private boolean handleClassification(
+        ClassificationResult classification,
+        String phase,
+        String scopeLabel,
+        Object scopeValue,
+        int retryAttempt
+    ) {
+        Category category = classification.category();
+
+        switch (category) {
+            case RETRYABLE -> {
+                if (retryAttempt < MAX_RETRY_ATTEMPTS) {
+                    log.warn(
+                        "Retrying {} after transient error: {}={}, attempt={}, error={}",
+                        phase,
+                        scopeLabel,
+                        scopeValue,
+                        retryAttempt + 1,
+                        classification.message()
+                    );
+                    try {
+                        ExponentialBackoff.sleep(retryAttempt + 1);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        return false;
+                    }
+                    return true;
+                }
+                log.warn(
+                    "Aborting {} after {} retries: {}={}, error={}",
+                    phase,
+                    MAX_RETRY_ATTEMPTS,
+                    scopeLabel,
+                    scopeValue,
+                    classification.message()
+                );
+                return false;
+            }
+            case RATE_LIMITED -> {
+                if (retryAttempt < MAX_RETRY_ATTEMPTS && classification.suggestedWait() != null) {
+                    long waitMs = Math.min(classification.suggestedWait().toMillis(), 300_000);
+                    log.warn(
+                        "Rate limited during {}, waiting: {}={}, waitMs={}",
+                        phase,
+                        scopeLabel,
+                        scopeValue,
+                        waitMs
+                    );
+                    try {
+                        Thread.sleep(waitMs);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        return false;
+                    }
+                    return true;
+                }
+                log.warn(
+                    "Aborting {} due to rate limit: {}={}, error={}",
+                    phase,
+                    scopeLabel,
+                    scopeValue,
+                    classification.message()
+                );
+                return false;
+            }
+            case NOT_FOUND -> {
+                log.warn(
+                    "Resource not found during {}: {}={}, error={}",
+                    phase,
+                    scopeLabel,
+                    scopeValue,
+                    classification.message()
+                );
+                return false;
+            }
+            case AUTH_ERROR -> {
+                log.warn(
+                    "Authentication error during {}: {}={}, error={}",
+                    phase,
+                    scopeLabel,
+                    scopeValue,
+                    classification.message()
+                );
+                return false;
+            }
+            case CLIENT_ERROR -> {
+                log.warn(
+                    "Client error during {}: {}={}, error={}",
+                    phase,
+                    scopeLabel,
+                    scopeValue,
+                    classification.message()
+                );
+                return false;
+            }
+            default -> {
+                log.warn(
+                    "Aborting {} due to error: {}={}, category={}, error={}",
+                    phase,
+                    scopeLabel,
+                    scopeValue,
+                    category,
+                    classification.message()
+                );
+                return false;
+            }
+        }
+    }
+
+    private boolean waitForRateLimitIfNeeded(Long scopeId, String phase, String scopeLabel, Object scopeValue) {
+        try {
+            boolean waited = graphQlClientProvider.waitIfRateLimitLow(scopeId);
+            if (waited) {
+                log.info("Paused due to critical rate limit: phase={}, {}={}", phase, scopeLabel, scopeValue);
+            }
+            return true;
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            log.warn("Interrupted while waiting for rate limit reset: phase={}, {}={}", phase, scopeLabel, scopeValue);
+            return false;
+        }
     }
 }

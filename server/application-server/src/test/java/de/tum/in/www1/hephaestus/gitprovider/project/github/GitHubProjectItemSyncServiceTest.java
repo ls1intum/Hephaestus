@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -13,6 +14,7 @@ import static org.mockito.Mockito.when;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.Category;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
@@ -89,6 +91,11 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
+        // Default exception classifier stub to prevent NPEs on unexpected exceptions
+        lenient()
+            .when(exceptionClassifier.classifyWithDetails(any()))
+            .thenReturn(ClassificationResult.of(Category.UNKNOWN, "test error"));
+
         service = new GitHubProjectItemSyncService(
             projectRepository,
             projectItemProcessor,
@@ -704,7 +711,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
 
         @Test
         @DisplayName("should stop on rate limit critical")
-        void shouldStopOnRateLimitCritical() {
+        void shouldStopOnRateLimitCritical() throws InterruptedException {
             // Arrange
             Repository repository = mock(Repository.class);
             when(graphQlClientProvider.forScope(SCOPE_ID)).thenReturn(graphQlClient);
@@ -716,8 +723,9 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
             when(response.isValid()).thenReturn(true);
             when(requestSpec.execute()).thenReturn(Mono.just(response));
 
-            // Rate limit becomes critical after first request
+            // Rate limit becomes critical after first request and wait fails
             when(graphQlClientProvider.isRateLimitCritical(SCOPE_ID)).thenReturn(true);
+            when(graphQlClientProvider.waitIfRateLimitLow(SCOPE_ID)).thenThrow(new InterruptedException("rate limit"));
 
             // Act
             int result = service.syncRemainingProjectItems(

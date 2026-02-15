@@ -89,6 +89,26 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
      *
      * @return 1 if inserted, 1 if updated (always 1 on success due to DO UPDATE)
      */
+    /**
+     * Finds an issue by ID with its blockedBy collection eagerly loaded.
+     * <p>
+     * This is needed by dependency sync because the persistence context may have been
+     * cleared by prior {@code upsertCore()} calls (via {@code clearAutomatically = true}),
+     * which detaches entities and invalidates lazy proxies.
+     *
+     * @param id the issue ID
+     * @return the issue with blockedBy eagerly loaded, if found
+     */
+    @Query(
+        """
+        SELECT i
+        FROM Issue i
+        LEFT JOIN FETCH i.blockedBy
+        WHERE i.id = :id
+        """
+    )
+    Optional<Issue> findByIdWithBlockedBy(@Param("id") Long id);
+
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Transactional
     @Query(

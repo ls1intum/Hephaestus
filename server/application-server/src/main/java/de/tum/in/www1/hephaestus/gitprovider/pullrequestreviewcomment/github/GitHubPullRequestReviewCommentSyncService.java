@@ -8,9 +8,11 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncCons
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.ExponentialBackoff;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncHelper;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
@@ -78,6 +80,8 @@ public class GitHubPullRequestReviewCommentSyncService {
     private final GitHubUserProcessor userProcessor;
     private final GitHubSyncProperties syncProperties;
     private final GitHubExceptionClassifier exceptionClassifier;
+    private final GitHubGraphQlSyncHelper graphQlSyncHelper;
+    private static final int MAX_RETRY_ATTEMPTS = 3;
 
     public GitHubPullRequestReviewCommentSyncService(
         PullRequestReviewThreadRepository threadRepository,
@@ -85,7 +89,8 @@ public class GitHubPullRequestReviewCommentSyncService {
         GitHubPullRequestReviewCommentProcessor commentProcessor,
         GitHubUserProcessor userProcessor,
         GitHubSyncProperties syncProperties,
-        GitHubExceptionClassifier exceptionClassifier
+        GitHubExceptionClassifier exceptionClassifier,
+        GitHubGraphQlSyncHelper graphQlSyncHelper
     ) {
         this.threadRepository = threadRepository;
         this.graphQlClientProvider = graphQlClientProvider;
@@ -93,6 +98,7 @@ public class GitHubPullRequestReviewCommentSyncService {
         this.userProcessor = userProcessor;
         this.syncProperties = syncProperties;
         this.exceptionClassifier = exceptionClassifier;
+        this.graphQlSyncHelper = graphQlSyncHelper;
     }
 
     /**
@@ -126,6 +132,7 @@ public class GitHubPullRequestReviewCommentSyncService {
 
         HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
 
+        int retryAttempt = 0;
         try {
             int totalSynced = 0;
             String cursor = null;
@@ -167,6 +174,24 @@ public class GitHubPullRequestReviewCommentSyncService {
                     .block(syncProperties.extendedGraphqlTimeout());
 
                 if (graphQlResponse == null || !graphQlResponse.isValid()) {
+                    ClassificationResult classification = graphQlSyncHelper.classifyGraphQlErrors(graphQlResponse);
+                    if (classification != null) {
+                        if (
+                            graphQlSyncHelper.handleGraphQlClassification(
+                                classification,
+                                retryAttempt,
+                                MAX_RETRY_ATTEMPTS,
+                                "review comment sync",
+                                "prNumber",
+                                pullRequest.getNumber(),
+                                log
+                            )
+                        ) {
+                            retryAttempt++;
+                            continue;
+                        }
+                        break;
+                    }
                     log.warn(
                         "Received invalid GraphQL response: repoName={}, prNumber={}, errors={}",
                         safeNameWithOwner,
@@ -181,12 +206,17 @@ public class GitHubPullRequestReviewCommentSyncService {
 
                 // Check if we should pause due to rate limiting
                 if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
-                    log.warn(
-                        "Aborting review comment sync due to critical rate limit: repoName={}, prNumber={}",
-                        safeNameWithOwner,
-                        pullRequest.getNumber()
-                    );
-                    break;
+                    if (
+                        !graphQlSyncHelper.waitForRateLimitIfNeeded(
+                            scopeId,
+                            "review comment sync",
+                            "prNumber",
+                            pullRequest.getNumber(),
+                            log
+                        )
+                    ) {
+                        break;
+                    }
                 }
 
                 GHPullRequestReviewThreadConnection response = graphQlResponse
@@ -205,6 +235,7 @@ public class GitHubPullRequestReviewCommentSyncService {
                 var pageInfo = response.getPageInfo();
                 hasNextPage = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
                 cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
+                retryAttempt = 0;
             }
 
             log.debug(
@@ -236,41 +267,18 @@ public class GitHubPullRequestReviewCommentSyncService {
             return 0;
         } catch (Exception e) {
             ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
-            switch (classification.category()) {
-                case RATE_LIMITED -> log.warn(
-                    "Rate limited during review comment sync: repoName={}, prNumber={}, message={}",
-                    safeNameWithOwner,
+            if (
+                !graphQlSyncHelper.handleGraphQlClassification(
+                    classification,
+                    retryAttempt,
+                    MAX_RETRY_ATTEMPTS,
+                    "review comment sync",
+                    "prNumber",
                     pullRequest.getNumber(),
-                    classification.message()
-                );
-                case NOT_FOUND -> log.warn(
-                    "Resource not found during review comment sync: repoName={}, prNumber={}, message={}",
-                    safeNameWithOwner,
-                    pullRequest.getNumber(),
-                    classification.message()
-                );
-                case AUTH_ERROR -> {
-                    log.error(
-                        "Authentication error during review comment sync: repoName={}, prNumber={}, message={}",
-                        safeNameWithOwner,
-                        pullRequest.getNumber(),
-                        classification.message()
-                    );
-                    throw e;
-                }
-                case RETRYABLE -> log.warn(
-                    "Retryable error during review comment sync: repoName={}, prNumber={}, message={}",
-                    safeNameWithOwner,
-                    pullRequest.getNumber(),
-                    classification.message()
-                );
-                default -> log.error(
-                    "Unexpected error during review comment sync: repoName={}, prNumber={}, message={}",
-                    safeNameWithOwner,
-                    pullRequest.getNumber(),
-                    classification.message(),
-                    e
-                );
+                    log
+                )
+            ) {
+                return 0;
             }
             return 0;
         }
@@ -406,6 +414,7 @@ public class GitHubPullRequestReviewCommentSyncService {
         String cursor = startCursor;
         boolean hasMore = true;
         int fetchedPages = 0;
+        int retryAttempt = 0;
 
         while (hasMore) {
             // Check for interrupt (e.g., during application shutdown)
@@ -439,6 +448,24 @@ public class GitHubPullRequestReviewCommentSyncService {
                     .block(syncProperties.graphqlTimeout());
 
                 if (response == null || !response.isValid()) {
+                    ClassificationResult classification = graphQlSyncHelper.classifyGraphQlErrors(response);
+                    if (classification != null) {
+                        if (
+                            graphQlSyncHelper.handleGraphQlClassification(
+                                classification,
+                                retryAttempt,
+                                MAX_RETRY_ATTEMPTS,
+                                "thread comments fetch",
+                                "threadId",
+                                threadNodeId,
+                                log
+                            )
+                        ) {
+                            retryAttempt++;
+                            continue;
+                        }
+                        break;
+                    }
                     log.warn(
                         "Invalid GraphQL response for thread comments: threadId={}, errors={}",
                         threadNodeId,
@@ -452,8 +479,17 @@ public class GitHubPullRequestReviewCommentSyncService {
 
                 // Check if we should pause due to rate limiting
                 if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
-                    log.warn("Aborting thread comments fetch due to critical rate limit: threadId={}", threadNodeId);
-                    break;
+                    if (
+                        !graphQlSyncHelper.waitForRateLimitIfNeeded(
+                            scopeId,
+                            "thread comments fetch",
+                            "threadId",
+                            threadNodeId,
+                            log
+                        )
+                    ) {
+                        break;
+                    }
                 }
 
                 GHPullRequestReviewCommentConnection fetchedConnection = response
@@ -469,40 +505,23 @@ public class GitHubPullRequestReviewCommentSyncService {
                 GHPageInfo pageInfo = fetchedConnection.getPageInfo();
                 hasMore = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
                 cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
+                retryAttempt = 0;
             } catch (Exception e) {
                 ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
-                switch (classification.category()) {
-                    case RATE_LIMITED -> log.warn(
-                        "Rate limited during thread comments fetch: threadId={}, message={}",
+                if (
+                    !graphQlSyncHelper.handleGraphQlClassification(
+                        classification,
+                        retryAttempt,
+                        MAX_RETRY_ATTEMPTS,
+                        "thread comments fetch",
+                        "threadId",
                         threadNodeId,
-                        classification.message()
-                    );
-                    case NOT_FOUND -> log.warn(
-                        "Resource not found during thread comments fetch: threadId={}, message={}",
-                        threadNodeId,
-                        classification.message()
-                    );
-                    case AUTH_ERROR -> {
-                        log.error(
-                            "Authentication error during thread comments fetch: threadId={}, message={}",
-                            threadNodeId,
-                            classification.message()
-                        );
-                        throw e;
-                    }
-                    case RETRYABLE -> log.warn(
-                        "Retryable error during thread comments fetch: threadId={}, message={}",
-                        threadNodeId,
-                        classification.message()
-                    );
-                    default -> log.error(
-                        "Unexpected error during thread comments fetch: threadId={}, message={}",
-                        threadNodeId,
-                        classification.message(),
-                        e
-                    );
+                        log
+                    )
+                ) {
+                    break;
                 }
-                break;
+                retryAttempt++;
             }
         }
 

@@ -6,6 +6,7 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncCons
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPageInfo;
 import java.time.Duration;
 import java.util.Map;
@@ -76,11 +77,17 @@ import reactor.util.retry.Retry;
 public final class GraphQlPaginationHelper {
 
     private static final Logger log = LoggerFactory.getLogger(GraphQlPaginationHelper.class);
+    private static final int MAX_RETRY_ATTEMPTS = 3;
 
     private final GitHubGraphQlClientProvider graphQlClientProvider;
+    private final GitHubGraphQlSyncHelper graphQlSyncHelper;
 
-    public GraphQlPaginationHelper(GitHubGraphQlClientProvider graphQlClientProvider) {
+    public GraphQlPaginationHelper(
+        GitHubGraphQlClientProvider graphQlClientProvider,
+        GitHubGraphQlSyncHelper graphQlSyncHelper
+    ) {
         this.graphQlClientProvider = graphQlClientProvider;
+        this.graphQlSyncHelper = graphQlSyncHelper;
     }
 
     /**
@@ -94,6 +101,7 @@ public final class GraphQlPaginationHelper {
         String cursor = request.initialCursor();
         boolean hasNextPage = true;
         int pageCount = 0;
+        int retryAttempt = 0;
 
         while (hasNextPage) {
             // Check for thread interruption (e.g., during application shutdown)
@@ -157,23 +165,29 @@ public final class GraphQlPaginationHelper {
                 return new PaginationResult(pageCount, TerminationReason.INVALID_RESPONSE);
             }
 
-            // Check for transient errors (timeouts, rate limits, server errors)
-            // These come back as HTTP 200 with error in the response body
-            GitHubGraphQlErrorUtils.TransientError transientError = GitHubGraphQlErrorUtils.detectTransientError(
-                response
-            );
-            if (transientError != null) {
-                log.warn(
-                    "Detected transient GraphQL error: context={}, type={}, message={}, recommendedWait={}",
-                    request.contextDescription(),
-                    transientError.type(),
-                    transientError.message(),
-                    transientError.getRecommendedWait()
-                );
-                return new PaginationResult(pageCount, TerminationReason.TRANSIENT_ERROR);
-            }
-
             if (!response.isValid()) {
+                var classification = graphQlSyncHelper.classifyGraphQlErrors(response);
+                if (classification != null) {
+                    boolean shouldRetry = graphQlSyncHelper.handleGraphQlClassification(
+                        classification,
+                        retryAttempt,
+                        MAX_RETRY_ATTEMPTS,
+                        request.contextDescription(),
+                        "context",
+                        request.contextDescription(),
+                        log
+                    );
+                    if (shouldRetry) {
+                        retryAttempt++;
+                        continue;
+                    }
+                    return new PaginationResult(
+                        pageCount,
+                        classification.category() == GitHubExceptionClassifier.Category.RATE_LIMITED
+                            ? TerminationReason.RATE_LIMIT_CRITICAL
+                            : TerminationReason.INVALID_RESPONSE
+                    );
+                }
                 log.warn(
                     "Received invalid GraphQL response: context={}, errors={}",
                     request.contextDescription(),
@@ -187,8 +201,17 @@ public final class GraphQlPaginationHelper {
 
             // Check rate limit threshold
             if (graphQlClientProvider.isRateLimitCritical(request.scopeId())) {
-                log.warn("Aborting pagination due to critical rate limit: context={}", request.contextDescription());
-                return new PaginationResult(pageCount, TerminationReason.RATE_LIMIT_CRITICAL);
+                if (
+                    !graphQlSyncHelper.waitForRateLimitIfNeeded(
+                        request.scopeId(),
+                        request.contextDescription(),
+                        "context",
+                        request.contextDescription(),
+                        log
+                    )
+                ) {
+                    return new PaginationResult(pageCount, TerminationReason.RATE_LIMIT_CRITICAL);
+                }
             }
 
             // Extract the connection from the response
@@ -218,6 +241,7 @@ public final class GraphQlPaginationHelper {
             GHPageInfo pageInfo = request.pageInfoExtractor().apply(connection);
             hasNextPage = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
             cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
+            retryAttempt = 0;
         }
 
         return new PaginationResult(pageCount, TerminationReason.COMPLETED);

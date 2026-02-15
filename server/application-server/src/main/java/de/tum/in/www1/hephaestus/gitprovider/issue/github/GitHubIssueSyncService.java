@@ -15,6 +15,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassi
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.Category;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncHelper;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
@@ -81,6 +82,7 @@ public class GitHubIssueSyncService {
     private final GitHubSyncProperties syncProperties;
     private final SyncSchedulerProperties syncSchedulerProperties;
     private final GitHubExceptionClassifier exceptionClassifier;
+    private final GitHubGraphQlSyncHelper graphQlSyncHelper;
 
     /** Maximum number of retry attempts for transient failures. */
     private static final int MAX_RETRY_ATTEMPTS = 3;
@@ -110,7 +112,8 @@ public class GitHubIssueSyncService {
         TransactionTemplate transactionTemplate,
         GitHubSyncProperties syncProperties,
         SyncSchedulerProperties syncSchedulerProperties,
-        GitHubExceptionClassifier exceptionClassifier
+        GitHubExceptionClassifier exceptionClassifier,
+        GitHubGraphQlSyncHelper graphQlSyncHelper
     ) {
         this.repositoryRepository = repositoryRepository;
         this.graphQlClientProvider = graphQlClientProvider;
@@ -123,6 +126,7 @@ public class GitHubIssueSyncService {
         this.syncProperties = syncProperties;
         this.syncSchedulerProperties = syncSchedulerProperties;
         this.exceptionClassifier = exceptionClassifier;
+        this.graphQlSyncHelper = graphQlSyncHelper;
     }
 
     /**
@@ -246,6 +250,28 @@ public class GitHubIssueSyncService {
             isIncrementalSync = true;
         }
 
+        // P0 optimization: probe totalCount before running the expensive full query.
+        // The full GetRepositoryIssues query costs ~59 rate limit points due to deeply nested
+        // embedded data (comments, projectItems, assignees, labels). In our audit, 119 of 122
+        // incremental issue syncs returned 0 issues — wasting ~7,000 points per run.
+        // This lightweight probe costs ~1 point and lets us skip the expensive query entirely.
+        if (isIncrementalSync && sinceDateTime != null && initialCursor == null) {
+            int updatedCount = probeIssueCount(client, ownerAndName, sinceDateTime, timeout, safeNameWithOwner);
+            if (updatedCount == 0) {
+                log.info(
+                    "Skipped issue sync: reason=noUpdatedIssues, repoName={}, since={}",
+                    safeNameWithOwner,
+                    sinceDateTime
+                );
+                return SyncResult.completed(0);
+            }
+            log.info(
+                "Issue count probe found {} updated issues, proceeding with full sync: repoName={}",
+                updatedCount,
+                safeNameWithOwner
+            );
+        }
+
         int totalIssuesSynced = 0;
         int totalCommentsSynced = 0;
         int totalProjectItemsSynced = 0;
@@ -320,11 +346,34 @@ public class GitHubIssueSyncService {
                     .block(timeout);
 
                 if (response == null || !response.isValid()) {
+                    ClassificationResult classification = graphQlSyncHelper.classifyGraphQlErrors(response);
+                    if (classification != null) {
+                        if (
+                            graphQlSyncHelper.handleGraphQlClassification(
+                                classification,
+                                retryAttempt,
+                                MAX_RETRY_ATTEMPTS,
+                                "issue sync",
+                                "repoName",
+                                safeNameWithOwner,
+                                log
+                            )
+                        ) {
+                            retryAttempt++;
+                            continue;
+                        }
+                        abortReason =
+                            classification.category() == Category.RATE_LIMITED
+                                ? SyncResult.Status.ABORTED_RATE_LIMIT
+                                : SyncResult.Status.ABORTED_ERROR;
+                        break;
+                    }
                     log.warn(
                         "Received invalid GraphQL response: repoName={}, errors={}",
                         safeNameWithOwner,
                         response != null ? response.getErrors() : "null"
                     );
+                    abortReason = SyncResult.Status.ABORTED_ERROR;
                     break;
                 }
 
@@ -333,13 +382,18 @@ public class GitHubIssueSyncService {
 
                 // Check if we should pause due to rate limiting
                 if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
-                    log.warn(
-                        "Aborting issue sync due to critical rate limit: repoName={}, pageCount={}",
-                        safeNameWithOwner,
-                        pageCount
-                    );
-                    abortReason = SyncResult.Status.ABORTED_RATE_LIMIT;
-                    break;
+                    if (
+                        !graphQlSyncHelper.waitForRateLimitIfNeeded(
+                            scopeId,
+                            "issue sync",
+                            "repoName",
+                            safeNameWithOwner,
+                            log
+                        )
+                    ) {
+                        abortReason = SyncResult.Status.ABORTED_RATE_LIMIT;
+                        break;
+                    }
                 }
 
                 GHIssueConnection connection = response.field("repository.issues").toEntity(GHIssueConnection.class);
@@ -664,5 +718,66 @@ public class GitHubIssueSyncService {
             backfillStateProvider.updateIssueSyncCursor(syncTargetId, null);
             log.debug("Cleared issue sync cursor checkpoint: syncTargetId={}", syncTargetId);
         });
+    }
+
+    /**
+     * Lightweight probe to check if a repository has any issues updated since a given timestamp.
+     * <p>
+     * Uses the GetRepositoryIssueCount query which costs ~1 rate limit point (vs ~59 for the
+     * full GetRepositoryIssues query). Returns the totalCount of issues matching the filter.
+     * <p>
+     * If the probe fails for any reason, returns -1 to signal the caller should proceed with
+     * the full sync (fail-open behavior to avoid skipping data).
+     *
+     * @param client           the GraphQL client
+     * @param ownerAndName     the parsed repository owner and name
+     * @param sinceDateTime    the timestamp to filter issues by (updatedAt >= since)
+     * @param timeout          the GraphQL request timeout
+     * @param safeNameWithOwner sanitized repository name for logging
+     * @return totalCount of matching issues, or -1 if the probe failed
+     */
+    private int probeIssueCount(
+        HttpGraphQlClient client,
+        RepositoryOwnerAndName ownerAndName,
+        OffsetDateTime sinceDateTime,
+        Duration timeout,
+        String safeNameWithOwner
+    ) {
+        try {
+            ClientGraphQlResponse response = client
+                .documentName("GetRepositoryIssueCount")
+                .variable("owner", ownerAndName.owner())
+                .variable("name", ownerAndName.name())
+                .variable("since", sinceDateTime.toString())
+                .execute()
+                .block(timeout);
+
+            if (response == null || !response.isValid()) {
+                log.warn(
+                    "Issue count probe returned invalid response, falling back to full sync: repoName={}",
+                    safeNameWithOwner
+                );
+                return -1;
+            }
+
+            Integer totalCount = response.field("repository.issues.totalCount").toEntity(Integer.class);
+            if (totalCount == null) {
+                log.warn(
+                    "Issue count probe returned null totalCount, falling back to full sync: repoName={}",
+                    safeNameWithOwner
+                );
+                return -1;
+            }
+
+            return totalCount;
+        } catch (Exception e) {
+            // Fail-open: if the probe itself fails, proceed with the full sync
+            log.warn(
+                "Issue count probe failed, falling back to full sync: repoName={}, error={}",
+                safeNameWithOwner,
+                e.getMessage()
+            );
+            return -1;
+        }
     }
 }

@@ -105,7 +105,28 @@ public class ScopedRateLimitTracker implements RateLimitTracker {
             return DEFAULT_LIMIT;
         }
         ScopeRateLimitState state = stateByScope.get(scopeId);
-        return state != null ? state.remaining.get() : DEFAULT_LIMIT;
+        if (state == null) {
+            return DEFAULT_LIMIT;
+        }
+        int remaining = state.remaining.get();
+        // Optimistic reset: if remaining is low and reset time has passed,
+        // reset remaining to full limit so callers don't stall on stale data.
+        if (remaining < DEFAULT_LOW_THRESHOLD) {
+            Instant resetAt = state.resetAt.get();
+            if (resetAt != null && !Instant.now().isBefore(resetAt)) {
+                int fullLimit = state.limit.get();
+                state.remaining.set(fullLimit);
+                log.info(
+                    "Rate limit reset time has passed, optimistically reset remaining: scopeId={}, oldRemaining={}, newRemaining={}, resetAt={}",
+                    scopeId,
+                    remaining,
+                    fullLimit,
+                    resetAt
+                );
+                return fullLimit;
+            }
+        }
+        return remaining;
     }
 
     @Override
@@ -158,8 +179,21 @@ public class ScopedRateLimitTracker implements RateLimitTracker {
 
         // Clamp to reasonable bounds
         if (waitTime.isNegative() || waitTime.isZero()) {
-            // Reset time has passed, limit should have reset
-            log.info("Rate limit reset time has passed, continuing: scopeId={}", scopeId);
+            // Reset time has passed — optimistically reset remaining to full limit.
+            // The next actual GraphQL call will update with the real remaining value.
+            ScopeRateLimitState state = stateByScope.get(scopeId);
+            if (state != null) {
+                int fullLimit = state.limit.get();
+                state.remaining.set(fullLimit);
+                log.info(
+                    "Rate limit reset time has passed, optimistically reset remaining: scopeId={}, remaining={}, resetAt={}",
+                    scopeId,
+                    fullLimit,
+                    reset
+                );
+            } else {
+                log.info("Rate limit reset time has passed, continuing: scopeId={}", scopeId);
+            }
             return false;
         }
 

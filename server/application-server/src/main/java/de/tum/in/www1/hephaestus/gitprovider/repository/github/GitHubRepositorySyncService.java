@@ -3,9 +3,11 @@ package de.tum.in.www1.hephaestus.gitprovider.repository.github;
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.ExponentialBackoff;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncHelper;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
@@ -45,19 +47,23 @@ public class GitHubRepositorySyncService {
     private final OrganizationRepository organizationRepository;
     private final GitHubSyncProperties syncProperties;
     private final GitHubExceptionClassifier exceptionClassifier;
+    private final GitHubGraphQlSyncHelper graphQlSyncHelper;
+    private static final int MAX_RETRY_ATTEMPTS = 3;
 
     public GitHubRepositorySyncService(
         GitHubGraphQlClientProvider graphQlClientProvider,
         RepositoryRepository repositoryRepository,
         OrganizationRepository organizationRepository,
         GitHubSyncProperties syncProperties,
-        GitHubExceptionClassifier exceptionClassifier
+        GitHubExceptionClassifier exceptionClassifier,
+        GitHubGraphQlSyncHelper graphQlSyncHelper
     ) {
         this.graphQlClientProvider = graphQlClientProvider;
         this.repositoryRepository = repositoryRepository;
         this.organizationRepository = organizationRepository;
         this.syncProperties = syncProperties;
         this.exceptionClassifier = exceptionClassifier;
+        this.graphQlSyncHelper = graphQlSyncHelper;
     }
 
     /**
@@ -92,6 +98,23 @@ public class GitHubRepositorySyncService {
                 .block(syncProperties.graphqlTimeout());
 
             if (response == null || !response.isValid()) {
+                ClassificationResult classification = graphQlSyncHelper.classifyGraphQlErrors(response);
+                if (classification != null) {
+                    if (
+                        graphQlSyncHelper.handleGraphQlClassification(
+                            classification,
+                            0,
+                            MAX_RETRY_ATTEMPTS,
+                            "repository sync",
+                            "repoName",
+                            safeNameWithOwner,
+                            log
+                        )
+                    ) {
+                        return syncRepository(scopeId, nameWithOwner);
+                    }
+                    return Optional.empty();
+                }
                 log.warn(
                     "Failed to fetch repository: scopeId={}, repoName={}, errors={}",
                     scopeId,
@@ -103,6 +126,20 @@ public class GitHubRepositorySyncService {
 
             // Track rate limit from response
             graphQlClientProvider.trackRateLimit(scopeId, response);
+
+            if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
+                if (
+                    !graphQlSyncHelper.waitForRateLimitIfNeeded(
+                        scopeId,
+                        "repository sync",
+                        "repoName",
+                        safeNameWithOwner,
+                        log
+                    )
+                ) {
+                    return Optional.empty();
+                }
+            }
 
             // Use typed GraphQL model for type-safe parsing
             var repoData = response.field("repository").toEntity(GHRepository.class);
@@ -194,42 +231,15 @@ public class GitHubRepositorySyncService {
             throw e;
         } catch (Exception e) {
             ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
-            switch (classification.category()) {
-                case RATE_LIMITED -> log.warn(
-                    "Rate limited during repository sync: repoName={}, scopeId={}, message={}",
-                    safeNameWithOwner,
-                    scopeId,
-                    classification.message()
-                );
-                case NOT_FOUND -> log.warn(
-                    "Resource not found during repository sync: repoName={}, scopeId={}, message={}",
-                    safeNameWithOwner,
-                    scopeId,
-                    classification.message()
-                );
-                case AUTH_ERROR -> {
-                    log.error(
-                        "Authentication error during repository sync: repoName={}, scopeId={}, message={}",
-                        safeNameWithOwner,
-                        scopeId,
-                        classification.message()
-                    );
-                    throw e;
-                }
-                case RETRYABLE -> log.warn(
-                    "Retryable error during repository sync: repoName={}, scopeId={}, message={}",
-                    safeNameWithOwner,
-                    scopeId,
-                    classification.message()
-                );
-                default -> log.error(
-                    "Unexpected error during repository sync: repoName={}, scopeId={}, message={}",
-                    safeNameWithOwner,
-                    scopeId,
-                    classification.message(),
-                    e
-                );
-            }
+            graphQlSyncHelper.handleGraphQlClassification(
+                classification,
+                0,
+                MAX_RETRY_ATTEMPTS,
+                "repository sync",
+                "repoName",
+                safeNameWithOwner,
+                log
+            );
             return Optional.empty();
         }
     }

@@ -15,6 +15,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassi
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.Category;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncHelper;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
@@ -90,6 +91,7 @@ public class GitHubPullRequestSyncService {
     private final GitHubSyncProperties syncProperties;
     private final SyncSchedulerProperties syncSchedulerProperties;
     private final GitHubExceptionClassifier exceptionClassifier;
+    private final GitHubGraphQlSyncHelper graphQlSyncHelper;
 
     /** Maximum number of retry attempts for transient failures. */
     private static final int MAX_RETRY_ATTEMPTS = 3;
@@ -130,7 +132,8 @@ public class GitHubPullRequestSyncService {
         TransactionTemplate transactionTemplate,
         GitHubSyncProperties syncProperties,
         SyncSchedulerProperties syncSchedulerProperties,
-        GitHubExceptionClassifier exceptionClassifier
+        GitHubExceptionClassifier exceptionClassifier,
+        GitHubGraphQlSyncHelper graphQlSyncHelper
     ) {
         this.repositoryRepository = repositoryRepository;
         this.pullRequestRepository = pullRequestRepository;
@@ -144,6 +147,7 @@ public class GitHubPullRequestSyncService {
         this.syncProperties = syncProperties;
         this.syncSchedulerProperties = syncSchedulerProperties;
         this.exceptionClassifier = exceptionClassifier;
+        this.graphQlSyncHelper = graphQlSyncHelper;
     }
 
     /**
@@ -352,11 +356,34 @@ public class GitHubPullRequestSyncService {
                     .block(timeout);
 
                 if (response == null || !response.isValid()) {
+                    ClassificationResult classification = graphQlSyncHelper.classifyGraphQlErrors(response);
+                    if (classification != null) {
+                        if (
+                            graphQlSyncHelper.handleGraphQlClassification(
+                                classification,
+                                retryAttempt,
+                                MAX_RETRY_ATTEMPTS,
+                                "pull request sync",
+                                "repoName",
+                                safeNameWithOwner,
+                                log
+                            )
+                        ) {
+                            retryAttempt++;
+                            continue;
+                        }
+                        abortReason =
+                            classification.category() == Category.RATE_LIMITED
+                                ? SyncResult.Status.ABORTED_RATE_LIMIT
+                                : SyncResult.Status.ABORTED_ERROR;
+                        break;
+                    }
                     log.warn(
                         "Invalid GraphQL response for pull requests: repoName={}, errors={}",
                         safeNameWithOwner,
                         response != null ? response.getErrors() : "null"
                     );
+                    abortReason = SyncResult.Status.ABORTED_ERROR;
                     break;
                 }
 
@@ -365,13 +392,18 @@ public class GitHubPullRequestSyncService {
 
                 // Check if we should pause due to rate limiting
                 if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
-                    log.warn(
-                        "Aborting pull request sync due to critical rate limit: repoName={}, pageCount={}",
-                        safeNameWithOwner,
-                        pageCount
-                    );
-                    abortReason = SyncResult.Status.ABORTED_RATE_LIMIT;
-                    break;
+                    if (
+                        !graphQlSyncHelper.waitForRateLimitIfNeeded(
+                            scopeId,
+                            "pull request sync",
+                            "repoName",
+                            safeNameWithOwner,
+                            log
+                        )
+                    ) {
+                        abortReason = SyncResult.Status.ABORTED_RATE_LIMIT;
+                        break;
+                    }
                 }
 
                 GHPullRequestConnection connection = response

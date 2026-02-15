@@ -7,7 +7,12 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncCons
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.github.ExponentialBackoff;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.Category;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlErrorUtils;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubTransportErrors;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2ItemFieldValueConnection;
@@ -38,6 +43,7 @@ public class GitHubProjectItemFieldValueSyncService {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubProjectItemFieldValueSyncService.class);
     private static final String GET_PROJECT_ITEM_FIELD_VALUES_DOCUMENT = "GetProjectItemFieldValues";
+    private static final int MAX_RETRY_ATTEMPTS = 3;
 
     private final ProjectFieldRepository projectFieldRepository;
     private final ProjectFieldValueRepository projectFieldValueRepository;
@@ -45,6 +51,7 @@ public class GitHubProjectItemFieldValueSyncService {
     private final GitHubGraphQlClientProvider graphQlClientProvider;
     private final GitHubSyncProperties syncProperties;
     private final TransactionTemplate transactionTemplate;
+    private final GitHubExceptionClassifier exceptionClassifier;
 
     public GitHubProjectItemFieldValueSyncService(
         ProjectFieldRepository projectFieldRepository,
@@ -52,7 +59,8 @@ public class GitHubProjectItemFieldValueSyncService {
         ProjectItemRepository projectItemRepository,
         GitHubGraphQlClientProvider graphQlClientProvider,
         GitHubSyncProperties syncProperties,
-        TransactionTemplate transactionTemplate
+        TransactionTemplate transactionTemplate,
+        GitHubExceptionClassifier exceptionClassifier
     ) {
         this.projectFieldRepository = projectFieldRepository;
         this.projectFieldValueRepository = projectFieldValueRepository;
@@ -60,6 +68,7 @@ public class GitHubProjectItemFieldValueSyncService {
         this.graphQlClientProvider = graphQlClientProvider;
         this.syncProperties = syncProperties;
         this.transactionTemplate = transactionTemplate;
+        this.exceptionClassifier = exceptionClassifier;
     }
 
     @Transactional
@@ -137,6 +146,7 @@ public class GitHubProjectItemFieldValueSyncService {
         int totalSynced = 0;
         boolean completedNormally = false;
         List<String> processedFieldIds = new ArrayList<>();
+        int retryAttempt = 0;
         if (initialFieldIds != null) {
             processedFieldIds.addAll(initialFieldIds);
         }
@@ -182,6 +192,22 @@ public class GitHubProjectItemFieldValueSyncService {
                     .block(timeout);
 
                 if (graphQlResponse == null || !graphQlResponse.isValid()) {
+                    ClassificationResult classification = classifyGraphQlErrors(graphQlResponse);
+                    if (classification != null) {
+                        if (
+                            handleClassification(
+                                classification,
+                                "field values pagination",
+                                "itemId",
+                                itemId,
+                                retryAttempt
+                            )
+                        ) {
+                            retryAttempt++;
+                            continue;
+                        }
+                        break;
+                    }
                     log.warn(
                         "Received invalid GraphQL response for item field values: itemId={}, errors={}",
                         itemId,
@@ -193,8 +219,9 @@ public class GitHubProjectItemFieldValueSyncService {
                 graphQlClientProvider.trackRateLimit(scopeId, graphQlResponse);
 
                 if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
-                    log.warn("Aborting field values pagination due to critical rate limit: itemId={}", itemId);
-                    break;
+                    if (!waitForRateLimitIfNeeded(scopeId, "field values pagination", "itemId", itemId)) {
+                        break;
+                    }
                 }
 
                 GHProjectV2ItemFieldValueConnection fieldValuesConnection = graphQlResponse
@@ -266,9 +293,13 @@ public class GitHubProjectItemFieldValueSyncService {
                         break;
                     }
                 }
+                retryAttempt = 0;
             } catch (Exception e) {
-                log.warn("Failed to sync remaining field values: itemId={}, error={}", itemId, e.getMessage());
-                break;
+                ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
+                if (!handleClassification(classification, "field values pagination", "itemId", itemId, retryAttempt)) {
+                    break;
+                }
+                retryAttempt++;
             }
         }
 
@@ -340,6 +371,156 @@ public class GitHubProjectItemFieldValueSyncService {
         int removed = projectFieldValueRepository.deleteByItemIdAndFieldIdNotIn(itemId, processedFieldIds);
         if (removed > 0) {
             log.debug("Removed stale field values: itemId={}, count={}", itemId, removed);
+        }
+    }
+
+    private ClassificationResult classifyGraphQlErrors(ClientGraphQlResponse response) {
+        ClassificationResult classification = exceptionClassifier.classifyGraphQlResponse(response);
+        if (classification != null) {
+            return classification;
+        }
+
+        GitHubGraphQlErrorUtils.TransientError transientError = GitHubGraphQlErrorUtils.detectTransientError(response);
+        if (transientError == null) {
+            return null;
+        }
+
+        return switch (transientError.type()) {
+            case RATE_LIMIT -> ClassificationResult.rateLimited(
+                transientError.getRecommendedWait(),
+                "GraphQL rate limit: " + transientError.message()
+            );
+            case TIMEOUT, SERVER_ERROR -> ClassificationResult.of(
+                Category.RETRYABLE,
+                "GraphQL transient error: " + transientError.message()
+            );
+            case RESOURCE_LIMIT -> ClassificationResult.of(
+                Category.CLIENT_ERROR,
+                "GraphQL resource limit: " + transientError.message()
+            );
+        };
+    }
+
+    private boolean handleClassification(
+        ClassificationResult classification,
+        String phase,
+        String scopeLabel,
+        Object scopeValue,
+        int retryAttempt
+    ) {
+        Category category = classification.category();
+
+        switch (category) {
+            case RETRYABLE -> {
+                if (retryAttempt < MAX_RETRY_ATTEMPTS) {
+                    log.warn(
+                        "Retrying {} after transient error: {}={}, attempt={}, error={}",
+                        phase,
+                        scopeLabel,
+                        scopeValue,
+                        retryAttempt + 1,
+                        classification.message()
+                    );
+                    try {
+                        ExponentialBackoff.sleep(retryAttempt + 1);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        return false;
+                    }
+                    return true;
+                }
+                log.warn(
+                    "Aborting {} after {} retries: {}={}, error={}",
+                    phase,
+                    MAX_RETRY_ATTEMPTS,
+                    scopeLabel,
+                    scopeValue,
+                    classification.message()
+                );
+                return false;
+            }
+            case RATE_LIMITED -> {
+                if (retryAttempt < MAX_RETRY_ATTEMPTS && classification.suggestedWait() != null) {
+                    long waitMs = Math.min(classification.suggestedWait().toMillis(), 300_000);
+                    log.warn(
+                        "Rate limited during {}, waiting: {}={}, waitMs={}",
+                        phase,
+                        scopeLabel,
+                        scopeValue,
+                        waitMs
+                    );
+                    try {
+                        Thread.sleep(waitMs);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        return false;
+                    }
+                    return true;
+                }
+                log.warn(
+                    "Aborting {} due to rate limit: {}={}, error={}",
+                    phase,
+                    scopeLabel,
+                    scopeValue,
+                    classification.message()
+                );
+                return false;
+            }
+            case NOT_FOUND -> {
+                log.warn(
+                    "Resource not found during {}: {}={}, error={}",
+                    phase,
+                    scopeLabel,
+                    scopeValue,
+                    classification.message()
+                );
+                return false;
+            }
+            case AUTH_ERROR -> {
+                log.warn(
+                    "Authentication error during {}: {}={}, error={}",
+                    phase,
+                    scopeLabel,
+                    scopeValue,
+                    classification.message()
+                );
+                return false;
+            }
+            case CLIENT_ERROR -> {
+                log.warn(
+                    "Client error during {}: {}={}, error={}",
+                    phase,
+                    scopeLabel,
+                    scopeValue,
+                    classification.message()
+                );
+                return false;
+            }
+            default -> {
+                log.warn(
+                    "Aborting {} due to error: {}={}, category={}, error={}",
+                    phase,
+                    scopeLabel,
+                    scopeValue,
+                    category,
+                    classification.message()
+                );
+                return false;
+            }
+        }
+    }
+
+    private boolean waitForRateLimitIfNeeded(Long scopeId, String phase, String scopeLabel, Object scopeValue) {
+        try {
+            boolean waited = graphQlClientProvider.waitIfRateLimitLow(scopeId);
+            if (waited) {
+                log.info("Paused due to critical rate limit: phase={}, {}={}", phase, scopeLabel, scopeValue);
+            }
+            return true;
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            log.warn("Interrupted while waiting for rate limit reset: phase={}, {}={}", phase, scopeLabel, scopeValue);
+            return false;
         }
     }
 }
