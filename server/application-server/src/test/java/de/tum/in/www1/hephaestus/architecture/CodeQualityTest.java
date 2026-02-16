@@ -158,7 +158,8 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                 "ProjectItemRepository.upsertCore",
                 "ProjectFieldValueRepository.upsertCore",
                 "ProjectStatusUpdateRepository.upsertCore",
-                "UserRepository.upsertUser"
+                "UserRepository.upsertUser",
+                "CommitRepository.upsertCommit"
             );
 
             ArchCondition<JavaClass> haveMethodsWithLimitedParams = new ArchCondition<>(
