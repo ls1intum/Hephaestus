@@ -1632,6 +1632,42 @@ public class ActivityEventListener {
     }
 
     // ========================================================================
+    // Commit Events
+    // ========================================================================
+
+    /**
+     * Handle commit created events.
+     *
+     * <p>Records COMMIT_CREATED activity event. If the author is unknown (null),
+     * the event is still recorded for audit purposes but with 0 XP.
+     *
+     * <p>XP is only awarded when we can attribute the commit to a known user.
+     */
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onCommitCreated(DomainEvent.CommitCreated event) {
+        var commitData = event.commit();
+        if (!hasValidScopeId("Commit created", commitData.id(), event.context().scopeId())) {
+            return;
+        }
+        User actor = getActorOrNull(commitData.authorId());
+        Instant occurredAt = commitData.authoredAt();
+        safeRecord("commit created", commitData.id(), () ->
+            activityEventService.record(
+                event.context().scopeId(),
+                ActivityEventType.COMMIT_CREATED,
+                occurredAt,
+                actor,
+                repositoryRepository.getReferenceById(commitData.repositoryId()),
+                ActivityTargetType.COMMIT,
+                commitData.id(),
+                xpForActor(actor, xpCalc.getXpCommitCreated())
+            )
+        );
+    }
+
+    // ========================================================================
     // Project Status Update Events
     // ========================================================================
 

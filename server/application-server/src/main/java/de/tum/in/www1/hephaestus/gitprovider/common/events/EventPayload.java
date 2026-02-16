@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.common.events;
 
+import de.tum.in.www1.hephaestus.gitprovider.commit.Commit;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
 import de.tum.in.www1.hephaestus.gitprovider.issuetype.IssueType;
@@ -477,6 +478,43 @@ public final class EventPayload {
                 update.getCreator() != null ? update.getCreator().getId() : null,
                 update.getCreatedAt(),
                 update.getUpdatedAt()
+            );
+        }
+    }
+
+    // ========================================================================
+    // Commit Event Payload
+    // ========================================================================
+
+    /**
+     * Immutable snapshot of a Commit for event handling.
+     */
+    public record CommitData(
+        @NonNull Long id,
+        @NonNull String sha,
+        @NonNull String message,
+        @NonNull Instant authoredAt,
+        int additions,
+        int deletions,
+        int changedFiles,
+        @Nullable String htmlUrl,
+        @Nullable Long authorId,
+        @Nullable Long committerId,
+        @NonNull Long repositoryId
+    ) {
+        public static CommitData from(Commit commit) {
+            return new CommitData(
+                commit.getId(),
+                commit.getSha(),
+                commit.getMessage(),
+                commit.getAuthoredAt(),
+                commit.getAdditions(),
+                commit.getDeletions(),
+                commit.getChangedFiles(),
+                commit.getHtmlUrl(),
+                commit.getAuthor() != null ? commit.getAuthor().getId() : null,
+                commit.getCommitter() != null ? commit.getCommitter().getId() : null,
+                commit.getRepository().getId()
             );
         }
     }

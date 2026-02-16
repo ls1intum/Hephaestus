@@ -137,6 +137,13 @@ public class ExperiencePointCalculator implements ExperiencePointStrategy {
         return properties.xpAwards().projectStatusUpdateCreated();
     }
 
+    /**
+     * Get XP for commit created (configurable).
+     */
+    public double getXpCommitCreated() {
+        return properties.xpAwards().commitCreated();
+    }
+
     // ========================================================================
     // Review Experience Points
     // ========================================================================

@@ -14,8 +14,10 @@ import static org.mockito.Mockito.when;
 
 import de.tum.in.www1.hephaestus.gitprovider.commit.CommitRepository;
 import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.ScopeIdResolver;
 import de.tum.in.www1.hephaestus.gitprovider.git.GitRepositoryManager;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
@@ -31,7 +33,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @DisplayName("GitHubPushMessageHandler")
@@ -53,6 +57,12 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
     private UserRepository userRepository;
 
     @Mock
+    private ApplicationEventPublisher eventPublisher;
+
+    @Mock
+    private ScopeIdResolver scopeIdResolver;
+
+    @Mock
     private NatsMessageDeserializer deserializer;
 
     @Mock
@@ -68,6 +78,8 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
             repositoryRepository,
             commitRepository,
             userRepository,
+            eventPublisher,
+            scopeIdResolver,
             deserializer,
             transactionTemplate
         );
@@ -170,7 +182,7 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
 
             invokeHandleEvent(event);
 
-            verify(repositoryRepository, never()).findById(anyLong());
+            verify(repositoryRepository, never()).findByIdWithOrganization(anyLong());
             verify(commitRepository, never()).upsertCommit(
                 anyString(),
                 anyString(),
@@ -209,7 +221,7 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
 
             invokeHandleEvent(event);
 
-            verify(repositoryRepository, never()).findById(anyLong());
+            verify(repositoryRepository, never()).findByIdWithOrganization(anyLong());
         }
 
         @Test
@@ -219,7 +231,7 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
 
             invokeHandleEvent(event);
 
-            verify(repositoryRepository, never()).findById(anyLong());
+            verify(repositoryRepository, never()).findByIdWithOrganization(anyLong());
         }
 
         @Test
@@ -228,7 +240,7 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
             var commit = createPushCommit("sha1", "message", List.of("file.txt"), List.of(), List.of());
             var event = createBasicPushEvent("refs/heads/main", false, List.of(commit));
 
-            when(repositoryRepository.findById(100L)).thenReturn(Optional.empty());
+            when(repositoryRepository.findByIdWithOrganization(100L)).thenReturn(Optional.empty());
 
             invokeHandleEvent(event);
 
@@ -271,7 +283,7 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
 
             invokeHandleEvent(event);
 
-            verify(repositoryRepository, never()).findById(anyLong());
+            verify(repositoryRepository, never()).findByIdWithOrganization(anyLong());
         }
 
         @Test
@@ -281,7 +293,7 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
             var event = createBasicPushEvent("refs/heads/feature-branch", false, List.of(commit));
 
             Repository repo = createMockRepository(100L, "owner/repo", "main");
-            when(repositoryRepository.findById(100L)).thenReturn(Optional.of(repo));
+            when(repositoryRepository.findByIdWithOrganization(100L)).thenReturn(Optional.of(repo));
 
             invokeHandleEvent(event);
 
@@ -320,7 +332,7 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
             var event = createBasicPushEvent("refs/heads/main", false, List.of(commit));
 
             Repository repo = createMockRepository(100L, "owner/repo", "main");
-            when(repositoryRepository.findById(100L)).thenReturn(Optional.of(repo));
+            when(repositoryRepository.findByIdWithOrganization(100L)).thenReturn(Optional.of(repo));
             when(gitRepositoryManager.isEnabled()).thenReturn(false);
 
             invokeHandleEvent(event);
@@ -362,7 +374,7 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
             var event = createBasicPushEvent("refs/heads/main", false, List.of(commit1, commit2));
 
             Repository repo = createMockRepository(100L, "owner/repo", "main");
-            when(repositoryRepository.findById(100L)).thenReturn(Optional.of(repo));
+            when(repositoryRepository.findByIdWithOrganization(100L)).thenReturn(Optional.of(repo));
             when(gitRepositoryManager.isEnabled()).thenReturn(false);
 
             invokeHandleEvent(event);
@@ -397,7 +409,7 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
             var event = createBasicPushEvent("refs/heads/main", false, List.of(commit));
 
             Repository repo = createMockRepository(100L, "owner/repo", "main");
-            when(repositoryRepository.findById(100L)).thenReturn(Optional.of(repo));
+            when(repositoryRepository.findByIdWithOrganization(100L)).thenReturn(Optional.of(repo));
             when(gitRepositoryManager.isEnabled()).thenReturn(false);
 
             User author = mock(User.class);
@@ -446,7 +458,7 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
             var event = createBasicPushEvent("refs/heads/main", false, List.of(commit));
 
             Repository repo = createMockRepository(100L, "owner/repo", "main");
-            when(repositoryRepository.findById(100L)).thenReturn(Optional.of(repo));
+            when(repositoryRepository.findByIdWithOrganization(100L)).thenReturn(Optional.of(repo));
             when(gitRepositoryManager.isEnabled()).thenReturn(false);
 
             invokeHandleEvent(event);
@@ -481,7 +493,7 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
             var event = createBasicPushEvent("refs/heads/main", false, List.of(commit));
 
             Repository repo = createMockRepository(100L, "owner/repo", "main");
-            when(repositoryRepository.findById(100L)).thenReturn(Optional.of(repo));
+            when(repositoryRepository.findByIdWithOrganization(100L)).thenReturn(Optional.of(repo));
             when(gitRepositoryManager.isEnabled()).thenReturn(false);
 
             invokeHandleEvent(event);
@@ -516,7 +528,7 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
             var event = createBasicPushEvent("refs/heads/main", false, List.of(commit));
 
             Repository repo = createMockRepository(100L, "owner/repo", "main");
-            when(repositoryRepository.findById(100L)).thenReturn(Optional.of(repo));
+            when(repositoryRepository.findByIdWithOrganization(100L)).thenReturn(Optional.of(repo));
             when(gitRepositoryManager.isEnabled()).thenReturn(false);
 
             invokeHandleEvent(event);
@@ -556,7 +568,7 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
             var event = createBasicPushEvent("refs/heads/main", false, List.of(commit));
 
             Repository repo = createMockRepository(100L, "owner/repo", "main");
-            when(repositoryRepository.findById(100L)).thenReturn(Optional.of(repo));
+            when(repositoryRepository.findByIdWithOrganization(100L)).thenReturn(Optional.of(repo));
             when(gitRepositoryManager.isEnabled()).thenReturn(true);
             when(tokenService.isConfigured()).thenReturn(true);
             when(tokenService.getInstallationToken(42L)).thenReturn("test-token");
@@ -585,7 +597,7 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
             var event = createBasicPushEvent("refs/heads/main", false, List.of(commit));
 
             Repository repo = createMockRepository(100L, "owner/repo", "main");
-            when(repositoryRepository.findById(100L)).thenReturn(Optional.of(repo));
+            when(repositoryRepository.findByIdWithOrganization(100L)).thenReturn(Optional.of(repo));
             when(gitRepositoryManager.isEnabled()).thenReturn(true);
             when(tokenService.isConfigured()).thenReturn(false);
             when(gitRepositoryManager.ensureRepository(eq(100L), any(), any())).thenThrow(
@@ -625,7 +637,7 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
             var event = createBasicPushEvent("refs/heads/main", false, List.of(commit));
 
             Repository repo = createMockRepository(100L, "owner/repo", "main");
-            when(repositoryRepository.findById(100L)).thenReturn(Optional.of(repo));
+            when(repositoryRepository.findByIdWithOrganization(100L)).thenReturn(Optional.of(repo));
             when(gitRepositoryManager.isEnabled()).thenReturn(true);
             when(tokenService.isConfigured()).thenReturn(false);
 
@@ -659,7 +671,16 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
             ).thenReturn(false);
 
             // After upsertCommit, findByShaAndRepositoryId must return a Commit entity for file changes
-            var persistedCommit = mock(de.tum.in.www1.hephaestus.gitprovider.commit.Commit.class);
+            // and for publishCommitCreated (which calls CommitData.from(commit))
+            var persistedCommit = mock(
+                de.tum.in.www1.hephaestus.gitprovider.commit.Commit.class,
+                org.mockito.Mockito.withSettings().lenient()
+            );
+            when(persistedCommit.getId()).thenReturn(1L);
+            when(persistedCommit.getSha()).thenReturn("sha1aabbccdd112233445566778899aabbccddeeff");
+            when(persistedCommit.getMessage()).thenReturn("msg");
+            when(persistedCommit.getAuthoredAt()).thenReturn(Instant.parse("2024-01-15T10:30:00Z"));
+            when(persistedCommit.getRepository()).thenReturn(repo);
             when(
                 commitRepository.findByShaAndRepositoryId("sha1aabbccdd112233445566778899aabbccddeeff", 100L)
             ).thenReturn(Optional.of(persistedCommit));
@@ -682,8 +703,11 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
                 any(),
                 any()
             );
-            // Should fetch the persisted commit and save with file changes
-            verify(commitRepository).findByShaAndRepositoryId("sha1aabbccdd112233445566778899aabbccddeeff", 100L);
+            // Should fetch the persisted commit: once for file changes, once for publishCommitCreated
+            verify(commitRepository, times(2)).findByShaAndRepositoryId(
+                "sha1aabbccdd112233445566778899aabbccddeeff",
+                100L
+            );
             verify(commitRepository).save(persistedCommit);
         }
 
@@ -700,7 +724,7 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
             var event = createBasicPushEvent("refs/heads/main", false, List.of(commit));
 
             Repository repo = createMockRepository(100L, "owner/repo", "main");
-            when(repositoryRepository.findById(100L)).thenReturn(Optional.of(repo));
+            when(repositoryRepository.findByIdWithOrganization(100L)).thenReturn(Optional.of(repo));
             when(gitRepositoryManager.isEnabled()).thenReturn(true);
             when(tokenService.isConfigured()).thenReturn(false);
 
@@ -762,7 +786,7 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
             var event = createBasicPushEvent("refs/heads/develop", false, List.of(commit));
 
             Repository repo = createMockRepository(100L, "owner/repo", "develop");
-            when(repositoryRepository.findById(100L)).thenReturn(Optional.of(repo));
+            when(repositoryRepository.findByIdWithOrganization(100L)).thenReturn(Optional.of(repo));
             when(gitRepositoryManager.isEnabled()).thenReturn(false);
 
             invokeHandleEvent(event);
@@ -798,7 +822,7 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
             var event = createBasicPushEvent("main", false, List.of(commit));
 
             Repository repo = createMockRepository(100L, "owner/repo", "main");
-            when(repositoryRepository.findById(100L)).thenReturn(Optional.of(repo));
+            when(repositoryRepository.findByIdWithOrganization(100L)).thenReturn(Optional.of(repo));
             when(gitRepositoryManager.isEnabled()).thenReturn(false);
 
             invokeHandleEvent(event);
@@ -839,6 +863,80 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
             assertThat(event.actionType()).isEqualTo(
                 de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction.Push.PUSHED
             );
+        }
+    }
+
+    @Nested
+    @DisplayName("event publishing")
+    class EventPublishing {
+
+        @Test
+        @DisplayName("should publish CommitCreated event after webhook processing")
+        void shouldPublishCommitCreatedEventAfterWebhookProcessing() throws Exception {
+            var commit = createPushCommit(
+                "abc123def456789012345678901234567890abcd",
+                "feat: publish test",
+                List.of("file.txt"),
+                List.of(),
+                List.of()
+            );
+            var event = createBasicPushEvent("refs/heads/main", false, List.of(commit));
+
+            Repository repo = createMockRepository(100L, "owner/repo", "main");
+            when(repositoryRepository.findByIdWithOrganization(100L)).thenReturn(Optional.of(repo));
+            when(gitRepositoryManager.isEnabled()).thenReturn(false);
+
+            // Mock the persisted commit lookup for publishCommitCreated
+            var persistedCommit = mock(
+                de.tum.in.www1.hephaestus.gitprovider.commit.Commit.class,
+                org.mockito.Mockito.withSettings().lenient()
+            );
+            when(persistedCommit.getId()).thenReturn(1L);
+            when(persistedCommit.getSha()).thenReturn("abc123def456789012345678901234567890abcd");
+            when(persistedCommit.getMessage()).thenReturn("feat: publish test");
+            when(persistedCommit.getAuthoredAt()).thenReturn(Instant.parse("2024-01-15T10:30:00Z"));
+            when(persistedCommit.getRepository()).thenReturn(repo);
+            when(
+                commitRepository.findByShaAndRepositoryId("abc123def456789012345678901234567890abcd", 100L)
+            ).thenReturn(Optional.of(persistedCommit));
+
+            invokeHandleEvent(event);
+
+            // Verify event was published
+            ArgumentCaptor<DomainEvent.CommitCreated> captor = ArgumentCaptor.forClass(DomainEvent.CommitCreated.class);
+            verify(eventPublisher).publishEvent(captor.capture());
+
+            DomainEvent.CommitCreated published = captor.getValue();
+            assertThat(published.commit().sha()).isEqualTo("abc123def456789012345678901234567890abcd");
+            assertThat(published.commit().message()).isEqualTo("feat: publish test");
+            assertThat(published.commit().repositoryId()).isEqualTo(100L);
+        }
+
+        @Test
+        @DisplayName("should not publish event when commit not found after upsert")
+        void shouldNotPublishEventWhenCommitNotFoundAfterUpsert() throws Exception {
+            var commit = createPushCommit(
+                "abc123def456789012345678901234567890abcd",
+                "msg",
+                List.of("file.txt"),
+                List.of(),
+                List.of()
+            );
+            var event = createBasicPushEvent("refs/heads/main", false, List.of(commit));
+
+            Repository repo = createMockRepository(100L, "owner/repo", "main");
+            when(repositoryRepository.findByIdWithOrganization(100L)).thenReturn(Optional.of(repo));
+            when(gitRepositoryManager.isEnabled()).thenReturn(false);
+
+            // findByShaAndRepositoryId returns empty — commit not found after upsert
+            when(
+                commitRepository.findByShaAndRepositoryId("abc123def456789012345678901234567890abcd", 100L)
+            ).thenReturn(Optional.empty());
+
+            invokeHandleEvent(event);
+
+            // Verify event was NOT published
+            verify(eventPublisher, never()).publishEvent(any(DomainEvent.CommitCreated.class));
         }
     }
 }

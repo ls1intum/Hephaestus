@@ -136,7 +136,13 @@ public enum ActivityEventType {
     /** Status update edited */
     PROJECT_STATUS_UPDATE_UPDATED("project_status_update.updated"),
     /** Status update deleted */
-    PROJECT_STATUS_UPDATE_DELETED("project_status_update.deleted");
+    PROJECT_STATUS_UPDATE_DELETED("project_status_update.deleted"),
+
+    // ========================================================================
+    // Commit Events (Code contribution tracking)
+    // ========================================================================
+    /** Commit created (pushed to default branch) */
+    COMMIT_CREATED("commit.created");
 
     private final String value;
 

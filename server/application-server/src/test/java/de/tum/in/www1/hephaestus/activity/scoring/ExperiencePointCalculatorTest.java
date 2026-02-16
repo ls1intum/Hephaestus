@@ -37,7 +37,7 @@ class ExperiencePointCalculatorTest {
         ExperiencePointProperties properties = new ExperiencePointProperties(
             List.of("Copilot", "dependabot[bot]"),
             new ExperiencePointProperties.ReviewWeights(2.0, 2.5, 1.5),
-            new ExperiencePointProperties.XpAwards(0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.0),
+            new ExperiencePointProperties.XpAwards(0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0),
             1000.0
         );
         calculator = new ExperiencePointCalculator(pullRequestRepository, properties);

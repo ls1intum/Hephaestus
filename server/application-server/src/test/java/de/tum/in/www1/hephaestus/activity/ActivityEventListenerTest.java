@@ -4,6 +4,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 import de.tum.in.www1.hephaestus.activity.scoring.ExperiencePointCalculator;
+import de.tum.in.www1.hephaestus.gitprovider.commit.Commit;
 import de.tum.in.www1.hephaestus.gitprovider.common.DataSource;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.EventContext;
@@ -90,6 +91,7 @@ class ActivityEventListenerTest {
         when(experiencePointCalculator.getXpReviewComment()).thenReturn(ExperiencePointCalculator.XP_REVIEW_COMMENT);
         when(experiencePointCalculator.getXpPullRequestReady()).thenReturn(0.5);
         when(experiencePointCalculator.getXpIssueCreated()).thenReturn(0.25);
+        when(experiencePointCalculator.getXpCommitCreated()).thenReturn(0.5);
 
         listener = new ActivityEventListener(
             activityEventService,
@@ -452,9 +454,96 @@ class ActivityEventListenerTest {
         }
     }
 
+    @Nested
+    @DisplayName("Commit Created Event")
+    class CommitCreatedTests {
+
+        @Test
+        @DisplayName("records commit created with XP for known author")
+        void recordsCommitCreatedWithXp() {
+            Commit commit = createCommit(20L);
+
+            var event = new DomainEvent.CommitCreated(createCommitData(commit), createContext());
+
+            listener.onCommitCreated(event);
+
+            verify(activityEventService).record(
+                eq(42L),
+                eq(ActivityEventType.COMMIT_CREATED),
+                any(Instant.class),
+                eq(testUser),
+                eq(testRepository),
+                eq(ActivityTargetType.COMMIT),
+                eq(20L),
+                eq(0.5) // XP from mock
+            );
+        }
+
+        @Test
+        @DisplayName("records commit with null author and zero XP (deleted user or bot)")
+        void recordsCommitWithNullAuthorAndZeroXp() {
+            Commit commit = createCommit(21L);
+            commit.setAuthor(null);
+
+            var event = new DomainEvent.CommitCreated(createCommitData(commit), createContext());
+
+            listener.onCommitCreated(event);
+
+            // Event is STILL recorded (for audit trail), but with null actor and 0 XP
+            verify(activityEventService).record(
+                eq(42L),
+                eq(ActivityEventType.COMMIT_CREATED),
+                any(Instant.class),
+                isNull(), // null actor - user deleted or bot
+                eq(testRepository),
+                eq(ActivityTargetType.COMMIT),
+                eq(21L),
+                eq(0.0) // Zero XP for unknown authors
+            );
+        }
+
+        @Test
+        @DisplayName("skips commit when scopeId is null")
+        void skipsCommitWhenScopeIdIsNull() {
+            Commit commit = createCommit(22L);
+
+            RepositoryRef repoRef = new RepositoryRef(testRepository.getId(), testRepository.getName(), "test");
+            EventContext contextWithNullScope = new EventContext(
+                UUID.randomUUID(),
+                Instant.now(),
+                null, // null scopeId
+                repoRef,
+                DataSource.WEBHOOK,
+                null,
+                UUID.randomUUID().toString()
+            );
+            var event = new DomainEvent.CommitCreated(createCommitData(commit), contextWithNullScope);
+
+            listener.onCommitCreated(event);
+
+            verifyNoInteractions(activityEventService);
+        }
+    }
+
     // ========================================================================
     // Helpers
     // ========================================================================
+
+    private Commit createCommit(Long id) {
+        Commit commit = new Commit();
+        commit.setId(id);
+        commit.setSha("abc123def456789012345678901234567890abcd");
+        commit.setMessage("Test commit message");
+        commit.setAuthoredAt(Instant.now());
+        commit.setCommittedAt(Instant.now());
+        commit.setAuthor(testUser);
+        commit.setRepository(testRepository);
+        return commit;
+    }
+
+    private EventPayload.CommitData createCommitData(Commit commit) {
+        return EventPayload.CommitData.from(commit);
+    }
 
     private PullRequest createPullRequest(Long id) {
         PullRequest pullRequest = new PullRequest();

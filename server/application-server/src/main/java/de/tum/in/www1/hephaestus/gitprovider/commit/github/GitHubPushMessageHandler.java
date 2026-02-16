@@ -5,18 +5,26 @@ import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 import de.tum.in.www1.hephaestus.gitprovider.commit.Commit;
 import de.tum.in.www1.hephaestus.gitprovider.commit.CommitFileChange;
 import de.tum.in.www1.hephaestus.gitprovider.commit.CommitRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.DataSource;
 import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.EventContext;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.EventPayload;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.RepositoryRef;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.ScopeIdResolver;
 import de.tum.in.www1.hephaestus.gitprovider.git.GitRepositoryManager;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -45,6 +53,8 @@ public class GitHubPushMessageHandler extends GitHubMessageHandler<GitHubPushEve
     private final RepositoryRepository repositoryRepository;
     private final CommitRepository commitRepository;
     private final UserRepository userRepository;
+    private final ApplicationEventPublisher eventPublisher;
+    private final ScopeIdResolver scopeIdResolver;
 
     public GitHubPushMessageHandler(
         GitRepositoryManager gitRepositoryManager,
@@ -52,6 +62,8 @@ public class GitHubPushMessageHandler extends GitHubMessageHandler<GitHubPushEve
         RepositoryRepository repositoryRepository,
         CommitRepository commitRepository,
         UserRepository userRepository,
+        ApplicationEventPublisher eventPublisher,
+        ScopeIdResolver scopeIdResolver,
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate
     ) {
@@ -61,6 +73,8 @@ public class GitHubPushMessageHandler extends GitHubMessageHandler<GitHubPushEve
         this.repositoryRepository = repositoryRepository;
         this.commitRepository = commitRepository;
         this.userRepository = userRepository;
+        this.eventPublisher = eventPublisher;
+        this.scopeIdResolver = scopeIdResolver;
     }
 
     @Override
@@ -99,7 +113,7 @@ public class GitHubPushMessageHandler extends GitHubMessageHandler<GitHubPushEve
             return;
         }
 
-        Repository repository = repositoryRepository.findById(repoId).orElse(null);
+        Repository repository = repositoryRepository.findByIdWithOrganization(repoId).orElse(null);
         if (repository == null) {
             log.debug("Skipped push event: reason=repositoryNotFound, repoId={}, repoName={}", repoId, repoName);
             return;
@@ -240,6 +254,10 @@ public class GitHubPushMessageHandler extends GitHubMessageHandler<GitHubPushEve
                 authorId,
                 committerId
             );
+
+            // Publish CommitCreated event after persisting
+            publishCommitCreated(webhookCommit.sha(), repository);
+
             processed++;
         }
 
@@ -308,6 +326,9 @@ public class GitHubPushMessageHandler extends GitHubMessageHandler<GitHubPushEve
             }
         }
 
+        // Publish CommitCreated event for new commits
+        publishCommitCreated(info.sha(), repository);
+
         return true;
     }
 
@@ -337,6 +358,67 @@ public class GitHubPushMessageHandler extends GitHubMessageHandler<GitHubPushEve
             .findByEmail(email)
             .map(u -> u.getId())
             .orElse(null);
+    }
+
+    // ========== Domain Event Publishing ==========
+
+    /**
+     * Publishes a {@link DomainEvent.CommitCreated} event for a newly persisted commit.
+     * <p>
+     * Looks up the persisted commit by SHA and repository ID to get its database ID,
+     * then creates the event payload and publishes via {@link ApplicationEventPublisher}.
+     * <p>
+     * Since this runs inside the {@code TransactionTemplate} block from the base handler,
+     * {@code @TransactionalEventListener(AFTER_COMMIT)} handlers will fire after the
+     * transaction commits — matching the existing pattern.
+     *
+     * @param sha        the commit SHA
+     * @param repository the repository entity (with organization eagerly loaded)
+     */
+    private void publishCommitCreated(String sha, Repository repository) {
+        Commit commit = commitRepository.findByShaAndRepositoryId(sha, repository.getId()).orElse(null);
+        if (commit == null) {
+            log.debug("Cannot publish CommitCreated: commit not found after upsert: sha={}", sha);
+            return;
+        }
+
+        EventPayload.CommitData commitData = EventPayload.CommitData.from(commit);
+        EventContext context = new EventContext(
+            UUID.randomUUID(),
+            Instant.now(),
+            resolveScopeId(repository),
+            RepositoryRef.from(repository),
+            DataSource.WEBHOOK,
+            null,
+            UUID.randomUUID().toString()
+        );
+
+        eventPublisher.publishEvent(new DomainEvent.CommitCreated(commitData, context));
+    }
+
+    /**
+     * Resolves the scope ID (workspace ID) for a repository.
+     * <p>
+     * Mirrors the resolution logic in {@link de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory}:
+     * <ol>
+     *   <li>For organization-owned repos: lookup by organization login</li>
+     *   <li>For personal repos (no organization): lookup by repository nameWithOwner</li>
+     *   <li>Fallback for org repos: if org lookup fails, try repository lookup</li>
+     * </ol>
+     *
+     * @param repository the repository to resolve scope for
+     * @return the scope ID, or null if no matching workspace found
+     */
+    @Nullable
+    private Long resolveScopeId(Repository repository) {
+        if (repository.getOrganization() != null) {
+            String orgLogin = repository.getOrganization().getLogin();
+            Long scopeId = scopeIdResolver.findScopeIdByOrgLogin(orgLogin).orElse(null);
+            if (scopeId != null) {
+                return scopeId;
+            }
+        }
+        return scopeIdResolver.findScopeIdByRepositoryName(repository.getNameWithOwner()).orElse(null);
     }
 
     // ========== Utility Methods ==========
