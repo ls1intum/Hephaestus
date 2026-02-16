@@ -4,7 +4,11 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import jakarta.persistence.*;
 import java.time.Instant;
 import java.util.List;
-import lombok.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
+import org.springframework.lang.NonNull;
 
 @Entity
 @Getter
