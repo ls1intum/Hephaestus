@@ -1,7 +1,7 @@
 import { format } from "date-fns";
 import type { ProfileXpRecord, RepositoryInfo, UserInfo } from "@/api/types.gen";
 import { LeagueIcon } from "@/components/leaderboard/LeagueIcon";
-import { getLeagueTier } from "@/components/leaderboard/utils.ts";
+import { getLeagueColor, getLeagueTier } from "@/components/leaderboard/utils.ts";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -64,7 +64,7 @@ export function ProfileHeader({
 										<div
 											className={cn(
 												"absolute -bottom-1 -right-1 flex size-7 items-center justify-center rounded-full border-2 border-background text-primary-foreground font-bold text-xs",
-												`bg-league-${leagueTier}`,
+												getLeagueColor(leagueTier),
 											)}
 										/>
 									}

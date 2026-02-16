@@ -75,3 +75,16 @@ export function getLeagueLabel(tier: ReturnType<typeof getLeagueTier>): string {
 
 	return labels[tier];
 }
+
+export function getLeagueColor(tier: ReturnType<typeof getLeagueTier>): string {
+	const labels = {
+		none: "bg-league-bronze",
+		bronze: "bg-league-bronze",
+		silver: "bg-league-silver",
+		gold: "bg-league-gold",
+		diamond: "gb-league-diamond",
+		master: "bg-league-master",
+	};
+
+	return labels[tier];
+}

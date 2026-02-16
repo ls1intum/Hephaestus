@@ -1,20 +1,16 @@
-import { Handle, Position } from "@xyflow/react";
-import { memo } from "react";
-import { getLeagueTier } from "@/components/leaderboard/utils";
+import { Handle, type Node, Position } from "@xyflow/react";
+import { getLeagueColor, getLeagueTier } from "@/components/leaderboard/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
-interface AvatarNodeData {
-	level: number;
-	leaguePoints: number;
-	avatarUrl: string;
-	name: string;
-}
+export type AvatarNodeProps = Node<
+	{ level: number; leaguePoints: number; avatarUrl: string; name: string; className?: string },
+	"avatar"
+>;
 
-function AvatarNodeComponent({ data }: { data: AvatarNodeData }) {
-	const level = data.level;
-	const leaguePoints = data.leaguePoints;
+export function AvatarNode({ data }: AvatarNodeProps) {
+	const { level, leaguePoints } = data;
 	const rawTier = getLeagueTier(leaguePoints);
 	const leagueTier = rawTier === "none" ? "bronze" : rawTier;
 
@@ -39,7 +35,7 @@ function AvatarNodeComponent({ data }: { data: AvatarNodeData }) {
 							<div
 								className={cn(
 									"absolute -bottom-1 -right-1 flex size-9 items-center justify-center rounded-full border-4 border-background text-primary-foreground font-bold text-sm shadow-md cursor-help",
-									`bg-league-${leagueTier}`,
+									getLeagueColor(leagueTier),
 								)}
 							/>
 						}
@@ -62,5 +58,3 @@ function AvatarNodeComponent({ data }: { data: AvatarNodeData }) {
 		</div>
 	);
 }
-
-export const AvatarNode = memo(AvatarNodeComponent);
