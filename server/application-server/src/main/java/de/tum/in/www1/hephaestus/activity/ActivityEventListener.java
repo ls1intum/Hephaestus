@@ -2,8 +2,12 @@ package de.tum.in.www1.hephaestus.activity;
 
 import de.tum.in.www1.hephaestus.activity.scoring.ExperiencePointCalculator;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.EventPayload;
+import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueCommentRepository;
+import de.tum.in.www1.hephaestus.gitprovider.project.Project;
+import de.tum.in.www1.hephaestus.gitprovider.project.ProjectRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThread;
@@ -50,6 +54,8 @@ public class ActivityEventListener {
     private final PullRequestReviewThreadRepository reviewThreadRepository;
     private final UserRepository userRepository;
     private final RepositoryRepository repositoryRepository;
+    private final ProjectRepository projectRepository;
+    private final IssueRepository issueRepository;
 
     public ActivityEventListener(
         ActivityEventService activityEventService,
@@ -58,7 +64,9 @@ public class ActivityEventListener {
         IssueCommentRepository issueCommentRepository,
         PullRequestReviewThreadRepository reviewThreadRepository,
         UserRepository userRepository,
-        RepositoryRepository repositoryRepository
+        RepositoryRepository repositoryRepository,
+        ProjectRepository projectRepository,
+        IssueRepository issueRepository
     ) {
         this.activityEventService = activityEventService;
         this.xpCalc = xpCalc;
@@ -67,6 +75,8 @@ public class ActivityEventListener {
         this.reviewThreadRepository = reviewThreadRepository;
         this.userRepository = userRepository;
         this.repositoryRepository = repositoryRepository;
+        this.projectRepository = projectRepository;
+        this.issueRepository = issueRepository;
     }
 
     /**
@@ -99,21 +109,29 @@ public class ActivityEventListener {
     }
 
     /**
-     * Gets the actor (User) for an activity event, or null if the actor is unknown.
+     * Gets the actor (User) for an activity event, or null if the actor is unknown or doesn't exist.
      *
      * <p>When an author ID is null (e.g., GitHub user deleted, organization bot, etc.),
      * we return null rather than skipping the event. This preserves the activity record
      * for audit trail and repository metrics while correctly attributing no XP.
      *
+     * <p>Uses {@code findById()} to verify the user exists before returning a reference.
+     * This prevents FK constraint violations when webhook events reference users
+     * that haven't been synced to the local database (e.g., external collaborators,
+     * deleted users, or users outside the monitored scope).
+     *
      * <p>The ActivityEvent schema explicitly supports null actors for system events
      * and events where the original actor is no longer known.
      *
      * @param authorId the author ID from the event payload (nullable)
-     * @return User reference if authorId is present, null otherwise
+     * @return User reference if authorId is present and user exists, null otherwise
      */
     @Nullable
     private User getActorOrNull(@Nullable Long authorId) {
-        return authorId != null ? userRepository.getReferenceById(authorId) : null;
+        if (authorId == null) {
+            return null;
+        }
+        return userRepository.findById(authorId).orElse(null);
     }
 
     /**
@@ -127,8 +145,8 @@ public class ActivityEventListener {
      * @param xpIfKnown the XP to award if the author is known
      * @return xpIfKnown if authorId is present, 0.0 otherwise
      */
-    private double xpForActor(@Nullable Long authorId, double xpIfKnown) {
-        return authorId != null ? xpIfKnown : 0.0;
+    private double xpForActor(@Nullable User actor, double xpIfKnown) {
+        return actor != null ? xpIfKnown : 0.0;
     }
 
     @Async
@@ -881,8 +899,9 @@ public class ActivityEventListener {
         if (!hasValidScopeId("Issue created", issueData.id(), event.context().scopeId())) {
             return;
         }
+        User actor = getActorOrNull(issueData.authorId());
         // Log unknown authors for observability, but don't skip the event
-        if (issueData.authorId() == null) {
+        if (actor == null) {
             log.info(
                 "Recording issue created event with unknown author (user deleted or bot): issueId={}, xp=0",
                 issueData.id()
@@ -894,11 +913,11 @@ public class ActivityEventListener {
                 event.context().scopeId(),
                 ActivityEventType.ISSUE_CREATED,
                 occurredAt,
-                getActorOrNull(issueData.authorId()),
+                actor,
                 repositoryRepository.getReferenceById(issueData.repository().id()),
                 ActivityTargetType.ISSUE,
                 issueData.id(),
-                xpForActor(issueData.authorId(), xpCalc.getXpIssueCreated())
+                xpForActor(actor, xpCalc.getXpIssueCreated())
             )
         );
     }
@@ -1143,6 +1162,462 @@ public class ActivityEventListener {
         );
     }
 
+    // ========================================================================
+    // Project Events (Project Management Tracking)
+    // ========================================================================
+
+    /**
+     * Handle project created events.
+     *
+     * <p>Records PROJECT_CREATED activity event with 0 XP. Project creation is
+     * tracked for activity completeness and audit trail purposes.
+     *
+     * <p>The actor is the project creator if available.
+     */
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onProjectCreated(DomainEvent.ProjectCreated event) {
+        var projectData = event.project();
+        if (!hasValidScopeId("Project created", projectData.id(), event.context().scopeId())) {
+            return;
+        }
+        Instant occurredAt =
+            projectData.createdAt() != null
+                ? projectData.createdAt()
+                : projectData.updatedAt() != null
+                    ? projectData.updatedAt()
+                    : Instant.now();
+        safeRecord("project created", projectData.id(), () ->
+            activityEventService.record(
+                event.context().scopeId(),
+                ActivityEventType.PROJECT_CREATED,
+                occurredAt,
+                getActorOrNull(projectData.creatorId()),
+                getRepositoryForProject(projectData),
+                ActivityTargetType.PROJECT,
+                projectData.id(),
+                0.0 // Project creation is tracked without XP
+            )
+        );
+    }
+
+    /**
+     * Handle project updated events.
+     *
+     * <p>Records PROJECT_UPDATED activity event with 0 XP. Updates are tracked
+     * for audit trail purposes.
+     *
+     * <p>The actor is the user who performed the update (from webhook sender),
+     * falling back to the project creator for sync operations.
+     */
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onProjectUpdated(DomainEvent.ProjectUpdated event) {
+        var projectData = event.project();
+        if (!hasValidScopeId("Project updated", projectData.id(), event.context().scopeId())) {
+            return;
+        }
+        Instant occurredAt = projectData.updatedAt() != null ? projectData.updatedAt() : Instant.now();
+        // Use actorId (webhook sender) if available, fall back to creatorId for sync
+        Long actorId = projectData.actorId() != null ? projectData.actorId() : projectData.creatorId();
+        safeRecord("project updated", projectData.id(), () ->
+            activityEventService.record(
+                event.context().scopeId(),
+                ActivityEventType.PROJECT_UPDATED,
+                occurredAt,
+                getActorOrNull(actorId),
+                getRepositoryForProject(projectData),
+                ActivityTargetType.PROJECT,
+                projectData.id(),
+                0.0 // Project updates are workflow tracking, no XP reward
+            )
+        );
+    }
+
+    /**
+     * Handle project closed events.
+     *
+     * <p>Records PROJECT_CLOSED activity event with 0 XP. Closing a project
+     * indicates completion or archival.
+     *
+     * <p>The actor is the user who closed the project (from webhook sender),
+     * falling back to the project creator for sync operations.
+     */
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onProjectClosed(DomainEvent.ProjectClosed event) {
+        var projectData = event.project();
+        if (!hasValidScopeId("Project closed", projectData.id(), event.context().scopeId())) {
+            return;
+        }
+        Instant occurredAt =
+            projectData.closedAt() != null
+                ? projectData.closedAt()
+                : projectData.updatedAt() != null
+                    ? projectData.updatedAt()
+                    : Instant.now();
+        // Use actorId (webhook sender) if available, fall back to creatorId for sync
+        Long actorId = projectData.actorId() != null ? projectData.actorId() : projectData.creatorId();
+        safeRecord("project closed", projectData.id(), () ->
+            activityEventService.record(
+                event.context().scopeId(),
+                ActivityEventType.PROJECT_CLOSED,
+                occurredAt,
+                getActorOrNull(actorId),
+                getRepositoryForProject(projectData),
+                ActivityTargetType.PROJECT,
+                projectData.id(),
+                0.0 // Project closure is workflow tracking, no XP reward
+            )
+        );
+    }
+
+    /**
+     * Handle project reopened events.
+     *
+     * <p>Records PROJECT_REOPENED activity event with 0 XP. Reopening indicates
+     * the project is being reactivated.
+     *
+     * <p>The actor is the user who reopened the project (from webhook sender),
+     * falling back to the project creator for sync operations.
+     */
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onProjectReopened(DomainEvent.ProjectReopened event) {
+        var projectData = event.project();
+        if (!hasValidScopeId("Project reopened", projectData.id(), event.context().scopeId())) {
+            return;
+        }
+        Instant occurredAt = projectData.updatedAt() != null ? projectData.updatedAt() : Instant.now();
+        // Use actorId (webhook sender) if available, fall back to creatorId for sync
+        Long actorId = projectData.actorId() != null ? projectData.actorId() : projectData.creatorId();
+        safeRecord("project reopened", projectData.id(), () ->
+            activityEventService.record(
+                event.context().scopeId(),
+                ActivityEventType.PROJECT_REOPENED,
+                occurredAt,
+                getActorOrNull(actorId),
+                getRepositoryForProject(projectData),
+                ActivityTargetType.PROJECT,
+                projectData.id(),
+                0.0 // Project reopening is workflow tracking, no XP reward
+            )
+        );
+    }
+
+    /**
+     * Handle project deleted events.
+     *
+     * <p>Records PROJECT_DELETED activity event with 0 XP. Note that we only
+     * have the project ID since the entity was deleted.
+     */
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onProjectDeleted(DomainEvent.ProjectDeleted event) {
+        Long projectId = event.projectId();
+        if (!hasValidScopeId("Project deleted", projectId, event.context().scopeId())) {
+            return;
+        }
+        log.debug("Recording project deleted event: projectId={}", projectId);
+        safeRecord("project deleted", projectId, () ->
+            activityEventService.recordDeleted(
+                event.context().scopeId(),
+                ActivityEventType.PROJECT_DELETED,
+                Instant.now(),
+                ActivityTargetType.PROJECT,
+                projectId
+            )
+        );
+    }
+
+    // ========================================================================
+    // Project Item Events (Work Item Tracking)
+    // ========================================================================
+
+    /**
+     * Handle project item created events.
+     *
+     * <p>Records PROJECT_ITEM_CREATED activity event with 0 XP. Adding items to
+     * a project is tracked for activity completeness.
+     *
+     * <p>The actor is the user who created the item (from webhook sender),
+     * which may be null for sync operations.
+     */
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onProjectItemCreated(DomainEvent.ProjectItemCreated event) {
+        var itemData = event.item();
+        if (!hasValidScopeId("Project item created", itemData.id(), event.context().scopeId())) {
+            return;
+        }
+        Instant occurredAt =
+            itemData.createdAt() != null
+                ? itemData.createdAt()
+                : itemData.updatedAt() != null
+                    ? itemData.updatedAt()
+                    : Instant.now();
+        User actor = getActorOrNull(itemData.actorId());
+        safeRecord("project item created", itemData.id(), () ->
+            activityEventService.record(
+                event.context().scopeId(),
+                ActivityEventType.PROJECT_ITEM_CREATED,
+                occurredAt,
+                actor,
+                resolveRepositoryForProjectItem(itemData, event.projectId()),
+                ActivityTargetType.PROJECT_ITEM,
+                itemData.id(),
+                0.0 // Project item events are tracked without XP
+            )
+        );
+    }
+
+    /**
+     * Handle project item updated events.
+     *
+     * <p>Records PROJECT_ITEM_UPDATED activity event with 0 XP. Updates to item
+     * field values or status are tracked for audit purposes.
+     *
+     * <p>The actor is the user who updated the item (from webhook sender),
+     * which may be null for sync operations.
+     */
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onProjectItemUpdated(DomainEvent.ProjectItemUpdated event) {
+        var itemData = event.item();
+        if (!hasValidScopeId("Project item updated", itemData.id(), event.context().scopeId())) {
+            return;
+        }
+        Instant occurredAt = itemData.updatedAt() != null ? itemData.updatedAt() : Instant.now();
+        safeRecord("project item updated", itemData.id(), () ->
+            activityEventService.record(
+                event.context().scopeId(),
+                ActivityEventType.PROJECT_ITEM_UPDATED,
+                occurredAt,
+                getActorOrNull(itemData.actorId()),
+                resolveRepositoryForProjectItem(itemData, event.projectId()),
+                ActivityTargetType.PROJECT_ITEM,
+                itemData.id(),
+                0.0 // Item updates are workflow tracking, no XP reward
+            )
+        );
+    }
+
+    /**
+     * Handle project item archived events.
+     *
+     * <p>Records PROJECT_ITEM_ARCHIVED activity event with 0 XP. Archiving
+     * hides items from active view.
+     *
+     * <p>The actor is the user who archived the item (from webhook sender),
+     * which may be null for sync operations.
+     */
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onProjectItemArchived(DomainEvent.ProjectItemArchived event) {
+        var itemData = event.item();
+        if (!hasValidScopeId("Project item archived", itemData.id(), event.context().scopeId())) {
+            return;
+        }
+        Instant occurredAt = itemData.updatedAt() != null ? itemData.updatedAt() : Instant.now();
+        safeRecord("project item archived", itemData.id(), () ->
+            activityEventService.record(
+                event.context().scopeId(),
+                ActivityEventType.PROJECT_ITEM_ARCHIVED,
+                occurredAt,
+                getActorOrNull(itemData.actorId()),
+                resolveRepositoryForProjectItem(itemData, event.projectId()),
+                ActivityTargetType.PROJECT_ITEM,
+                itemData.id(),
+                0.0 // Item archiving is workflow tracking, no XP reward
+            )
+        );
+    }
+
+    /**
+     * Handle project item restored events.
+     *
+     * <p>Records PROJECT_ITEM_RESTORED activity event with 0 XP. Restoring
+     * brings archived items back to active view.
+     *
+     * <p>The actor is the user who restored the item (from webhook sender),
+     * which may be null for sync operations.
+     */
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onProjectItemRestored(DomainEvent.ProjectItemRestored event) {
+        var itemData = event.item();
+        if (!hasValidScopeId("Project item restored", itemData.id(), event.context().scopeId())) {
+            return;
+        }
+        Instant occurredAt = itemData.updatedAt() != null ? itemData.updatedAt() : Instant.now();
+        safeRecord("project item restored", itemData.id(), () ->
+            activityEventService.record(
+                event.context().scopeId(),
+                ActivityEventType.PROJECT_ITEM_RESTORED,
+                occurredAt,
+                getActorOrNull(itemData.actorId()),
+                resolveRepositoryForProjectItem(itemData, event.projectId()),
+                ActivityTargetType.PROJECT_ITEM,
+                itemData.id(),
+                0.0 // Item restoration is workflow tracking, no XP reward
+            )
+        );
+    }
+
+    /**
+     * Handle project item deleted events.
+     *
+     * <p>Records PROJECT_ITEM_DELETED activity event with 0 XP. Note that we
+     * only have the item ID since the entity was deleted.
+     */
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onProjectItemDeleted(DomainEvent.ProjectItemDeleted event) {
+        Long itemId = event.itemId();
+        if (!hasValidScopeId("Project item deleted", itemId, event.context().scopeId())) {
+            return;
+        }
+        log.debug("Recording project item deleted event: itemId={}", itemId);
+        safeRecord("project item deleted", itemId, () ->
+            activityEventService.record(
+                event.context().scopeId(),
+                ActivityEventType.PROJECT_ITEM_DELETED,
+                Instant.now(),
+                null,
+                resolveRepositoryForProjectId(event.projectId()),
+                ActivityTargetType.PROJECT_ITEM,
+                itemId,
+                0.0
+            )
+        );
+    }
+
+    /**
+     * Handle project item converted events.
+     *
+     * <p>Records PROJECT_ITEM_CONVERTED activity event with 0 XP. Conversion
+     * occurs when a draft issue is converted to a real issue.
+     *
+     * <p>The actor is the user who converted the item (from webhook sender),
+     * which may be null for sync operations.
+     */
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onProjectItemConverted(DomainEvent.ProjectItemConverted event) {
+        var itemData = event.item();
+        if (!hasValidScopeId("Project item converted", itemData.id(), event.context().scopeId())) {
+            return;
+        }
+        Instant occurredAt = itemData.updatedAt() != null ? itemData.updatedAt() : Instant.now();
+        safeRecord("project item converted", itemData.id(), () ->
+            activityEventService.record(
+                event.context().scopeId(),
+                ActivityEventType.PROJECT_ITEM_CONVERTED,
+                occurredAt,
+                getActorOrNull(itemData.actorId()),
+                resolveRepositoryForProjectItem(itemData, event.projectId()),
+                ActivityTargetType.PROJECT_ITEM,
+                itemData.id(),
+                0.0 // Item conversion is workflow tracking, no XP reward
+            )
+        );
+    }
+
+    /**
+     * Handle project item reordered events.
+     *
+     * <p>Records PROJECT_ITEM_REORDERED activity event with 0 XP. Reordering
+     * occurs when item position changes in the project view.
+     *
+     * <p>The actor is the user who reordered the item (from webhook sender),
+     * which may be null for sync operations.
+     */
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onProjectItemReordered(DomainEvent.ProjectItemReordered event) {
+        var itemData = event.item();
+        if (!hasValidScopeId("Project item reordered", itemData.id(), event.context().scopeId())) {
+            return;
+        }
+        Instant occurredAt = itemData.updatedAt() != null ? itemData.updatedAt() : Instant.now();
+        safeRecord("project item reordered", itemData.id(), () ->
+            activityEventService.record(
+                event.context().scopeId(),
+                ActivityEventType.PROJECT_ITEM_REORDERED,
+                occurredAt,
+                getActorOrNull(itemData.actorId()),
+                resolveRepositoryForProjectItem(itemData, event.projectId()),
+                ActivityTargetType.PROJECT_ITEM,
+                itemData.id(),
+                0.0 // Item reordering is workflow tracking, no XP reward
+            )
+        );
+    }
+
+    /**
+     * Get the repository reference for a project, or null if the project is
+     * organization-scoped (not associated with a specific repository).
+     *
+     * @param projectData the project data from the event
+     * @return Repository reference if repository-scoped, null otherwise
+     */
+    @Nullable
+    private de.tum.in.www1.hephaestus.gitprovider.repository.Repository getRepositoryForProject(
+        EventPayload.ProjectData projectData
+    ) {
+        if (projectData.ownerType() == Project.OwnerType.REPOSITORY) {
+            return repositoryRepository.getReferenceById(projectData.ownerId());
+        }
+        // Organization or user-scoped projects don't have a direct repository link
+        return null;
+    }
+
+    @Nullable
+    private de.tum.in.www1.hephaestus.gitprovider.repository.Repository resolveRepositoryForProjectId(
+        @Nullable Long projectId
+    ) {
+        if (projectId == null) {
+            return null;
+        }
+        Project project = projectRepository.findById(projectId).orElse(null);
+        if (project == null) {
+            return null;
+        }
+        if (project.getOwnerType() == Project.OwnerType.REPOSITORY) {
+            return repositoryRepository.getReferenceById(project.getOwnerId());
+        }
+        return null;
+    }
+
+    @Nullable
+    private de.tum.in.www1.hephaestus.gitprovider.repository.Repository resolveRepositoryForProjectItem(
+        EventPayload.ProjectItemData itemData,
+        @Nullable Long projectId
+    ) {
+        if (itemData == null) {
+            return resolveRepositoryForProjectId(projectId);
+        }
+        if (itemData.issueId() != null) {
+            var issue = issueRepository.findById(itemData.issueId()).orElse(null);
+            if (issue != null && issue.getRepository() != null) {
+                return repositoryRepository.getReferenceById(issue.getRepository().getId());
+            }
+        }
+        return resolveRepositoryForProjectId(projectId);
+    }
+
     private ActivityEventType mapReviewState(PullRequestReview.State state) {
         if (state == PullRequestReview.State.APPROVED) {
             return ActivityEventType.REVIEW_APPROVED;
@@ -1154,5 +1629,78 @@ public class ActivityEventListener {
             return ActivityEventType.REVIEW_UNKNOWN;
         }
         return ActivityEventType.REVIEW_COMMENTED;
+    }
+
+    // ========================================================================
+    // Project Status Update Events
+    // ========================================================================
+
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onProjectStatusUpdateCreated(DomainEvent.ProjectStatusUpdateCreated event) {
+        var data = event.statusUpdate();
+        if (!hasValidScopeId("Project status update created", data.id(), event.context().scopeId())) {
+            return;
+        }
+        Instant occurredAt =
+            data.createdAt() != null ? data.createdAt() : data.updatedAt() != null ? data.updatedAt() : Instant.now();
+        safeRecord("project status update created", data.id(), () ->
+            activityEventService.record(
+                event.context().scopeId(),
+                ActivityEventType.PROJECT_STATUS_UPDATE_CREATED,
+                occurredAt,
+                getActorOrNull(data.creatorId()),
+                resolveRepositoryForProjectId(event.projectId()),
+                ActivityTargetType.PROJECT_STATUS_UPDATE,
+                data.id(),
+                0.0 // Status updates tracked without XP
+            )
+        );
+    }
+
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onProjectStatusUpdateUpdated(DomainEvent.ProjectStatusUpdateUpdated event) {
+        var data = event.statusUpdate();
+        if (!hasValidScopeId("Project status update updated", data.id(), event.context().scopeId())) {
+            return;
+        }
+        Instant occurredAt = data.updatedAt() != null ? data.updatedAt() : Instant.now();
+        safeRecord("project status update updated", data.id(), () ->
+            activityEventService.record(
+                event.context().scopeId(),
+                ActivityEventType.PROJECT_STATUS_UPDATE_UPDATED,
+                occurredAt,
+                getActorOrNull(data.creatorId()),
+                resolveRepositoryForProjectId(event.projectId()),
+                ActivityTargetType.PROJECT_STATUS_UPDATE,
+                data.id(),
+                0.0
+            )
+        );
+    }
+
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onProjectStatusUpdateDeleted(DomainEvent.ProjectStatusUpdateDeleted event) {
+        Long id = event.statusUpdateId();
+        if (!hasValidScopeId("Project status update deleted", id, event.context().scopeId())) {
+            return;
+        }
+        safeRecord("project status update deleted", id, () ->
+            activityEventService.record(
+                event.context().scopeId(),
+                ActivityEventType.PROJECT_STATUS_UPDATE_DELETED,
+                Instant.now(),
+                null,
+                resolveRepositoryForProjectId(event.projectId()),
+                ActivityTargetType.PROJECT_STATUS_UPDATE,
+                id,
+                0.0
+            )
+        );
     }
 }

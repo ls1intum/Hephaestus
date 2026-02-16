@@ -534,4 +534,103 @@ public sealed interface GitHubEventAction {
             };
         }
     }
+
+    // ========== GitHub Projects V2 Events ==========
+
+    /**
+     * Actions for the projects_v2 webhook event.
+     *
+     * @see GitHubEventType#PROJECTS_V2
+     */
+    enum ProjectV2 implements GitHubEventAction {
+        CREATED,
+        EDITED,
+        CLOSED,
+        REOPENED,
+        DELETED,
+        UNKNOWN;
+
+        @Override
+        public String value() {
+            return name().toLowerCase();
+        }
+
+        public static ProjectV2 fromString(String action) {
+            if (action == null || action.isBlank()) return UNKNOWN;
+            return switch (action.toLowerCase()) {
+                case "created" -> CREATED;
+                case "edited" -> EDITED;
+                case "closed" -> CLOSED;
+                case "reopened" -> REOPENED;
+                case "deleted" -> DELETED;
+                default -> UNKNOWN;
+            };
+        }
+    }
+
+    // ========== GitHub Projects V2 Item Events ==========
+
+    /**
+     * Actions for the projects_v2_item webhook event.
+     *
+     * @see GitHubEventType#PROJECTS_V2_ITEM
+     */
+    enum ProjectV2Item implements GitHubEventAction {
+        CREATED,
+        EDITED,
+        DELETED,
+        ARCHIVED,
+        RESTORED,
+        CONVERTED,
+        REORDERED,
+        UNKNOWN;
+
+        @Override
+        public String value() {
+            return name().toLowerCase();
+        }
+
+        public static ProjectV2Item fromString(String action) {
+            if (action == null || action.isBlank()) return UNKNOWN;
+            return switch (action.toLowerCase()) {
+                case "created" -> CREATED;
+                case "edited" -> EDITED;
+                case "deleted" -> DELETED;
+                case "archived" -> ARCHIVED;
+                case "restored" -> RESTORED;
+                case "converted" -> CONVERTED;
+                case "reordered" -> REORDERED;
+                default -> UNKNOWN;
+            };
+        }
+    }
+
+    // ========== GitHub Projects V2 Status Update Events ==========
+
+    /**
+     * Actions for the projects_v2_status_update webhook event.
+     *
+     * @see GitHubEventType#PROJECTS_V2_STATUS_UPDATE
+     */
+    enum ProjectV2StatusUpdate implements GitHubEventAction {
+        CREATED,
+        EDITED,
+        DELETED,
+        UNKNOWN;
+
+        @Override
+        public String value() {
+            return name().toLowerCase();
+        }
+
+        public static ProjectV2StatusUpdate fromString(String action) {
+            if (action == null || action.isBlank()) return UNKNOWN;
+            return switch (action.toLowerCase()) {
+                case "created" -> CREATED;
+                case "edited" -> EDITED;
+                case "deleted" -> DELETED;
+                default -> UNKNOWN;
+            };
+        }
+    }
 }

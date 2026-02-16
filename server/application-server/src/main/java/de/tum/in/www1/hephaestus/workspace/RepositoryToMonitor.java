@@ -35,8 +35,11 @@ public class RepositoryToMonitor {
     private Instant milestonesSyncedAt;
     private Instant collaboratorsSyncedAt;
 
-    // The time up to which issues and pull requests have been synced in the recent sync
-    private Instant issuesAndPullRequestsSyncedAt;
+    // The time up to which issues have been synced in the recent sync
+    private Instant issuesSyncedAt;
+
+    // The time up to which pull requests have been synced in the recent sync
+    private Instant pullRequestsSyncedAt;
 
     // ========================================================================
     // Issue Backfill Tracking

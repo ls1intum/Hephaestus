@@ -216,7 +216,8 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
      * @param repositoryNameWithOwner             repository identifier in "owner/repo" format
      * @param lastLabelsSyncedAt                  last labels sync timestamp
      * @param lastMilestonesSyncedAt              last milestones sync timestamp
-     * @param lastIssuesAndPullRequestsSyncedAt   last issues/PRs sync timestamp
+     * @param lastIssuesSyncedAt                  last issues sync timestamp
+     * @param lastPullRequestsSyncedAt            last pull requests sync timestamp
      * @param lastCollaboratorsSyncedAt           last collaborators sync timestamp
      * @param lastFullSyncAt                      last full repository sync timestamp
      * @param issueBackfillHighWaterMark          highest issue number at issue backfill start
@@ -236,7 +237,8 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
         String repositoryNameWithOwner,
         Instant lastLabelsSyncedAt,
         Instant lastMilestonesSyncedAt,
-        Instant lastIssuesAndPullRequestsSyncedAt,
+        Instant lastIssuesSyncedAt,
+        Instant lastPullRequestsSyncedAt,
         Instant lastCollaboratorsSyncedAt,
         Instant lastFullSyncAt,
         Integer issueBackfillHighWaterMark,
@@ -367,8 +369,10 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
         LABELS,
         /** Repository milestones sync */
         MILESTONES,
-        /** Issues and pull requests incremental sync */
-        ISSUES_AND_PULL_REQUESTS,
+        /** Issues incremental sync */
+        ISSUES,
+        /** Pull requests incremental sync */
+        PULL_REQUESTS,
         /** Repository collaborators sync */
         COLLABORATORS,
         /** Full repository metadata sync */

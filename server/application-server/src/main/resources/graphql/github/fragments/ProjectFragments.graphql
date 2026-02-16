@@ -1,0 +1,539 @@
+# Reusable fragments for GitHub Projects V2. Use ...FragmentName to include.
+# Page sizes here are defaults; GetProjectItems.graphql uses cost-optimized sizes.
+
+fragment ActorFields on Actor {
+    __typename
+    login
+    ... on User {
+        id
+        databaseId
+        avatarUrl
+        name
+        email
+    }
+    ... on Bot {
+        id
+        databaseId
+        avatarUrl
+    }
+    ... on Mannequin {
+        id
+        databaseId
+        avatarUrl
+    }
+    ... on Organization {
+        id
+        databaseId
+        avatarUrl
+    }
+}
+
+fragment ActorFieldsCompact on Actor {
+    __typename
+    login
+    ... on User {
+        id
+        databaseId
+        avatarUrl
+        name
+    }
+    ... on Bot {
+        id
+        databaseId
+        avatarUrl
+    }
+    ... on Mannequin {
+        id
+        databaseId
+        avatarUrl
+    }
+    ... on Organization {
+        id
+        databaseId
+        avatarUrl
+    }
+}
+
+fragment ProjectV2BaseFields on ProjectV2 {
+    __typename
+    id
+    fullDatabaseId
+    number
+    title
+    shortDescription
+    readme
+    template
+    url
+    closed
+    closedAt
+    public
+    createdAt
+    updatedAt
+}
+
+fragment ProjectV2OwnerFields on ProjectV2Owner {
+    __typename
+    ... on Organization {
+        id
+        databaseId
+        login
+    }
+    ... on User {
+        id
+        databaseId
+        login
+    }
+}
+
+fragment ProjectV2ItemFields on ProjectV2Item {
+    __typename
+    id
+    fullDatabaseId
+    type
+    isArchived
+    createdAt
+    updatedAt
+    creator {
+        ...ActorFieldsCompact
+    }
+}
+
+fragment ProjectV2ItemContentFields on ProjectV2ItemContent {
+    ... on Issue {
+        __typename
+        id
+        fullDatabaseId
+        number
+        title
+        issueState: state
+        stateReason
+        author {
+            login
+        }
+        repository {
+            id
+            databaseId
+            nameWithOwner
+        }
+    }
+    ... on PullRequest {
+        __typename
+        id
+        fullDatabaseId
+        number
+        title
+        prState: state
+        author {
+            login
+        }
+        repository {
+            id
+            databaseId
+            nameWithOwner
+        }
+    }
+    ... on DraftIssue {
+        __typename
+        id
+        title
+        body
+    }
+}
+
+fragment FieldValueFields on ProjectV2ItemFieldValue {
+    __typename
+    ... on ProjectV2ItemFieldTextValue {
+        text
+        field {
+            ... on ProjectV2Field {
+                id
+                name
+            }
+        }
+    }
+    ... on ProjectV2ItemFieldNumberValue {
+        number
+        field {
+            ... on ProjectV2Field {
+                id
+                name
+            }
+        }
+    }
+    ... on ProjectV2ItemFieldDateValue {
+        date
+        field {
+            ... on ProjectV2Field {
+                id
+                name
+            }
+        }
+    }
+    ... on ProjectV2ItemFieldSingleSelectValue {
+        optionId
+        name
+        color
+        field {
+            ... on ProjectV2SingleSelectField {
+                id
+                name
+            }
+        }
+    }
+    ... on ProjectV2ItemFieldIterationValue {
+        iterationId
+        title
+        startDate
+        duration
+        field {
+            ... on ProjectV2IterationField {
+                id
+                name
+            }
+        }
+    }
+    ... on ProjectV2ItemFieldLabelValue {
+        labels(first: 50) {
+            pageInfo {
+                hasNextPage
+            }
+            nodes {
+                id
+                name
+                color
+            }
+        }
+        field {
+            ... on ProjectV2Field {
+                id
+                name
+            }
+        }
+    }
+    ... on ProjectV2ItemFieldMilestoneValue {
+        milestone {
+            id
+            number
+            title
+            dueOn
+            state
+        }
+        field {
+            ... on ProjectV2Field {
+                id
+                name
+            }
+        }
+    }
+    ... on ProjectV2ItemFieldUserValue {
+        users(first: 50) {
+            pageInfo {
+                hasNextPage
+            }
+            nodes {
+                id
+                databaseId
+                login
+                avatarUrl
+            }
+        }
+        field {
+            ... on ProjectV2Field {
+                id
+                name
+            }
+        }
+    }
+    ... on ProjectV2ItemFieldRepositoryValue {
+        repository {
+            id
+            databaseId
+            nameWithOwner
+        }
+        field {
+            ... on ProjectV2Field {
+                id
+                name
+            }
+        }
+    }
+    ... on ProjectV2ItemFieldPullRequestValue {
+        pullRequests(first: 20) {
+            pageInfo {
+                hasNextPage
+            }
+            nodes {
+                __typename
+                id
+                number
+                title
+                state
+            }
+        }
+        field {
+            ... on ProjectV2Field {
+                id
+                name
+            }
+        }
+    }
+    ... on ProjectV2ItemFieldReviewerValue {
+        reviewers(first: 50) {
+            pageInfo {
+                hasNextPage
+            }
+            nodes {
+                ...RequestedReviewerFields
+            }
+        }
+        field {
+            ... on ProjectV2Field {
+                id
+                name
+            }
+        }
+    }
+}
+
+fragment RequestedReviewerFields on RequestedReviewer {
+    __typename
+    ... on User {
+        id
+        databaseId
+        login
+        avatarUrl
+    }
+    ... on Team {
+        id
+        databaseId
+        name
+        slug
+    }
+    ... on Bot {
+        id
+        databaseId
+        login
+        avatarUrl
+    }
+    ... on Mannequin {
+        id
+        databaseId
+        login
+        avatarUrl
+    }
+}
+
+fragment ProjectV2FieldConfigFields on ProjectV2FieldConfiguration {
+    __typename
+    ... on ProjectV2Field {
+        id
+        name
+        dataType
+        createdAt
+        updatedAt
+    }
+    ... on ProjectV2SingleSelectField {
+        id
+        name
+        dataType
+        createdAt
+        updatedAt
+        options {
+            id
+            name
+            color
+            description
+        }
+    }
+    ... on ProjectV2IterationField {
+        id
+        name
+        dataType
+        createdAt
+        updatedAt
+        configuration {
+            iterations {
+                id
+                title
+                startDate
+                duration
+            }
+        }
+    }
+}
+
+fragment ProjectV2StatusUpdateFields on ProjectV2StatusUpdate {
+    __typename
+    id
+    fullDatabaseId
+    body
+    bodyHTML
+    startDate
+    targetDate
+    status
+    createdAt
+    updatedAt
+    creator {
+        ...ActorFields
+    }
+}
+
+# Cost-optimized variant of FieldValueFields with smaller page sizes for nested
+# collections (labels: 10, users: 10, pullRequests: 5, reviewers: 10) to reduce
+# GraphQL cost when fetching many items at once.
+# Shared fragment — used by GetProjectItems, GetRepositoryIssues, GetRepositoryPullRequests,
+# GetIssueProjectItems, and GetPullRequestProjectItems.
+fragment FieldValueFieldsCostOptimized on ProjectV2ItemFieldValue {
+    __typename
+    ... on ProjectV2ItemFieldTextValue {
+        text
+        field {
+            ... on ProjectV2Field {
+                id
+                name
+            }
+        }
+    }
+    ... on ProjectV2ItemFieldNumberValue {
+        number
+        field {
+            ... on ProjectV2Field {
+                id
+                name
+            }
+        }
+    }
+    ... on ProjectV2ItemFieldDateValue {
+        date
+        field {
+            ... on ProjectV2Field {
+                id
+                name
+            }
+        }
+    }
+    ... on ProjectV2ItemFieldSingleSelectValue {
+        optionId
+        name
+        color
+        field {
+            ... on ProjectV2SingleSelectField {
+                id
+                name
+            }
+        }
+    }
+    ... on ProjectV2ItemFieldIterationValue {
+        iterationId
+        title
+        startDate
+        duration
+        field {
+            ... on ProjectV2IterationField {
+                id
+                name
+            }
+        }
+    }
+    ... on ProjectV2ItemFieldLabelValue {
+        labels(first: 10) {
+            pageInfo {
+                hasNextPage
+            }
+            nodes {
+                id
+                name
+                color
+            }
+        }
+        field {
+            ... on ProjectV2Field {
+                id
+                name
+            }
+        }
+    }
+    ... on ProjectV2ItemFieldMilestoneValue {
+        milestone {
+            id
+            number
+            title
+            dueOn
+            state
+        }
+        field {
+            ... on ProjectV2Field {
+                id
+                name
+            }
+        }
+    }
+    ... on ProjectV2ItemFieldUserValue {
+        users(first: 10) {
+            pageInfo {
+                hasNextPage
+            }
+            nodes {
+                id
+                databaseId
+                login
+                avatarUrl
+            }
+        }
+        field {
+            ... on ProjectV2Field {
+                id
+                name
+            }
+        }
+    }
+    ... on ProjectV2ItemFieldRepositoryValue {
+        repository {
+            id
+            databaseId
+            nameWithOwner
+        }
+        field {
+            ... on ProjectV2Field {
+                id
+                name
+            }
+        }
+    }
+    ... on ProjectV2ItemFieldPullRequestValue {
+        pullRequests(first: 5) {
+            pageInfo {
+                hasNextPage
+            }
+            nodes {
+                __typename
+                id
+                number
+                title
+                state
+            }
+        }
+        field {
+            ... on ProjectV2Field {
+                id
+                name
+            }
+        }
+    }
+    ... on ProjectV2ItemFieldReviewerValue {
+        reviewers(first: 10) {
+            pageInfo {
+                hasNextPage
+            }
+            nodes {
+                ...RequestedReviewerFields
+            }
+        }
+        field {
+            ... on ProjectV2Field {
+                id
+                name
+            }
+        }
+    }
+}

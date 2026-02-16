@@ -238,6 +238,16 @@ public class GitHubGraphQlClientProvider {
         return rateLimitTracker.getRemaining(scopeId);
     }
 
+    /**
+     * Gets the time when the rate limit resets for a scope.
+     *
+     * @param scopeId the scope to check
+     * @return the reset instant, or null if unknown
+     */
+    public java.time.Instant getRateLimitResetAt(Long scopeId) {
+        return rateLimitTracker.getResetAt(scopeId);
+    }
+
     private String getToken(Long scopeId) {
         // Fail fast for suspended/inactive scopes - don't waste API calls
         if (!tokenProvider.isScopeActive(scopeId)) {

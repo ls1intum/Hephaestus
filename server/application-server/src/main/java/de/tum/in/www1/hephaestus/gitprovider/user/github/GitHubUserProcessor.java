@@ -3,11 +3,9 @@ package de.tum.in.www1.hephaestus.gitprovider.user.github;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
+import jakarta.persistence.EntityManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.dao.CannotAcquireLockException;
-import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.dao.DeadlockLoserDataAccessException;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,42 +20,64 @@ import org.springframework.transaction.annotation.Transactional;
  * <b>Design Principles:</b>
  * <ul>
  * <li>Single processing path for all data sources (sync and webhooks)</li>
- * <li>Idempotent operations via find-or-create pattern</li>
+ * <li>Idempotent operations via native SQL upsert (INSERT ON CONFLICT DO UPDATE)</li>
  * <li>Works exclusively with DTOs for complete field coverage</li>
+ * <li>All operations use default REQUIRED propagation — joins the caller's
+ *     transaction if one exists, or creates a new one when called from
+ *     non-transactional contexts (e.g., webhook message handlers)</li>
  * </ul>
+ *
+ * <b>Concurrency Strategy:</b>
+ * <p>
+ * User upserts use three separate SQL statements within the caller's transaction:
+ * <ol>
+ *   <li>Acquire a transaction-scoped advisory lock on the login (serializing
+ *       concurrent upserts for the same login across threads/scopes)</li>
+ *   <li>Rename any other user holding the target login (to {@code RENAMED_<id>})</li>
+ *   <li>Insert or update the user via {@code INSERT ... ON CONFLICT (id) DO UPDATE}</li>
+ * </ol>
+ * These are separate statements (not a CTE) because PostgreSQL data-modifying
+ * CTEs all operate on the same snapshot — the INSERT would not see the UPDATE's
+ * effect and would still hit the unique constraint. Separate statements each see
+ * the results of the previous statement within the same transaction.
  */
 @Service
+@Transactional
 public class GitHubUserProcessor {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubUserProcessor.class);
 
     private final UserRepository userRepository;
+    private final EntityManager entityManager;
 
-    public GitHubUserProcessor(UserRepository userRepository) {
+    public GitHubUserProcessor(UserRepository userRepository, EntityManager entityManager) {
         this.userRepository = userRepository;
+        this.entityManager = entityManager;
     }
 
     /**
      * Find an existing user or create a new one from the DTO.
      * <p>
-     * This method is idempotent and thread-safe - calling it multiple times with the same DTO
-     * will return the same user entity.
+     * This method is idempotent — calling it multiple times with the same DTO
+     * will return the same user entity. Uses default REQUIRED propagation:
+     * joins the caller's transaction if one exists, or creates a new one
+     * (e.g., when called from non-transactional message handlers).
      * <p>
-     * Uses a "find-first-then-insert" pattern to avoid deadlocks:
-     * 1. Try to find the user by ID (fast path, no locks for most cases)
-     * 2. If not found, try INSERT ON CONFLICT DO NOTHING (avoids UPDATE lock contention)
-     * 3. Fetch and update any additional fields
-     * <p>
-     * This approach handles concurrent inserts gracefully without deadlocks because:
-     * - ON CONFLICT DO NOTHING doesn't try to UPDATE, avoiding lock escalation
-     * - Multiple transactions inserting the same user will all succeed (one inserts, others skip)
-     * - Updates happen on fetched entities without competing for insert locks
+     * Uses three separate SQL statements (not a CTE) within the caller's transaction:
+     * <ol>
+     *   <li>Acquire advisory lock on the login to serialize concurrent upserts</li>
+     *   <li>Rename any other user that currently holds the target login</li>
+     *   <li>INSERT ... ON CONFLICT (id) DO UPDATE the user</li>
+     * </ol>
+     * Separate statements are required because PostgreSQL data-modifying CTEs
+     * all operate on the same snapshot — the INSERT would not see the UPDATE's
+     * effect and would still violate the unique constraint on login.
      *
      * @param dto the GitHub user DTO
-     * @return the User entity, or null if dto is null or has no ID
+     * @return the User entity (managed in caller's persistence context),
+     *     or null if dto is null or has no ID
      */
     @Nullable
-    @Transactional
     public User findOrCreate(GitHubUserDTO dto) {
         if (dto == null) {
             return null;
@@ -74,161 +94,63 @@ public class GitHubUserProcessor {
         String htmlUrl = dto.htmlUrl() != null ? dto.htmlUrl() : "";
         User.Type userType = dto.getEffectiveType();
 
-        // Fast path: check if user already exists (most common case, no write locks)
-        User existingUser = userRepository.findById(userId).orElse(null);
+        // Flush any pending Hibernate changes before the native SQL to ensure
+        // consistency between Hibernate's cache and the database.
+        entityManager.flush();
 
-        if (existingUser == null) {
-            // User doesn't exist - try to insert with ON CONFLICT DO NOTHING
-            // This avoids deadlocks because DO NOTHING doesn't acquire update locks
-            try {
-                userRepository.insertIgnore(userId, login, name, avatarUrl, htmlUrl, userType.name());
-            } catch (DataIntegrityViolationException e) {
-                // Login conflict: another user has this login (common when users rename)
-                // This happens when:
-                // 1. User A had login "alice", renamed to "bob"
-                // 2. User B (new) took login "alice"
-                // 3. We're processing User B but User A still has "alice" in our DB
-                //
-                // Solution: Free up the login by renaming the old user
-                if (isLoginConflict(e)) {
-                    handleLoginConflict(userId, login, name, avatarUrl, htmlUrl, userType.name());
-                } else {
-                    // Some other constraint violation - rethrow
-                    throw e;
-                }
-            } catch (CannotAcquireLockException | DeadlockLoserDataAccessException e) {
-                // Rare case: concurrent insert caused a lock issue
-                // Just log and continue - the user should exist now from the other transaction
-                log.debug(
-                    "User insert encountered lock contention, will fetch existing: userId={}, login={}",
-                    userId,
-                    login
-                );
-            }
+        // Step 1: Acquire advisory lock to serialize concurrent upserts for
+        // the same login across threads/scopes.
+        userRepository.acquireLoginLock(login);
+
+        // Step 2: Rename any other user that holds this login (different id).
+        // This is a separate statement so that step 3 sees the update.
+        userRepository.freeLoginConflicts(login, userId);
+
+        // Step 3: Insert or update the user. The login conflict has been
+        // resolved by step 2, so the unique constraint will not be violated.
+        userRepository.upsertUser(
+            userId,
+            login,
+            name,
+            avatarUrl,
+            htmlUrl,
+            userType.name(),
+            dto.email(),
+            dto.createdAt(),
+            dto.updatedAt()
+        );
+
+        // Evict from L1 cache so the next find() returns fresh data from DB
+        // instead of a stale cached version.
+        User cached = entityManager.find(User.class, userId);
+        if (cached != null) {
+            entityManager.refresh(cached);
         }
 
-        // Fetch the entity and update any fields that may have changed
-        return userRepository
-            .findById(userId)
-            .map(user -> {
-                boolean changed = false;
-                // Update core fields if they've changed
-                if (!login.equals(user.getLogin())) {
-                    user.setLogin(login);
-                    changed = true;
-                }
-                if (!name.equals(user.getName())) {
-                    user.setName(name);
-                    changed = true;
-                }
-                if (!avatarUrl.equals(user.getAvatarUrl())) {
-                    user.setAvatarUrl(avatarUrl);
-                    changed = true;
-                }
-                if (!htmlUrl.equals(user.getHtmlUrl())) {
-                    user.setHtmlUrl(htmlUrl);
-                    changed = true;
-                }
-                if (userType != user.getType()) {
-                    user.setType(userType);
-                    changed = true;
-                }
-                // Update additional profile fields
-                if (dto.email() != null && !dto.email().equals(user.getEmail())) {
-                    user.setEmail(dto.email());
-                    changed = true;
-                }
-                if (dto.createdAt() != null && !dto.createdAt().equals(user.getCreatedAt())) {
-                    user.setCreatedAt(dto.createdAt());
-                    changed = true;
-                }
-                if (dto.updatedAt() != null && !dto.updatedAt().equals(user.getUpdatedAt())) {
-                    user.setUpdatedAt(dto.updatedAt());
-                    changed = true;
-                }
-                if (changed) {
-                    return userRepository.save(user);
-                }
-                return user;
-            })
-            .orElse(null);
+        // Load the entity into the persistence context. We use find() instead of
+        // returning a detached entity because callers set JPA associations
+        // (e.g., comment.setAuthor(user)) which require managed entities.
+        //
+        // The find() call uses the L1 cache — since we just refreshed above,
+        // it returns the up-to-date instance without an extra DB round-trip.
+        User result = entityManager.find(User.class, userId);
+        if (result == null) {
+            // Should not happen after a successful upsert, but handle gracefully
+            log.warn("User not found after upsert: userId={}, login={}", userId, login);
+        }
+        return result;
     }
 
     /**
      * Ensure a user exists, creating if necessary.
      * <p>
-     * Convenience method that extracts the user ID from the DTO and ensures
-     * the user exists in the database.
+     * Convenience method that delegates to {@link #findOrCreate(GitHubUserDTO)}.
      *
      * @param dto the GitHub user DTO
      * @return the User entity, or null if dto is null or has no ID
      */
     @Nullable
-    @Transactional
     public User ensureExists(GitHubUserDTO dto) {
         return findOrCreate(dto);
-    }
-
-    /**
-     * Check if the exception is a login unique constraint violation.
-     */
-    private boolean isLoginConflict(DataIntegrityViolationException e) {
-        String message = e.getMessage();
-        if (message == null) {
-            return false;
-        }
-        // Check for the constraint name or login column reference
-        return message.contains("uk_user_login") || message.contains("login");
-    }
-
-    /**
-     * Handle a login conflict by freeing up the login from the old user.
-     * <p>
-     * When a user renames their GitHub account, another user can take their old username.
-     * This method handles that case by:
-     * 1. Finding the user who currently has the conflicting login
-     * 2. Renaming that user's login to a placeholder (RENAMED_&lt;id&gt;)
-     * 3. Retrying the insert for the new user
-     */
-    private void handleLoginConflict(
-        Long userId,
-        String login,
-        String name,
-        String avatarUrl,
-        String htmlUrl,
-        String type
-    ) {
-        // Find the user who has this login
-        User oldUser = userRepository.findByLogin(login).orElse(null);
-        if (oldUser == null) {
-            // Concurrent modification - the conflict may have been resolved
-            log.debug("Login conflict resolved concurrently: login={}", login);
-            return;
-        }
-
-        if (oldUser.getId().equals(userId)) {
-            // Same user - this shouldn't happen but handle it gracefully
-            log.debug("Login conflict was for same user: userId={}, login={}", userId, login);
-            return;
-        }
-
-        // Rename the old user's login to free up the username
-        String renamedLogin = "RENAMED_" + oldUser.getId();
-        log.info(
-            "Freeing up login for renamed user: oldUserId={}, oldLogin={}, newLogin={}, newUserId={}",
-            oldUser.getId(),
-            login,
-            renamedLogin,
-            userId
-        );
-        userRepository.updateLogin(oldUser.getId(), renamedLogin);
-
-        // Retry the insert
-        try {
-            userRepository.insertIgnore(userId, login, name, avatarUrl, htmlUrl, type);
-        } catch (DataIntegrityViolationException e) {
-            // Still failing - might be a race condition or different constraint
-            log.warn("Insert still failed after freeing login: userId={}, login={}", userId, login, e);
-        }
     }
 }

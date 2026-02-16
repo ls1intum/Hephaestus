@@ -6,6 +6,7 @@ import {
 	bigint,
 	boolean,
 	check,
+	date,
 	doublePrecision,
 	foreignKey,
 	index,
@@ -630,6 +631,214 @@ export const organizationMembership = pgTable(
 	],
 );
 
+export const project = pgTable(
+	"project",
+	{
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		id: bigint({ mode: "number" }).primaryKey().notNull(),
+		nodeId: varchar("node_id", { length: 64 }),
+		ownerType: varchar("owner_type", { length: 32 }).notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		ownerId: bigint("owner_id", { mode: "number" }).notNull(),
+		number: integer().notNull(),
+		title: varchar({ length: 256 }),
+		shortDescription: text("short_description"),
+		readme: text(),
+		template: boolean().default(false).notNull(),
+		url: varchar({ length: 512 }),
+		closed: boolean().default(false).notNull(),
+		closedAt: timestamp("closed_at", { withTimezone: true, mode: "string" }),
+		isPublic: boolean("is_public").default(false).notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		creatorId: bigint("creator_id", { mode: "number" }),
+		lastSyncAt: timestamp("last_sync_at", { withTimezone: true, mode: "string" }),
+		itemSyncCursor: varchar("item_sync_cursor", { length: 256 }),
+		itemsSyncedAt: timestamp("items_synced_at", { withTimezone: true, mode: "string" }),
+		fieldSyncCursor: varchar("field_sync_cursor", { length: 256 }),
+		fieldsSyncedAt: timestamp("fields_synced_at", { withTimezone: true, mode: "string" }),
+		statusUpdateSyncCursor: varchar("status_update_sync_cursor", { length: 256 }),
+		statusUpdatesSyncedAt: timestamp("status_updates_synced_at", {
+			withTimezone: true,
+			mode: "string",
+		}),
+		createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }),
+		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }),
+	},
+	(table) => [
+		index("idx_project_creator_id").using("btree", table.creatorId.asc().nullsLast()),
+		index("idx_project_owner").using(
+			"btree",
+			table.ownerType.asc().nullsLast(),
+			table.ownerId.asc().nullsLast(),
+		),
+		foreignKey({
+			columns: [table.creatorId],
+			foreignColumns: [user.id],
+			name: "fk_project_creator",
+		}).onDelete("set null"),
+		unique("uk_project_node_id").on(table.nodeId),
+		unique("uk_project_owner_number").on(table.ownerType, table.ownerId, table.number),
+	],
+);
+
+export const projectField = pgTable(
+	"project_field",
+	{
+		id: varchar({ length: 64 }).primaryKey().notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		projectId: bigint("project_id", { mode: "number" }).notNull(),
+		name: varchar({ length: 256 }).notNull(),
+		dataType: varchar("data_type", { length: 32 }).notNull(),
+		options: jsonb(),
+		createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }),
+		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }),
+	},
+	(table) => [
+		index("idx_project_field_project_id").using("btree", table.projectId.asc().nullsLast()),
+		foreignKey({
+			columns: [table.projectId],
+			foreignColumns: [project.id],
+			name: "fk_project_field_project",
+		}).onDelete("cascade"),
+		unique("uk_project_field_project_name").on(table.projectId, table.name),
+	],
+);
+
+export const projectFieldValue = pgTable(
+	"project_field_value",
+	{
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({
+			name: "project_field_value_id_seq",
+			startWith: 1,
+			increment: 1,
+			cache: 1,
+		}),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		itemId: bigint("item_id", { mode: "number" }).notNull(),
+		fieldId: varchar("field_id", { length: 64 }).notNull(),
+		textValue: text("text_value"),
+		numberValue: doublePrecision("number_value"),
+		dateValue: date("date_value"),
+		singleSelectOptionId: varchar("single_select_option_id", { length: 64 }),
+		iterationId: varchar("iteration_id", { length: 64 }),
+		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }),
+	},
+	(table) => [
+		index("idx_project_field_value_field_id").using("btree", table.fieldId.asc().nullsLast()),
+		index("idx_project_field_value_item_id").using("btree", table.itemId.asc().nullsLast()),
+		foreignKey({
+			columns: [table.itemId],
+			foreignColumns: [projectItem.id],
+			name: "fk_project_field_value_item",
+		}).onDelete("cascade"),
+		foreignKey({
+			columns: [table.fieldId],
+			foreignColumns: [projectField.id],
+			name: "fk_project_field_value_field",
+		}).onDelete("cascade"),
+		unique("uk_project_field_value_item_field").on(table.itemId, table.fieldId),
+	],
+);
+
+export const projectItem = pgTable(
+	"project_item",
+	{
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		id: bigint({ mode: "number" }).primaryKey().notNull(),
+		nodeId: varchar("node_id", { length: 64 }),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		projectId: bigint("project_id", { mode: "number" }).notNull(),
+		contentType: varchar("content_type", { length: 32 }).notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		issueId: bigint("issue_id", { mode: "number" }),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		contentDatabaseId: bigint("content_database_id", { mode: "number" }),
+		draftTitle: varchar("draft_title", { length: 1024 }),
+		draftBody: text("draft_body"),
+		archived: boolean().default(false).notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		creatorId: bigint("creator_id", { mode: "number" }),
+		createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }),
+		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }),
+	},
+	(table) => [
+		index("idx_project_item_content_type_archived").using(
+			"btree",
+			table.projectId.asc().nullsLast(),
+			table.contentType.asc().nullsLast(),
+			table.archived.asc().nullsLast(),
+		),
+		index("idx_project_item_creator_id").using("btree", table.creatorId.asc().nullsLast()),
+		index("idx_project_item_issue_id").using("btree", table.issueId.asc().nullsLast()),
+		index("idx_project_item_orphaned_relink")
+			.using("btree", table.contentDatabaseId.asc().nullsLast())
+			.where(
+				sql`((issue_id IS NULL) AND (content_database_id IS NOT NULL) AND ((content_type)::text = ANY ((ARRAY['ISSUE'::character varying, 'PULL_REQUEST'::character varying])::text[])))`,
+			),
+		index("idx_project_item_project_archived").using(
+			"btree",
+			table.projectId.asc().nullsLast(),
+			table.archived.asc().nullsLast(),
+		),
+		foreignKey({
+			columns: [table.projectId],
+			foreignColumns: [project.id],
+			name: "fk_project_item_project",
+		}).onDelete("cascade"),
+		foreignKey({
+			columns: [table.issueId],
+			foreignColumns: [issue.id],
+			name: "fk_project_item_issue",
+		}).onDelete("set null"),
+		foreignKey({
+			columns: [table.creatorId],
+			foreignColumns: [user.id],
+			name: "fk_project_item_creator",
+		}).onDelete("set null"),
+		unique("uk_project_item_project_nodeid").on(table.nodeId, table.projectId),
+	],
+);
+
+export const projectStatusUpdate = pgTable(
+	"project_status_update",
+	{
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		id: bigint({ mode: "number" }).primaryKey().notNull(),
+		nodeId: varchar("node_id", { length: 64 }),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		projectId: bigint("project_id", { mode: "number" }).notNull(),
+		body: text(),
+		bodyHtml: text("body_html"),
+		startDate: date("start_date"),
+		targetDate: date("target_date"),
+		status: varchar({ length: 32 }),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		creatorId: bigint("creator_id", { mode: "number" }),
+		createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }),
+		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }),
+	},
+	(table) => [
+		index("idx_project_status_update_created_at").using(
+			"btree",
+			table.projectId.asc().nullsLast(),
+			table.createdAt.desc().nullsFirst(),
+		),
+		index("idx_project_status_update_creator_id").using("btree", table.creatorId.asc().nullsLast()),
+		foreignKey({
+			columns: [table.projectId],
+			foreignColumns: [project.id],
+			name: "fk_project_status_update_project",
+		}).onDelete("cascade"),
+		foreignKey({
+			columns: [table.creatorId],
+			foreignColumns: [user.id],
+			name: "fk_project_status_update_creator",
+		}).onDelete("set null"),
+		unique("uk_project_status_update_node_id").on(table.nodeId),
+	],
+);
+
 export const pullRequestBadPractice = pgTable(
 	"pull_request_bad_practice",
 	{
@@ -908,10 +1117,6 @@ export const repositoryToMonitor = pgTable(
 			increment: 1,
 			cache: 1,
 		}),
-		issuesAndPullRequestsSyncedAt: timestamp("issues_and_pull_requests_synced_at", {
-			withTimezone: true,
-			mode: "string",
-		}),
 		labelsSyncedAt: timestamp("labels_synced_at", { withTimezone: true, mode: "string" }),
 		milestonesSyncedAt: timestamp("milestones_synced_at", { withTimezone: true, mode: "string" }),
 		nameWithOwner: varchar("name_with_owner", { length: 255 }),
@@ -934,6 +1139,11 @@ export const repositoryToMonitor = pgTable(
 		issueBackfillCheckpoint: integer("issue_backfill_checkpoint"),
 		pullRequestBackfillHighWaterMark: integer("pull_request_backfill_high_water_mark"),
 		pullRequestBackfillCheckpoint: integer("pull_request_backfill_checkpoint"),
+		issuesSyncedAt: timestamp("issues_synced_at", { withTimezone: true, mode: "string" }),
+		pullRequestsSyncedAt: timestamp("pull_requests_synced_at", {
+			withTimezone: true,
+			mode: "string",
+		}),
 	},
 	(table) => [
 		foreignKey({
@@ -1030,7 +1240,7 @@ export const user = pgTable(
 		name: varchar({ length: 255 }),
 		type: varchar({ length: 255 }),
 	},
-	(table) => [unique("uk_user_login").on(table.login)],
+	(table) => [uniqueIndex("uk_user_login_lower").using("btree", sql`lower((login)::text)`)],
 );
 
 export const userPreferences = pgTable(

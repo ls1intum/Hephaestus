@@ -14,6 +14,7 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.github.dto.GitHub
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserProcessor;
 import java.time.Instant;
 import java.util.Set;
 import org.slf4j.Logger;
@@ -51,9 +52,10 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
         PullRequestReviewRepository reviewRepository,
         PullRequestRepository prRepository,
         UserRepository userRepository,
+        GitHubUserProcessor gitHubUserProcessor,
         ApplicationEventPublisher eventPublisher
     ) {
-        super(userRepository, null, null);
+        super(userRepository, null, null, gitHubUserProcessor);
         this.reviewRepository = reviewRepository;
         this.prRepository = prRepository;
         this.eventPublisher = eventPublisher;

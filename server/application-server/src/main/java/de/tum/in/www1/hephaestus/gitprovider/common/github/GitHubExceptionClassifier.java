@@ -250,6 +250,13 @@ public class GitHubExceptionClassifier {
                     notFoundCounter.increment();
                     return ClassificationResult.of(Category.NOT_FOUND, "GraphQL NOT_FOUND: " + error.getMessage());
                 }
+                case "RATE_LIMIT", "RATE_LIMITED" -> {
+                    rateLimitedCounter.increment();
+                    return ClassificationResult.rateLimited(
+                        Duration.ofMinutes(1),
+                        "GraphQL rate limit: " + error.getMessage()
+                    );
+                }
                 case "FORBIDDEN" -> {
                     // Check if it's a rate limit error
                     String message = error.getMessage();
@@ -270,6 +277,15 @@ public class GitHubExceptionClassifier {
                 default -> {
                     // Continue checking other errors
                 }
+            }
+        }
+
+        // Fallback: check all error messages for rate limit text (covers null extensions/type)
+        for (ResponseError error : errors) {
+            String message = error.getMessage();
+            if (message != null && message.toLowerCase().contains("rate limit")) {
+                rateLimitedCounter.increment();
+                return ClassificationResult.rateLimited(Duration.ofMinutes(1), "GraphQL rate limit: " + message);
             }
         }
 

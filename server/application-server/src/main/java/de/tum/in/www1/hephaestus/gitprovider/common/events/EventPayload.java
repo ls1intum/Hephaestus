@@ -5,6 +5,9 @@ import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
 import de.tum.in.www1.hephaestus.gitprovider.issuetype.IssueType;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.Milestone;
+import de.tum.in.www1.hephaestus.gitprovider.project.Project;
+import de.tum.in.www1.hephaestus.gitprovider.project.ProjectItem;
+import de.tum.in.www1.hephaestus.gitprovider.project.ProjectStatusUpdate;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
@@ -12,6 +15,7 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequest
 import de.tum.in.www1.hephaestus.gitprovider.team.Team;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -324,6 +328,156 @@ public final class EventPayload {
     public record UserData(@NonNull Long id, @NonNull String login, @Nullable String name, @Nullable String avatarUrl) {
         public static UserData from(User user) {
             return new UserData(user.getId(), user.getLogin(), user.getName(), user.getAvatarUrl());
+        }
+    }
+
+    // ========================================================================
+    // Project Event Payload (GitHub Projects V2)
+    // ========================================================================
+
+    /**
+     * Immutable snapshot of a Project for event handling.
+     *
+     * @param actorId The user who performed the action (e.g., closed, reopened, updated the project).
+     *                This is distinct from creatorId which is the original project creator.
+     *                For webhook events, this comes from the sender field.
+     *                For sync operations, this may be null.
+     */
+    public record ProjectData(
+        @NonNull Long id,
+        int number,
+        @NonNull String title,
+        @Nullable String shortDescription,
+        boolean closed,
+        boolean isPublic,
+        @NonNull String url,
+        @NonNull Project.OwnerType ownerType,
+        @NonNull Long ownerId,
+        @Nullable Long creatorId,
+        @Nullable Long actorId,
+        @Nullable Instant createdAt,
+        @Nullable Instant updatedAt,
+        @Nullable Instant closedAt
+    ) {
+        /**
+         * Creates ProjectData from a Project entity with no actor specified.
+         * Use this for sync operations where the actor is unknown.
+         */
+        public static ProjectData from(Project project) {
+            return from(project, null);
+        }
+
+        /**
+         * Creates ProjectData from a Project entity with the specified actor.
+         * Use this for webhook events where the sender is known.
+         *
+         * @param project the project entity
+         * @param actorId the ID of the user who performed the action (from webhook sender)
+         */
+        public static ProjectData from(Project project, @Nullable Long actorId) {
+            return new ProjectData(
+                project.getId(),
+                project.getNumber(),
+                project.getTitle() != null ? project.getTitle() : "Untitled",
+                project.getShortDescription(),
+                project.isClosed(),
+                project.isPublic(),
+                project.getUrl() != null ? project.getUrl() : "",
+                project.getOwnerType(),
+                project.getOwnerId(),
+                project.getCreator() != null ? project.getCreator().getId() : null,
+                actorId,
+                project.getCreatedAt(),
+                project.getUpdatedAt(),
+                project.getClosedAt()
+            );
+        }
+    }
+
+    // ========================================================================
+    // Project Item Event Payload (GitHub Projects V2)
+    // ========================================================================
+
+    /**
+     * Immutable snapshot of a ProjectItem for event handling.
+     *
+     * @param actorId The user who performed the action (e.g., created, archived, moved the item).
+     *                For webhook events, this comes from the sender field.
+     *                For sync operations, this may be null.
+     */
+    public record ProjectItemData(
+        @NonNull Long id,
+        @NonNull String nodeId,
+        @NonNull Long projectId,
+        @NonNull ProjectItem.ContentType contentType,
+        @Nullable Long issueId,
+        boolean archived,
+        @Nullable Long actorId,
+        @Nullable Instant createdAt,
+        @Nullable Instant updatedAt
+    ) {
+        /**
+         * Creates ProjectItemData from a ProjectItem entity with no actor specified.
+         * Use this for sync operations where the actor is unknown.
+         */
+        public static ProjectItemData from(ProjectItem item) {
+            return from(item, null);
+        }
+
+        /**
+         * Creates ProjectItemData from a ProjectItem entity with the specified actor.
+         * Use this for webhook events where the sender is known.
+         *
+         * @param item the project item entity
+         * @param actorId the ID of the user who performed the action (from webhook sender)
+         */
+        public static ProjectItemData from(ProjectItem item, @Nullable Long actorId) {
+            return new ProjectItemData(
+                item.getId(),
+                item.getNodeId() != null ? item.getNodeId() : "",
+                item.getProject().getId(),
+                item.getContentType(),
+                item.getIssue() != null ? item.getIssue().getId() : null,
+                item.isArchived(),
+                actorId,
+                item.getCreatedAt(),
+                item.getUpdatedAt()
+            );
+        }
+    }
+
+    // ========================================================================
+    // Project Status Update Event Payload
+    // ========================================================================
+
+    /**
+     * Immutable snapshot of a ProjectStatusUpdate for event handling.
+     */
+    public record ProjectStatusUpdateData(
+        @NonNull Long id,
+        @NonNull String nodeId,
+        @NonNull Long projectId,
+        @Nullable String body,
+        @Nullable LocalDate startDate,
+        @Nullable LocalDate targetDate,
+        @Nullable ProjectStatusUpdate.Status status,
+        @Nullable Long creatorId,
+        @Nullable Instant createdAt,
+        @Nullable Instant updatedAt
+    ) {
+        public static ProjectStatusUpdateData from(ProjectStatusUpdate update) {
+            return new ProjectStatusUpdateData(
+                update.getId(),
+                update.getNodeId() != null ? update.getNodeId() : "",
+                update.getProject().getId(),
+                update.getBody(),
+                update.getStartDate(),
+                update.getTargetDate(),
+                update.getStatus(),
+                update.getCreator() != null ? update.getCreator().getId() : null,
+                update.getCreatedAt(),
+                update.getUpdatedAt()
+            );
         }
     }
 }

@@ -19,7 +19,10 @@ spring:
 
     jpa:
         hibernate:
-            # We use update for development and none for production, as we use liquibase
+            # Liquibase handles DDL migrations; Hibernate validates the schema.
+            # Use 'update' for development convenience (adds missing columns/tables).
+            # If you hit a Hibernate NPE in EnumHelper.getEnumeratedValues on startup,
+            # the database schema is stale — recreate the database from scratch.
             ddl-auto: update
         # Disable open-in-view to prevent lazy loading during view rendering
         # and avoid the warning. Database queries should be completed in the service layer.
@@ -175,9 +178,15 @@ hephaestus:
         # ═══════════════════════════════════════════════════════════════════════════
         # BACKFILL CONFIGURATION
         # ═══════════════════════════════════════════════════════════════════════════
-        # Historical data synchronization settings.
+        # Historical data synchronization settings for ISSUES and PULL REQUESTS only.
         # When enabled, backfill runs AFTER recent sync completes, in small batches
         # to avoid exhausting GitHub API rate limits.
+        #
+        # NOTE: Backfill does NOT affect GitHub Projects V2 sync. Projects are always
+        # fully synced during incremental sync because:
+        # 1. GitHub API doesn't support server-side filtering for project items
+        # 2. Project items are metadata views on issues/PRs, not source data
+        # 3. Subsequent syncs use client-side incremental filtering (skip unchanged items)
         backfill:
             # Whether to backfill historical issues and pull requests
             enabled: false

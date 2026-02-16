@@ -8,9 +8,12 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncCons
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.ExponentialBackoff;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoordinator;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoordinator.GraphQlClassificationContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
@@ -32,10 +35,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.FieldAccessException;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -43,6 +48,10 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>
  * Uses typed GraphQL models for type-safe deserialization and delegates
  * persistence to GitHubPullRequestReviewProcessor.
+ * <p>
+ * GraphQL fetching is non-transactional; persistence is done per-page in
+ * {@code REQUIRES_NEW} transactions via self-proxy to isolate deadlock
+ * failures and avoid poisoned-transaction retries.
  */
 @Service
 public class GitHubPullRequestReviewSyncService {
@@ -57,6 +66,10 @@ public class GitHubPullRequestReviewSyncService {
     private final GitHubPullRequestReviewProcessor reviewProcessor;
     private final GitHubSyncProperties syncProperties;
     private final GitHubExceptionClassifier exceptionClassifier;
+    private final GitHubGraphQlSyncCoordinator graphQlSyncHelper;
+    private final GitHubPullRequestReviewSyncService self;
+    private static final int MAX_RETRY_ATTEMPTS = 3;
+    private static final int MAX_DEADLOCK_RETRIES = 3;
 
     public GitHubPullRequestReviewSyncService(
         RepositoryRepository repositoryRepository,
@@ -64,7 +77,9 @@ public class GitHubPullRequestReviewSyncService {
         GitHubGraphQlClientProvider graphQlClientProvider,
         GitHubPullRequestReviewProcessor reviewProcessor,
         GitHubSyncProperties syncProperties,
-        GitHubExceptionClassifier exceptionClassifier
+        GitHubExceptionClassifier exceptionClassifier,
+        GitHubGraphQlSyncCoordinator graphQlSyncHelper,
+        @Lazy GitHubPullRequestReviewSyncService self
     ) {
         this.repositoryRepository = repositoryRepository;
         this.pullRequestRepository = pullRequestRepository;
@@ -72,6 +87,8 @@ public class GitHubPullRequestReviewSyncService {
         this.reviewProcessor = reviewProcessor;
         this.syncProperties = syncProperties;
         this.exceptionClassifier = exceptionClassifier;
+        this.graphQlSyncHelper = graphQlSyncHelper;
+        this.self = self;
     }
 
     /**
@@ -125,7 +142,6 @@ public class GitHubPullRequestReviewSyncService {
      * consider using {@link #syncRemainingReviews(Long, PullRequest, String)} with
      * a starting cursor.
      */
-    @Transactional
     public int syncForPullRequest(Long scopeId, PullRequest pullRequest) {
         return syncRemainingReviews(scopeId, pullRequest, null);
     }
@@ -133,16 +149,16 @@ public class GitHubPullRequestReviewSyncService {
     /**
      * Synchronizes remaining reviews for a pull request starting from a cursor.
      * <p>
-     * This method is optimized for cases where initial reviews have already been
-     * processed inline with the PR query. Pass the endCursor from the embedded
-     * reviews to skip already-processed reviews.
+     * This method is non-transactional: it fetches data from the GraphQL API and
+     * delegates persistence to {@link #processReviewPageInTransaction} which runs
+     * each page in a {@code REQUIRES_NEW} transaction. This ensures that a deadlock
+     * on one page does not poison the entire sync, and retries start fresh transactions.
      *
      * @param scopeId  the scope ID for authentication
      * @param pullRequest  the pull request to sync reviews for
      * @param startCursor  the cursor to start from (null to fetch all reviews)
      * @return number of reviews synced
      */
-    @Transactional
     public int syncRemainingReviews(Long scopeId, PullRequest pullRequest, String startCursor) {
         if (pullRequest == null || pullRequest.getRepository() == null) {
             log.warn(
@@ -162,15 +178,13 @@ public class GitHubPullRequestReviewSyncService {
         }
         RepositoryOwnerAndName ownerAndName = parsedName.get();
 
-        // Create processing context for sync operations to enable activity event creation
-        ProcessingContext context = ProcessingContext.forSync(scopeId, repository);
-
         HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
 
         int totalSynced = 0;
         String cursor = startCursor;
         boolean hasMore = true;
         int pageCount = 0;
+        int retryAttempt = 0;
 
         while (hasMore) {
             // Check for interrupt (e.g., during application shutdown)
@@ -215,7 +229,27 @@ public class GitHubPullRequestReviewSyncService {
                             safeNameWithOwner,
                             pullRequest.getNumber()
                         );
-                        return 0;
+                        return totalSynced;
+                    }
+                    ClassificationResult classification = graphQlSyncHelper.classifyGraphQlErrors(response);
+                    if (classification != null) {
+                        if (
+                            graphQlSyncHelper.handleGraphQlClassification(
+                                new GraphQlClassificationContext(
+                                    classification,
+                                    retryAttempt,
+                                    MAX_RETRY_ATTEMPTS,
+                                    "review sync",
+                                    "prNumber",
+                                    pullRequest.getNumber(),
+                                    log
+                                )
+                            )
+                        ) {
+                            retryAttempt++;
+                            continue;
+                        }
+                        break;
                     }
                     log.warn(
                         "Invalid GraphQL response for reviews: repoName={}, prNumber={}, errors={}",
@@ -231,13 +265,17 @@ public class GitHubPullRequestReviewSyncService {
 
                 // Check if we should pause due to rate limiting
                 if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
-                    log.warn(
-                        "Aborting review sync due to critical rate limit: repoName={}, prNumber={}, pageCount={}",
-                        safeNameWithOwner,
-                        pullRequest.getNumber(),
-                        pageCount
-                    );
-                    break;
+                    if (
+                        !graphQlSyncHelper.waitForRateLimitIfNeeded(
+                            scopeId,
+                            "review sync",
+                            "prNumber",
+                            pullRequest.getNumber(),
+                            log
+                        )
+                    ) {
+                        break;
+                    }
                 }
 
                 GHPullRequestReviewConnection connection = response
@@ -248,32 +286,35 @@ public class GitHubPullRequestReviewSyncService {
                     break;
                 }
 
+                // Fetch any remaining nested review comments before persistence
                 for (var graphQlReview : connection.getNodes()) {
-                    // Handle nested pagination for review comments
                     var commentsConnection = graphQlReview.getComments();
                     if (commentsConnection != null) {
                         var commentsPageInfo = commentsConnection.getPageInfo();
                         if (commentsPageInfo != null && Boolean.TRUE.equals(commentsPageInfo.getHasNextPage())) {
-                            // Fetch all remaining comments using pagination
                             fetchAllRemainingComments(client, graphQlReview, commentsPageInfo.getEndCursor(), scopeId);
-                        }
-                    }
-
-                    GitHubReviewDTO dto = GitHubReviewDTO.fromPullRequestReview(graphQlReview);
-                    if (dto != null) {
-                        PullRequestReview entity = reviewProcessor.process(dto, pullRequest.getId(), context);
-                        if (entity != null) {
-                            totalSynced++;
                         }
                     }
                 }
 
+                // Persist the page in a REQUIRES_NEW transaction with deadlock retry
+                int pageSynced = persistReviewPageWithRetry(
+                    connection.getNodes(),
+                    pullRequest.getId(),
+                    scopeId,
+                    repository,
+                    safeNameWithOwner,
+                    pullRequest.getNumber()
+                );
+                totalSynced += pageSynced;
+
                 GHPageInfo pageInfo = connection.getPageInfo();
                 hasMore = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
                 cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
+                retryAttempt = 0;
             } catch (InstallationNotFoundException e) {
                 log.warn("Installation not found for repository {}, skipping review sync", safeNameWithOwner);
-                return 0;
+                return totalSynced;
             } catch (FieldAccessException e) {
                 // Check if this is a NOT_FOUND error (PR deleted from GitHub)
                 if (isNotFoundError(e.getResponse(), "repository.pullRequest")) {
@@ -282,7 +323,7 @@ public class GitHubPullRequestReviewSyncService {
                         safeNameWithOwner,
                         pullRequest.getNumber()
                     );
-                    return 0;
+                    return totalSynced;
                 }
                 log.error(
                     "Failed to sync reviews: repoName={}, prNumber={}",
@@ -293,43 +334,22 @@ public class GitHubPullRequestReviewSyncService {
                 break;
             } catch (Exception e) {
                 ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
-                switch (classification.category()) {
-                    case RATE_LIMITED -> log.warn(
-                        "Rate limited during review sync: repoName={}, prNumber={}, message={}",
-                        safeNameWithOwner,
-                        pullRequest.getNumber(),
-                        classification.message()
-                    );
-                    case NOT_FOUND -> log.warn(
-                        "Resource not found during review sync: repoName={}, prNumber={}, message={}",
-                        safeNameWithOwner,
-                        pullRequest.getNumber(),
-                        classification.message()
-                    );
-                    case AUTH_ERROR -> {
-                        log.error(
-                            "Authentication error during review sync: repoName={}, prNumber={}, message={}",
-                            safeNameWithOwner,
+                if (
+                    !graphQlSyncHelper.handleGraphQlClassification(
+                        new GraphQlClassificationContext(
+                            classification,
+                            retryAttempt,
+                            MAX_RETRY_ATTEMPTS,
+                            "review sync",
+                            "prNumber",
                             pullRequest.getNumber(),
-                            classification.message()
-                        );
-                        throw e;
-                    }
-                    case RETRYABLE -> log.warn(
-                        "Retryable error during review sync: repoName={}, prNumber={}, message={}",
-                        safeNameWithOwner,
-                        pullRequest.getNumber(),
-                        classification.message()
-                    );
-                    default -> log.error(
-                        "Unexpected error during review sync: repoName={}, prNumber={}, message={}",
-                        safeNameWithOwner,
-                        pullRequest.getNumber(),
-                        classification.message(),
-                        e
-                    );
+                            log
+                        )
+                    )
+                ) {
+                    break;
                 }
-                break;
+                retryAttempt++;
             }
         }
 
@@ -340,6 +360,120 @@ public class GitHubPullRequestReviewSyncService {
             totalSynced
         );
         return totalSynced;
+    }
+
+    /**
+     * Persists a page of reviews with transient failure retry. Each attempt runs in a fresh
+     * {@code REQUIRES_NEW} transaction via self-proxy, so a deadlock on one attempt
+     * does not poison subsequent retries.
+     */
+    private int persistReviewPageWithRetry(
+        List<GHPullRequestReview> reviews,
+        Long pullRequestId,
+        Long scopeId,
+        Repository repository,
+        String safeNameWithOwner,
+        int prNumber
+    ) {
+        for (int attempt = 0; attempt <= MAX_DEADLOCK_RETRIES; attempt++) {
+            try {
+                return self.processReviewPageInTransaction(reviews, pullRequestId, scopeId, repository);
+            } catch (Exception e) {
+                boolean retryable;
+                String errorDetail;
+                if (e instanceof org.springframework.transaction.UnexpectedRollbackException) {
+                    retryable = true;
+                    errorDetail = "Transaction rolled back (likely deadlock): " + e.getMessage();
+                } else {
+                    ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
+                    retryable = classification.category() == GitHubExceptionClassifier.Category.RETRYABLE;
+                    errorDetail = classification.message();
+                }
+
+                if (retryable && attempt < MAX_DEADLOCK_RETRIES) {
+                    log.warn(
+                        "Transient failure during review page persistence (attempt {}/{}), retrying: repoName={}, prNumber={}, error={}",
+                        attempt + 1,
+                        MAX_DEADLOCK_RETRIES,
+                        safeNameWithOwner,
+                        prNumber,
+                        errorDetail
+                    );
+                    try {
+                        ExponentialBackoff.sleep(attempt);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        log.warn("Interrupted during retry backoff for review page: prNumber={}", prNumber);
+                        return 0;
+                    }
+                } else {
+                    log.error(
+                        "Failed to persist review page after {} attempts: repoName={}, prNumber={}, error={}",
+                        attempt + 1,
+                        safeNameWithOwner,
+                        prNumber,
+                        errorDetail,
+                        e
+                    );
+                    return 0;
+                }
+            }
+        }
+        return 0;
+    }
+
+    /**
+     * Processes a page of review nodes in a {@code REQUIRES_NEW} transaction.
+     * <p>
+     * Called via self-proxy to ensure the transaction annotation is honoured.
+     * If a deadlock occurs, the transaction is rolled back independently without
+     * poisoning any outer transaction.
+     *
+     * @param reviews       the review nodes from the GraphQL response
+     * @param pullRequestId the database ID of the owning pull request
+     * @param scopeId       the scope ID for authentication
+     * @param repository    the repository entity for creating the processing context
+     * @return number of reviews persisted
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public int processReviewPageInTransaction(
+        List<GHPullRequestReview> reviews,
+        Long pullRequestId,
+        Long scopeId,
+        Repository repository
+    ) {
+        ProcessingContext context = ProcessingContext.forSync(scopeId, repository);
+        int synced = 0;
+        for (var graphQlReview : reviews) {
+            GitHubReviewDTO dto = GitHubReviewDTO.fromPullRequestReview(graphQlReview);
+            if (dto != null) {
+                PullRequestReview entity = reviewProcessor.process(dto, pullRequestId, context);
+                if (entity != null) {
+                    synced++;
+                }
+            }
+        }
+        return synced;
+    }
+
+    /**
+     * Processes a single inline review DTO during pull request sync.
+     * <p>
+     * This delegation method allows the PR sync service to process embedded reviews
+     * without depending directly on the review processor.
+     *
+     * @param reviewDTO    the review DTO to process
+     * @param pullRequestId the database ID of the owning pull request
+     * @param context       the processing context for activity event creation
+     * @return the persisted review entity, or null if processing was skipped
+     */
+    @Transactional
+    public PullRequestReview processInlineReview(
+        GitHubReviewDTO reviewDTO,
+        Long pullRequestId,
+        ProcessingContext context
+    ) {
+        return reviewProcessor.process(reviewDTO, pullRequestId, context);
     }
 
     /**
@@ -368,6 +502,7 @@ public class GitHubPullRequestReviewSyncService {
         String cursor = startCursor;
         boolean hasMore = true;
         int fetchedPages = 0;
+        int retryAttempt = 0;
 
         while (hasMore) {
             // Check for interrupt (e.g., during application shutdown)
@@ -401,6 +536,26 @@ public class GitHubPullRequestReviewSyncService {
                     .block(syncProperties.graphqlTimeout());
 
                 if (response == null || !response.isValid()) {
+                    ClassificationResult classification = graphQlSyncHelper.classifyGraphQlErrors(response);
+                    if (classification != null) {
+                        if (
+                            graphQlSyncHelper.handleGraphQlClassification(
+                                new GraphQlClassificationContext(
+                                    classification,
+                                    retryAttempt,
+                                    MAX_RETRY_ATTEMPTS,
+                                    "review comments fetch",
+                                    "reviewId",
+                                    reviewId,
+                                    log
+                                )
+                            )
+                        ) {
+                            retryAttempt++;
+                            continue;
+                        }
+                        break;
+                    }
                     log.warn(
                         "Invalid GraphQL response for review comments: reviewId={}, errors={}",
                         reviewId,
@@ -414,8 +569,17 @@ public class GitHubPullRequestReviewSyncService {
 
                 // Check if we should pause due to rate limiting
                 if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
-                    log.warn("Aborting review comments fetch due to critical rate limit: reviewId={}", reviewId);
-                    break;
+                    if (
+                        !graphQlSyncHelper.waitForRateLimitIfNeeded(
+                            scopeId,
+                            "review comments fetch",
+                            "reviewId",
+                            reviewId,
+                            log
+                        )
+                    ) {
+                        break;
+                    }
                 }
 
                 GHPullRequestReviewCommentConnection commentsConnection = response
@@ -431,40 +595,25 @@ public class GitHubPullRequestReviewSyncService {
                 GHPageInfo pageInfo = commentsConnection.getPageInfo();
                 hasMore = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
                 cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
+                retryAttempt = 0;
             } catch (Exception e) {
                 ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
-                switch (classification.category()) {
-                    case RATE_LIMITED -> log.warn(
-                        "Rate limited during review comments fetch: reviewId={}, message={}",
-                        reviewId,
-                        classification.message()
-                    );
-                    case NOT_FOUND -> log.warn(
-                        "Resource not found during review comments fetch: reviewId={}, message={}",
-                        reviewId,
-                        classification.message()
-                    );
-                    case AUTH_ERROR -> {
-                        log.error(
-                            "Authentication error during review comments fetch: reviewId={}, message={}",
+                if (
+                    !graphQlSyncHelper.handleGraphQlClassification(
+                        new GraphQlClassificationContext(
+                            classification,
+                            retryAttempt,
+                            MAX_RETRY_ATTEMPTS,
+                            "review comments fetch",
+                            "reviewId",
                             reviewId,
-                            classification.message()
-                        );
-                        throw e;
-                    }
-                    case RETRYABLE -> log.warn(
-                        "Retryable error during review comments fetch: reviewId={}, message={}",
-                        reviewId,
-                        classification.message()
-                    );
-                    default -> log.error(
-                        "Unexpected error during review comments fetch: reviewId={}, message={}",
-                        reviewId,
-                        classification.message(),
-                        e
-                    );
+                            log
+                        )
+                    )
+                ) {
+                    break;
                 }
-                break;
+                retryAttempt++;
             }
         }
 
