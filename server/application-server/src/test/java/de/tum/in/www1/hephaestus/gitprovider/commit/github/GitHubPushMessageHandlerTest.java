@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.commit.github;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -153,10 +154,8 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
         @Test
         @DisplayName("should return PUSH event type")
         void shouldReturnPushEventType() {
-            assertThatCode(() -> {
-                GitHubEventType type = handler.getEventType();
-                assert type == GitHubEventType.PUSH;
-            }).doesNotThrowAnyException();
+            GitHubEventType type = handler.getEventType();
+            assertThat(type).isEqualTo(GitHubEventType.PUSH);
         }
     }
 
@@ -179,9 +178,9 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
                 any(),
                 any(),
                 any(),
-                any(int.class),
-                any(int.class),
-                any(int.class),
+                any(Integer.class),
+                any(Integer.class),
+                any(Integer.class),
                 any(),
                 anyLong(),
                 any(),
@@ -240,9 +239,9 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
                 any(),
                 any(),
                 any(),
-                any(int.class),
-                any(int.class),
-                any(int.class),
+                any(Integer.class),
+                any(Integer.class),
+                any(Integer.class),
                 any(),
                 anyLong(),
                 any(),
@@ -293,9 +292,9 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
                 any(),
                 any(),
                 any(),
-                any(int.class),
-                any(int.class),
-                any(int.class),
+                any(Integer.class),
+                any(Integer.class),
+                any(Integer.class),
                 any(),
                 anyLong(),
                 any(),
@@ -375,9 +374,9 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
                 any(),
                 any(),
                 any(),
-                any(int.class),
-                any(int.class),
-                any(int.class),
+                any(Integer.class),
+                any(Integer.class),
+                any(Integer.class),
                 any(),
                 eq(100L),
                 any(),
@@ -418,9 +417,9 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
                 any(),
                 any(),
                 any(),
-                any(int.class),
-                any(int.class),
-                any(int.class),
+                any(Integer.class),
+                any(Integer.class),
+                any(Integer.class),
                 any(),
                 eq(100L),
                 eq(42L),
@@ -459,9 +458,9 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
                 any(),
                 any(),
                 any(),
-                any(int.class),
-                any(int.class),
-                any(int.class),
+                any(Integer.class),
+                any(Integer.class),
+                any(Integer.class),
                 any(),
                 eq(100L),
                 eq(null),
@@ -529,9 +528,9 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
                 any(),
                 any(),
                 any(),
-                any(int.class),
-                any(int.class),
-                any(int.class),
+                any(Integer.class),
+                any(Integer.class),
+                any(Integer.class),
                 any(),
                 eq(100L),
                 any(),
@@ -595,7 +594,7 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
 
             invokeHandleEvent(event);
 
-            // Should fall back to webhook processing
+            // Should fall back to webhook processing with null stats (preserves existing data)
             verify(commitRepository).upsertCommit(
                 anyString(),
                 anyString(),
@@ -603,9 +602,9 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
                 any(),
                 any(),
                 any(),
-                any(int.class),
-                any(int.class),
-                any(int.class),
+                eq(null), // additions: null on fallback to preserve richer data
+                eq(null), // deletions: null on fallback to preserve richer data
+                eq(null), // changedFiles: null on fallback to preserve richer data
                 any(),
                 eq(100L),
                 any(),
@@ -737,9 +736,9 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
                 any(),
                 any(),
                 any(),
-                any(int.class),
-                any(int.class),
-                any(int.class),
+                any(Integer.class),
+                any(Integer.class),
+                any(Integer.class),
                 any(),
                 eq(100L),
                 any(),
@@ -773,9 +772,9 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
                 any(),
                 any(),
                 any(),
-                any(int.class),
-                any(int.class),
-                any(int.class),
+                any(Integer.class),
+                any(Integer.class),
+                any(Integer.class),
                 any(),
                 eq(100L),
                 any(),
@@ -792,19 +791,16 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
         @DisplayName("action should return pushed")
         void actionShouldReturnPushed() {
             var event = createBasicPushEvent("refs/heads/main", false, List.of());
-            assertThatCode(() -> {
-                assert "pushed".equals(event.action());
-            }).doesNotThrowAnyException();
+            assertThat(event.action()).isEqualTo("pushed");
         }
 
         @Test
         @DisplayName("actionType should return PUSHED")
         void actionTypeShouldReturnPushed() {
             var event = createBasicPushEvent("refs/heads/main", false, List.of());
-            assertThatCode(() -> {
-                assert event.actionType() ==
-                de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction.Push.PUSHED;
-            }).doesNotThrowAnyException();
+            assertThat(event.actionType()).isEqualTo(
+                de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction.Push.PUSHED
+            );
         }
     }
 }

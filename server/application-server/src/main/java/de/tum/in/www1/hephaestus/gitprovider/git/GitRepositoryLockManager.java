@@ -42,12 +42,21 @@ public class GitRepositoryLockManager {
     /**
      * Get or create a lock for the given repository.
      * Locks are keyed by repository database ID for uniqueness.
+     * <p>
+     * Eviction runs <em>before</em> {@code computeIfAbsent} to avoid mutating the
+     * ConcurrentHashMap from inside its own mapping function (which can cause
+     * deadlock on bin-level locks in some JDK versions).
      */
     public ReentrantReadWriteLock getLock(Long repositoryId) {
-        return locks.computeIfAbsent(repositoryId, k -> {
-            evictIdleLocksIfNeeded();
-            return new ReentrantReadWriteLock();
-        });
+        // Check existing first (fast path without eviction)
+        ReentrantReadWriteLock existing = locks.get(repositoryId);
+        if (existing != null) {
+            return existing;
+        }
+
+        // Evict outside computeIfAbsent to avoid ConcurrentHashMap reentrancy
+        evictIdleLocksIfNeeded();
+        return locks.computeIfAbsent(repositoryId, k -> new ReentrantReadWriteLock());
     }
 
     /**
@@ -107,10 +116,21 @@ public class GitRepositoryLockManager {
 
     /**
      * Remove the lock for a repository (e.g., when repository is deleted).
-     * Should only be called when no operations are in progress.
+     * Only removes the lock if it is not currently held by any thread.
+     *
+     * @return true if the lock was removed, false if it was still held or didn't exist
      */
-    public void removeLock(Long repositoryId) {
-        locks.remove(repositoryId);
+    public boolean removeLock(Long repositoryId) {
+        return (
+            locks.computeIfPresent(repositoryId, (k, lock) -> {
+                if (!lock.isWriteLocked() && lock.getReadLockCount() == 0) {
+                    return null; // removes entry
+                }
+                log.warn("Cannot remove lock for repository {}: still held", repositoryId);
+                return lock; // keep it
+            }) ==
+            null
+        );
     }
 
     /**

@@ -47,7 +47,7 @@ public class CommitFileChange {
      * The filename/path of the changed file.
      */
     @NonNull
-    @Column(length = 1024)
+    @Column(length = 1024, nullable = false)
     private String filename;
 
     /**
@@ -55,7 +55,7 @@ public class CommitFileChange {
      */
     @NonNull
     @Enumerated(EnumType.STRING)
-    @Column(length = 32)
+    @Column(length = 32, nullable = false)
     private ChangeType changeType;
 
     /**

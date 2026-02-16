@@ -179,22 +179,38 @@ class GitRepositoryLockManagerTest extends BaseUnitTest {
     class RemoveLock {
 
         @Test
-        @DisplayName("should remove existing lock")
+        @DisplayName("should remove existing lock and return true")
         void shouldRemoveExistingLock() {
             lockManager.getLock(1L);
             assertThat(lockManager.getActiveLockCount()).isEqualTo(1);
 
-            lockManager.removeLock(1L);
+            boolean removed = lockManager.removeLock(1L);
 
+            assertThat(removed).isTrue();
             assertThat(lockManager.getActiveLockCount()).isZero();
         }
 
         @Test
-        @DisplayName("should not fail when removing non-existent lock")
-        void shouldNotFailWhenRemovingNonExistentLock() {
-            lockManager.removeLock(999L);
+        @DisplayName("should return true when removing non-existent lock")
+        void shouldReturnTrueWhenRemovingNonExistentLock() {
+            boolean removed = lockManager.removeLock(999L);
 
+            assertThat(removed).isTrue();
             assertThat(lockManager.getActiveLockCount()).isZero();
+        }
+
+        @Test
+        @DisplayName("should not remove lock that is currently held and return false")
+        void shouldNotRemoveHeldLock() {
+            lockManager.getLock(1L).writeLock().lock();
+            try {
+                boolean removed = lockManager.removeLock(1L);
+
+                assertThat(removed).isFalse();
+                assertThat(lockManager.getActiveLockCount()).isEqualTo(1);
+            } finally {
+                lockManager.getLock(1L).writeLock().unlock();
+            }
         }
     }
 
@@ -260,6 +276,105 @@ class GitRepositoryLockManagerTest extends BaseUnitTest {
             lockManager.getLock(3L);
 
             assertThat(lockManager.getActiveLockCount()).isEqualTo(3);
+        }
+    }
+
+    @Nested
+    @DisplayName("lock exclusion contracts")
+    class LockExclusionContracts {
+
+        @Test
+        @DisplayName("write lock should exclude readers")
+        void writeLockShouldExcludeReaders() throws InterruptedException {
+            AtomicBoolean readerEnteredCriticalSection = new AtomicBoolean(false);
+            CountDownLatch writerHoldsLock = new CountDownLatch(1);
+            CountDownLatch readerAttempted = new CountDownLatch(1);
+
+            // Writer thread: acquire write lock, signal, then hold it
+            Thread writer = new Thread(() ->
+                lockManager.withWriteLock(1L, () -> {
+                    writerHoldsLock.countDown();
+                    try {
+                        // Hold the lock long enough for the reader to attempt
+                        readerAttempted.await(5, TimeUnit.SECONDS);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                })
+            );
+
+            // Reader thread: wait for writer to hold lock, then try to read
+            Thread reader = new Thread(() -> {
+                try {
+                    writerHoldsLock.await(5, TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+                // Try to acquire read lock (should block while writer holds it)
+                ReentrantReadWriteLock lock = lockManager.getLock(1L);
+                boolean acquired = lock.readLock().tryLock();
+                readerEnteredCriticalSection.set(acquired);
+                if (acquired) {
+                    lock.readLock().unlock();
+                }
+                readerAttempted.countDown();
+            });
+
+            writer.start();
+            reader.start();
+
+            writer.join(10_000);
+            reader.join(10_000);
+
+            assertThat(readerEnteredCriticalSection.get())
+                .as("Reader should NOT enter critical section while writer holds lock")
+                .isFalse();
+        }
+
+        @Test
+        @DisplayName("write lock should exclude other writers")
+        void writeLockShouldExcludeOtherWriters() throws InterruptedException {
+            AtomicBoolean secondWriterEnteredCriticalSection = new AtomicBoolean(false);
+            CountDownLatch firstWriterHoldsLock = new CountDownLatch(1);
+            CountDownLatch secondWriterAttempted = new CountDownLatch(1);
+
+            Thread firstWriter = new Thread(() ->
+                lockManager.withWriteLock(1L, () -> {
+                    firstWriterHoldsLock.countDown();
+                    try {
+                        secondWriterAttempted.await(5, TimeUnit.SECONDS);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                })
+            );
+
+            Thread secondWriter = new Thread(() -> {
+                try {
+                    firstWriterHoldsLock.await(5, TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+                ReentrantReadWriteLock lock = lockManager.getLock(1L);
+                boolean acquired = lock.writeLock().tryLock();
+                secondWriterEnteredCriticalSection.set(acquired);
+                if (acquired) {
+                    lock.writeLock().unlock();
+                }
+                secondWriterAttempted.countDown();
+            });
+
+            firstWriter.start();
+            secondWriter.start();
+
+            firstWriter.join(10_000);
+            secondWriter.join(10_000);
+
+            assertThat(secondWriterEnteredCriticalSection.get())
+                .as("Second writer should NOT enter critical section while first writer holds lock")
+                .isFalse();
         }
     }
 }

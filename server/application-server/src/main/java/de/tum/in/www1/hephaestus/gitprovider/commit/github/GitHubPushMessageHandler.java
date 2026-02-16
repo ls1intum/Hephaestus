@@ -17,6 +17,7 @@ import java.time.Instant;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -121,7 +122,7 @@ public class GitHubPushMessageHandler extends GitHubMessageHandler<GitHubPushEve
         if (gitRepositoryManager.isEnabled()) {
             processCommitsViaLocalGit(event, repository);
         } else {
-            processCommitsViaWebhook(event, repository);
+            processCommitsViaWebhook(event, repository, false);
         }
     }
 
@@ -172,8 +173,8 @@ public class GitHubPushMessageHandler extends GitHubMessageHandler<GitHubPushEve
                 repoName,
                 e.getMessage()
             );
-            // Fall back to webhook-only data
-            processCommitsViaWebhook(event, repository);
+            // Fall back to webhook-only data (preserves any richer data already persisted)
+            processCommitsViaWebhook(event, repository, true);
         }
     }
 
@@ -183,8 +184,15 @@ public class GitHubPushMessageHandler extends GitHubMessageHandler<GitHubPushEve
      * <p>
      * Uses native {@code INSERT ... ON CONFLICT DO UPDATE} for idempotency,
      * avoiding the check-then-act race of {@code existsBy...} + {@code save}.
+     * <p>
+     * When called as fallback after local-git failure, uses {@code COALESCE}
+     * semantics: additions/deletions/changedFiles pass null so the upsert
+     * preserves any richer data already persisted by the local-git path.
+     *
+     * @param asFallback true when called as fallback after local-git failure,
+     *                   which uses null for stats to preserve existing richer data
      */
-    private void processCommitsViaWebhook(GitHubPushEventDTO event, Repository repository) {
+    private void processCommitsViaWebhook(GitHubPushEventDTO event, Repository repository, boolean asFallback) {
         String repoName = sanitizeForLog(repository.getNameWithOwner());
         int processed = 0;
 
@@ -215,9 +223,9 @@ public class GitHubPushMessageHandler extends GitHubMessageHandler<GitHubPushEve
                 htmlUrl,
                 authoredAt,
                 authoredAt, // committedAt = authoredAt (webhook doesn't distinguish)
-                0, // additions not available from webhook
-                0, // deletions not available from webhook
-                changedFiles,
+                asFallback ? null : 0, // additions: null preserves existing richer data on fallback
+                asFallback ? null : 0, // deletions: null preserves existing richer data on fallback
+                asFallback ? null : changedFiles, // changedFiles: null preserves on fallback
                 Instant.now(),
                 repository.getId(),
                 authorId,
@@ -227,18 +235,25 @@ public class GitHubPushMessageHandler extends GitHubMessageHandler<GitHubPushEve
         }
 
         log.info(
-            "Processed push commits via webhook: processed={}, total={}, branch={}, repoName={}",
+            "Processed push commits via webhook: processed={}, total={}, branch={}, fallback={}, repoName={}",
             processed,
             event.commits().size(),
             getBranchName(event.ref()),
+            asFallback,
             repoName
         );
     }
 
     /**
      * Process a single commit from local git info.
+     * <p>
+     * Uses optimistic insert: attempts {@code save()} and catches
+     * {@link DataIntegrityViolationException} from the unique constraint
+     * (sha, repository_id), treating it as a benign concurrent insert.
+     * This avoids the check-then-act race of {@code existsBy...} + {@code save}.
      */
     private boolean processCommitInfo(GitRepositoryManager.CommitInfo info, Repository repository) {
+        // Fast-path: skip if already persisted (avoid building entity graph)
         if (commitRepository.existsByShaAndRepositoryId(info.sha(), repository.getId())) {
             return false;
         }
@@ -279,8 +294,14 @@ public class GitHubPushMessageHandler extends GitHubMessageHandler<GitHubPushEve
             commit.addFileChange(fileChange);
         }
 
-        commitRepository.save(commit);
-        return true;
+        try {
+            commitRepository.save(commit);
+            return true;
+        } catch (DataIntegrityViolationException e) {
+            // Concurrent insert won the race — benign, skip
+            log.debug("Commit already persisted concurrently: sha={}, repo={}", info.sha(), repository.getId());
+            return false;
+        }
     }
 
     /**

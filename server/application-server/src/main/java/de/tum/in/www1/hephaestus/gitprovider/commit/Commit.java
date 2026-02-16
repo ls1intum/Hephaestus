@@ -74,7 +74,7 @@ public class Commit {
      * The commit message (first line / subject).
      */
     @NonNull
-    @Column(length = 1024)
+    @Column(length = 1024, nullable = false)
     private String message;
 
     /**
@@ -96,12 +96,14 @@ public class Commit {
      * code change was created, committedAt is when it was applied.
      */
     @NonNull
+    @Column(nullable = false)
     private Instant authoredAt;
 
     /**
      * The timestamp when the commit was committed.
      */
     @NonNull
+    @Column(nullable = false)
     private Instant committedAt;
 
     /**
@@ -127,11 +129,13 @@ public class Commit {
     /**
      * Audit timestamp: when this entity was first persisted.
      */
+    @Column(name = "created_at")
     private Instant createdAt;
 
     /**
      * Audit timestamp: when this entity was last modified.
      */
+    @Column(name = "updated_at")
     private Instant updatedAt;
 
     @PrePersist
@@ -156,7 +160,7 @@ public class Commit {
      * The repository this commit belongs to.
      */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "repository_id")
+    @JoinColumn(name = "repository_id", nullable = false)
     @ToString.Exclude
     private Repository repository;
 
