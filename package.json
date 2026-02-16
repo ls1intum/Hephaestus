@@ -73,7 +73,7 @@
 		"@biomejs/biome": "2.3.12",
 		"@commitlint/cli": "19.8.1",
 		"@commitlint/config-conventional": "19.8.1",
-		"@nats-io/jetstream": "3.3.0",
+		"@nats-io/jetstream": "3.3.1",
 		"@nats-io/transport-node": "3.3.0",
 		"@openapitools/openapi-generator-cli": "2.28.0",
 		"@types/node": "22.19.3",
