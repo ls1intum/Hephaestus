@@ -31,7 +31,7 @@ services:
   # NATS Server - Message queue for webhook events (internal only)
   # ---------------------------------------------------------------------------
   nats-server:
-    image: nats:2.10-alpine
+    image: nats:2.12-alpine@sha256:31c6ed3b2da61645aaa3ad9217b5a52b34b6ebd555ecb71259cd7723c59ae1ea
     restart: unless-stopped
     command: ["--config", "/etc/nats/nats-server.conf"]
     volumes:
@@ -82,7 +82,7 @@ services:
   # Keycloak PostgreSQL - Database for Keycloak (internal only)
   # ---------------------------------------------------------------------------
   keycloak-db:
-    image: postgres:16-alpine
+    image: postgres:16-alpine@sha256:97ff59a4e30e08d1c11bdcd9455e7832368c0572b576c9092cde2df4ae5552a3
     restart: unless-stopped
     environment:
       POSTGRES_DB: keycloak
@@ -156,7 +156,7 @@ services:
   # Postfix - Email relay (internal only)
   # ---------------------------------------------------------------------------
   postfix:
-    image: ghcr.io/ls1admin/postfix:latest
+    image: ghcr.io/ls1admin/postfix:latest@sha256:c7d7f2dab71992b7a137e787573258a51ea7936f4b4a1786d0de0254acdde302
     restart: unless-stopped
     hostname: ${PREVIEW_DOMAIN:?Required}
     logging:
