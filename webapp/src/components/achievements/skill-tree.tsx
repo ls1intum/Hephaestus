@@ -13,7 +13,7 @@ import { useEffect, useMemo, useSyncExternalStore } from "react";
 import type { Achievement } from "@/api/types.gen";
 import { SkillEdge } from "./AchievementEdge.tsx";
 import { AchievementNode } from "./AchievementNode.tsx";
-import { AvatarNode } from "./avatar-node";
+import { AvatarNodeProps } from "./AvatarNode.tsx";
 import { type AchievementNodeData, generateSkillTreeData } from "./data";
 
 const nodeTypes: NodeTypes = {

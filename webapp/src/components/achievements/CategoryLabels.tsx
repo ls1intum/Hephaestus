@@ -1,15 +1,5 @@
-import { CircleDot, GitCommit, GitPullRequest, Layers, MessageSquare } from "lucide-react";
-import type React from "react";
-import { categoryMeta } from "./data";
-import type { AchievementCategory } from "./styles.ts";
-
-const categoryIcons: Record<AchievementCategory, React.ElementType> = {
-	commits: GitCommit,
-	pull_requests: GitPullRequest,
-	communication: MessageSquare,
-	issues: CircleDot,
-	milestones: Layers,
-};
+import type { AchievementCategory } from "@/components/achievements/types.ts";
+import { categoryMeta, defaultCategoryIcons } from "./styles.ts";
 
 export function CategoryLabels() {
 	// Position labels around the outer edge of the skill tree
@@ -21,7 +11,7 @@ export function CategoryLabels() {
 		<div className="absolute inset-0 pointer-events-none">
 			{mainCategories.map(([key, meta]) => {
 				const category = key as AchievementCategory;
-				const Icon = categoryIcons[category];
+				const Icon = defaultCategoryIcons[category];
 				const radians = (meta.angle * Math.PI) / 180;
 
 				// Calculate position

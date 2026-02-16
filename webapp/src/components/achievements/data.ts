@@ -31,41 +31,6 @@ export interface AchievementNodeData {
 	[key: string]: unknown;
 }
 
-/**
- * Category metadata for positioning achievements on the skill tree.
- * Keys match backend enum values (lowercase).
- */
-export const categoryMeta: Record<
-	AchievementCategory,
-	{ name: string; angle: number; description: string }
-> = {
-	commits: {
-		name: "Commits",
-		angle: 270, // Top (12 o'clock)
-		description: "Track your code contributions",
-	},
-	pull_requests: {
-		name: "Pull Requests",
-		angle: 342, // Top-right (2 o'clock)
-		description: "Submit and merge code changes",
-	},
-	communication: {
-		name: "Communication",
-		angle: 54, // Right (4 o'clock)
-		description: "Reviews, comments, and discussions",
-	},
-	issues: {
-		name: "Issues",
-		angle: 126, // Bottom-right (7 o'clock)
-		description: "Report and track work items",
-	},
-	milestones: {
-		name: "Milestones",
-		angle: 198, // Bottom-left (9 o'clock)
-		description: "Combined achievements",
-	},
-};
-
 /** Ring distances based on achievement level (1-7) */
 const levelDistances: Record<number, number> = {
 	1: 180,

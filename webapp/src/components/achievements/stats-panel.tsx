@@ -8,8 +8,7 @@ import {
 	Trophy,
 } from "lucide-react";
 import type React from "react";
-import type { Achievement } from "@/api/types.gen";
-import type { AchievementCategory } from "@/components/achievements/types";
+import type { AchievementCategory, UIAchievement } from "@/components/achievements/types";
 import { Progress, ProgressIndicator, ProgressTrack } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { calculateStats, categoryMeta } from "./data";
@@ -23,7 +22,7 @@ const categoryIcons: Record<AchievementCategory, React.ElementType> = {
 };
 
 export interface StatsPanelProps {
-	achievements: Achievement[];
+	achievements: UIAchievement[];
 }
 
 export function StatsPanel({ achievements }: StatsPanelProps) {

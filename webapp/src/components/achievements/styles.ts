@@ -92,3 +92,53 @@ export const statusIcons = {
 	unlocked: UnlockIcon,
 	hidden: EyeClosedIcon,
 } as const satisfies Record<AchievementStatus, React.ElementType>;
+
+// ===== Achievement Label Styling ===== //
+
+/** Skill tree radial angles with clock direction annotations */
+const skillTreeAngles = {
+	TOP: 270, // Top (12 o'clock)
+	TOP_RIGHT: 342, // Top-right (2 o'clock)
+	RIGHT: 54, // Right (4 o'clock)
+	BOTTOM_RIGHT: 126, // Bottom-right (7 o'clock)
+	BOTTOM_LEFT: 198, // Bottom-left (9 o'clock)
+} as const satisfies Record<string, number>;
+
+/**
+ * Category metadata for positioning achievements on the skill tree.
+ * Keys match backend enum values (lowercase).
+ */
+export const categoryMeta = {
+	commits: {
+		name: "Commits",
+		angle: skillTreeAngles.TOP,
+		description: "Track your code contributions",
+	},
+	pull_requests: {
+		name: "Pull Requests",
+		angle: skillTreeAngles.TOP_RIGHT,
+		description: "Submit and merge code changes",
+	},
+	communication: {
+		name: "Communication",
+		angle: skillTreeAngles.RIGHT,
+		description: "Reviews, comments, and discussions",
+	},
+	issues: {
+		name: "Issues",
+		angle: skillTreeAngles.BOTTOM_RIGHT,
+		description: "Report and track work items",
+	},
+	milestones: {
+		name: "Milestones",
+		angle: skillTreeAngles.BOTTOM_LEFT,
+		description: "Combined achievements",
+	},
+} as const satisfies Record<
+	AchievementCategory,
+	{
+		name: string;
+		angle: number;
+		description: string;
+	}
+>;

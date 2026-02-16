@@ -4,7 +4,7 @@ import { ReactFlowProvider } from "@xyflow/react";
 import { useState } from "react";
 import { getUserProfileOptions } from "@/api/@tanstack/react-query.gen";
 import { AchievementsListView } from "@/components/achievements/AchievementsListView.tsx";
-import { CategoryLabels } from "@/components/achievements/category-labels";
+import { CategoryLabels } from "@/components/achievements/CategoryLabels.tsx";
 import { Header } from "@/components/achievements/header";
 import { SkillTree } from "@/components/achievements/skill-tree";
 import { StatsPanel } from "@/components/achievements/stats-panel";

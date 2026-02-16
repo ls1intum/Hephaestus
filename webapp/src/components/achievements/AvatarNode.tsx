@@ -10,12 +10,12 @@ export type AvatarNodeProps = Node<
 >;
 
 export function AvatarNode({ data }: AvatarNodeProps) {
-	const { level, leaguePoints } = data;
+	const { level, leaguePoints, className } = data;
 	const rawTier = getLeagueTier(leaguePoints);
 	const leagueTier = rawTier === "none" ? "bronze" : rawTier;
 
 	return (
-		<div className="relative group">
+		<div className={cn(className, "relative group")}>
 			{/* Pulse effect */}
 			<div className="absolute inset-0 rounded-full bg-primary/20 animate-ping opacity-75 duration-3000 pointer-events-none" />
 
