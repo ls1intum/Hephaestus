@@ -1,14 +1,10 @@
-import { BaseEdge, type EdgeProps } from "@xyflow/react";
-import { memo } from "react";
+import { BaseEdge, type Edge, type EdgeProps } from "@xyflow/react";
 
-interface SkillEdgeData {
-	active?: boolean;
-}
+type AchievementEdge = Edge<{ isEnabled: boolean }, "achievement">;
 
-function SkillEdgeComponent(props: EdgeProps) {
+export function AchievementEdge(props: EdgeProps<AchievementEdge>) {
 	const { sourceX, sourceY, targetX, targetY, data } = props;
-	const edgeData = data as SkillEdgeData | undefined;
-	const isActive = edgeData?.active ?? false;
+	const isEnabled = data?.isEnabled ?? false;
 
 	// Create a straight line path (cleaner for radial layout)
 	const edgePath = `M ${sourceX} ${sourceY} L ${targetX} ${targetY}`;
@@ -16,7 +12,7 @@ function SkillEdgeComponent(props: EdgeProps) {
 	return (
 		<>
 			{/* Glow effect for active edges */}
-			{isActive && (
+			{isEnabled && (
 				<BaseEdge
 					path={edgePath}
 					style={{
@@ -30,12 +26,12 @@ function SkillEdgeComponent(props: EdgeProps) {
 			<BaseEdge
 				path={edgePath}
 				style={{
-					stroke: isActive ? "var(--edge-active)" : "var(--edge-inactive)",
-					strokeWidth: isActive ? 1.5 : 1,
+					stroke: isEnabled ? "var(--edge-active)" : "var(--edge-inactive)",
+					strokeWidth: isEnabled ? 1.5 : 1,
 				}}
 			/>
 			{/* Animated particle for active edges */}
-			{isActive && (
+			{isEnabled && (
 				<circle r="2.5" fill="var(--edge-active)">
 					<animateMotion dur="3s" repeatCount="indefinite" path={edgePath} />
 				</circle>
@@ -43,5 +39,3 @@ function SkillEdgeComponent(props: EdgeProps) {
 		</>
 	);
 }
-
-export const SkillEdge = memo(SkillEdgeComponent);

@@ -11,10 +11,10 @@ import {
 import "@xyflow/react/dist/style.css";
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 import type { Achievement } from "@/api/types.gen";
+import { SkillEdge } from "./AchievementEdge.tsx";
 import { AchievementNode } from "./AchievementNode.tsx";
 import { AvatarNode } from "./avatar-node";
 import { type AchievementNodeData, generateSkillTreeData } from "./data";
-import { SkillEdge } from "./skill-edge";
 
 const nodeTypes: NodeTypes = {
 	achievement: AchievementNode,

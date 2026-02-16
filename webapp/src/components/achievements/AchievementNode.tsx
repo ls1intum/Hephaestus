@@ -117,5 +117,3 @@ export function AchievementNode({ data }: NodeProps<AchievementNode>) {
 		</>
 	);
 }
-
-// export AchievementNode = memo(AchievementNode);

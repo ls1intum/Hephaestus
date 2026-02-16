@@ -84,29 +84,6 @@ export const rarityStylingClasses = {
 		"bg-node-mythic border-node-mythic shadow-[0_0_30px_rgba(var(--shadow-rgb),0.6),0_0_60px_rgba(var(--shadow-rgb),0.3),inset_0_0_20px_rgba(var(--shadow-rgb),0.2)]",
 } as const satisfies Record<AchievementRarity, string>;
 
-// Moved from original function from AchievementNode.tsx
-//
-// const getStatusClasses = () => {
-// 	switch (achievementData.status) {
-// 		case "unlocked":
-// 			if (achievementData.tier === "mythic") {
-// 				return "bg-node-mythic border-node-mythic shadow-[0_0_30px_rgba(var(--shadow-rgb),0.6),0_0_60px_rgba(var(--shadow-rgb),0.3),inset_0_0_20px_rgba(var(--shadow-rgb),0.2)]";
-// 			}
-// 			if (achievementData.tier === "legendary") {
-// 				return "bg-node-legendary border-node-legendary shadow-[0_0_30px_rgba(var(--shadow-rgb),0.6),0_0_60px_rgba(var(--shadow-rgb),0.3),inset_0_0_20px_rgba(var(--shadow-rgb),0.2)]";
-// 			}
-// 			if (achievementData.tier === "epic") {
-// 				return "bg-node-epic border-node-epic shadow-[0_0_25px_rgba(var(--shadow-rgb),0.4),0_0_50px_rgba(var(--shadow-rgb),0.2),inset_0_0_15px_rgba(var(--shadow-rgb),0.15)]";
-// 			}
-// 			return "bg-node-unlocked border-node-unlocked shadow-[0_0_15px_rgba(var(--shadow-rgb),0.3),0_0_30px_rgba(var(--shadow-rgb),0.15)]";
-// 		case "available":
-// 			return "bg-node-available/80 border-node-available/70 shadow-[0_0_12px_rgba(var(--shadow-rgb),0.15)]";
-// 		// TODO: Add locked state here!!
-// 		default:
-// 			return "bg-node-locked border-node-locked/50 opacity-40";
-// 	}
-// };
-
 // ===== Achievement Status Styling ===== //
 
 export const statusIcons = {
