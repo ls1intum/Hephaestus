@@ -129,6 +129,14 @@ public class GitHubPushMessageHandler extends GitHubMessageHandler<GitHubPushEve
     /**
      * Process commits using local git clone/fetch.
      * Provides complete file-level change information.
+     * <p>
+     * KNOWN LIMITATION: {@code ensureRepository()} (which may clone a repo
+     * from scratch — potentially minutes for large repos) runs inside the
+     * {@link de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler}'s
+     * {@code TransactionTemplate} block, holding a DB connection for the
+     * entire duration. Under high push event volume with many uncached repos,
+     * this could exhaust the HikariCP connection pool. In practice, repos
+     * are cloned once and then only fetched (fast), limiting the impact.
      */
     private void processCommitsViaLocalGit(GitHubPushEventDTO event, Repository repository) {
         String repoName = sanitizeForLog(repository.getNameWithOwner());
@@ -199,7 +207,9 @@ public class GitHubPushMessageHandler extends GitHubMessageHandler<GitHubPushEve
         for (var webhookCommit : event.commits()) {
             String message = extractHeadline(webhookCommit.message());
             String messageBody = extractBody(webhookCommit.message());
-            String htmlUrl = webhookCommit.url();
+            // webhookCommit.url() returns the API URL (api.github.com/...),
+            // not the browser-facing HTML URL; build it ourselves.
+            String htmlUrl = buildCommitUrl(repository.getNameWithOwner(), webhookCommit.sha());
             Instant authoredAt = webhookCommit.timestamp() != null ? webhookCommit.timestamp() : Instant.now();
 
             // Count changed files from the file lists
@@ -298,7 +308,15 @@ public class GitHubPushMessageHandler extends GitHubMessageHandler<GitHubPushEve
             commitRepository.save(commit);
             return true;
         } catch (DataIntegrityViolationException e) {
-            // Concurrent insert won the race — benign, skip
+            // Concurrent insert won the race — benign, skip.
+            //
+            // KNOWN LIMITATION: this exception marks the enclosing Spring
+            // transaction as rollback-only. Subsequent save() calls in the
+            // same TransactionTemplate block will fail. In practice, this
+            // race requires two instances processing the same NATS push
+            // message simultaneously, which NATS consumer groups prevent.
+            // The existsByShaAndRepositoryId fast-path above prevents the
+            // vast majority of duplicates; this catch is a narrow safety net.
             log.debug("Commit already persisted concurrently: sha={}, repo={}", info.sha(), repository.getId());
             return false;
         }

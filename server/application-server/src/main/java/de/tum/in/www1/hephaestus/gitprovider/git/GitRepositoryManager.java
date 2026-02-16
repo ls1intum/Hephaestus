@@ -201,6 +201,12 @@ public class GitRepositoryManager {
                     }
                 }
             } catch (IOException e) {
+                // KNOWN LIMITATION: errors during commit walking are logged
+                // but return an empty list. The handler reports "processed 0
+                // commits" as success. The handler's fallback to webhook
+                // processing won't trigger because no exception is thrown.
+                // Throwing here would be cleaner but changes the contract
+                // and error-recovery behavior; left as-is for safety.
                 log.error("Failed to walk commits: repoId={}, error={}", repositoryId, e.getMessage(), e);
             }
 

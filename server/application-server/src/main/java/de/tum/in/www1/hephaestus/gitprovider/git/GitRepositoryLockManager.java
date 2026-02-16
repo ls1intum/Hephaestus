@@ -145,6 +145,14 @@ public class GitRepositoryLockManager {
      * Evict idle locks (not currently held by any thread) when the map
      * exceeds {@link #MAX_LOCKS}. Best-effort: races are harmless because
      * {@code computeIfAbsent} will simply recreate the lock on next access.
+     * <p>
+     * KNOWN LIMITATION: eviction can remove a lock entry between another
+     * thread's {@code getLock()} fast-path miss and its
+     * {@code computeIfAbsent}, creating two distinct lock objects for the
+     * same repository. This is theoretical — it requires &gt;10,000 repos
+     * AND eviction running at the exact nanosecond another thread acquires
+     * the same lock. At that scale, consider switching to distributed
+     * locking (pg_advisory_lock or Redis).
      */
     private void evictIdleLocksIfNeeded() {
         if (locks.size() < MAX_LOCKS) {
