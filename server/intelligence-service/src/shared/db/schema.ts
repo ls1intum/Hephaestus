@@ -373,6 +373,7 @@ export const gitCommit = pgTable(
 	(table) => [
 		index("idx_git_commit_author_id").using("btree", table.authorId.asc().nullsLast()),
 		index("idx_git_commit_authored_at").using("btree", table.authoredAt.asc().nullsLast()),
+		index("idx_git_commit_committer_id").using("btree", table.committerId.asc().nullsLast()),
 		index("idx_git_commit_repository_id").using("btree", table.repositoryId.asc().nullsLast()),
 		foreignKey({
 			columns: [table.repositoryId],
