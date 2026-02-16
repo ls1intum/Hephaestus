@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.17.0](https://github.com/ls1intum/Hephaestus/compare/v0.16.0...v0.17.0) (2026-02-16)
+
+### 🚀 Features
+
+* **server:** add GitHub Projects V2 synchronization support ([#692](https://github.com/ls1intum/Hephaestus/issues/692)) ([fa602b3](https://github.com/ls1intum/Hephaestus/commit/fa602b387ecae0bdbd322c2f51ff785fc6a8077e))
+
 ## [0.16.0](https://github.com/ls1intum/Hephaestus/compare/v0.15.0...v0.16.0) (2026-02-15)
 
 ### 🚀 Features
