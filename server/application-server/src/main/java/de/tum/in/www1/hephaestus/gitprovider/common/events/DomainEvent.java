@@ -489,7 +489,9 @@ public final class DomainEvent {
         extends Event, ContextualEvent
         permits ProjectStatusUpdateCreated, ProjectStatusUpdateUpdated, ProjectStatusUpdateDeleted
     {
+        @Nullable
         EventPayload.ProjectStatusUpdateData statusUpdate();
+
         Long projectId();
     }
 

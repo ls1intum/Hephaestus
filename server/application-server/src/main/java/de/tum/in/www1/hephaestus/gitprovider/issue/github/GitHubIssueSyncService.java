@@ -31,6 +31,7 @@ import de.tum.in.www1.hephaestus.gitprovider.issue.github.dto.IssueWithComments;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.github.GitHubIssueCommentProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.github.GitHubIssueCommentSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.github.dto.GitHubIssueCommentEventDTO.GitHubCommentDTO;
+import de.tum.in.www1.hephaestus.gitprovider.project.github.GitHubProjectItemSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.sync.SyncResult;
@@ -77,7 +78,7 @@ public class GitHubIssueSyncService {
     private final GitHubIssueProcessor issueProcessor;
     private final GitHubIssueCommentProcessor commentProcessor;
     private final GitHubIssueCommentSyncService commentSyncService;
-    private final de.tum.in.www1.hephaestus.gitprovider.project.github.GitHubProjectItemSyncService projectItemSyncService;
+    private final GitHubProjectItemSyncService projectItemSyncService;
     private final BackfillStateProvider backfillStateProvider;
     private final TransactionTemplate transactionTemplate;
     private final GitHubSyncProperties syncProperties;
