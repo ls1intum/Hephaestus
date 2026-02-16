@@ -46,6 +46,7 @@ import org.springframework.lang.NonNull;
     indexes = {
         @Index(name = "idx_git_commit_repository_id", columnList = "repository_id"),
         @Index(name = "idx_git_commit_author_id", columnList = "author_id"),
+        @Index(name = "idx_git_commit_committer_id", columnList = "committer_id"),
         @Index(name = "idx_git_commit_authored_at", columnList = "authored_at"),
     }
 )

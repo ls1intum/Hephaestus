@@ -1,6 +1,10 @@
 package de.tum.in.www1.hephaestus.gitprovider.repository.github;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.JITTER_FACTOR;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_INITIAL_BACKOFF;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.ExponentialBackoff;
@@ -12,6 +16,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoor
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubTransportErrors;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHOrganization;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHRepository;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHRepositoryOwner;
@@ -29,6 +34,8 @@ import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import reactor.core.publisher.Mono;
+import reactor.util.retry.Retry;
 
 /**
  * Service for syncing GitHub repository metadata via GraphQL API.
@@ -76,6 +83,13 @@ public class GitHubRepositorySyncService {
      */
     @Transactional
     public Optional<Repository> syncRepository(Long scopeId, String nameWithOwner) {
+        return syncRepositoryWithRetry(scopeId, nameWithOwner, 0);
+    }
+
+    /**
+     * Internal implementation with retry counter to prevent infinite recursion.
+     */
+    private Optional<Repository> syncRepositoryWithRetry(Long scopeId, String nameWithOwner, int retryAttempt) {
         String safeNameWithOwner = sanitizeForLog(nameWithOwner);
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(nameWithOwner);
         if (parsedName.isEmpty()) {
@@ -91,11 +105,23 @@ public class GitHubRepositorySyncService {
 
         try {
             HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
-            ClientGraphQlResponse response = client
-                .documentName(QUERY_DOCUMENT)
-                .variable("owner", repoOwner)
-                .variable("name", repoName)
-                .execute()
+            ClientGraphQlResponse response = Mono.defer(() ->
+                client.documentName(QUERY_DOCUMENT).variable("owner", repoOwner).variable("name", repoName).execute()
+            )
+                .retryWhen(
+                    Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                        .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                        .jitter(JITTER_FACTOR)
+                        .filter(GitHubTransportErrors::isTransportError)
+                        .doBeforeRetry(signal ->
+                            log.warn(
+                                "Retrying repository sync after transport error: repoName={}, attempt={}, error={}",
+                                safeNameWithOwner,
+                                signal.totalRetries() + 1,
+                                signal.failure().getMessage()
+                            )
+                        )
+                )
                 .block(syncProperties.graphqlTimeout());
 
             if (response == null || !response.isValid()) {
@@ -105,7 +131,7 @@ public class GitHubRepositorySyncService {
                         graphQlSyncHelper.handleGraphQlClassification(
                             new GraphQlClassificationContext(
                                 classification,
-                                0,
+                                retryAttempt,
                                 MAX_RETRY_ATTEMPTS,
                                 "repository sync",
                                 "repoName",
@@ -114,7 +140,7 @@ public class GitHubRepositorySyncService {
                             )
                         )
                     ) {
-                        return syncRepository(scopeId, nameWithOwner);
+                        return syncRepositoryWithRetry(scopeId, nameWithOwner, retryAttempt + 1);
                     }
                     return Optional.empty();
                 }
@@ -237,7 +263,7 @@ public class GitHubRepositorySyncService {
             graphQlSyncHelper.handleGraphQlClassification(
                 new GraphQlClassificationContext(
                     classification,
-                    0,
+                    retryAttempt,
                     MAX_RETRY_ATTEMPTS,
                     "repository sync",
                     "repoName",

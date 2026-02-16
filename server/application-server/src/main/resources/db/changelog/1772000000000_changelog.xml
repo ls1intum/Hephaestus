@@ -210,4 +210,13 @@
         </createIndex>
     </changeSet>
 
+    <changeSet id="1772000000000-13" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not><indexExists indexName="idx_git_commit_committer_id"/></not>
+        </preConditions>
+        <createIndex tableName="git_commit" indexName="idx_git_commit_committer_id">
+            <column name="committer_id"/>
+        </createIndex>
+    </changeSet>
+
 </databaseChangeLog>

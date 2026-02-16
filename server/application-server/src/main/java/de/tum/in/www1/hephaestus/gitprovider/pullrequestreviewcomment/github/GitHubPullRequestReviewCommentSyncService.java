@@ -3,8 +3,12 @@ package de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.github;
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlErrorUtils.isNotFoundError;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.DEFAULT_PAGE_SIZE;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.JITTER_FACTOR;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.LARGE_PAGE_SIZE;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.MAX_PAGINATION_PAGES;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_INITIAL_BACKOFF;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
@@ -17,6 +21,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoor
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubTransportErrors;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHCommentAuthorAssociation;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHDiffSide;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPageInfo;
@@ -45,6 +50,8 @@ import org.springframework.graphql.client.FieldAccessException;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import reactor.core.publisher.Mono;
+import reactor.util.retry.Retry;
 
 /**
  * Service for synchronizing GitHub pull request review comments via GraphQL API.
@@ -164,14 +171,34 @@ public class GitHubPullRequestReviewCommentSyncService {
                     break;
                 }
 
-                ClientGraphQlResponse graphQlResponse = client
-                    .documentName(GET_PR_REVIEW_COMMENTS_DOCUMENT)
-                    .variable("owner", owner)
-                    .variable("name", name)
-                    .variable("number", pullRequest.getNumber())
-                    .variable("first", DEFAULT_PAGE_SIZE)
-                    .variable("after", cursor)
-                    .execute()
+                final String currentCursor = cursor;
+                final int currentPage = pageCount;
+
+                ClientGraphQlResponse graphQlResponse = Mono.defer(() ->
+                    client
+                        .documentName(GET_PR_REVIEW_COMMENTS_DOCUMENT)
+                        .variable("owner", owner)
+                        .variable("name", name)
+                        .variable("number", pullRequest.getNumber())
+                        .variable("first", DEFAULT_PAGE_SIZE)
+                        .variable("after", currentCursor)
+                        .execute()
+                )
+                    .retryWhen(
+                        Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                            .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                            .jitter(JITTER_FACTOR)
+                            .filter(GitHubTransportErrors::isTransportError)
+                            .doBeforeRetry(signal ->
+                                log.warn(
+                                    "Retrying review comment sync after transport error: prNumber={}, page={}, attempt={}, error={}",
+                                    pullRequest.getNumber(),
+                                    currentPage,
+                                    signal.totalRetries() + 1,
+                                    signal.failure().getMessage()
+                                )
+                            )
+                    )
                     .block(syncProperties.extendedGraphqlTimeout());
 
                 if (graphQlResponse == null || !graphQlResponse.isValid()) {
@@ -444,12 +471,32 @@ public class GitHubPullRequestReviewCommentSyncService {
             }
 
             try {
-                ClientGraphQlResponse response = client
-                    .documentName(GET_THREAD_COMMENTS_DOCUMENT)
-                    .variable("threadId", threadNodeId)
-                    .variable("first", LARGE_PAGE_SIZE)
-                    .variable("after", cursor)
-                    .execute()
+                final String currentCursor = cursor;
+                final int currentPage = fetchedPages;
+
+                ClientGraphQlResponse response = Mono.defer(() ->
+                    client
+                        .documentName(GET_THREAD_COMMENTS_DOCUMENT)
+                        .variable("threadId", threadNodeId)
+                        .variable("first", LARGE_PAGE_SIZE)
+                        .variable("after", currentCursor)
+                        .execute()
+                )
+                    .retryWhen(
+                        Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                            .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                            .jitter(JITTER_FACTOR)
+                            .filter(GitHubTransportErrors::isTransportError)
+                            .doBeforeRetry(signal ->
+                                log.warn(
+                                    "Retrying thread comments fetch after transport error: threadId={}, page={}, attempt={}, error={}",
+                                    threadNodeId,
+                                    currentPage,
+                                    signal.totalRetries() + 1,
+                                    signal.failure().getMessage()
+                                )
+                            )
+                    )
                     .block(syncProperties.graphqlTimeout());
 
                 if (response == null || !response.isValid()) {
@@ -986,14 +1033,34 @@ public class GitHubPullRequestReviewCommentSyncService {
                     break;
                 }
 
-                ClientGraphQlResponse graphQlResponse = client
-                    .documentName(GET_PR_REVIEW_COMMENTS_DOCUMENT)
-                    .variable("owner", owner)
-                    .variable("name", name)
-                    .variable("number", pullRequest.getNumber())
-                    .variable("first", DEFAULT_PAGE_SIZE)
-                    .variable("after", cursor)
-                    .execute()
+                final String currentCursor = cursor;
+                final int currentPage = pageCount;
+
+                ClientGraphQlResponse graphQlResponse = Mono.defer(() ->
+                    client
+                        .documentName(GET_PR_REVIEW_COMMENTS_DOCUMENT)
+                        .variable("owner", owner)
+                        .variable("name", name)
+                        .variable("number", pullRequest.getNumber())
+                        .variable("first", DEFAULT_PAGE_SIZE)
+                        .variable("after", currentCursor)
+                        .execute()
+                )
+                    .retryWhen(
+                        Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                            .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                            .jitter(JITTER_FACTOR)
+                            .filter(GitHubTransportErrors::isTransportError)
+                            .doBeforeRetry(signal ->
+                                log.warn(
+                                    "Retrying remaining thread sync after transport error: prNumber={}, page={}, attempt={}, error={}",
+                                    pullRequest.getNumber(),
+                                    currentPage,
+                                    signal.totalRetries() + 1,
+                                    signal.failure().getMessage()
+                                )
+                            )
+                    )
                     .block(syncProperties.extendedGraphqlTimeout());
 
                 if (graphQlResponse == null || !graphQlResponse.isValid()) {

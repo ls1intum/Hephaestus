@@ -658,10 +658,33 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
                 commitRepository.existsByShaAndRepositoryId("sha1aabbccdd112233445566778899aabbccddeeff", 100L)
             ).thenReturn(false);
 
+            // After upsertCommit, findByShaAndRepositoryId must return a Commit entity for file changes
+            var persistedCommit = mock(de.tum.in.www1.hephaestus.gitprovider.commit.Commit.class);
+            when(
+                commitRepository.findByShaAndRepositoryId("sha1aabbccdd112233445566778899aabbccddeeff", 100L)
+            ).thenReturn(Optional.of(persistedCommit));
+
             invokeHandleEvent(event);
 
-            // Should save the commit entity (with file changes cascaded)
-            verify(commitRepository).save(any());
+            // Should upsert the commit via native SQL
+            verify(commitRepository).upsertCommit(
+                eq("sha1aabbccdd112233445566778899aabbccddeeff"),
+                eq("msg"),
+                any(),
+                anyString(),
+                any(),
+                any(),
+                eq(10),
+                eq(0),
+                eq(1),
+                any(),
+                eq(100L),
+                any(),
+                any()
+            );
+            // Should fetch the persisted commit and save with file changes
+            verify(commitRepository).findByShaAndRepositoryId("sha1aabbccdd112233445566778899aabbccddeeff", 100L);
+            verify(commitRepository).save(persistedCommit);
         }
 
         @Test
@@ -703,6 +726,21 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
 
             invokeHandleEvent(event);
 
+            verify(commitRepository, never()).upsertCommit(
+                anyString(),
+                anyString(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                anyLong(),
+                any(),
+                any()
+            );
             verify(commitRepository, never()).save(any());
         }
     }

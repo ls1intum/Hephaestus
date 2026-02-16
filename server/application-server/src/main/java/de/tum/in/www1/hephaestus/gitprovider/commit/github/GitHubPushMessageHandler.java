@@ -17,7 +17,6 @@ import java.time.Instant;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -257,10 +256,11 @@ public class GitHubPushMessageHandler extends GitHubMessageHandler<GitHubPushEve
     /**
      * Process a single commit from local git info.
      * <p>
-     * Uses optimistic insert: attempts {@code save()} and catches
-     * {@link DataIntegrityViolationException} from the unique constraint
-     * (sha, repository_id), treating it as a benign concurrent insert.
-     * This avoids the check-then-act race of {@code existsBy...} + {@code save}.
+     * Uses native {@code INSERT ... ON CONFLICT DO UPDATE} via
+     * {@link CommitRepository#upsertCommit} for the commit row, then fetches
+     * the persisted entity to attach file changes. This avoids the
+     * {@code DataIntegrityViolationException} that would poison the
+     * enclosing Spring transaction on duplicate inserts.
      */
     private boolean processCommitInfo(GitRepositoryManager.CommitInfo info, Repository repository) {
         // Fast-path: skip if already persisted (avoid building entity graph)
@@ -268,58 +268,47 @@ public class GitHubPushMessageHandler extends GitHubMessageHandler<GitHubPushEve
             return false;
         }
 
-        Commit commit = new Commit();
-        commit.setSha(info.sha());
-        commit.setMessage(info.message());
-        commit.setMessageBody(info.messageBody());
-        commit.setHtmlUrl(buildCommitUrl(repository.getNameWithOwner(), info.sha()));
-        commit.setAuthoredAt(info.authoredAt());
-        commit.setCommittedAt(info.committedAt());
-        commit.setAdditions(info.additions());
-        commit.setDeletions(info.deletions());
-        commit.setChangedFiles(info.changedFiles());
-        commit.setRepository(repository);
-        commit.setLastSyncAt(Instant.now());
+        // Resolve author/committer IDs by email
+        Long authorId = resolveUserIdByEmail(info.authorEmail());
+        Long committerId = resolveUserIdByEmail(info.committerEmail());
 
-        // Try to resolve author by email
-        if (info.authorEmail() != null) {
-            userRepository.findByEmail(info.authorEmail()).ifPresent(commit::setAuthor);
+        // Upsert commit via native SQL (no exception on conflict)
+        commitRepository.upsertCommit(
+            info.sha(),
+            info.message(),
+            info.messageBody(),
+            buildCommitUrl(repository.getNameWithOwner(), info.sha()),
+            info.authoredAt(),
+            info.committedAt(),
+            info.additions(),
+            info.deletions(),
+            info.changedFiles(),
+            Instant.now(),
+            repository.getId(),
+            authorId,
+            committerId
+        );
+
+        // Attach file changes if present
+        if (!info.fileChanges().isEmpty()) {
+            Commit commit = commitRepository.findByShaAndRepositoryId(info.sha(), repository.getId()).orElse(null);
+            if (commit != null) {
+                for (GitRepositoryManager.FileChange fc : info.fileChanges()) {
+                    CommitFileChange fileChange = new CommitFileChange();
+                    fileChange.setFilename(fc.filename());
+                    fileChange.setChangeType(CommitFileChange.fromGitChangeType(fc.changeType()));
+                    fileChange.setAdditions(fc.additions());
+                    fileChange.setDeletions(fc.deletions());
+                    fileChange.setChanges(fc.changes());
+                    fileChange.setPreviousFilename(fc.previousFilename());
+                    fileChange.setPatch(fc.patch());
+                    commit.addFileChange(fileChange);
+                }
+                commitRepository.save(commit);
+            }
         }
 
-        // Try to resolve committer by email
-        if (info.committerEmail() != null) {
-            userRepository.findByEmail(info.committerEmail()).ifPresent(commit::setCommitter);
-        }
-
-        // Process file changes
-        for (GitRepositoryManager.FileChange fc : info.fileChanges()) {
-            CommitFileChange fileChange = new CommitFileChange();
-            fileChange.setFilename(fc.filename());
-            fileChange.setChangeType(CommitFileChange.fromGitChangeType(fc.changeType()));
-            fileChange.setAdditions(fc.additions());
-            fileChange.setDeletions(fc.deletions());
-            fileChange.setChanges(fc.changes());
-            fileChange.setPreviousFilename(fc.previousFilename());
-            fileChange.setPatch(fc.patch());
-            commit.addFileChange(fileChange);
-        }
-
-        try {
-            commitRepository.save(commit);
-            return true;
-        } catch (DataIntegrityViolationException e) {
-            // Concurrent insert won the race — benign, skip.
-            //
-            // KNOWN LIMITATION: this exception marks the enclosing Spring
-            // transaction as rollback-only. Subsequent save() calls in the
-            // same TransactionTemplate block will fail. In practice, this
-            // race requires two instances processing the same NATS push
-            // message simultaneously, which NATS consumer groups prevent.
-            // The existsByShaAndRepositoryId fast-path above prevents the
-            // vast majority of duplicates; this catch is a narrow safety net.
-            log.debug("Commit already persisted concurrently: sha={}, repo={}", info.sha(), repository.getId());
-            return false;
-        }
+        return true;
     }
 
     /**
@@ -332,6 +321,20 @@ public class GitHubPushMessageHandler extends GitHubMessageHandler<GitHubPushEve
         }
         return userRepository
             .findByLogin(login)
+            .map(u -> u.getId())
+            .orElse(null);
+    }
+
+    /**
+     * Resolve a user's database ID by email, returning null if not found.
+     */
+    @Nullable
+    private Long resolveUserIdByEmail(@Nullable String email) {
+        if (email == null || email.isBlank()) {
+            return null;
+        }
+        return userRepository
+            .findByEmail(email)
             .map(u -> u.getId())
             .orElse(null);
     }
