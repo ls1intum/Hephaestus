@@ -273,6 +273,37 @@ export const chatThread = pgTable(
 	],
 );
 
+export const commitFileChange = pgTable(
+	"commit_file_change",
+	{
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({
+			name: "commit_file_change_id_seq",
+			startWith: 1,
+			increment: 1,
+			cache: 1,
+		}),
+		filename: varchar({ length: 1024 }).notNull(),
+		changeType: varchar("change_type", { length: 32 }).notNull(),
+		additions: integer().default(0).notNull(),
+		deletions: integer().default(0).notNull(),
+		changes: integer().default(0).notNull(),
+		previousFilename: varchar("previous_filename", { length: 1024 }),
+		patch: text(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		commitId: bigint("commit_id", { mode: "number" }).notNull(),
+	},
+	(table) => [
+		index("idx_commit_file_change_commit_id").using("btree", table.commitId.asc().nullsLast()),
+		index("idx_commit_file_change_filename").using("btree", table.filename.asc().nullsLast()),
+		foreignKey({
+			columns: [table.commitId],
+			foreignColumns: [gitCommit.id],
+			name: "fk_commit_file_change_commit",
+		}).onDelete("cascade"),
+	],
+);
+
 export const document = pgTable(
 	"document",
 	{
@@ -307,6 +338,58 @@ export const document = pgTable(
 			name: "fk_document_workspace",
 		}).onDelete("cascade"),
 		primaryKey({ columns: [table.id, table.versionNumber], name: "documentPK" }),
+	],
+);
+
+export const gitCommit = pgTable(
+	"git_commit",
+	{
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({
+			name: "git_commit_id_seq",
+			startWith: 1,
+			increment: 1,
+			cache: 1,
+		}),
+		sha: varchar({ length: 40 }).notNull(),
+		message: varchar({ length: 1024 }).notNull(),
+		messageBody: text("message_body"),
+		htmlUrl: varchar("html_url", { length: 512 }),
+		authoredAt: timestamp("authored_at", { withTimezone: true, mode: "string" }).notNull(),
+		committedAt: timestamp("committed_at", { withTimezone: true, mode: "string" }).notNull(),
+		additions: integer().default(0).notNull(),
+		deletions: integer().default(0).notNull(),
+		changedFiles: integer("changed_files").default(0).notNull(),
+		lastSyncAt: timestamp("last_sync_at", { withTimezone: true, mode: "string" }),
+		createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }),
+		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		repositoryId: bigint("repository_id", { mode: "number" }).notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		authorId: bigint("author_id", { mode: "number" }),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		committerId: bigint("committer_id", { mode: "number" }),
+	},
+	(table) => [
+		index("idx_git_commit_author_id").using("btree", table.authorId.asc().nullsLast()),
+		index("idx_git_commit_authored_at").using("btree", table.authoredAt.asc().nullsLast()),
+		index("idx_git_commit_repository_id").using("btree", table.repositoryId.asc().nullsLast()),
+		foreignKey({
+			columns: [table.repositoryId],
+			foreignColumns: [repository.id],
+			name: "fk_git_commit_repository",
+		}).onDelete("cascade"),
+		foreignKey({
+			columns: [table.authorId],
+			foreignColumns: [user.id],
+			name: "fk_git_commit_author",
+		}).onDelete("set null"),
+		foreignKey({
+			columns: [table.committerId],
+			foreignColumns: [user.id],
+			name: "fk_git_commit_committer",
+		}).onDelete("set null"),
+		unique("uq_git_commit_sha_repository").on(table.sha, table.repositoryId),
 	],
 );
 

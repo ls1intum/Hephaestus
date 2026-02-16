@@ -72,6 +72,18 @@ erDiagram
         BIGINT workspace_id FK "NOT NULL"
     }
 
+    CommitFileChange {
+        BIGINT id PK
+        VARCHAR(1024) filename "NOT NULL"
+        VARCHAR(32) change_type "NOT NULL"
+        INTEGER additions "NOT NULL"
+        INTEGER deletions "NOT NULL"
+        INTEGER changes "NOT NULL"
+        VARCHAR(1024) previous_filename
+        TEXT patch
+        BIGINT commit_id FK "NOT NULL"
+    }
+
     Document {
         UUID id PK
         INTEGER version_number PK
@@ -81,6 +93,25 @@ erDiagram
         VARCHAR(255) title "NOT NULL"
         BIGINT user_id FK "NOT NULL"
         BIGINT workspace_id FK "NOT NULL"
+    }
+
+    GitCommit {
+        BIGINT id PK
+        VARCHAR(40) sha UK "NOT NULL"
+        VARCHAR(1024) message "NOT NULL"
+        TEXT message_body
+        VARCHAR(512) html_url
+        TIMESTAMPTZ authored_at "NOT NULL"
+        TIMESTAMPTZ committed_at "NOT NULL"
+        INTEGER additions "NOT NULL"
+        INTEGER deletions "NOT NULL"
+        INTEGER changed_files "NOT NULL"
+        TIMESTAMPTZ last_sync_at
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+        BIGINT repository_id FK,UK "NOT NULL"
+        BIGINT author_id FK
+        BIGINT committer_id FK
     }
 
     Issue {
@@ -354,35 +385,6 @@ erDiagram
         BIGINT resolved_by_id FK
     }
 
-    Commit {
-        BIGINT id PK
-        VARCHAR(40) sha "NOT NULL"
-        VARCHAR(1024) message "NOT NULL"
-        TEXT message_body
-        VARCHAR(512) html_url
-        TIMESTAMPTZ authored_at "NOT NULL"
-        TIMESTAMPTZ committed_at "NOT NULL"
-        INTEGER additions "NOT NULL"
-        INTEGER deletions "NOT NULL"
-        INTEGER changed_files "NOT NULL"
-        TIMESTAMPTZ last_sync_at
-        BIGINT repository_id FK
-        BIGINT author_id FK
-        BIGINT committer_id FK
-    }
-
-    CommitFileChange {
-        BIGINT id PK
-        VARCHAR(1024) filename "NOT NULL"
-        VARCHAR(32) change_type "NOT NULL"
-        INTEGER additions "NOT NULL"
-        INTEGER deletions "NOT NULL"
-        INTEGER changes "NOT NULL"
-        VARCHAR(1024) previous_filename
-        TEXT patch
-        BIGINT commit_id FK
-    }
-
     Repository {
         BIGINT id PK
         TIMESTAMPTZ created_at
@@ -542,6 +544,7 @@ erDiagram
     Workspace ||--|| ActivityEvent : has
     ChatMessage ||--|| ChatMessagePart : has
     ChatMessage ||--|| ChatThread : references
+    Repository ||--|| GitCommit : has
     Repository ||--|| Issue : has
     Repository ||--|| Label : labeled
     Repository ||--|| Milestone : has
@@ -558,18 +561,17 @@ erDiagram
     %% One-to-Many relationships
     User ||--o{ ActivityEvent : references
     Repository ||--o{ ActivityEvent : has
-    Commit ||--o{ CommitFileChange : has
-    Repository ||--o{ Commit : has
-    User ||--o{ Commit : authored_by
-    User ||--o{ Commit : committed_by
     Issue ||--o{ BadPracticeDetection : references
     PullRequestBadPractice ||--o{ BadPracticeFeedback : has
     ChatMessage ||--o{ ChatMessage : references
     ChatThread ||--o{ ChatMessage : has
     User ||--o{ ChatThread : has
     Workspace ||--o{ ChatThread : has
+    GitCommit ||--o{ CommitFileChange : has
     User ||--o{ Document : has
     Workspace ||--o{ Document : has
+    User ||--o{ GitCommit : authored_by
+    User ||--o{ GitCommit : references
     User ||--o{ Issue : authored_by
     IssueType ||--o{ Issue : has
     User ||--o{ Issue : merged_by
@@ -628,8 +630,6 @@ erDiagram
     classDef associationEntity fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
     classDef metadataEntity fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
 
-    class Commit primaryEntity
-    class CommitFileChange associationEntity
     class Issue primaryEntity
     class IssueAssignee associationEntity
     class IssueLabel associationEntity
