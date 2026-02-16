@@ -330,6 +330,15 @@ public class GitHubExceptionClassifier {
             );
         }
 
+        // UnexpectedRollbackException is transient — typically caused by a nested
+        // transaction that was rolled back (e.g., deadlock in a sub-transaction)
+        if (cause instanceof org.springframework.transaction.UnexpectedRollbackException) {
+            return ClassificationResult.of(
+                Category.RETRYABLE,
+                "Transaction rollback detected - will retry: " + cause.getMessage()
+            );
+        }
+
         // Check for WebClient response exceptions (HTTP errors)
         if (cause instanceof WebClientResponseException responseException) {
             return classifyHttpStatus(responseException);

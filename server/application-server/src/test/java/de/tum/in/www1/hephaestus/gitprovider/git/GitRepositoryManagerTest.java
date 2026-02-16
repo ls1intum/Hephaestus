@@ -258,19 +258,15 @@ class GitRepositoryManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return empty list for unresolvable toSha")
+        @DisplayName("should throw GitOperationException for unresolvable toSha")
         void shouldReturnEmptyListForUnresolvableToSha() throws Exception {
             manager = createManager(true);
             try (Git sourceGit = createSourceRepo()) {
                 manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
 
-                List<GitRepositoryManager.CommitInfo> commits = manager.walkCommits(
-                    1L,
-                    null,
-                    "0000000000000000000000000000000000000000"
-                );
-
-                assertThat(commits).isEmpty();
+                assertThatThrownBy(() -> manager.walkCommits(1L, null, "0000000000000000000000000000000000000000"))
+                    .isInstanceOf(GitRepositoryManager.GitOperationException.class)
+                    .hasMessageContaining("Failed to walk commits");
             }
         }
 

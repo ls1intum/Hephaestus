@@ -748,12 +748,28 @@ public class GitHubIssueSyncService {
         String safeNameWithOwner
     ) {
         try {
-            ClientGraphQlResponse response = client
-                .documentName("GetRepositoryIssueCount")
-                .variable("owner", ownerAndName.owner())
-                .variable("name", ownerAndName.name())
-                .variable("since", sinceDateTime.toString())
-                .execute()
+            ClientGraphQlResponse response = Mono.defer(() ->
+                client
+                    .documentName("GetRepositoryIssueCount")
+                    .variable("owner", ownerAndName.owner())
+                    .variable("name", ownerAndName.name())
+                    .variable("since", sinceDateTime.toString())
+                    .execute()
+            )
+                .retryWhen(
+                    Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                        .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                        .jitter(JITTER_FACTOR)
+                        .filter(GitHubTransportErrors::isTransportError)
+                        .doBeforeRetry(signal ->
+                            log.warn(
+                                "Retrying after transport error: context=issueCountProbe, repoName={}, attempt={}, error={}",
+                                safeNameWithOwner,
+                                signal.totalRetries() + 1,
+                                signal.failure().getMessage()
+                            )
+                        )
+                )
                 .block(timeout);
 
             if (response == null || !response.isValid()) {

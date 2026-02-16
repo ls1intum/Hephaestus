@@ -1,8 +1,12 @@
 package de.tum.in.www1.hephaestus.gitprovider.subissue.github;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.JITTER_FACTOR;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.LARGE_PAGE_SIZE;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.MAX_PAGINATION_PAGES;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_INITIAL_BACKOFF;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
@@ -15,6 +19,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoor
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubTransportErrors;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncMetadata;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHIssue;
@@ -39,6 +44,8 @@ import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import reactor.core.publisher.Mono;
+import reactor.util.retry.Retry;
 
 /**
  * Service for syncing sub-issue (parent-child) relationships from GitHub.
@@ -355,13 +362,33 @@ public class GitHubSubIssueSyncService {
 
             try {
                 // GraphQL call OUTSIDE of @Transactional to avoid blocking DB connection
-                ClientGraphQlResponse graphQlResponse = client
-                    .documentName(GET_SUB_ISSUES_DOCUMENT)
-                    .variable("owner", owner)
-                    .variable("name", name)
-                    .variable("first", LARGE_PAGE_SIZE)
-                    .variable("after", cursor)
-                    .execute()
+                final String currentCursor = cursor;
+                final int currentPage = pageCount;
+
+                ClientGraphQlResponse graphQlResponse = Mono.defer(() ->
+                    client
+                        .documentName(GET_SUB_ISSUES_DOCUMENT)
+                        .variable("owner", owner)
+                        .variable("name", name)
+                        .variable("first", LARGE_PAGE_SIZE)
+                        .variable("after", currentCursor)
+                        .execute()
+                )
+                    .retryWhen(
+                        Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                            .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                            .jitter(JITTER_FACTOR)
+                            .filter(GitHubTransportErrors::isTransportError)
+                            .doBeforeRetry(signal ->
+                                log.warn(
+                                    "Retrying after transport error: context=subIssueSync, repoName={}, page={}, attempt={}, error={}",
+                                    sanitizeForLog(repository.getNameWithOwner()),
+                                    currentPage,
+                                    signal.totalRetries() + 1,
+                                    signal.failure().getMessage()
+                                )
+                            )
+                    )
                     .block(syncProperties.graphqlTimeout());
 
                 if (graphQlResponse == null || !graphQlResponse.isValid()) {

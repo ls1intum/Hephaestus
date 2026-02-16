@@ -281,6 +281,20 @@ public class GitHubProjectSyncService {
                     .block(timeout);
 
                 if (graphQlResponse == null || !graphQlResponse.isValid()) {
+                    ClassificationResult classification = exceptionClassifier.classifyGraphQlResponse(graphQlResponse);
+                    if (classification != null && classification.category() == Category.NOT_FOUND) {
+                        log.info(
+                            "Organization not found via GraphQL (may have been renamed/deleted): orgLogin={}",
+                            safeOrgLogin
+                        );
+                        abortReason = SyncResult.Status.ABORTED_ERROR;
+                        break;
+                    }
+                    if (classification != null && classification.category() == Category.RATE_LIMITED) {
+                        log.warn("Rate limited during project list sync: orgLogin={}", safeOrgLogin);
+                        abortReason = SyncResult.Status.ABORTED_RATE_LIMIT;
+                        break;
+                    }
                     log.warn(
                         "Received invalid GraphQL response: orgLogin={}, errors={}",
                         safeOrgLogin,
@@ -744,6 +758,17 @@ public class GitHubProjectSyncService {
                     .block(timeout);
 
                 if (graphQlResponse == null || !graphQlResponse.isValid()) {
+                    ClassificationResult classification = exceptionClassifier.classifyGraphQlResponse(graphQlResponse);
+                    if (classification != null && classification.category() == Category.NOT_FOUND) {
+                        log.info("Project not found via GraphQL (may have been deleted): projectId={}", projectId);
+                        abortReason = SyncResult.Status.ABORTED_ERROR;
+                        break;
+                    }
+                    if (classification != null && classification.category() == Category.RATE_LIMITED) {
+                        log.warn("Rate limited during project items sync: projectId={}", projectId);
+                        abortReason = SyncResult.Status.ABORTED_RATE_LIMIT;
+                        break;
+                    }
                     log.warn(
                         "Received invalid GraphQL response for project items: projectId={}, errors={}",
                         projectId,
@@ -1152,6 +1177,18 @@ public class GitHubProjectSyncService {
                     .block(syncProperties.graphqlTimeout());
 
                 if (graphQlResponse == null || !graphQlResponse.isValid()) {
+                    ClassificationResult classification = exceptionClassifier.classifyGraphQlResponse(graphQlResponse);
+                    if (classification != null && classification.category() == Category.NOT_FOUND) {
+                        log.info(
+                            "Project not found via GraphQL for fields sync (may have been deleted): projectId={}",
+                            projectId
+                        );
+                        return PhaseResult.FAILED;
+                    }
+                    if (classification != null && classification.category() == Category.RATE_LIMITED) {
+                        log.warn("Rate limited during project fields sync: projectId={}", projectId);
+                        return PhaseResult.FAILED;
+                    }
                     log.warn(
                         "Received invalid GraphQL response for project fields: projectId={}, errors={}",
                         projectId,
@@ -1339,6 +1376,18 @@ public class GitHubProjectSyncService {
                     .block(syncProperties.graphqlTimeout());
 
                 if (graphQlResponse == null || !graphQlResponse.isValid()) {
+                    ClassificationResult classification = exceptionClassifier.classifyGraphQlResponse(graphQlResponse);
+                    if (classification != null && classification.category() == Category.NOT_FOUND) {
+                        log.info(
+                            "Project not found via GraphQL for status updates (may have been deleted): projectId={}",
+                            projectId
+                        );
+                        return false;
+                    }
+                    if (classification != null && classification.category() == Category.RATE_LIMITED) {
+                        log.warn("Rate limited during status updates sync: projectId={}", projectId);
+                        return false;
+                    }
                     log.warn(
                         "Received invalid GraphQL response for status updates: projectId={}, errors={}",
                         projectId,
