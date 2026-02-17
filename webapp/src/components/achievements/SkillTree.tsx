@@ -9,12 +9,12 @@ import {
 	useNodesState,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { useEffect, useMemo, useSyncExternalStore } from "react";
-import type { Achievement } from "@/api/types.gen";
-import { SkillEdge } from "./AchievementEdge.tsx";
+import { useEffect, useSyncExternalStore } from "react";
+import type { UIAchievement } from "@/components/achievements/types";
+import { generateSkillTreeData } from "@/components/achievements/utils";
+import { AchievementEdge } from "./AchievementEdge.tsx";
 import { AchievementNode } from "./AchievementNode.tsx";
-import { AvatarNodeProps } from "./AvatarNode.tsx";
-import { type AchievementNodeData, generateSkillTreeData } from "./data";
+import { AvatarNode } from "./AvatarNode.tsx";
 
 const nodeTypes: NodeTypes = {
 	achievement: AchievementNode,
@@ -22,7 +22,7 @@ const nodeTypes: NodeTypes = {
 };
 
 const edgeTypes: EdgeTypes = {
-	skill: SkillEdge,
+	achievement: AchievementEdge,
 };
 
 // Theme detection for MiniMap colors (React Flow requires computed color strings)
@@ -46,20 +46,17 @@ function getIsDarkMode() {
 }
 
 export interface SkillTreeProps {
-	user?: {
-		name?: string;
-		avatarUrl?: string;
-		level?: number;
-		leaguePoints?: number;
+	user: {
+		name: string;
+		avatarUrl: string;
+		level: number;
+		leaguePoints: number;
 	};
-	achievements?: Achievement[];
+	achievements: UIAchievement[];
 }
 
-export function SkillTree({ user, achievements = [] }: SkillTreeProps) {
-	const { nodes: initialNodes, edges: initialEdges } = useMemo(
-		() => generateSkillTreeData(user, achievements),
-		[user, achievements],
-	);
+export function SkillTree({ user, achievements }: SkillTreeProps) {
+	const { nodes: initialNodes, edges: initialEdges } = generateSkillTreeData(user, achievements); // removed memoization due to the compiler handling it
 
 	const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
 	const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -112,18 +109,40 @@ export function SkillTree({ user, achievements = [] }: SkillTreeProps) {
 
 				{/* Mini map */}
 				<MiniMap
-					nodeColor={(node) => {
-						const data = node.data as AchievementNodeData;
-						if (isDark) {
-							// Dark mode: white nodes on dark bg
-							if (data.status === "unlocked") return "rgba(255, 255, 255, 0.9)";
-							if (data.status === "available") return "rgba(255, 255, 255, 0.4)";
-							return "rgba(255, 255, 255, 0.15)";
+					nodeColor={(node: AchievementNode | AvatarNode) => {
+						if (node.type === "achievement") {
+							const status = node.data.achievement.status;
+							if (isDark) {
+								// Dark mode: white nodes on dark bg
+								switch (status) {
+									case "unlocked":
+										return "rgba(255, 255, 255, 0.9)";
+									case "available":
+										return "rgba(255, 255, 255, 0.4)";
+									case "locked":
+										return "rgba(255, 255, 255, 0.15)";
+									case "hidden":
+										return "rgba(0, 0, 0, 0)";
+								}
+							}
+
+							// Light mode: dark nodes on light bg
+							switch (status) {
+								case "unlocked":
+									return "rgba(0, 0, 0, 0.85)";
+								case "available":
+									return "rgba(0, 0, 0, 0.5)";
+								case "locked":
+									return "rgba(0, 0, 0, 0.15)";
+								case "hidden":
+									return "rgba(0, 0, 0, 0)";
+							}
 						}
-						// Light mode: dark nodes on light bg
-						if (data.status === "unlocked") return "rgba(0, 0, 0, 0.85)";
-						if (data.status === "available") return "rgba(0, 0, 0, 0.5)";
-						return "rgba(0, 0, 0, 0.15)";
+						if (node.type === "avatar") {
+							return isDark ? "rgba(187,247,208,0.85)" : "rgba(21,128,61,0.85)";
+						}
+						// fallback
+						return isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.12)";
 					}}
 					maskColor={isDark ? "rgba(0, 0, 0, 0.85)" : "rgba(255, 255, 255, 0.85)"}
 					className="bg-card/80! border-border! rounded-lg!"

@@ -1,15 +1,15 @@
-import { Handle, type Node, Position } from "@xyflow/react";
+import { Handle, type Node, type NodeProps, Position } from "@xyflow/react";
 import { getLeagueColor, getLeagueTier } from "@/components/leaderboard/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
-export type AvatarNodeProps = Node<
+export type AvatarNode = Node<
 	{ level: number; leaguePoints: number; avatarUrl: string; name: string; className?: string },
 	"avatar"
 >;
 
-export function AvatarNode({ data }: AvatarNodeProps) {
+export function AvatarNode({ data }: NodeProps<AvatarNode>) {
 	const { level, leaguePoints, className } = data;
 	const rawTier = getLeagueTier(leaguePoints);
 	const leagueTier = rawTier === "none" ? "bronze" : rawTier;

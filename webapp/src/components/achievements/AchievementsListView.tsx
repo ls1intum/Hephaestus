@@ -6,7 +6,7 @@ import type {
 	AchievementStatus,
 	UIAchievement,
 } from "@/components/achievements/types";
-import { compareByRarity } from "@/components/achievements/utils";
+import { ACHIEVEMENT_CATEGORIES, compareByRarity } from "@/components/achievements/utils";
 import { Badge } from "@/components/ui/badge";
 import {
 	Table,
@@ -41,16 +41,9 @@ export function AchievementsListView({ achievements }: AchievementListViewProps)
 		{} as Record<AchievementCategory, UIAchievement[]>,
 	);
 
-	// Sort categories in a logical order
-	const categoryOrder: readonly AchievementCategory[] = [
-		"pull_requests",
-		"commits",
-		"communication",
-		"issues",
-		"milestones",
-	] as const satisfies ReadonlyArray<AchievementCategory>;
-
-	const sortedCategories = categoryOrder.filter((cat) => groupedAchievements[cat]?.length > 0);
+	const sortedCategories = ACHIEVEMENT_CATEGORIES.filter(
+		(cat) => groupedAchievements[cat]?.length > 0,
+	);
 
 	const getStatusBadge = (status: AchievementStatus) => {
 		switch (status) {

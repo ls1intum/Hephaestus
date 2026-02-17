@@ -1,10 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { ReactFlowProvider } from "@xyflow/react";
 import type { Achievement } from "@/api/types.gen";
+import { AchievementHeader } from "./AchievementHeader.tsx";
 import { AchievementNode } from "./AchievementNode.tsx";
 import type { AchievementNodeData } from "./data";
-import { Header } from "./header";
-import { SkillTree } from "./skill-tree";
+import { SkillTree } from "./SkillTree.tsx";
 import { StatsPanel } from "./stats-panel";
 
 // Mock achievements data for stories
@@ -285,11 +285,11 @@ export const StatsPanelStory: StoryObj<typeof StatsPanel> = {
 };
 
 // Header Story
-export const HeaderStory: StoryObj<typeof Header> = {
+export const HeaderStory: StoryObj<typeof AchievementHeader> = {
 	render: () => (
 		<ReactFlowProvider>
 			<div className="dark bg-background">
-				<Header />
+				<AchievementHeader />
 			</div>
 		</ReactFlowProvider>
 	),

@@ -1,6 +1,6 @@
 import { BaseEdge, type Edge, type EdgeProps } from "@xyflow/react";
 
-type AchievementEdge = Edge<{ isEnabled: boolean }, "achievement">;
+export type AchievementEdge = Edge<{ isEnabled: boolean }, "achievement">;
 
 export function AchievementEdge(props: EdgeProps<AchievementEdge>) {
 	const { sourceX, sourceY, targetX, targetY, data } = props;
@@ -39,3 +39,5 @@ export function AchievementEdge(props: EdgeProps<AchievementEdge>) {
 		</>
 	);
 }
+
+export class SkillEdge {}

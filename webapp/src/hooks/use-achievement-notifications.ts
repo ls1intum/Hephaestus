@@ -1,7 +1,6 @@
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
-import type { Achievement } from "@/api/types.gen";
-import type { AchievementStatus } from "@/components/achievements/styles.ts";
+import type { AchievementStatus, UIAchievement } from "@/components/achievements/types";
 
 /**
  * Hook to display toast notifications when achievements are unlocked.
@@ -10,7 +9,7 @@ import type { AchievementStatus } from "@/components/achievements/styles.ts";
  * @param achievements - Current list of achievements from the API
  * @param enabled - Whether notifications are enabled (default: true)
  */
-export function useAchievementNotifications(achievements: Achievement[], enabled = true) {
+export function useAchievementNotifications(achievements: UIAchievement[], enabled = true) {
 	// Track the set of unlocked achievement IDs we've already notified about
 	const notifiedIdsRef = useRef<Set<string>>(new Set());
 	// Track whether this is the initial load (don't notify for existing unlocks)

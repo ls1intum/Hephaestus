@@ -1,6 +1,6 @@
 import { useReactFlow } from "@xyflow/react";
 import { List, Map as MapIcon, Maximize2, Sparkles, ZoomIn, ZoomOut } from "lucide-react";
-import type { ViewMode } from "@/components/achievements/styles.ts";
+import type { ViewMode } from "@/components/achievements/types";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
@@ -10,7 +10,7 @@ interface HeaderProps {
 	showZoomControls?: boolean;
 }
 
-export function Header({
+export function AchievementHeader({
 	viewMode = "tree",
 	onViewModeChange,
 	showZoomControls = true,
@@ -37,7 +37,7 @@ export function Header({
 				</div>
 				<div>
 					<h1 className="text-lg font-bold text-foreground">Contributor Journey</h1>
-					<p className="text-xs text-muted-foreground">Track your team contributions</p>
+					<p className="text-xs text-muted-foreground">Track your own contributions</p>
 				</div>
 			</div>
 

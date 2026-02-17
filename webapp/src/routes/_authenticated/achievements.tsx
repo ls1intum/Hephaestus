@@ -3,12 +3,13 @@ import { createFileRoute } from "@tanstack/react-router";
 import { ReactFlowProvider } from "@xyflow/react";
 import { useState } from "react";
 import { getUserProfileOptions } from "@/api/@tanstack/react-query.gen";
+import { AchievementHeader } from "@/components/achievements/AchievementHeader.tsx";
 import { AchievementsListView } from "@/components/achievements/AchievementsListView.tsx";
 import { CategoryLabels } from "@/components/achievements/CategoryLabels.tsx";
-import { Header } from "@/components/achievements/header";
-import { SkillTree } from "@/components/achievements/skill-tree";
+import { SkillTree } from "@/components/achievements/SkillTree.tsx";
 import { StatsPanel } from "@/components/achievements/stats-panel";
-import type { ViewMode } from "@/components/achievements/styles.ts";
+import type { ViewMode } from "@/components/achievements/types";
+import { enhanceAchievements } from "@/components/achievements/utils.ts";
 import { useAchievementNotifications } from "@/hooks/use-achievement-notifications";
 import { useAchievements } from "@/hooks/use-achievements";
 import { useAuth } from "@/integrations/auth/AuthContext";
@@ -34,14 +35,14 @@ function AchievementsPage() {
 	// Fetch achievements from the API
 	const achievementsQuery = useAchievements(selectedSlug || "", username || "");
 
-	const achievements = achievementsQuery.data ?? [];
+	const uiAchievements = enhanceAchievements(achievementsQuery.data ?? []);
 
 	// Show toast notifications when achievements are unlocked
-	useAchievementNotifications(achievements);
+	useAchievementNotifications(uiAchievements);
 
 	// Derived user data for the skill tree (React Compiler handles memoization)
 	const user = {
-		name: profileQuery.data?.userInfo?.name || userProfile?.name || userProfile?.username,
+		name: profileQuery.data?.userInfo?.name || userProfile?.name || userProfile?.username || "",
 		avatarUrl: profileQuery.data?.userInfo?.avatarUrl || getUserGithubProfilePictureUrl(),
 		level: profileQuery.data?.xpRecord?.currentLevel ?? 1,
 		leaguePoints: profileQuery.data?.userInfo?.leaguePoints ?? 0,
@@ -50,7 +51,7 @@ function AchievementsPage() {
 	return (
 		<ReactFlowProvider>
 			<div className="h-screen flex flex-col bg-background overflow-hidden">
-				<Header
+				<AchievementHeader
 					viewMode={viewMode}
 					onViewModeChange={setViewMode}
 					showZoomControls={viewMode === "tree"}
@@ -93,7 +94,7 @@ function AchievementsPage() {
 								)}
 
 								{/* Skill tree */}
-								<SkillTree user={user} achievements={achievements} />
+								<SkillTree user={user} achievements={uiAchievements} />
 							</>
 						) : (
 							<>
@@ -114,14 +115,14 @@ function AchievementsPage() {
 
 								{/* List view */}
 								{!achievementsQuery.isLoading && !achievementsQuery.isError && (
-									<AchievementsListView achievements={achievements} />
+									<AchievementsListView achievements={uiAchievements} />
 								)}
 							</>
 						)}
 					</div>
 
 					{/* Stats panel - visible in both views */}
-					<StatsPanel achievements={achievements} />
+					<StatsPanel achievements={uiAchievements} />
 				</div>
 			</div>
 		</ReactFlowProvider>
