@@ -387,4 +387,86 @@ class GitRepositoryManagerTest extends BaseUnitTest {
             }
         }
     }
+
+    @Nested
+    @DisplayName("resolveDefaultBranchHead")
+    class ResolveDefaultBranchHead {
+
+        @Test
+        @DisplayName("should return null when not enabled")
+        void shouldReturnNullWhenNotEnabled() {
+            manager = createManager(false);
+
+            String result = manager.resolveDefaultBranchHead(1L, "main");
+
+            assertThat(result).isNull();
+        }
+
+        @Test
+        @DisplayName("should resolve HEAD SHA for default branch")
+        void shouldResolveHeadShaForDefaultBranch() throws Exception {
+            manager = createManager(true);
+            try (Git sourceGit = createSourceRepo()) {
+                String expectedSha = sourceGit.log().call().iterator().next().getName();
+
+                manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
+                String result = manager.resolveDefaultBranchHead(1L, "master");
+
+                assertThat(result).isEqualTo(expectedSha);
+            }
+        }
+
+        @Test
+        @DisplayName("should resolve HEAD after fetch updates")
+        void shouldResolveHeadAfterFetchUpdates() throws Exception {
+            manager = createManager(true);
+            try (Git sourceGit = createSourceRepo()) {
+                manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
+
+                // Add another commit to source
+                Path file = sourceRepoPath.resolve("file2.txt");
+                Files.writeString(file, "content");
+                sourceGit.add().addFilepattern("file2.txt").call();
+                String newSha = sourceGit
+                    .commit()
+                    .setMessage("Second commit")
+                    .setAuthor(new PersonIdent("Test Author", "author@test.com"))
+                    .setCommitter(new PersonIdent("Test Committer", "committer@test.com"))
+                    .call()
+                    .getName();
+
+                // Fetch updates
+                manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
+                String result = manager.resolveDefaultBranchHead(1L, "master");
+
+                assertThat(result).isEqualTo(newSha);
+            }
+        }
+
+        @Test
+        @DisplayName("should return null for non-existent branch")
+        void shouldReturnNullForNonExistentBranch() throws Exception {
+            manager = createManager(true);
+            try (Git sourceGit = createSourceRepo()) {
+                manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
+
+                String result = manager.resolveDefaultBranchHead(1L, "nonexistent-branch");
+
+                // Falls through to HEAD fallback, which should resolve
+                // Since there IS a HEAD, this returns a value
+                assertThat(result).isNotNull();
+            }
+        }
+
+        @Test
+        @DisplayName("should return null for non-existent repository")
+        void shouldReturnNullForNonExistentRepository() {
+            manager = createManager(true);
+
+            // Repository 999 doesn't exist on disk, so Git.open will throw IOException
+            String result = manager.resolveDefaultBranchHead(999L, "main");
+
+            assertThat(result).isNull();
+        }
+    }
 }

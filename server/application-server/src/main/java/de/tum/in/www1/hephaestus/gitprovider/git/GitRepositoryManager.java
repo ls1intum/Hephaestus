@@ -162,6 +162,62 @@ public class GitRepositoryManager {
     }
 
     /**
+     * Resolves the HEAD SHA of the default branch from a bare clone.
+     * <p>
+     * In bare repos created with {@code --clone-all-branches}, remote refs are
+     * stored at {@code refs/remotes/origin/<branch>}. This method resolves
+     * the ObjectId for that ref and returns its SHA-1 hex string.
+     *
+     * @param repositoryId  the repository database ID
+     * @param defaultBranch the default branch name (e.g. "main")
+     * @return the HEAD SHA hex string, or null if the ref cannot be resolved
+     */
+    @Nullable
+    public String resolveDefaultBranchHead(Long repositoryId, String defaultBranch) {
+        if (!properties.enabled()) {
+            return null;
+        }
+
+        return lockManager.withReadLock(repositoryId, () -> {
+            Path repoPath = getRepositoryPath(repositoryId);
+            try (Git git = Git.open(repoPath.toFile())) {
+                Repository repo = git.getRepository();
+
+                // Try refs/remotes/origin/<branch> first (bare clone with remotes)
+                String ref = "refs/remotes/origin/" + defaultBranch;
+                ObjectId objectId = repo.resolve(ref);
+                if (objectId != null) {
+                    return objectId.getName();
+                }
+
+                // Fallback: try refs/heads/<branch> (some bare clones store heads directly)
+                ref = "refs/heads/" + defaultBranch;
+                objectId = repo.resolve(ref);
+                if (objectId != null) {
+                    return objectId.getName();
+                }
+
+                // Last resort: try HEAD
+                objectId = repo.resolve("HEAD");
+                if (objectId != null) {
+                    return objectId.getName();
+                }
+
+                log.warn("Cannot resolve default branch HEAD: repoId={}, branch={}", repositoryId, defaultBranch);
+                return null;
+            } catch (IOException e) {
+                log.error(
+                    "Failed to resolve default branch HEAD: repoId={}, branch={}, error={}",
+                    repositoryId,
+                    defaultBranch,
+                    e.getMessage()
+                );
+                return null;
+            }
+        });
+    }
+
+    /**
      * Walk commits between two SHAs and extract commit info with file changes.
      *
      * @param repositoryId the repository database ID

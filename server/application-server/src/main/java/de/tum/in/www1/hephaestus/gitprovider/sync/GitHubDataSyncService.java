@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.gitprovider.sync;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
+import de.tum.in.www1.hephaestus.gitprovider.commit.github.GitHubCommitBackfillService;
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.ExponentialBackoff;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
@@ -96,6 +97,7 @@ public class GitHubDataSyncService {
     private final GitHubOrganizationSyncService organizationSyncService;
     private final GitHubRepositorySyncService repositorySyncService;
     private final GitHubCollaboratorSyncService collaboratorSyncService;
+    private final GitHubCommitBackfillService commitBackfillService;
     private final GitHubExceptionClassifier exceptionClassifier;
     private final InstallationTokenProvider tokenProvider;
     private final GitHubAppTokenService gitHubAppTokenService;
@@ -121,6 +123,7 @@ public class GitHubDataSyncService {
         GitHubOrganizationSyncService organizationSyncService,
         GitHubRepositorySyncService repositorySyncService,
         GitHubCollaboratorSyncService collaboratorSyncService,
+        GitHubCommitBackfillService commitBackfillService,
         GitHubExceptionClassifier exceptionClassifier,
         InstallationTokenProvider tokenProvider,
         GitHubAppTokenService gitHubAppTokenService,
@@ -144,6 +147,7 @@ public class GitHubDataSyncService {
         this.organizationSyncService = organizationSyncService;
         this.repositorySyncService = repositorySyncService;
         this.collaboratorSyncService = collaboratorSyncService;
+        this.commitBackfillService = commitBackfillService;
         this.exceptionClassifier = exceptionClassifier;
         this.tokenProvider = tokenProvider;
         this.gitHubAppTokenService = gitHubAppTokenService;
@@ -234,6 +238,13 @@ public class GitHubDataSyncService {
                 }
             }
 
+            // Backfill commits from local bare git clone (runs BEFORE the repoUnchanged
+            // check because it uses local git, not the GitHub API — no rate limit concern).
+            // Must run even for "unchanged" repos to handle initial backfill when git
+            // checkout is first enabled. The backfill service has its own short-circuit
+            // (HEAD SHA == latest known SHA → fast return).
+            int commitsBackfilled = commitBackfillService.backfillCommits(syncTarget, repository, scopeId);
+
             // P3 optimization: skip sub-syncs when the repository has no new activity.
             // GitHub's repository.updatedAt changes on any activity (pushes, issues, PRs, labels, etc.).
             // If the freshly-fetched updatedAt equals what we previously stored, nothing has changed.
@@ -307,9 +318,10 @@ public class GitHubDataSyncService {
             }
 
             log.info(
-                "Completed repository sync: scopeId={}, repoId={}, collaborators={}, labels={}, milestones={}, issues={}, prs={}, issueStatus={}, prStatus={}",
+                "Completed repository sync: scopeId={}, repoId={}, commitsBackfilled={}, collaborators={}, labels={}, milestones={}, issues={}, prs={}, issueStatus={}, prStatus={}",
                 scopeId,
                 repositoryId,
+                commitsBackfilled >= 0 ? commitsBackfilled : "skipped",
                 collaboratorsCount >= 0 ? collaboratorsCount : "skipped",
                 labelsCount >= 0 ? labelsCount : "skipped",
                 milestonesCount >= 0 ? milestonesCount : "skipped",
