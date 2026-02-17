@@ -13,6 +13,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.in.www1.hephaestus.gitprovider.commit.Commit;
+import de.tum.in.www1.hephaestus.gitprovider.commit.CommitAuthorResolver;
 import de.tum.in.www1.hephaestus.gitprovider.commit.CommitRepository;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
@@ -20,8 +21,6 @@ import de.tum.in.www1.hephaestus.gitprovider.common.spi.AuthMode;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncTarget;
 import de.tum.in.www1.hephaestus.gitprovider.git.GitRepositoryManager;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
-import de.tum.in.www1.hephaestus.gitprovider.user.User;
-import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
 import java.util.List;
@@ -49,7 +48,7 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
     private CommitRepository commitRepository;
 
     @Mock
-    private UserRepository userRepository;
+    private CommitAuthorResolver authorResolver;
 
     @Mock
     private ApplicationEventPublisher eventPublisher;
@@ -74,7 +73,7 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
             gitRepositoryManager,
             tokenService,
             commitRepository,
-            userRepository,
+            authorResolver,
             eventPublisher,
             transactionTemplate
         );
@@ -531,13 +530,8 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
             when(gitRepositoryManager.walkCommits(1L, null, "head123")).thenReturn(List.of(commitInfo));
             when(commitRepository.existsByShaAndRepositoryId("commit1", 1L)).thenReturn(false);
 
-            User author = mock(User.class);
-            when(author.getId()).thenReturn(10L);
-            when(userRepository.findByEmail("author@test.com")).thenReturn(Optional.of(author));
-
-            User committer = mock(User.class);
-            when(committer.getId()).thenReturn(20L);
-            when(userRepository.findByEmail("committer@test.com")).thenReturn(Optional.of(committer));
+            when(authorResolver.resolveByEmail("author@test.com")).thenReturn(10L);
+            when(authorResolver.resolveByEmail("committer@test.com")).thenReturn(20L);
 
             Commit mockCommit = createMockCommit("commit1", 1L);
             when(commitRepository.findByShaAndRepositoryId("commit1", 1L)).thenReturn(Optional.of(mockCommit));
@@ -575,8 +569,8 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
             when(gitRepositoryManager.walkCommits(1L, null, "head123")).thenReturn(List.of(commitInfo));
             when(commitRepository.existsByShaAndRepositoryId("commit1", 1L)).thenReturn(false);
 
-            when(userRepository.findByEmail("author@test.com")).thenReturn(Optional.empty());
-            when(userRepository.findByEmail("committer@test.com")).thenReturn(Optional.empty());
+            when(authorResolver.resolveByEmail("author@test.com")).thenReturn(null);
+            when(authorResolver.resolveByEmail("committer@test.com")).thenReturn(null);
 
             Commit mockCommit = createMockCommit("commit1", 1L);
             when(commitRepository.findByShaAndRepositoryId("commit1", 1L)).thenReturn(Optional.of(mockCommit));
@@ -619,12 +613,13 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
             when(gitRepositoryManager.walkCommits(1L, null, "head123")).thenReturn(List.of(commitInfo));
             when(commitRepository.existsByShaAndRepositoryId("commit1", 1L)).thenReturn(false);
 
+            Repository repo = createMockRepository(1L, "owner/repo", "main");
+
             Commit mockCommit = mock(Commit.class);
             lenient().when(mockCommit.getSha()).thenReturn("commit1");
+            lenient().when(mockCommit.getRepository()).thenReturn(repo);
             // findByShaAndRepositoryId called twice: once for file changes, once for event
             when(commitRepository.findByShaAndRepositoryId("commit1", 1L)).thenReturn(Optional.of(mockCommit));
-
-            Repository repo = createMockRepository(1L, "owner/repo", "main");
             SyncTarget target = createSyncTarget(AuthMode.GITHUB_APP);
 
             service.backfillCommits(target, repo, 100L);

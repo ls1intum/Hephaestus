@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.commit.github;
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.in.www1.hephaestus.gitprovider.commit.Commit;
+import de.tum.in.www1.hephaestus.gitprovider.commit.CommitAuthorResolver;
 import de.tum.in.www1.hephaestus.gitprovider.commit.CommitFileChange;
 import de.tum.in.www1.hephaestus.gitprovider.commit.CommitRepository;
 import de.tum.in.www1.hephaestus.gitprovider.common.DataSource;
@@ -18,7 +19,6 @@ import de.tum.in.www1.hephaestus.gitprovider.common.spi.ScopeIdResolver;
 import de.tum.in.www1.hephaestus.gitprovider.git.GitRepositoryManager;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
-import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -52,7 +52,7 @@ public class GitHubPushMessageHandler extends GitHubMessageHandler<GitHubPushEve
     private final GitHubAppTokenService tokenService;
     private final RepositoryRepository repositoryRepository;
     private final CommitRepository commitRepository;
-    private final UserRepository userRepository;
+    private final CommitAuthorResolver authorResolver;
     private final ApplicationEventPublisher eventPublisher;
     private final ScopeIdResolver scopeIdResolver;
 
@@ -61,7 +61,7 @@ public class GitHubPushMessageHandler extends GitHubMessageHandler<GitHubPushEve
         GitHubAppTokenService tokenService,
         RepositoryRepository repositoryRepository,
         CommitRepository commitRepository,
-        UserRepository userRepository,
+        CommitAuthorResolver authorResolver,
         ApplicationEventPublisher eventPublisher,
         ScopeIdResolver scopeIdResolver,
         NatsMessageDeserializer deserializer,
@@ -72,7 +72,7 @@ public class GitHubPushMessageHandler extends GitHubMessageHandler<GitHubPushEve
         this.tokenService = tokenService;
         this.repositoryRepository = repositoryRepository;
         this.commitRepository = commitRepository;
-        this.userRepository = userRepository;
+        this.authorResolver = authorResolver;
         this.eventPublisher = eventPublisher;
         this.scopeIdResolver = scopeIdResolver;
     }
@@ -232,10 +232,10 @@ public class GitHubPushMessageHandler extends GitHubMessageHandler<GitHubPushEve
             int changedFiles = added + removed + modified;
 
             // Resolve author/committer by username
-            Long authorId = resolveUserIdByLogin(
+            Long authorId = authorResolver.resolveByLogin(
                 webhookCommit.author() != null ? webhookCommit.author().username() : null
             );
-            Long committerId = resolveUserIdByLogin(
+            Long committerId = authorResolver.resolveByLogin(
                 webhookCommit.committer() != null ? webhookCommit.committer().username() : null
             );
 
@@ -286,9 +286,9 @@ public class GitHubPushMessageHandler extends GitHubMessageHandler<GitHubPushEve
             return false;
         }
 
-        // Resolve author/committer IDs by email
-        Long authorId = resolveUserIdByEmail(info.authorEmail());
-        Long committerId = resolveUserIdByEmail(info.committerEmail());
+        // Resolve author/committer IDs by email (with noreply fallback)
+        Long authorId = authorResolver.resolveByEmail(info.authorEmail());
+        Long committerId = authorResolver.resolveByEmail(info.committerEmail());
 
         // Upsert commit via native SQL (no exception on conflict)
         commitRepository.upsertCommit(
@@ -330,34 +330,6 @@ public class GitHubPushMessageHandler extends GitHubMessageHandler<GitHubPushEve
         publishCommitCreated(info.sha(), repository);
 
         return true;
-    }
-
-    /**
-     * Resolve a user's database ID by login, returning null if not found.
-     */
-    @Nullable
-    private Long resolveUserIdByLogin(@Nullable String login) {
-        if (login == null || login.isBlank()) {
-            return null;
-        }
-        return userRepository
-            .findByLogin(login)
-            .map(u -> u.getId())
-            .orElse(null);
-    }
-
-    /**
-     * Resolve a user's database ID by email, returning null if not found.
-     */
-    @Nullable
-    private Long resolveUserIdByEmail(@Nullable String email) {
-        if (email == null || email.isBlank()) {
-            return null;
-        }
-        return userRepository
-            .findByEmail(email)
-            .map(u -> u.getId())
-            .orElse(null);
     }
 
     // ========== Domain Event Publishing ==========

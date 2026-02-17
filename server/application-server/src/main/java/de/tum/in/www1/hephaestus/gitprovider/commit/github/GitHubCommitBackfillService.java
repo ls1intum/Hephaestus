@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.commit.github;
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.in.www1.hephaestus.gitprovider.commit.Commit;
+import de.tum.in.www1.hephaestus.gitprovider.commit.CommitAuthorResolver;
 import de.tum.in.www1.hephaestus.gitprovider.commit.CommitFileChange;
 import de.tum.in.www1.hephaestus.gitprovider.commit.CommitRepository;
 import de.tum.in.www1.hephaestus.gitprovider.common.DataSource;
@@ -15,7 +16,6 @@ import de.tum.in.www1.hephaestus.gitprovider.common.spi.AuthMode;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncTarget;
 import de.tum.in.www1.hephaestus.gitprovider.git.GitRepositoryManager;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
-import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -66,7 +66,7 @@ public class GitHubCommitBackfillService {
     private final GitRepositoryManager gitRepositoryManager;
     private final GitHubAppTokenService tokenService;
     private final CommitRepository commitRepository;
-    private final UserRepository userRepository;
+    private final CommitAuthorResolver authorResolver;
     private final ApplicationEventPublisher eventPublisher;
     private final TransactionTemplate transactionTemplate;
 
@@ -74,14 +74,14 @@ public class GitHubCommitBackfillService {
         GitRepositoryManager gitRepositoryManager,
         GitHubAppTokenService tokenService,
         CommitRepository commitRepository,
-        UserRepository userRepository,
+        CommitAuthorResolver authorResolver,
         ApplicationEventPublisher eventPublisher,
         TransactionTemplate transactionTemplate
     ) {
         this.gitRepositoryManager = gitRepositoryManager;
         this.tokenService = tokenService;
         this.commitRepository = commitRepository;
-        this.userRepository = userRepository;
+        this.authorResolver = authorResolver;
         this.eventPublisher = eventPublisher;
         this.transactionTemplate = transactionTemplate;
     }
@@ -265,9 +265,9 @@ public class GitHubCommitBackfillService {
                 return false;
             }
 
-            // Resolve author/committer IDs by email
-            Long authorId = resolveUserIdByEmail(info.authorEmail());
-            Long committerId = resolveUserIdByEmail(info.committerEmail());
+            // Resolve author/committer IDs by email (with noreply fallback)
+            Long authorId = authorResolver.resolveByEmail(info.authorEmail());
+            Long committerId = authorResolver.resolveByEmail(info.committerEmail());
 
             // Upsert commit via native SQL (no exception on conflict)
             commitRepository.upsertCommit(
@@ -311,20 +311,6 @@ public class GitHubCommitBackfillService {
             return true;
         });
         return Boolean.TRUE.equals(result);
-    }
-
-    /**
-     * Resolve a user's database ID by email, returning null if not found.
-     */
-    @Nullable
-    private Long resolveUserIdByEmail(@Nullable String email) {
-        if (email == null || email.isBlank()) {
-            return null;
-        }
-        return userRepository
-            .findByEmail(email)
-            .map(u -> u.getId())
-            .orElse(null);
     }
 
     /**

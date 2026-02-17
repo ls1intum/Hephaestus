@@ -12,6 +12,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.in.www1.hephaestus.gitprovider.commit.CommitAuthorResolver;
 import de.tum.in.www1.hephaestus.gitprovider.commit.CommitRepository;
 import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
@@ -22,8 +23,6 @@ import de.tum.in.www1.hephaestus.gitprovider.git.GitRepositoryManager;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.dto.GitHubRepositoryRefDTO;
-import de.tum.in.www1.hephaestus.gitprovider.user.User;
-import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import java.lang.reflect.Method;
 import java.time.Instant;
@@ -54,7 +53,7 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
     private CommitRepository commitRepository;
 
     @Mock
-    private UserRepository userRepository;
+    private CommitAuthorResolver authorResolver;
 
     @Mock
     private ApplicationEventPublisher eventPublisher;
@@ -77,7 +76,7 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
             tokenService,
             repositoryRepository,
             commitRepository,
-            userRepository,
+            authorResolver,
             eventPublisher,
             scopeIdResolver,
             deserializer,
@@ -412,13 +411,8 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
             when(repositoryRepository.findByIdWithOrganization(100L)).thenReturn(Optional.of(repo));
             when(gitRepositoryManager.isEnabled()).thenReturn(false);
 
-            User author = mock(User.class);
-            when(author.getId()).thenReturn(42L);
-            when(userRepository.findByLogin("authoruser")).thenReturn(Optional.of(author));
-
-            User committer = mock(User.class);
-            when(committer.getId()).thenReturn(43L);
-            when(userRepository.findByLogin("committeruser")).thenReturn(Optional.of(committer));
+            when(authorResolver.resolveByLogin("authoruser")).thenReturn(42L);
+            when(authorResolver.resolveByLogin("committeruser")).thenReturn(43L);
 
             invokeHandleEvent(event);
 
@@ -460,6 +454,7 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
             Repository repo = createMockRepository(100L, "owner/repo", "main");
             when(repositoryRepository.findByIdWithOrganization(100L)).thenReturn(Optional.of(repo));
             when(gitRepositoryManager.isEnabled()).thenReturn(false);
+            when(authorResolver.resolveByLogin(null)).thenReturn(null);
 
             invokeHandleEvent(event);
 
