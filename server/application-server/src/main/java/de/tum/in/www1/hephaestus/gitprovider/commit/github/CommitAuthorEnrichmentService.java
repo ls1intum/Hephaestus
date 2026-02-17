@@ -17,10 +17,13 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
+import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
+import reactor.netty.http.client.HttpClient;
 
 /**
  * Enriches commits with unresolved author/committer by fetching from GitHub REST API.
@@ -50,6 +53,18 @@ public class CommitAuthorEnrichmentService {
     private final GitRepositoryManager gitRepositoryManager;
     private final WebClient webClient;
 
+    /**
+     * Buffer limit for GitHub REST API responses (2 MB).
+     * <p>
+     * The {@code GET /repos/{owner}/{repo}/commits/{sha}} endpoint returns the full
+     * diff in the response body. For commits touching many files, this can easily
+     * exceed Spring's default 256 KB in-memory buffer. We only deserialize the
+     * author/committer fields ({@link GitHubCommitResponse} ignores unknown
+     * properties), but the entire response must be buffered before Jackson
+     * processes it.
+     */
+    private static final int MAX_BUFFER_SIZE = 2 * 1024 * 1024;
+
     public CommitAuthorEnrichmentService(
         CommitRepository commitRepository,
         CommitAuthorResolver authorResolver,
@@ -58,8 +73,17 @@ public class CommitAuthorEnrichmentService {
         this.commitRepository = commitRepository;
         this.authorResolver = authorResolver;
         this.gitRepositoryManager = gitRepositoryManager;
+
+        var strategies = ExchangeStrategies.builder()
+            .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(MAX_BUFFER_SIZE))
+            .build();
+
+        var httpClient = HttpClient.create().compress(true);
+
         this.webClient = WebClient.builder()
             .baseUrl(GITHUB_API_BASE_URL)
+            .clientConnector(new ReactorClientHttpConnector(httpClient))
+            .exchangeStrategies(strategies)
             .defaultHeader(HttpHeaders.ACCEPT, "application/vnd.github+json")
             .defaultHeader("X-GitHub-Api-Version", "2022-11-28")
             .build();
