@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.commit;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -54,6 +55,68 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
      * Uses {@code COALESCE} for nullable fields so null parameters preserve
      * existing database values (webhooks may provide less data than local git).
      */
+    /**
+     * Find SHAs of commits with null author_id for a repository.
+     */
+    @Query(
+        value = """
+        SELECT gc.sha FROM git_commit gc
+        WHERE gc.repository_id = :repositoryId AND gc.author_id IS NULL
+        """,
+        nativeQuery = true
+    )
+    List<String> findShasWithNullAuthorByRepositoryId(@Param("repositoryId") Long repositoryId);
+
+    /**
+     * Find SHAs of commits with null committer_id for a repository.
+     */
+    @Query(
+        value = """
+        SELECT gc.sha FROM git_commit gc
+        WHERE gc.repository_id = :repositoryId AND gc.committer_id IS NULL
+        """,
+        nativeQuery = true
+    )
+    List<String> findShasWithNullCommitterByRepositoryId(@Param("repositoryId") Long repositoryId);
+
+    /**
+     * Bulk update author_id for commits matching the given SHAs in a repository.
+     * Only updates rows where author_id is currently NULL (safe for concurrent use).
+     */
+    @Modifying
+    @Transactional
+    @Query(
+        value = """
+        UPDATE git_commit SET author_id = :authorId, updated_at = NOW()
+        WHERE repository_id = :repositoryId AND author_id IS NULL AND sha IN (:shas)
+        """,
+        nativeQuery = true
+    )
+    int bulkUpdateAuthorId(
+        @Param("shas") List<String> shas,
+        @Param("repositoryId") Long repositoryId,
+        @Param("authorId") Long authorId
+    );
+
+    /**
+     * Bulk update committer_id for commits matching the given SHAs in a repository.
+     * Only updates rows where committer_id is currently NULL (safe for concurrent use).
+     */
+    @Modifying
+    @Transactional
+    @Query(
+        value = """
+        UPDATE git_commit SET committer_id = :committerId, updated_at = NOW()
+        WHERE repository_id = :repositoryId AND committer_id IS NULL AND sha IN (:shas)
+        """,
+        nativeQuery = true
+    )
+    int bulkUpdateCommitterId(
+        @Param("shas") List<String> shas,
+        @Param("repositoryId") Long repositoryId,
+        @Param("committerId") Long committerId
+    );
+
     @Modifying
     @Transactional
     @Query(

@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.gitprovider.sync;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
+import de.tum.in.www1.hephaestus.gitprovider.commit.github.CommitAuthorEnrichmentService;
 import de.tum.in.www1.hephaestus.gitprovider.commit.github.GitHubCommitBackfillService;
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.ExponentialBackoff;
@@ -9,6 +10,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassi
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.Category;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.AuthMode;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.InstallationTokenProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.OrganizationMembershipListener;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.OrganizationMembershipListener.OrganizationSyncedEvent;
@@ -47,6 +49,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.task.AsyncTaskExecutor;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 
 /**
@@ -98,6 +101,7 @@ public class GitHubDataSyncService {
     private final GitHubRepositorySyncService repositorySyncService;
     private final GitHubCollaboratorSyncService collaboratorSyncService;
     private final GitHubCommitBackfillService commitBackfillService;
+    private final CommitAuthorEnrichmentService commitAuthorEnrichmentService;
     private final GitHubExceptionClassifier exceptionClassifier;
     private final InstallationTokenProvider tokenProvider;
     private final GitHubAppTokenService gitHubAppTokenService;
@@ -124,6 +128,7 @@ public class GitHubDataSyncService {
         GitHubRepositorySyncService repositorySyncService,
         GitHubCollaboratorSyncService collaboratorSyncService,
         GitHubCommitBackfillService commitBackfillService,
+        CommitAuthorEnrichmentService commitAuthorEnrichmentService,
         GitHubExceptionClassifier exceptionClassifier,
         InstallationTokenProvider tokenProvider,
         GitHubAppTokenService gitHubAppTokenService,
@@ -148,6 +153,7 @@ public class GitHubDataSyncService {
         this.repositorySyncService = repositorySyncService;
         this.collaboratorSyncService = collaboratorSyncService;
         this.commitBackfillService = commitBackfillService;
+        this.commitAuthorEnrichmentService = commitAuthorEnrichmentService;
         this.exceptionClassifier = exceptionClassifier;
         this.tokenProvider = tokenProvider;
         this.gitHubAppTokenService = gitHubAppTokenService;
@@ -238,12 +244,17 @@ public class GitHubDataSyncService {
                 }
             }
 
-            // Backfill commits from local bare git clone (runs BEFORE the repoUnchanged
+            // Backfill commits from local git clone (runs BEFORE the repoUnchanged
             // check because it uses local git, not the GitHub API — no rate limit concern).
             // Must run even for "unchanged" repos to handle initial backfill when git
             // checkout is first enabled. The backfill service has its own short-circuit
             // (HEAD SHA == latest known SHA → fast return).
             int commitsBackfilled = commitBackfillService.backfillCommits(syncTarget, repository, scopeId);
+
+            // Enrich unresolved commit authors via local git emails + GitHub REST API.
+            // Runs after backfill to catch newly persisted commits with NULL author_id.
+            // Uses O(unique_emails) API calls instead of O(commits) — very efficient.
+            int commitsEnriched = enrichCommitAuthors(syncTarget, repository);
 
             // P3 optimization: skip sub-syncs when the repository has no new activity.
             // GitHub's repository.updatedAt changes on any activity (pushes, issues, PRs, labels, etc.).
@@ -318,10 +329,11 @@ public class GitHubDataSyncService {
             }
 
             log.info(
-                "Completed repository sync: scopeId={}, repoId={}, commitsBackfilled={}, collaborators={}, labels={}, milestones={}, issues={}, prs={}, issueStatus={}, prStatus={}",
+                "Completed repository sync: scopeId={}, repoId={}, commitsBackfilled={}, commitsEnriched={}, collaborators={}, labels={}, milestones={}, issues={}, prs={}, issueStatus={}, prStatus={}",
                 scopeId,
                 repositoryId,
                 commitsBackfilled >= 0 ? commitsBackfilled : "skipped",
+                commitsEnriched >= 0 ? commitsEnriched : "skipped",
                 collaboratorsCount >= 0 ? collaboratorsCount : "skipped",
                 labelsCount >= 0 ? labelsCount : "skipped",
                 milestonesCount >= 0 ? milestonesCount : "skipped",
@@ -1012,6 +1024,51 @@ public class GitHubDataSyncService {
         boolean prsStale =
             target.lastPullRequestsSyncedAt() == null || target.lastPullRequestsSyncedAt().isBefore(staleThreshold);
         return issuesStale || prsStale;
+    }
+
+    /**
+     * Enriches unresolved commit authors/committers for a repository.
+     * <p>
+     * Resolves the API token from the sync target (installation or PAT) and delegates
+     * to {@link CommitAuthorEnrichmentService}. Catches all exceptions to avoid
+     * failing the entire sync if enrichment fails.
+     *
+     * @param syncTarget the sync target with auth info
+     * @param repository the repository entity
+     * @return number of commits enriched, or -1 if skipped
+     */
+    private int enrichCommitAuthors(SyncTarget syncTarget, Repository repository) {
+        try {
+            String token = resolveTokenForEnrichment(syncTarget);
+            return commitAuthorEnrichmentService.enrichCommitAuthors(
+                repository.getId(),
+                repository.getNameWithOwner(),
+                token
+            );
+        } catch (Exception e) {
+            log.warn("Commit author enrichment failed: repoId={}, error={}", repository.getId(), e.getMessage());
+            return -1;
+        }
+    }
+
+    /**
+     * Resolves the authentication token for commit author enrichment.
+     * Uses the same precedence as commit backfill: PAT first, then installation token.
+     */
+    @Nullable
+    private String resolveTokenForEnrichment(SyncTarget syncTarget) {
+        if (syncTarget.authMode() == AuthMode.PERSONAL_ACCESS_TOKEN) {
+            return syncTarget.personalAccessToken();
+        }
+        if (syncTarget.installationId() != null && gitHubAppTokenService.isConfigured()) {
+            try {
+                return gitHubAppTokenService.getInstallationToken(syncTarget.installationId());
+            } catch (Exception e) {
+                log.warn("Failed to get installation token for commit enrichment: {}", e.getMessage());
+                return null;
+            }
+        }
+        return null;
     }
 
     /**
