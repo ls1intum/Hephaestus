@@ -10,7 +10,6 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassi
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.Category;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
-import de.tum.in.www1.hephaestus.gitprovider.common.spi.AuthMode;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.InstallationTokenProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.OrganizationMembershipListener;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.OrganizationMembershipListener.OrganizationSyncedEvent;
@@ -49,7 +48,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.task.AsyncTaskExecutor;
-import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 
 /**
@@ -1029,9 +1027,9 @@ public class GitHubDataSyncService {
     /**
      * Enriches unresolved commit authors/committers for a repository.
      * <p>
-     * Resolves the API token from the sync target (installation or PAT) and delegates
-     * to {@link CommitAuthorEnrichmentService}. Catches all exceptions to avoid
-     * failing the entire sync if enrichment fails.
+     * Delegates to {@link CommitAuthorEnrichmentService} with the sync target's scope ID
+     * for GraphQL authentication. Catches all exceptions to avoid failing the entire
+     * sync if enrichment fails.
      *
      * @param syncTarget the sync target with auth info
      * @param repository the repository entity
@@ -1039,36 +1037,15 @@ public class GitHubDataSyncService {
      */
     private int enrichCommitAuthors(SyncTarget syncTarget, Repository repository) {
         try {
-            String token = resolveTokenForEnrichment(syncTarget);
             return commitAuthorEnrichmentService.enrichCommitAuthors(
                 repository.getId(),
                 repository.getNameWithOwner(),
-                token
+                syncTarget.scopeId()
             );
         } catch (Exception e) {
             log.warn("Commit author enrichment failed: repoId={}, error={}", repository.getId(), e.getMessage());
             return -1;
         }
-    }
-
-    /**
-     * Resolves the authentication token for commit author enrichment.
-     * Uses the same precedence as commit backfill: PAT first, then installation token.
-     */
-    @Nullable
-    private String resolveTokenForEnrichment(SyncTarget syncTarget) {
-        if (syncTarget.authMode() == AuthMode.PERSONAL_ACCESS_TOKEN) {
-            return syncTarget.personalAccessToken();
-        }
-        if (syncTarget.installationId() != null && gitHubAppTokenService.isConfigured()) {
-            try {
-                return gitHubAppTokenService.getInstallationToken(syncTarget.installationId());
-            } catch (Exception e) {
-                log.warn("Failed to get installation token for commit enrichment: {}", e.getMessage());
-                return null;
-            }
-        }
-        return null;
     }
 
     /**

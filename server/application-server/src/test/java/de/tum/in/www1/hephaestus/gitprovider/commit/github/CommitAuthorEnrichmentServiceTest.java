@@ -11,6 +11,9 @@ import static org.mockito.Mockito.when;
 
 import de.tum.in.www1.hephaestus.gitprovider.commit.CommitAuthorResolver;
 import de.tum.in.www1.hephaestus.gitprovider.commit.CommitRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoordinator;
 import de.tum.in.www1.hephaestus.gitprovider.git.GitRepositoryManager;
 import de.tum.in.www1.hephaestus.gitprovider.git.GitRepositoryManager.EmailPair;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
@@ -35,11 +38,27 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
     @Mock
     private GitRepositoryManager gitRepositoryManager;
 
+    @Mock
+    private GitHubGraphQlClientProvider graphQlClientProvider;
+
+    @Mock
+    private GitHubGraphQlSyncCoordinator graphQlSyncCoordinator;
+
+    @Mock
+    private GitHubExceptionClassifier exceptionClassifier;
+
     private CommitAuthorEnrichmentService service;
 
     @BeforeEach
     void setUp() {
-        service = new CommitAuthorEnrichmentService(commitRepository, authorResolver, gitRepositoryManager);
+        service = new CommitAuthorEnrichmentService(
+            commitRepository,
+            authorResolver,
+            gitRepositoryManager,
+            graphQlClientProvider,
+            graphQlSyncCoordinator,
+            exceptionClassifier
+        );
     }
 
     // ========== Tests ==========
@@ -53,7 +72,7 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
         void shouldReturnNegativeOneWhenDisabled() {
             when(gitRepositoryManager.isEnabled()).thenReturn(false);
 
-            int result = service.enrichCommitAuthors(1L, "owner/repo", "token");
+            int result = service.enrichCommitAuthors(1L, "owner/repo", 1L);
 
             assertThat(result).isEqualTo(-1);
             verify(commitRepository, never()).findShasWithNullAuthorByRepositoryId(anyLong());
@@ -66,7 +85,7 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
             when(commitRepository.findShasWithNullAuthorByRepositoryId(1L)).thenReturn(List.of());
             when(commitRepository.findShasWithNullCommitterByRepositoryId(1L)).thenReturn(List.of());
 
-            int result = service.enrichCommitAuthors(1L, "owner/repo", "token");
+            int result = service.enrichCommitAuthors(1L, "owner/repo", 1L);
 
             assertThat(result).isEqualTo(0);
             verify(gitRepositoryManager, never()).resolveCommitEmails(anyLong(), any());
@@ -80,7 +99,7 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
             when(commitRepository.findShasWithNullCommitterByRepositoryId(1L)).thenReturn(List.of());
             when(gitRepositoryManager.resolveCommitEmails(eq(1L), any())).thenReturn(Map.of());
 
-            int result = service.enrichCommitAuthors(1L, "owner/repo", "token");
+            int result = service.enrichCommitAuthors(1L, "owner/repo", 1L);
 
             assertThat(result).isEqualTo(0);
         }
@@ -116,7 +135,7 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
 
             when(commitRepository.bulkUpdateAuthorId(List.of("sha1", "sha2"), 1L, 42L)).thenReturn(2);
 
-            int result = service.enrichCommitAuthors(1L, "owner/repo", "token");
+            int result = service.enrichCommitAuthors(1L, "owner/repo", 1L);
 
             assertThat(result).isEqualTo(2);
             verify(commitRepository).bulkUpdateAuthorId(List.of("sha1", "sha2"), 1L, 42L);
@@ -136,7 +155,7 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
             when(authorResolver.resolveByEmail("committer@example.com")).thenReturn(99L);
             when(commitRepository.bulkUpdateCommitterId(List.of("sha1"), 1L, 99L)).thenReturn(1);
 
-            int result = service.enrichCommitAuthors(1L, "owner/repo", "token");
+            int result = service.enrichCommitAuthors(1L, "owner/repo", 1L);
 
             assertThat(result).isEqualTo(1);
             verify(commitRepository).bulkUpdateCommitterId(List.of("sha1"), 1L, 99L);
@@ -157,7 +176,7 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
             );
             when(authorResolver.resolveByEmail("unknown@personal.com")).thenReturn(null);
 
-            // Token is null so API pass is skipped
+            // ScopeId is null so API pass is skipped
             int result = service.enrichCommitAuthors(1L, "owner/repo", null);
 
             assertThat(result).isEqualTo(0);
@@ -205,8 +224,8 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
     class ApiBasedEnrichment {
 
         @Test
-        @DisplayName("should skip API enrichment when token is null")
-        void shouldSkipApiEnrichmentWhenTokenNull() {
+        @DisplayName("should skip API enrichment when scopeId is null")
+        void shouldSkipApiEnrichmentWhenScopeIdNull() {
             when(gitRepositoryManager.isEnabled()).thenReturn(true);
             when(commitRepository.findShasWithNullAuthorByRepositoryId(1L))
                 .thenReturn(List.of("sha1"))
@@ -220,26 +239,6 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
             when(authorResolver.resolveByEmail("unknown@personal.com")).thenReturn(null);
 
             int result = service.enrichCommitAuthors(1L, "owner/repo", null);
-
-            assertThat(result).isEqualTo(0);
-        }
-
-        @Test
-        @DisplayName("should skip API enrichment when token is blank")
-        void shouldSkipApiEnrichmentWhenTokenBlank() {
-            when(gitRepositoryManager.isEnabled()).thenReturn(true);
-            when(commitRepository.findShasWithNullAuthorByRepositoryId(1L))
-                .thenReturn(List.of("sha1"))
-                .thenReturn(List.of("sha1"));
-            when(commitRepository.findShasWithNullCommitterByRepositoryId(1L))
-                .thenReturn(List.of())
-                .thenReturn(List.of());
-            when(gitRepositoryManager.resolveCommitEmails(eq(1L), any())).thenReturn(
-                Map.of("sha1", new EmailPair("unknown@personal.com", "unknown@personal.com"))
-            );
-            when(authorResolver.resolveByEmail("unknown@personal.com")).thenReturn(null);
-
-            int result = service.enrichCommitAuthors(1L, "owner/repo", "  ");
 
             assertThat(result).isEqualTo(0);
         }
@@ -268,7 +267,7 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
             when(commitRepository.bulkUpdateAuthorId(List.of("sha1"), 1L, 10L)).thenReturn(1);
             when(commitRepository.bulkUpdateCommitterId(List.of("sha1"), 1L, 20L)).thenReturn(1);
 
-            int result = service.enrichCommitAuthors(1L, "owner/repo", "token");
+            int result = service.enrichCommitAuthors(1L, "owner/repo", 1L);
 
             assertThat(result).isEqualTo(2);
             verify(commitRepository).bulkUpdateAuthorId(List.of("sha1"), 1L, 10L);
@@ -301,10 +300,10 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
             when(commitRepository.bulkUpdateAuthorId(List.of("sha1"), 1L, 10L)).thenReturn(1);
 
             // API pass would be attempted for sha2 but since we're not mocking
-            // the WebClient (it's a real HTTP call), the API fetch will fail/return null.
+            // the GraphQL client, the API fetch will fail/return empty.
             // The service handles this gracefully — no crash, just 0 from API.
 
-            int result = service.enrichCommitAuthors(1L, "owner/repo", "token");
+            int result = service.enrichCommitAuthors(1L, "owner/repo", 1L);
 
             // Only the email-resolved enrichment should count
             assertThat(result).isGreaterThanOrEqualTo(1);
