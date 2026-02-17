@@ -31,8 +31,8 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>
  * User upserts use three separate SQL statements within the caller's transaction:
  * <ol>
- *   <li>Acquire a transaction-scoped advisory lock on the login (serializing
- *       concurrent upserts for the same login across threads/scopes)</li>
+ *   <li>Try to acquire a transaction-scoped advisory lock on the login using
+ *       {@code pg_try_advisory_xact_lock} (non-blocking to prevent deadlocks)</li>
  *   <li>Rename any other user holding the target login (to {@code RENAMED_<id>})</li>
  *   <li>Insert or update the user via {@code INSERT ... ON CONFLICT (id) DO UPDATE}</li>
  * </ol>
@@ -40,12 +40,26 @@ import org.springframework.transaction.annotation.Transactional;
  * CTEs all operate on the same snapshot — the INSERT would not see the UPDATE's
  * effect and would still hit the unique constraint. Separate statements each see
  * the results of the previous statement within the same transaction.
+ * <p>
+ * <b>Deadlock Prevention:</b> Uses {@code pg_try_advisory_xact_lock} instead of
+ * the blocking {@code pg_advisory_xact_lock}. When two threads process overlapping
+ * sets of users in different orders (e.g., NATS webhook thread A processes users
+ * [alice, bob] while sync thread B processes [bob, alice]), blocking locks create
+ * an ABBA deadlock cycle. Non-blocking try-locks with retry break the cycle because
+ * a thread that can't acquire the lock sleeps briefly and retries, rather than
+ * blocking in PostgreSQL's wait queue.
  */
 @Service
 @Transactional
 public class GitHubUserProcessor {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubUserProcessor.class);
+
+    /** Maximum number of attempts to acquire the advisory lock before falling back. */
+    private static final int MAX_LOCK_ATTEMPTS = 5;
+
+    /** Base delay between lock acquisition attempts (with jitter). */
+    private static final long LOCK_RETRY_BASE_MS = 50;
 
     private final UserRepository userRepository;
     private final EntityManager entityManager;
@@ -65,7 +79,7 @@ public class GitHubUserProcessor {
      * <p>
      * Uses three separate SQL statements (not a CTE) within the caller's transaction:
      * <ol>
-     *   <li>Acquire advisory lock on the login to serialize concurrent upserts</li>
+     *   <li>Try to acquire advisory lock on the login (non-blocking, with retry)</li>
      *   <li>Rename any other user that currently holds the target login</li>
      *   <li>INSERT ... ON CONFLICT (id) DO UPDATE the user</li>
      * </ol>
@@ -98,16 +112,28 @@ public class GitHubUserProcessor {
         // consistency between Hibernate's cache and the database.
         entityManager.flush();
 
-        // Step 1: Acquire advisory lock to serialize concurrent upserts for
-        // the same login across threads/scopes.
-        userRepository.acquireLoginLock(login);
+        // Step 1: Try to acquire advisory lock (non-blocking to prevent deadlocks).
+        // If another transaction holds the lock, retry with jitter backoff.
+        // After MAX_LOCK_ATTEMPTS, fall through and attempt the upsert anyway —
+        // the INSERT ON CONFLICT handles concurrent inserts gracefully.
+        boolean lockAcquired = tryAcquireWithRetry(login);
 
-        // Step 2: Rename any other user that holds this login (different id).
-        // This is a separate statement so that step 3 sees the update.
-        userRepository.freeLoginConflicts(login, userId);
+        if (lockAcquired) {
+            // Step 2: Rename any other user that holds this login (different id).
+            // This is a separate statement so that step 3 sees the update.
+            userRepository.freeLoginConflicts(login, userId);
+        } else {
+            log.debug(
+                "Could not acquire advisory lock after {} attempts, proceeding with upsert: login={}",
+                MAX_LOCK_ATTEMPTS,
+                login
+            );
+        }
 
-        // Step 3: Insert or update the user. The login conflict has been
-        // resolved by step 2, so the unique constraint will not be violated.
+        // Step 3: Insert or update the user. When the lock was acquired, the login
+        // conflict has been resolved by step 2. When the lock was not acquired,
+        // the upsert may fail with a unique constraint violation if there is a login
+        // conflict — this is acceptable because the caller (NATS/sync) will retry.
         userRepository.upsertUser(
             userId,
             login,
@@ -139,6 +165,36 @@ public class GitHubUserProcessor {
             log.warn("User not found after upsert: userId={}, login={}", userId, login);
         }
         return result;
+    }
+
+    /**
+     * Attempts to acquire the advisory lock with retry and jitter.
+     * <p>
+     * Uses {@code pg_try_advisory_xact_lock} which returns immediately (never blocks).
+     * If the lock is held by another transaction, waits briefly with randomized jitter
+     * before retrying. This prevents the ABBA deadlock pattern that occurs when
+     * blocking locks are acquired in different orders by concurrent transactions.
+     *
+     * @param login the login to lock on
+     * @return true if the lock was acquired, false after all attempts exhausted
+     */
+    private boolean tryAcquireWithRetry(String login) {
+        for (int attempt = 0; attempt < MAX_LOCK_ATTEMPTS; attempt++) {
+            if (userRepository.tryAcquireLoginLock(login)) {
+                return true;
+            }
+            if (attempt < MAX_LOCK_ATTEMPTS - 1) {
+                try {
+                    // Jittered backoff: base * (attempt+1) + random [0, base)
+                    long delay = LOCK_RETRY_BASE_MS * (attempt + 1) + (long) (Math.random() * LOCK_RETRY_BASE_MS);
+                    Thread.sleep(delay);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return false;
+                }
+            }
+        }
+        return false;
     }
 
     /**

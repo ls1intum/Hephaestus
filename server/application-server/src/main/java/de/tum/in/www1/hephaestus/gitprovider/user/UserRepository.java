@@ -118,11 +118,32 @@ public interface UserRepository extends JpaRepository<User, Long> {
     List<User> findAllByLoginLowerIn(@Param("logins") Set<String> logins);
 
     /**
+     * Try to acquire a transaction-scoped advisory lock on the given login.
+     * <p>
+     * Returns {@code true} if the lock was acquired, {@code false} if it is
+     * already held by another transaction. Unlike {@link #acquireLoginLock},
+     * this method never blocks and cannot participate in a deadlock cycle.
+     * <p>
+     * The lock key is derived from {@code hashtext(LOWER(login))}, so only
+     * operations on the same (case-insensitive) login contend. The lock is
+     * automatically released when the enclosing transaction commits or rolls back.
+     *
+     * @return true if the lock was acquired, false if another transaction holds it
+     */
+    @Query(value = "SELECT pg_try_advisory_xact_lock(hashtext(LOWER(:login)))", nativeQuery = true)
+    boolean tryAcquireLoginLock(@Param("login") String login);
+
+    /**
      * Acquire a transaction-scoped advisory lock on the given login.
      * <p>
      * The lock key is derived from {@code hashtext(LOWER(login))}, so only
      * operations on the same (case-insensitive) login contend. The lock is
      * automatically released when the enclosing transaction commits or rolls back.
+     * <p>
+     * <b>Warning:</b> This method blocks until the lock is available and can
+     * participate in deadlock cycles when multiple transactions acquire locks
+     * in different orders. Prefer {@link #tryAcquireLoginLock} with retry logic
+     * to avoid deadlocks.
      * <p>
      * Must be called before {@link #freeLoginConflicts} and {@link #upsertUser}
      * to prevent cross-scope race conditions.
