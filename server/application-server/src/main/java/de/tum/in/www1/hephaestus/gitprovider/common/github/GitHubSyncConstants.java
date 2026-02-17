@@ -38,14 +38,16 @@ public final class GitHubSyncConstants {
     /**
      * Page size for pull request sync GraphQL queries.
      * <p>
-     * Uses a smaller page size (25) because the PR query has triple-nested pagination:
-     * pullRequests -> reviewThreads -> comments, which creates exponential data volume.
-     * With 100 PRs, the worst case is 100 x 10 threads x 10 comments = 10,000 review comments
-     * per query, causing GitHub API timeouts (502 errors) on large repositories.
+     * Uses a small page size because the PR query has triple-nested pagination:
+     * pullRequests -> reviews -> reviewThreads -> comments, which creates exponential
+     * data volume. With the nested collection sizes of 5, each PR can generate up to
+     * 5 reviews + 5 threads × 5 comments = 30 nodes. At 10 PRs per page, worst case
+     * is ~300 nested nodes per query — well within GitHub's compute budget.
      * <p>
-     * With 25 PRs per page: 25 x 10 x 10 = 2,500 review comments - much more manageable.
+     * Previous value of 25 caused GitHub API timeouts (502 errors) on repositories
+     * with heavy review activity (e.g., Artemis with 10,000+ PRs).
      */
-    public static final int PR_SYNC_PAGE_SIZE = 25;
+    public static final int PR_SYNC_PAGE_SIZE = 10;
 
     /**
      * Large page size for GraphQL queries (100 items per page).

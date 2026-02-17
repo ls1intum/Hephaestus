@@ -12,8 +12,8 @@ import org.springframework.lang.Nullable;
  * <p>
  * <h2>Embedded Data</h2>
  * <ul>
- *   <li>{@code embeddedReviews} - First 10 reviews (pagination for PRs with more)</li>
- *   <li>{@code embeddedReviewThreads} - First 10 review threads with their comments</li>
+ *   <li>{@code embeddedReviews} - First 5 reviews (pagination for PRs with more)</li>
+ *   <li>{@code embeddedReviewThreads} - First 5 review threads with their comments</li>
  *   <li>{@code embeddedProjectItems} - First 5 project items (pagination for PRs in more projects)</li>
  * </ul>
  */

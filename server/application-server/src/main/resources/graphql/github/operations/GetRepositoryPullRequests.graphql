@@ -203,8 +203,8 @@ query GetRepositoryPullRequests(
                 }
 
                 # Reviews (embedded to avoid N+1 queries)
-                # Most PRs have <10 reviews; we'll paginate for PRs with more
-                reviews(first: 10) {
+                # Most PRs have <5 reviews; follow-up pagination handles PRs with more
+                reviews(first: 5) {
                     totalCount
                     pageInfo {
                         hasNextPage
@@ -259,8 +259,8 @@ query GetRepositoryPullRequests(
                 }
 
                 # Review threads (embedded to avoid N+1 queries)
-                # Most PRs have <10 threads; pagination handled by GetPullRequestReviewComments for PRs with more
-                reviewThreads(first: 10) {
+                # Most PRs have <5 threads; pagination handled by GetPullRequestReviewComments for PRs with more
+                reviewThreads(first: 5) {
                     totalCount
                     pageInfo {
                         hasNextPage
@@ -291,8 +291,8 @@ query GetRepositoryPullRequests(
                             updatedAt
                         }
 
-                        # Comments in thread (first 10)
-                        comments(first: 10) {
+                        # Comments in thread (first 5)
+                        comments(first: 5) {
                             totalCount
                             pageInfo {
                                 hasNextPage
