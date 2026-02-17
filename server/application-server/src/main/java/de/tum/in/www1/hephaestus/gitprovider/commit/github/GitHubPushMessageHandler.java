@@ -16,6 +16,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.ScopeIdResolver;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider;
 import de.tum.in.www1.hephaestus.gitprovider.git.GitRepositoryManager;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
@@ -55,6 +56,7 @@ public class GitHubPushMessageHandler extends GitHubMessageHandler<GitHubPushEve
     private final CommitAuthorResolver authorResolver;
     private final ApplicationEventPublisher eventPublisher;
     private final ScopeIdResolver scopeIdResolver;
+    private final SyncTargetProvider syncTargetProvider;
 
     public GitHubPushMessageHandler(
         GitRepositoryManager gitRepositoryManager,
@@ -64,6 +66,7 @@ public class GitHubPushMessageHandler extends GitHubMessageHandler<GitHubPushEve
         CommitAuthorResolver authorResolver,
         ApplicationEventPublisher eventPublisher,
         ScopeIdResolver scopeIdResolver,
+        SyncTargetProvider syncTargetProvider,
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate
     ) {
@@ -75,6 +78,7 @@ public class GitHubPushMessageHandler extends GitHubMessageHandler<GitHubPushEve
         this.authorResolver = authorResolver;
         this.eventPublisher = eventPublisher;
         this.scopeIdResolver = scopeIdResolver;
+        this.syncTargetProvider = syncTargetProvider;
     }
 
     @Override
@@ -131,10 +135,23 @@ public class GitHubPushMessageHandler extends GitHubMessageHandler<GitHubPushEve
             return;
         }
 
+        // Only use local git clone for repositories in active workspaces.
+        // Without this check, pushes to repos belonging to inactive/archived/purged
+        // workspaces would still trigger expensive clone operations.
+        Long scopeId = resolveScopeId(repository);
+        boolean scopeActive = scopeId != null && syncTargetProvider.isScopeActiveForSync(scopeId);
+
         // Process commits
-        if (gitRepositoryManager.isEnabled()) {
+        if (gitRepositoryManager.isEnabled() && scopeActive) {
             processCommitsViaLocalGit(event, repository);
         } else {
+            if (gitRepositoryManager.isEnabled() && !scopeActive) {
+                log.debug(
+                    "Skipped local git processing: reason=scopeNotActive, scopeId={}, repoName={}",
+                    scopeId,
+                    repoName
+                );
+            }
             processCommitsViaWebhook(event, repository, false);
         }
     }

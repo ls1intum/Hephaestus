@@ -19,6 +19,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.ScopeIdResolver;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider;
 import de.tum.in.www1.hephaestus.gitprovider.git.GitRepositoryManager;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
@@ -62,6 +63,9 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
     private ScopeIdResolver scopeIdResolver;
 
     @Mock
+    private SyncTargetProvider syncTargetProvider;
+
+    @Mock
     private NatsMessageDeserializer deserializer;
 
     @Mock
@@ -79,6 +83,7 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
             authorResolver,
             eventPublisher,
             scopeIdResolver,
+            syncTargetProvider,
             deserializer,
             transactionTemplate
         );
@@ -155,7 +160,17 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
         when(repo.getId()).thenReturn(id);
         when(repo.getNameWithOwner()).thenReturn(nameWithOwner);
         when(repo.getDefaultBranch()).thenReturn(defaultBranch);
+        when(repo.getOrganization()).thenReturn(null);
         return repo;
+    }
+
+    /**
+     * Sets up scope resolution mocks so that the handler considers the scope active.
+     * Required for tests that exercise the local git processing path.
+     */
+    private void mockActiveScopeForRepo(String nameWithOwner) {
+        when(scopeIdResolver.findScopeIdByRepositoryName(nameWithOwner)).thenReturn(Optional.of(1L));
+        when(syncTargetProvider.isScopeActiveForSync(1L)).thenReturn(true);
     }
 
     @Nested
@@ -564,6 +579,7 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
 
             Repository repo = createMockRepository(100L, "owner/repo", "main");
             when(repositoryRepository.findByIdWithOrganization(100L)).thenReturn(Optional.of(repo));
+            mockActiveScopeForRepo("owner/repo");
             when(gitRepositoryManager.isEnabled()).thenReturn(true);
             when(tokenService.isConfigured()).thenReturn(true);
             when(tokenService.getInstallationToken(42L)).thenReturn("test-token");
@@ -593,6 +609,7 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
 
             Repository repo = createMockRepository(100L, "owner/repo", "main");
             when(repositoryRepository.findByIdWithOrganization(100L)).thenReturn(Optional.of(repo));
+            mockActiveScopeForRepo("owner/repo");
             when(gitRepositoryManager.isEnabled()).thenReturn(true);
             when(tokenService.isConfigured()).thenReturn(false);
             when(gitRepositoryManager.ensureRepository(eq(100L), any(), any())).thenThrow(
@@ -633,6 +650,7 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
 
             Repository repo = createMockRepository(100L, "owner/repo", "main");
             when(repositoryRepository.findByIdWithOrganization(100L)).thenReturn(Optional.of(repo));
+            mockActiveScopeForRepo("owner/repo");
             when(gitRepositoryManager.isEnabled()).thenReturn(true);
             when(tokenService.isConfigured()).thenReturn(false);
 
@@ -719,6 +737,7 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
 
             Repository repo = createMockRepository(100L, "owner/repo", "main");
             when(repositoryRepository.findByIdWithOrganization(100L)).thenReturn(Optional.of(repo));
+            mockActiveScopeForRepo("owner/repo");
             when(gitRepositoryManager.isEnabled()).thenReturn(true);
             when(tokenService.isConfigured()).thenReturn(false);
 
@@ -760,6 +779,49 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
                 any()
             );
             verify(commitRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("should fall back to webhook when scope is not active")
+        void shouldFallBackToWebhookWhenScopeNotActive() throws Exception {
+            var commit = createPushCommit(
+                "sha1aabbccdd112233445566778899aabbccddeeff",
+                "msg",
+                List.of("file.txt"),
+                List.of(),
+                List.of()
+            );
+            var event = createBasicPushEvent("refs/heads/main", false, List.of(commit));
+
+            Repository repo = createMockRepository(100L, "owner/repo", "main");
+            when(repositoryRepository.findByIdWithOrganization(100L)).thenReturn(Optional.of(repo));
+            when(gitRepositoryManager.isEnabled()).thenReturn(true);
+            // Scope not active: scopeIdResolver returns a scope, but it's inactive
+            when(scopeIdResolver.findScopeIdByRepositoryName("owner/repo")).thenReturn(Optional.of(99L));
+            when(syncTargetProvider.isScopeActiveForSync(99L)).thenReturn(false);
+
+            invokeHandleEvent(event);
+
+            // Should NOT use local git
+            verify(gitRepositoryManager, never()).ensureRepository(anyLong(), anyString(), any());
+            verify(gitRepositoryManager, never()).walkCommits(anyLong(), any(), any());
+
+            // Should process via webhook instead (non-fallback: additions=0, not null)
+            verify(commitRepository).upsertCommit(
+                anyString(),
+                anyString(),
+                any(),
+                any(),
+                any(),
+                any(),
+                eq(0),
+                eq(0),
+                eq(1), // 1 added file
+                any(),
+                eq(100L),
+                any(),
+                any()
+            );
         }
     }
 
