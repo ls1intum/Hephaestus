@@ -134,8 +134,7 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
                     10,
                     5,
                     15,
-                    null,
-                    "patch content"
+                    null
                 )
             )
         );

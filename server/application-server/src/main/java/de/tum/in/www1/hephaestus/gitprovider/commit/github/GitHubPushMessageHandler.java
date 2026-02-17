@@ -319,7 +319,6 @@ public class GitHubPushMessageHandler extends GitHubMessageHandler<GitHubPushEve
                     fileChange.setDeletions(fc.deletions());
                     fileChange.setChanges(fc.changes());
                     fileChange.setPreviousFilename(fc.previousFilename());
-                    fileChange.setPatch(fc.patch());
                     commit.addFileChange(fileChange);
                 }
                 commitRepository.save(commit);

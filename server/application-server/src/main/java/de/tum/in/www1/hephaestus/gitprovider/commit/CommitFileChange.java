@@ -79,14 +79,6 @@ public class CommitFileChange {
     @Column(length = 1024)
     private String previousFilename;
 
-    /**
-     * The patch/diff content for this file change.
-     * May be null if the diff is too large or binary.
-     */
-    @Column(columnDefinition = "TEXT")
-    @ToString.Exclude
-    private String patch;
-
     // ========== Relationships ==========
 
     /**

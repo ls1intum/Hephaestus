@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.gitprovider.git;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -14,11 +13,13 @@ import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.diff.DiffFormatter;
+import org.eclipse.jgit.diff.Edit;
 import org.eclipse.jgit.diff.RawTextComparator;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.patch.FileHeader;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
@@ -405,7 +406,7 @@ public class GitRepositoryManager {
             }
 
             for (DiffEntry diff : diffs) {
-                FileChange change = createFileChange(repo, diff);
+                FileChange change = createFileChange(diffFormatter, diff);
                 changes.add(change);
             }
         }
@@ -415,60 +416,38 @@ public class GitRepositoryManager {
 
     /**
      * Create a FileChange from a DiffEntry, counting additions/deletions.
+     * <p>
+     * Uses {@link DiffFormatter#toFileHeader(DiffEntry)} with {@link Edit} regions
+     * to compute line counts directly from the diff algorithm, avoiding the need to
+     * generate patch text. This approach is both faster and avoids the JGit
+     * {@code DiffDriver.valueOf()} NPE that occurs during {@code format()} for
+     * repositories with certain {@code .gitattributes} configurations.
      */
-    private FileChange createFileChange(Repository repo, DiffEntry diff) throws IOException {
+    private FileChange createFileChange(DiffFormatter diffFormatter, DiffEntry diff) throws IOException {
         String filename = diff.getChangeType() == DiffEntry.ChangeType.DELETE ? diff.getOldPath() : diff.getNewPath();
 
         String previousFilename = diff.getChangeType() == DiffEntry.ChangeType.RENAME ? diff.getOldPath() : null;
 
         ChangeType changeType = mapChangeType(diff.getChangeType());
 
-        // Count additions and deletions
+        // Count additions and deletions from EditList regions
         int additions = 0;
         int deletions = 0;
-        String patch = null;
 
-        try (
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            DiffFormatter formatter = new DiffFormatter(out)
-        ) {
-            formatter.setRepository(repo);
-            formatter.setDetectRenames(true);
-            try {
-                formatter.format(diff);
-                patch = out.toString();
-
-                // Parse the patch to count additions/deletions
-                for (String line : patch.split("\n")) {
-                    if (line.startsWith("+") && !line.startsWith("+++")) {
-                        additions++;
-                    } else if (line.startsWith("-") && !line.startsWith("---")) {
-                        deletions++;
-                    }
-                }
-
-                // Truncate large patches
-                if (patch.length() > 100_000) {
-                    patch = null; // Don't store very large patches
-                }
-            } catch (NullPointerException e) {
-                // JGit DiffDriver.valueOf() throws NPE for files with
-                // certain .gitattributes configurations (e.g., empty diff driver).
-                // Fall back to zero additions/deletions — we still have the filename
-                // and change type from the DiffEntry itself.
-                log.debug("Skipped diff for file (JGit DiffDriver NPE): filename={}", filename);
+        try {
+            FileHeader fileHeader = diffFormatter.toFileHeader(diff);
+            for (Edit edit : fileHeader.toEditList()) {
+                deletions += edit.getEndA() - edit.getBeginA();
+                additions += edit.getEndB() - edit.getBeginB();
             }
+        } catch (Exception e) {
+            // Certain .gitattributes configurations can cause JGit internal errors.
+            // Fall back to zero additions/deletions — we still have the filename
+            // and change type from the DiffEntry itself.
+            log.debug("Skipped diff stats for file: filename={}, error={}", filename, e.getMessage());
         }
 
-        return new FileChange(
-            filename,
-            changeType,
-            additions,
-            deletions,
-            additions + deletions,
-            previousFilename,
-            patch
-        );
+        return new FileChange(filename, changeType, additions, deletions, additions + deletions, previousFilename);
     }
 
     private ChangeType mapChangeType(DiffEntry.ChangeType type) {
@@ -517,8 +496,7 @@ public class GitRepositoryManager {
         int additions,
         int deletions,
         int changes,
-        @Nullable String previousFilename,
-        @Nullable String patch
+        @Nullable String previousFilename
     ) {}
 
     /**

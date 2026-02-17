@@ -642,8 +642,7 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
                 10,
                 0,
                 10,
-                null,
-                "+added code"
+                null
             );
             var commitInfo = new GitRepositoryManager.CommitInfo(
                 "sha1aabbccdd112233445566778899aabbccddeeff",

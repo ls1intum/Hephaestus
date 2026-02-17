@@ -289,7 +289,6 @@ export const commitFileChange = pgTable(
 		deletions: integer().default(0).notNull(),
 		changes: integer().default(0).notNull(),
 		previousFilename: varchar("previous_filename", { length: 1024 }),
-		patch: text(),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		commitId: bigint("commit_id", { mode: "number" }).notNull(),
 	},
