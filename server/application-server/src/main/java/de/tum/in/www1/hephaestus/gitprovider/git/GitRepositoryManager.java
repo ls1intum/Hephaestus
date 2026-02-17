@@ -95,6 +95,40 @@ public class GitRepositoryManager {
     }
 
     /**
+     * Delete the local clone for a repository.
+     * <p>
+     * Acquires a write lock, recursively deletes the clone directory, then removes the lock
+     * entry from the lock manager. Safe to call even if the clone does not exist (no-op).
+     *
+     * @param repositoryId the repository database ID
+     */
+    public void deleteClone(Long repositoryId) {
+        if (!properties.enabled()) {
+            return;
+        }
+
+        lockManager.withWriteLock(repositoryId, () -> {
+            Path repoPath = getRepositoryPath(repositoryId);
+            if (Files.exists(repoPath)) {
+                try {
+                    deleteRecursively(repoPath);
+                    log.info("Deleted local git clone: repoId={}, path={}", repositoryId, repoPath);
+                } catch (IOException e) {
+                    log.error(
+                        "Failed to delete local git clone: repoId={}, path={}, error={}",
+                        repositoryId,
+                        repoPath,
+                        e.getMessage(),
+                        e
+                    );
+                }
+            }
+        });
+
+        lockManager.removeLock(repositoryId);
+    }
+
+    /**
      * Ensure repository is cloned/fetched. Returns path to bare repo.
      * Called by push webhook handler.
      *
@@ -466,6 +500,27 @@ public class GitRepositoryManager {
     private String sanitizeUrl(String url) {
         if (url == null) return null;
         return url.replaceAll("x-access-token:[^@]+@", "x-access-token:***@");
+    }
+
+    /**
+     * Recursively delete a directory and all its contents.
+     * Walks the tree depth-first (files before directories).
+     */
+    private void deleteRecursively(Path path) throws IOException {
+        try (var stream = Files.walk(path)) {
+            // Sort in reverse order so files are deleted before their parent directories
+            stream
+                .sorted(java.util.Comparator.reverseOrder())
+                .forEach(p -> {
+                    try {
+                        Files.delete(p);
+                    } catch (IOException e) {
+                        throw new java.io.UncheckedIOException(e);
+                    }
+                });
+        } catch (java.io.UncheckedIOException e) {
+            throw e.getCause();
+        }
     }
 
     /**
