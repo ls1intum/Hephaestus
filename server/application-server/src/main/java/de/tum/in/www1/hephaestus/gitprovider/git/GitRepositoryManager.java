@@ -6,7 +6,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.diff.DiffEntry;
@@ -29,14 +32,14 @@ import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 
 /**
- * Manages local bare git repository clones for file-level commit analysis.
+ * Manages local git repository clones for file-level commit analysis.
  * <p>
- * Repositories are stored as bare clones at {storagePath}/{repositoryId}.git
+ * Repositories are stored as full clones at {storagePath}/{repositoryId}
  * This approach:
  * <ul>
- *   <li>Uses 30-40% less disk than regular clones</li>
- *   <li>Is inherently read-only (no working tree conflicts)</li>
- *   <li>Allows intelligence-service to read files directly from disk</li>
+ *   <li>Supports worktree-based operations for coding agents</li>
+ *   <li>Allows intelligence-service to read files directly from the working tree</li>
+ *   <li>Maintains all branches via {@code setCloneAllBranches(true)}</li>
  * </ul>
  */
 @Service
@@ -73,19 +76,21 @@ public class GitRepositoryManager {
     }
 
     /**
-     * Get the local path for a repository's bare clone.
-     * Path format: {baseStoragePath}/{repositoryId}.git
+     * Get the local path for a repository clone.
+     * Path format: {baseStoragePath}/{repositoryId}
      */
     public Path getRepositoryPath(Long repositoryId) {
-        return baseStoragePath.resolve(repositoryId + ".git");
+        return baseStoragePath.resolve(repositoryId.toString());
     }
 
     /**
      * Check if a repository is already cloned locally.
+     * Supports both full clones (.git subdirectory) and bare clones (HEAD at root).
      */
     public boolean isRepositoryCloned(Long repositoryId) {
         Path repoPath = getRepositoryPath(repositoryId);
-        return Files.exists(repoPath.resolve("HEAD"));
+        // Full clone: .git/HEAD; bare clone (legacy): HEAD at root
+        return Files.exists(repoPath.resolve(".git").resolve("HEAD")) || Files.exists(repoPath.resolve("HEAD"));
     }
 
     /**
@@ -95,7 +100,7 @@ public class GitRepositoryManager {
      * @param repositoryId the repository database ID
      * @param cloneUrl the git clone URL (https://github.com/owner/repo.git)
      * @param token the authentication token (for private repos)
-     * @return path to the local bare repository
+     * @return path to the local repository
      */
     public Path ensureRepository(Long repositoryId, String cloneUrl, @Nullable String token) {
         if (!properties.enabled()) {
@@ -120,7 +125,7 @@ public class GitRepositoryManager {
     }
 
     /**
-     * Clone a repository as a bare clone.
+     * Clone a repository as a full clone.
      */
     private void cloneRepository(Path repoPath, String cloneUrl, @Nullable String token)
         throws GitAPIException, IOException {
@@ -131,7 +136,7 @@ public class GitRepositoryManager {
         var cloneCommand = Git.cloneRepository()
             .setURI(cloneUrl)
             .setDirectory(repoPath.toFile())
-            .setBare(true)
+            .setBare(false)
             .setCloneAllBranches(true);
 
         if (token != null && !token.isBlank()) {
@@ -162,11 +167,12 @@ public class GitRepositoryManager {
     }
 
     /**
-     * Resolves the HEAD SHA of the default branch from a bare clone.
+     * Resolves the HEAD SHA of the default branch from a local clone.
      * <p>
-     * In bare repos created with {@code --clone-all-branches}, remote refs are
+     * In clones created with {@code --clone-all-branches}, remote refs are
      * stored at {@code refs/remotes/origin/<branch>}. This method resolves
      * the ObjectId for that ref and returns its SHA-1 hex string.
+     * Also checks {@code refs/heads/<branch>} and {@code HEAD} as fallbacks.
      *
      * @param repositoryId  the repository database ID
      * @param defaultBranch the default branch name (e.g. "main")
@@ -216,6 +222,67 @@ public class GitRepositoryManager {
             }
         });
     }
+
+    /**
+     * Lightweight SHA-to-email resolution from the local git clone.
+     * <p>
+     * For each SHA in the input set, reads the {@link RevCommit} to extract
+     * author and committer email addresses. This is very fast — only the commit
+     * object is parsed (no diff computation).
+     *
+     * @param repositoryId the repository database ID
+     * @param shas         the commit SHAs to resolve
+     * @return map from SHA to {@link EmailPair} (author + committer email)
+     */
+    public Map<String, EmailPair> resolveCommitEmails(Long repositoryId, Set<String> shas) {
+        if (!properties.enabled() || shas.isEmpty()) {
+            return Map.of();
+        }
+
+        return lockManager.withReadLock(repositoryId, () -> {
+            Path repoPath = getRepositoryPath(repositoryId);
+            Map<String, EmailPair> result = new HashMap<>();
+
+            try (Git git = Git.open(repoPath.toFile())) {
+                Repository repo = git.getRepository();
+                try (RevWalk revWalk = new RevWalk(repo)) {
+                    for (String sha : shas) {
+                        try {
+                            ObjectId objectId = repo.resolve(sha);
+                            if (objectId == null) {
+                                log.debug("Cannot resolve SHA for email lookup: sha={}", sha);
+                                continue;
+                            }
+                            RevCommit commit = revWalk.parseCommit(objectId);
+                            result.put(
+                                sha,
+                                new EmailPair(
+                                    commit.getAuthorIdent().getEmailAddress(),
+                                    commit.getCommitterIdent().getEmailAddress()
+                                )
+                            );
+                            revWalk.reset();
+                        } catch (IOException e) {
+                            log.debug("Failed to parse commit for email: sha={}, error={}", sha, e.getMessage());
+                        }
+                    }
+                }
+            } catch (IOException e) {
+                log.error(
+                    "Failed to open repo for email resolution: repoId={}, error={}",
+                    repositoryId,
+                    e.getMessage()
+                );
+            }
+
+            return result;
+        });
+    }
+
+    /**
+     * Author and committer email pair for a commit.
+     */
+    public record EmailPair(String authorEmail, String committerEmail) {}
 
     /**
      * Walk commits between two SHAs and extract commit info with file changes.
@@ -367,21 +434,29 @@ public class GitRepositoryManager {
         ) {
             formatter.setRepository(repo);
             formatter.setDetectRenames(true);
-            formatter.format(diff);
-            patch = out.toString();
+            try {
+                formatter.format(diff);
+                patch = out.toString();
 
-            // Parse the patch to count additions/deletions
-            for (String line : patch.split("\n")) {
-                if (line.startsWith("+") && !line.startsWith("+++")) {
-                    additions++;
-                } else if (line.startsWith("-") && !line.startsWith("---")) {
-                    deletions++;
+                // Parse the patch to count additions/deletions
+                for (String line : patch.split("\n")) {
+                    if (line.startsWith("+") && !line.startsWith("+++")) {
+                        additions++;
+                    } else if (line.startsWith("-") && !line.startsWith("---")) {
+                        deletions++;
+                    }
                 }
-            }
 
-            // Truncate large patches
-            if (patch.length() > 100_000) {
-                patch = null; // Don't store very large patches
+                // Truncate large patches
+                if (patch.length() > 100_000) {
+                    patch = null; // Don't store very large patches
+                }
+            } catch (NullPointerException e) {
+                // JGit DiffDriver.valueOf() throws NPE for files with
+                // certain .gitattributes configurations (e.g., empty diff driver).
+                // Fall back to zero additions/deletions — we still have the filename
+                // and change type from the DiffEntry itself.
+                log.debug("Skipped diff for file (JGit DiffDriver NPE): filename={}", filename);
             }
         }
 

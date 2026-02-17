@@ -16,8 +16,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "hephaestus.git")
 public record GitRepositoryProperties(
     /**
-     * Base path where bare git repositories are stored.
-     * Each repository is stored at {storagePath}/{repositoryId}.git
+     * Base path where git repositories are stored.
+     * Each repository is stored at {storagePath}/{repositoryId}
      * Defaults to /data/git-repos
      */
     String storagePath,
