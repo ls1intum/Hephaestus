@@ -13,8 +13,6 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientPr
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoordinator;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoordinator.GraphQlClassificationContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubTransportErrors;
-import de.tum.in.www1.hephaestus.gitprovider.git.GitRepositoryManager;
-import de.tum.in.www1.hephaestus.gitprovider.git.GitRepositoryManager.EmailPair;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -22,7 +20,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.graphql.client.ClientGraphQlResponse;
@@ -33,31 +30,30 @@ import reactor.core.publisher.Mono;
 import reactor.util.retry.Retry;
 
 /**
- * Enriches commits with unresolved author/committer by querying GitHub GraphQL API.
+ * Enriches commits with unresolved author/committer by querying the database
+ * for stored email addresses and, if needed, the GitHub GraphQL API.
  * <p>
- * <b>Algorithm:</b>
+ * <b>Algorithm (email-based negative caching):</b>
  * <ol>
- *   <li>Find all commits for a repo where {@code author_id IS NULL} or
- *       {@code committer_id IS NULL}</li>
- *   <li>Use the local git clone to read SHA &rarr; email mappings (lightweight)</li>
- *   <li>First pass: resolve emails against existing DB users (noreply fallback)</li>
- *   <li>Group remaining unresolved SHAs by email &rarr; "clusters"</li>
- *   <li>For each unique email cluster, pick ONE representative SHA</li>
- *   <li>Batch up to 50 SHAs per GraphQL query using alias-based batching:
- *       each SHA becomes an aliased {@code repository.object(oid:)} field</li>
- *   <li>Extract {@code author.user.login} and {@code committer.user.login}
- *       from each commit response</li>
- *   <li>Resolve login &rarr; user_id via {@link CommitAuthorResolver}</li>
- *   <li>Bulk update ALL commits in each email cluster</li>
+ *   <li>Query distinct unresolved author/committer emails from {@code git_commit}
+ *       where {@code author_id IS NULL AND author_email IS NOT NULL}</li>
+ *   <li>First pass: resolve each email against existing DB users via
+ *       {@link CommitAuthorResolver#resolveByEmail} (direct match + noreply parsing)</li>
+ *   <li>Bulk update all commits sharing the resolved email in one statement</li>
+ *   <li>For still-unresolved emails: pick one representative SHA per email,
+ *       batch up to 50 per GraphQL query to get the login from GitHub</li>
+ *   <li>Resolve login &rarr; user_id, then bulk update by email</li>
  * </ol>
  * <p>
- * This is O(unique_authors) API calls (batched 50 at a time) instead of
- * O(commits) &mdash; extremely efficient.
+ * <b>Negative caching:</b> Emails that cannot be resolved remain in the database
+ * with {@code author_id IS NULL}. Each enrichment cycle re-attempts resolution
+ * cheaply (two indexed DB lookups per email). When new users are synced to the
+ * database, their emails will match on the next cycle — no TTL needed.
  * <p>
- * Follows the gold standard pattern: transport retry via {@code Mono.defer()},
- * GraphQL error classification via {@link GitHubGraphQlSyncCoordinator},
- * rate limit tracking via {@link GitHubGraphQlClientProvider}, and exception
- * classification via {@link GitHubExceptionClassifier}.
+ * <b>Key improvement:</b> This service no longer depends on {@code GitRepositoryManager}
+ * for enrichment. Emails are captured at commit ingestion time (webhook or backfill)
+ * and stored on the {@code git_commit} table, eliminating the need to open JGit
+ * bare clones during enrichment.
  */
 @Service
 public class CommitAuthorEnrichmentService {
@@ -78,7 +74,6 @@ public class CommitAuthorEnrichmentService {
 
     private final CommitRepository commitRepository;
     private final CommitAuthorResolver authorResolver;
-    private final GitRepositoryManager gitRepositoryManager;
     private final GitHubGraphQlClientProvider graphQlClientProvider;
     private final GitHubGraphQlSyncCoordinator graphQlSyncCoordinator;
     private final GitHubExceptionClassifier exceptionClassifier;
@@ -86,14 +81,12 @@ public class CommitAuthorEnrichmentService {
     public CommitAuthorEnrichmentService(
         CommitRepository commitRepository,
         CommitAuthorResolver authorResolver,
-        GitRepositoryManager gitRepositoryManager,
         GitHubGraphQlClientProvider graphQlClientProvider,
         GitHubGraphQlSyncCoordinator graphQlSyncCoordinator,
         GitHubExceptionClassifier exceptionClassifier
     ) {
         this.commitRepository = commitRepository;
         this.authorResolver = authorResolver;
-        this.gitRepositoryManager = gitRepositoryManager;
         this.graphQlClientProvider = graphQlClientProvider;
         this.graphQlSyncCoordinator = graphQlSyncCoordinator;
         this.exceptionClassifier = exceptionClassifier;
@@ -103,53 +96,48 @@ public class CommitAuthorEnrichmentService {
      * Enriches unresolved commit authors/committers for a repository.
      * <p>
      * This method is safe to call repeatedly &mdash; it only processes commits where
-     * {@code author_id} or {@code committer_id} is NULL.
+     * {@code author_id} or {@code committer_id} is NULL and the corresponding email is stored.
      *
      * @param repositoryId     the repository database ID
      * @param nameWithOwner    the repository name with owner (e.g. "owner/repo")
      * @param scopeId          the scope ID for GraphQL client authentication
-     * @return the number of commits enriched, or -1 if skipped
+     * @return the number of commits enriched
      */
     public int enrichCommitAuthors(Long repositoryId, String nameWithOwner, @Nullable Long scopeId) {
-        if (!gitRepositoryManager.isEnabled()) {
-            return -1;
-        }
+        // Phase 1: Find all distinct unresolved emails from the database
+        List<String> unresolvedAuthorEmails = commitRepository.findDistinctUnresolvedAuthorEmailsByRepositoryId(
+            repositoryId
+        );
+        List<String> unresolvedCommitterEmails = commitRepository.findDistinctUnresolvedCommitterEmailsByRepositoryId(
+            repositoryId
+        );
 
-        // Phase 1: Find all unresolved SHAs
-        List<String> nullAuthorShas = commitRepository.findShasWithNullAuthorByRepositoryId(repositoryId);
-        List<String> nullCommitterShas = commitRepository.findShasWithNullCommitterByRepositoryId(repositoryId);
-
-        Set<String> allUnresolvedShas = new HashSet<>(nullAuthorShas);
-        allUnresolvedShas.addAll(nullCommitterShas);
-
-        if (allUnresolvedShas.isEmpty()) {
+        if (unresolvedAuthorEmails.isEmpty() && unresolvedCommitterEmails.isEmpty()) {
             log.debug("No unresolved commit authors: repoId={}", repositoryId);
             return 0;
         }
 
-        // Phase 2: Resolve SHA → email via local git (lightweight, no diff)
-        Map<String, EmailPair> emailMap = gitRepositoryManager.resolveCommitEmails(repositoryId, allUnresolvedShas);
+        log.debug(
+            "Found unresolved emails: repoId={}, authorEmails={}, committerEmails={}",
+            repositoryId,
+            unresolvedAuthorEmails.size(),
+            unresolvedCommitterEmails.size()
+        );
 
-        if (emailMap.isEmpty()) {
-            log.debug(
-                "Could not resolve emails from git: repoId={}, unresolvedCount={}",
-                repositoryId,
-                allUnresolvedShas.size()
-            );
-            return 0;
-        }
+        // Phase 2: First pass — try resolving by email using existing DB users
+        int enrichedByEmail = enrichByEmail(repositoryId, unresolvedAuthorEmails, unresolvedCommitterEmails);
 
-        // Phase 3: First pass — try resolving by email using existing DB users
-        int enrichedByEmail = enrichByEmail(repositoryId, nullAuthorShas, nullCommitterShas, emailMap);
+        // Phase 3: Re-check which emails are still unresolved after email pass
+        List<String> stillUnresolvedAuthorEmails = commitRepository.findDistinctUnresolvedAuthorEmailsByRepositoryId(
+            repositoryId
+        );
+        List<String> stillUnresolvedCommitterEmails =
+            commitRepository.findDistinctUnresolvedCommitterEmailsByRepositoryId(repositoryId);
 
-        // Phase 4: Re-check which commits are still unresolved after email pass
-        List<String> stillNullAuthorShas = commitRepository.findShasWithNullAuthorByRepositoryId(repositoryId);
-        List<String> stillNullCommitterShas = commitRepository.findShasWithNullCommitterByRepositoryId(repositoryId);
+        Set<String> allStillUnresolved = new HashSet<>(stillUnresolvedAuthorEmails);
+        allStillUnresolved.addAll(stillUnresolvedCommitterEmails);
 
-        Set<String> stillUnresolvedShas = new HashSet<>(stillNullAuthorShas);
-        stillUnresolvedShas.addAll(stillNullCommitterShas);
-
-        if (stillUnresolvedShas.isEmpty()) {
+        if (allStillUnresolved.isEmpty()) {
             log.info("Enriched all commit authors via email: repoId={}, enriched={}", repositoryId, enrichedByEmail);
             return enrichedByEmail;
         }
@@ -158,19 +146,18 @@ public class CommitAuthorEnrichmentService {
             log.debug(
                 "Skipping GitHub API enrichment: reason=noScopeId, repoId={}, remaining={}",
                 repositoryId,
-                stillUnresolvedShas.size()
+                allStillUnresolved.size()
             );
             return enrichedByEmail;
         }
 
-        // Phase 5: Cluster remaining unresolved by email, fetch from GitHub GraphQL API
+        // Phase 4: Cluster remaining unresolved by email, fetch from GitHub GraphQL API
         int enrichedByApi = enrichByGitHubGraphQl(
             repositoryId,
             nameWithOwner,
             scopeId,
-            stillNullAuthorShas,
-            stillNullCommitterShas,
-            emailMap
+            stillUnresolvedAuthorEmails,
+            stillUnresolvedCommitterEmails
         );
 
         int total = enrichedByEmail + enrichedByApi;
@@ -187,44 +174,28 @@ public class CommitAuthorEnrichmentService {
     /**
      * First pass: resolve authors by email using {@link CommitAuthorResolver#resolveByEmail}.
      * This resolves noreply emails and direct email matches without any API call.
+     * Uses bulk update by email — one UPDATE per distinct email.
      */
     private int enrichByEmail(
         Long repositoryId,
-        List<String> nullAuthorShas,
-        List<String> nullCommitterShas,
-        Map<String, EmailPair> emailMap
+        List<String> unresolvedAuthorEmails,
+        List<String> unresolvedCommitterEmails
     ) {
         int enriched = 0;
 
-        // Group null-author SHAs by author email
-        Map<String, List<String>> authorEmailToShas = nullAuthorShas
-            .stream()
-            .filter(emailMap::containsKey)
-            .collect(Collectors.groupingBy(sha -> emailMap.get(sha).authorEmail()));
-
-        for (var entry : authorEmailToShas.entrySet()) {
-            String email = entry.getKey();
-            List<String> shas = entry.getValue();
+        for (String email : unresolvedAuthorEmails) {
             Long userId = authorResolver.resolveByEmail(email);
             if (userId != null) {
-                int updated = commitRepository.bulkUpdateAuthorId(shas, repositoryId, userId);
+                int updated = commitRepository.bulkUpdateAuthorIdByEmail(email, repositoryId, userId);
                 enriched += updated;
                 log.debug("Enriched {} commits author by email: email={}, repoId={}", updated, email, repositoryId);
             }
         }
 
-        // Group null-committer SHAs by committer email
-        Map<String, List<String>> committerEmailToShas = nullCommitterShas
-            .stream()
-            .filter(emailMap::containsKey)
-            .collect(Collectors.groupingBy(sha -> emailMap.get(sha).committerEmail()));
-
-        for (var entry : committerEmailToShas.entrySet()) {
-            String email = entry.getKey();
-            List<String> shas = entry.getValue();
+        for (String email : unresolvedCommitterEmails) {
             Long userId = authorResolver.resolveByEmail(email);
             if (userId != null) {
-                int updated = commitRepository.bulkUpdateCommitterId(shas, repositoryId, userId);
+                int updated = commitRepository.bulkUpdateCommitterIdByEmail(email, repositoryId, userId);
                 enriched += updated;
                 log.debug("Enriched {} commits committer by email: email={}, repoId={}", updated, email, repositoryId);
             }
@@ -234,59 +205,54 @@ public class CommitAuthorEnrichmentService {
     }
 
     /**
-     * Second pass: cluster remaining unresolved commits by email, fetch ONE
-     * representative commit per email from GitHub GraphQL API (batched up to
-     * 50 per query) to get the login, then bulk update all commits in each cluster.
+     * Second pass: for each still-unresolved email, find ONE representative commit SHA,
+     * fetch from GitHub GraphQL API (batched up to 50 per query) to get the login,
+     * then bulk update all commits sharing that email.
      */
     private int enrichByGitHubGraphQl(
         Long repositoryId,
         String nameWithOwner,
         Long scopeId,
-        List<String> nullAuthorShas,
-        List<String> nullCommitterShas,
-        Map<String, EmailPair> emailMap
+        List<String> unresolvedAuthorEmails,
+        List<String> unresolvedCommitterEmails
     ) {
-        // Build email→representative SHA maps for unresolved authors/committers
-        Map<String, String> authorEmailToRepSha = new HashMap<>();
-        for (String sha : nullAuthorShas) {
-            EmailPair pair = emailMap.get(sha);
-            if (pair != null) {
-                authorEmailToRepSha.putIfAbsent(pair.authorEmail(), sha);
+        // Collect all unique unresolved emails
+        Set<String> allUnresolvedEmails = new HashSet<>(unresolvedAuthorEmails);
+        allUnresolvedEmails.addAll(unresolvedCommitterEmails);
+
+        if (allUnresolvedEmails.isEmpty()) {
+            return 0;
+        }
+
+        // Single query: get one representative SHA per unresolved email
+        Map<String, String> emailToRepSha = new HashMap<>();
+        for (Object[] row : commitRepository.findRepresentativeShasByUnresolvedEmail(repositoryId)) {
+            String email = (String) row[0];
+            String sha = (String) row[1];
+            // Only keep emails that are still in our unresolved set, deduplicate
+            if (allUnresolvedEmails.contains(email)) {
+                emailToRepSha.putIfAbsent(email, sha);
             }
         }
 
-        Map<String, String> committerEmailToRepSha = new HashMap<>();
-        for (String sha : nullCommitterShas) {
-            EmailPair pair = emailMap.get(sha);
-            if (pair != null) {
-                committerEmailToRepSha.putIfAbsent(pair.committerEmail(), sha);
-            }
+        if (emailToRepSha.isEmpty()) {
+            return 0;
         }
 
-        // Merge all representative SHAs to fetch (deduplicate)
+        // Build reverse map: SHA → email (for GraphQL response extraction)
         Map<String, String> shaToEmail = new HashMap<>();
-        authorEmailToRepSha.forEach((email, sha) -> shaToEmail.putIfAbsent(sha, email));
-        committerEmailToRepSha.forEach((email, sha) -> shaToEmail.putIfAbsent(sha, email));
+        for (var entry : emailToRepSha.entrySet()) {
+            String sha = entry.getValue();
+            if (SHA_PATTERN.matcher(sha).matches()) {
+                shaToEmail.putIfAbsent(sha, entry.getKey());
+            }
+        }
 
         if (shaToEmail.isEmpty()) {
             return 0;
         }
 
-        // Validate SHAs before baking into GraphQL query string
-        List<String> validShas = shaToEmail
-            .keySet()
-            .stream()
-            .filter(sha -> SHA_PATTERN.matcher(sha).matches())
-            .toList();
-
-        int invalidCount = shaToEmail.size() - validShas.size();
-        if (invalidCount > 0) {
-            log.warn("Skipped {} invalid SHAs during enrichment: repoId={}", invalidCount, repositoryId);
-        }
-
-        if (validShas.isEmpty()) {
-            return 0;
-        }
+        List<String> validShas = new ArrayList<>(shaToEmail.keySet());
 
         log.debug(
             "Fetching {} representative commits via GraphQL: repoId={}, repo={}",
@@ -296,27 +262,21 @@ public class CommitAuthorEnrichmentService {
         );
 
         // Fetch commit authors in batches via GraphQL
-        Map<String, String> emailToLogin = fetchCommitAuthorsBatched(nameWithOwner, scopeId, validShas, emailMap);
+        Map<String, String> emailToLogin = fetchCommitAuthorsBatched(nameWithOwner, scopeId, validShas, shaToEmail);
 
         // Bulk update: for each email → login, resolve login → user_id,
-        // then update all SHAs in that email cluster
+        // then update all commits with that email
         int enriched = 0;
 
         // Author updates
-        Map<String, List<String>> authorEmailToAllShas = nullAuthorShas
-            .stream()
-            .filter(emailMap::containsKey)
-            .collect(Collectors.groupingBy(sha -> emailMap.get(sha).authorEmail()));
-
-        for (var entry : authorEmailToAllShas.entrySet()) {
-            String email = entry.getKey();
+        for (String email : unresolvedAuthorEmails) {
             String login = emailToLogin.get(email);
             if (login == null) {
                 continue;
             }
             Long userId = authorResolver.resolveByLogin(login);
             if (userId != null) {
-                int updated = commitRepository.bulkUpdateAuthorId(entry.getValue(), repositoryId, userId);
+                int updated = commitRepository.bulkUpdateAuthorIdByEmail(email, repositoryId, userId);
                 enriched += updated;
                 log.debug(
                     "Enriched {} commits author via GraphQL: email={}, login={}, repoId={}",
@@ -329,20 +289,14 @@ public class CommitAuthorEnrichmentService {
         }
 
         // Committer updates
-        Map<String, List<String>> committerEmailToAllShas = nullCommitterShas
-            .stream()
-            .filter(emailMap::containsKey)
-            .collect(Collectors.groupingBy(sha -> emailMap.get(sha).committerEmail()));
-
-        for (var entry : committerEmailToAllShas.entrySet()) {
-            String email = entry.getKey();
+        for (String email : unresolvedCommitterEmails) {
             String login = emailToLogin.get(email);
             if (login == null) {
                 continue;
             }
             Long userId = authorResolver.resolveByLogin(login);
             if (userId != null) {
-                int updated = commitRepository.bulkUpdateCommitterId(entry.getValue(), repositoryId, userId);
+                int updated = commitRepository.bulkUpdateCommitterIdByEmail(email, repositoryId, userId);
                 enriched += updated;
                 log.debug(
                     "Enriched {} commits committer via GraphQL: email={}, login={}, repoId={}",
@@ -379,7 +333,7 @@ public class CommitAuthorEnrichmentService {
         String nameWithOwner,
         Long scopeId,
         List<String> shas,
-        Map<String, EmailPair> emailMap
+        Map<String, String> shaToEmail
     ) {
         Map<String, String> emailToLogin = new HashMap<>();
         String[] parts = nameWithOwner.split("/", 2);
@@ -416,7 +370,7 @@ public class CommitAuthorEnrichmentService {
                 }
             }
 
-            Map<String, String> batchResult = fetchBatch(owner, repoName, scopeId, batch, emailMap, nameWithOwner);
+            Map<String, String> batchResult = fetchBatch(owner, repoName, scopeId, batch, shaToEmail, nameWithOwner);
             emailToLogin.putAll(batchResult);
         }
 
@@ -435,7 +389,7 @@ public class CommitAuthorEnrichmentService {
         String repoName,
         Long scopeId,
         List<String> batch,
-        Map<String, EmailPair> emailMap,
+        Map<String, String> shaToEmail,
         String nameWithOwner
     ) {
         Map<String, String> emailToLogin = new HashMap<>();
@@ -507,7 +461,7 @@ public class CommitAuthorEnrichmentService {
                 graphQlClientProvider.recordSuccess();
 
                 // Extract results from aliased fields
-                extractLoginsFromResponse(response, batch, emailMap, emailToLogin);
+                extractLoginsFromResponse(response, batch, shaToEmail, emailToLogin);
                 break; // Success — exit retry loop
             } catch (Exception e) {
                 graphQlClientProvider.recordFailure(e);
@@ -577,12 +531,13 @@ public class CommitAuthorEnrichmentService {
     private void extractLoginsFromResponse(
         ClientGraphQlResponse response,
         List<String> batch,
-        Map<String, EmailPair> emailMap,
+        Map<String, String> shaToEmail,
         Map<String, String> emailToLogin
     ) {
         for (int i = 0; i < batch.size(); i++) {
             String sha = batch.get(i);
             String fieldPath = "repository.commit" + i;
+            String email = shaToEmail.get(sha);
 
             try {
                 ClientResponseField field = response.field(fieldPath);
@@ -593,20 +548,14 @@ public class CommitAuthorEnrichmentService {
 
                 // Extract author login
                 String authorLogin = extractNestedLogin(field, "author");
-                if (authorLogin != null) {
-                    EmailPair pair = emailMap.get(sha);
-                    if (pair != null) {
-                        emailToLogin.putIfAbsent(pair.authorEmail(), authorLogin);
-                    }
+                if (authorLogin != null && email != null) {
+                    emailToLogin.putIfAbsent(email, authorLogin);
                 }
 
                 // Extract committer login
                 String committerLogin = extractNestedLogin(field, "committer");
-                if (committerLogin != null) {
-                    EmailPair pair = emailMap.get(sha);
-                    if (pair != null) {
-                        emailToLogin.putIfAbsent(pair.committerEmail(), committerLogin);
-                    }
+                if (committerLogin != null && email != null) {
+                    emailToLogin.putIfAbsent(email, committerLogin);
                 }
             } catch (Exception e) {
                 log.debug("Failed to extract login for commit: sha={}, error={}", sha, e.getMessage());

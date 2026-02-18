@@ -210,6 +210,8 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
                 any(),
                 anyLong(),
                 any(),
+                any(),
+                any(),
                 any()
             );
         }
@@ -271,6 +273,8 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
                 any(),
                 anyLong(),
                 any(),
+                any(),
+                any(),
                 any()
             );
         }
@@ -324,6 +328,8 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
                 any(),
                 anyLong(),
                 any(),
+                any(),
+                any(),
                 any()
             );
         }
@@ -364,7 +370,9 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
                 any(Instant.class), // lastSyncAt
                 eq(100L),
                 any(), // authorId
-                any() // committerId
+                any(), // committerId
+                any(), // authorEmail
+                any() // committerEmail
             );
         }
 
@@ -406,6 +414,8 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
                 any(),
                 eq(100L),
                 any(),
+                any(),
+                any(),
                 any()
             );
         }
@@ -444,7 +454,9 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
                 any(),
                 eq(100L),
                 eq(42L),
-                eq(43L)
+                eq(43L),
+                any(),
+                any()
             );
         }
 
@@ -486,7 +498,9 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
                 any(),
                 eq(100L),
                 eq(null),
-                eq(null)
+                eq(null),
+                any(),
+                any()
             );
         }
 
@@ -520,6 +534,8 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
                 eq(6), // 2 + 1 + 3
                 any(),
                 eq(100L),
+                any(),
+                any(),
                 any(),
                 any()
             );
@@ -555,6 +571,8 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
                 any(Integer.class),
                 any(),
                 eq(100L),
+                any(),
+                any(),
                 any(),
                 any()
             );
@@ -631,6 +649,8 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
                 eq(null), // changedFiles: null on fallback to preserve richer data
                 any(),
                 eq(100L),
+                any(),
+                any(),
                 any(),
                 any()
             );
@@ -713,6 +733,8 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
                 any(),
                 eq(100L),
                 any(),
+                any(),
+                any(),
                 any()
             );
             // Should fetch the persisted commit: once for file changes, once for publishCommitCreated
@@ -776,6 +798,8 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
                 any(),
                 anyLong(),
                 any(),
+                any(),
+                any(),
                 any()
             );
             verify(commitRepository, never()).save(any());
@@ -820,6 +844,8 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
                 any(),
                 eq(100L),
                 any(),
+                any(),
+                any(),
                 any()
             );
         }
@@ -860,6 +886,8 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
                 any(),
                 eq(100L),
                 any(),
+                any(),
+                any(),
                 any()
             );
         }
@@ -895,6 +923,8 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
                 any(Integer.class),
                 any(),
                 eq(100L),
+                any(),
+                any(),
                 any(),
                 any()
             );

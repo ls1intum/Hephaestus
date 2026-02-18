@@ -1,5 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequest.github;
 
+import de.tum.in.www1.hephaestus.gitprovider.commit.CommitAuthorResolver;
+import de.tum.in.www1.hephaestus.gitprovider.commit.CommitRepository;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.EventContext;
@@ -54,11 +56,15 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
 
     private final PullRequestRepository pullRequestRepository;
     private final IssueRepository issueRepository;
+    private final CommitRepository commitRepository;
+    private final CommitAuthorResolver commitAuthorResolver;
     private final ApplicationEventPublisher eventPublisher;
 
     public GitHubPullRequestProcessor(
         PullRequestRepository pullRequestRepository,
         IssueRepository issueRepository,
+        CommitRepository commitRepository,
+        CommitAuthorResolver commitAuthorResolver,
         LabelRepository labelRepository,
         MilestoneRepository milestoneRepository,
         UserRepository userRepository,
@@ -68,6 +74,8 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         super(userRepository, labelRepository, milestoneRepository, gitHubUserProcessor);
         this.pullRequestRepository = pullRequestRepository;
         this.issueRepository = issueRepository;
+        this.commitRepository = commitRepository;
+        this.commitAuthorResolver = commitAuthorResolver;
         this.eventPublisher = eventPublisher;
     }
 
@@ -205,6 +213,9 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         if (relationshipsChanged) {
             pr = pullRequestRepository.save(pr);
         }
+
+        // Upsert merge commit if present (from GraphQL data — zero extra rate limit cost)
+        upsertMergeCommit(dto, repository);
 
         // Publish events
         if (isNew) {
@@ -414,5 +425,42 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
                 yield Issue.State.OPEN;
             }
         };
+    }
+
+    /**
+     * Upserts the merge commit when GraphQL data provides full merge commit metadata.
+     * This piggybacks on data already fetched in the PR query (flat fields on Commit type)
+     * so it costs zero additional rate limit points.
+     */
+    private void upsertMergeCommit(GitHubPullRequestDTO dto, Repository repository) {
+        var info = dto.mergeCommitInfo();
+        if (info == null || info.sha() == null) {
+            return;
+        }
+
+        Long authorId = commitAuthorResolver.resolveByLogin(info.authorLogin());
+        Long committerId = commitAuthorResolver.resolveByLogin(info.committerLogin());
+
+        String htmlUrl = "https://github.com/" + repository.getNameWithOwner() + "/commit/" + info.sha();
+
+        commitRepository.upsertCommit(
+            info.sha(),
+            info.message(),
+            null, // messageBody — not available from GraphQL mergeCommit
+            htmlUrl,
+            info.authoredDate(),
+            info.committedDate(),
+            info.additions(),
+            info.deletions(),
+            info.changedFiles(),
+            Instant.now(),
+            repository.getId(),
+            authorId,
+            committerId,
+            null, // authorEmail — not available from GraphQL GitActor
+            null // committerEmail — not available from GraphQL GitActor
+        );
+
+        log.debug("Upserted merge commit: sha={}, repository={}", info.sha(), repository.getNameWithOwner());
     }
 }

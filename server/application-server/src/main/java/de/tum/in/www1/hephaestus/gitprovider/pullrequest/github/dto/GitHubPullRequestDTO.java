@@ -71,8 +71,31 @@ public record GitHubPullRequestDTO(
     @Nullable ReviewDecision reviewDecision,
     @Nullable MergeStateStatus mergeStateStatus,
     @Nullable Boolean isMergeable,
-    boolean maintainerCanModify
+    boolean maintainerCanModify,
+    /**
+     * Merge commit metadata extracted from GraphQL.
+     * Null when the PR is not merged or when created from webhook payloads
+     * (which only provide the SHA via {@link #mergeCommitSha}).
+     */
+    @Nullable MergeCommitInfo mergeCommitInfo
 ) {
+    /**
+     * Merge commit metadata from GraphQL PR queries. All flat fields on the
+     * Commit type — zero additional rate limit cost.
+     */
+    public record MergeCommitInfo(
+        String sha,
+        @Nullable String message,
+        @Nullable String url,
+        @Nullable Instant authoredDate,
+        @Nullable Instant committedDate,
+        @Nullable Integer additions,
+        @Nullable Integer deletions,
+        @Nullable Integer changedFiles,
+        @Nullable String authorLogin,
+        @Nullable String committerLogin
+    ) {}
+
     /**
      * Get the database ID, preferring databaseId over id for GraphQL responses.
      */
@@ -139,7 +162,34 @@ public record GitHubPullRequestDTO(
             convertReviewDecision(pr.getReviewDecision()),
             convertMergeStateStatus(pr.getMergeStateStatus()),
             convertMergeableState(pr.getMergeable()),
-            pr.getMaintainerCanModify()
+            pr.getMaintainerCanModify(),
+            extractMergeCommitInfo(pr)
+        );
+    }
+
+    /**
+     * Extracts merge commit metadata from a GraphQL PullRequest.
+     * All fields are flat on the Commit type — zero additional rate limit cost.
+     */
+    @Nullable
+    private static MergeCommitInfo extractMergeCommitInfo(GHPullRequest pr) {
+        var mc = pr.getMergeCommit();
+        if (mc == null) {
+            return null;
+        }
+        return new MergeCommitInfo(
+            mc.getOid(),
+            mc.getMessage(),
+            uriToString(mc.getUrl()),
+            toInstant(mc.getAuthoredDate()),
+            toInstant(mc.getCommittedDate()),
+            mc.getAdditions(),
+            mc.getDeletions(),
+            mc.getChangedFilesIfAvailable(),
+            mc.getAuthor() != null && mc.getAuthor().getUser() != null ? mc.getAuthor().getUser().getLogin() : null,
+            mc.getCommitter() != null && mc.getCommitter().getUser() != null
+                ? mc.getCommitter().getUser().getLogin()
+                : null
         );
     }
 

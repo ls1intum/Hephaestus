@@ -128,6 +128,22 @@ public class Commit {
     private Instant lastSyncAt;
 
     /**
+     * The email address of the commit author (from git metadata).
+     * Stored at ingestion time to enable negative caching for author enrichment.
+     * When author_email is set but author_id is NULL, enrichment was attempted and failed.
+     */
+    @Column(name = "author_email", length = 255)
+    private String authorEmail;
+
+    /**
+     * The email address of the committer (from git metadata).
+     * Stored at ingestion time to enable negative caching for committer enrichment.
+     * When committer_email is set but committer_id is NULL, enrichment was attempted and failed.
+     */
+    @Column(name = "committer_email", length = 255)
+    private String committerEmail;
+
+    /**
      * Audit timestamp: when this entity was first persisted.
      */
     @Column(name = "created_at")

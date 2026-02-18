@@ -56,6 +56,97 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
      * existing database values (webhooks may provide less data than local git).
      */
     /**
+     * Find distinct unresolved author emails for a repository.
+     * Returns emails where author_id is NULL but author_email is stored.
+     */
+    @Query(
+        value = """
+        SELECT DISTINCT gc.author_email FROM git_commit gc
+        WHERE gc.repository_id = :repositoryId AND gc.author_id IS NULL AND gc.author_email IS NOT NULL
+        """,
+        nativeQuery = true
+    )
+    List<String> findDistinctUnresolvedAuthorEmailsByRepositoryId(@Param("repositoryId") Long repositoryId);
+
+    /**
+     * Find distinct unresolved committer emails for a repository.
+     * Returns emails where committer_id is NULL but committer_email is stored.
+     */
+    @Query(
+        value = """
+        SELECT DISTINCT gc.committer_email FROM git_commit gc
+        WHERE gc.repository_id = :repositoryId AND gc.committer_id IS NULL AND gc.committer_email IS NOT NULL
+        """,
+        nativeQuery = true
+    )
+    List<String> findDistinctUnresolvedCommitterEmailsByRepositoryId(@Param("repositoryId") Long repositoryId);
+
+    /**
+     * Bulk update author_id for commits matching a given author email in a repository.
+     * Only updates rows where author_id is currently NULL (safe for concurrent use).
+     */
+    @Modifying
+    @Transactional
+    @Query(
+        value = """
+        UPDATE git_commit SET author_id = :authorId, updated_at = NOW()
+        WHERE repository_id = :repositoryId AND author_id IS NULL AND author_email = :email
+        """,
+        nativeQuery = true
+    )
+    int bulkUpdateAuthorIdByEmail(
+        @Param("email") String email,
+        @Param("repositoryId") Long repositoryId,
+        @Param("authorId") Long authorId
+    );
+
+    /**
+     * Bulk update committer_id for commits matching a given committer email in a repository.
+     * Only updates rows where committer_id is currently NULL (safe for concurrent use).
+     */
+    @Modifying
+    @Transactional
+    @Query(
+        value = """
+        UPDATE git_commit SET committer_id = :committerId, updated_at = NOW()
+        WHERE repository_id = :repositoryId AND committer_id IS NULL AND committer_email = :email
+        """,
+        nativeQuery = true
+    )
+    int bulkUpdateCommitterIdByEmail(
+        @Param("email") String email,
+        @Param("repositoryId") Long repositoryId,
+        @Param("committerId") Long committerId
+    );
+
+    /**
+     * Find one representative SHA per unresolved email for GraphQL author lookup.
+     * Returns pairs of (email, sha) where author_id or committer_id is NULL.
+     * Uses DISTINCT ON to pick exactly one SHA per email efficiently.
+     */
+    @Query(
+        value = """
+        SELECT sub.email, sub.sha FROM (
+            SELECT DISTINCT ON (gc.author_email)
+                gc.author_email AS email, gc.sha AS sha
+            FROM git_commit gc
+            WHERE gc.repository_id = :repositoryId
+              AND gc.author_id IS NULL
+              AND gc.author_email IS NOT NULL
+            UNION ALL
+            SELECT DISTINCT ON (gc.committer_email)
+                gc.committer_email AS email, gc.sha AS sha
+            FROM git_commit gc
+            WHERE gc.repository_id = :repositoryId
+              AND gc.committer_id IS NULL
+              AND gc.committer_email IS NOT NULL
+        ) sub
+        """,
+        nativeQuery = true
+    )
+    List<Object[]> findRepresentativeShasByUnresolvedEmail(@Param("repositoryId") Long repositoryId);
+
+    /**
      * Find SHAs of commits with null author_id for a repository.
      */
     @Query(
@@ -123,10 +214,10 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
         value = """
         INSERT INTO git_commit (sha, message, message_body, html_url, authored_at, committed_at,
             additions, deletions, changed_files, last_sync_at, created_at, updated_at,
-            repository_id, author_id, committer_id)
+            repository_id, author_id, committer_id, author_email, committer_email)
         VALUES (:sha, :message, :messageBody, :htmlUrl, :authoredAt, :committedAt,
             :additions, :deletions, :changedFiles, :lastSyncAt, NOW(), NOW(),
-            :repositoryId, :authorId, :committerId)
+            :repositoryId, :authorId, :committerId, :authorEmail, :committerEmail)
         ON CONFLICT (sha, repository_id) DO UPDATE SET
             message = EXCLUDED.message,
             message_body = COALESCE(EXCLUDED.message_body, git_commit.message_body),
@@ -139,7 +230,9 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
             last_sync_at = EXCLUDED.last_sync_at,
             updated_at = NOW(),
             author_id = COALESCE(EXCLUDED.author_id, git_commit.author_id),
-            committer_id = COALESCE(EXCLUDED.committer_id, git_commit.committer_id)
+            committer_id = COALESCE(EXCLUDED.committer_id, git_commit.committer_id),
+            author_email = COALESCE(EXCLUDED.author_email, git_commit.author_email),
+            committer_email = COALESCE(EXCLUDED.committer_email, git_commit.committer_email)
         """,
         nativeQuery = true
     )
@@ -156,6 +249,8 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
         @Param("lastSyncAt") Instant lastSyncAt,
         @Param("repositoryId") Long repositoryId,
         @Param("authorId") Long authorId,
-        @Param("committerId") Long committerId
+        @Param("committerId") Long committerId,
+        @Param("authorEmail") String authorEmail,
+        @Param("committerEmail") String committerEmail
     );
 }

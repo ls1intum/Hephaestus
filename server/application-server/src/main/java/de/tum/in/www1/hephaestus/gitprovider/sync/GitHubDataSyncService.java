@@ -249,11 +249,6 @@ public class GitHubDataSyncService {
             // (HEAD SHA == latest known SHA → fast return).
             int commitsBackfilled = commitBackfillService.backfillCommits(syncTarget, repository, scopeId);
 
-            // Enrich unresolved commit authors via local git emails + GitHub REST API.
-            // Runs after backfill to catch newly persisted commits with NULL author_id.
-            // Uses O(unique_emails) API calls instead of O(commits) — very efficient.
-            int commitsEnriched = enrichCommitAuthors(syncTarget, repository);
-
             // P3 optimization: skip sub-syncs when the repository has no new activity.
             // GitHub's repository.updatedAt changes on any activity (pushes, issues, PRs, labels, etc.).
             // If the freshly-fetched updatedAt equals what we previously stored, nothing has changed.
@@ -325,6 +320,12 @@ public class GitHubDataSyncService {
                     prResult.status()
                 );
             }
+
+            // Enrich unresolved commit authors via stored emails + GitHub GraphQL API.
+            // Runs AFTER collaborator/PR/issue sync so that users imported as side effects
+            // of those syncs are available for email → user_id resolution on the first cycle.
+            // Uses O(unique_emails) API calls instead of O(commits) — very efficient.
+            int commitsEnriched = enrichCommitAuthors(syncTarget, repository);
 
             log.info(
                 "Completed repository sync: scopeId={}, repoId={}, commitsBackfilled={}, commitsEnriched={}, collaborators={}, labels={}, milestones={}, issues={}, prs={}, issueStatus={}, prStatus={}",
@@ -1033,7 +1034,7 @@ public class GitHubDataSyncService {
      *
      * @param syncTarget the sync target with auth info
      * @param repository the repository entity
-     * @return number of commits enriched, or -1 if skipped
+     * @return number of commits enriched, or -1 on error
      */
     private int enrichCommitAuthors(SyncTarget syncTarget, Repository repository) {
         try {

@@ -283,7 +283,9 @@ public class GitHubCommitBackfillService {
                 Instant.now(),
                 repository.getId(),
                 authorId,
-                committerId
+                committerId,
+                info.authorEmail(),
+                info.committerEmail()
             );
 
             // Attach file changes if present

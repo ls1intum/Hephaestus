@@ -269,7 +269,9 @@ public class GitHubPushMessageHandler extends GitHubMessageHandler<GitHubPushEve
                 Instant.now(),
                 repository.getId(),
                 authorId,
-                committerId
+                committerId,
+                webhookCommit.author() != null ? webhookCommit.author().email() : null,
+                webhookCommit.committer() != null ? webhookCommit.committer().email() : null
             );
 
             // Publish CommitCreated event after persisting
@@ -321,7 +323,9 @@ public class GitHubPushMessageHandler extends GitHubMessageHandler<GitHubPushEve
             Instant.now(),
             repository.getId(),
             authorId,
-            committerId
+            committerId,
+            info.authorEmail(),
+            info.committerEmail()
         );
 
         // Attach file changes if present

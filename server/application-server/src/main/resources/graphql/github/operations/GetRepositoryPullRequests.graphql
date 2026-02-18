@@ -54,8 +54,26 @@ query GetRepositoryPullRequests(
                 }
 
                 # Merge commit (available when PR is merged)
+                # All flat fields on the Commit type — zero additional rate limit cost
                 mergeCommit {
                     oid
+                    message
+                    url
+                    authoredDate
+                    committedDate
+                    additions
+                    deletions
+                    changedFilesIfAvailable
+                    author {
+                        user {
+                            login
+                        }
+                    }
+                    committer {
+                        user {
+                            login
+                        }
+                    }
                 }
 
                 # Head and base refs

@@ -275,6 +275,8 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
                 any(),
                 eq(1L),
                 any(),
+                any(),
+                any(),
                 any()
             );
         }
@@ -381,6 +383,8 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
                 any(),
                 anyLong(),
                 any(),
+                any(),
+                any(),
                 any()
             );
         }
@@ -411,6 +415,8 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
                 any(Integer.class),
                 any(),
                 anyLong(),
+                any(),
+                any(),
                 any(),
                 any()
             );
@@ -553,7 +559,9 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
                 any(),
                 eq(1L),
                 eq(10L),
-                eq(20L)
+                eq(20L),
+                any(),
+                any()
             );
         }
 
@@ -592,7 +600,9 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
                 any(),
                 eq(1L),
                 eq(null),
-                eq(null)
+                eq(null),
+                any(),
+                any()
             );
         }
     }
