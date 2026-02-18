@@ -368,12 +368,20 @@ export const gitCommit = pgTable(
 		authorId: bigint("author_id", { mode: "number" }),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		committerId: bigint("committer_id", { mode: "number" }),
+		authorEmail: varchar("author_email", { length: 255 }),
+		committerEmail: varchar("committer_email", { length: 255 }),
 	},
 	(table) => [
 		index("idx_git_commit_author_id").using("btree", table.authorId.asc().nullsLast()),
 		index("idx_git_commit_authored_at").using("btree", table.authoredAt.asc().nullsLast()),
 		index("idx_git_commit_committer_id").using("btree", table.committerId.asc().nullsLast()),
 		index("idx_git_commit_repository_id").using("btree", table.repositoryId.asc().nullsLast()),
+		index("idx_git_commit_unresolved_author_email")
+			.using("btree", table.repositoryId.asc().nullsLast(), table.authorEmail.asc().nullsLast())
+			.where(sql`((author_id IS NULL) AND (author_email IS NOT NULL))`),
+		index("idx_git_commit_unresolved_committer_email")
+			.using("btree", table.repositoryId.asc().nullsLast(), table.committerEmail.asc().nullsLast())
+			.where(sql`((committer_id IS NULL) AND (committer_email IS NOT NULL))`),
 		foreignKey({
 			columns: [table.repositoryId],
 			foreignColumns: [repository.id],
