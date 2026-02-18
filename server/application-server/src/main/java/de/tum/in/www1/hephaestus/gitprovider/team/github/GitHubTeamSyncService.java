@@ -7,6 +7,7 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncCons
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_INITIAL_BACKOFF;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.adaptPageSize;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
@@ -18,6 +19,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoor
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoordinator.GraphQlClassificationContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubTransportErrors;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GraphQlConnectionOverflowDetector;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHRepositoryPermission;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHTeam;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHTeamConnection;
@@ -137,6 +139,7 @@ public class GitHubTeamSyncService {
             int pageCount = 0;
             boolean syncCompletedNormally = false;
             int retryAttempt = 0;
+            int reportedTotalCount = -1;
 
             while (hasNextPage) {
                 pageCount++;
@@ -156,7 +159,10 @@ public class GitHubTeamSyncService {
                     client
                         .documentName(GET_ORGANIZATION_TEAMS_DOCUMENT)
                         .variable("login", organizationLogin)
-                        .variable("first", LARGE_PAGE_SIZE)
+                        .variable(
+                            "first",
+                            adaptPageSize(LARGE_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
+                        )
                         .variable("after", currentCursor)
                         .execute()
                 )
@@ -226,6 +232,10 @@ public class GitHubTeamSyncService {
                     break;
                 }
 
+                if (reportedTotalCount < 0) {
+                    reportedTotalCount = response.getTotalCount();
+                }
+
                 for (var graphQlTeam : response.getNodes()) {
                     Team team = processTeam(graphQlTeam, organizationLogin, context);
                     if (team != null) {
@@ -246,6 +256,16 @@ public class GitHubTeamSyncService {
                 hasNextPage = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
                 cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
                 retryAttempt = 0;
+            }
+
+            // Check for overflow
+            if (reportedTotalCount >= 0) {
+                GraphQlConnectionOverflowDetector.check(
+                    "teams",
+                    totalSynced,
+                    reportedTotalCount,
+                    "orgLogin=" + safeOrgLogin
+                );
             }
 
             // Mark sync as completed normally if we exhausted all pages
@@ -578,6 +598,7 @@ public class GitHubTeamSyncService {
         boolean hasNextPage = true;
         int pageCount = 0;
         int retryAttempt = 0;
+        int reportedTotalCount = -1;
 
         while (hasNextPage) {
             pageCount++;
@@ -598,7 +619,10 @@ public class GitHubTeamSyncService {
                     .documentName(GET_TEAM_MEMBERS_DOCUMENT)
                     .variable("orgLogin", organizationLogin)
                     .variable("teamSlug", teamSlug)
-                    .variable("first", LARGE_PAGE_SIZE)
+                    .variable(
+                        "first",
+                        adaptPageSize(LARGE_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
+                    )
                     .variable("after", currentCursor)
                     .execute()
             )
@@ -674,12 +698,26 @@ public class GitHubTeamSyncService {
                 break;
             }
 
+            if (reportedTotalCount < 0) {
+                reportedTotalCount = response.getTotalCount();
+            }
+
             allMemberEdges.addAll(response.getEdges());
 
             var pageInfo = response.getPageInfo();
             hasNextPage = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
             cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
             retryAttempt = 0;
+        }
+
+        // Check for overflow
+        if (reportedTotalCount >= 0) {
+            GraphQlConnectionOverflowDetector.check(
+                "teamMembers",
+                allMemberEdges.size(),
+                reportedTotalCount,
+                "teamSlug=" + teamSlug
+            );
         }
 
         return allMemberEdges;
@@ -706,6 +744,7 @@ public class GitHubTeamSyncService {
         boolean hasNextPage = true;
         int pageCount = 0;
         int retryAttempt = 0;
+        int reportedTotalCount = -1;
 
         while (hasNextPage) {
             pageCount++;
@@ -726,7 +765,10 @@ public class GitHubTeamSyncService {
                     .documentName(GET_TEAM_REPOSITORIES_DOCUMENT)
                     .variable("orgLogin", organizationLogin)
                     .variable("teamSlug", teamSlug)
-                    .variable("first", LARGE_PAGE_SIZE)
+                    .variable(
+                        "first",
+                        adaptPageSize(LARGE_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
+                    )
                     .variable("after", currentCursor)
                     .execute()
             )
@@ -802,12 +844,26 @@ public class GitHubTeamSyncService {
                 break;
             }
 
+            if (reportedTotalCount < 0) {
+                reportedTotalCount = response.getTotalCount();
+            }
+
             allEdges.addAll(response.getEdges());
 
             var pageInfo = response.getPageInfo();
             hasNextPage = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
             cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
             retryAttempt = 0;
+        }
+
+        // Check for overflow
+        if (reportedTotalCount >= 0) {
+            GraphQlConnectionOverflowDetector.check(
+                "teamRepositories",
+                allEdges.size(),
+                reportedTotalCount,
+                "teamSlug=" + teamSlug
+            );
         }
 
         return allEdges;

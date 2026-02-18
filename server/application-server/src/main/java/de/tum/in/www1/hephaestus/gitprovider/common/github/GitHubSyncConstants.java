@@ -178,4 +178,44 @@ public final class GitHubSyncConstants {
     public static final Duration TRANSPORT_INITIAL_BACKOFF = Duration.ofSeconds(2);
     public static final Duration TRANSPORT_MAX_BACKOFF = Duration.ofSeconds(15);
     public static final double JITTER_FACTOR = 0.5;
+
+    // ========================================================================
+    // Adaptive Page Sizing
+    // ========================================================================
+
+    /**
+     * Remaining-points threshold below which page sizes are halved.
+     */
+    private static final int LOW_REMAINING_THRESHOLD = 500;
+
+    /**
+     * Remaining-points threshold below which page sizes are quartered.
+     */
+    private static final int CRITICAL_REMAINING_THRESHOLD = 100;
+
+    /**
+     * Returns an adjusted page size based on current rate-limit budget.
+     * <p>
+     * When the rate-limit budget is healthy the base page size is returned
+     * unchanged. As the budget drops, the page size is reduced to slow down
+     * point consumption and give the budget time to reset:
+     * <ul>
+     *   <li>{@code remaining >= 500} → full {@code basePageSize}</li>
+     *   <li>{@code 100 <= remaining < 500} → {@code basePageSize / 2} (min 10)</li>
+     *   <li>{@code remaining < 100} → {@code basePageSize / 4} (min 5)</li>
+     * </ul>
+     *
+     * @param basePageSize the nominal page size (e.g. {@link #DEFAULT_PAGE_SIZE})
+     * @param remaining    current rate-limit points remaining for the scope
+     * @return the (possibly reduced) page size to use for the next query
+     */
+    public static int adaptPageSize(int basePageSize, int remaining) {
+        if (remaining >= LOW_REMAINING_THRESHOLD) {
+            return basePageSize;
+        }
+        if (remaining >= CRITICAL_REMAINING_THRESHOLD) {
+            return Math.max(10, basePageSize / 2);
+        }
+        return Math.max(5, basePageSize / 4);
+    }
 }

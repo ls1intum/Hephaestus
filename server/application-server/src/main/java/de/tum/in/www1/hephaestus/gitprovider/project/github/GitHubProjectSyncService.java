@@ -10,6 +10,7 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncCons
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_INITIAL_BACKOFF;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.adaptPageSize;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
@@ -20,6 +21,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassi
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubTransportErrors;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GraphQlConnectionOverflowDetector;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.BackfillStateProvider;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2Connection;
@@ -237,6 +239,7 @@ public class GitHubProjectSyncService {
         boolean hasMore = true;
         int pageCount = 0;
         int retryAttempt = 0;
+        int reportedTotalCount = -1;
         SyncResult.Status abortReason = null;
 
         while (hasMore) {
@@ -259,7 +262,10 @@ public class GitHubProjectSyncService {
                     client
                         .documentName(GET_ORGANIZATION_PROJECTS_DOCUMENT)
                         .variable("login", organizationLogin)
-                        .variable("first", LARGE_PAGE_SIZE)
+                        .variable(
+                            "first",
+                            adaptPageSize(LARGE_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
+                        )
                         .variable("after", currentCursor)
                         .execute()
                 )
@@ -321,6 +327,10 @@ public class GitHubProjectSyncService {
 
                 if (response == null || response.getNodes() == null || response.getNodes().isEmpty()) {
                     break;
+                }
+
+                if (reportedTotalCount < 0) {
+                    reportedTotalCount = response.getTotalCount();
                 }
 
                 // Process this page of projects in its own transaction
@@ -524,6 +534,16 @@ public class GitHubProjectSyncService {
             }
         }
 
+        // Check for overflow
+        if (reportedTotalCount >= 0) {
+            GraphQlConnectionOverflowDetector.check(
+                "projects",
+                totalSynced,
+                reportedTotalCount,
+                "orgLogin=" + safeOrgLogin
+            );
+        }
+
         // Only remove stale projects if sync completed without abort
         boolean syncCompletedNormally = !hasMore && abortReason == null;
         if (syncCompletedNormally && !syncedProjectIds.isEmpty()) {
@@ -706,6 +726,7 @@ public class GitHubProjectSyncService {
         boolean hasMore = true;
         int pageCount = 0;
         int retryAttempt = 0;
+        int reportedTotalCount = -1;
         SyncResult.Status abortReason = null;
         final Instant syncThreshold = incrementalSyncThreshold; // Final for lambda capture
         final boolean incrementalSync = isIncrementalSync;
@@ -735,7 +756,10 @@ public class GitHubProjectSyncService {
                     client
                         .documentName(GET_PROJECT_ITEMS_DOCUMENT)
                         .variable("nodeId", projectNodeId)
-                        .variable("first", PROJECT_ITEM_PAGE_SIZE)
+                        .variable(
+                            "first",
+                            adaptPageSize(PROJECT_ITEM_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
+                        )
                         .variable("after", currentCursor)
                         .variable("filterQuery", filterQuery)
                         .execute()
@@ -813,6 +837,10 @@ public class GitHubProjectSyncService {
                     }
                     hasMore = false;
                     break;
+                }
+
+                if (reportedTotalCount < 0) {
+                    reportedTotalCount = itemsConnection.getTotalCount();
                 }
 
                 // Process this page of items in its own transaction
@@ -1010,6 +1038,16 @@ public class GitHubProjectSyncService {
             }
         }
 
+        // Check for overflow
+        if (reportedTotalCount >= 0) {
+            GraphQlConnectionOverflowDetector.check(
+                "projectItems",
+                totalSynced,
+                reportedTotalCount,
+                "projectId=" + projectId
+            );
+        }
+
         // Process remaining field values for Draft Issues that had truncated inline data
         // This follows the nested pagination pattern from GitHubIssueSyncService (comments)
         // and GitHubPullRequestSyncService (review threads)
@@ -1135,6 +1173,7 @@ public class GitHubProjectSyncService {
             String cursor = null;
             boolean hasMore = true;
             int pageCount = 0;
+            int reportedTotalCount = -1;
 
             while (hasMore) {
                 pageCount++;
@@ -1228,6 +1267,10 @@ public class GitHubProjectSyncService {
                     break;
                 }
 
+                if (reportedTotalCount < 0) {
+                    reportedTotalCount = fieldsConnection.getTotalCount();
+                }
+
                 // Process this page of fields in a transaction
                 transactionTemplate.executeWithoutResult(status -> {
                     Project managedProject = projectRepository.findById(projectId).orElse(null);
@@ -1266,6 +1309,16 @@ public class GitHubProjectSyncService {
             // Set completedNormally only if not already set (e.g., by empty response branch)
             // This preserves true if already set via early break, otherwise uses hasMore state
             completedNormally = completedNormally || !hasMore;
+
+            // Check for overflow
+            if (reportedTotalCount >= 0) {
+                GraphQlConnectionOverflowDetector.check(
+                    "projectFields",
+                    allSyncedFieldIds.size(),
+                    reportedTotalCount,
+                    "projectId=" + project.getId()
+                );
+            }
 
             // On successful completion, handle cleanup and update timestamp
             if (completedNormally) {
@@ -1335,6 +1388,7 @@ public class GitHubProjectSyncService {
             String cursor = null;
             boolean hasMore = true;
             int pageCount = 0;
+            int reportedTotalCount = -1;
 
             while (hasMore) {
                 pageCount++;
@@ -1355,7 +1409,10 @@ public class GitHubProjectSyncService {
                     client
                         .documentName(GET_PROJECT_STATUS_UPDATES_DOCUMENT)
                         .variable("nodeId", projectNodeId)
-                        .variable("first", STATUS_UPDATE_PAGE_SIZE)
+                        .variable(
+                            "first",
+                            adaptPageSize(STATUS_UPDATE_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
+                        )
                         .variable("after", currentCursor)
                         .execute()
                 )
@@ -1417,6 +1474,10 @@ public class GitHubProjectSyncService {
                     break;
                 }
 
+                if (reportedTotalCount < 0) {
+                    reportedTotalCount = statusUpdatesConnection.getTotalCount();
+                }
+
                 // Process this page of status updates in a transaction
                 transactionTemplate.executeWithoutResult(status -> {
                     Project managedProject = projectRepository.findById(projectId).orElse(null);
@@ -1458,6 +1519,16 @@ public class GitHubProjectSyncService {
             // Set completedNormally only if not already set (e.g., by empty response branch)
             // This preserves true if already set via early break, otherwise uses hasMore state
             completedNormally = completedNormally || !hasMore;
+
+            // Check for overflow
+            if (reportedTotalCount >= 0) {
+                GraphQlConnectionOverflowDetector.check(
+                    "statusUpdates",
+                    syncedStatusUpdateNodeIds.size(),
+                    reportedTotalCount,
+                    "projectId=" + project.getId()
+                );
+            }
 
             // On successful completion, handle cleanup and update timestamp
             if (completedNormally) {

@@ -7,6 +7,7 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncCons
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_INITIAL_BACKOFF;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.adaptPageSize;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.ExponentialBackoff;
@@ -17,6 +18,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoor
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoordinator.GraphQlClassificationContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubTransportErrors;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GraphQlConnectionOverflowDetector;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHOrganization;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHOrganizationMemberConnection;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHOrganizationMemberEdge;
@@ -299,7 +301,10 @@ public class GitHubOrganizationSyncService {
                 client
                     .documentName(GET_ORGANIZATION_MEMBERS_DOCUMENT)
                     .variable("login", organization.getLogin())
-                    .variable("first", LARGE_PAGE_SIZE)
+                    .variable(
+                        "first",
+                        adaptPageSize(LARGE_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
+                    )
                     .variable("after", currentCursor)
                     .execute()
             )
@@ -395,6 +400,16 @@ public class GitHubOrganizationSyncService {
 
         // Mark sync as completed normally if we exhausted all pages (pageInfo.hasNextPage is false)
         syncCompletedNormally = pageInfo == null || !Boolean.TRUE.equals(pageInfo.getHasNextPage());
+
+        // Check for overflow
+        if (latestTotalCount >= 0) {
+            GraphQlConnectionOverflowDetector.check(
+                "members",
+                allMembers.size(),
+                latestTotalCount,
+                "orgLogin=" + sanitizeForLog(organization.getLogin())
+            );
+        }
 
         log.debug(
             "Fetched organization members: orgId={}, orgLogin={}, fetchedCount={}, totalCount={}, pages={}, complete={}",

@@ -9,6 +9,7 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncCons
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_INITIAL_BACKOFF;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.adaptPageSize;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
@@ -22,6 +23,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameP
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubTransportErrors;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GraphQlConnectionOverflowDetector;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHCommentAuthorAssociation;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHDiffSide;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPageInfo;
@@ -146,6 +148,7 @@ public class GitHubPullRequestReviewCommentSyncService {
             String cursor = null;
             boolean hasNextPage = true;
             int pageCount = 0;
+            int reportedTotalCount = -1;
 
             while (hasNextPage) {
                 // Check for interrupt (e.g., during application shutdown)
@@ -180,7 +183,10 @@ public class GitHubPullRequestReviewCommentSyncService {
                         .variable("owner", owner)
                         .variable("name", name)
                         .variable("number", pullRequest.getNumber())
-                        .variable("first", DEFAULT_PAGE_SIZE)
+                        .variable(
+                            "first",
+                            adaptPageSize(DEFAULT_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
+                        )
                         .variable("after", currentCursor)
                         .execute()
                 )
@@ -257,6 +263,10 @@ public class GitHubPullRequestReviewCommentSyncService {
                     break;
                 }
 
+                if (reportedTotalCount < 0) {
+                    reportedTotalCount = response.getTotalCount();
+                }
+
                 for (var graphQlThread : response.getNodes()) {
                     int synced = processThreadInternal(graphQlThread, pullRequest, client, scopeId);
                     totalSynced += synced;
@@ -266,6 +276,16 @@ public class GitHubPullRequestReviewCommentSyncService {
                 hasNextPage = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
                 cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
                 retryAttempt = 0;
+            }
+
+            // Check for overflow
+            if (reportedTotalCount >= 0) {
+                GraphQlConnectionOverflowDetector.check(
+                    "reviewThreads",
+                    totalSynced,
+                    reportedTotalCount,
+                    "prNumber=" + pullRequest.getNumber()
+                );
             }
 
             log.debug(
@@ -447,6 +467,7 @@ public class GitHubPullRequestReviewCommentSyncService {
         boolean hasMore = true;
         int fetchedPages = 0;
         int retryAttempt = 0;
+        int reportedTotalCount = -1;
 
         while (hasMore) {
             // Check for interrupt (e.g., during application shutdown)
@@ -478,7 +499,10 @@ public class GitHubPullRequestReviewCommentSyncService {
                     client
                         .documentName(GET_THREAD_COMMENTS_DOCUMENT)
                         .variable("threadId", threadNodeId)
-                        .variable("first", LARGE_PAGE_SIZE)
+                        .variable(
+                            "first",
+                            adaptPageSize(LARGE_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
+                        )
                         .variable("after", currentCursor)
                         .execute()
                 )
@@ -554,6 +578,10 @@ public class GitHubPullRequestReviewCommentSyncService {
                     break;
                 }
 
+                if (reportedTotalCount < 0) {
+                    reportedTotalCount = fetchedConnection.getTotalCount();
+                }
+
                 allComments.addAll(fetchedConnection.getNodes());
 
                 GHPageInfo pageInfo = fetchedConnection.getPageInfo();
@@ -579,6 +607,16 @@ public class GitHubPullRequestReviewCommentSyncService {
                 }
                 retryAttempt++;
             }
+        }
+
+        // Check for overflow
+        if (reportedTotalCount >= 0) {
+            GraphQlConnectionOverflowDetector.check(
+                "threadComments",
+                allComments.size(),
+                reportedTotalCount,
+                "threadId=" + threadNodeId
+            );
         }
 
         // Update the connection's comments with the complete list
@@ -1008,6 +1046,7 @@ public class GitHubPullRequestReviewCommentSyncService {
             String cursor = startCursor;
             boolean hasNextPage = true;
             int pageCount = 0;
+            int reportedTotalCount = -1;
 
             while (hasNextPage) {
                 // Check for interrupt (e.g., during application shutdown)
@@ -1042,7 +1081,10 @@ public class GitHubPullRequestReviewCommentSyncService {
                         .variable("owner", owner)
                         .variable("name", name)
                         .variable("number", pullRequest.getNumber())
-                        .variable("first", DEFAULT_PAGE_SIZE)
+                        .variable(
+                            "first",
+                            adaptPageSize(DEFAULT_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
+                        )
                         .variable("after", currentCursor)
                         .execute()
                 )
@@ -1094,6 +1136,10 @@ public class GitHubPullRequestReviewCommentSyncService {
                     break;
                 }
 
+                if (reportedTotalCount < 0) {
+                    reportedTotalCount = response.getTotalCount();
+                }
+
                 for (var graphQlThread : response.getNodes()) {
                     int synced = processThreadInternal(graphQlThread, pullRequest, client, scopeId);
                     totalSynced += synced;
@@ -1102,6 +1148,16 @@ public class GitHubPullRequestReviewCommentSyncService {
                 var pageInfo = response.getPageInfo();
                 hasNextPage = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
                 cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
+            }
+
+            // Check for overflow
+            if (reportedTotalCount >= 0) {
+                GraphQlConnectionOverflowDetector.check(
+                    "reviewThreads",
+                    totalSynced,
+                    reportedTotalCount,
+                    "prNumber=" + pullRequest.getNumber()
+                );
             }
 
             log.debug(

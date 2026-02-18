@@ -7,6 +7,7 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncCons
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_INITIAL_BACKOFF;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.adaptPageSize;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.ExponentialBackoff;
@@ -19,6 +20,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameP
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubTransportErrors;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GraphQlConnectionOverflowDetector;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHRepositoryCollaboratorConnection;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHRepositoryCollaboratorEdge;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHRepositoryPermission;
@@ -108,6 +110,7 @@ public class GitHubCollaboratorSyncService {
         try {
             HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
             int totalSynced = 0;
+            int reportedTotalCount = -1;
             String cursor = null;
             boolean hasNextPage = true;
             Set<Long> syncedUserIds = new HashSet<>();
@@ -134,7 +137,10 @@ public class GitHubCollaboratorSyncService {
                         .documentName(GET_COLLABORATORS_DOCUMENT)
                         .variable("owner", owner)
                         .variable("name", name)
-                        .variable("first", LARGE_PAGE_SIZE)
+                        .variable(
+                            "first",
+                            adaptPageSize(LARGE_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
+                        )
                         .variable("after", currentCursor)
                         .execute()
                 )
@@ -210,6 +216,10 @@ public class GitHubCollaboratorSyncService {
                     break;
                 }
 
+                if (reportedTotalCount < 0) {
+                    reportedTotalCount = response.getTotalCount();
+                }
+
                 for (GHRepositoryCollaboratorEdge edge : response.getEdges()) {
                     var graphQlUser = edge.getNode();
                     if (graphQlUser == null) {
@@ -240,6 +250,16 @@ public class GitHubCollaboratorSyncService {
 
             // Mark sync as completed normally if we exhausted all pages
             syncCompletedNormally = !hasNextPage;
+
+            // Check for overflow: did we fetch fewer items than GitHub reported?
+            if (reportedTotalCount >= 0) {
+                GraphQlConnectionOverflowDetector.check(
+                    "collaborators",
+                    totalSynced,
+                    reportedTotalCount,
+                    safeNameWithOwner
+                );
+            }
 
             // CRITICAL: Only remove stale collaborators if sync completed fully.
             // If sync was aborted (rate limit, error, pagination limit), we don't have

@@ -6,6 +6,7 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncCons
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_INITIAL_BACKOFF;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.adaptPageSize;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
@@ -17,6 +18,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientPr
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlErrorUtils;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubTransportErrors;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GraphQlConnectionOverflowDetector;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2Item;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2ItemConnection;
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.dto.EmbeddedProjectItemsDTO;
@@ -157,6 +159,7 @@ public class GitHubProjectItemSyncService {
         HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
 
         int totalSynced = 0;
+        int reportedTotalCount = -1;
         String cursor = startCursor;
         boolean hasMore = true;
         int pageCount = 0;
@@ -192,7 +195,10 @@ public class GitHubProjectItemSyncService {
                     client
                         .documentName(queryDocument)
                         .variable(variableName, issueNodeId)
-                        .variable("first", DEFAULT_PAGE_SIZE)
+                        .variable(
+                            "first",
+                            adaptPageSize(DEFAULT_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
+                        )
                         .variable("after", currentCursor)
                         .execute()
                 )
@@ -250,6 +256,10 @@ public class GitHubProjectItemSyncService {
                     break;
                 }
 
+                if (reportedTotalCount < 0) {
+                    reportedTotalCount = connection.getTotalCount();
+                }
+
                 // Process this page of items in its own transaction
                 Integer pageSynced = transactionTemplate.execute(status -> {
                     ProcessingContext context = ProcessingContext.forSync(scopeId, repository);
@@ -288,6 +298,16 @@ public class GitHubProjectItemSyncService {
                 }
                 retryAttempt++;
             }
+        }
+
+        // Check for overflow
+        if (reportedTotalCount >= 0) {
+            GraphQlConnectionOverflowDetector.check(
+                "projectItems",
+                totalSynced,
+                reportedTotalCount,
+                "itemNodeId=" + issueNodeId
+            );
         }
 
         log.debug("Completed project item pagination: nodeId={}, additionalItems={}", issueNodeId, totalSynced);

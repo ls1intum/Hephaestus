@@ -7,6 +7,7 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncCons
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_INITIAL_BACKOFF;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.adaptPageSize;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
@@ -20,6 +21,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameP
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubTransportErrors;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GraphQlConnectionOverflowDetector;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncMetadata;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHIssue;
@@ -297,6 +299,7 @@ public class GitHubIssueDependencySyncService {
         String after = null;
         boolean hasNextPage = true;
         int totalSynced = 0;
+        int reportedTotalCount = -1;
         int pageCount = 0;
         int retryAttempt = 0;
 
@@ -320,7 +323,10 @@ public class GitHubIssueDependencySyncService {
                     .documentName(GET_DEPENDENCIES_DOCUMENT)
                     .variable("owner", owner)
                     .variable("name", name)
-                    .variable("first", LARGE_PAGE_SIZE)
+                    .variable(
+                        "first",
+                        adaptPageSize(LARGE_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
+                    )
                     .variable("after", currentAfter)
                     .execute()
             )
@@ -397,6 +403,10 @@ public class GitHubIssueDependencySyncService {
                 break;
             }
 
+            if (reportedTotalCount < 0) {
+                reportedTotalCount = issueConnection.getTotalCount();
+            }
+
             var pageInfo = issueConnection.getPageInfo();
             if (pageInfo == null) {
                 log.debug("Received null pageInfo during dependency sync: repoName={}", safeNameWithOwner);
@@ -408,6 +418,16 @@ public class GitHubIssueDependencySyncService {
 
             // Process each page in its own transaction (call through proxy for @Transactional to work)
             totalSynced += self.processIssueDependenciesPage(issueConnection, repo, scopeId);
+        }
+
+        // Check for overflow
+        if (reportedTotalCount >= 0) {
+            GraphQlConnectionOverflowDetector.check(
+                "issues",
+                totalSynced,
+                reportedTotalCount,
+                "repoName=" + safeNameWithOwner
+            );
         }
 
         return totalSynced;
@@ -468,6 +488,13 @@ public class GitHubIssueDependencySyncService {
             }
             return 0;
         }
+
+        GraphQlConnectionOverflowDetector.check(
+            "blockedBy",
+            blockedBy.getNodes().size(),
+            blockedBy.getTotalCount(),
+            "Issue #" + graphQlIssue.getNumber()
+        );
 
         return syncBlockedByRelationships(issue, blockedBy.getNodes(), scopeId);
     }

@@ -7,6 +7,7 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncCons
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_INITIAL_BACKOFF;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.adaptPageSize;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.ExponentialBackoff;
@@ -17,6 +18,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoor
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoordinator.GraphQlClassificationContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubTransportErrors;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GraphQlConnectionOverflowDetector;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncMetadata;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHIssueTypeColor;
@@ -120,6 +122,7 @@ public class GitHubIssueTypeSyncService {
         try {
             Set<String> syncedIds = new HashSet<>();
             int totalSynced = 0;
+            int reportedTotalCount = -1;
             String cursor = null;
             boolean hasNextPage = true;
             int pageCount = 0;
@@ -143,7 +146,10 @@ public class GitHubIssueTypeSyncService {
                     client
                         .documentName(GET_ISSUE_TYPES_DOCUMENT)
                         .variable("login", orgLogin)
-                        .variable("first", LARGE_PAGE_SIZE)
+                        .variable(
+                            "first",
+                            adaptPageSize(LARGE_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
+                        )
                         .variable("after", currentCursor)
                         .execute()
                 )
@@ -219,6 +225,10 @@ public class GitHubIssueTypeSyncService {
                     break;
                 }
 
+                if (reportedTotalCount < 0) {
+                    reportedTotalCount = response.getTotalCount();
+                }
+
                 for (var graphQlType : response.getNodes()) {
                     String id = graphQlType.getId();
                     syncIssueType(graphQlType, organization);
@@ -230,6 +240,11 @@ public class GitHubIssueTypeSyncService {
                 hasNextPage = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
                 cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
                 retryAttempt = 0;
+            }
+
+            // Check for overflow: did we fetch fewer items than GitHub reported?
+            if (reportedTotalCount >= 0) {
+                GraphQlConnectionOverflowDetector.check("issueTypes", totalSynced, reportedTotalCount, safeOrgLogin);
             }
 
             removeDeletedIssueTypes(organization.getId(), syncedIds);

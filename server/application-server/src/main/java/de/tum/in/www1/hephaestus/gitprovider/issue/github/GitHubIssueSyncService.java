@@ -7,6 +7,7 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncCons
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_INITIAL_BACKOFF;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.adaptPageSize;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
@@ -21,6 +22,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameP
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubTransportErrors;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GraphQlConnectionOverflowDetector;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.BackfillStateProvider;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHIssueConnection;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPageInfo;
@@ -277,6 +279,7 @@ public class GitHubIssueSyncService {
         int totalIssuesSynced = 0;
         int totalCommentsSynced = 0;
         int totalProjectItemsSynced = 0;
+        int reportedTotalCount = -1;
         List<IssueWithCommentCursor> issuesNeedingCommentPagination = new ArrayList<>();
         List<IssueWithProjectItemCursor> issuesNeedingProjectItemPagination = new ArrayList<>();
         String cursor = initialCursor;
@@ -320,7 +323,10 @@ public class GitHubIssueSyncService {
                         .documentName(QUERY_DOCUMENT)
                         .variable("owner", ownerAndName.owner())
                         .variable("name", ownerAndName.name())
-                        .variable("first", DEFAULT_PAGE_SIZE)
+                        .variable(
+                            "first",
+                            adaptPageSize(DEFAULT_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
+                        )
                         .variable("after", currentCursor);
 
                     // Add 'since' parameter for incremental sync (filters by updatedAt >= since)
@@ -404,6 +410,10 @@ public class GitHubIssueSyncService {
 
                 if (connection == null || connection.getNodes() == null || connection.getNodes().isEmpty()) {
                     break;
+                }
+
+                if (reportedTotalCount < 0) {
+                    reportedTotalCount = connection.getTotalCount();
                 }
 
                 // Process the page within its own transaction to keep transactions short
@@ -555,6 +565,11 @@ public class GitHubIssueSyncService {
                 }
                 break;
             }
+        }
+
+        // Check for overflow: did we fetch fewer items than GitHub reported?
+        if (reportedTotalCount >= 0) {
+            GraphQlConnectionOverflowDetector.check("issues", totalIssuesSynced, reportedTotalCount, safeNameWithOwner);
         }
 
         // Fetch remaining comments for issues with >10 comments (using cursor for efficient continuation)
