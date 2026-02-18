@@ -63,35 +63,7 @@ query GetRepositoryIssues(
 
                         # Author
                         author {
-                            __typename
-                            ... on User {
-                                id
-                                databaseId
-                                login
-                                avatarUrl
-                                name
-                                email
-                                createdAt
-                                updatedAt
-                            }
-                            ... on Bot {
-                                id
-                                databaseId
-                                login
-                                avatarUrl
-                            }
-                            ... on Mannequin {
-                                id
-                                databaseId
-                                login
-                                avatarUrl
-                            }
-                            ... on Organization {
-                                id
-                                databaseId
-                                login
-                                avatarUrl
-                            }
+                            ...ActorFields
                         }
 
                         authorAssociation
@@ -109,53 +81,20 @@ query GetRepositoryIssues(
 
                 # Author
                 author {
-                    __typename
-                    ... on User {
-                        id
-                        databaseId
-                        login
-                        avatarUrl
-                        name
-                        email
-                        createdAt
-                        updatedAt
-                    }
-                    ... on Bot {
-                        id
-                        databaseId
-                        login
-                        avatarUrl
-                    }
-                    ... on Mannequin {
-                        id
-                        databaseId
-                        login
-                        avatarUrl
-                    }
-                    ... on Organization {
-                        id
-                        databaseId
-                        login
-                        avatarUrl
-                    }
+                    ...ActorFields
                 }
 
                 # Assignees
                 assignees(first: 20) {
+                    totalCount
                     nodes {
-                        id
-                        databaseId
-                        login
-                        avatarUrl
-                        name
-                        email
-                        createdAt
-                        updatedAt
+                        ...UserFields
                     }
                 }
 
                 # Labels
                 labels(first: 50) {
+                    totalCount
                     nodes {
                         id
                         name
@@ -193,25 +132,7 @@ query GetRepositoryIssues(
 
                         # Project reference - needed to link item to correct project
                         project {
-                            id
-                            fullDatabaseId
-                            number
-                            title
-                            url
-                            # Owner for project identification
-                            owner {
-                                __typename
-                                ... on Organization {
-                                    id
-                                    databaseId
-                                    login
-                                }
-                                ... on User {
-                                    id
-                                    databaseId
-                                    login
-                                }
-                            }
+                            ...ProjectV2RefFields
                         }
 
                         # Field values (embedded, first 10) - pagination for items with more

@@ -35,10 +35,18 @@ public record PullRequestWithReviewThreads(
             return null;
         }
 
+        String context = "PR #" + ghPullRequest.getNumber();
+
         GitHubPullRequestDTO dto = GitHubPullRequestDTO.fromPullRequest(ghPullRequest);
-        EmbeddedReviewsDTO reviews = EmbeddedReviewsDTO.fromConnection(ghPullRequest.getReviews());
-        EmbeddedReviewThreadsDTO threads = EmbeddedReviewThreadsDTO.fromConnection(ghPullRequest.getReviewThreads());
-        EmbeddedProjectItemsDTO projectItems = EmbeddedProjectItemsDTO.fromConnection(ghPullRequest.getProjectItems());
+        EmbeddedReviewsDTO reviews = EmbeddedReviewsDTO.fromConnection(ghPullRequest.getReviews(), context);
+        EmbeddedReviewThreadsDTO threads = EmbeddedReviewThreadsDTO.fromConnection(
+            ghPullRequest.getReviewThreads(),
+            context
+        );
+        EmbeddedProjectItemsDTO projectItems = EmbeddedProjectItemsDTO.fromConnection(
+            ghPullRequest.getProjectItems(),
+            context
+        );
 
         return new PullRequestWithReviewThreads(dto, reviews, threads, projectItems);
     }

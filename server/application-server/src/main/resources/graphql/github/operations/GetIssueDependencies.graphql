@@ -64,23 +64,7 @@ query GetIssueDependencies($owner: String!, $name: String!, $first: Int!, $after
                         }
                         # Author
                         author {
-                            __typename
-                            ... on User {
-                                id
-                                databaseId
-                                login
-                                avatarUrl
-                                name
-                                email
-                                createdAt
-                                updatedAt
-                            }
-                            ... on Bot {
-                                id
-                                databaseId
-                                login
-                                avatarUrl
-                            }
+                            ...ActorFields
                         }
                     }
                     totalCount
@@ -110,23 +94,7 @@ query GetIssueDependencies($owner: String!, $name: String!, $first: Int!, $after
                         }
                         # Author
                         author {
-                            __typename
-                            ... on User {
-                                id
-                                databaseId
-                                login
-                                avatarUrl
-                                name
-                                email
-                                createdAt
-                                updatedAt
-                            }
-                            ... on Bot {
-                                id
-                                databaseId
-                                login
-                                avatarUrl
-                            }
+                            ...ActorFields
                         }
                     }
                     totalCount

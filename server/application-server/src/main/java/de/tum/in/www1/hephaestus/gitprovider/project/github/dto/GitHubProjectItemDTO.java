@@ -4,6 +4,7 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.DateTimeUtils.toInsta
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GraphQlConnectionOverflowDetector;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHDraftIssue;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHIssue;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2Item;
@@ -197,6 +198,13 @@ public record GitHubProjectItemDTO(
                 fieldValuesTruncated = Boolean.TRUE.equals(pageInfo.getHasNextPage());
                 fieldValuesEndCursor = pageInfo.getEndCursor();
             }
+
+            GraphQlConnectionOverflowDetector.check(
+                "fieldValues",
+                fieldValues.size(),
+                fieldValuesTotalCount,
+                "project item " + (item.getId() != null ? item.getId() : "unknown")
+            );
         }
 
         // Extract creator info

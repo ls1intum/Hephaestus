@@ -86,123 +86,35 @@ query GetRepositoryPullRequests(
 
                 # Author
                 author {
-                    __typename
-                    ... on User {
-                        id
-                        databaseId
-                        login
-                        avatarUrl
-                        name
-                        email
-                        createdAt
-                        updatedAt
-                    }
-                    ... on Bot {
-                        id
-                        databaseId
-                        login
-                        avatarUrl
-                    }
-                    ... on Mannequin {
-                        id
-                        databaseId
-                        login
-                        avatarUrl
-                    }
-                    ... on Organization {
-                        id
-                        databaseId
-                        login
-                        avatarUrl
-                    }
+                    ...ActorFields
                 }
 
                 # Merged by
                 mergedBy {
-                    __typename
-                    ... on User {
-                        id
-                        databaseId
-                        login
-                        avatarUrl
-                        name
-                        email
-                        createdAt
-                        updatedAt
-                    }
-                    ... on Bot {
-                        id
-                        databaseId
-                        login
-                        avatarUrl
-                    }
-                    ... on Mannequin {
-                        id
-                        databaseId
-                        login
-                        avatarUrl
-                    }
-                    ... on Organization {
-                        id
-                        databaseId
-                        login
-                        avatarUrl
-                    }
+                    ...ActorFields
                 }
 
                 # Assignees
                 assignees(first: 20) {
+                    totalCount
                     nodes {
-                        id
-                        databaseId
-                        login
-                        avatarUrl
-                        name
-                        email
-                        createdAt
-                        updatedAt
+                        ...UserFields
                     }
                 }
 
                 # Requested reviewers (RequestedReviewer union: User, Team, Mannequin, Bot)
                 reviewRequests(first: 20) {
+                    totalCount
                     nodes {
                         requestedReviewer {
-                            __typename
-                            ... on User {
-                                id
-                                databaseId
-                                login
-                                avatarUrl
-                                name
-                                email
-                                createdAt
-                                updatedAt
-                            }
-                            ... on Team {
-                                id
-                                databaseId
-                                name
-                                slug
-                            }
-                            ... on Bot {
-                                id
-                                databaseId
-                                login
-                                avatarUrl
-                            }
-                            ... on Mannequin {
-                                id
-                                databaseId
-                                login
-                                avatarUrl
-                            }
+                            ...RequestedReviewerFields
                         }
                     }
                 }
 
                 # Labels
                 labels(first: 50) {
+                    totalCount
                     nodes {
                         id
                         name
@@ -245,35 +157,7 @@ query GetRepositoryPullRequests(
 
                         # Author
                         author {
-                            __typename
-                            ... on User {
-                                id
-                                databaseId
-                                login
-                                avatarUrl
-                                name
-                                email
-                                createdAt
-                                updatedAt
-                            }
-                            ... on Bot {
-                                id
-                                databaseId
-                                login
-                                avatarUrl
-                            }
-                            ... on Mannequin {
-                                id
-                                databaseId
-                                login
-                                avatarUrl
-                            }
-                            ... on Organization {
-                                id
-                                databaseId
-                                login
-                                avatarUrl
-                            }
+                            ...ActorFields
                         }
                     }
                 }
@@ -301,14 +185,7 @@ query GetRepositoryPullRequests(
 
                         # User who resolved the thread
                         resolvedBy {
-                            id
-                            databaseId
-                            login
-                            avatarUrl
-                            name
-                            email
-                            createdAt
-                            updatedAt
+                            ...UserFields
                         }
 
                         # Comments in thread (first 5)
@@ -336,35 +213,7 @@ query GetRepositoryPullRequests(
 
                                 # Comment author
                                 author {
-                                    __typename
-                                    ... on User {
-                                        id
-                                        databaseId
-                                        login
-                                        avatarUrl
-                                        name
-                                        email
-                                        createdAt
-                                        updatedAt
-                                    }
-                                    ... on Bot {
-                                        id
-                                        databaseId
-                                        login
-                                        avatarUrl
-                                    }
-                                    ... on Mannequin {
-                                        id
-                                        databaseId
-                                        login
-                                        avatarUrl
-                                    }
-                                    ... on Organization {
-                                        id
-                                        databaseId
-                                        login
-                                        avatarUrl
-                                    }
+                                    ...ActorFields
                                 }
 
                                 # Reply to (for threading)
@@ -409,25 +258,7 @@ query GetRepositoryPullRequests(
 
                         # Project reference - needed to link item to correct project
                         project {
-                            id
-                            fullDatabaseId
-                            number
-                            title
-                            url
-                            # Owner for project identification
-                            owner {
-                                __typename
-                                ... on Organization {
-                                    id
-                                    databaseId
-                                    login
-                                }
-                                ... on User {
-                                    id
-                                    databaseId
-                                    login
-                                }
-                            }
+                            ...ProjectV2RefFields
                         }
 
                         # Field values (embedded, first 10) - pagination for items with more

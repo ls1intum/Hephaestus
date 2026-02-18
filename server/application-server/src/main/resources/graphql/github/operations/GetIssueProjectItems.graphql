@@ -30,24 +30,7 @@ query GetIssueProjectItems($issueId: ID!, $first: Int!, $after: String) {
 
                     # Project reference - needed to link item to correct project
                     project {
-                        id
-                        fullDatabaseId
-                        number
-                        title
-                        url
-                        owner {
-                            __typename
-                            ... on Organization {
-                                id
-                                databaseId
-                                login
-                            }
-                            ... on User {
-                                id
-                                databaseId
-                                login
-                            }
-                        }
+                        ...ProjectV2RefFields
                     }
 
                     # Field values (embedded, first 10)

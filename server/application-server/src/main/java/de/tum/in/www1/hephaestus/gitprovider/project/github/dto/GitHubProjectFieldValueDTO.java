@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GraphQlConnectionOverflowDetector;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHLabel;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHMilestone;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2Field;
@@ -174,6 +175,12 @@ public record GitHubProjectFieldValueDTO(
                 .map(GHLabel::getName)
                 .filter(Objects::nonNull)
                 .toList();
+            GraphQlConnectionOverflowDetector.check(
+                "fieldValue.labels",
+                labelNames.size(),
+                value.getLabels().getTotalCount(),
+                "field " + fieldId
+            );
         }
         String jsonValue = serializeToJson(labelNames);
         return new GitHubProjectFieldValueDTO(fieldId, "LABELS", jsonValue, null, null, null, null);
@@ -195,6 +202,12 @@ public record GitHubProjectFieldValueDTO(
                 .map(GHUser::getLogin)
                 .filter(Objects::nonNull)
                 .toList();
+            GraphQlConnectionOverflowDetector.check(
+                "fieldValue.users",
+                userLogins.size(),
+                value.getUsers().getTotalCount(),
+                "field " + fieldId
+            );
         }
         String jsonValue = serializeToJson(userLogins);
         return new GitHubProjectFieldValueDTO(fieldId, "ASSIGNEES", jsonValue, null, null, null, null);
@@ -216,6 +229,12 @@ public record GitHubProjectFieldValueDTO(
                 .map(GitHubProjectFieldValueDTO::extractReviewerName)
                 .filter(Objects::nonNull)
                 .toList();
+            GraphQlConnectionOverflowDetector.check(
+                "fieldValue.reviewers",
+                reviewerNames.size(),
+                value.getReviewers().getTotalCount(),
+                "field " + fieldId
+            );
         }
         String jsonValue = serializeToJson(reviewerNames);
         return new GitHubProjectFieldValueDTO(fieldId, "REVIEWERS", jsonValue, null, null, null, null);
@@ -274,6 +293,12 @@ public record GitHubProjectFieldValueDTO(
                 .filter(Objects::nonNull)
                 .map(GHPullRequest::getNumber)
                 .toList();
+            GraphQlConnectionOverflowDetector.check(
+                "fieldValue.pullRequests",
+                prNumbers.size(),
+                value.getPullRequests().getTotalCount(),
+                "field " + fieldId
+            );
         }
         String jsonValue = serializeToJson(prNumbers);
         return new GitHubProjectFieldValueDTO(fieldId, "PULL_REQUESTS", jsonValue, null, null, null, null);

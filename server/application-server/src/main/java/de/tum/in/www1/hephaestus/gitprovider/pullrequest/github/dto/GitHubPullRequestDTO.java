@@ -5,6 +5,7 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.DateTimeUtils.uriToSt
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GraphQlConnectionOverflowDetector;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHMergeStateStatus;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHMergeableState;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPullRequest;
@@ -154,9 +155,9 @@ public record GitHubPullRequestDTO(
             0, // comments count
             0, // review comments count
             GitHubUserDTO.fromActor(pr.getAuthor()),
-            extractAssignees(pr.getAssignees()),
-            extractRequestedReviewers(pr.getReviewRequests()),
-            GitHubLabelDTO.fromLabelConnection(pr.getLabels()),
+            extractAssignees(pr.getAssignees(), "PR #" + pr.getNumber()),
+            extractRequestedReviewers(pr.getReviewRequests(), "PR #" + pr.getNumber()),
+            GitHubLabelDTO.fromLabelConnection(pr.getLabels(), "PR #" + pr.getNumber()),
             GitHubMilestoneDTO.fromMilestone(pr.getMilestone()),
             new GitHubBranchRefDTO(pr.getHeadRefName(), pr.getHeadRefOid(), null),
             new GitHubBranchRefDTO(pr.getBaseRefName(), pr.getBaseRefOid(), null),
@@ -285,18 +286,28 @@ public record GitHubPullRequestDTO(
         return state.name().toLowerCase();
     }
 
-    private static List<GitHubUserDTO> extractAssignees(@Nullable GHUserConnection connection) {
+    private static List<GitHubUserDTO> extractAssignees(@Nullable GHUserConnection connection, String context) {
         if (connection == null || connection.getNodes() == null) {
             return Collections.emptyList();
         }
-        return connection.getNodes().stream().map(GitHubUserDTO::fromUser).filter(Objects::nonNull).toList();
+        List<GitHubUserDTO> result = connection
+            .getNodes()
+            .stream()
+            .map(GitHubUserDTO::fromUser)
+            .filter(Objects::nonNull)
+            .toList();
+        GraphQlConnectionOverflowDetector.check("assignees", result.size(), connection.getTotalCount(), context);
+        return result;
     }
 
-    private static List<GitHubUserDTO> extractRequestedReviewers(@Nullable GHReviewRequestConnection connection) {
+    private static List<GitHubUserDTO> extractRequestedReviewers(
+        @Nullable GHReviewRequestConnection connection,
+        String context
+    ) {
         if (connection == null || connection.getNodes() == null) {
             return Collections.emptyList();
         }
-        return connection
+        List<GitHubUserDTO> result = connection
             .getNodes()
             .stream()
             .map(GHReviewRequest::getRequestedReviewer)
@@ -304,5 +315,12 @@ public record GitHubPullRequestDTO(
             .map(reviewer -> GitHubUserDTO.fromUser((GHUser) reviewer))
             .filter(Objects::nonNull)
             .toList();
+        GraphQlConnectionOverflowDetector.check(
+            "requestedReviewers",
+            result.size(),
+            connection.getTotalCount(),
+            context
+        );
+        return result;
     }
 }
