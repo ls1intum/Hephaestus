@@ -1,5 +1,6 @@
-package de.tum.in.www1.hephaestus.gitprovider.git;
+package de.tum.in.www1.hephaestus.workspace.adapter;
 
+import de.tum.in.www1.hephaestus.gitprovider.git.GitRepositoryManager;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitorRepository;
