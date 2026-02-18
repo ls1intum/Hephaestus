@@ -5,9 +5,9 @@ import de.tum.in.www1.hephaestus.gitprovider.issue.github.dto.EmbeddedProjectIte
 import org.springframework.lang.Nullable;
 
 /**
- * Container for a Pull Request DTO with its embedded reviews, review threads, and project items.
+ * Container for a Pull Request DTO with its embedded reviews, review threads, project items, and commits.
  * <p>
- * Used during sync to process reviews, review comments, and project items inline with PRs,
+ * Used during sync to process reviews, review comments, project items, and commits inline with PRs,
  * eliminating N+1 queries.
  * <p>
  * <h2>Embedded Data</h2>
@@ -15,13 +15,15 @@ import org.springframework.lang.Nullable;
  *   <li>{@code embeddedReviews} - First 5 reviews (pagination for PRs with more)</li>
  *   <li>{@code embeddedReviewThreads} - First 5 review threads with their comments</li>
  *   <li>{@code embeddedProjectItems} - First 5 project items (pagination for PRs in more projects)</li>
+ *   <li>{@code embeddedCommits} - First 100 commits (no pagination yet)</li>
  * </ul>
  */
 public record PullRequestWithReviewThreads(
     GitHubPullRequestDTO pullRequest,
     EmbeddedReviewsDTO embeddedReviews,
     EmbeddedReviewThreadsDTO embeddedReviewThreads,
-    EmbeddedProjectItemsDTO embeddedProjectItems
+    EmbeddedProjectItemsDTO embeddedProjectItems,
+    EmbeddedCommitsDTO embeddedCommits
 ) {
     /**
      * Creates a PullRequestWithReviewThreads from a GraphQL GHPullRequest model.
@@ -39,7 +41,8 @@ public record PullRequestWithReviewThreads(
         EmbeddedReviewsDTO reviews = EmbeddedReviewsDTO.fromConnection(ghPullRequest.getReviews());
         EmbeddedReviewThreadsDTO threads = EmbeddedReviewThreadsDTO.fromConnection(ghPullRequest.getReviewThreads());
         EmbeddedProjectItemsDTO projectItems = EmbeddedProjectItemsDTO.fromConnection(ghPullRequest.getProjectItems());
+        EmbeddedCommitsDTO commits = EmbeddedCommitsDTO.fromConnection(ghPullRequest.getCommits());
 
-        return new PullRequestWithReviewThreads(dto, reviews, threads, projectItems);
+        return new PullRequestWithReviewThreads(dto, reviews, threads, projectItems, commits);
     }
 }

@@ -53,9 +53,39 @@ query GetRepositoryPullRequestsHistorical(
                 mergeable
                 maintainerCanModify
 
-                # Commits count
-                commits(first: 0) {
+                # Commits (embedded to avoid separate commit sync queries)
+                # Most PRs have <100 commits; pagination not implemented yet
+                commits(first: 100) {
                     totalCount
+                    nodes {
+                        commit {
+                            oid
+                            messageHeadline
+                            messageBody
+                            authoredDate
+                            committedDate
+                            additions
+                            deletions
+                            changedFilesIfAvailable
+                            url
+                            author {
+                                email
+                                name
+                                user {
+                                    login
+                                    databaseId
+                                }
+                            }
+                            committer {
+                                email
+                                name
+                                user {
+                                    login
+                                    databaseId
+                                }
+                            }
+                        }
+                    }
                 }
 
                 # Merge commit (available when PR is merged)

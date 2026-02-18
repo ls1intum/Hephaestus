@@ -7,6 +7,7 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncCons
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 
+import de.tum.in.www1.hephaestus.gitprovider.commit.github.GitHubInlineCommitSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlErrorUtils;
@@ -28,6 +29,7 @@ import de.tum.in.www1.hephaestus.gitprovider.issue.github.dto.IssueWithComments;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.github.GitHubIssueCommentProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.GitHubPullRequestProcessor;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.dto.EmbeddedCommitsDTO;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.dto.EmbeddedReviewThreadsDTO;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.dto.EmbeddedReviewsDTO;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.dto.PullRequestWithReviewThreads;
@@ -146,6 +148,7 @@ public class HistoricalBackfillService {
     private final GitHubPullRequestReviewProcessor reviewProcessor;
     private final GitHubPullRequestReviewSyncService reviewSyncService;
     private final GitHubPullRequestReviewCommentSyncService reviewCommentSyncService;
+    private final GitHubInlineCommitSyncService inlineCommitSyncService;
     private final RepositoryRepository repositoryRepository;
     private final TransactionTemplate transactionTemplate;
     private final Executor monitoringExecutor;
@@ -162,6 +165,7 @@ public class HistoricalBackfillService {
         GitHubPullRequestReviewProcessor reviewProcessor,
         GitHubPullRequestReviewSyncService reviewSyncService,
         GitHubPullRequestReviewCommentSyncService reviewCommentSyncService,
+        GitHubInlineCommitSyncService inlineCommitSyncService,
         RepositoryRepository repositoryRepository,
         TransactionTemplate transactionTemplate,
         @Qualifier("monitoringExecutor") Executor monitoringExecutor
@@ -177,6 +181,7 @@ public class HistoricalBackfillService {
         this.reviewProcessor = reviewProcessor;
         this.reviewSyncService = reviewSyncService;
         this.reviewCommentSyncService = reviewCommentSyncService;
+        this.inlineCommitSyncService = inlineCommitSyncService;
         this.repositoryRepository = repositoryRepository;
         this.transactionTemplate = transactionTemplate;
         this.monitoringExecutor = monitoringExecutor;
@@ -797,6 +802,7 @@ public class HistoricalBackfillService {
         int totalPRsSynced = 0;
         int totalReviewsSynced = 0;
         int totalReviewCommentsSynced = 0;
+        int totalCommitsSynced = 0;
         int batchMinNumber = Integer.MAX_VALUE;
         int batchMaxNumber = Integer.MIN_VALUE;
         boolean hasMore = true;
@@ -885,6 +891,7 @@ public class HistoricalBackfillService {
                 totalPRsSynced += pageResult.prCount();
                 totalReviewsSynced += pageResult.reviewCount();
                 totalReviewCommentsSynced += pageResult.reviewCommentCount();
+                totalCommitsSynced += pageResult.commitCount();
                 // Track min/max across pages (sync goes newest to oldest by CREATED_AT DESC)
                 if (pageResult.prCount() > 0) {
                     batchMinNumber = Math.min(batchMinNumber, pageResult.minNumber());
@@ -980,11 +987,12 @@ public class HistoricalBackfillService {
 
         if (totalPRsSynced > 0) {
             log.debug(
-                "Backfill PRs batch complete: repo={}, prs={}, reviews={}, reviewComments={}, numberRange=[#{}..#{}], prsWithReviewPagination={}",
+                "Backfill PRs batch complete: repo={}, prs={}, reviews={}, reviewComments={}, commits={}, numberRange=[#{}..#{}], prsWithReviewPagination={}",
                 sanitizeForLog(repoNameForLog),
                 totalPRsSynced,
                 totalReviewsSynced,
                 totalReviewCommentsSynced,
+                totalCommitsSynced,
                 batchMinNumber,
                 batchMaxNumber,
                 allPrsNeedingReviewPagination.size()
@@ -1123,6 +1131,7 @@ public class HistoricalBackfillService {
             int prCount = 0;
             int reviewCount = 0;
             int reviewCommentCount = 0;
+            int commitCount = 0;
             int minNumber = Integer.MAX_VALUE;
             int maxNumber = Integer.MIN_VALUE;
             List<PullRequestWithReviewCursor> prsNeedingReviewPagination = new ArrayList<>();
@@ -1160,6 +1169,10 @@ public class HistoricalBackfillService {
                             int commentsSynced = reviewCommentSyncService.processThread(thread, processed, scopeId);
                             reviewCommentCount += commentsSynced;
                         }
+
+                        // Process embedded commits
+                        EmbeddedCommitsDTO embeddedCommits = prData.embeddedCommits();
+                        commitCount += inlineCommitSyncService.processEmbeddedCommits(embeddedCommits, repositoryId);
                     }
                 }
             }
@@ -1178,12 +1191,13 @@ public class HistoricalBackfillService {
                 prCount,
                 reviewCount,
                 reviewCommentCount,
+                commitCount,
                 prsNeedingReviewPagination,
                 minNumber,
                 maxNumber
             );
         });
-        return result != null ? result : new PullRequestPageResult(0, 0, 0, new ArrayList<>(), 0, 0);
+        return result != null ? result : new PullRequestPageResult(0, 0, 0, 0, new ArrayList<>(), 0, 0);
     }
 
     // Note: Backfill tracking is now initialized inline during the first batch.
@@ -1240,6 +1254,7 @@ public class HistoricalBackfillService {
      * @param prCount                      number of PRs processed
      * @param reviewCount                  number of reviews processed
      * @param reviewCommentCount           number of review comments processed
+     * @param commitCount                  number of commits processed
      * @param prsNeedingReviewPagination   PRs that have more reviews to fetch
      * @param minNumber                    lowest PR number in this page
      * @param maxNumber                    highest PR number in this page
@@ -1248,6 +1263,7 @@ public class HistoricalBackfillService {
         int prCount,
         int reviewCount,
         int reviewCommentCount,
+        int commitCount,
         List<PullRequestWithReviewCursor> prsNeedingReviewPagination,
         int minNumber,
         int maxNumber

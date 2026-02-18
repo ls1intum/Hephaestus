@@ -8,6 +8,7 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncCons
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 
+import de.tum.in.www1.hephaestus.gitprovider.commit.github.GitHubInlineCommitSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.ExponentialBackoff;
@@ -28,6 +29,7 @@ import de.tum.in.www1.hephaestus.gitprovider.issue.github.dto.EmbeddedProjectIte
 import de.tum.in.www1.hephaestus.gitprovider.project.github.GitHubProjectItemSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.dto.EmbeddedCommitsDTO;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.dto.EmbeddedReviewThreadsDTO;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.dto.EmbeddedReviewsDTO;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.dto.GitHubReviewThreadDTO;
@@ -87,6 +89,7 @@ public class GitHubPullRequestSyncService {
     private final GitHubPullRequestReviewSyncService reviewSyncService;
     private final GitHubPullRequestReviewCommentSyncService reviewCommentSyncService;
     private final GitHubProjectItemSyncService projectItemSyncService;
+    private final GitHubInlineCommitSyncService inlineCommitSyncService;
     private final BackfillStateProvider backfillStateProvider;
     private final TransactionTemplate transactionTemplate;
     private final GitHubSyncProperties syncProperties;
@@ -129,6 +132,7 @@ public class GitHubPullRequestSyncService {
         GitHubPullRequestReviewSyncService reviewSyncService,
         GitHubPullRequestReviewCommentSyncService reviewCommentSyncService,
         GitHubProjectItemSyncService projectItemSyncService,
+        GitHubInlineCommitSyncService inlineCommitSyncService,
         BackfillStateProvider backfillStateProvider,
         TransactionTemplate transactionTemplate,
         GitHubSyncProperties syncProperties,
@@ -143,6 +147,7 @@ public class GitHubPullRequestSyncService {
         this.reviewSyncService = reviewSyncService;
         this.reviewCommentSyncService = reviewCommentSyncService;
         this.projectItemSyncService = projectItemSyncService;
+        this.inlineCommitSyncService = inlineCommitSyncService;
         this.backfillStateProvider = backfillStateProvider;
         this.transactionTemplate = transactionTemplate;
         this.syncProperties = syncProperties;
@@ -292,6 +297,7 @@ public class GitHubPullRequestSyncService {
         int totalReviewsSynced = 0;
         int totalReviewCommentsSynced = 0;
         int totalProjectItemsSynced = 0;
+        int totalCommitsSynced = 0;
         List<PullRequestWithReviewCursor> prsNeedingReviewPagination = new ArrayList<>();
         List<PullRequestWithThreadCursor> prsNeedingThreadPagination = new ArrayList<>();
         List<PullRequestWithProjectItemCursor> prsNeedingProjectItemPagination = new ArrayList<>();
@@ -423,7 +429,7 @@ public class GitHubPullRequestSyncService {
                     // Re-fetch repository within transaction to ensure it's attached to session
                     Repository repo = repositoryRepository.findById(repoId).orElse(null);
                     if (repo == null) {
-                        return new PageSyncResult(0, 0, 0, 0);
+                        return new PageSyncResult(0, 0, 0, 0, 0);
                     }
                     ProcessingContext context = ProcessingContext.forSync(scopeId, repo);
                     return processPullRequestPage(
@@ -441,6 +447,7 @@ public class GitHubPullRequestSyncService {
                     totalReviewsSynced += pageResult.reviewsSynced();
                     totalReviewCommentsSynced += pageResult.reviewCommentsSynced();
                     totalProjectItemsSynced += pageResult.projectItemsSynced();
+                    totalCommitsSynced += pageResult.commitsSynced();
                 }
 
                 GHPageInfo pageInfo = connection.getPageInfo();
@@ -710,12 +717,13 @@ public class GitHubPullRequestSyncService {
         SyncResult.Status finalStatus = abortReason != null ? abortReason : SyncResult.Status.COMPLETED;
 
         log.info(
-            "Completed pull request sync: repoName={}, prCount={}, reviewCount={}, reviewCommentCount={}, projectItemCount={}, prsWithReviewPagination={}, prsWithThreadPagination={}, prsWithProjectItemPagination={}, resumed={}, incremental={}, stoppedByIncremental={}, status={}",
+            "Completed pull request sync: repoName={}, prCount={}, reviewCount={}, reviewCommentCount={}, projectItemCount={}, commitCount={}, prsWithReviewPagination={}, prsWithThreadPagination={}, prsWithProjectItemPagination={}, resumed={}, incremental={}, stoppedByIncremental={}, status={}",
             safeNameWithOwner,
             totalPRsSynced,
             totalReviewsSynced,
             totalReviewCommentsSynced,
             totalProjectItemsSynced,
+            totalCommitsSynced,
             prsNeedingReviewPagination.size(),
             prsNeedingThreadPagination.size(),
             prsNeedingProjectItemPagination.size(),
@@ -730,7 +738,13 @@ public class GitHubPullRequestSyncService {
     /**
      * Result of processing a page of pull requests.
      */
-    private record PageSyncResult(int prsSynced, int reviewsSynced, int reviewCommentsSynced, int projectItemsSynced) {}
+    private record PageSyncResult(
+        int prsSynced,
+        int reviewsSynced,
+        int reviewCommentsSynced,
+        int projectItemsSynced,
+        int commitsSynced
+    ) {}
 
     /**
      * Processes a page of pull requests with their embedded reviews, review threads, and project items.
@@ -747,6 +761,7 @@ public class GitHubPullRequestSyncService {
         int reviewsSynced = 0;
         int reviewCommentsSynced = 0;
         int projectItemsSynced = 0;
+        int commitsSynced = 0;
 
         for (var graphQlPullRequest : connection.getNodes()) {
             PullRequestWithReviewThreads prWithReviews = PullRequestWithReviewThreads.fromPullRequest(
@@ -813,9 +828,16 @@ public class GitHubPullRequestSyncService {
                     )
                 );
             }
+
+            // Process embedded commits
+            EmbeddedCommitsDTO embeddedCommits = prWithReviews.embeddedCommits();
+            commitsSynced += inlineCommitSyncService.processEmbeddedCommits(
+                embeddedCommits,
+                context.repository().getId()
+            );
         }
 
-        return new PageSyncResult(prsSynced, reviewsSynced, reviewCommentsSynced, projectItemsSynced);
+        return new PageSyncResult(prsSynced, reviewsSynced, reviewCommentsSynced, projectItemsSynced, commitsSynced);
     }
 
     /**

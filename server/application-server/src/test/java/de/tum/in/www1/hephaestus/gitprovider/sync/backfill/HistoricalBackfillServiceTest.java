@@ -8,6 +8,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.in.www1.hephaestus.gitprovider.commit.github.GitHubInlineCommitSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.AuthMode;
@@ -78,6 +79,9 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
 
     @Mock
     private GitHubPullRequestReviewCommentSyncService reviewCommentSyncService;
+
+    @Mock
+    private GitHubInlineCommitSyncService inlineCommitSyncService;
 
     @Mock
     private RepositoryRepository repositoryRepository;
@@ -156,6 +160,7 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             reviewProcessor,
             reviewSyncService,
             reviewCommentSyncService,
+            inlineCommitSyncService,
             repositoryRepository,
             transactionTemplate,
             Runnable::run // synchronous executor for tests
