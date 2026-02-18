@@ -86,6 +86,7 @@ public record GitHubPullRequestDTO(
     public record MergeCommitInfo(
         String sha,
         @Nullable String message,
+        @Nullable String messageBody,
         @Nullable String url,
         @Nullable Instant authoredDate,
         @Nullable Instant committedDate,
@@ -93,7 +94,9 @@ public record GitHubPullRequestDTO(
         @Nullable Integer deletions,
         @Nullable Integer changedFiles,
         @Nullable String authorLogin,
-        @Nullable String committerLogin
+        @Nullable String committerLogin,
+        @Nullable String authorEmail,
+        @Nullable String committerEmail
     ) {}
 
     /**
@@ -177,9 +180,30 @@ public record GitHubPullRequestDTO(
         if (mc == null) {
             return null;
         }
+
+        // Split full message into subject (first line) and body (rest)
+        String subject = null;
+        String body = null;
+        if (mc.getMessage() != null) {
+            String raw = mc.getMessage();
+            int newline = raw.indexOf('\n');
+            if (newline >= 0) {
+                subject = raw.substring(0, newline).trim();
+                String rest = raw.substring(newline + 1).trim();
+                body = rest.isEmpty() ? null : rest;
+            } else {
+                subject = raw.trim();
+            }
+            // Truncate subject to fit varchar(1024)
+            if (subject.length() > 1024) {
+                subject = subject.substring(0, 1024);
+            }
+        }
+
         return new MergeCommitInfo(
             mc.getOid(),
-            mc.getMessage(),
+            subject,
+            body,
             uriToString(mc.getUrl()),
             toInstant(mc.getAuthoredDate()),
             toInstant(mc.getCommittedDate()),
@@ -189,7 +213,9 @@ public record GitHubPullRequestDTO(
             mc.getAuthor() != null && mc.getAuthor().getUser() != null ? mc.getAuthor().getUser().getLogin() : null,
             mc.getCommitter() != null && mc.getCommitter().getUser() != null
                 ? mc.getCommitter().getUser().getLogin()
-                : null
+                : null,
+            mc.getAuthor() != null ? mc.getAuthor().getEmail() : null,
+            mc.getCommitter() != null ? mc.getCommitter().getEmail() : null
         );
     }
 

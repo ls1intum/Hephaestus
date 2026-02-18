@@ -446,7 +446,7 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         commitRepository.upsertCommit(
             info.sha(),
             info.message(),
-            null, // messageBody — not available from GraphQL mergeCommit
+            info.messageBody(),
             htmlUrl,
             info.authoredDate(),
             info.committedDate(),
@@ -457,8 +457,8 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
             repository.getId(),
             authorId,
             committerId,
-            null, // authorEmail — not available from GraphQL GitActor
-            null // committerEmail — not available from GraphQL GitActor
+            info.authorEmail(),
+            info.committerEmail()
         );
 
         log.debug("Upserted merge commit: sha={}, repository={}", info.sha(), repository.getNameWithOwner());

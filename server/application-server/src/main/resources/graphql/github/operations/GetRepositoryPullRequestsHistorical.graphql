@@ -70,11 +70,13 @@ query GetRepositoryPullRequestsHistorical(
                     deletions
                     changedFilesIfAvailable
                     author {
+                        email
                         user {
                             login
                         }
                     }
                     committer {
+                        email
                         user {
                             login
                         }
