@@ -6,9 +6,13 @@ import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
 import jakarta.persistence.EntityManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.CannotAcquireLockException;
+import org.springframework.dao.DeadlockLoserDataAccessException;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Processor for GitHub users.
@@ -29,7 +33,8 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <b>Concurrency Strategy:</b>
  * <p>
- * User upserts use three separate SQL statements within the caller's transaction:
+ * User upserts use three separate SQL statements within an isolated REQUIRES_NEW
+ * transaction to prevent deadlocks from propagating to the caller:
  * <ol>
  *   <li>Try to acquire a transaction-scoped advisory lock on the login using
  *       {@code pg_try_advisory_xact_lock} (non-blocking to prevent deadlocks)</li>
@@ -41,13 +46,13 @@ import org.springframework.transaction.annotation.Transactional;
  * effect and would still hit the unique constraint. Separate statements each see
  * the results of the previous statement within the same transaction.
  * <p>
- * <b>Deadlock Prevention:</b> Uses {@code pg_try_advisory_xact_lock} instead of
- * the blocking {@code pg_advisory_xact_lock}. When two threads process overlapping
- * sets of users in different orders (e.g., NATS webhook thread A processes users
- * [alice, bob] while sync thread B processes [bob, alice]), blocking locks create
- * an ABBA deadlock cycle. Non-blocking try-locks with retry break the cycle because
- * a thread that can't acquire the lock sleeps briefly and retries, rather than
- * blocking in PostgreSQL's wait queue.
+ * <b>Deadlock Handling:</b> The upsert runs in a REQUIRES_NEW transaction so that
+ * PostgreSQL deadlocks (which mark the transaction for rollback) are isolated from
+ * the caller's transaction. When a deadlock is detected, the inner transaction rolls
+ * back and is retried with exponential backoff. This handles the case where concurrent
+ * virtual threads upsert different users whose primary key index entries fall on the
+ * same or adjacent B-tree pages, causing PostgreSQL-level deadlocks independent of
+ * the advisory lock strategy.
  */
 @Service
 @Transactional
@@ -61,12 +66,27 @@ public class GitHubUserProcessor {
     /** Base delay between lock acquisition attempts (with jitter). */
     private static final long LOCK_RETRY_BASE_MS = 50;
 
+    /** Maximum number of retry attempts for deadlock recovery. */
+    private static final int MAX_DEADLOCK_RETRIES = 3;
+
+    /** Base delay between deadlock retries (with exponential backoff and jitter). */
+    private static final long DEADLOCK_RETRY_BASE_MS = 100;
+
     private final UserRepository userRepository;
     private final EntityManager entityManager;
+    private final TransactionTemplate requiresNewTransaction;
 
-    public GitHubUserProcessor(UserRepository userRepository, EntityManager entityManager) {
+    public GitHubUserProcessor(
+        UserRepository userRepository,
+        EntityManager entityManager,
+        TransactionTemplate transactionTemplate
+    ) {
         this.userRepository = userRepository;
         this.entityManager = entityManager;
+        // Create a REQUIRES_NEW template so the upsert runs in its own transaction.
+        // This isolates deadlock rollbacks from the caller's transaction.
+        this.requiresNewTransaction = new TransactionTemplate(transactionTemplate.getTransactionManager());
+        this.requiresNewTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
     /**
@@ -77,15 +97,10 @@ public class GitHubUserProcessor {
      * joins the caller's transaction if one exists, or creates a new one
      * (e.g., when called from non-transactional message handlers).
      * <p>
-     * Uses three separate SQL statements (not a CTE) within the caller's transaction:
-     * <ol>
-     *   <li>Try to acquire advisory lock on the login (non-blocking, with retry)</li>
-     *   <li>Rename any other user that currently holds the target login</li>
-     *   <li>INSERT ... ON CONFLICT (id) DO UPDATE the user</li>
-     * </ol>
-     * Separate statements are required because PostgreSQL data-modifying CTEs
-     * all operate on the same snapshot — the INSERT would not see the UPDATE's
-     * effect and would still violate the unique constraint on login.
+     * The actual upsert (advisory lock + rename conflicts + INSERT ON CONFLICT)
+     * runs in a REQUIRES_NEW transaction to isolate deadlock rollbacks. If
+     * PostgreSQL detects a deadlock, only the inner transaction rolls back and
+     * the operation is retried with exponential backoff.
      *
      * @param dto the GitHub user DTO
      * @return the User entity (managed in caller's persistence context),
@@ -112,39 +127,11 @@ public class GitHubUserProcessor {
         // consistency between Hibernate's cache and the database.
         entityManager.flush();
 
-        // Step 1: Try to acquire advisory lock (non-blocking to prevent deadlocks).
-        // If another transaction holds the lock, retry with jitter backoff.
-        // After MAX_LOCK_ATTEMPTS, fall through and attempt the upsert anyway —
-        // the INSERT ON CONFLICT handles concurrent inserts gracefully.
-        boolean lockAcquired = tryAcquireWithRetry(login);
-
-        if (lockAcquired) {
-            // Step 2: Rename any other user that holds this login (different id).
-            // This is a separate statement so that step 3 sees the update.
-            userRepository.freeLoginConflicts(login, userId);
-        } else {
-            log.debug(
-                "Could not acquire advisory lock after {} attempts, proceeding with upsert: login={}",
-                MAX_LOCK_ATTEMPTS,
-                login
-            );
-        }
-
-        // Step 3: Insert or update the user. When the lock was acquired, the login
-        // conflict has been resolved by step 2. When the lock was not acquired,
-        // the upsert may fail with a unique constraint violation if there is a login
-        // conflict — this is acceptable because the caller (NATS/sync) will retry.
-        userRepository.upsertUser(
-            userId,
-            login,
-            name,
-            avatarUrl,
-            htmlUrl,
-            userType.name(),
-            dto.email(),
-            dto.createdAt(),
-            dto.updatedAt()
-        );
+        // Execute the upsert in a REQUIRES_NEW transaction with deadlock retry.
+        // This isolates the upsert from the caller's transaction so that if
+        // PostgreSQL detects a deadlock and rolls back, only the inner transaction
+        // is affected and we can retry without corrupting the caller's state.
+        executeUpsertWithDeadlockRetry(userId, login, name, avatarUrl, htmlUrl, userType, dto);
 
         // Evict from L1 cache so the next find() returns fresh data from DB
         // instead of a stale cached version.
@@ -165,6 +152,85 @@ public class GitHubUserProcessor {
             log.warn("User not found after upsert: userId={}, login={}", userId, login);
         }
         return result;
+    }
+
+    /**
+     * Executes the upsert operation in a REQUIRES_NEW transaction with deadlock retry.
+     * <p>
+     * On deadlock (PostgreSQL error 40P01), the inner transaction is rolled back by
+     * Spring and we retry with exponential backoff and jitter. The caller's transaction
+     * is not affected because we use REQUIRES_NEW propagation.
+     */
+    private void executeUpsertWithDeadlockRetry(
+        Long userId,
+        String login,
+        String name,
+        String avatarUrl,
+        String htmlUrl,
+        User.Type userType,
+        GitHubUserDTO dto
+    ) {
+        for (int attempt = 0; attempt <= MAX_DEADLOCK_RETRIES; attempt++) {
+            try {
+                requiresNewTransaction.executeWithoutResult(status -> {
+                    // Step 1: Try to acquire advisory lock (non-blocking to prevent deadlocks).
+                    boolean lockAcquired = tryAcquireWithRetry(login);
+
+                    if (lockAcquired) {
+                        // Step 2: Rename any other user that holds this login (different id).
+                        userRepository.freeLoginConflicts(login, userId);
+                    } else {
+                        log.debug(
+                            "Could not acquire advisory lock after {} attempts, proceeding with upsert: login={}",
+                            MAX_LOCK_ATTEMPTS,
+                            login
+                        );
+                    }
+
+                    // Step 3: Insert or update the user.
+                    userRepository.upsertUser(
+                        userId,
+                        login,
+                        name,
+                        avatarUrl,
+                        htmlUrl,
+                        userType.name(),
+                        dto.email(),
+                        dto.createdAt(),
+                        dto.updatedAt()
+                    );
+                });
+                // Success — exit the retry loop
+                return;
+            } catch (DeadlockLoserDataAccessException | CannotAcquireLockException e) {
+                if (attempt < MAX_DEADLOCK_RETRIES) {
+                    // Exponential backoff with jitter: base * 2^attempt + random [0, base)
+                    long delay =
+                        DEADLOCK_RETRY_BASE_MS * (1L << attempt) + (long) (Math.random() * DEADLOCK_RETRY_BASE_MS);
+                    log.warn(
+                        "Deadlock detected during user upsert, retrying: login={}, attempt={}/{}, delayMs={}",
+                        login,
+                        attempt + 1,
+                        MAX_DEADLOCK_RETRIES,
+                        delay
+                    );
+                    try {
+                        Thread.sleep(delay);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw e; // Propagate the original deadlock exception
+                    }
+                } else {
+                    log.error(
+                        "Deadlock persisted after {} retries during user upsert: login={}, userId={}",
+                        MAX_DEADLOCK_RETRIES,
+                        login,
+                        userId
+                    );
+                    throw e; // Exhausted retries, propagate to caller
+                }
+            }
+        }
     }
 
     /**
