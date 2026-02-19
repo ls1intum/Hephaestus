@@ -826,18 +826,13 @@ public class HistoricalBackfillService {
             try {
                 // Use Mono.defer() to wrap the entire execute() call so retries cover body streaming.
                 final String currentCursor = cursor;
+                final int prPageSize = resolveBackfillPrPageSize(scopeId, syncTargetId);
                 ClientGraphQlResponse response = Mono.defer(() ->
                     client
                         .documentName(PRS_HISTORICAL_QUERY)
                         .variable("owner", ownerAndName.owner())
                         .variable("name", ownerAndName.name())
-                        .variable(
-                            "first",
-                            adaptPageSize(
-                                syncProperties.backfillPrPageSize(),
-                                graphQlClientProvider.getRateLimitRemaining(scopeId)
-                            )
-                        )
+                        .variable("first", prPageSize)
                         .variable("after", currentCursor)
                         .execute()
                 )
@@ -936,10 +931,11 @@ public class HistoricalBackfillService {
                 // Rethrow to trigger cooldown mechanism in runBackfillCycle.
                 // Progress is preserved: cursor was saved in the last successful transaction.
                 log.warn(
-                    "Error during pull requests backfill, will retry after cooldown: repo={}, page={}, synced={}, error={}",
+                    "Error during pull requests backfill, will retry after cooldown: repo={}, page={}, synced={}, failures={}, error={}",
                     sanitizeForLog(repoNameForLog),
                     pageCount,
                     totalPRsSynced,
+                    consecutiveFailures.getOrDefault(syncTargetId, 0),
                     e.getMessage()
                 );
                 throw new BackfillTransientException(
@@ -1524,6 +1520,29 @@ public class HistoricalBackfillService {
                     signal.failure().getMessage()
                 )
             );
+    }
+
+    /**
+     * Resolves the effective pull request page size for backfill.
+     *
+     * <p>Base sizing follows rate-limit-aware adaptation. Additionally, when a repository has
+     * consecutive transient failures we reduce PR page size further so large payloads can progress
+     * instead of repeatedly timing out and entering cooldown.
+     */
+    private int resolveBackfillPrPageSize(Long scopeId, Long syncTargetId) {
+        int rateLimitAdjusted = adaptPageSize(
+            syncProperties.backfillPrPageSize(),
+            graphQlClientProvider.getRateLimitRemaining(scopeId)
+        );
+        int failures = consecutiveFailures.getOrDefault(syncTargetId, 0);
+
+        if (failures >= MAX_CONSECUTIVE_FAILURES) {
+            return Math.max(1, rateLimitAdjusted / 4);
+        }
+        if (failures > 0) {
+            return Math.max(2, rateLimitAdjusted / 2);
+        }
+        return rateLimitAdjusted;
     }
 
     // ========================================================================
