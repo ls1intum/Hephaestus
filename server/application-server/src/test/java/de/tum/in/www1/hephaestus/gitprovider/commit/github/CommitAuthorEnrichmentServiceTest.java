@@ -13,6 +13,7 @@ import de.tum.in.www1.hephaestus.gitprovider.commit.CommitRepository;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoordinator;
+import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserProcessor;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,6 +40,9 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
     @Mock
     private GitHubExceptionClassifier exceptionClassifier;
 
+    @Mock
+    private GitHubUserProcessor userProcessor;
+
     private CommitAuthorEnrichmentService service;
 
     @BeforeEach
@@ -48,7 +52,8 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
             authorResolver,
             graphQlClientProvider,
             graphQlSyncCoordinator,
-            exceptionClassifier
+            exceptionClassifier,
+            userProcessor
         );
     }
 

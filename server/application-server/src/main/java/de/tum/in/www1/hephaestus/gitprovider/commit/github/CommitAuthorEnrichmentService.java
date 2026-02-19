@@ -13,6 +13,9 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientPr
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoordinator;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoordinator.GraphQlClassificationContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubTransportErrors;
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserProcessor;
+import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -77,19 +80,22 @@ public class CommitAuthorEnrichmentService {
     private final GitHubGraphQlClientProvider graphQlClientProvider;
     private final GitHubGraphQlSyncCoordinator graphQlSyncCoordinator;
     private final GitHubExceptionClassifier exceptionClassifier;
+    private final GitHubUserProcessor userProcessor;
 
     public CommitAuthorEnrichmentService(
         CommitRepository commitRepository,
         CommitAuthorResolver authorResolver,
         GitHubGraphQlClientProvider graphQlClientProvider,
         GitHubGraphQlSyncCoordinator graphQlSyncCoordinator,
-        GitHubExceptionClassifier exceptionClassifier
+        GitHubExceptionClassifier exceptionClassifier,
+        GitHubUserProcessor userProcessor
     ) {
         this.commitRepository = commitRepository;
         this.authorResolver = authorResolver;
         this.graphQlClientProvider = graphQlClientProvider;
         this.graphQlSyncCoordinator = graphQlSyncCoordinator;
         this.exceptionClassifier = exceptionClassifier;
+        this.userProcessor = userProcessor;
     }
 
     /**
@@ -336,6 +342,7 @@ public class CommitAuthorEnrichmentService {
         Map<String, String> shaToEmail
     ) {
         Map<String, String> emailToLogin = new HashMap<>();
+        Map<Long, GitHubUserDTO> usersToUpsert = new HashMap<>();
         String[] parts = nameWithOwner.split("/", 2);
         if (parts.length != 2) {
             log.warn("Invalid nameWithOwner format: {}", nameWithOwner);
@@ -370,9 +377,19 @@ public class CommitAuthorEnrichmentService {
                 }
             }
 
-            Map<String, String> batchResult = fetchBatch(owner, repoName, scopeId, batch, shaToEmail, nameWithOwner);
+            Map<String, String> batchResult = fetchBatch(
+                owner,
+                repoName,
+                scopeId,
+                batch,
+                shaToEmail,
+                nameWithOwner,
+                usersToUpsert
+            );
             emailToLogin.putAll(batchResult);
         }
+
+        upsertUsers(usersToUpsert, nameWithOwner);
 
         return emailToLogin;
     }
@@ -390,7 +407,8 @@ public class CommitAuthorEnrichmentService {
         Long scopeId,
         List<String> batch,
         Map<String, String> shaToEmail,
-        String nameWithOwner
+        String nameWithOwner,
+        Map<Long, GitHubUserDTO> usersToUpsert
     ) {
         Map<String, String> emailToLogin = new HashMap<>();
         String queryString = buildBatchQuery(owner, repoName, batch);
@@ -461,7 +479,7 @@ public class CommitAuthorEnrichmentService {
                 graphQlClientProvider.recordSuccess();
 
                 // Extract results from aliased fields
-                extractLoginsFromResponse(response, batch, shaToEmail, emailToLogin);
+                extractLoginsFromResponse(response, batch, shaToEmail, emailToLogin, usersToUpsert);
                 break; // Success — exit retry loop
             } catch (Exception e) {
                 graphQlClientProvider.recordFailure(e);
@@ -508,8 +526,8 @@ public class CommitAuthorEnrichmentService {
             sb.append("    commit").append(i).append(": object(oid: \"").append(shas.get(i)).append("\") {\n");
             sb.append("      ... on Commit {\n");
             sb.append("        oid\n");
-            sb.append("        author { user { login } }\n");
-            sb.append("        committer { user { login } }\n");
+            sb.append("        author { user { login databaseId name email avatarUrl url createdAt updatedAt } }\n");
+            sb.append("        committer { user { login databaseId name email avatarUrl url createdAt updatedAt } }\n");
             sb.append("      }\n");
             sb.append("    }\n");
         }
@@ -532,7 +550,8 @@ public class CommitAuthorEnrichmentService {
         ClientGraphQlResponse response,
         List<String> batch,
         Map<String, String> shaToEmail,
-        Map<String, String> emailToLogin
+        Map<String, String> emailToLogin,
+        Map<Long, GitHubUserDTO> usersToUpsert
     ) {
         for (int i = 0; i < batch.size(); i++) {
             String sha = batch.get(i);
@@ -546,16 +565,25 @@ public class CommitAuthorEnrichmentService {
                     continue;
                 }
 
-                // Extract author login
-                String authorLogin = extractNestedLogin(field, "author");
-                if (authorLogin != null && email != null) {
-                    emailToLogin.putIfAbsent(email, authorLogin);
+                Map<String, Object> commitData = field.toEntity(Map.class);
+                if (commitData == null) {
+                    continue;
                 }
 
-                // Extract committer login
-                String committerLogin = extractNestedLogin(field, "committer");
-                if (committerLogin != null && email != null) {
-                    emailToLogin.putIfAbsent(email, committerLogin);
+                UserSnapshot authorSnapshot = extractUserSnapshot(commitData, "author");
+                if (authorSnapshot != null && email != null) {
+                    emailToLogin.putIfAbsent(email, authorSnapshot.login());
+                    if (authorSnapshot.user() != null) {
+                        usersToUpsert.putIfAbsent(authorSnapshot.user().getDatabaseId(), authorSnapshot.user());
+                    }
+                }
+
+                UserSnapshot committerSnapshot = extractUserSnapshot(commitData, "committer");
+                if (committerSnapshot != null && email != null) {
+                    emailToLogin.putIfAbsent(email, committerSnapshot.login());
+                    if (committerSnapshot.user() != null) {
+                        usersToUpsert.putIfAbsent(committerSnapshot.user().getDatabaseId(), committerSnapshot.user());
+                    }
                 }
             } catch (Exception e) {
                 log.debug("Failed to extract login for commit: sha={}, error={}", sha, e.getMessage());
@@ -573,12 +601,8 @@ public class CommitAuthorEnrichmentService {
      */
     @SuppressWarnings("unchecked")
     @Nullable
-    private String extractNestedLogin(ClientResponseField commitField, String role) {
+    private UserSnapshot extractUserSnapshot(Map<String, Object> commitData, String role) {
         try {
-            Map<String, Object> commitData = commitField.toEntity(Map.class);
-            if (commitData == null) {
-                return null;
-            }
             Object roleObj = commitData.get(role);
             if (!(roleObj instanceof Map<?, ?> roleMap)) {
                 return null;
@@ -587,11 +611,85 @@ public class CommitAuthorEnrichmentService {
             if (!(userObj instanceof Map<?, ?> userMap)) {
                 return null;
             }
-            Object login = userMap.get("login");
-            return login instanceof String s ? s : null;
+            String login = normalizeString(userMap.get("login"));
+            if (login == null) {
+                return null;
+            }
+
+            Long databaseId = toLong(userMap.get("databaseId"));
+            GitHubUserDTO user = null;
+            if (databaseId != null) {
+                user = new GitHubUserDTO(
+                    null,
+                    databaseId,
+                    login,
+                    normalizeString(userMap.get("avatarUrl")),
+                    normalizeString(userMap.get("url")),
+                    normalizeString(userMap.get("name")),
+                    normalizeString(userMap.get("email")),
+                    inferUserType(login)
+                );
+            }
+
+            return new UserSnapshot(login, user);
         } catch (Exception e) {
             log.debug("Failed to extract {} login: error={}", role, e.getMessage());
             return null;
         }
     }
+
+    private void upsertUsers(Map<Long, GitHubUserDTO> usersToUpsert, String nameWithOwner) {
+        if (usersToUpsert.isEmpty()) {
+            return;
+        }
+        int processed = 0;
+        for (GitHubUserDTO dto : usersToUpsert.values()) {
+            if (dto == null || dto.getDatabaseId() == null || dto.login() == null) {
+                continue;
+            }
+            try {
+                userProcessor.ensureExists(dto);
+                processed++;
+            } catch (Exception e) {
+                log.debug(
+                    "Failed to upsert user from commit enrichment: repo={}, login={}, error={}",
+                    nameWithOwner,
+                    dto.login(),
+                    e.getMessage()
+                );
+            }
+        }
+        log.debug("Upserted {} users from commit enrichment: repo={}", processed, nameWithOwner);
+    }
+
+    private static String normalizeString(Object value) {
+        if (!(value instanceof String s)) {
+            return null;
+        }
+        String trimmed = s.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private static Long toLong(Object value) {
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        if (value instanceof String s) {
+            try {
+                return Long.parseLong(s);
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    private static User.Type inferUserType(String login) {
+        if (login != null && login.toLowerCase().endsWith("[bot]")) {
+            return User.Type.BOT;
+        }
+        return User.Type.USER;
+    }
+
+    private record UserSnapshot(String login, @Nullable GitHubUserDTO user) {}
 }
