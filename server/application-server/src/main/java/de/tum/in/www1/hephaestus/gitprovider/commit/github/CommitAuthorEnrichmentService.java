@@ -75,6 +75,14 @@ public class CommitAuthorEnrichmentService {
     /** Pattern to validate SHA-1 hex strings (prevents injection into dynamic query). */
     private static final Pattern SHA_PATTERN = Pattern.compile("^[0-9a-f]{40}$");
 
+    /**
+     * Emails that should never be resolved to a user. GitHub's web-flow bot uses
+     * {@code noreply@github.com} as the committer email for squash merges done via
+     * the web UI. This always resolves to {@code user: null} in GraphQL, wasting API
+     * calls. Filtering these out avoids unnecessary resolution attempts.
+     */
+    private static final Set<String> UNRESOLVABLE_EMAILS = Set.of("noreply@github.com");
+
     private final CommitRepository commitRepository;
     private final CommitAuthorResolver authorResolver;
     private final GitHubGraphQlClientProvider graphQlClientProvider;
@@ -117,6 +125,16 @@ public class CommitAuthorEnrichmentService {
         List<String> unresolvedCommitterEmails = commitRepository.findDistinctUnresolvedCommitterEmailsByRepositoryId(
             repositoryId
         );
+
+        // Filter out known-unresolvable emails (e.g., GitHub web-flow bot)
+        unresolvedAuthorEmails = unresolvedAuthorEmails
+            .stream()
+            .filter(e -> !UNRESOLVABLE_EMAILS.contains(e))
+            .toList();
+        unresolvedCommitterEmails = unresolvedCommitterEmails
+            .stream()
+            .filter(e -> !UNRESOLVABLE_EMAILS.contains(e))
+            .toList();
 
         if (unresolvedAuthorEmails.isEmpty() && unresolvedCommitterEmails.isEmpty()) {
             log.debug("No unresolved commit authors: repoId={}", repositoryId);

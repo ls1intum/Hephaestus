@@ -279,4 +279,60 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
             assertThat(result).isEqualTo(0);
         }
     }
+
+    @Nested
+    @DisplayName("unresolvable email filtering (R3)")
+    class UnresolvableEmailFiltering {
+
+        @Test
+        @DisplayName("should filter out noreply@github.com from author emails")
+        void shouldFilterNoreplyFromAuthorEmails() {
+            // noreply@github.com is the only unresolved email — should be filtered out
+            when(commitRepository.findDistinctUnresolvedAuthorEmailsByRepositoryId(1L)).thenReturn(
+                List.of("noreply@github.com")
+            );
+            when(commitRepository.findDistinctUnresolvedCommitterEmailsByRepositoryId(1L)).thenReturn(List.of());
+
+            int result = service.enrichCommitAuthors(1L, "owner/repo", 1L);
+
+            assertThat(result).isEqualTo(0);
+            // Should never attempt to resolve the unresolvable email
+            verify(authorResolver, never()).resolveByEmail("noreply@github.com");
+        }
+
+        @Test
+        @DisplayName("should filter out noreply@github.com from committer emails")
+        void shouldFilterNoreplyFromCommitterEmails() {
+            when(commitRepository.findDistinctUnresolvedAuthorEmailsByRepositoryId(1L)).thenReturn(List.of());
+            when(commitRepository.findDistinctUnresolvedCommitterEmailsByRepositoryId(1L)).thenReturn(
+                List.of("noreply@github.com")
+            );
+
+            int result = service.enrichCommitAuthors(1L, "owner/repo", 1L);
+
+            assertThat(result).isEqualTo(0);
+            verify(authorResolver, never()).resolveByEmail("noreply@github.com");
+        }
+
+        @Test
+        @DisplayName("should filter noreply@github.com but process other emails")
+        void shouldFilterNoreplyButProcessOtherEmails() {
+            when(commitRepository.findDistinctUnresolvedAuthorEmailsByRepositoryId(1L))
+                .thenReturn(List.of("noreply@github.com", "real@example.com"))
+                .thenReturn(List.of()); // after enrichment
+            when(commitRepository.findDistinctUnresolvedCommitterEmailsByRepositoryId(1L))
+                .thenReturn(List.of("noreply@github.com"))
+                .thenReturn(List.of());
+
+            when(authorResolver.resolveByEmail("real@example.com")).thenReturn(42L);
+            when(commitRepository.bulkUpdateAuthorIdByEmail("real@example.com", 1L, 42L)).thenReturn(3);
+
+            int result = service.enrichCommitAuthors(1L, "owner/repo", null);
+
+            assertThat(result).isEqualTo(3);
+            // noreply should be filtered, real email should be resolved
+            verify(authorResolver, never()).resolveByEmail("noreply@github.com");
+            verify(authorResolver).resolveByEmail("real@example.com");
+        }
+    }
 }

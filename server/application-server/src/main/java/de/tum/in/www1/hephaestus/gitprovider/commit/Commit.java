@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.commit;
 
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import jakarta.persistence.CascadeType;
@@ -11,6 +12,8 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.PrePersist;
@@ -206,6 +209,29 @@ public class Commit {
     @ToString.Exclude
     private Set<CommitFileChange> fileChanges = new HashSet<>();
 
+    /**
+     * The contributors to this commit (primary author, co-authors, committer).
+     * Populated during enrichment from GitHub's {@code Commit.authors} field
+     * which automatically parses Co-authored-by trailers.
+     */
+    @OneToMany(mappedBy = "commit", cascade = CascadeType.ALL, orphanRemoval = true)
+    @ToString.Exclude
+    private Set<CommitContributor> contributors = new HashSet<>();
+
+    /**
+     * The pull requests associated with this commit.
+     * Populated from GitHub's {@code Commit.associatedPullRequests} GraphQL field
+     * during enrichment. A commit may be associated with multiple PRs (e.g., cherry-picks).
+     */
+    @ManyToMany
+    @JoinTable(
+        name = "commit_pull_request",
+        joinColumns = @JoinColumn(name = "commit_id"),
+        inverseJoinColumns = @JoinColumn(name = "pull_request_id")
+    )
+    @ToString.Exclude
+    private Set<PullRequest> associatedPullRequests = new HashSet<>();
+
     // ========== Helper Methods ==========
 
     /**
@@ -232,6 +258,26 @@ public class Commit {
         if (fileChange != null) {
             this.fileChanges.remove(fileChange);
             fileChange.setCommit(null);
+        }
+    }
+
+    /**
+     * Adds a contributor to this commit and maintains bidirectional consistency.
+     */
+    public void addContributor(CommitContributor contributor) {
+        if (contributor != null) {
+            this.contributors.add(contributor);
+            contributor.setCommit(this);
+        }
+    }
+
+    /**
+     * Removes a contributor from this commit and maintains bidirectional consistency.
+     */
+    public void removeContributor(CommitContributor contributor) {
+        if (contributor != null) {
+            this.contributors.remove(contributor);
+            contributor.setCommit(null);
         }
     }
 }

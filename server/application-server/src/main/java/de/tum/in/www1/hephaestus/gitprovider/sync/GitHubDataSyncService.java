@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.sync;
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.in.www1.hephaestus.gitprovider.commit.github.CommitAuthorEnrichmentService;
+import de.tum.in.www1.hephaestus.gitprovider.commit.github.CommitMetadataEnrichmentService;
 import de.tum.in.www1.hephaestus.gitprovider.commit.github.GitHubCommitBackfillService;
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.ExponentialBackoff;
@@ -100,6 +101,7 @@ public class GitHubDataSyncService {
     private final GitHubCollaboratorSyncService collaboratorSyncService;
     private final GitHubCommitBackfillService commitBackfillService;
     private final CommitAuthorEnrichmentService commitAuthorEnrichmentService;
+    private final CommitMetadataEnrichmentService commitMetadataEnrichmentService;
     private final GitHubExceptionClassifier exceptionClassifier;
     private final InstallationTokenProvider tokenProvider;
     private final GitHubAppTokenService gitHubAppTokenService;
@@ -127,6 +129,7 @@ public class GitHubDataSyncService {
         GitHubCollaboratorSyncService collaboratorSyncService,
         GitHubCommitBackfillService commitBackfillService,
         CommitAuthorEnrichmentService commitAuthorEnrichmentService,
+        CommitMetadataEnrichmentService commitMetadataEnrichmentService,
         GitHubExceptionClassifier exceptionClassifier,
         InstallationTokenProvider tokenProvider,
         GitHubAppTokenService gitHubAppTokenService,
@@ -152,6 +155,7 @@ public class GitHubDataSyncService {
         this.collaboratorSyncService = collaboratorSyncService;
         this.commitBackfillService = commitBackfillService;
         this.commitAuthorEnrichmentService = commitAuthorEnrichmentService;
+        this.commitMetadataEnrichmentService = commitMetadataEnrichmentService;
         this.exceptionClassifier = exceptionClassifier;
         this.tokenProvider = tokenProvider;
         this.gitHubAppTokenService = gitHubAppTokenService;
@@ -327,12 +331,17 @@ public class GitHubDataSyncService {
             // Uses O(unique_emails) API calls instead of O(commits) — very efficient.
             int commitsEnriched = enrichCommitAuthors(syncTarget, repository);
 
+            // Enrich commits with multi-author contributor data and associated PR links.
+            // Runs AFTER commit author enrichment so that users are already resolved.
+            int commitsMetadataEnriched = enrichCommitMetadata(syncTarget, repository);
+
             log.info(
-                "Completed repository sync: scopeId={}, repoId={}, commitsBackfilled={}, commitsEnriched={}, collaborators={}, labels={}, milestones={}, issues={}, prs={}, issueStatus={}, prStatus={}",
+                "Completed repository sync: scopeId={}, repoId={}, commitsBackfilled={}, commitsEnriched={}, commitsMetadataEnriched={}, collaborators={}, labels={}, milestones={}, issues={}, prs={}, issueStatus={}, prStatus={}",
                 scopeId,
                 repositoryId,
                 commitsBackfilled >= 0 ? commitsBackfilled : "skipped",
                 commitsEnriched >= 0 ? commitsEnriched : "skipped",
+                commitsMetadataEnriched >= 0 ? commitsMetadataEnriched : "skipped",
                 collaboratorsCount >= 0 ? collaboratorsCount : "skipped",
                 labelsCount >= 0 ? labelsCount : "skipped",
                 milestonesCount >= 0 ? milestonesCount : "skipped",
@@ -1045,6 +1054,30 @@ public class GitHubDataSyncService {
             );
         } catch (Exception e) {
             log.warn("Commit author enrichment failed: repoId={}, error={}", repository.getId(), e.getMessage());
+            return -1;
+        }
+    }
+
+    /**
+     * Enriches commits with multi-author contributor data and associated PR links.
+     * <p>
+     * Delegates to {@link CommitMetadataEnrichmentService} with the sync target's scope ID
+     * for GraphQL authentication. Catches all exceptions to avoid failing the entire
+     * sync if enrichment fails.
+     *
+     * @param syncTarget the sync target with auth info
+     * @param repository the repository entity
+     * @return number of commits enriched, or -1 on error
+     */
+    private int enrichCommitMetadata(SyncTarget syncTarget, Repository repository) {
+        try {
+            return commitMetadataEnrichmentService.enrichCommitMetadata(
+                repository.getId(),
+                repository.getNameWithOwner(),
+                syncTarget.scopeId()
+            );
+        } catch (Exception e) {
+            log.warn("Commit metadata enrichment failed: repoId={}, error={}", repository.getId(), e.getMessage());
             return -1;
         }
     }

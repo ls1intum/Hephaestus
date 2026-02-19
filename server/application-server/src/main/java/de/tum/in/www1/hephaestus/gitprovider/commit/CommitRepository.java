@@ -253,4 +253,44 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
         @Param("authorEmail") String authorEmail,
         @Param("committerEmail") String committerEmail
     );
+
+    /**
+     * Find SHAs of commits that have no contributor rows yet.
+     * These commits need metadata enrichment (multi-author data + PR links).
+     */
+    @Query(
+        value = """
+        SELECT gc.sha FROM git_commit gc
+        WHERE gc.repository_id = :repositoryId
+          AND NOT EXISTS (
+              SELECT 1 FROM commit_contributor cc WHERE cc.commit_id = gc.id
+          )
+        """,
+        nativeQuery = true
+    )
+    List<String> findShasWithoutContributorsByRepositoryId(@Param("repositoryId") Long repositoryId);
+
+    /**
+     * Link a commit to pull requests by PR numbers within the same repository.
+     * Uses INSERT ... ON CONFLICT DO NOTHING to be idempotent.
+     */
+    @Modifying
+    @Transactional
+    @Query(
+        value = """
+        INSERT INTO commit_pull_request (commit_id, pull_request_id)
+        SELECT :commitId, i.id
+        FROM issue i
+        WHERE i.repository_id = :repositoryId
+          AND i.number IN (:prNumbers)
+          AND i.issue_type = 'PULL_REQUEST'
+        ON CONFLICT DO NOTHING
+        """,
+        nativeQuery = true
+    )
+    void linkCommitToPullRequests(
+        @Param("commitId") Long commitId,
+        @Param("repositoryId") Long repositoryId,
+        @Param("prNumbers") List<Integer> prNumbers
+    );
 }
