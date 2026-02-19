@@ -72,6 +72,16 @@ erDiagram
         BIGINT workspace_id FK "NOT NULL"
     }
 
+    CommitContributor {
+        BIGINT id PK
+        BIGINT commit_id FK,UK "NOT NULL"
+        BIGINT user_id FK
+        VARCHAR(32) role UK "NOT NULL"
+        VARCHAR(255) name
+        VARCHAR(255) email UK "NOT NULL"
+        INTEGER ordinal "NOT NULL"
+    }
+
     CommitFileChange {
         BIGINT id PK
         VARCHAR(1024) filename "NOT NULL"
@@ -81,6 +91,11 @@ erDiagram
         INTEGER changes "NOT NULL"
         VARCHAR(1024) previous_filename
         BIGINT commit_id FK "NOT NULL"
+    }
+
+    CommitPullRequest {
+        BIGINT commit_id PK,FK
+        BIGINT pull_request_id PK,FK
     }
 
     Document {
@@ -545,6 +560,7 @@ erDiagram
     Workspace ||--|| ActivityEvent : has
     ChatMessage ||--|| ChatMessagePart : has
     ChatMessage ||--|| ChatThread : references
+    GitCommit ||--|| CommitContributor : has
     Repository ||--|| GitCommit : has
     Repository ||--|| Issue : has
     Repository ||--|| Label : labeled
@@ -568,6 +584,7 @@ erDiagram
     ChatThread ||--o{ ChatMessage : has
     User ||--o{ ChatThread : has
     Workspace ||--o{ ChatThread : has
+    User ||--o{ CommitContributor : has
     GitCommit ||--o{ CommitFileChange : has
     User ||--o{ Document : has
     Workspace ||--o{ Document : has
@@ -603,6 +620,8 @@ erDiagram
     Workspace ||--o{ WorkspaceSlugHistory : has
 
     %% Many-to-Many relationships
+    GitCommit }o--o{ CommitPullRequest : has
+    Issue }o--o{ CommitPullRequest : references
     Issue }o--o{ IssueAssignee : assigned_to
     User }o--o{ IssueAssignee : assigned_to
     Issue }o--o{ IssueBlocking : has

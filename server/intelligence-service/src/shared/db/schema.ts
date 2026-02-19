@@ -273,6 +273,42 @@ export const chatThread = pgTable(
 	],
 );
 
+export const commitContributor = pgTable(
+	"commit_contributor",
+	{
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({
+			name: "commit_contributor_id_seq",
+			startWith: 1,
+			increment: 1,
+			cache: 1,
+		}),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		commitId: bigint("commit_id", { mode: "number" }).notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		userId: bigint("user_id", { mode: "number" }),
+		role: varchar({ length: 32 }).notNull(),
+		name: varchar({ length: 255 }),
+		email: varchar({ length: 255 }).notNull(),
+		ordinal: integer().default(0).notNull(),
+	},
+	(table) => [
+		index("idx_commit_contributor_commit_id").using("btree", table.commitId.asc().nullsLast()),
+		index("idx_commit_contributor_user_id").using("btree", table.userId.asc().nullsLast()),
+		foreignKey({
+			columns: [table.commitId],
+			foreignColumns: [gitCommit.id],
+			name: "fk_commit_contributor_commit",
+		}).onDelete("cascade"),
+		foreignKey({
+			columns: [table.userId],
+			foreignColumns: [user.id],
+			name: "fk_commit_contributor_user",
+		}).onDelete("set null"),
+		unique("uq_commit_contributor_commit_email_role").on(table.commitId, table.role, table.email),
+	],
+);
+
 export const commitFileChange = pgTable(
 	"commit_file_change",
 	{
@@ -300,6 +336,30 @@ export const commitFileChange = pgTable(
 			foreignColumns: [gitCommit.id],
 			name: "fk_commit_file_change_commit",
 		}).onDelete("cascade"),
+	],
+);
+
+export const commitPullRequest = pgTable(
+	"commit_pull_request",
+	{
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		commitId: bigint("commit_id", { mode: "number" }).notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		pullRequestId: bigint("pull_request_id", { mode: "number" }).notNull(),
+	},
+	(table) => [
+		index("idx_commit_pull_request_pr_id").using("btree", table.pullRequestId.asc().nullsLast()),
+		foreignKey({
+			columns: [table.commitId],
+			foreignColumns: [gitCommit.id],
+			name: "fk_commit_pr_commit",
+		}).onDelete("cascade"),
+		foreignKey({
+			columns: [table.pullRequestId],
+			foreignColumns: [issue.id],
+			name: "fk_commit_pr_pull_request",
+		}).onDelete("cascade"),
+		primaryKey({ columns: [table.commitId, table.pullRequestId], name: "pk_commit_pull_request" }),
 	],
 );
 
