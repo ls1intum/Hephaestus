@@ -129,7 +129,7 @@ query GetRepositoryPullRequestsHistorical(
                 }
 
                 # Requested reviewers
-                reviewRequests(first: 10) {
+                reviewRequests(first: 100) {
                     totalCount
                     nodes {
                         requestedReviewer {

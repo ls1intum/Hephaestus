@@ -307,6 +307,17 @@ public record GitHubPullRequestDTO(
         if (connection == null || connection.getNodes() == null) {
             return Collections.emptyList();
         }
+        // Check overflow using the pre-filter count (total nodes fetched, including
+        // Teams/Bots/Mannequins) against totalCount. The previous implementation
+        // compared the post-filter count (only Users) against totalCount, producing
+        // false-positive overflow warnings whenever non-User reviewers existed.
+        int fetchedCount = connection.getNodes().size();
+        GraphQlConnectionOverflowDetector.check(
+            "requestedReviewers",
+            fetchedCount,
+            connection.getTotalCount(),
+            context
+        );
         List<GitHubUserDTO> result = connection
             .getNodes()
             .stream()
@@ -315,12 +326,6 @@ public record GitHubPullRequestDTO(
             .map(reviewer -> GitHubUserDTO.fromUser((GHUser) reviewer))
             .filter(Objects::nonNull)
             .toList();
-        GraphQlConnectionOverflowDetector.check(
-            "requestedReviewers",
-            result.size(),
-            connection.getTotalCount(),
-            context
-        );
         return result;
     }
 }

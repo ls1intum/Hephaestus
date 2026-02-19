@@ -414,9 +414,9 @@ fragment ProjectV2StatusUpdateFields on ProjectV2StatusUpdate {
     }
 }
 
-# Cost-optimized variant of FieldValueFields with smaller page sizes for nested
-# collections (labels: 10, users: 10, pullRequests: 5, reviewers: 10) to reduce
-# GraphQL cost when fetching many items at once.
+# Previously cost-optimized variant of FieldValueFields — now aligned with FieldValueFields
+# page sizes (labels: 50, users: 50, pullRequests: 20, reviewers: 50) to prevent
+# silent data truncation for projects with many field values.
 # Shared fragment — used by GetProjectItems, GetRepositoryIssues, GetRepositoryPullRequests,
 # GetIssueProjectItems, and GetPullRequestProjectItems.
 fragment FieldValueFieldsCostOptimized on ProjectV2ItemFieldValue {
@@ -472,7 +472,7 @@ fragment FieldValueFieldsCostOptimized on ProjectV2ItemFieldValue {
         }
     }
     ... on ProjectV2ItemFieldLabelValue {
-        labels(first: 10) {
+        labels(first: 50) {
             totalCount
             pageInfo {
                 hasNextPage
@@ -506,7 +506,7 @@ fragment FieldValueFieldsCostOptimized on ProjectV2ItemFieldValue {
         }
     }
     ... on ProjectV2ItemFieldUserValue {
-        users(first: 10) {
+        users(first: 50) {
             totalCount
             pageInfo {
                 hasNextPage
@@ -539,7 +539,7 @@ fragment FieldValueFieldsCostOptimized on ProjectV2ItemFieldValue {
         }
     }
     ... on ProjectV2ItemFieldPullRequestValue {
-        pullRequests(first: 5) {
+        pullRequests(first: 20) {
             totalCount
             pageInfo {
                 hasNextPage
@@ -560,7 +560,7 @@ fragment FieldValueFieldsCostOptimized on ProjectV2ItemFieldValue {
         }
     }
     ... on ProjectV2ItemFieldReviewerValue {
-        reviewers(first: 10) {
+        reviewers(first: 50) {
             totalCount
             pageInfo {
                 hasNextPage

@@ -103,7 +103,7 @@ query GetRepositoryPullRequests(
                 }
 
                 # Requested reviewers (RequestedReviewer union: User, Team, Mannequin, Bot)
-                reviewRequests(first: 20) {
+                reviewRequests(first: 100) {
                     totalCount
                     nodes {
                         requestedReviewer {
