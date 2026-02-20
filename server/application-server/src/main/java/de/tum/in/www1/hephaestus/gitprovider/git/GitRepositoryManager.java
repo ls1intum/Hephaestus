@@ -9,6 +9,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import lombok.extern.slf4j.Slf4j;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.diff.DiffEntry;
@@ -26,8 +27,6 @@ import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.EmptyTreeIterator;
 import org.eclipse.jgit.util.io.DisabledOutputStream;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
@@ -43,11 +42,10 @@ import org.springframework.stereotype.Service;
  *   <li>Maintains all branches via {@code setCloneAllBranches(true)}</li>
  * </ul>
  */
+@Slf4j
 @Service
 @EnableConfigurationProperties(GitRepositoryProperties.class)
 public class GitRepositoryManager {
-
-    private static final Logger log = LoggerFactory.getLogger(GitRepositoryManager.class);
 
     private final GitRepositoryProperties properties;
     private final GitRepositoryLockManager lockManager;
@@ -385,8 +383,17 @@ public class GitRepositoryManager {
 
         String message = revCommit.getShortMessage();
         String fullMessage = revCommit.getFullMessage();
-        String messageBody =
-            fullMessage.length() > message.length() ? fullMessage.substring(message.length()).trim() : null;
+        // Extract the body: everything after the first line break in the full message.
+        // We cannot use getShortMessage().length() as offset because getShortMessage()
+        // trims trailing whitespace, causing an off-by-one mismatch with the full message.
+        String messageBody = null;
+        int newlineIndex = fullMessage.indexOf('\n');
+        if (newlineIndex >= 0 && newlineIndex < fullMessage.length() - 1) {
+            messageBody = fullMessage.substring(newlineIndex + 1).trim();
+            if (messageBody.isEmpty()) {
+                messageBody = null;
+            }
+        }
 
         return new CommitInfo(
             revCommit.getName(),

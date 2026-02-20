@@ -134,6 +134,9 @@ public class CommitFileChange {
      * Convert from GitRepositoryManager.ChangeType to entity ChangeType.
      */
     public static ChangeType fromGitChangeType(GitRepositoryManager.ChangeType gitType) {
+        if (gitType == null) {
+            return ChangeType.UNKNOWN;
+        }
         return switch (gitType) {
             case ADDED -> ChangeType.ADDED;
             case MODIFIED -> ChangeType.MODIFIED;

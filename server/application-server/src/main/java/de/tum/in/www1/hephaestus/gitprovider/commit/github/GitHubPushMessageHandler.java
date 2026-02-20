@@ -23,8 +23,7 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
@@ -43,10 +42,10 @@ import org.springframework.transaction.support.TransactionTemplate;
  * @see <a href="https://docs.github.com/en/webhooks/webhook-events-and-payloads#push">
  *      GitHub Push Event Documentation</a>
  */
+@Slf4j
 @Component
 public class GitHubPushMessageHandler extends GitHubMessageHandler<GitHubPushEventDTO> {
 
-    private static final Logger log = LoggerFactory.getLogger(GitHubPushMessageHandler.class);
     private static final String ZERO_SHA = "0000000000000000000000000000000000000000";
 
     private final GitRepositoryManager gitRepositoryManager;

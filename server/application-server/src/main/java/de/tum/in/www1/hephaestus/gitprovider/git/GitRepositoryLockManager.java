@@ -3,8 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.git;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Supplier;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /**
@@ -26,10 +25,9 @@ import org.springframework.stereotype.Service;
  * If horizontal scaling is needed later, this can be replaced with
  * distributed locking (pg_advisory_lock or Redis SETNX).
  */
+@Slf4j
 @Service
 public class GitRepositoryLockManager {
-
-    private static final Logger log = LoggerFactory.getLogger(GitRepositoryLockManager.class);
 
     /**
      * Maximum number of lock entries. Each entry is ~100 bytes
@@ -118,7 +116,7 @@ public class GitRepositoryLockManager {
      * Remove the lock for a repository (e.g., when repository is deleted).
      * Only removes the lock if it is not currently held by any thread.
      *
-     * @return true if the lock was removed, false if it was still held or didn't exist
+     * @return true if the lock was removed or didn't exist, false if it was still held
      */
     public boolean removeLock(Long repositoryId) {
         return (

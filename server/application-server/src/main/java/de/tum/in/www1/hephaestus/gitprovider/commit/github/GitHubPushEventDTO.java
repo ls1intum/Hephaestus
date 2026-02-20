@@ -7,6 +7,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubWebhookEvent;
 import de.tum.in.www1.hephaestus.gitprovider.repository.github.dto.GitHubRepositoryRefDTO;
 import java.time.Instant;
 import java.util.List;
+import org.springframework.lang.NonNull;
 import org.springframework.lang.Nullable;
 
 /**
@@ -17,17 +18,17 @@ import org.springframework.lang.Nullable;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitHubPushEventDTO(
-    @JsonProperty("ref") String ref,
-    @JsonProperty("before") String before,
-    @JsonProperty("after") String after,
+    @NonNull @JsonProperty("ref") String ref,
+    @NonNull @JsonProperty("before") String before,
+    @NonNull @JsonProperty("after") String after,
     @JsonProperty("created") boolean created,
     @JsonProperty("deleted") boolean deleted,
     @JsonProperty("forced") boolean forced,
     @JsonProperty("compare") String compareUrl,
-    @JsonProperty("commits") List<PushCommit> commits,
+    @NonNull @JsonProperty("commits") List<PushCommit> commits,
     @JsonProperty("head_commit") @Nullable PushCommit headCommit,
-    @JsonProperty("repository") GitHubRepositoryRefDTO repository,
-    @JsonProperty("pusher") Pusher pusher,
+    @NonNull @JsonProperty("repository") GitHubRepositoryRefDTO repository,
+    @NonNull @JsonProperty("pusher") Pusher pusher,
     @JsonProperty("sender") @Nullable Sender sender,
     @JsonProperty("installation") @Nullable InstallationRef installation
 ) implements GitHubWebhookEvent {
