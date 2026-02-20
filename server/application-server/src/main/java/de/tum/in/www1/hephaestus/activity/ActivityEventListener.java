@@ -16,8 +16,8 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import java.time.Instant;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.Nullable;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
@@ -42,10 +42,10 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * the {@code User} and {@code Repository} entities that are stored as foreign keys
  * in the activity event.
  */
+@Slf4j
+@RequiredArgsConstructor
 @Component
 public class ActivityEventListener {
-
-    private static final Logger log = LoggerFactory.getLogger(ActivityEventListener.class);
 
     private final ActivityEventService activityEventService;
     private final ExperiencePointCalculator xpCalc;
@@ -56,28 +56,6 @@ public class ActivityEventListener {
     private final RepositoryRepository repositoryRepository;
     private final ProjectRepository projectRepository;
     private final IssueRepository issueRepository;
-
-    public ActivityEventListener(
-        ActivityEventService activityEventService,
-        ExperiencePointCalculator xpCalc,
-        PullRequestReviewRepository reviewRepository,
-        IssueCommentRepository issueCommentRepository,
-        PullRequestReviewThreadRepository reviewThreadRepository,
-        UserRepository userRepository,
-        RepositoryRepository repositoryRepository,
-        ProjectRepository projectRepository,
-        IssueRepository issueRepository
-    ) {
-        this.activityEventService = activityEventService;
-        this.xpCalc = xpCalc;
-        this.reviewRepository = reviewRepository;
-        this.issueCommentRepository = issueCommentRepository;
-        this.reviewThreadRepository = reviewThreadRepository;
-        this.userRepository = userRepository;
-        this.repositoryRepository = repositoryRepository;
-        this.projectRepository = projectRepository;
-        this.issueRepository = issueRepository;
-    }
 
     /**
      * Safely records an activity event, catching and logging any exceptions.
