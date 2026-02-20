@@ -14,6 +14,8 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientPr
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoordinator;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoordinator.GraphQlClassificationContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubTransportErrors;
+import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -268,10 +270,14 @@ public class CommitMetadataEnrichmentService {
     }
 
     /**
-     * Builds a GraphQL query that fetches commit authors and associated PRs.
+     * Builds a GraphQL query that fetches commit authors, associated PRs, and enrichment metadata.
      * <p>
      * Uses {@code authors(first:10)} to get all co-authors from Co-authored-by trailers,
-     * and {@code associatedPullRequests(first:5)} to get linked PRs.
+     * {@code associatedPullRequests(first:5)} to get linked PRs, and additional free-data
+     * fields ({@code additions}, {@code deletions}, {@code changedFilesIfAvailable},
+     * {@code authoredDate}, {@code committedDate}, {@code messageHeadline}, {@code message},
+     * {@code url}, {@code signature}, {@code authoredByCommitter}, {@code committedViaWeb},
+     * {@code parents}) that piggyback on the same query at zero extra API cost.
      */
     private String buildBatchQuery(String owner, String repoName, List<String> shas) {
         StringBuilder sb = new StringBuilder();
@@ -283,7 +289,25 @@ public class CommitMetadataEnrichmentService {
             sb.append("    commit").append(i).append(": object(oid: \"").append(shas.get(i)).append("\") {\n");
             sb.append("      ... on Commit {\n");
             sb.append("        oid\n");
+            // Free data: authoritative commit metadata
+            sb.append("        additions\n");
+            sb.append("        deletions\n");
+            sb.append("        changedFilesIfAvailable\n");
+            sb.append("        authoredDate\n");
+            sb.append("        committedDate\n");
+            sb.append("        messageHeadline\n");
+            sb.append("        message\n");
+            sb.append("        url\n");
+            // Free data: signature verification
+            sb.append("        signature { isValid }\n");
+            // Free data: boolean flags
+            sb.append("        authoredByCommitter\n");
+            sb.append("        committedViaWeb\n");
+            // Free data: parent count for merge commit detection
+            sb.append("        parents(first: 0) { totalCount }\n");
+            // Existing: multi-author contributor data
             sb.append("        authors(first: 10) {\n");
+            sb.append("          totalCount\n");
             sb.append("          nodes {\n");
             sb.append("            name\n");
             sb.append("            email\n");
@@ -296,6 +320,7 @@ public class CommitMetadataEnrichmentService {
             sb.append("          user { login databaseId }\n");
             sb.append("        }\n");
             sb.append("        associatedPullRequests(first: 5) {\n");
+            sb.append("          totalCount\n");
             sb.append("          nodes {\n");
             sb.append("            number\n");
             sb.append("          }\n");
@@ -310,7 +335,7 @@ public class CommitMetadataEnrichmentService {
     }
 
     /**
-     * Processes a GraphQL response, upserting contributors and PR links.
+     * Processes a GraphQL response, upserting contributors, PR links, and enrichment metadata.
      *
      * @return the number of commits successfully processed
      */
@@ -352,6 +377,9 @@ public class CommitMetadataEnrichmentService {
                 // Process associated PRs
                 processAssociatedPullRequests(commitData, commitId, repositoryId);
 
+                // Update enrichment metadata (free data fields)
+                updateEnrichmentMetadata(commitData, commitId);
+
                 processed++;
             } catch (Exception e) {
                 log.debug("Failed to process metadata for commit: sha={}, error={}", sha, e.getMessage());
@@ -370,9 +398,20 @@ public class CommitMetadataEnrichmentService {
         if (!(authorsObj instanceof Map<?, ?> authorsMap)) {
             return;
         }
+
+        // Overflow detection: warn when totalCount > fetched nodes
+        Integer totalCount = extractInteger(authorsMap.get("totalCount"));
         Object nodesObj = authorsMap.get("nodes");
         if (!(nodesObj instanceof List<?> nodes)) {
             return;
+        }
+        if (totalCount != null && totalCount > nodes.size()) {
+            log.warn(
+                "Commit authors connection overflow: commitId={}, totalCount={}, fetched={}",
+                commitId,
+                totalCount,
+                nodes.size()
+            );
         }
 
         for (int ordinal = 0; ordinal < nodes.size(); ordinal++) {
@@ -433,9 +472,20 @@ public class CommitMetadataEnrichmentService {
         if (!(prObj instanceof Map<?, ?> prMap)) {
             return;
         }
+
+        // Overflow detection: warn when totalCount > fetched nodes
+        Integer totalCount = extractInteger(prMap.get("totalCount"));
         Object nodesObj = prMap.get("nodes");
         if (!(nodesObj instanceof List<?> nodes)) {
             return;
+        }
+        if (totalCount != null && totalCount > nodes.size()) {
+            log.warn(
+                "Commit associatedPullRequests connection overflow: commitId={}, totalCount={}, fetched={}",
+                commitId,
+                totalCount,
+                nodes.size()
+            );
         }
 
         List<Integer> prNumbers = new ArrayList<>();
@@ -452,6 +502,73 @@ public class CommitMetadataEnrichmentService {
         if (!prNumbers.isEmpty()) {
             commitRepository.linkCommitToPullRequests(commitId, repositoryId, prNumbers);
         }
+    }
+
+    /**
+     * Extracts enrichment metadata from the GraphQL response and updates the commit.
+     * <p>
+     * Uses COALESCE in the repository query so null values don't overwrite existing data.
+     * This is important for backfilling webhook-ingested commits where some fields
+     * (e.g. additions, deletions) may have been 0 from the webhook but have real values
+     * from GraphQL.
+     */
+    @SuppressWarnings("unchecked")
+    private void updateEnrichmentMetadata(Map<String, Object> commitData, Long commitId) {
+        // Additions, deletions, changedFiles
+        Integer additions = extractInteger(commitData.get("additions"));
+        Integer deletions = extractInteger(commitData.get("deletions"));
+        Integer changedFiles = extractInteger(commitData.get("changedFilesIfAvailable"));
+
+        // Timestamps
+        Instant authoredAt = parseInstant(commitData.get("authoredDate"));
+        Instant committedAt = parseInstant(commitData.get("committedDate"));
+
+        // Message fields
+        String messageHeadline = normalizeString(commitData.get("messageHeadline"));
+        // GraphQL 'message' field contains the full commit message (subject + body).
+        // Extract the body portion (everything after the first line) to store separately.
+        String fullMessage = normalizeString(commitData.get("message"));
+        String messageBody = extractMessageBody(fullMessage);
+
+        // URL
+        String url = normalizeString(commitData.get("url"));
+
+        // Signature verification
+        Boolean signatureValid = null;
+        Object signatureObj = commitData.get("signature");
+        if (signatureObj instanceof Map<?, ?> signatureMap) {
+            Object isValidObj = signatureMap.get("isValid");
+            if (isValidObj instanceof Boolean b) {
+                signatureValid = b;
+            }
+        }
+
+        // Boolean flags
+        Boolean authoredByCommitter = extractBoolean(commitData.get("authoredByCommitter"));
+        Boolean committedViaWeb = extractBoolean(commitData.get("committedViaWeb"));
+
+        // Parent count for merge detection
+        Integer parentCount = null;
+        Object parentsObj = commitData.get("parents");
+        if (parentsObj instanceof Map<?, ?> parentsMap) {
+            parentCount = extractInteger(parentsMap.get("totalCount"));
+        }
+
+        commitRepository.updateEnrichmentMetadata(
+            commitId,
+            additions,
+            deletions,
+            changedFiles,
+            authoredAt,
+            committedAt,
+            messageHeadline,
+            messageBody,
+            url,
+            signatureValid,
+            authoredByCommitter,
+            committedViaWeb,
+            parentCount
+        );
     }
 
     /**
@@ -477,5 +594,51 @@ public class CommitMetadataEnrichmentService {
         }
         String trimmed = s.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    @Nullable
+    private static Integer extractInteger(Object value) {
+        if (value instanceof Number num) {
+            return num.intValue();
+        }
+        return null;
+    }
+
+    @Nullable
+    private static Boolean extractBoolean(Object value) {
+        if (value instanceof Boolean b) {
+            return b;
+        }
+        return null;
+    }
+
+    @Nullable
+    private static Instant parseInstant(Object value) {
+        if (!(value instanceof String s) || s.isEmpty()) {
+            return null;
+        }
+        try {
+            return Instant.parse(s);
+        } catch (DateTimeParseException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Extracts the message body (everything after the first line) from a full commit message.
+     * Returns null if the message has no body.
+     */
+    @Nullable
+    private static String extractMessageBody(String fullMessage) {
+        if (fullMessage == null) {
+            return null;
+        }
+        int newlineIndex = fullMessage.indexOf('\n');
+        if (newlineIndex < 0) {
+            return null;
+        }
+        // Skip the first line and any leading blank lines in the body
+        String body = fullMessage.substring(newlineIndex + 1).stripLeading();
+        return body.isEmpty() ? null : body;
     }
 }

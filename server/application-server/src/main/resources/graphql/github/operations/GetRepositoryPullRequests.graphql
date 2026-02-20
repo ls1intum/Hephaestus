@@ -261,9 +261,9 @@ query GetRepositoryPullRequests(
                             ...ProjectV2RefFields
                         }
 
-                        # Field values (embedded, first 10) - pagination for items with more
+                        # Field values (embedded, first 20) - pagination for items with more
                         # Uses shared FieldValueFieldsCostOptimized fragment (all 11 field value types)
-                        fieldValues(first: 10) {
+                        fieldValues(first: 20) {
                             totalCount
                             pageInfo {
                                 hasNextPage

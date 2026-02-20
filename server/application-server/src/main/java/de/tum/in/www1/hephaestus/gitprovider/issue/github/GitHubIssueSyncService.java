@@ -1,7 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.issue.github;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
-import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.DEFAULT_PAGE_SIZE;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.ISSUE_SYNC_PAGE_SIZE;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.JITTER_FACTOR;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.MAX_PAGINATION_PAGES;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_INITIAL_BACKOFF;
@@ -325,7 +325,7 @@ public class GitHubIssueSyncService {
                         .variable("name", ownerAndName.name())
                         .variable(
                             "first",
-                            adaptPageSize(DEFAULT_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
+                            adaptPageSize(ISSUE_SYNC_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
                         )
                         .variable("after", currentCursor);
 

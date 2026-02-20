@@ -100,7 +100,7 @@ query GetRepositoryPullRequestsHistorical(
                 }
 
                 # Labels
-                labels(first: 20) {
+                labels(first: 50) {
                     totalCount
                     nodes {
                         id
@@ -121,7 +121,7 @@ query GetRepositoryPullRequestsHistorical(
                 }
 
                 # Assignees
-                assignees(first: 10) {
+                assignees(first: 20) {
                     totalCount
                     nodes {
                         ...UserFields

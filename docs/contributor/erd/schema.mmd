@@ -120,14 +120,18 @@ erDiagram
         INTEGER additions "NOT NULL"
         INTEGER deletions "NOT NULL"
         INTEGER changed_files "NOT NULL"
+        VARCHAR(255) author_email
+        VARCHAR(255) committer_email
+        BOOLEAN signature_valid
+        BOOLEAN authored_by_committer
+        BOOLEAN committed_via_web
+        INTEGER parent_count
         TIMESTAMPTZ last_sync_at
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
         BIGINT repository_id FK,UK "NOT NULL"
         BIGINT author_id FK
         BIGINT committer_id FK
-        VARCHAR(255) author_email
-        VARCHAR(255) committer_email
     }
 
     Issue {

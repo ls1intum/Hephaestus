@@ -293,4 +293,49 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
         @Param("repositoryId") Long repositoryId,
         @Param("prNumbers") List<Integer> prNumbers
     );
+
+    /**
+     * Bulk-update enrichment metadata fields on a commit.
+     * <p>
+     * Uses {@code COALESCE} so that NULL parameters preserve existing database values.
+     * This ensures webhook-ingested data is not overwritten with NULLs if the
+     * GraphQL response omits a field.
+     */
+    @Modifying
+    @Transactional
+    @Query(
+        value = """
+        UPDATE git_commit SET
+            additions = COALESCE(:additions, git_commit.additions),
+            deletions = COALESCE(:deletions, git_commit.deletions),
+            changed_files = COALESCE(:changedFiles, git_commit.changed_files),
+            authored_at = COALESCE(:authoredAt, git_commit.authored_at),
+            committed_at = COALESCE(:committedAt, git_commit.committed_at),
+            message = COALESCE(:message, git_commit.message),
+            message_body = COALESCE(:messageBody, git_commit.message_body),
+            html_url = COALESCE(:htmlUrl, git_commit.html_url),
+            signature_valid = COALESCE(:signatureValid, git_commit.signature_valid),
+            authored_by_committer = COALESCE(:authoredByCommitter, git_commit.authored_by_committer),
+            committed_via_web = COALESCE(:committedViaWeb, git_commit.committed_via_web),
+            parent_count = COALESCE(:parentCount, git_commit.parent_count),
+            updated_at = NOW()
+        WHERE git_commit.id = :commitId
+        """,
+        nativeQuery = true
+    )
+    void updateEnrichmentMetadata(
+        @Param("commitId") Long commitId,
+        @Param("additions") Integer additions,
+        @Param("deletions") Integer deletions,
+        @Param("changedFiles") Integer changedFiles,
+        @Param("authoredAt") Instant authoredAt,
+        @Param("committedAt") Instant committedAt,
+        @Param("message") String message,
+        @Param("messageBody") String messageBody,
+        @Param("htmlUrl") String htmlUrl,
+        @Param("signatureValid") Boolean signatureValid,
+        @Param("authoredByCommitter") Boolean authoredByCommitter,
+        @Param("committedViaWeb") Boolean committedViaWeb,
+        @Param("parentCount") Integer parentCount
+    );
 }

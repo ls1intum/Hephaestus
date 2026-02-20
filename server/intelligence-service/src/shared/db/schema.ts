@@ -419,6 +419,12 @@ export const gitCommit = pgTable(
 		additions: integer().default(0).notNull(),
 		deletions: integer().default(0).notNull(),
 		changedFiles: integer("changed_files").default(0).notNull(),
+		authorEmail: varchar("author_email", { length: 255 }),
+		committerEmail: varchar("committer_email", { length: 255 }),
+		signatureValid: boolean("signature_valid"),
+		authoredByCommitter: boolean("authored_by_committer"),
+		committedViaWeb: boolean("committed_via_web"),
+		parentCount: integer("parent_count"),
 		lastSyncAt: timestamp("last_sync_at", { withTimezone: true, mode: "string" }),
 		createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }),
 		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }),
@@ -428,8 +434,6 @@ export const gitCommit = pgTable(
 		authorId: bigint("author_id", { mode: "number" }),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		committerId: bigint("committer_id", { mode: "number" }),
-		authorEmail: varchar("author_email", { length: 255 }),
-		committerEmail: varchar("committer_email", { length: 255 }),
 	},
 	(table) => [
 		index("idx_git_commit_author_id").using("btree", table.authorId.asc().nullsLast()),

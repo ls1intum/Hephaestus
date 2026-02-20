@@ -166,13 +166,25 @@ public class GitHubGraphQlSyncCoordinator {
                 return false;
             }
             case CLIENT_ERROR -> {
-                log.error(
-                    "Client error during {} GraphQL response: {}={}, error={}",
-                    phase,
-                    scopeLabel,
-                    scopeValue,
-                    classification.message()
-                );
+                boolean isResourceLimit =
+                    classification.message() != null && classification.message().contains("resource limit");
+                if (isResourceLimit) {
+                    log.warn(
+                        "Resource limit exceeded during {} GraphQL response (reduce page size): {}={}, error={}",
+                        phase,
+                        scopeLabel,
+                        scopeValue,
+                        classification.message()
+                    );
+                } else {
+                    log.error(
+                        "Client error during {} GraphQL response: {}={}, error={}",
+                        phase,
+                        scopeLabel,
+                        scopeValue,
+                        classification.message()
+                    );
+                }
                 return false;
             }
             default -> {

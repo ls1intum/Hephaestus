@@ -36,6 +36,17 @@ public final class GitHubSyncConstants {
     public static final int DEFAULT_PAGE_SIZE = 100;
 
     /**
+     * Page size for issue sync GraphQL queries.
+     * <p>
+     * Uses a reduced page size because the issue query embeds comments (first 10),
+     * project items (first 5), assignees, and labels per issue. With 25 issues per
+     * page the worst case is ~25 × (10 + 5 + 10 + 10) = 875 nested nodes — safely
+     * under GitHub's MAX_NODE_LIMIT. Previous value of 100 triggered
+     * MAX_NODE_LIMIT_EXCEEDED errors on repositories with many issue cross-references.
+     */
+    public static final int ISSUE_SYNC_PAGE_SIZE = 25;
+
+    /**
      * Page size for pull request sync GraphQL queries.
      * <p>
      * Uses a small page size because the PR query has triple-nested pagination:
@@ -71,9 +82,9 @@ public final class GitHubSyncConstants {
     //
     // AFTER optimization (worst case per page):
     //   items(50) * fieldValues(20) = 1,000 nodes = 10 cost points
-    //   + labels(10) * 1,000 = 10,000 nodes = 100 cost points
-    //   + users(10) + reviewers(10) + pullRequests(5) = ~25,000 additional nodes
-    //   Estimated cost: ~360 points per page (sustainable for large projects)
+    //   + labels(50) * 1,000 = 50,000 nodes = 500 cost points
+    //   + users(50) + reviewers(50) + pullRequests(20) = ~120,000 additional nodes
+    //   Estimated cost: ~1,300 points per page (sustainable for large projects)
     //
     // Reference: https://docs.github.com/en/graphql/overview/rate-limits-and-node-limits
 
@@ -115,35 +126,35 @@ public final class GitHubSyncConstants {
     /**
      * Page size for labels within field values (triple-nested).
      * <p>
-     * Minimal size (10) because this is triply-nested: items -> fieldValues -> labels.
-     * Most issues have fewer than 10 labels. The multiplicative cost impact is:
-     * 50 items * 20 fieldValues * 10 labels = 10,000 potential nodes.
+     * Uses 50 to match the actual GraphQL fragment page sizes in
+     * FieldValueFields and FieldValueFieldsCostOptimized.
+     * Multiplicative cost impact: 50 items * 20 fieldValues * 50 labels = 50,000 potential nodes.
      */
-    public static final int NESTED_LABELS_SIZE = 10;
+    public static final int NESTED_LABELS_SIZE = 50;
 
     /**
      * Page size for users within field values (triple-nested).
      * <p>
-     * Minimal size (10) because this is triply-nested: items -> fieldValues -> users.
-     * Most field values reference fewer than 10 users (assignees, watchers, etc.).
+     * Uses 50 to match the actual GraphQL fragment page sizes in
+     * FieldValueFields and FieldValueFieldsCostOptimized.
      */
-    public static final int NESTED_USERS_SIZE = 10;
+    public static final int NESTED_USERS_SIZE = 50;
 
     /**
      * Page size for reviewers within field values (triple-nested).
      * <p>
-     * Minimal size (10) because this is triply-nested: items -> fieldValues -> reviewers.
-     * Most PRs have fewer than 10 reviewers.
+     * Uses 50 to match the actual GraphQL fragment page sizes in
+     * FieldValueFields and FieldValueFieldsCostOptimized.
      */
-    public static final int NESTED_REVIEWERS_SIZE = 10;
+    public static final int NESTED_REVIEWERS_SIZE = 50;
 
     /**
      * Page size for pull requests within field values (triple-nested).
      * <p>
-     * Very small size (5) because this is triply-nested and PR data is heavy.
-     * Field values linking to multiple PRs are rare; most reference 1-2 PRs.
+     * Uses 20 to match the actual GraphQL fragment page sizes in
+     * FieldValueFields and FieldValueFieldsCostOptimized.
      */
-    public static final int NESTED_PULL_REQUESTS_SIZE = 5;
+    public static final int NESTED_PULL_REQUESTS_SIZE = 20;
 
     /**
      * Page size for project status updates.

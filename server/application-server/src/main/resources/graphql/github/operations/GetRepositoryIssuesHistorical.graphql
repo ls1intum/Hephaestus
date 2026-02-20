@@ -82,7 +82,7 @@ query GetRepositoryIssuesHistorical(
                 }
 
                 # Labels
-                labels(first: 20) {
+                labels(first: 50) {
                     totalCount
                     nodes {
                         id
@@ -103,7 +103,7 @@ query GetRepositoryIssuesHistorical(
                 }
 
                 # Assignees
-                assignees(first: 10) {
+                assignees(first: 20) {
                     totalCount
                     nodes {
                         ...UserFields

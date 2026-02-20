@@ -126,6 +126,36 @@ public class Commit {
     private int changedFiles;
 
     /**
+     * Whether the commit has a valid cryptographic signature (GPG/SSH).
+     * Null when the commit has not been enriched yet.
+     */
+    @Column(name = "signature_valid")
+    private Boolean signatureValid;
+
+    /**
+     * Whether the commit was authored by the same person who committed it.
+     * False for cherry-picks, rebases, or patches applied by a different person.
+     * Null when the commit has not been enriched yet.
+     */
+    @Column(name = "authored_by_committer")
+    private Boolean authoredByCommitter;
+
+    /**
+     * Whether the commit was made via the GitHub web interface.
+     * True for edits, file creations, and merge commits done through the web UI.
+     * Null when the commit has not been enriched yet.
+     */
+    @Column(name = "committed_via_web")
+    private Boolean committedViaWeb;
+
+    /**
+     * Number of parent commits. 0 = root commit, 1 = normal commit, 2+ = merge commit.
+     * Null when the commit has not been enriched yet.
+     */
+    @Column(name = "parent_count")
+    private Integer parentCount;
+
+    /**
      * The time when this commit was last synced.
      */
     private Instant lastSyncAt;
