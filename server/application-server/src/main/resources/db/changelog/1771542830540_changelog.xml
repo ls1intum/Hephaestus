@@ -1,0 +1,61 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                   http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- ========================================================================
+         Expand commit enrichment columns (R2, R3, R4, R6)
+         ========================================================================
+
+         Adds free-data fields from GitHub GraphQL Commit type that were
+         previously unfetched:
+
+         R2 - Expanded GitSignature fields:
+              signature_state           (GitSignatureState enum, e.g. VALID, INVALID)
+              signature_was_signed_by_github (boolean flag)
+              signature_signer_login    (login of the signature signer)
+              signature_verified_at     (timestamp of signature verification — not available
+                                         on GitSignature interface; dropped)
+
+         R3 - Parent commit OIDs:
+              parent_shas               (comma-separated parent SHAs for merge analysis)
+
+         R4 - CI status rollup:
+              status_check_rollup_state (StatusState enum: ERROR, EXPECTED, FAILURE, PENDING, SUCCESS)
+
+         R6 - Organizational commit attribution:
+              on_behalf_of_login        (organization login for on-behalf-of commits)
+    -->
+
+    <changeSet id="1771542830540-1" author="hephaestus">
+        <addColumn tableName="git_commit">
+            <!-- R2: Expanded signature fields -->
+            <column name="signature_state" type="VARCHAR(32)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="signature_was_signed_by_github" type="BOOLEAN">
+                <constraints nullable="true"/>
+            </column>
+            <column name="signature_signer_login" type="VARCHAR(255)">
+                <constraints nullable="true"/>
+            </column>
+
+            <!-- R3: Parent commit SHAs (comma-separated OIDs, e.g. "abc123,def456") -->
+            <column name="parent_shas" type="TEXT">
+                <constraints nullable="true"/>
+            </column>
+
+            <!-- R4: CI status check rollup state -->
+            <column name="status_check_rollup_state" type="VARCHAR(32)">
+                <constraints nullable="true"/>
+            </column>
+
+            <!-- R6: Organizational commit attribution -->
+            <column name="on_behalf_of_login" type="VARCHAR(255)">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+</databaseChangeLog>

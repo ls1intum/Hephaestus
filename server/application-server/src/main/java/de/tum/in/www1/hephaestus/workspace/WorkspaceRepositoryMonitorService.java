@@ -5,6 +5,7 @@ import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.ProvisioningListener;
+import de.tum.in.www1.hephaestus.gitprovider.git.GitRepositoryManager;
 import de.tum.in.www1.hephaestus.gitprovider.installation.github.GitHubInstallationRepositoryEnumerationService;
 import de.tum.in.www1.hephaestus.gitprovider.project.ProjectIntegrityService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
@@ -58,6 +59,7 @@ public class WorkspaceRepositoryMonitorService {
     private final WorkspaceScopeFilter workspaceScopeFilter;
     private final GitHubAppTokenService gitHubAppTokenService;
     private final ProjectIntegrityService projectIntegrityService;
+    private final GitRepositoryManager gitRepositoryManager;
 
     // Lazy-loaded dependencies (to break circular references)
     private final ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider;
@@ -72,6 +74,7 @@ public class WorkspaceRepositoryMonitorService {
         WorkspaceScopeFilter workspaceScopeFilter,
         GitHubAppTokenService gitHubAppTokenService,
         ProjectIntegrityService projectIntegrityService,
+        GitRepositoryManager gitRepositoryManager,
         ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider
     ) {
         this.natsProperties = natsProperties;
@@ -83,6 +86,7 @@ public class WorkspaceRepositoryMonitorService {
         this.workspaceScopeFilter = workspaceScopeFilter;
         this.gitHubAppTokenService = gitHubAppTokenService;
         this.projectIntegrityService = projectIntegrityService;
+        this.gitRepositoryManager = gitRepositoryManager;
         this.gitHubDataSyncServiceProvider = gitHubDataSyncServiceProvider;
     }
 
@@ -511,6 +515,9 @@ public class WorkspaceRepositoryMonitorService {
             .findByNameWithOwner(nameWithOwner)
             .ifPresent(repository -> {
                 Long repoId = repository.getId();
+
+                // Clean up local git clone before deleting the DB entity
+                gitRepositoryManager.deleteClone(repoId);
 
                 // Cascade delete projects owned by this repository BEFORE deleting the repository
                 int deletedProjects = projectIntegrityService.cascadeDeleteProjectsForRepository(repoId);

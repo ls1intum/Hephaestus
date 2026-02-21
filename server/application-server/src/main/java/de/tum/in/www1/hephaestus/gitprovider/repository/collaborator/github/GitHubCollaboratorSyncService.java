@@ -1,8 +1,13 @@
 package de.tum.in.www1.hephaestus.gitprovider.repository.collaborator.github;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.JITTER_FACTOR;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.LARGE_PAGE_SIZE;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.MAX_PAGINATION_PAGES;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_INITIAL_BACKOFF;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.adaptPageSize;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.ExponentialBackoff;
@@ -14,6 +19,8 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoor
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubTransportErrors;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GraphQlConnectionOverflowDetector;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHRepositoryCollaboratorConnection;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHRepositoryCollaboratorEdge;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHRepositoryPermission;
@@ -34,6 +41,8 @@ import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import reactor.core.publisher.Mono;
+import reactor.util.retry.Retry;
 
 /**
  * Service for synchronizing GitHub repository collaborators via GraphQL API.
@@ -101,6 +110,7 @@ public class GitHubCollaboratorSyncService {
         try {
             HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
             int totalSynced = 0;
+            int reportedTotalCount = -1;
             String cursor = null;
             boolean hasNextPage = true;
             Set<Long> syncedUserIds = new HashSet<>();
@@ -119,13 +129,36 @@ public class GitHubCollaboratorSyncService {
                     break;
                 }
 
-                ClientGraphQlResponse graphQlResponse = client
-                    .documentName(GET_COLLABORATORS_DOCUMENT)
-                    .variable("owner", owner)
-                    .variable("name", name)
-                    .variable("first", LARGE_PAGE_SIZE)
-                    .variable("after", cursor)
-                    .execute()
+                final String currentCursor = cursor;
+                final int currentPage = pageCount;
+
+                ClientGraphQlResponse graphQlResponse = Mono.defer(() ->
+                    client
+                        .documentName(GET_COLLABORATORS_DOCUMENT)
+                        .variable("owner", owner)
+                        .variable("name", name)
+                        .variable(
+                            "first",
+                            adaptPageSize(LARGE_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
+                        )
+                        .variable("after", currentCursor)
+                        .execute()
+                )
+                    .retryWhen(
+                        Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                            .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                            .jitter(JITTER_FACTOR)
+                            .filter(GitHubTransportErrors::isTransportError)
+                            .doBeforeRetry(signal ->
+                                log.warn(
+                                    "Retrying after transport error: context=collaboratorSync, repoName={}, page={}, attempt={}, error={}",
+                                    safeNameWithOwner,
+                                    currentPage,
+                                    signal.totalRetries() + 1,
+                                    signal.failure().getMessage()
+                                )
+                            )
+                    )
                     .block(syncProperties.graphqlTimeout());
 
                 if (graphQlResponse == null || !graphQlResponse.isValid()) {
@@ -183,6 +216,10 @@ public class GitHubCollaboratorSyncService {
                     break;
                 }
 
+                if (reportedTotalCount < 0) {
+                    reportedTotalCount = response.getTotalCount();
+                }
+
                 for (GHRepositoryCollaboratorEdge edge : response.getEdges()) {
                     var graphQlUser = edge.getNode();
                     if (graphQlUser == null) {
@@ -213,6 +250,16 @@ public class GitHubCollaboratorSyncService {
 
             // Mark sync as completed normally if we exhausted all pages
             syncCompletedNormally = !hasNextPage;
+
+            // Check for overflow: did we fetch fewer items than GitHub reported?
+            if (reportedTotalCount >= 0) {
+                GraphQlConnectionOverflowDetector.check(
+                    "collaborators",
+                    totalSynced,
+                    reportedTotalCount,
+                    safeNameWithOwner
+                );
+            }
 
             // CRITICAL: Only remove stale collaborators if sync completed fully.
             // If sync was aborted (rate limit, error, pagination limit), we don't have

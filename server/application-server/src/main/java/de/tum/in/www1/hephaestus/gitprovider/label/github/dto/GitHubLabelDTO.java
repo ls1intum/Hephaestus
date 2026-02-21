@@ -4,6 +4,7 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.DateTimeUtils.toInsta
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GraphQlConnectionOverflowDetector;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHLabel;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHLabelConnection;
 import java.time.Instant;
@@ -49,16 +50,22 @@ public record GitHubLabelDTO(
 
     /**
      * Creates a list of GitHubLabelDTOs from a GraphQL GHLabelConnection.
+     *
+     * @param connection the GraphQL label connection (may be null)
+     * @param context    contextual description for overflow logging (e.g. "PR #42")
+     * @return list of label DTOs, or empty list if connection is null
      */
-    public static List<GitHubLabelDTO> fromLabelConnection(@Nullable GHLabelConnection connection) {
+    public static List<GitHubLabelDTO> fromLabelConnection(@Nullable GHLabelConnection connection, String context) {
         if (connection == null || connection.getNodes() == null) {
             return Collections.emptyList();
         }
-        return connection
+        List<GitHubLabelDTO> result = connection
             .getNodes()
             .stream()
             .map(GitHubLabelDTO::fromLabel)
             .filter(dto -> dto != null)
             .toList();
+        GraphQlConnectionOverflowDetector.check("labels", result.size(), connection.getTotalCount(), context);
+        return result;
     }
 }

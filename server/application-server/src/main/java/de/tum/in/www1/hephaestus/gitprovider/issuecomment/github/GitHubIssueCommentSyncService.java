@@ -8,6 +8,7 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncCons
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_INITIAL_BACKOFF;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.adaptPageSize;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
@@ -20,6 +21,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameP
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubTransportErrors;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GraphQlConnectionOverflowDetector;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHIssueCommentConnection;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPageInfo;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
@@ -114,6 +116,7 @@ public class GitHubIssueCommentSyncService {
         boolean hasMore = true;
         int pageCount = 0;
         int retryAttempt = 0;
+        int reportedTotalCount = -1;
 
         while (hasMore) {
             pageCount++;
@@ -136,7 +139,10 @@ public class GitHubIssueCommentSyncService {
                         .variable("owner", ownerAndName.owner())
                         .variable("name", ownerAndName.name())
                         .variable("number", issue.getNumber())
-                        .variable("first", DEFAULT_PAGE_SIZE)
+                        .variable(
+                            "first",
+                            adaptPageSize(DEFAULT_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
+                        )
                         .variable("after", currentCursor)
                         .execute()
                 )
@@ -222,6 +228,10 @@ public class GitHubIssueCommentSyncService {
                     break;
                 }
 
+                if (reportedTotalCount < 0) {
+                    reportedTotalCount = connection.getTotalCount();
+                }
+
                 for (var graphQlComment : connection.getNodes()) {
                     GitHubCommentDTO dto = GitHubCommentDTO.fromIssueComment(graphQlComment);
                     if (dto != null) {
@@ -278,6 +288,16 @@ public class GitHubIssueCommentSyncService {
             }
         }
 
+        // Check for overflow
+        if (reportedTotalCount >= 0) {
+            GraphQlConnectionOverflowDetector.check(
+                "issueComments",
+                totalSynced,
+                reportedTotalCount,
+                "issueNumber=" + issue.getNumber()
+            );
+        }
+
         log.debug(
             "Completed comment sync for issue: repoName={}, issueNumber={}, commentCount={}",
             safeNameWithOwner,
@@ -327,6 +347,7 @@ public class GitHubIssueCommentSyncService {
         boolean hasMore = true;
         int pageCount = 0;
         int retryAttempt = 0;
+        int reportedTotalCount = -1;
 
         log.debug(
             "Starting remaining comment sync: repoName={}, issueNumber={}, startCursor={}",
@@ -356,7 +377,10 @@ public class GitHubIssueCommentSyncService {
                         .variable("owner", ownerAndName.owner())
                         .variable("name", ownerAndName.name())
                         .variable("number", issue.getNumber())
-                        .variable("first", DEFAULT_PAGE_SIZE)
+                        .variable(
+                            "first",
+                            adaptPageSize(DEFAULT_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
+                        )
                         .variable("after", currentCursor)
                         .execute()
                 )
@@ -441,6 +465,10 @@ public class GitHubIssueCommentSyncService {
                     break;
                 }
 
+                if (reportedTotalCount < 0) {
+                    reportedTotalCount = connection.getTotalCount();
+                }
+
                 for (var graphQlComment : connection.getNodes()) {
                     GitHubCommentDTO dto = GitHubCommentDTO.fromIssueComment(graphQlComment);
                     if (dto != null) {
@@ -492,6 +520,16 @@ public class GitHubIssueCommentSyncService {
                 }
                 retryAttempt++;
             }
+        }
+
+        // Check for overflow
+        if (reportedTotalCount >= 0) {
+            GraphQlConnectionOverflowDetector.check(
+                "issueComments",
+                totalSynced,
+                reportedTotalCount,
+                "issueNumber=" + issue.getNumber()
+            );
         }
 
         log.debug(

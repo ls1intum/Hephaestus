@@ -6,6 +6,7 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncCons
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_INITIAL_BACKOFF;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.adaptPageSize;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
@@ -14,6 +15,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameP
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubTransportErrors;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GraphQlConnectionOverflowDetector;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.BackfillStateProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncSession;
@@ -629,6 +631,7 @@ public class HistoricalBackfillService {
         int batchMaxNumber = Integer.MIN_VALUE;
         boolean hasMore = true;
         int pageCount = 0;
+        int reportedTotalCount = -1;
 
         while (hasMore && pageCount < maxPages) {
             pageCount++;
@@ -643,7 +646,10 @@ public class HistoricalBackfillService {
                         .documentName(ISSUES_HISTORICAL_QUERY)
                         .variable("owner", ownerAndName.owner())
                         .variable("name", ownerAndName.name())
-                        .variable("first", DEFAULT_PAGE_SIZE)
+                        .variable(
+                            "first",
+                            adaptPageSize(DEFAULT_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
+                        )
                         .variable("after", currentCursor)
                         .execute()
                 )
@@ -689,6 +695,9 @@ public class HistoricalBackfillService {
                 if (connection == null || connection.getNodes() == null || connection.getNodes().isEmpty()) {
                     hasMore = false;
                     break;
+                }
+                if (reportedTotalCount < 0) {
+                    reportedTotalCount = connection.getTotalCount();
                 }
 
                 GHPageInfo pageInfo = connection.getPageInfo();
@@ -742,6 +751,13 @@ public class HistoricalBackfillService {
                 );
             }
         }
+
+        GraphQlConnectionOverflowDetector.check(
+            "issues",
+            totalIssuesSynced,
+            reportedTotalCount,
+            "repo=" + repoNameForLog
+        );
 
         // Note: cursor is cleared inside the transaction when hasMore is false
         // (null cursor is passed to processIssuesPage when !hasMore)
@@ -801,6 +817,7 @@ public class HistoricalBackfillService {
         int batchMaxNumber = Integer.MIN_VALUE;
         boolean hasMore = true;
         int pageCount = 0;
+        int reportedTotalCount = -1;
         List<PullRequestWithReviewCursor> allPrsNeedingReviewPagination = new ArrayList<>();
 
         while (hasMore && pageCount < maxPages) {
@@ -809,12 +826,13 @@ public class HistoricalBackfillService {
             try {
                 // Use Mono.defer() to wrap the entire execute() call so retries cover body streaming.
                 final String currentCursor = cursor;
+                final int prPageSize = resolveBackfillPrPageSize(scopeId, syncTargetId);
                 ClientGraphQlResponse response = Mono.defer(() ->
                     client
                         .documentName(PRS_HISTORICAL_QUERY)
                         .variable("owner", ownerAndName.owner())
                         .variable("name", ownerAndName.name())
-                        .variable("first", syncProperties.backfillPrPageSize())
+                        .variable("first", prPageSize)
                         .variable("after", currentCursor)
                         .execute()
                 )
@@ -866,6 +884,9 @@ public class HistoricalBackfillService {
                     hasMore = false;
                     break;
                 }
+                if (reportedTotalCount < 0) {
+                    reportedTotalCount = connection.getTotalCount();
+                }
 
                 GHPageInfo pageInfo = connection.getPageInfo();
                 hasMore = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
@@ -910,10 +931,11 @@ public class HistoricalBackfillService {
                 // Rethrow to trigger cooldown mechanism in runBackfillCycle.
                 // Progress is preserved: cursor was saved in the last successful transaction.
                 log.warn(
-                    "Error during pull requests backfill, will retry after cooldown: repo={}, page={}, synced={}, error={}",
+                    "Error during pull requests backfill, will retry after cooldown: repo={}, page={}, synced={}, failures={}, error={}",
                     sanitizeForLog(repoNameForLog),
                     pageCount,
                     totalPRsSynced,
+                    consecutiveFailures.getOrDefault(syncTargetId, 0),
                     e.getMessage()
                 );
                 throw new BackfillTransientException(
@@ -922,6 +944,13 @@ public class HistoricalBackfillService {
                 );
             }
         }
+
+        GraphQlConnectionOverflowDetector.check(
+            "pullRequests",
+            totalPRsSynced,
+            reportedTotalCount,
+            "repo=" + repoNameForLog
+        );
 
         // Note: cursor is cleared inside the transaction when hasMore is false
         // (null cursor is passed to processPullRequestsPage when !hasMore)
@@ -1491,6 +1520,29 @@ public class HistoricalBackfillService {
                     signal.failure().getMessage()
                 )
             );
+    }
+
+    /**
+     * Resolves the effective pull request page size for backfill.
+     *
+     * <p>Base sizing follows rate-limit-aware adaptation. Additionally, when a repository has
+     * consecutive transient failures we reduce PR page size further so large payloads can progress
+     * instead of repeatedly timing out and entering cooldown.
+     */
+    private int resolveBackfillPrPageSize(Long scopeId, Long syncTargetId) {
+        int rateLimitAdjusted = adaptPageSize(
+            syncProperties.backfillPrPageSize(),
+            graphQlClientProvider.getRateLimitRemaining(scopeId)
+        );
+        int failures = consecutiveFailures.getOrDefault(syncTargetId, 0);
+
+        if (failures >= MAX_CONSECUTIVE_FAILURES) {
+            return Math.max(1, rateLimitAdjusted / 4);
+        }
+        if (failures > 0) {
+            return Math.max(2, rateLimitAdjusted / 2);
+        }
+        return rateLimitAdjusted;
     }
 
     // ========================================================================

@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.issue.github.dto;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GraphQlConnectionOverflowDetector;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2Item;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2ItemConnection;
 import de.tum.in.www1.hephaestus.gitprovider.project.github.dto.GitHubProjectItemDTO;
@@ -37,9 +38,13 @@ public record EmbeddedProjectItemsDTO(
      * Creates an EmbeddedProjectItemsDTO from a GraphQL GHProjectV2ItemConnection.
      *
      * @param connection the GraphQL connection (may be null)
+     * @param context    contextual description for overflow logging (e.g. "PR #42 in owner/repo")
      * @return EmbeddedProjectItemsDTO or empty DTO if connection is null
      */
-    public static EmbeddedProjectItemsDTO fromConnection(@Nullable GHProjectV2ItemConnection connection) {
+    public static EmbeddedProjectItemsDTO fromConnection(
+        @Nullable GHProjectV2ItemConnection connection,
+        String context
+    ) {
         if (connection == null) {
             return empty();
         }
@@ -58,6 +63,8 @@ public record EmbeddedProjectItemsDTO(
             connection.getPageInfo() != null && Boolean.TRUE.equals(connection.getPageInfo().getHasNextPage());
 
         String endCursor = connection.getPageInfo() != null ? connection.getPageInfo().getEndCursor() : null;
+
+        GraphQlConnectionOverflowDetector.check("projectItems", items.size(), connection.getTotalCount(), context);
 
         return new EmbeddedProjectItemsDTO(items, connection.getTotalCount(), hasNextPage, endCursor);
     }

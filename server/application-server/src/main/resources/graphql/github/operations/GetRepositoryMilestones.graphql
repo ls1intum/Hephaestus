@@ -40,35 +40,7 @@ query GetRepositoryMilestones(
 
                 # Creator
                 creator {
-                    __typename
-                    ... on User {
-                        id
-                        databaseId
-                        login
-                        avatarUrl
-                        name
-                        email
-                        createdAt
-                        updatedAt
-                    }
-                    ... on Bot {
-                        id
-                        databaseId
-                        login
-                        avatarUrl
-                    }
-                    ... on Mannequin {
-                        id
-                        databaseId
-                        login
-                        avatarUrl
-                    }
-                    ... on Organization {
-                        id
-                        databaseId
-                        login
-                        avatarUrl
-                    }
+                    ...ActorFields
                 }
             }
         }

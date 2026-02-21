@@ -28,6 +28,7 @@ public enum GitHubEventType {
     LABEL("label"),
     MILESTONE("milestone"),
     MEMBER("member"),
+    PUSH("push"),
 
     // Issue hierarchy events
     /** Available for subscription - test fixtures exist. */

@@ -1,6 +1,8 @@
-# Reusable fragments for GitHub Projects V2. Use ...FragmentName to include.
+# Reusable fragments for GitHub GraphQL queries. Use ...FragmentName to include.
 # Page sizes here are defaults; GetProjectItems.graphql uses cost-optimized sizes.
 
+# Full Actor union with all fields needed for user upsert (timestamps on User).
+# Used for author/mergedBy/creator on PRs, issues, reviews, comments, milestones, etc.
 fragment ActorFields on Actor {
     __typename
     login
@@ -10,6 +12,8 @@ fragment ActorFields on Actor {
         avatarUrl
         name
         email
+        createdAt
+        updatedAt
     }
     ... on Bot {
         id
@@ -26,6 +30,18 @@ fragment ActorFields on Actor {
         databaseId
         avatarUrl
     }
+}
+
+# Direct User fields (not Actor union). Used for resolvedBy, assignees, members, collaborators.
+fragment UserFields on User {
+    id
+    databaseId
+    login
+    avatarUrl
+    name
+    email
+    createdAt
+    updatedAt
 }
 
 fragment ActorFieldsCompact on Actor {
@@ -82,6 +98,18 @@ fragment ProjectV2OwnerFields on ProjectV2Owner {
         id
         databaseId
         login
+    }
+}
+
+# Lightweight project reference for embedded project items on PRs/issues.
+fragment ProjectV2RefFields on ProjectV2 {
+    id
+    fullDatabaseId
+    number
+    title
+    url
+    owner {
+        ...ProjectV2OwnerFields
     }
 }
 
@@ -194,6 +222,7 @@ fragment FieldValueFields on ProjectV2ItemFieldValue {
     }
     ... on ProjectV2ItemFieldLabelValue {
         labels(first: 50) {
+            totalCount
             pageInfo {
                 hasNextPage
             }
@@ -227,6 +256,7 @@ fragment FieldValueFields on ProjectV2ItemFieldValue {
     }
     ... on ProjectV2ItemFieldUserValue {
         users(first: 50) {
+            totalCount
             pageInfo {
                 hasNextPage
             }
@@ -259,6 +289,7 @@ fragment FieldValueFields on ProjectV2ItemFieldValue {
     }
     ... on ProjectV2ItemFieldPullRequestValue {
         pullRequests(first: 20) {
+            totalCount
             pageInfo {
                 hasNextPage
             }
@@ -279,6 +310,7 @@ fragment FieldValueFields on ProjectV2ItemFieldValue {
     }
     ... on ProjectV2ItemFieldReviewerValue {
         reviewers(first: 50) {
+            totalCount
             pageInfo {
                 hasNextPage
             }
@@ -302,6 +334,10 @@ fragment RequestedReviewerFields on RequestedReviewer {
         databaseId
         login
         avatarUrl
+        name
+        email
+        createdAt
+        updatedAt
     }
     ... on Team {
         id
@@ -378,9 +414,9 @@ fragment ProjectV2StatusUpdateFields on ProjectV2StatusUpdate {
     }
 }
 
-# Cost-optimized variant of FieldValueFields with smaller page sizes for nested
-# collections (labels: 10, users: 10, pullRequests: 5, reviewers: 10) to reduce
-# GraphQL cost when fetching many items at once.
+# Previously cost-optimized variant of FieldValueFields — now aligned with FieldValueFields
+# page sizes (labels: 50, users: 50, pullRequests: 20, reviewers: 50) to prevent
+# silent data truncation for projects with many field values.
 # Shared fragment — used by GetProjectItems, GetRepositoryIssues, GetRepositoryPullRequests,
 # GetIssueProjectItems, and GetPullRequestProjectItems.
 fragment FieldValueFieldsCostOptimized on ProjectV2ItemFieldValue {
@@ -436,7 +472,8 @@ fragment FieldValueFieldsCostOptimized on ProjectV2ItemFieldValue {
         }
     }
     ... on ProjectV2ItemFieldLabelValue {
-        labels(first: 10) {
+        labels(first: 50) {
+            totalCount
             pageInfo {
                 hasNextPage
             }
@@ -469,7 +506,8 @@ fragment FieldValueFieldsCostOptimized on ProjectV2ItemFieldValue {
         }
     }
     ... on ProjectV2ItemFieldUserValue {
-        users(first: 10) {
+        users(first: 50) {
+            totalCount
             pageInfo {
                 hasNextPage
             }
@@ -501,7 +539,8 @@ fragment FieldValueFieldsCostOptimized on ProjectV2ItemFieldValue {
         }
     }
     ... on ProjectV2ItemFieldPullRequestValue {
-        pullRequests(first: 5) {
+        pullRequests(first: 20) {
+            totalCount
             pageInfo {
                 hasNextPage
             }
@@ -521,7 +560,8 @@ fragment FieldValueFieldsCostOptimized on ProjectV2ItemFieldValue {
         }
     }
     ... on ProjectV2ItemFieldReviewerValue {
-        reviewers(first: 10) {
+        reviewers(first: 50) {
+            totalCount
             pageInfo {
                 hasNextPage
             }

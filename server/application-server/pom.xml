@@ -61,6 +61,10 @@
 
         <!-- Local development port for Liquibase plugin (override via -Dpostgres.port=XXXX) -->
         <postgres.port>5432</postgres.port>
+
+        <!-- Stale class cleanup: always enabled to prevent ghost .class files from CI caches.
+             Override with -DskipCleanStaleClasses=true only for local iterative dev. -->
+        <skipCleanStaleClasses>false</skipCleanStaleClasses>
     </properties>
     <dependencies>
         <dependency>
@@ -391,6 +395,12 @@
             <artifactId>netty-resolver-dns-native-macos</artifactId>
             <classifier>osx-aarch_64</classifier>
         </dependency>
+        <!-- JGit for local git repository operations -->
+        <dependency>
+            <groupId>org.eclipse.jgit</groupId>
+            <artifactId>org.eclipse.jgit</artifactId>
+            <version>7.5.0.202512021534-r</version>
+        </dependency>
     </dependencies>
     <dependencyManagement>
         <dependencies>
@@ -406,6 +416,38 @@
     </dependencyManagement>
     <build>
         <plugins>
+            <!--
+                Clean compiled classes before compilation to prevent orphaned .class files
+                from deleted/moved source files (e.g., CI cache restoring stale classes).
+                Only target/classes and target/test-classes are cleaned; generated-sources
+                and other cached artifacts are preserved.
+                Skipped by the quick profile for fast local development.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-clean-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>clean-stale-classes</id>
+                        <phase>initialize</phase>
+                        <goals>
+                            <goal>clean</goal>
+                        </goals>
+                        <configuration>
+                            <skip>${skipCleanStaleClasses}</skip>
+                            <excludeDefaultDirectories>true</excludeDefaultDirectories>
+                            <filesets>
+                                <fileset>
+                                    <directory>${project.build.outputDirectory}</directory>
+                                </fileset>
+                                <fileset>
+                                    <directory>${project.build.testOutputDirectory}</directory>
+                                </fileset>
+                            </filesets>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
@@ -673,6 +715,9 @@
                     <!-- Forked JVM timeout settings to prevent hanging -->
                     <forkedProcessTimeoutInSeconds>${hephaestus.surefire.timeout}</forkedProcessTimeoutInSeconds>
                     <forkedProcessExitTimeoutInSeconds>60</forkedProcessExitTimeoutInSeconds>
+                    <!-- Enable process checker so forkedProcessTimeoutInSeconds actually works.
+                         Without this, Surefire 3.x ignores the timeout and hung forks run forever. -->
+                    <enableProcessChecker>ping</enableProcessChecker>
                     <!-- Tag filtering: run unit tests, exclude live tests -->
                     <groups>${surefire.includedGroups}</groups>
                     <excludedGroups>${surefire.excludedGroups}</excludedGroups>

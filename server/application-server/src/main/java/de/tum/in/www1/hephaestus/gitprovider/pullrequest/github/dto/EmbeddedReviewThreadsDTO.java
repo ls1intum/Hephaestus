@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.dto;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GraphQlConnectionOverflowDetector;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPullRequestReviewThreadConnection;
 import java.util.Collections;
 import java.util.List;
@@ -24,9 +25,13 @@ public record EmbeddedReviewThreadsDTO(
      * Creates an EmbeddedReviewThreadsDTO from a GraphQL GHPullRequestReviewThreadConnection.
      *
      * @param connection the GraphQL connection (may be null)
+     * @param context    contextual description for overflow logging (e.g. "PR #42 in owner/repo")
      * @return EmbeddedReviewThreadsDTO or empty DTO if connection is null
      */
-    public static EmbeddedReviewThreadsDTO fromConnection(@Nullable GHPullRequestReviewThreadConnection connection) {
+    public static EmbeddedReviewThreadsDTO fromConnection(
+        @Nullable GHPullRequestReviewThreadConnection connection,
+        String context
+    ) {
         if (connection == null) {
             return empty();
         }
@@ -45,6 +50,8 @@ public record EmbeddedReviewThreadsDTO(
             connection.getPageInfo() != null && Boolean.TRUE.equals(connection.getPageInfo().getHasNextPage());
 
         String endCursor = connection.getPageInfo() != null ? connection.getPageInfo().getEndCursor() : null;
+
+        GraphQlConnectionOverflowDetector.check("reviewThreads", threads.size(), connection.getTotalCount(), context);
 
         return new EmbeddedReviewThreadsDTO(threads, connection.getTotalCount(), hasNextPage, endCursor);
     }

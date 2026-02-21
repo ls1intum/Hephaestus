@@ -3,8 +3,13 @@ package de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.github;
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlErrorUtils.isNotFoundError;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.DEFAULT_PAGE_SIZE;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.JITTER_FACTOR;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.LARGE_PAGE_SIZE;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.MAX_PAGINATION_PAGES;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_INITIAL_BACKOFF;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.adaptPageSize;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
@@ -17,6 +22,8 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoor
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubTransportErrors;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GraphQlConnectionOverflowDetector;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPageInfo;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPullRequestReviewComment;
@@ -42,6 +49,8 @@ import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import reactor.core.publisher.Mono;
+import reactor.util.retry.Retry;
 
 /**
  * Service for synchronizing GitHub pull request reviews via GraphQL API.
@@ -181,6 +190,7 @@ public class GitHubPullRequestReviewSyncService {
         HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
 
         int totalSynced = 0;
+        int reportedTotalCount = -1;
         String cursor = startCursor;
         boolean hasMore = true;
         int pageCount = 0;
@@ -211,14 +221,37 @@ public class GitHubPullRequestReviewSyncService {
             }
 
             try {
-                ClientGraphQlResponse response = client
-                    .documentName(QUERY_DOCUMENT)
-                    .variable("owner", ownerAndName.owner())
-                    .variable("name", ownerAndName.name())
-                    .variable("number", pullRequest.getNumber())
-                    .variable("first", DEFAULT_PAGE_SIZE)
-                    .variable("after", cursor)
-                    .execute()
+                final String currentCursor = cursor;
+                final int currentPage = pageCount;
+
+                ClientGraphQlResponse response = Mono.defer(() ->
+                    client
+                        .documentName(QUERY_DOCUMENT)
+                        .variable("owner", ownerAndName.owner())
+                        .variable("name", ownerAndName.name())
+                        .variable("number", pullRequest.getNumber())
+                        .variable(
+                            "first",
+                            adaptPageSize(DEFAULT_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
+                        )
+                        .variable("after", currentCursor)
+                        .execute()
+                )
+                    .retryWhen(
+                        Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                            .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                            .jitter(JITTER_FACTOR)
+                            .filter(GitHubTransportErrors::isTransportError)
+                            .doBeforeRetry(signal ->
+                                log.warn(
+                                    "Retrying review sync after transport error: prNumber={}, page={}, attempt={}, error={}",
+                                    pullRequest.getNumber(),
+                                    currentPage,
+                                    signal.totalRetries() + 1,
+                                    signal.failure().getMessage()
+                                )
+                            )
+                    )
                     .block(syncProperties.graphqlTimeout());
 
                 if (response == null || !response.isValid()) {
@@ -286,6 +319,10 @@ public class GitHubPullRequestReviewSyncService {
                     break;
                 }
 
+                if (reportedTotalCount < 0) {
+                    reportedTotalCount = connection.getTotalCount();
+                }
+
                 // Fetch any remaining nested review comments before persistence
                 for (var graphQlReview : connection.getNodes()) {
                     var commentsConnection = graphQlReview.getComments();
@@ -351,6 +388,16 @@ public class GitHubPullRequestReviewSyncService {
                 }
                 retryAttempt++;
             }
+        }
+
+        // Check for overflow: did we fetch fewer items than GitHub reported?
+        if (reportedTotalCount >= 0) {
+            GraphQlConnectionOverflowDetector.check(
+                "reviews",
+                totalSynced,
+                reportedTotalCount,
+                safeNameWithOwner + " PR #" + pullRequest.getNumber()
+            );
         }
 
         log.debug(
@@ -502,6 +549,7 @@ public class GitHubPullRequestReviewSyncService {
         String cursor = startCursor;
         boolean hasMore = true;
         int fetchedPages = 0;
+        int reportedTotalCount = -1;
         int retryAttempt = 0;
 
         while (hasMore) {
@@ -527,12 +575,35 @@ public class GitHubPullRequestReviewSyncService {
             }
 
             try {
-                ClientGraphQlResponse response = client
-                    .documentName(REVIEW_COMMENTS_QUERY_DOCUMENT)
-                    .variable("reviewId", reviewId)
-                    .variable("first", LARGE_PAGE_SIZE)
-                    .variable("after", cursor)
-                    .execute()
+                final String currentCursor = cursor;
+                final int currentPage = fetchedPages;
+
+                ClientGraphQlResponse response = Mono.defer(() ->
+                    client
+                        .documentName(REVIEW_COMMENTS_QUERY_DOCUMENT)
+                        .variable("reviewId", reviewId)
+                        .variable(
+                            "first",
+                            adaptPageSize(LARGE_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
+                        )
+                        .variable("after", currentCursor)
+                        .execute()
+                )
+                    .retryWhen(
+                        Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                            .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                            .jitter(JITTER_FACTOR)
+                            .filter(GitHubTransportErrors::isTransportError)
+                            .doBeforeRetry(signal ->
+                                log.warn(
+                                    "Retrying review comments fetch after transport error: reviewId={}, page={}, attempt={}, error={}",
+                                    reviewId,
+                                    currentPage,
+                                    signal.totalRetries() + 1,
+                                    signal.failure().getMessage()
+                                )
+                            )
+                    )
                     .block(syncProperties.graphqlTimeout());
 
                 if (response == null || !response.isValid()) {
@@ -590,6 +661,10 @@ public class GitHubPullRequestReviewSyncService {
                     break;
                 }
 
+                if (reportedTotalCount < 0) {
+                    reportedTotalCount = commentsConnection.getTotalCount();
+                }
+
                 allComments.addAll(commentsConnection.getNodes());
 
                 GHPageInfo pageInfo = commentsConnection.getPageInfo();
@@ -615,6 +690,16 @@ public class GitHubPullRequestReviewSyncService {
                 }
                 retryAttempt++;
             }
+        }
+
+        // Check for overflow: did we fetch fewer comments than GitHub reported?
+        if (reportedTotalCount >= 0) {
+            GraphQlConnectionOverflowDetector.check(
+                "reviewComments",
+                allComments.size(),
+                reportedTotalCount,
+                "reviewId=" + reviewId
+            );
         }
 
         // Update the review's comments with the complete list

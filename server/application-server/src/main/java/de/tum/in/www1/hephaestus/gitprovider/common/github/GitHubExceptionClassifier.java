@@ -274,6 +274,13 @@ public class GitHubExceptionClassifier {
                     authErrorCounter.increment();
                     return ClassificationResult.of(Category.AUTH_ERROR, "GraphQL UNAUTHORIZED: " + error.getMessage());
                 }
+                case "MAX_NODE_LIMIT_EXCEEDED", "RESOURCE_LIMITS_EXCEEDED" -> {
+                    clientErrorCounter.increment();
+                    return ClassificationResult.of(
+                        Category.CLIENT_ERROR,
+                        "GraphQL resource limit: " + error.getMessage()
+                    );
+                }
                 default -> {
                     // Continue checking other errors
                 }
@@ -327,6 +334,15 @@ public class GitHubExceptionClassifier {
             return ClassificationResult.of(
                 Category.RETRYABLE,
                 "Database deadlock detected - will retry: " + cause.getMessage()
+            );
+        }
+
+        // UnexpectedRollbackException is transient — typically caused by a nested
+        // transaction that was rolled back (e.g., deadlock in a sub-transaction)
+        if (cause instanceof org.springframework.transaction.UnexpectedRollbackException) {
+            return ClassificationResult.of(
+                Category.RETRYABLE,
+                "Transaction rollback detected - will retry: " + cause.getMessage()
             );
         }
 

@@ -59,7 +59,8 @@ public final class DomainEvent {
             TeamEvent,
             ProjectEvent,
             ProjectItemEvent,
-            ProjectStatusUpdateEvent {}
+            ProjectStatusUpdateEvent,
+            CommitEvent {}
 
     /** Events that carry context information. */
     public interface ContextualEvent {
@@ -517,4 +518,15 @@ public final class DomainEvent {
             return null;
         }
     }
+
+    // ========================================================================
+    // Commit Events
+    // ========================================================================
+
+    /** All commit-related events. */
+    public sealed interface CommitEvent extends Event, ContextualEvent permits CommitCreated {
+        EventPayload.CommitData commit();
+    }
+
+    public record CommitCreated(EventPayload.CommitData commit, EventContext context) implements CommitEvent {}
 }

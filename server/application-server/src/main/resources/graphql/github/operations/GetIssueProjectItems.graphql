@@ -30,29 +30,12 @@ query GetIssueProjectItems($issueId: ID!, $first: Int!, $after: String) {
 
                     # Project reference - needed to link item to correct project
                     project {
-                        id
-                        fullDatabaseId
-                        number
-                        title
-                        url
-                        owner {
-                            __typename
-                            ... on Organization {
-                                id
-                                databaseId
-                                login
-                            }
-                            ... on User {
-                                id
-                                databaseId
-                                login
-                            }
-                        }
+                        ...ProjectV2RefFields
                     }
 
-                    # Field values (embedded, first 10)
+                    # Field values (embedded, first 20)
                     # Uses shared FieldValueFieldsCostOptimized fragment (all 11 field value types)
-                    fieldValues(first: 10) {
+                    fieldValues(first: 20) {
                         totalCount
                         pageInfo {
                             hasNextPage

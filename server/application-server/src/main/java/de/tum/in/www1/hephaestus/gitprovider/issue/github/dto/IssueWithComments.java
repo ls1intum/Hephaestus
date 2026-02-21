@@ -31,9 +31,14 @@ public record IssueWithComments(
             return null;
         }
 
+        String context = "Issue #" + ghIssue.getNumber();
+
         GitHubIssueDTO dto = GitHubIssueDTO.fromIssue(ghIssue);
-        EmbeddedCommentsDTO comments = EmbeddedCommentsDTO.fromConnection(ghIssue.getComments());
-        EmbeddedProjectItemsDTO projectItems = EmbeddedProjectItemsDTO.fromConnection(ghIssue.getProjectItems());
+        EmbeddedCommentsDTO comments = EmbeddedCommentsDTO.fromConnection(ghIssue.getComments(), context);
+        EmbeddedProjectItemsDTO projectItems = EmbeddedProjectItemsDTO.fromConnection(
+            ghIssue.getProjectItems(),
+            context
+        );
 
         return new IssueWithComments(dto, comments, projectItems);
     }

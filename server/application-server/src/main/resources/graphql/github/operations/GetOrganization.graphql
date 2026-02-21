@@ -32,15 +32,7 @@ query GetOrganization($login: String!) {
             edges {
                 role
                 node {
-                    __typename
-                    id
-                    databaseId
-                    login
-                    avatarUrl
-                    name
-                    email
-                    createdAt
-                    updatedAt
+                    ...UserFields
                 }
             }
         }

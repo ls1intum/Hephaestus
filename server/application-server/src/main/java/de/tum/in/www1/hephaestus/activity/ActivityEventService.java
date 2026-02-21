@@ -14,8 +14,7 @@ import java.time.Instant;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,10 +42,9 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * @see ActivityEventListener The only intended caller of this service
  */
+@Slf4j
 @Service
 public class ActivityEventService {
-
-    private static final Logger log = LoggerFactory.getLogger(ActivityEventService.class);
 
     private final ActivityEventRepository eventRepository;
     private final WorkspaceRepository workspaceRepository;

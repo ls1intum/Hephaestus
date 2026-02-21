@@ -155,7 +155,7 @@ public class GitHubGraphQlConfig {
             .lifo() // Use last-in-first-out to prefer fresh connections
             .build();
 
-        HttpClient httpClient = HttpClient.create(connectionProvider).responseTimeout(Duration.ofSeconds(90)); // Response timeout for slow responses
+        HttpClient httpClient = HttpClient.create(connectionProvider).responseTimeout(Duration.ofSeconds(135)); // Must exceed longest block() timeout (backfillGraphqlTimeout=120s)
 
         return WebClient.builder()
             .clientConnector(new ReactorClientHttpConnector(httpClient))

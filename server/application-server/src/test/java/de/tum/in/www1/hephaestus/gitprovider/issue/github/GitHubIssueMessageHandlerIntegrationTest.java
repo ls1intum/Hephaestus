@@ -36,7 +36,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Integration tests for GitHubIssueMessageHandler.
@@ -48,9 +48,11 @@ import org.springframework.transaction.annotation.Transactional;
  * - Event publishing through the handler → processor chain
  * - Edge cases in event handling
  * <p>
- * Note: This test class uses @Transactional because it directly calls handler methods
- * and needs to access lazy-loaded relationships. This is safe because there are no
- * parallel HTTP handler threads that would compete for database connections.
+ * Note: This test class does NOT use @Transactional because the issue processing
+ * chain calls GitHubUserProcessor.findOrCreate() which uses REQUIRES_NEW propagation.
+ * Having @Transactional here would cause connection pool deadlocks under parallel test
+ * execution (-T 2C) as the test transaction holds a connection while REQUIRES_NEW
+ * needs an additional one. We use TransactionTemplate for lazy-loading assertions.
  * <p>
  * <b>Fixture Values (issues.opened.json - Issue #20):</b>
  * <ul>
@@ -68,7 +70,6 @@ import org.springframework.transaction.annotation.Transactional;
  * </ul>
  */
 @DisplayName("GitHub Issue Message Handler")
-@Transactional
 class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     // IDs from the actual GitHub webhook fixtures
@@ -132,6 +133,9 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     private ObjectMapper objectMapper;
 
     @Autowired
+    private TransactionTemplate transactionTemplate;
+
+    @Autowired
     private TestEventListener eventListener;
 
     @BeforeEach
@@ -170,53 +174,56 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             handler.handleEvent(event);
 
             // Then - verify ALL persisted fields against hardcoded fixture values
-            Issue issue = issueRepository.findById(ISSUE_20_ID).orElseThrow();
+            // Use TransactionTemplate for lazy-loading assertions
+            transactionTemplate.executeWithoutResult(status -> {
+                Issue issue = issueRepository.findById(ISSUE_20_ID).orElseThrow();
 
-            // Core identification fields
-            assertThat(issue.getId()).isEqualTo(ISSUE_20_ID);
-            assertThat(issue.getNumber()).isEqualTo(FIXTURE_ISSUE_NUMBER);
+                // Core identification fields
+                assertThat(issue.getId()).isEqualTo(ISSUE_20_ID);
+                assertThat(issue.getNumber()).isEqualTo(FIXTURE_ISSUE_NUMBER);
 
-            // Content fields
-            assertThat(issue.getTitle()).isEqualTo(FIXTURE_ISSUE_TITLE);
-            assertThat(issue.getBody()).isEqualTo(FIXTURE_ISSUE_BODY);
+                // Content fields
+                assertThat(issue.getTitle()).isEqualTo(FIXTURE_ISSUE_TITLE);
+                assertThat(issue.getBody()).isEqualTo(FIXTURE_ISSUE_BODY);
 
-            // State fields
-            assertThat(issue.getState()).isEqualTo(Issue.State.OPEN);
-            assertThat(issue.isLocked()).isFalse();
-            assertThat(issue.getClosedAt()).isNull();
+                // State fields
+                assertThat(issue.getState()).isEqualTo(Issue.State.OPEN);
+                assertThat(issue.isLocked()).isFalse();
+                assertThat(issue.getClosedAt()).isNull();
 
-            // URL fields
-            assertThat(issue.getHtmlUrl()).isEqualTo(FIXTURE_ISSUE_HTML_URL);
+                // URL fields
+                assertThat(issue.getHtmlUrl()).isEqualTo(FIXTURE_ISSUE_HTML_URL);
 
-            // Timestamp fields (critical for sync correctness)
-            assertThat(issue.getCreatedAt()).isEqualTo(FIXTURE_ISSUE_CREATED_AT);
-            assertThat(issue.getUpdatedAt()).isEqualTo(FIXTURE_ISSUE_UPDATED_AT);
+                // Timestamp fields (critical for sync correctness)
+                assertThat(issue.getCreatedAt()).isEqualTo(FIXTURE_ISSUE_CREATED_AT);
+                assertThat(issue.getUpdatedAt()).isEqualTo(FIXTURE_ISSUE_UPDATED_AT);
 
-            // Counts
-            assertThat(issue.getCommentsCount()).isEqualTo(FIXTURE_ISSUE_COMMENTS_COUNT);
+                // Counts
+                assertThat(issue.getCommentsCount()).isEqualTo(FIXTURE_ISSUE_COMMENTS_COUNT);
 
-            // Repository association (foreign key)
-            assertThat(issue.getRepository()).isNotNull();
-            assertThat(issue.getRepository().getId()).isEqualTo(FIXTURE_REPO_ID);
+                // Repository association (foreign key)
+                assertThat(issue.getRepository()).isNotNull();
+                assertThat(issue.getRepository().getId()).isEqualTo(FIXTURE_REPO_ID);
 
-            // Author association (foreign key) - verify exact fixture values
-            assertThat(issue.getAuthor()).isNotNull();
-            assertThat(issue.getAuthor().getId()).isEqualTo(FIXTURE_AUTHOR_ID);
-            assertThat(issue.getAuthor().getLogin()).isEqualTo(FIXTURE_AUTHOR_LOGIN);
-            assertThat(issue.getAuthor().getAvatarUrl()).isEqualTo(FIXTURE_AUTHOR_AVATAR_URL);
-            assertThat(issue.getAuthor().getHtmlUrl()).isEqualTo(FIXTURE_AUTHOR_HTML_URL);
+                // Author association (foreign key) - verify exact fixture values
+                assertThat(issue.getAuthor()).isNotNull();
+                assertThat(issue.getAuthor().getId()).isEqualTo(FIXTURE_AUTHOR_ID);
+                assertThat(issue.getAuthor().getLogin()).isEqualTo(FIXTURE_AUTHOR_LOGIN);
+                assertThat(issue.getAuthor().getAvatarUrl()).isEqualTo(FIXTURE_AUTHOR_AVATAR_URL);
+                assertThat(issue.getAuthor().getHtmlUrl()).isEqualTo(FIXTURE_AUTHOR_HTML_URL);
 
-            // Label association - verify exact fixture values
-            assertThat(issue.getLabels()).hasSize(1);
-            Label label = issue.getLabels().iterator().next();
-            assertThat(label.getId()).isEqualTo(FIXTURE_LABEL_ID);
-            assertThat(label.getName()).isEqualTo(FIXTURE_LABEL_NAME);
-            assertThat(label.getColor()).isEqualTo(FIXTURE_LABEL_COLOR);
+                // Label association - verify exact fixture values
+                assertThat(issue.getLabels()).hasSize(1);
+                Label label = issue.getLabels().iterator().next();
+                assertThat(label.getId()).isEqualTo(FIXTURE_LABEL_ID);
+                assertThat(label.getName()).isEqualTo(FIXTURE_LABEL_NAME);
+                assertThat(label.getColor()).isEqualTo(FIXTURE_LABEL_COLOR);
 
-            // Null associations (not present in fixture)
-            assertThat(issue.getMilestone()).isNull();
-            assertThat(issue.getAssignees()).isEmpty();
-            assertThat(issue.getIssueType()).isNull();
+                // Null associations (not present in fixture)
+                assertThat(issue.getMilestone()).isNull();
+                assertThat(issue.getAssignees()).isEmpty();
+                assertThat(issue.getIssueType()).isNull();
+            });
 
             // Domain event published
             assertThat(eventListener.getCreatedEvents()).hasSize(1);
@@ -325,10 +332,12 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             // When
             handler.handleEvent(labeledEvent);
 
-            // Then
-            Issue issue = issueRepository.findById(ISSUE_20_ID).orElse(null);
-            assertThat(issue).isNotNull();
-            assertThat(labelNames(issue)).contains("etl-sample");
+            // Then - use TransactionTemplate for lazy-loading assertions
+            transactionTemplate.executeWithoutResult(status -> {
+                Issue issue = issueRepository.findById(ISSUE_20_ID).orElse(null);
+                assertThat(issue).isNotNull();
+                assertThat(labelNames(issue)).contains("etl-sample");
+            });
 
             // Verify label was created in repository
             assertThat(labelRepository.findById(9567656085L)).isPresent();
@@ -373,11 +382,13 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             handler.handleEvent(assignedEvent);
 
             // Then - issue should be created with assignees from the DTO
-            Issue issue = issueRepository.findById(ISSUE_20_ID).orElse(null);
-            assertThat(issue).isNotNull();
-            // The assignees are set from the DTO on creation
-            assertThat(issue.getAssignees()).isNotEmpty();
-            assertThat(issue.getAssignees().iterator().next().getLogin()).isEqualTo("FelixTJDietrich");
+            transactionTemplate.executeWithoutResult(status -> {
+                Issue issue = issueRepository.findById(ISSUE_20_ID).orElse(null);
+                assertThat(issue).isNotNull();
+                // The assignees are set from the DTO on creation
+                assertThat(issue.getAssignees()).isNotEmpty();
+                assertThat(issue.getAssignees().iterator().next().getLogin()).isEqualTo("FelixTJDietrich");
+            });
         }
 
         @Test
@@ -413,12 +424,14 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             // When
             handler.handleEvent(milestonedEvent);
 
-            // Then
-            Issue issue = issueRepository.findById(ISSUE_22_ID).orElse(null);
-            assertThat(issue).isNotNull();
-            assertThat(issue.getMilestone()).isNotNull();
-            assertThat(issue.getMilestone().getTitle()).isEqualTo("Webhook Fixtures");
-            assertThat(issue.getMilestone().getNumber()).isEqualTo(2);
+            // Then - use TransactionTemplate for lazy-loading assertions
+            transactionTemplate.executeWithoutResult(status -> {
+                Issue issue = issueRepository.findById(ISSUE_22_ID).orElse(null);
+                assertThat(issue).isNotNull();
+                assertThat(issue.getMilestone()).isNotNull();
+                assertThat(issue.getMilestone().getTitle()).isEqualTo("Webhook Fixtures");
+                assertThat(issue.getMilestone().getNumber()).isEqualTo(2);
+            });
 
             // Verify milestone was created in repository
             assertThat(milestoneRepository.findById(14028563L)).isPresent();
@@ -436,9 +449,11 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             handler.handleEvent(demilestonedEvent);
 
             // Then
-            Issue issue = issueRepository.findById(ISSUE_22_ID).orElse(null);
-            assertThat(issue).isNotNull();
-            assertThat(issue.getMilestone()).isNull();
+            transactionTemplate.executeWithoutResult(status -> {
+                Issue issue = issueRepository.findById(ISSUE_22_ID).orElse(null);
+                assertThat(issue).isNotNull();
+                assertThat(issue.getMilestone()).isNull();
+            });
         }
     }
 
@@ -457,12 +472,14 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             // When
             handler.handleEvent(typedEvent);
 
-            // Then
-            Issue issue = issueRepository.findById(ISSUE_25_ID).orElse(null);
-            assertThat(issue).isNotNull();
-            assertThat(issue.getIssueType()).isNotNull();
-            assertThat(issue.getIssueType().getName()).isEqualTo("Task");
-            assertThat(issue.getIssueType().getColor()).isEqualTo(IssueType.Color.YELLOW);
+            // Then - use TransactionTemplate for lazy-loading assertions
+            transactionTemplate.executeWithoutResult(status -> {
+                Issue issue = issueRepository.findById(ISSUE_25_ID).orElse(null);
+                assertThat(issue).isNotNull();
+                assertThat(issue.getIssueType()).isNotNull();
+                assertThat(issue.getIssueType().getName()).isEqualTo("Task");
+                assertThat(issue.getIssueType().getColor()).isEqualTo(IssueType.Color.YELLOW);
+            });
 
             // Verify Typed event was published
             assertThat(eventListener.getTypedEvents()).hasSize(1);
@@ -481,9 +498,11 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             handler.handleEvent(untypedEvent);
 
             // Then
-            Issue issue = issueRepository.findById(ISSUE_25_ID).orElse(null);
-            assertThat(issue).isNotNull();
-            assertThat(issue.getIssueType()).isNull();
+            transactionTemplate.executeWithoutResult(status -> {
+                Issue issue = issueRepository.findById(ISSUE_25_ID).orElse(null);
+                assertThat(issue).isNotNull();
+                assertThat(issue.getIssueType()).isNull();
+            });
 
             // Verify Untyped event was published
             assertThat(eventListener.getUntypedEvents()).hasSize(1);

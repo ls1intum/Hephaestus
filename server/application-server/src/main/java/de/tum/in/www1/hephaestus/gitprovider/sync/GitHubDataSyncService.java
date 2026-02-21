@@ -2,6 +2,9 @@ package de.tum.in.www1.hephaestus.gitprovider.sync;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
+import de.tum.in.www1.hephaestus.gitprovider.commit.github.CommitAuthorEnrichmentService;
+import de.tum.in.www1.hephaestus.gitprovider.commit.github.CommitMetadataEnrichmentService;
+import de.tum.in.www1.hephaestus.gitprovider.commit.github.GitHubCommitBackfillService;
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.ExponentialBackoff;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
@@ -96,6 +99,9 @@ public class GitHubDataSyncService {
     private final GitHubOrganizationSyncService organizationSyncService;
     private final GitHubRepositorySyncService repositorySyncService;
     private final GitHubCollaboratorSyncService collaboratorSyncService;
+    private final GitHubCommitBackfillService commitBackfillService;
+    private final CommitAuthorEnrichmentService commitAuthorEnrichmentService;
+    private final CommitMetadataEnrichmentService commitMetadataEnrichmentService;
     private final GitHubExceptionClassifier exceptionClassifier;
     private final InstallationTokenProvider tokenProvider;
     private final GitHubAppTokenService gitHubAppTokenService;
@@ -121,6 +127,9 @@ public class GitHubDataSyncService {
         GitHubOrganizationSyncService organizationSyncService,
         GitHubRepositorySyncService repositorySyncService,
         GitHubCollaboratorSyncService collaboratorSyncService,
+        GitHubCommitBackfillService commitBackfillService,
+        CommitAuthorEnrichmentService commitAuthorEnrichmentService,
+        CommitMetadataEnrichmentService commitMetadataEnrichmentService,
         GitHubExceptionClassifier exceptionClassifier,
         InstallationTokenProvider tokenProvider,
         GitHubAppTokenService gitHubAppTokenService,
@@ -144,6 +153,9 @@ public class GitHubDataSyncService {
         this.organizationSyncService = organizationSyncService;
         this.repositorySyncService = repositorySyncService;
         this.collaboratorSyncService = collaboratorSyncService;
+        this.commitBackfillService = commitBackfillService;
+        this.commitAuthorEnrichmentService = commitAuthorEnrichmentService;
+        this.commitMetadataEnrichmentService = commitMetadataEnrichmentService;
         this.exceptionClassifier = exceptionClassifier;
         this.tokenProvider = tokenProvider;
         this.gitHubAppTokenService = gitHubAppTokenService;
@@ -234,12 +246,24 @@ public class GitHubDataSyncService {
                 }
             }
 
+            // Backfill commits from local git clone (runs BEFORE the repoUnchanged
+            // check because it uses local git, not the GitHub API — no rate limit concern).
+            // Must run even for "unchanged" repos to handle initial backfill when git
+            // checkout is first enabled. The backfill service has its own short-circuit
+            // (HEAD SHA == latest known SHA → fast return).
+            int commitsBackfilled = commitBackfillService.backfillCommits(syncTarget, repository, scopeId);
+
             // P3 optimization: skip sub-syncs when the repository has no new activity.
             // GitHub's repository.updatedAt changes on any activity (pushes, issues, PRs, labels, etc.).
             // If the freshly-fetched updatedAt equals what we previously stored, nothing has changed.
-            // Only apply this skip when we have a previous timestamp (not on first sync).
+            // Only apply this skip when we have a previous timestamp (not on first sync)
+            // AND when both issue/PR syncs have completed at least once (otherwise the
+            // backfill scheduler will spin indefinitely waiting for sync timestamps).
+            boolean initialSyncCompleted =
+                syncTarget.lastIssuesSyncedAt() != null && syncTarget.lastPullRequestsSyncedAt() != null;
             boolean repoUnchanged =
                 !repositoryCreatedDuringSync &&
+                initialSyncCompleted &&
                 previousUpdatedAt != null &&
                 repository.getUpdatedAt() != null &&
                 !repository.getUpdatedAt().isAfter(previousUpdatedAt);
@@ -306,10 +330,23 @@ public class GitHubDataSyncService {
                 );
             }
 
+            // Enrich unresolved commit authors via stored emails + GitHub GraphQL API.
+            // Runs AFTER collaborator/PR/issue sync so that users imported as side effects
+            // of those syncs are available for email → user_id resolution on the first cycle.
+            // Uses O(unique_emails) API calls instead of O(commits) — very efficient.
+            int commitsEnriched = enrichCommitAuthors(syncTarget, repository);
+
+            // Enrich commits with multi-author contributor data and associated PR links.
+            // Runs AFTER commit author enrichment so that users are already resolved.
+            int commitsMetadataEnriched = enrichCommitMetadata(syncTarget, repository);
+
             log.info(
-                "Completed repository sync: scopeId={}, repoId={}, collaborators={}, labels={}, milestones={}, issues={}, prs={}, issueStatus={}, prStatus={}",
+                "Completed repository sync: scopeId={}, repoId={}, commitsBackfilled={}, commitsEnriched={}, commitsMetadataEnriched={}, collaborators={}, labels={}, milestones={}, issues={}, prs={}, issueStatus={}, prStatus={}",
                 scopeId,
                 repositoryId,
+                commitsBackfilled >= 0 ? commitsBackfilled : "skipped",
+                commitsEnriched >= 0 ? commitsEnriched : "skipped",
+                commitsMetadataEnriched >= 0 ? commitsMetadataEnriched : "skipped",
                 collaboratorsCount >= 0 ? collaboratorsCount : "skipped",
                 labelsCount >= 0 ? labelsCount : "skipped",
                 milestonesCount >= 0 ? milestonesCount : "skipped",
@@ -1000,6 +1037,54 @@ public class GitHubDataSyncService {
         boolean prsStale =
             target.lastPullRequestsSyncedAt() == null || target.lastPullRequestsSyncedAt().isBefore(staleThreshold);
         return issuesStale || prsStale;
+    }
+
+    /**
+     * Enriches unresolved commit authors/committers for a repository.
+     * <p>
+     * Delegates to {@link CommitAuthorEnrichmentService} with the sync target's scope ID
+     * for GraphQL authentication. Catches all exceptions to avoid failing the entire
+     * sync if enrichment fails.
+     *
+     * @param syncTarget the sync target with auth info
+     * @param repository the repository entity
+     * @return number of commits enriched, or -1 on error
+     */
+    private int enrichCommitAuthors(SyncTarget syncTarget, Repository repository) {
+        try {
+            return commitAuthorEnrichmentService.enrichCommitAuthors(
+                repository.getId(),
+                repository.getNameWithOwner(),
+                syncTarget.scopeId()
+            );
+        } catch (Exception e) {
+            log.warn("Commit author enrichment failed: repoId={}, error={}", repository.getId(), e.getMessage());
+            return -1;
+        }
+    }
+
+    /**
+     * Enriches commits with multi-author contributor data and associated PR links.
+     * <p>
+     * Delegates to {@link CommitMetadataEnrichmentService} with the sync target's scope ID
+     * for GraphQL authentication. Catches all exceptions to avoid failing the entire
+     * sync if enrichment fails.
+     *
+     * @param syncTarget the sync target with auth info
+     * @param repository the repository entity
+     * @return number of commits enriched, or -1 on error
+     */
+    private int enrichCommitMetadata(SyncTarget syncTarget, Repository repository) {
+        try {
+            return commitMetadataEnrichmentService.enrichCommitMetadata(
+                repository.getId(),
+                repository.getNameWithOwner(),
+                syncTarget.scopeId()
+            );
+        } catch (Exception e) {
+            log.warn("Commit metadata enrichment failed: repoId={}, error={}", repository.getId(), e.getMessage());
+            return -1;
+        }
     }
 
     /**

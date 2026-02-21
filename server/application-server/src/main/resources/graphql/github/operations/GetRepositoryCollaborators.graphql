@@ -18,14 +18,7 @@ query GetRepositoryCollaborators($owner: String!, $name: String!, $first: Int!, 
             edges {
                 permission
                 node {
-                    id
-                    databaseId
-                    login
-                    avatarUrl
-                    name
-                    email
-                    createdAt
-                    updatedAt
+                    ...UserFields
                 }
             }
         }
