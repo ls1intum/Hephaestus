@@ -27,7 +27,6 @@ import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.ClientResponseField;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Mono;
 import reactor.util.retry.Retry;
 
@@ -420,7 +419,6 @@ public class CommitMetadataEnrichmentService {
      * @return a {@link BatchProcessingResult} with the count and overflow records
      */
     @SuppressWarnings("unchecked")
-    @Transactional
     private BatchProcessingResult processResponse(
         ClientGraphQlResponse response,
         List<String> batch,
@@ -746,7 +744,6 @@ public class CommitMetadataEnrichmentService {
      * Fetches remaining associated pull requests for a single commit whose connection overflowed.
      * Issues cursor-based paginated queries until all PRs are fetched.
      */
-    @Transactional
     private void fetchRemainingPullRequests(
         String owner,
         String repoName,
