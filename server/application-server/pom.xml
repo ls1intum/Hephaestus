@@ -62,8 +62,8 @@
         <!-- Local development port for Liquibase plugin (override via -Dpostgres.port=XXXX) -->
         <postgres.port>5432</postgres.port>
 
-        <!-- Stale class cleanup: enabled by default to prevent ghost .class files in CI caches.
-             The 'quick' profile overrides this to 'true' for fast local rebuilds. -->
+        <!-- Stale class cleanup: always enabled to prevent ghost .class files from CI caches.
+             Override with -DskipCleanStaleClasses=true only for local iterative dev. -->
         <skipCleanStaleClasses>false</skipCleanStaleClasses>
     </properties>
     <dependencies>
@@ -986,8 +986,6 @@
                 <!-- maven.main.skip deliberately NOT set - we want incremental compile -->
                 <!-- Skip test compilation for faster spring-boot:run -->
                 <maven.test.skip>true</maven.test.skip>
-                <!-- Skip stale-class cleanup for fast local rebuilds -->
-                <skipCleanStaleClasses>true</skipCleanStaleClasses>
             </properties>
         </profile>
     </profiles>
