@@ -715,6 +715,9 @@
                     <!-- Forked JVM timeout settings to prevent hanging -->
                     <forkedProcessTimeoutInSeconds>${hephaestus.surefire.timeout}</forkedProcessTimeoutInSeconds>
                     <forkedProcessExitTimeoutInSeconds>60</forkedProcessExitTimeoutInSeconds>
+                    <!-- Enable process checker so forkedProcessTimeoutInSeconds actually works.
+                         Without this, Surefire 3.x ignores the timeout and hung forks run forever. -->
+                    <enableProcessChecker>ping</enableProcessChecker>
                     <!-- Tag filtering: run unit tests, exclude live tests -->
                     <groups>${surefire.includedGroups}</groups>
                     <excludedGroups>${surefire.excludedGroups}</excludedGroups>
