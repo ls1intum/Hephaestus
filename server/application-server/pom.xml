@@ -14,7 +14,7 @@
     <artifactId>hephaestus</artifactId>
     <version>0.17.0</version>
     <name>Hephaestus</name>
-    <description>AI-driven learning for better software development — Hephaestus</description>
+    <description>AI-driven learning for better software development</description>
     <url/>
     <licenses>
         <license/>
@@ -61,6 +61,10 @@
 
         <!-- Local development port for Liquibase plugin (override via -Dpostgres.port=XXXX) -->
         <postgres.port>5432</postgres.port>
+
+        <!-- Stale class cleanup: enabled by default to prevent ghost .class files in CI caches.
+             The 'quick' profile overrides this to 'true' for fast local rebuilds. -->
+        <skipCleanStaleClasses>false</skipCleanStaleClasses>
     </properties>
     <dependencies>
         <dependency>
@@ -412,6 +416,38 @@
     </dependencyManagement>
     <build>
         <plugins>
+            <!--
+                Clean compiled classes before compilation to prevent orphaned .class files
+                from deleted/moved source files (e.g., CI cache restoring stale classes).
+                Only target/classes and target/test-classes are cleaned; generated-sources
+                and other cached artifacts are preserved.
+                Skipped by the quick profile for fast local development.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-clean-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>clean-stale-classes</id>
+                        <phase>initialize</phase>
+                        <goals>
+                            <goal>clean</goal>
+                        </goals>
+                        <configuration>
+                            <skip>${skipCleanStaleClasses}</skip>
+                            <excludeDefaultDirectories>true</excludeDefaultDirectories>
+                            <filesets>
+                                <fileset>
+                                    <directory>${project.build.outputDirectory}</directory>
+                                </fileset>
+                                <fileset>
+                                    <directory>${project.build.testOutputDirectory}</directory>
+                                </fileset>
+                            </filesets>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
@@ -950,6 +986,8 @@
                 <!-- maven.main.skip deliberately NOT set - we want incremental compile -->
                 <!-- Skip test compilation for faster spring-boot:run -->
                 <maven.test.skip>true</maven.test.skip>
+                <!-- Skip stale-class cleanup for fast local rebuilds -->
+                <skipCleanStaleClasses>true</skipCleanStaleClasses>
             </properties>
         </profile>
     </profiles>
