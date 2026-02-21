@@ -434,6 +434,12 @@ export const gitCommit = pgTable(
 		authorId: bigint("author_id", { mode: "number" }),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		committerId: bigint("committer_id", { mode: "number" }),
+		signatureState: varchar("signature_state", { length: 32 }),
+		signatureWasSignedByGithub: boolean("signature_was_signed_by_github"),
+		signatureSignerLogin: varchar("signature_signer_login", { length: 255 }),
+		parentShas: text("parent_shas"),
+		statusCheckRollupState: varchar("status_check_rollup_state", { length: 32 }),
+		onBehalfOfLogin: varchar("on_behalf_of_login", { length: 255 }),
 	},
 	(table) => [
 		index("idx_git_commit_author_id").using("btree", table.authorId.asc().nullsLast()),

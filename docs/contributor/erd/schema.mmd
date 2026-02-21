@@ -132,6 +132,12 @@ erDiagram
         BIGINT repository_id FK,UK "NOT NULL"
         BIGINT author_id FK
         BIGINT committer_id FK
+        VARCHAR(32) signature_state
+        BOOLEAN signature_was_signed_by_github
+        VARCHAR(255) signature_signer_login
+        TEXT parent_shas
+        VARCHAR(32) status_check_rollup_state
+        VARCHAR(255) on_behalf_of_login
     }
 
     Issue {
