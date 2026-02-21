@@ -256,9 +256,14 @@ public class GitHubDataSyncService {
             // P3 optimization: skip sub-syncs when the repository has no new activity.
             // GitHub's repository.updatedAt changes on any activity (pushes, issues, PRs, labels, etc.).
             // If the freshly-fetched updatedAt equals what we previously stored, nothing has changed.
-            // Only apply this skip when we have a previous timestamp (not on first sync).
+            // Only apply this skip when we have a previous timestamp (not on first sync)
+            // AND when both issue/PR syncs have completed at least once (otherwise the
+            // backfill scheduler will spin indefinitely waiting for sync timestamps).
+            boolean initialSyncCompleted =
+                syncTarget.lastIssuesSyncedAt() != null && syncTarget.lastPullRequestsSyncedAt() != null;
             boolean repoUnchanged =
                 !repositoryCreatedDuringSync &&
+                initialSyncCompleted &&
                 previousUpdatedAt != null &&
                 repository.getUpdatedAt() != null &&
                 !repository.getUpdatedAt().isAfter(previousUpdatedAt);
