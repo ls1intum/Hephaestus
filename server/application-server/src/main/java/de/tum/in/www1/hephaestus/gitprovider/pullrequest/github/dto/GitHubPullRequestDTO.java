@@ -182,22 +182,24 @@ public record GitHubPullRequestDTO(
             return null;
         }
 
-        // Split full message into subject (first line) and body (rest)
-        String subject = null;
-        String body = null;
-        if (mc.getMessage() != null) {
-            String raw = mc.getMessage();
-            int newline = raw.indexOf('\n');
-            if (newline >= 0) {
-                subject = raw.substring(0, newline).trim();
-                String rest = raw.substring(newline + 1).trim();
-                body = rest.isEmpty() ? null : rest;
-            } else {
-                subject = raw.trim();
-            }
+        // R1: Use messageHeadline (subject) and messageBody directly from GraphQL
+        // instead of splitting the full message manually.
+        // Default to empty string if null — git_commit.message is NOT NULL.
+        String subject = mc.getMessageHeadline();
+        if (subject == null || subject.isBlank()) {
+            subject = "";
+        } else {
+            subject = subject.trim();
             // Truncate subject to fit varchar(1024)
             if (subject.length() > 1024) {
                 subject = subject.substring(0, 1024);
+            }
+        }
+        String body = mc.getMessageBody();
+        if (body != null) {
+            body = body.trim();
+            if (body.isEmpty()) {
+                body = null;
             }
         }
 

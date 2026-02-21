@@ -309,9 +309,11 @@ public class GitHubPushMessageHandler extends GitHubMessageHandler<GitHubPushEve
         Long committerId = authorResolver.resolveByEmail(info.committerEmail());
 
         // Upsert commit via native SQL (no exception on conflict)
+        // Defense-in-depth: git_commit.message is NOT NULL; default to empty string
+        String message = info.message() != null ? info.message() : "";
         commitRepository.upsertCommit(
             info.sha(),
-            info.message(),
+            message,
             info.messageBody(),
             buildCommitUrl(repository.getNameWithOwner(), info.sha()),
             info.authoredAt(),

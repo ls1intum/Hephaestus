@@ -58,6 +58,8 @@ query GetRepositoryPullRequests(
                 mergeCommit {
                     oid
                     message
+                    messageHeadline
+                    messageBody
                     url
                     authoredDate
                     committedDate

@@ -382,6 +382,9 @@ public class GitRepositoryManager {
         }
 
         String message = revCommit.getShortMessage();
+        if (message == null) {
+            message = "";
+        }
         String fullMessage = revCommit.getFullMessage();
         // Extract the body: everything after the first line break in the full message.
         // We cannot use getShortMessage().length() as offset because getShortMessage()

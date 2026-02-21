@@ -155,6 +155,64 @@ public class Commit {
     @Column(name = "parent_count")
     private Integer parentCount;
 
+    // ========== R2: Expanded signature fields ==========
+
+    /**
+     * The signature verification state from GitHub's GitSignatureState enum.
+     * Provides granular detail beyond the boolean {@link #signatureValid} flag,
+     * e.g. VALID, INVALID, BAD_CERT, EXPIRED_KEY, UNSIGNED, etc.
+     * Null when the commit has not been enriched yet.
+     */
+    @Column(name = "signature_state", length = 32)
+    private String signatureState;
+
+    /**
+     * Whether the commit signature was created by GitHub itself
+     * (e.g. for web UI edits, merge commits).
+     * Null when the commit has not been enriched yet.
+     */
+    @Column(name = "signature_was_signed_by_github")
+    private Boolean signatureWasSignedByGitHub;
+
+    /**
+     * The login of the user who signed the commit, if the signature has an
+     * associated GitHub user.
+     * Null when the commit has not been enriched yet or the signer is not a GitHub user.
+     */
+    @Column(name = "signature_signer_login", length = 255)
+    private String signatureSignerLogin;
+
+    // ========== R3: Parent commit SHAs ==========
+
+    /**
+     * Comma-separated SHAs of parent commits (up to 3 parents fetched).
+     * Enables merge commit analysis and history graph traversal without
+     * additional API calls.
+     * Null when the commit has not been enriched yet.
+     */
+    @Column(name = "parent_shas", columnDefinition = "TEXT")
+    private String parentShas;
+
+    // ========== R4: CI status rollup ==========
+
+    /**
+     * The aggregated CI status check rollup state for this commit.
+     * One of: ERROR, EXPECTED, FAILURE, PENDING, SUCCESS.
+     * Null when the commit has not been enriched yet or has no status checks.
+     */
+    @Column(name = "status_check_rollup_state", length = 32)
+    private String statusCheckRollupState;
+
+    // ========== R6: Organizational attribution ==========
+
+    /**
+     * The login of the organization on whose behalf this commit was made.
+     * Populated from GitHub's {@code Commit.onBehalfOf} GraphQL field.
+     * Null when the commit was not made on behalf of an organization.
+     */
+    @Column(name = "on_behalf_of_login", length = 255)
+    private String onBehalfOfLogin;
+
     /**
      * The time when this commit was last synced.
      */

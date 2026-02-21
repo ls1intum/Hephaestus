@@ -180,7 +180,7 @@ class CommitMetadataEnrichmentServiceTest extends BaseUnitTest {
                 Map.entry("authoredDate", "2025-01-15T10:30:00Z"),
                 Map.entry("committedDate", "2025-01-15T11:00:00Z"),
                 Map.entry("messageHeadline", "feat: add feature"),
-                Map.entry("message", "feat: add feature\n\nDetailed description here"),
+                Map.entry("messageBody", "Detailed description here"),
                 Map.entry("url", "https://github.com/owner/repo/commit/" + sha),
                 Map.entry("signature", Map.of("isValid", true)),
                 Map.entry("authoredByCommitter", true),
@@ -230,7 +230,13 @@ class CommitMetadataEnrichmentServiceTest extends BaseUnitTest {
                 eq(true),
                 eq(true),
                 eq(false),
-                eq(1)
+                eq(1),
+                eq(null), // signatureState (not in simple Map.of("isValid", true))
+                eq(null), // signatureWasSignedByGitHub
+                eq(null), // signatureSignerLogin
+                eq(null), // parentShas (parents has no nodes)
+                eq(null), // statusCheckRollupState
+                eq(null) // onBehalfOfLogin
             );
 
             // Verify contributor was upserted (primary author)
@@ -270,7 +276,7 @@ class CommitMetadataEnrichmentServiceTest extends BaseUnitTest {
             commitData.put("authoredDate", "2025-01-15T10:30:00Z");
             commitData.put("committedDate", "2025-01-15T10:30:00Z");
             commitData.put("messageHeadline", "initial commit");
-            commitData.put("message", "initial commit");
+            commitData.put("messageBody", null);
             commitData.put("url", "https://github.com/owner/repo/commit/" + sha);
             commitData.put("signature", null);
             commitData.put("authoredByCommitter", true);
@@ -314,12 +320,18 @@ class CommitMetadataEnrichmentServiceTest extends BaseUnitTest {
                 eq(Instant.parse("2025-01-15T10:30:00Z")),
                 eq(Instant.parse("2025-01-15T10:30:00Z")),
                 eq("initial commit"),
-                eq(null), // no message body (single-line message)
+                eq(null), // no message body
                 eq("https://github.com/owner/repo/commit/" + sha),
                 eq(null), // signatureValid = null (no signature)
                 eq(true),
                 eq(false),
-                eq(0)
+                eq(0),
+                eq(null), // signatureState
+                eq(null), // signatureWasSignedByGitHub
+                eq(null), // signatureSignerLogin
+                eq(null), // parentShas
+                eq(null), // statusCheckRollupState
+                eq(null) // onBehalfOfLogin
             );
         }
     }

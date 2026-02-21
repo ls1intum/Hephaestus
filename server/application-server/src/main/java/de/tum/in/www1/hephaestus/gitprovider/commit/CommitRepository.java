@@ -318,6 +318,12 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
             authored_by_committer = COALESCE(:authoredByCommitter, git_commit.authored_by_committer),
             committed_via_web = COALESCE(:committedViaWeb, git_commit.committed_via_web),
             parent_count = COALESCE(:parentCount, git_commit.parent_count),
+            signature_state = COALESCE(:signatureState, git_commit.signature_state),
+            signature_was_signed_by_github = COALESCE(:signatureWasSignedByGitHub, git_commit.signature_was_signed_by_github),
+            signature_signer_login = COALESCE(:signatureSignerLogin, git_commit.signature_signer_login),
+            parent_shas = COALESCE(:parentShas, git_commit.parent_shas),
+            status_check_rollup_state = COALESCE(:statusCheckRollupState, git_commit.status_check_rollup_state),
+            on_behalf_of_login = COALESCE(:onBehalfOfLogin, git_commit.on_behalf_of_login),
             updated_at = NOW()
         WHERE git_commit.id = :commitId
         """,
@@ -336,6 +342,12 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
         @Param("signatureValid") Boolean signatureValid,
         @Param("authoredByCommitter") Boolean authoredByCommitter,
         @Param("committedViaWeb") Boolean committedViaWeb,
-        @Param("parentCount") Integer parentCount
+        @Param("parentCount") Integer parentCount,
+        @Param("signatureState") String signatureState,
+        @Param("signatureWasSignedByGitHub") Boolean signatureWasSignedByGitHub,
+        @Param("signatureSignerLogin") String signatureSignerLogin,
+        @Param("parentShas") String parentShas,
+        @Param("statusCheckRollupState") String statusCheckRollupState,
+        @Param("onBehalfOfLogin") String onBehalfOfLogin
     );
 }
