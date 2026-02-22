@@ -21,7 +21,9 @@ import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -295,10 +297,13 @@ public class Commit {
 
     /**
      * The file changes in this commit.
+     * Uses a List instead of Set because new (unsaved) CommitFileChange entities
+     * all have id=null, causing HashSet to treat them as equal and silently dropping
+     * all but one. ArrayList preserves all file changes until they are persisted.
      */
     @OneToMany(mappedBy = "commit", cascade = CascadeType.ALL, orphanRemoval = true)
     @ToString.Exclude
-    private Set<CommitFileChange> fileChanges = new HashSet<>();
+    private List<CommitFileChange> fileChanges = new ArrayList<>();
 
     /**
      * The contributors to this commit (primary author, co-authors, committer).

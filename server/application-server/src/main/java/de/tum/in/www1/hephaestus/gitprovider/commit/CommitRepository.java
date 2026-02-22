@@ -26,6 +26,40 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
     boolean existsByShaAndRepositoryId(String sha, Long repositoryId);
 
     /**
+     * Count the number of file change rows for a commit identified by SHA and repository ID.
+     * Returns 0 if the commit does not exist or has no file changes.
+     * Used to detect commits with corrupted file change data that need repair.
+     */
+    @Query(
+        value = """
+        SELECT COUNT(cfc.id) FROM commit_file_change cfc
+        JOIN git_commit gc ON gc.id = cfc.commit_id
+        WHERE gc.sha = :sha AND gc.repository_id = :repositoryId
+        """,
+        nativeQuery = true
+    )
+    int countFileChangesByShaAndRepositoryId(@Param("sha") String sha, @Param("repositoryId") Long repositoryId);
+
+    /**
+     * Check if a repository has commits that need file change repair.
+     * Detects commits where changed_files &gt; 1 but only 0 or 1 file change rows exist,
+     * which indicates data corrupted by the HashSet deduplication bug.
+     * Returns true if at least one such commit exists.
+     */
+    @Query(
+        value = """
+        SELECT CASE WHEN COUNT(*) > 0 THEN true ELSE false END
+        FROM git_commit gc
+        WHERE gc.repository_id = :repositoryId
+          AND gc.changed_files > 1
+          AND (SELECT COUNT(*) FROM commit_file_change cfc WHERE cfc.commit_id = gc.id) <= 1
+        LIMIT 1
+        """,
+        nativeQuery = true
+    )
+    boolean existsCommitsNeedingFileChangeRepair(@Param("repositoryId") Long repositoryId);
+
+    /**
      * Count commits for a repository.
      */
     long countByRepositoryId(Long repositoryId);

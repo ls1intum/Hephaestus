@@ -119,6 +119,17 @@ public class GitHubCommitBackfillService {
 
             // Phase 3: Determine walk range (incremental vs full)
             String fromSha = findLatestKnownSha(repoId);
+
+            // Detect repos needing file change repair (HashSet dedup bug).
+            // If corrupted commits exist, force a full re-walk so processCommitInfo
+            // can repair their file changes. This is a one-time self-healing pass.
+            boolean repairMode = false;
+            if (fromSha != null && commitRepository.existsCommitsNeedingFileChangeRepair(repoId)) {
+                log.info("File change repair needed: repoId={}, repoName={}, forcing full re-walk", repoId, repoName);
+                fromSha = null;
+                repairMode = true;
+            }
+
             if (fromSha != null && fromSha.equals(headSha)) {
                 log.debug(
                     "Skipped commit backfill: reason=alreadyUpToDate, repoId={}, repoName={}, headSha={}",
@@ -177,7 +188,7 @@ public class GitHubCommitBackfillService {
                     repoName,
                     processed,
                     total,
-                    fromSha != null ? "incremental" : "full"
+                    fromSha != null ? "incremental" : (repairMode ? "repair" : "full")
                 );
             }
 
@@ -241,44 +252,71 @@ public class GitHubCommitBackfillService {
      * @param info       the commit info from git walk
      * @param repository the repository entity
      * @param scopeId    the scope ID for event context
-     * @return true if this was a new commit, false if already existed
+     * @return true if this was a new commit or an existing commit was repaired, false if skipped
      */
     private boolean processCommitInfo(GitRepositoryManager.CommitInfo info, Repository repository, Long scopeId) {
         Boolean result = transactionTemplate.execute(status -> {
-            // Fast-path: skip if already persisted
-            if (commitRepository.existsByShaAndRepositoryId(info.sha(), repository.getId())) {
-                return false;
+            boolean alreadyExists = commitRepository.existsByShaAndRepositoryId(info.sha(), repository.getId());
+
+            if (alreadyExists) {
+                // Repair check: detect commits with fewer file change rows than JGit provides.
+                // This fixes data corrupted by the HashSet deduplication bug where new
+                // (unsaved) CommitFileChange entities all had id=null, so the Set kept only one.
+                boolean needsFileChangeRepair = false;
+                if (!info.fileChanges().isEmpty()) {
+                    int storedFileChanges = commitRepository.countFileChangesByShaAndRepositoryId(
+                        info.sha(),
+                        repository.getId()
+                    );
+                    needsFileChangeRepair = storedFileChanges < info.fileChanges().size();
+                }
+                if (!needsFileChangeRepair) {
+                    return false;
+                }
+                log.debug(
+                    "Repairing file changes for existing commit: sha={}, repo={}",
+                    abbreviateSha(info.sha()),
+                    repository.getNameWithOwner()
+                );
             }
 
-            // Resolve author/committer IDs by email (with noreply fallback)
-            Long authorId = authorResolver.resolveByEmail(info.authorEmail());
-            Long committerId = authorResolver.resolveByEmail(info.committerEmail());
+            if (!alreadyExists) {
+                // Resolve author/committer IDs by email (with noreply fallback)
+                Long authorId = authorResolver.resolveByEmail(info.authorEmail());
+                Long committerId = authorResolver.resolveByEmail(info.committerEmail());
 
-            // Upsert commit via native SQL (no exception on conflict)
-            // Defense-in-depth: git_commit.message is NOT NULL; default to empty string
-            String message = info.message() != null ? info.message() : "";
-            commitRepository.upsertCommit(
-                info.sha(),
-                message,
-                info.messageBody(),
-                buildCommitUrl(repository.getNameWithOwner(), info.sha()),
-                info.authoredAt(),
-                info.committedAt(),
-                info.additions(),
-                info.deletions(),
-                info.changedFiles(),
-                Instant.now(),
-                repository.getId(),
-                authorId,
-                committerId,
-                info.authorEmail(),
-                info.committerEmail()
-            );
+                // Upsert commit via native SQL (no exception on conflict)
+                // Defense-in-depth: git_commit.message is NOT NULL; default to empty string
+                String message = info.message() != null ? info.message() : "";
+                commitRepository.upsertCommit(
+                    info.sha(),
+                    message,
+                    info.messageBody(),
+                    buildCommitUrl(repository.getNameWithOwner(), info.sha()),
+                    info.authoredAt(),
+                    info.committedAt(),
+                    info.additions(),
+                    info.deletions(),
+                    info.changedFiles(),
+                    Instant.now(),
+                    repository.getId(),
+                    authorId,
+                    committerId,
+                    info.authorEmail(),
+                    info.committerEmail()
+                );
+            }
 
-            // Attach file changes if present
+            // Attach file changes if present (for new commits or repairs)
             if (!info.fileChanges().isEmpty()) {
                 Commit commit = commitRepository.findByShaAndRepositoryId(info.sha(), repository.getId()).orElse(null);
                 if (commit != null) {
+                    if (alreadyExists) {
+                        // Repair: clear corrupted file changes before re-attaching
+                        commit.getFileChanges().clear();
+                        commitRepository.save(commit);
+                        commitRepository.flush();
+                    }
                     for (GitRepositoryManager.FileChange fc : info.fileChanges()) {
                         CommitFileChange fileChange = new CommitFileChange();
                         fileChange.setFilename(fc.filename());
@@ -293,8 +331,10 @@ public class GitHubCommitBackfillService {
                 }
             }
 
-            // Publish CommitCreated event (fires after transaction commits)
-            publishCommitCreated(info.sha(), repository, scopeId);
+            if (!alreadyExists) {
+                // Publish CommitCreated event only for genuinely new commits
+                publishCommitCreated(info.sha(), repository, scopeId);
+            }
 
             return true;
         });
