@@ -63,6 +63,8 @@ query GetRepositoryPullRequestsHistorical(
                 mergeCommit {
                     oid
                     message
+                    messageHeadline
+                    messageBody
                     url
                     authoredDate
                     committedDate

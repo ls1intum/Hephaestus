@@ -50,8 +50,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.HttpGraphQlClient;
@@ -96,10 +95,9 @@ import reactor.util.retry.Retry;
  *
  * @see SyncSchedulerProperties.BackfillProperties
  */
+@Slf4j
 @Service
 public class HistoricalBackfillService {
-
-    private static final Logger log = LoggerFactory.getLogger(HistoricalBackfillService.class);
 
     /** GraphQL query document name for historical issue sync (CREATED_AT DESC). */
     private static final String ISSUES_HISTORICAL_QUERY = "GetRepositoryIssuesHistorical";
