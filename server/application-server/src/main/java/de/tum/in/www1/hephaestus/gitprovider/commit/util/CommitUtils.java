@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.gitprovider.commit.github;
+package de.tum.in.www1.hephaestus.gitprovider.commit.util;
 
 import lombok.experimental.UtilityClass;
 import org.springframework.lang.Nullable;
@@ -16,7 +16,7 @@ public class CommitUtils {
      * @return the trimmed string, or {@code null} if the input is not a {@link String} or is blank
      */
     @Nullable
-    static String normalizeString(Object value) {
+    public String normalizeString(Object value) {
         if (!(value instanceof String s)) {
             return null;
         }
@@ -31,7 +31,7 @@ public class CommitUtils {
      * @param sha           full commit SHA
      * @return the commit URL on GitHub
      */
-    static String buildCommitUrl(String nameWithOwner, String sha) {
+    public String buildCommitUrl(String nameWithOwner, String sha) {
         return "https://github.com/" + nameWithOwner + "/commit/" + sha;
     }
 }
