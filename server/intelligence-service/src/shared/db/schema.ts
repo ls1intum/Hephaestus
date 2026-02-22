@@ -1080,6 +1080,9 @@ export const pullRequestReview = pgTable(
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		pullRequestId: bigint("pull_request_id", { mode: "number" }),
 		body: text(),
+		createdAt: timestamp("created_at", { mode: "string" }),
+		updatedAt: timestamp("updated_at", { mode: "string" }),
+		authorCanPushToRepository: boolean("author_can_push_to_repository"),
 	},
 	(table) => [
 		index("idx_pr_review_author_id").using("btree", table.authorId.asc().nullsLast()),
@@ -1126,6 +1129,7 @@ export const pullRequestReviewComment = pgTable(
 		inReplyToId: bigint("in_reply_to_id", { mode: "number" }),
 		body: text(),
 		diffHunk: text("diff_hunk"),
+		outdated: boolean(),
 	},
 	(table) => [
 		index("idx_pull_request_review_comment_thread").using(

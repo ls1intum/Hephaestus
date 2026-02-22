@@ -369,6 +369,9 @@ erDiagram
         BIGINT author_id FK
         BIGINT pull_request_id FK
         TEXT body
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
+        BOOLEAN author_can_push_to_repository
     }
 
     PullRequestReviewComment {
@@ -391,6 +394,7 @@ erDiagram
         BIGINT in_reply_to_id FK
         TEXT body
         TEXT diff_hunk
+        BOOLEAN outdated
     }
 
     PullRequestReviewThread {
