@@ -26,6 +26,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.ClientResponseField;
 import org.springframework.graphql.client.GraphQlClient;
@@ -197,7 +198,7 @@ class CommitMetadataEnrichmentServiceTest extends BaseUnitTest {
             // Mock GraphQL client and response
             ClientResponseField field = org.mockito.Mockito.mock(ClientResponseField.class);
             when(field.getValue()).thenReturn(commitData);
-            when(field.toEntity(any(Class.class))).thenReturn(commitData);
+            when(field.toEntity(any(ParameterizedTypeReference.class))).thenReturn(commitData);
 
             ClientGraphQlResponse graphQlResponse = org.mockito.Mockito.mock(ClientGraphQlResponse.class);
             when(graphQlResponse.isValid()).thenReturn(true);
@@ -292,7 +293,7 @@ class CommitMetadataEnrichmentServiceTest extends BaseUnitTest {
             // Mock GraphQL client and response
             ClientResponseField field = org.mockito.Mockito.mock(ClientResponseField.class);
             when(field.getValue()).thenReturn(commitData);
-            when(field.toEntity(any(Class.class))).thenReturn(commitData);
+            when(field.toEntity(any(ParameterizedTypeReference.class))).thenReturn(commitData);
 
             ClientGraphQlResponse graphQlResponse = org.mockito.Mockito.mock(ClientGraphQlResponse.class);
             when(graphQlResponse.isValid()).thenReturn(true);

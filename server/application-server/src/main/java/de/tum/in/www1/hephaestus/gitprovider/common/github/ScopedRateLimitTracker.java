@@ -11,8 +11,7 @@ import java.time.OffsetDateTime;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
@@ -41,9 +40,8 @@ import org.springframework.stereotype.Component;
  * @see RateLimitTracker
  */
 @Component
+@Slf4j
 public class ScopedRateLimitTracker implements RateLimitTracker {
-
-    private static final Logger log = LoggerFactory.getLogger(ScopedRateLimitTracker.class);
 
     /**
      * Default rate limit for GitHub App installations (5000 points/hour).

@@ -30,8 +30,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.stereotype.Service;
@@ -40,10 +40,11 @@ import org.springframework.transaction.support.TransactionTemplate;
 import reactor.core.publisher.Mono;
 import reactor.util.retry.Retry;
 
+@Slf4j
 @Service
+@RequiredArgsConstructor
 public class GitHubProjectItemFieldValueSyncService {
 
-    private static final Logger log = LoggerFactory.getLogger(GitHubProjectItemFieldValueSyncService.class);
     private static final String GET_PROJECT_ITEM_FIELD_VALUES_DOCUMENT = "GetProjectItemFieldValues";
     private static final int MAX_RETRY_ATTEMPTS = 3;
 
@@ -54,24 +55,6 @@ public class GitHubProjectItemFieldValueSyncService {
     private final GitHubSyncProperties syncProperties;
     private final TransactionTemplate transactionTemplate;
     private final GitHubExceptionClassifier exceptionClassifier;
-
-    public GitHubProjectItemFieldValueSyncService(
-        ProjectFieldRepository projectFieldRepository,
-        ProjectFieldValueRepository projectFieldValueRepository,
-        ProjectItemRepository projectItemRepository,
-        GitHubGraphQlClientProvider graphQlClientProvider,
-        GitHubSyncProperties syncProperties,
-        TransactionTemplate transactionTemplate,
-        GitHubExceptionClassifier exceptionClassifier
-    ) {
-        this.projectFieldRepository = projectFieldRepository;
-        this.projectFieldValueRepository = projectFieldValueRepository;
-        this.projectItemRepository = projectItemRepository;
-        this.graphQlClientProvider = graphQlClientProvider;
-        this.syncProperties = syncProperties;
-        this.transactionTemplate = transactionTemplate;
-        this.exceptionClassifier = exceptionClassifier;
-    }
 
     @Transactional
     public List<String> processFieldValues(

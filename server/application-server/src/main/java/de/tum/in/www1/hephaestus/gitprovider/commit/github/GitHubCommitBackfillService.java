@@ -325,7 +325,7 @@ public class GitHubCommitBackfillService {
     }
 
     private String buildCommitUrl(String nameWithOwner, String sha) {
-        return "https://github.com/" + nameWithOwner + "/commit/" + sha;
+        return CommitUtils.buildCommitUrl(nameWithOwner, sha);
     }
 
     private static String abbreviateSha(String sha) {

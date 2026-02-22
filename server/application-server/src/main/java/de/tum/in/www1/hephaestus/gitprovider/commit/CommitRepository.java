@@ -49,13 +49,6 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
     void deleteByRepositoryId(Long repositoryId);
 
     /**
-     * Upsert a commit by SHA and repository_id.
-     * <p>
-     * On conflict (same SHA in same repository), updates all mutable fields.
-     * Uses {@code COALESCE} for nullable fields so null parameters preserve
-     * existing database values (webhooks may provide less data than local git).
-     */
-    /**
      * Find distinct unresolved author emails for a repository.
      * Returns emails where author_id is NULL but author_email is stored.
      */
@@ -208,6 +201,13 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
         @Param("committerId") Long committerId
     );
 
+    /**
+     * Upsert a commit by SHA and repository_id.
+     * <p>
+     * On conflict (same SHA in same repository), updates all mutable fields.
+     * Uses {@code COALESCE} for nullable fields so null parameters preserve
+     * existing database values (webhooks may provide less data than local git).
+     */
     @Modifying
     @Transactional
     @Query(

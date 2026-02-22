@@ -11,8 +11,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.spi.ScopeIdResolver;
 import de.tum.in.www1.hephaestus.gitprovider.project.Project;
 import de.tum.in.www1.hephaestus.gitprovider.project.ProjectRepository;
 import de.tum.in.www1.hephaestus.gitprovider.project.github.dto.GitHubProjectItemEventDTO;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -32,10 +31,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  *       with a monitored workspace/scope.</li>
  * </ul>
  */
+@Slf4j
 @Component
 public class GitHubProjectItemMessageHandler extends GitHubMessageHandler<GitHubProjectItemEventDTO> {
-
-    private static final Logger log = LoggerFactory.getLogger(GitHubProjectItemMessageHandler.class);
 
     private final GitHubProjectItemProcessor itemProcessor;
     private final ProjectRepository projectRepository;

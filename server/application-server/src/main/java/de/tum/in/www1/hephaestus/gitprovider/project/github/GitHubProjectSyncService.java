@@ -51,8 +51,8 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.stereotype.Service;
@@ -118,10 +118,11 @@ import reactor.util.retry.Retry;
  * @see de.tum.in.www1.hephaestus.gitprovider.project.Project.OwnerType
  * @see de.tum.in.www1.hephaestus.gitprovider.project.github.GitHubProjectItemSyncService
  */
+@Slf4j
 @Service
+@RequiredArgsConstructor
 public class GitHubProjectSyncService {
 
-    private static final Logger log = LoggerFactory.getLogger(GitHubProjectSyncService.class);
     private static final String GET_ORGANIZATION_PROJECTS_DOCUMENT = "GetOrganizationProjects";
     private static final String GET_PROJECT_WITH_FIELDS_DOCUMENT = "GetProjectWithFields";
     private static final String GET_PROJECT_ITEMS_DOCUMENT = "GetProjectItems";
@@ -156,34 +157,6 @@ public class GitHubProjectSyncService {
     private final GitHubSyncProperties syncProperties;
     private final SyncSchedulerProperties syncSchedulerProperties;
     private final GitHubExceptionClassifier exceptionClassifier;
-
-    public GitHubProjectSyncService(
-        ProjectRepository projectRepository,
-        OrganizationRepository organizationRepository,
-        GitHubGraphQlClientProvider graphQlClientProvider,
-        GitHubProjectProcessor projectProcessor,
-        GitHubProjectItemProcessor itemProcessor,
-        GitHubProjectStatusUpdateProcessor statusUpdateProcessor,
-        GitHubProjectItemFieldValueSyncService fieldValueSyncService,
-        BackfillStateProvider backfillStateProvider,
-        TransactionTemplate transactionTemplate,
-        GitHubSyncProperties syncProperties,
-        SyncSchedulerProperties syncSchedulerProperties,
-        GitHubExceptionClassifier exceptionClassifier
-    ) {
-        this.projectRepository = projectRepository;
-        this.organizationRepository = organizationRepository;
-        this.graphQlClientProvider = graphQlClientProvider;
-        this.projectProcessor = projectProcessor;
-        this.itemProcessor = itemProcessor;
-        this.statusUpdateProcessor = statusUpdateProcessor;
-        this.fieldValueSyncService = fieldValueSyncService;
-        this.backfillStateProvider = backfillStateProvider;
-        this.transactionTemplate = transactionTemplate;
-        this.syncProperties = syncProperties;
-        this.syncSchedulerProperties = syncSchedulerProperties;
-        this.exceptionClassifier = exceptionClassifier;
-    }
 
     /**
      * Relinks orphaned project items whose issue_id is NULL but content_database_id

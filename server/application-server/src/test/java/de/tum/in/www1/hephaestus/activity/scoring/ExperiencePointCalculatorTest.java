@@ -6,24 +6,20 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
  * Unit tests for ExperiencePointCalculator.
  */
-@Tag("unit")
 @DisplayName("ExperiencePointCalculator")
-@ExtendWith(MockitoExtension.class)
-class ExperiencePointCalculatorTest {
+class ExperiencePointCalculatorTest extends BaseUnitTest {
 
     @Mock
     private PullRequestRepository pullRequestRepository;

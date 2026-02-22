@@ -29,8 +29,8 @@ import de.tum.in.www1.hephaestus.gitprovider.project.ProjectRepository;
 import de.tum.in.www1.hephaestus.gitprovider.project.github.dto.GitHubProjectItemDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import java.time.Duration;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.lang.Nullable;
@@ -59,10 +59,11 @@ import reactor.util.retry.Retry;
  *
  * @see GitHubProjectSyncService#syncProjectItems(Long, Project)
  */
+@Slf4j
 @Service
+@RequiredArgsConstructor
 public class GitHubProjectItemSyncService {
 
-    private static final Logger log = LoggerFactory.getLogger(GitHubProjectItemSyncService.class);
     private static final String ISSUE_PROJECT_ITEMS_QUERY = "GetIssueProjectItems";
     private static final String PR_PROJECT_ITEMS_QUERY = "GetPullRequestProjectItems";
     private static final int MAX_RETRY_ATTEMPTS = 3;
@@ -74,24 +75,6 @@ public class GitHubProjectItemSyncService {
     private final GitHubSyncProperties syncProperties;
     private final GitHubExceptionClassifier exceptionClassifier;
     private final TransactionTemplate transactionTemplate;
-
-    public GitHubProjectItemSyncService(
-        ProjectRepository projectRepository,
-        GitHubProjectItemProcessor projectItemProcessor,
-        GitHubProjectItemFieldValueSyncService fieldValueSyncService,
-        GitHubGraphQlClientProvider graphQlClientProvider,
-        GitHubSyncProperties syncProperties,
-        GitHubExceptionClassifier exceptionClassifier,
-        TransactionTemplate transactionTemplate
-    ) {
-        this.projectRepository = projectRepository;
-        this.projectItemProcessor = projectItemProcessor;
-        this.fieldValueSyncService = fieldValueSyncService;
-        this.graphQlClientProvider = graphQlClientProvider;
-        this.syncProperties = syncProperties;
-        this.exceptionClassifier = exceptionClassifier;
-        this.transactionTemplate = transactionTemplate;
-    }
 
     /**
      * Processes embedded project items from an issue/PR sync.

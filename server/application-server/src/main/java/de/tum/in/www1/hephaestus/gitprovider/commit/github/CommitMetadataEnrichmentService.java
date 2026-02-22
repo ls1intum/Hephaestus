@@ -15,6 +15,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoor
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoordinator.GraphQlClassificationContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubTransportErrors;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GraphQlConnectionOverflowDetector;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -23,6 +24,7 @@ import java.util.Map;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.ClientResponseField;
 import org.springframework.lang.Nullable;
@@ -65,6 +67,12 @@ import reactor.util.retry.Retry;
 @RequiredArgsConstructor
 public class CommitMetadataEnrichmentService {
 
+    /** Timeout for batch GraphQL queries (multiple commits per request). */
+    private static final Duration GRAPHQL_BATCH_TIMEOUT = Duration.ofSeconds(60);
+
+    /** Timeout for single-commit follow-up GraphQL queries. */
+    private static final Duration GRAPHQL_TIMEOUT = Duration.ofSeconds(30);
+
     /**
      * Maximum number of commit SHAs to batch in a single GraphQL query.
      */
@@ -84,6 +92,10 @@ public class CommitMetadataEnrichmentService {
 
     /** Pattern to validate SHA-1 hex strings. */
     private static final Pattern SHA_PATTERN = Pattern.compile("^[0-9a-f]{40}$");
+
+    /** Type reference for deserializing GraphQL fields as {@code Map<String, Object>} without unchecked casts. */
+    private static final ParameterizedTypeReference<Map<String, Object>> MAP_TYPE_REF =
+        new ParameterizedTypeReference<>() {};
 
     private final CommitRepository commitRepository;
     private final CommitContributorRepository contributorRepository;
@@ -282,7 +294,7 @@ public class CommitMetadataEnrichmentService {
                                 )
                             )
                     )
-                    .block();
+                    .block(GRAPHQL_BATCH_TIMEOUT);
 
                 if (response == null || !response.isValid()) {
                     ClassificationResult classification = graphQlSyncCoordinator.classifyGraphQlErrors(response);
@@ -426,7 +438,6 @@ public class CommitMetadataEnrichmentService {
      *
      * @return a {@link BatchProcessingResult} with the count and overflow records
      */
-    @SuppressWarnings("unchecked")
     private BatchProcessingResult processResponse(
         ClientGraphQlResponse response,
         List<String> batch,
@@ -448,7 +459,7 @@ public class CommitMetadataEnrichmentService {
                     continue;
                 }
 
-                Map<String, Object> commitData = field.toEntity(Map.class);
+                Map<String, Object> commitData = field.toEntity(MAP_TYPE_REF);
                 if (commitData == null) {
                     continue;
                 }
@@ -916,7 +927,6 @@ public class CommitMetadataEnrichmentService {
      * @param description   human-readable description for logging
      * @return the connection as a Map, or null if the query failed
      */
-    @SuppressWarnings("unchecked")
     @Nullable
     private Map<String, Object> executeSingleCommitFollowUp(
         String queryString,
@@ -947,7 +957,7 @@ public class CommitMetadataEnrichmentService {
                                 )
                             )
                     )
-                    .block();
+                    .block(GRAPHQL_TIMEOUT);
 
                 if (response == null || !response.isValid()) {
                     ClassificationResult classification = graphQlSyncCoordinator.classifyGraphQlErrors(response);
@@ -988,7 +998,7 @@ public class CommitMetadataEnrichmentService {
                     return null;
                 }
 
-                return field.toEntity(Map.class);
+                return field.toEntity(MAP_TYPE_REF);
             } catch (Exception e) {
                 graphQlClientProvider.recordFailure(e);
 
@@ -1178,11 +1188,7 @@ public class CommitMetadataEnrichmentService {
     }
 
     private static String normalizeString(Object value) {
-        if (!(value instanceof String s)) {
-            return null;
-        }
-        String trimmed = s.trim();
-        return trimmed.isEmpty() ? null : trimmed;
+        return CommitUtils.normalizeString(value);
     }
 
     @Nullable

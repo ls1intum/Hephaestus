@@ -119,9 +119,9 @@ public class ActivityEventListener {
      * no XP should be awarded. The event is still recorded for audit purposes,
      * but deleted users cannot earn XP posthumously.
      *
-     * @param authorId the author ID (nullable)
-     * @param xpIfKnown the XP to award if the author is known
-     * @return xpIfKnown if authorId is present, 0.0 otherwise
+     * @param actor the actor user (nullable)
+     * @param xpIfKnown the XP to award if the actor is known
+     * @return xpIfKnown if actor is present, 0.0 otherwise
      */
     private double xpForActor(@Nullable User actor, double xpIfKnown) {
         return actor != null ? xpIfKnown : 0.0;

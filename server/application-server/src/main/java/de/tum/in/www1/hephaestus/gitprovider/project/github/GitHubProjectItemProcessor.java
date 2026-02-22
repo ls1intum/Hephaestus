@@ -16,8 +16,7 @@ import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserProcessor;
 import java.util.List;
 import java.util.Set;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,10 +30,9 @@ import org.springframework.transaction.annotation.Transactional;
  * Extends {@link BaseGitHubProcessor} for consistency with other GitHub entity processors
  * and to reuse common functionality like the {@code sanitize()} method.
  */
+@Slf4j
 @Service
 public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
-
-    private static final Logger log = LoggerFactory.getLogger(GitHubProjectItemProcessor.class);
 
     private final ProjectItemRepository projectItemRepository;
     private final IssueRepository issueRepository;

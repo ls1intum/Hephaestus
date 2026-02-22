@@ -11,8 +11,7 @@ import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
 import java.math.BigInteger;
 import java.time.Instant;
 import java.time.LocalDate;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.Nullable;
 
 /**
@@ -22,6 +21,7 @@ import org.springframework.lang.Nullable;
  * It can be constructed from any source (GraphQL, REST, webhook payload).
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
+@Slf4j
 public record GitHubProjectStatusUpdateDTO(
     @JsonProperty("id") Long id,
     @JsonProperty("database_id") Long databaseId,
@@ -35,8 +35,6 @@ public record GitHubProjectStatusUpdateDTO(
     @JsonProperty("created_at") Instant createdAt,
     @JsonProperty("updated_at") Instant updatedAt
 ) {
-    private static final Logger log = LoggerFactory.getLogger(GitHubProjectStatusUpdateDTO.class);
-
     /**
      * Get the database ID, preferring databaseId over id for GraphQL responses.
      */

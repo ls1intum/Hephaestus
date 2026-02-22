@@ -14,8 +14,7 @@ import de.tum.in.www1.hephaestus.gitprovider.project.github.dto.GitHubProjectSta
 import de.tum.in.www1.hephaestus.gitprovider.project.github.dto.GitHubProjectStatusUpdateEventDTO;
 import java.time.Instant;
 import java.time.LocalDate;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -36,10 +35,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  *       with a monitored workspace/scope.</li>
  * </ul>
  */
+@Slf4j
 @Component
 public class GitHubProjectStatusUpdateMessageHandler extends GitHubMessageHandler<GitHubProjectStatusUpdateEventDTO> {
-
-    private static final Logger log = LoggerFactory.getLogger(GitHubProjectStatusUpdateMessageHandler.class);
 
     private final ProjectRepository projectRepository;
     private final GitHubProjectStatusUpdateProcessor statusUpdateProcessor;

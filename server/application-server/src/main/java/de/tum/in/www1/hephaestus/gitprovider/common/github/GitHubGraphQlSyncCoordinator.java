@@ -2,26 +2,20 @@ package de.tum.in.www1.hephaestus.gitprovider.common.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.Category;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
 @Component
+@RequiredArgsConstructor
 public class GitHubGraphQlSyncCoordinator {
 
     private static final long MAX_RATE_LIMIT_WAIT_MS = 300_000;
 
     private final GitHubGraphQlClientProvider graphQlClientProvider;
     private final GitHubExceptionClassifier exceptionClassifier;
-
-    public GitHubGraphQlSyncCoordinator(
-        GitHubGraphQlClientProvider graphQlClientProvider,
-        GitHubExceptionClassifier exceptionClassifier
-    ) {
-        this.graphQlClientProvider = graphQlClientProvider;
-        this.exceptionClassifier = exceptionClassifier;
-    }
 
     /**
      * Context for handling a GraphQL classification result.

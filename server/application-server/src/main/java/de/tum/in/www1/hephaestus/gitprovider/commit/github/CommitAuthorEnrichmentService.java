@@ -16,6 +16,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubTransportErrors
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -25,6 +26,7 @@ import java.util.Set;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.ClientResponseField;
 import org.springframework.lang.Nullable;
@@ -63,6 +65,9 @@ import reactor.util.retry.Retry;
 @RequiredArgsConstructor
 public class CommitAuthorEnrichmentService {
 
+    /** Timeout for batch GraphQL queries (multiple commits per request). */
+    private static final Duration GRAPHQL_TIMEOUT = Duration.ofSeconds(60);
+
     /**
      * Maximum number of commit SHAs to batch in a single GraphQL query.
      * Each SHA becomes an aliased field; cost is ~1 point regardless of alias count.
@@ -82,6 +87,10 @@ public class CommitAuthorEnrichmentService {
      * calls. Filtering these out avoids unnecessary resolution attempts.
      */
     private static final Set<String> UNRESOLVABLE_EMAILS = Set.of("noreply@github.com");
+
+    /** Type reference for deserializing GraphQL fields as {@code Map<String, Object>} without unchecked casts. */
+    private static final ParameterizedTypeReference<Map<String, Object>> MAP_TYPE_REF =
+        new ParameterizedTypeReference<>() {};
 
     private final CommitRepository commitRepository;
     private final CommitAuthorResolver authorResolver;
@@ -438,7 +447,7 @@ public class CommitAuthorEnrichmentService {
                                 )
                             )
                     )
-                    .block();
+                    .block(GRAPHQL_TIMEOUT);
 
                 // Classify GraphQL errors
                 if (response == null || !response.isValid()) {
@@ -547,7 +556,6 @@ public class CommitAuthorEnrichmentService {
      * The {@code user} field is nullable — null when GitHub can't match the commit
      * email to a GitHub account.
      */
-    @SuppressWarnings("unchecked")
     private void extractLoginsFromResponse(
         ClientGraphQlResponse response,
         List<String> batch,
@@ -567,7 +575,7 @@ public class CommitAuthorEnrichmentService {
                     continue;
                 }
 
-                Map<String, Object> commitData = field.toEntity(Map.class);
+                Map<String, Object> commitData = field.toEntity(MAP_TYPE_REF);
                 if (commitData == null) {
                     continue;
                 }
@@ -664,11 +672,7 @@ public class CommitAuthorEnrichmentService {
     }
 
     private static String normalizeString(Object value) {
-        if (!(value instanceof String s)) {
-            return null;
-        }
-        String trimmed = s.trim();
-        return trimmed.isEmpty() ? null : trimmed;
+        return CommitUtils.normalizeString(value);
     }
 
     private static Long toLong(Object value) {

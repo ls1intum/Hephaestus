@@ -1,7 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.common.github;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * Detects silent data truncation in GitHub GraphQL connection responses.
@@ -29,9 +28,8 @@ import org.slf4j.LoggerFactory;
  *
  * @see GraphQlPaginationHelper for the complementary pagination loop helper
  */
+@Slf4j
 public final class GraphQlConnectionOverflowDetector {
-
-    private static final Logger log = LoggerFactory.getLogger(GraphQlConnectionOverflowDetector.class);
 
     private GraphQlConnectionOverflowDetector() {
         // Utility class - prevent instantiation

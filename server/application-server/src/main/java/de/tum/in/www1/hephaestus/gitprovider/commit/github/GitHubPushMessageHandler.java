@@ -452,6 +452,6 @@ public class GitHubPushMessageHandler extends GitHubMessageHandler<GitHubPushEve
     }
 
     private String buildCommitUrl(String nameWithOwner, String sha) {
-        return "https://github.com/" + nameWithOwner + "/commit/" + sha;
+        return CommitUtils.buildCommitUrl(nameWithOwner, sha);
     }
 }
