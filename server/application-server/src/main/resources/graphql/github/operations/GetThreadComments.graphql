@@ -34,6 +34,7 @@ query GetThreadComments($threadId: ID!, $first: Int!, $after: String) {
                     updatedAt
                     state
                     url
+                    outdated
                     authorAssociation
 
                     # Comment author - supports User, Bot, Mannequin, and Organization types

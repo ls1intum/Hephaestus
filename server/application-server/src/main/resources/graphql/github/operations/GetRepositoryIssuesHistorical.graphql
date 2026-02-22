@@ -100,6 +100,7 @@ query GetRepositoryIssuesHistorical(
                     description
                     state
                     dueOn
+                    url
                 }
 
                 # Assignees

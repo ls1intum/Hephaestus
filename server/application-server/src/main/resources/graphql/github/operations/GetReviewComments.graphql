@@ -33,6 +33,7 @@ query GetReviewComments($reviewId: ID!, $first: Int!, $after: String) {
                     updatedAt
                     state
                     url
+                    outdated
                     authorAssociation
 
                     # Comment author

@@ -211,6 +211,12 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
         if (dto.commitId() != null) {
             review.setCommitId(dto.commitId());
         }
+        if (dto.updatedAt() != null) {
+            review.setUpdatedAt(dto.updatedAt());
+        }
+        if (dto.authorCanPushToRepository() != null) {
+            review.setAuthorCanPushToRepository(dto.authorCanPushToRepository());
+        }
         PullRequestReview saved = reviewRepository.save(review);
         EventPayload.ReviewData.from(saved).ifPresent(reviewData ->
             eventPublisher.publishEvent(
@@ -244,6 +250,9 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
         review.setHtmlUrl(dto.htmlUrl() != null ? dto.htmlUrl() : "");
         review.setPullRequest(pr);
         review.setCommitId(dto.commitId());
+        review.setCreatedAt(dto.createdAt());
+        review.setUpdatedAt(dto.updatedAt());
+        review.setAuthorCanPushToRepository(dto.authorCanPushToRepository());
 
         if (dto.author() != null) {
             User author = findOrCreateUser(dto.author());

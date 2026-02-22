@@ -27,6 +27,7 @@ query GetPullRequestReviews($owner: String!, $name: String!, $number: Int!, $fir
                     submittedAt
                     createdAt
                     updatedAt
+                    authorCanPushToRepository
 
                     # Commit associated with the review
                     commit {
@@ -60,6 +61,7 @@ query GetPullRequestReviews($owner: String!, $name: String!, $number: Int!, $fir
                             updatedAt
                             state
                             url
+                            outdated
                             authorAssociation
 
                             # Comment author

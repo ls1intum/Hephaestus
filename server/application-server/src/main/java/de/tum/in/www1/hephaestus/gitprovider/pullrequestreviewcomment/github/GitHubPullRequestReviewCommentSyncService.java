@@ -968,7 +968,8 @@ public class GitHubPullRequestReviewCommentSyncService {
             graphQlComment.getOriginalStartLine(), // originalStartLine
             side, // side
             null, // startSide
-            inReplyToId // inReplyToId
+            inReplyToId, // inReplyToId
+            graphQlComment.getOutdated() // outdated
         );
     }
 

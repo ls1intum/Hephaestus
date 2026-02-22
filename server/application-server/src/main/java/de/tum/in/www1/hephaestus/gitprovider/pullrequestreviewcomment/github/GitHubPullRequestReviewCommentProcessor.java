@@ -298,6 +298,9 @@ public class GitHubPullRequestReviewCommentProcessor {
             comment.setOriginalStartLine(dto.originalStartLine());
         }
 
+        // Outdated flag (whether the comment's code context has changed)
+        comment.setOutdated(dto.outdated());
+
         // Link to review if present
         if (dto.reviewId() != null) {
             reviewRepository.findById(dto.reviewId()).ifPresent(comment::setReview);

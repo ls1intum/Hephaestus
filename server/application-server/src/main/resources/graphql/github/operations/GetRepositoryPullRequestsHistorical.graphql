@@ -120,6 +120,7 @@ query GetRepositoryPullRequestsHistorical(
                     description
                     state
                     dueOn
+                    url
                 }
 
                 # Assignees

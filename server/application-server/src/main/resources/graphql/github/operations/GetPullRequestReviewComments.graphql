@@ -57,6 +57,7 @@ query GetPullRequestReviewComments($owner: String!, $name: String!, $number: Int
                             updatedAt
                             state
                             url
+                            outdated
 
                             # Author - supports User, Bot, Mannequin, and Organization types
                             author {
