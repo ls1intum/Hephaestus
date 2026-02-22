@@ -23,8 +23,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.ClientResponseField;
 import org.springframework.lang.Nullable;
@@ -59,9 +59,9 @@ import reactor.util.retry.Retry;
  * bare clones during enrichment.
  */
 @Service
+@Slf4j
+@RequiredArgsConstructor
 public class CommitAuthorEnrichmentService {
-
-    private static final Logger log = LoggerFactory.getLogger(CommitAuthorEnrichmentService.class);
 
     /**
      * Maximum number of commit SHAs to batch in a single GraphQL query.
@@ -89,22 +89,6 @@ public class CommitAuthorEnrichmentService {
     private final GitHubGraphQlSyncCoordinator graphQlSyncCoordinator;
     private final GitHubExceptionClassifier exceptionClassifier;
     private final GitHubUserProcessor userProcessor;
-
-    public CommitAuthorEnrichmentService(
-        CommitRepository commitRepository,
-        CommitAuthorResolver authorResolver,
-        GitHubGraphQlClientProvider graphQlClientProvider,
-        GitHubGraphQlSyncCoordinator graphQlSyncCoordinator,
-        GitHubExceptionClassifier exceptionClassifier,
-        GitHubUserProcessor userProcessor
-    ) {
-        this.commitRepository = commitRepository;
-        this.authorResolver = authorResolver;
-        this.graphQlClientProvider = graphQlClientProvider;
-        this.graphQlSyncCoordinator = graphQlSyncCoordinator;
-        this.exceptionClassifier = exceptionClassifier;
-        this.userProcessor = userProcessor;
-    }
 
     /**
      * Enriches unresolved commit authors/committers for a repository.
@@ -617,7 +601,6 @@ public class CommitAuthorEnrichmentService {
      * @param role        "author" or "committer"
      * @return the login string, or null if not present
      */
-    @SuppressWarnings("unchecked")
     @Nullable
     private UserSnapshot extractUserSnapshot(Map<String, Object> commitData, String role) {
         try {

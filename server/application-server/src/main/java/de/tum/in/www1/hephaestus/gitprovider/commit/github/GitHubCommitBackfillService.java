@@ -19,8 +19,8 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
@@ -53,9 +53,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  * repository's own {@code @Transactional} methods.
  */
 @Service
+@Slf4j
+@RequiredArgsConstructor
 public class GitHubCommitBackfillService {
-
-    private static final Logger log = LoggerFactory.getLogger(GitHubCommitBackfillService.class);
 
     /**
      * Maximum number of commits to process per repository per backfill cycle.
@@ -69,22 +69,6 @@ public class GitHubCommitBackfillService {
     private final CommitAuthorResolver authorResolver;
     private final ApplicationEventPublisher eventPublisher;
     private final TransactionTemplate transactionTemplate;
-
-    public GitHubCommitBackfillService(
-        GitRepositoryManager gitRepositoryManager,
-        GitHubAppTokenService tokenService,
-        CommitRepository commitRepository,
-        CommitAuthorResolver authorResolver,
-        ApplicationEventPublisher eventPublisher,
-        TransactionTemplate transactionTemplate
-    ) {
-        this.gitRepositoryManager = gitRepositoryManager;
-        this.tokenService = tokenService;
-        this.commitRepository = commitRepository;
-        this.authorResolver = authorResolver;
-        this.eventPublisher = eventPublisher;
-        this.transactionTemplate = transactionTemplate;
-    }
 
     /**
      * Backfills commits for a repository from its local bare git clone.

@@ -51,6 +51,14 @@ import reactor.util.retry.Retry;
  * <p>
  * This service runs separately from {@link CommitAuthorEnrichmentService} because it targets
  * all commits lacking contributor rows (not just those with unresolved emails).
+ * <p>
+ * <b>Why buildBatchQuery uses raw string construction:</b> GraphQL aliases
+ * ({@code commit0: object(oid:"..."), commit1: object(oid:"...")}) are syntactic constructs
+ * that cannot be parameterized via GraphQL variables. Spring's {@code HttpGraphQlClient}
+ * does not support dynamic alias counts or templating. Building the query string
+ * programmatically is the only viable approach for batching a variable number of commits
+ * per request. SHA values are validated against {@link #SHA_PATTERN} before interpolation
+ * to prevent injection.
  */
 @Service
 @Slf4j
@@ -493,7 +501,6 @@ public class CommitMetadataEnrichmentService {
      *
      * @return a {@link CommitWithAuthorCursor} if the connection overflowed, null otherwise
      */
-    @SuppressWarnings("unchecked")
     @Nullable
     private CommitWithAuthorCursor processAuthors(
         Map<String, Object> commitData,
@@ -553,7 +560,6 @@ public class CommitMetadataEnrichmentService {
     /**
      * Extracts the committer from the GraphQL response and upserts as a COMMITTER contributor.
      */
-    @SuppressWarnings("unchecked")
     private void processCommitter(Map<String, Object> commitData, Long commitId) {
         Object committerObj = commitData.get("committer");
         if (!(committerObj instanceof Map<?, ?> committerMap)) {
@@ -583,7 +589,6 @@ public class CommitMetadataEnrichmentService {
      *
      * @return a {@link CommitWithPrCursor} if the connection overflowed, null otherwise
      */
-    @SuppressWarnings("unchecked")
     @Nullable
     private CommitWithPrCursor processAssociatedPullRequests(
         Map<String, Object> commitData,
@@ -1023,7 +1028,6 @@ public class CommitMetadataEnrichmentService {
      * (e.g. additions, deletions) may have been 0 from the webhook but have real values
      * from GraphQL.
      */
-    @SuppressWarnings("unchecked")
     private void updateEnrichmentMetadata(Map<String, Object> commitData, Long commitId) {
         // Additions, deletions, changedFiles
         Integer additions = extractInteger(commitData.get("additions"));
@@ -1132,7 +1136,6 @@ public class CommitMetadataEnrichmentService {
     /**
      * Extracts the user's database ID from a GitActor node.
      */
-    @SuppressWarnings("unchecked")
     @Nullable
     private Long extractUserId(Map<?, ?> actorMap) {
         Object userObj = actorMap.get("user");

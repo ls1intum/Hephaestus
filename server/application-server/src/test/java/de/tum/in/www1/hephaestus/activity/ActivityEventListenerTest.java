@@ -22,17 +22,15 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
@@ -42,10 +40,8 @@ import org.mockito.quality.Strictness;
  * <p>Tests verify that activity events are correctly recorded using event payload data
  * and getReferenceById() for entity references (no N+1 queries).
  */
-@Tag("unit")
-@ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
-class ActivityEventListenerTest {
+class ActivityEventListenerTest extends BaseUnitTest {
 
     @Mock
     private ActivityEventService activityEventService;
