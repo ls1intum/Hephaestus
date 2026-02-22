@@ -359,8 +359,6 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
             // First commit already exists, second does not
             when(commitRepository.existsByShaAndRepositoryId("existing", 1L)).thenReturn(true);
             when(commitRepository.existsByShaAndRepositoryId("newone", 1L)).thenReturn(false);
-            // Existing commit has correct file change count — no repair needed
-            when(commitRepository.countFileChangesByShaAndRepositoryId("existing", 1L)).thenReturn(1);
 
             Commit mockCommit = createMockCommit("newone", 1L);
             when(commitRepository.findByShaAndRepositoryId("newone", 1L)).thenReturn(Optional.of(mockCommit));
