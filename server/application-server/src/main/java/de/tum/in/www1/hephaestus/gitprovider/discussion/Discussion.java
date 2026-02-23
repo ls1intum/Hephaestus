@@ -21,7 +21,9 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -138,7 +140,7 @@ public class Discussion extends BaseGitServiceEntity {
         inverseJoinColumns = @JoinColumn(name = "label_id")
     )
     @ToString.Exclude
-    private List<Label> labels = new ArrayList<>();
+    private Set<Label> labels = new HashSet<>();
 
     // ========== Enums ==========
 

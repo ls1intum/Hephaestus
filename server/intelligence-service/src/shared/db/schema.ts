@@ -424,7 +424,6 @@ export const discussion = pgTable(
 			name: "fk_discussion_answer_comment",
 		}).onDelete("set null"),
 		unique("uq_discussion_repo_number").on(table.number, table.repositoryId),
-		unique("uknlcwyn2relkgw95s8okgpkqrt").on(table.number, table.repositoryId),
 		unique("uk_discussion_answer_comment_id").on(table.answerCommentId),
 	],
 );
@@ -454,7 +453,6 @@ export const discussionCategory = pgTable(
 			name: "fk_discussion_category_repository",
 		}).onDelete("cascade"),
 		unique("uq_discussion_category_repo_slug").on(table.slug, table.repositoryId),
-		unique("uk6cjmvjyh5jc9bfnn8i9wggbo5").on(table.slug, table.repositoryId),
 	],
 );
 
