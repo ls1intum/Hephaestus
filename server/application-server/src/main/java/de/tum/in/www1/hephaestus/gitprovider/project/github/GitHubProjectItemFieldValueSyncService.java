@@ -6,6 +6,7 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncCons
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_INITIAL_BACKOFF;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.adaptPageSize;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.ExponentialBackoff;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
@@ -15,6 +16,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientPr
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlErrorUtils;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubTransportErrors;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GraphQlConnectionOverflowDetector;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2ItemFieldValueConnection;
 import de.tum.in.www1.hephaestus.gitprovider.project.ProjectField;
 import de.tum.in.www1.hephaestus.gitprovider.project.ProjectFieldRepository;
@@ -28,8 +30,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.stereotype.Service;
@@ -38,10 +40,11 @@ import org.springframework.transaction.support.TransactionTemplate;
 import reactor.core.publisher.Mono;
 import reactor.util.retry.Retry;
 
+@Slf4j
 @Service
+@RequiredArgsConstructor
 public class GitHubProjectItemFieldValueSyncService {
 
-    private static final Logger log = LoggerFactory.getLogger(GitHubProjectItemFieldValueSyncService.class);
     private static final String GET_PROJECT_ITEM_FIELD_VALUES_DOCUMENT = "GetProjectItemFieldValues";
     private static final int MAX_RETRY_ATTEMPTS = 3;
 
@@ -52,24 +55,6 @@ public class GitHubProjectItemFieldValueSyncService {
     private final GitHubSyncProperties syncProperties;
     private final TransactionTemplate transactionTemplate;
     private final GitHubExceptionClassifier exceptionClassifier;
-
-    public GitHubProjectItemFieldValueSyncService(
-        ProjectFieldRepository projectFieldRepository,
-        ProjectFieldValueRepository projectFieldValueRepository,
-        ProjectItemRepository projectItemRepository,
-        GitHubGraphQlClientProvider graphQlClientProvider,
-        GitHubSyncProperties syncProperties,
-        TransactionTemplate transactionTemplate,
-        GitHubExceptionClassifier exceptionClassifier
-    ) {
-        this.projectFieldRepository = projectFieldRepository;
-        this.projectFieldValueRepository = projectFieldValueRepository;
-        this.projectItemRepository = projectItemRepository;
-        this.graphQlClientProvider = graphQlClientProvider;
-        this.syncProperties = syncProperties;
-        this.transactionTemplate = transactionTemplate;
-        this.exceptionClassifier = exceptionClassifier;
-    }
 
     @Transactional
     public List<String> processFieldValues(
@@ -144,6 +129,7 @@ public class GitHubProjectItemFieldValueSyncService {
         String cursor = startCursor;
         int pageCount = 0;
         int totalSynced = 0;
+        int reportedTotalCount = -1;
         boolean completedNormally = false;
         List<String> processedFieldIds = new ArrayList<>();
         int retryAttempt = 0;
@@ -170,7 +156,13 @@ public class GitHubProjectItemFieldValueSyncService {
                     client
                         .documentName(GET_PROJECT_ITEM_FIELD_VALUES_DOCUMENT)
                         .variable("itemId", itemNodeId)
-                        .variable("first", FIELD_VALUES_PAGINATION_SIZE)
+                        .variable(
+                            "first",
+                            adaptPageSize(
+                                FIELD_VALUES_PAGINATION_SIZE,
+                                graphQlClientProvider.getRateLimitRemaining(scopeId)
+                            )
+                        )
                         .variable("after", currentCursor)
                         .execute()
                 )
@@ -230,6 +222,10 @@ public class GitHubProjectItemFieldValueSyncService {
 
                 if (fieldValuesConnection == null || fieldValuesConnection.getNodes() == null) {
                     break;
+                }
+
+                if (reportedTotalCount < 0) {
+                    reportedTotalCount = fieldValuesConnection.getTotalCount();
                 }
 
                 List<GitHubProjectFieldValueDTO> fieldValueDTOs = fieldValuesConnection
@@ -301,6 +297,16 @@ public class GitHubProjectItemFieldValueSyncService {
                 }
                 retryAttempt++;
             }
+        }
+
+        // Check for overflow
+        if (reportedTotalCount >= 0) {
+            GraphQlConnectionOverflowDetector.check(
+                "fieldValues",
+                totalSynced,
+                reportedTotalCount,
+                "itemId=" + itemNodeId
+            );
         }
 
         if (!processedFieldIds.isEmpty() && completedNormally) {

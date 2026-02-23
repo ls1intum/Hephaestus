@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GraphQlConnectionOverflowDetector;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHLabel;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHMilestone;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2Field;
@@ -32,8 +33,7 @@ import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.Nullable;
 
 /**
@@ -53,6 +53,7 @@ import org.springframework.lang.Nullable;
  * - PULL_REQUESTS: textValue (JSON array of PR numbers)
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
+@Slf4j
 public record GitHubProjectFieldValueDTO(
     @JsonProperty("field_id") String fieldId,
     @JsonProperty("field_type") String fieldType,
@@ -62,7 +63,6 @@ public record GitHubProjectFieldValueDTO(
     @JsonProperty("single_select_option_id") String singleSelectOptionId,
     @JsonProperty("iteration_id") String iterationId
 ) {
-    private static final Logger log = LoggerFactory.getLogger(GitHubProjectFieldValueDTO.class);
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper().registerModule(new JavaTimeModule());
 
     // ========== STATIC FACTORY METHODS FOR GRAPHQL RESPONSES ==========
@@ -174,6 +174,12 @@ public record GitHubProjectFieldValueDTO(
                 .map(GHLabel::getName)
                 .filter(Objects::nonNull)
                 .toList();
+            GraphQlConnectionOverflowDetector.check(
+                "fieldValue.labels",
+                labelNames.size(),
+                value.getLabels().getTotalCount(),
+                "field " + fieldId
+            );
         }
         String jsonValue = serializeToJson(labelNames);
         return new GitHubProjectFieldValueDTO(fieldId, "LABELS", jsonValue, null, null, null, null);
@@ -195,6 +201,12 @@ public record GitHubProjectFieldValueDTO(
                 .map(GHUser::getLogin)
                 .filter(Objects::nonNull)
                 .toList();
+            GraphQlConnectionOverflowDetector.check(
+                "fieldValue.users",
+                userLogins.size(),
+                value.getUsers().getTotalCount(),
+                "field " + fieldId
+            );
         }
         String jsonValue = serializeToJson(userLogins);
         return new GitHubProjectFieldValueDTO(fieldId, "ASSIGNEES", jsonValue, null, null, null, null);
@@ -216,6 +228,12 @@ public record GitHubProjectFieldValueDTO(
                 .map(GitHubProjectFieldValueDTO::extractReviewerName)
                 .filter(Objects::nonNull)
                 .toList();
+            GraphQlConnectionOverflowDetector.check(
+                "fieldValue.reviewers",
+                reviewerNames.size(),
+                value.getReviewers().getTotalCount(),
+                "field " + fieldId
+            );
         }
         String jsonValue = serializeToJson(reviewerNames);
         return new GitHubProjectFieldValueDTO(fieldId, "REVIEWERS", jsonValue, null, null, null, null);
@@ -274,6 +292,12 @@ public record GitHubProjectFieldValueDTO(
                 .filter(Objects::nonNull)
                 .map(GHPullRequest::getNumber)
                 .toList();
+            GraphQlConnectionOverflowDetector.check(
+                "fieldValue.pullRequests",
+                prNumbers.size(),
+                value.getPullRequests().getTotalCount(),
+                "field " + fieldId
+            );
         }
         String jsonValue = serializeToJson(prNumbers);
         return new GitHubProjectFieldValueDTO(fieldId, "PULL_REQUESTS", jsonValue, null, null, null, null);

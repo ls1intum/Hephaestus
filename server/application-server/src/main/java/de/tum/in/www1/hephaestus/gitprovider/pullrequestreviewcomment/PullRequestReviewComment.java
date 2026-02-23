@@ -70,6 +70,9 @@ public class PullRequestReviewComment extends BaseGitServiceEntity {
     // The line of the blob to which the comment applies. The last line of the range for a multi-line comment
     private int originalLine;
 
+    // Whether the comment body content is outdated (i.e., code it refers to has changed)
+    private Boolean outdated;
+
     @ManyToOne
     @JoinColumn(name = "author_id")
     @ToString.Exclude

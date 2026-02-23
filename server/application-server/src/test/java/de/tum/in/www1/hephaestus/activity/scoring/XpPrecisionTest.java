@@ -2,10 +2,10 @@ package de.tum.in.www1.hephaestus.activity.scoring;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import java.math.RoundingMode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -15,9 +15,8 @@ import org.junit.jupiter.params.provider.CsvSource;
  *
  * <p>Verifies that XP rounding is consistent and uses HALF_UP mode.
  */
-@Tag("unit")
 @DisplayName("XpPrecision")
-class XpPrecisionTest {
+class XpPrecisionTest extends BaseUnitTest {
 
     @Nested
     @DisplayName("round(double)")

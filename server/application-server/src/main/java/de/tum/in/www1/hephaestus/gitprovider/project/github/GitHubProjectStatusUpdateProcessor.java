@@ -11,8 +11,8 @@ import de.tum.in.www1.hephaestus.gitprovider.project.github.dto.GitHubProjectSta
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import java.time.Instant;
 import java.util.List;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,24 +20,14 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Processor for GitHub Projects V2 status updates.
  */
+@Slf4j
 @Service
+@RequiredArgsConstructor
 public class GitHubProjectStatusUpdateProcessor {
-
-    private static final Logger log = LoggerFactory.getLogger(GitHubProjectStatusUpdateProcessor.class);
 
     private final ProjectStatusUpdateRepository statusUpdateRepository;
     private final UserRepository userRepository;
     private final ApplicationEventPublisher eventPublisher;
-
-    public GitHubProjectStatusUpdateProcessor(
-        ProjectStatusUpdateRepository statusUpdateRepository,
-        UserRepository userRepository,
-        ApplicationEventPublisher eventPublisher
-    ) {
-        this.statusUpdateRepository = statusUpdateRepository;
-        this.userRepository = userRepository;
-        this.eventPublisher = eventPublisher;
-    }
 
     @Transactional
     public ProjectStatusUpdate process(GitHubProjectStatusUpdateDTO dto, Project project, ProcessingContext context) {

@@ -2,10 +2,10 @@ package de.tum.in.www1.hephaestus.activity;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -13,9 +13,8 @@ import org.junit.jupiter.api.Test;
  *
  * <p>Tests the command object builder pattern and validation.
  */
-@Tag("unit")
 @DisplayName("RecordActivityCommand")
-class RecordActivityCommandTest {
+class RecordActivityCommandTest extends BaseUnitTest {
 
     @Nested
     @DisplayName("Builder")

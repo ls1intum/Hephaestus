@@ -65,7 +65,12 @@ public enum ActivityTargetType {
     /**
      * Target is a project status update (progress tracking posts).
      */
-    PROJECT_STATUS_UPDATE("project_status_update");
+    PROJECT_STATUS_UPDATE("project_status_update"),
+
+    /**
+     * Target is a git commit.
+     */
+    COMMIT("commit");
 
     private final String value;
 

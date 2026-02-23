@@ -273,6 +273,96 @@ export const chatThread = pgTable(
 	],
 );
 
+export const commitContributor = pgTable(
+	"commit_contributor",
+	{
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({
+			name: "commit_contributor_id_seq",
+			startWith: 1,
+			increment: 1,
+			cache: 1,
+		}),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		commitId: bigint("commit_id", { mode: "number" }).notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		userId: bigint("user_id", { mode: "number" }),
+		role: varchar({ length: 32 }).notNull(),
+		name: varchar({ length: 255 }),
+		email: varchar({ length: 255 }).notNull(),
+		ordinal: integer().default(0).notNull(),
+	},
+	(table) => [
+		index("idx_commit_contributor_commit_id").using("btree", table.commitId.asc().nullsLast()),
+		index("idx_commit_contributor_user_id").using("btree", table.userId.asc().nullsLast()),
+		foreignKey({
+			columns: [table.commitId],
+			foreignColumns: [gitCommit.id],
+			name: "fk_commit_contributor_commit",
+		}).onDelete("cascade"),
+		foreignKey({
+			columns: [table.userId],
+			foreignColumns: [user.id],
+			name: "fk_commit_contributor_user",
+		}).onDelete("set null"),
+		unique("uq_commit_contributor_commit_email_role").on(table.commitId, table.role, table.email),
+	],
+);
+
+export const commitFileChange = pgTable(
+	"commit_file_change",
+	{
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({
+			name: "commit_file_change_id_seq",
+			startWith: 1,
+			increment: 1,
+			cache: 1,
+		}),
+		filename: varchar({ length: 1024 }).notNull(),
+		changeType: varchar("change_type", { length: 32 }).notNull(),
+		additions: integer().default(0).notNull(),
+		deletions: integer().default(0).notNull(),
+		changes: integer().default(0).notNull(),
+		previousFilename: varchar("previous_filename", { length: 1024 }),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		commitId: bigint("commit_id", { mode: "number" }).notNull(),
+	},
+	(table) => [
+		index("idx_commit_file_change_commit_id").using("btree", table.commitId.asc().nullsLast()),
+		index("idx_commit_file_change_filename").using("btree", table.filename.asc().nullsLast()),
+		foreignKey({
+			columns: [table.commitId],
+			foreignColumns: [gitCommit.id],
+			name: "fk_commit_file_change_commit",
+		}).onDelete("cascade"),
+	],
+);
+
+export const commitPullRequest = pgTable(
+	"commit_pull_request",
+	{
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		commitId: bigint("commit_id", { mode: "number" }).notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		pullRequestId: bigint("pull_request_id", { mode: "number" }).notNull(),
+	},
+	(table) => [
+		index("idx_commit_pull_request_pr_id").using("btree", table.pullRequestId.asc().nullsLast()),
+		foreignKey({
+			columns: [table.commitId],
+			foreignColumns: [gitCommit.id],
+			name: "fk_commit_pr_commit",
+		}).onDelete("cascade"),
+		foreignKey({
+			columns: [table.pullRequestId],
+			foreignColumns: [issue.id],
+			name: "fk_commit_pr_pull_request",
+		}).onDelete("cascade"),
+		primaryKey({ columns: [table.commitId, table.pullRequestId], name: "pk_commit_pull_request" }),
+	],
+);
+
 export const document = pgTable(
 	"document",
 	{
@@ -307,6 +397,77 @@ export const document = pgTable(
 			name: "fk_document_workspace",
 		}).onDelete("cascade"),
 		primaryKey({ columns: [table.id, table.versionNumber], name: "documentPK" }),
+	],
+);
+
+export const gitCommit = pgTable(
+	"git_commit",
+	{
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({
+			name: "git_commit_id_seq",
+			startWith: 1,
+			increment: 1,
+			cache: 1,
+		}),
+		sha: varchar({ length: 40 }).notNull(),
+		message: varchar({ length: 1024 }).notNull(),
+		messageBody: text("message_body"),
+		htmlUrl: varchar("html_url", { length: 512 }),
+		authoredAt: timestamp("authored_at", { withTimezone: true, mode: "string" }).notNull(),
+		committedAt: timestamp("committed_at", { withTimezone: true, mode: "string" }).notNull(),
+		additions: integer().default(0).notNull(),
+		deletions: integer().default(0).notNull(),
+		changedFiles: integer("changed_files").default(0).notNull(),
+		authorEmail: varchar("author_email", { length: 255 }),
+		committerEmail: varchar("committer_email", { length: 255 }),
+		signatureValid: boolean("signature_valid"),
+		authoredByCommitter: boolean("authored_by_committer"),
+		committedViaWeb: boolean("committed_via_web"),
+		parentCount: integer("parent_count"),
+		lastSyncAt: timestamp("last_sync_at", { withTimezone: true, mode: "string" }),
+		createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }),
+		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		repositoryId: bigint("repository_id", { mode: "number" }).notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		authorId: bigint("author_id", { mode: "number" }),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		committerId: bigint("committer_id", { mode: "number" }),
+		signatureState: varchar("signature_state", { length: 32 }),
+		signatureWasSignedByGithub: boolean("signature_was_signed_by_github"),
+		signatureSignerLogin: varchar("signature_signer_login", { length: 255 }),
+		parentShas: text("parent_shas"),
+		statusCheckRollupState: varchar("status_check_rollup_state", { length: 32 }),
+		onBehalfOfLogin: varchar("on_behalf_of_login", { length: 255 }),
+	},
+	(table) => [
+		index("idx_git_commit_author_id").using("btree", table.authorId.asc().nullsLast()),
+		index("idx_git_commit_authored_at").using("btree", table.authoredAt.asc().nullsLast()),
+		index("idx_git_commit_committer_id").using("btree", table.committerId.asc().nullsLast()),
+		index("idx_git_commit_repository_id").using("btree", table.repositoryId.asc().nullsLast()),
+		index("idx_git_commit_unresolved_author_email")
+			.using("btree", table.repositoryId.asc().nullsLast(), table.authorEmail.asc().nullsLast())
+			.where(sql`((author_id IS NULL) AND (author_email IS NOT NULL))`),
+		index("idx_git_commit_unresolved_committer_email")
+			.using("btree", table.repositoryId.asc().nullsLast(), table.committerEmail.asc().nullsLast())
+			.where(sql`((committer_id IS NULL) AND (committer_email IS NOT NULL))`),
+		foreignKey({
+			columns: [table.repositoryId],
+			foreignColumns: [repository.id],
+			name: "fk_git_commit_repository",
+		}).onDelete("cascade"),
+		foreignKey({
+			columns: [table.authorId],
+			foreignColumns: [user.id],
+			name: "fk_git_commit_author",
+		}).onDelete("set null"),
+		foreignKey({
+			columns: [table.committerId],
+			foreignColumns: [user.id],
+			name: "fk_git_commit_committer",
+		}).onDelete("set null"),
+		unique("uq_git_commit_sha_repository").on(table.sha, table.repositoryId),
 	],
 );
 
@@ -919,6 +1080,9 @@ export const pullRequestReview = pgTable(
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		pullRequestId: bigint("pull_request_id", { mode: "number" }),
 		body: text(),
+		createdAt: timestamp("created_at", { mode: "string" }),
+		updatedAt: timestamp("updated_at", { mode: "string" }),
+		authorCanPushToRepository: boolean("author_can_push_to_repository"),
 	},
 	(table) => [
 		index("idx_pr_review_author_id").using("btree", table.authorId.asc().nullsLast()),
@@ -965,6 +1129,7 @@ export const pullRequestReviewComment = pgTable(
 		inReplyToId: bigint("in_reply_to_id", { mode: "number" }),
 		body: text(),
 		diffHunk: text("diff_hunk"),
+		outdated: boolean(),
 	},
 	(table) => [
 		index("idx_pull_request_review_comment_thread").using(

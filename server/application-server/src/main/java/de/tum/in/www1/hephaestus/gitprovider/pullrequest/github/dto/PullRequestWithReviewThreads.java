@@ -12,8 +12,8 @@ import org.springframework.lang.Nullable;
  * <p>
  * <h2>Embedded Data</h2>
  * <ul>
- *   <li>{@code embeddedReviews} - First 10 reviews (pagination for PRs with more)</li>
- *   <li>{@code embeddedReviewThreads} - First 10 review threads with their comments</li>
+ *   <li>{@code embeddedReviews} - First 5 reviews (pagination for PRs with more)</li>
+ *   <li>{@code embeddedReviewThreads} - First 5 review threads with their comments</li>
  *   <li>{@code embeddedProjectItems} - First 5 project items (pagination for PRs in more projects)</li>
  * </ul>
  */
@@ -35,10 +35,18 @@ public record PullRequestWithReviewThreads(
             return null;
         }
 
+        String context = "PR #" + ghPullRequest.getNumber();
+
         GitHubPullRequestDTO dto = GitHubPullRequestDTO.fromPullRequest(ghPullRequest);
-        EmbeddedReviewsDTO reviews = EmbeddedReviewsDTO.fromConnection(ghPullRequest.getReviews());
-        EmbeddedReviewThreadsDTO threads = EmbeddedReviewThreadsDTO.fromConnection(ghPullRequest.getReviewThreads());
-        EmbeddedProjectItemsDTO projectItems = EmbeddedProjectItemsDTO.fromConnection(ghPullRequest.getProjectItems());
+        EmbeddedReviewsDTO reviews = EmbeddedReviewsDTO.fromConnection(ghPullRequest.getReviews(), context);
+        EmbeddedReviewThreadsDTO threads = EmbeddedReviewThreadsDTO.fromConnection(
+            ghPullRequest.getReviewThreads(),
+            context
+        );
+        EmbeddedProjectItemsDTO projectItems = EmbeddedProjectItemsDTO.fromConnection(
+            ghPullRequest.getProjectItems(),
+            context
+        );
 
         return new PullRequestWithReviewThreads(dto, reviews, threads, projectItems);
     }

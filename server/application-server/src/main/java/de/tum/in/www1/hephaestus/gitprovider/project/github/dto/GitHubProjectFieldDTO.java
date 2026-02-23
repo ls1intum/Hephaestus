@@ -15,8 +15,7 @@ import de.tum.in.www1.hephaestus.gitprovider.project.ProjectField;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.Nullable;
 
 /**
@@ -26,6 +25,7 @@ import org.springframework.lang.Nullable;
  * GitHub provides various field types: text, number, date, single-select, iteration.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
+@Slf4j
 public record GitHubProjectFieldDTO(
     @JsonProperty("id") String id,
     @JsonProperty("name") String name,
@@ -34,7 +34,6 @@ public record GitHubProjectFieldDTO(
     @JsonProperty("created_at") Instant createdAt,
     @JsonProperty("updated_at") Instant updatedAt
 ) {
-    private static final Logger log = LoggerFactory.getLogger(GitHubProjectFieldDTO.class);
     private static final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
 
     /**

@@ -7,6 +7,7 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncCons
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_INITIAL_BACKOFF;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.adaptPageSize;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
@@ -21,6 +22,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameP
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubTransportErrors;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GraphQlConnectionOverflowDetector;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.BackfillStateProvider;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPageInfo;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPullRequestConnection;
@@ -292,6 +294,7 @@ public class GitHubPullRequestSyncService {
         int totalReviewsSynced = 0;
         int totalReviewCommentsSynced = 0;
         int totalProjectItemsSynced = 0;
+        int reportedTotalCount = -1;
         List<PullRequestWithReviewCursor> prsNeedingReviewPagination = new ArrayList<>();
         List<PullRequestWithThreadCursor> prsNeedingThreadPagination = new ArrayList<>();
         List<PullRequestWithProjectItemCursor> prsNeedingProjectItemPagination = new ArrayList<>();
@@ -335,7 +338,10 @@ public class GitHubPullRequestSyncService {
                         .documentName(QUERY_DOCUMENT)
                         .variable("owner", ownerAndName.owner())
                         .variable("name", ownerAndName.name())
-                        .variable("first", PR_SYNC_PAGE_SIZE)
+                        .variable(
+                            "first",
+                            adaptPageSize(PR_SYNC_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
+                        )
                         .variable("after", currentCursor)
                         .execute()
                 )
@@ -415,6 +421,10 @@ public class GitHubPullRequestSyncService {
 
                 if (connection == null || connection.getNodes() == null || connection.getNodes().isEmpty()) {
                     break;
+                }
+
+                if (reportedTotalCount < 0) {
+                    reportedTotalCount = connection.getTotalCount();
                 }
 
                 // Process the page within its own transaction to keep transactions short
@@ -598,6 +608,16 @@ public class GitHubPullRequestSyncService {
                 }
                 break;
             }
+        }
+
+        // Check for overflow: did we fetch fewer items than GitHub reported?
+        if (reportedTotalCount >= 0) {
+            GraphQlConnectionOverflowDetector.check(
+                "pullRequests",
+                totalPRsSynced,
+                reportedTotalCount,
+                safeNameWithOwner
+            );
         }
 
         // Fetch remaining reviews for PRs with >10 reviews (using cursor for efficient continuation)

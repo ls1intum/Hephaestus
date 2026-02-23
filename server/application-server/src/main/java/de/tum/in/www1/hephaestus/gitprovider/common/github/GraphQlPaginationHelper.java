@@ -12,8 +12,7 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.lang.Nullable;
@@ -74,9 +73,9 @@ import reactor.util.retry.Retry;
  * @see PaginationResult for result details
  */
 @Component
+@Slf4j
 public final class GraphQlPaginationHelper {
 
-    private static final Logger log = LoggerFactory.getLogger(GraphQlPaginationHelper.class);
     private static final int MAX_RETRY_ATTEMPTS = 3;
 
     private final GitHubGraphQlClientProvider graphQlClientProvider;

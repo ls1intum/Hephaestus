@@ -8,8 +8,8 @@ import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import java.util.List;
 import java.util.Optional;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -54,27 +54,15 @@ import org.springframework.transaction.annotation.Transactional;
  * @see Project
  * @see Project.OwnerType
  */
+@Slf4j
 @Service
+@RequiredArgsConstructor
 public class ProjectIntegrityService {
-
-    private static final Logger log = LoggerFactory.getLogger(ProjectIntegrityService.class);
 
     private final ProjectRepository projectRepository;
     private final OrganizationRepository organizationRepository;
     private final RepositoryRepository repositoryRepository;
     private final UserRepository userRepository;
-
-    public ProjectIntegrityService(
-        ProjectRepository projectRepository,
-        OrganizationRepository organizationRepository,
-        RepositoryRepository repositoryRepository,
-        UserRepository userRepository
-    ) {
-        this.projectRepository = projectRepository;
-        this.organizationRepository = organizationRepository;
-        this.repositoryRepository = repositoryRepository;
-        this.userRepository = userRepository;
-    }
 
     // ==================== Cascade Delete Operations ====================
 

@@ -33,39 +33,12 @@ query GetReviewComments($reviewId: ID!, $first: Int!, $after: String) {
                     updatedAt
                     state
                     url
+                    outdated
                     authorAssociation
 
                     # Comment author
                     author {
-                        __typename
-                        ... on User {
-                            id
-                            databaseId
-                            login
-                            avatarUrl
-                            name
-                            email
-                            createdAt
-                            updatedAt
-                        }
-                        ... on Bot {
-                            id
-                            databaseId
-                            login
-                            avatarUrl
-                        }
-                        ... on Mannequin {
-                            id
-                            databaseId
-                            login
-                            avatarUrl
-                        }
-                        ... on Organization {
-                            id
-                            databaseId
-                            login
-                            avatarUrl
-                        }
+                        ...ActorFields
                     }
 
                     # Reply to (for threading)

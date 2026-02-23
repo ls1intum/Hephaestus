@@ -2,26 +2,20 @@ package de.tum.in.www1.hephaestus.gitprovider.common.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.Category;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
 @Component
+@RequiredArgsConstructor
 public class GitHubGraphQlSyncCoordinator {
 
     private static final long MAX_RATE_LIMIT_WAIT_MS = 300_000;
 
     private final GitHubGraphQlClientProvider graphQlClientProvider;
     private final GitHubExceptionClassifier exceptionClassifier;
-
-    public GitHubGraphQlSyncCoordinator(
-        GitHubGraphQlClientProvider graphQlClientProvider,
-        GitHubExceptionClassifier exceptionClassifier
-    ) {
-        this.graphQlClientProvider = graphQlClientProvider;
-        this.exceptionClassifier = exceptionClassifier;
-    }
 
     /**
      * Context for handling a GraphQL classification result.
@@ -166,13 +160,25 @@ public class GitHubGraphQlSyncCoordinator {
                 return false;
             }
             case CLIENT_ERROR -> {
-                log.error(
-                    "Client error during {} GraphQL response: {}={}, error={}",
-                    phase,
-                    scopeLabel,
-                    scopeValue,
-                    classification.message()
-                );
+                boolean isResourceLimit =
+                    classification.message() != null && classification.message().contains("resource limit");
+                if (isResourceLimit) {
+                    log.warn(
+                        "Resource limit exceeded during {} GraphQL response (reduce page size): {}={}, error={}",
+                        phase,
+                        scopeLabel,
+                        scopeValue,
+                        classification.message()
+                    );
+                } else {
+                    log.error(
+                        "Client error during {} GraphQL response: {}={}, error={}",
+                        phase,
+                        scopeLabel,
+                        scopeValue,
+                        classification.message()
+                    );
+                }
                 return false;
             }
             default -> {

@@ -3,8 +3,13 @@ package de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.github;
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlErrorUtils.isNotFoundError;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.DEFAULT_PAGE_SIZE;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.JITTER_FACTOR;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.LARGE_PAGE_SIZE;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.MAX_PAGINATION_PAGES;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_INITIAL_BACKOFF;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.adaptPageSize;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
@@ -17,6 +22,8 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoor
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubTransportErrors;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GraphQlConnectionOverflowDetector;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHCommentAuthorAssociation;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHDiffSide;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPageInfo;
@@ -45,6 +52,8 @@ import org.springframework.graphql.client.FieldAccessException;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import reactor.core.publisher.Mono;
+import reactor.util.retry.Retry;
 
 /**
  * Service for synchronizing GitHub pull request review comments via GraphQL API.
@@ -139,6 +148,7 @@ public class GitHubPullRequestReviewCommentSyncService {
             String cursor = null;
             boolean hasNextPage = true;
             int pageCount = 0;
+            int reportedTotalCount = -1;
 
             while (hasNextPage) {
                 // Check for interrupt (e.g., during application shutdown)
@@ -164,14 +174,37 @@ public class GitHubPullRequestReviewCommentSyncService {
                     break;
                 }
 
-                ClientGraphQlResponse graphQlResponse = client
-                    .documentName(GET_PR_REVIEW_COMMENTS_DOCUMENT)
-                    .variable("owner", owner)
-                    .variable("name", name)
-                    .variable("number", pullRequest.getNumber())
-                    .variable("first", DEFAULT_PAGE_SIZE)
-                    .variable("after", cursor)
-                    .execute()
+                final String currentCursor = cursor;
+                final int currentPage = pageCount;
+
+                ClientGraphQlResponse graphQlResponse = Mono.defer(() ->
+                    client
+                        .documentName(GET_PR_REVIEW_COMMENTS_DOCUMENT)
+                        .variable("owner", owner)
+                        .variable("name", name)
+                        .variable("number", pullRequest.getNumber())
+                        .variable(
+                            "first",
+                            adaptPageSize(DEFAULT_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
+                        )
+                        .variable("after", currentCursor)
+                        .execute()
+                )
+                    .retryWhen(
+                        Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                            .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                            .jitter(JITTER_FACTOR)
+                            .filter(GitHubTransportErrors::isTransportError)
+                            .doBeforeRetry(signal ->
+                                log.warn(
+                                    "Retrying review comment sync after transport error: prNumber={}, page={}, attempt={}, error={}",
+                                    pullRequest.getNumber(),
+                                    currentPage,
+                                    signal.totalRetries() + 1,
+                                    signal.failure().getMessage()
+                                )
+                            )
+                    )
                     .block(syncProperties.extendedGraphqlTimeout());
 
                 if (graphQlResponse == null || !graphQlResponse.isValid()) {
@@ -230,6 +263,10 @@ public class GitHubPullRequestReviewCommentSyncService {
                     break;
                 }
 
+                if (reportedTotalCount < 0) {
+                    reportedTotalCount = response.getTotalCount();
+                }
+
                 for (var graphQlThread : response.getNodes()) {
                     int synced = processThreadInternal(graphQlThread, pullRequest, client, scopeId);
                     totalSynced += synced;
@@ -239,6 +276,16 @@ public class GitHubPullRequestReviewCommentSyncService {
                 hasNextPage = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
                 cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
                 retryAttempt = 0;
+            }
+
+            // Check for overflow
+            if (reportedTotalCount >= 0) {
+                GraphQlConnectionOverflowDetector.check(
+                    "reviewThreads",
+                    totalSynced,
+                    reportedTotalCount,
+                    "prNumber=" + pullRequest.getNumber()
+                );
             }
 
             log.debug(
@@ -420,6 +467,7 @@ public class GitHubPullRequestReviewCommentSyncService {
         boolean hasMore = true;
         int fetchedPages = 0;
         int retryAttempt = 0;
+        int reportedTotalCount = -1;
 
         while (hasMore) {
             // Check for interrupt (e.g., during application shutdown)
@@ -444,12 +492,35 @@ public class GitHubPullRequestReviewCommentSyncService {
             }
 
             try {
-                ClientGraphQlResponse response = client
-                    .documentName(GET_THREAD_COMMENTS_DOCUMENT)
-                    .variable("threadId", threadNodeId)
-                    .variable("first", LARGE_PAGE_SIZE)
-                    .variable("after", cursor)
-                    .execute()
+                final String currentCursor = cursor;
+                final int currentPage = fetchedPages;
+
+                ClientGraphQlResponse response = Mono.defer(() ->
+                    client
+                        .documentName(GET_THREAD_COMMENTS_DOCUMENT)
+                        .variable("threadId", threadNodeId)
+                        .variable(
+                            "first",
+                            adaptPageSize(LARGE_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
+                        )
+                        .variable("after", currentCursor)
+                        .execute()
+                )
+                    .retryWhen(
+                        Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                            .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                            .jitter(JITTER_FACTOR)
+                            .filter(GitHubTransportErrors::isTransportError)
+                            .doBeforeRetry(signal ->
+                                log.warn(
+                                    "Retrying thread comments fetch after transport error: threadId={}, page={}, attempt={}, error={}",
+                                    threadNodeId,
+                                    currentPage,
+                                    signal.totalRetries() + 1,
+                                    signal.failure().getMessage()
+                                )
+                            )
+                    )
                     .block(syncProperties.graphqlTimeout());
 
                 if (response == null || !response.isValid()) {
@@ -507,6 +578,10 @@ public class GitHubPullRequestReviewCommentSyncService {
                     break;
                 }
 
+                if (reportedTotalCount < 0) {
+                    reportedTotalCount = fetchedConnection.getTotalCount();
+                }
+
                 allComments.addAll(fetchedConnection.getNodes());
 
                 GHPageInfo pageInfo = fetchedConnection.getPageInfo();
@@ -532,6 +607,16 @@ public class GitHubPullRequestReviewCommentSyncService {
                 }
                 retryAttempt++;
             }
+        }
+
+        // Check for overflow
+        if (reportedTotalCount >= 0) {
+            GraphQlConnectionOverflowDetector.check(
+                "threadComments",
+                allComments.size(),
+                reportedTotalCount,
+                "threadId=" + threadNodeId
+            );
         }
 
         // Update the connection's comments with the complete list
@@ -883,7 +968,8 @@ public class GitHubPullRequestReviewCommentSyncService {
             graphQlComment.getOriginalStartLine(), // originalStartLine
             side, // side
             null, // startSide
-            inReplyToId // inReplyToId
+            inReplyToId, // inReplyToId
+            graphQlComment.getOutdated() // outdated
         );
     }
 
@@ -961,6 +1047,7 @@ public class GitHubPullRequestReviewCommentSyncService {
             String cursor = startCursor;
             boolean hasNextPage = true;
             int pageCount = 0;
+            int reportedTotalCount = -1;
 
             while (hasNextPage) {
                 // Check for interrupt (e.g., during application shutdown)
@@ -986,14 +1073,37 @@ public class GitHubPullRequestReviewCommentSyncService {
                     break;
                 }
 
-                ClientGraphQlResponse graphQlResponse = client
-                    .documentName(GET_PR_REVIEW_COMMENTS_DOCUMENT)
-                    .variable("owner", owner)
-                    .variable("name", name)
-                    .variable("number", pullRequest.getNumber())
-                    .variable("first", DEFAULT_PAGE_SIZE)
-                    .variable("after", cursor)
-                    .execute()
+                final String currentCursor = cursor;
+                final int currentPage = pageCount;
+
+                ClientGraphQlResponse graphQlResponse = Mono.defer(() ->
+                    client
+                        .documentName(GET_PR_REVIEW_COMMENTS_DOCUMENT)
+                        .variable("owner", owner)
+                        .variable("name", name)
+                        .variable("number", pullRequest.getNumber())
+                        .variable(
+                            "first",
+                            adaptPageSize(DEFAULT_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
+                        )
+                        .variable("after", currentCursor)
+                        .execute()
+                )
+                    .retryWhen(
+                        Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                            .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                            .jitter(JITTER_FACTOR)
+                            .filter(GitHubTransportErrors::isTransportError)
+                            .doBeforeRetry(signal ->
+                                log.warn(
+                                    "Retrying remaining thread sync after transport error: prNumber={}, page={}, attempt={}, error={}",
+                                    pullRequest.getNumber(),
+                                    currentPage,
+                                    signal.totalRetries() + 1,
+                                    signal.failure().getMessage()
+                                )
+                            )
+                    )
                     .block(syncProperties.extendedGraphqlTimeout());
 
                 if (graphQlResponse == null || !graphQlResponse.isValid()) {
@@ -1027,6 +1137,10 @@ public class GitHubPullRequestReviewCommentSyncService {
                     break;
                 }
 
+                if (reportedTotalCount < 0) {
+                    reportedTotalCount = response.getTotalCount();
+                }
+
                 for (var graphQlThread : response.getNodes()) {
                     int synced = processThreadInternal(graphQlThread, pullRequest, client, scopeId);
                     totalSynced += synced;
@@ -1035,6 +1149,16 @@ public class GitHubPullRequestReviewCommentSyncService {
                 var pageInfo = response.getPageInfo();
                 hasNextPage = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
                 cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
+            }
+
+            // Check for overflow
+            if (reportedTotalCount >= 0) {
+                GraphQlConnectionOverflowDetector.check(
+                    "reviewThreads",
+                    totalSynced,
+                    reportedTotalCount,
+                    "prNumber=" + pullRequest.getNumber()
+                );
             }
 
             log.debug(

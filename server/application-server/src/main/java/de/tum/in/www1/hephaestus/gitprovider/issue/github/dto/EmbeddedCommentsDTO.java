@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.issue.github.dto;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GraphQlConnectionOverflowDetector;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHIssueCommentConnection;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.github.dto.GitHubIssueCommentEventDTO.GitHubCommentDTO;
 import java.util.Collections;
@@ -23,9 +24,10 @@ public record EmbeddedCommentsDTO(
      * Creates an EmbeddedCommentsDTO from a GraphQL GHIssueCommentConnection.
      *
      * @param connection the GraphQL connection (may be null)
+     * @param context    contextual description for overflow logging (e.g. "Issue #42 in owner/repo")
      * @return EmbeddedCommentsDTO or empty DTO if connection is null
      */
-    public static EmbeddedCommentsDTO fromConnection(@Nullable GHIssueCommentConnection connection) {
+    public static EmbeddedCommentsDTO fromConnection(@Nullable GHIssueCommentConnection connection, String context) {
         if (connection == null) {
             return empty();
         }
@@ -44,6 +46,8 @@ public record EmbeddedCommentsDTO(
             connection.getPageInfo() != null && Boolean.TRUE.equals(connection.getPageInfo().getHasNextPage());
 
         String endCursor = connection.getPageInfo() != null ? connection.getPageInfo().getEndCursor() : null;
+
+        GraphQlConnectionOverflowDetector.check("comments", comments.size(), connection.getTotalCount(), context);
 
         return new EmbeddedCommentsDTO(comments, connection.getTotalCount(), hasNextPage, endCursor);
     }

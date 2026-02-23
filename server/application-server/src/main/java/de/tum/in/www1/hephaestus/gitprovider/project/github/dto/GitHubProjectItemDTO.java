@@ -4,6 +4,7 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.DateTimeUtils.toInsta
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GraphQlConnectionOverflowDetector;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHDraftIssue;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHIssue;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2Item;
@@ -19,8 +20,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.Nullable;
 
 /**
@@ -32,6 +32,7 @@ import org.springframework.lang.Nullable;
  * - DRAFT_ISSUE: A draft that hasn't been converted to a real issue yet
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
+@Slf4j
 public record GitHubProjectItemDTO(
     @JsonProperty("id") Long id,
     @JsonProperty("database_id") Long databaseId,
@@ -51,8 +52,6 @@ public record GitHubProjectItemDTO(
     @JsonProperty("created_at") Instant createdAt,
     @JsonProperty("updated_at") Instant updatedAt
 ) {
-    private static final Logger log = LoggerFactory.getLogger(GitHubProjectItemDTO.class);
-
     /**
      * Get the database ID, preferring databaseId over id for GraphQL responses.
      */
@@ -197,6 +196,13 @@ public record GitHubProjectItemDTO(
                 fieldValuesTruncated = Boolean.TRUE.equals(pageInfo.getHasNextPage());
                 fieldValuesEndCursor = pageInfo.getEndCursor();
             }
+
+            GraphQlConnectionOverflowDetector.check(
+                "fieldValues",
+                fieldValues.size(),
+                fieldValuesTotalCount,
+                "project item " + (item.getId() != null ? item.getId() : "unknown")
+            );
         }
 
         // Extract creator info

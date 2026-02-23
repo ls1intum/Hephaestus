@@ -61,23 +61,7 @@ query GetSubIssuesForRepository($owner: String!, $name: String!, $first: Int!, $
                     }
                     # Author
                     author {
-                        __typename
-                        ... on User {
-                            id
-                            databaseId
-                            login
-                            avatarUrl
-                            name
-                            email
-                            createdAt
-                            updatedAt
-                        }
-                        ... on Bot {
-                            id
-                            databaseId
-                            login
-                            avatarUrl
-                        }
+                        ...ActorFields
                     }
                 }
                 subIssuesSummary {

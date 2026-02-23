@@ -5,6 +5,7 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.DateTimeUtils.uriToSt
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GraphQlConnectionOverflowDetector;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHIssue;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHIssueState;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHIssueStateReason;
@@ -106,8 +107,8 @@ public record GitHubIssueDTO(
             toInstant(issue.getClosedAt()),
             Boolean.TRUE.equals(issue.getLocked()),
             GitHubUserDTO.fromActor(issue.getAuthor()),
-            extractAssignees(issue.getAssignees()),
-            GitHubLabelDTO.fromLabelConnection(issue.getLabels()),
+            extractAssignees(issue.getAssignees(), "Issue #" + issue.getNumber()),
+            GitHubLabelDTO.fromLabelConnection(issue.getLabels(), "Issue #" + issue.getNumber()),
             GitHubMilestoneDTO.fromMilestone(issue.getMilestone()),
             GitHubIssueTypeDTO.fromIssueType(issue.getIssueType()),
             null, // repository
@@ -150,8 +151,8 @@ public record GitHubIssueDTO(
             toInstant(issue.getClosedAt()),
             Boolean.TRUE.equals(issue.getLocked()),
             GitHubUserDTO.fromActor(issue.getAuthor()),
-            extractAssignees(issue.getAssignees()),
-            GitHubLabelDTO.fromLabelConnection(issue.getLabels()),
+            extractAssignees(issue.getAssignees(), "Issue #" + issue.getNumber()),
+            GitHubLabelDTO.fromLabelConnection(issue.getLabels(), "Issue #" + issue.getNumber()),
             GitHubMilestoneDTO.fromMilestone(issue.getMilestone()),
             GitHubIssueTypeDTO.fromIssueType(issue.getIssueType()),
             GitHubRepositoryRefDTO.fromRepository(issue.getRepository()),
@@ -185,10 +186,17 @@ public record GitHubIssueDTO(
         return stateReason.name().toLowerCase();
     }
 
-    private static List<GitHubUserDTO> extractAssignees(@Nullable GHUserConnection connection) {
+    private static List<GitHubUserDTO> extractAssignees(@Nullable GHUserConnection connection, String context) {
         if (connection == null || connection.getNodes() == null) {
             return Collections.emptyList();
         }
-        return connection.getNodes().stream().map(GitHubUserDTO::fromUser).filter(Objects::nonNull).toList();
+        List<GitHubUserDTO> result = connection
+            .getNodes()
+            .stream()
+            .map(GitHubUserDTO::fromUser)
+            .filter(Objects::nonNull)
+            .toList();
+        GraphQlConnectionOverflowDetector.check("assignees", result.size(), connection.getTotalCount(), context);
+        return result;
     }
 }

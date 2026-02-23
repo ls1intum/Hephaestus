@@ -10,6 +10,7 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncCons
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_INITIAL_BACKOFF;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.adaptPageSize;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
@@ -20,6 +21,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassi
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubTransportErrors;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GraphQlConnectionOverflowDetector;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.BackfillStateProvider;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHProjectV2Connection;
@@ -49,8 +51,8 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.stereotype.Service;
@@ -116,10 +118,11 @@ import reactor.util.retry.Retry;
  * @see de.tum.in.www1.hephaestus.gitprovider.project.Project.OwnerType
  * @see de.tum.in.www1.hephaestus.gitprovider.project.github.GitHubProjectItemSyncService
  */
+@Slf4j
 @Service
+@RequiredArgsConstructor
 public class GitHubProjectSyncService {
 
-    private static final Logger log = LoggerFactory.getLogger(GitHubProjectSyncService.class);
     private static final String GET_ORGANIZATION_PROJECTS_DOCUMENT = "GetOrganizationProjects";
     private static final String GET_PROJECT_WITH_FIELDS_DOCUMENT = "GetProjectWithFields";
     private static final String GET_PROJECT_ITEMS_DOCUMENT = "GetProjectItems";
@@ -154,34 +157,6 @@ public class GitHubProjectSyncService {
     private final GitHubSyncProperties syncProperties;
     private final SyncSchedulerProperties syncSchedulerProperties;
     private final GitHubExceptionClassifier exceptionClassifier;
-
-    public GitHubProjectSyncService(
-        ProjectRepository projectRepository,
-        OrganizationRepository organizationRepository,
-        GitHubGraphQlClientProvider graphQlClientProvider,
-        GitHubProjectProcessor projectProcessor,
-        GitHubProjectItemProcessor itemProcessor,
-        GitHubProjectStatusUpdateProcessor statusUpdateProcessor,
-        GitHubProjectItemFieldValueSyncService fieldValueSyncService,
-        BackfillStateProvider backfillStateProvider,
-        TransactionTemplate transactionTemplate,
-        GitHubSyncProperties syncProperties,
-        SyncSchedulerProperties syncSchedulerProperties,
-        GitHubExceptionClassifier exceptionClassifier
-    ) {
-        this.projectRepository = projectRepository;
-        this.organizationRepository = organizationRepository;
-        this.graphQlClientProvider = graphQlClientProvider;
-        this.projectProcessor = projectProcessor;
-        this.itemProcessor = itemProcessor;
-        this.statusUpdateProcessor = statusUpdateProcessor;
-        this.fieldValueSyncService = fieldValueSyncService;
-        this.backfillStateProvider = backfillStateProvider;
-        this.transactionTemplate = transactionTemplate;
-        this.syncProperties = syncProperties;
-        this.syncSchedulerProperties = syncSchedulerProperties;
-        this.exceptionClassifier = exceptionClassifier;
-    }
 
     /**
      * Relinks orphaned project items whose issue_id is NULL but content_database_id
@@ -237,6 +212,7 @@ public class GitHubProjectSyncService {
         boolean hasMore = true;
         int pageCount = 0;
         int retryAttempt = 0;
+        int reportedTotalCount = -1;
         SyncResult.Status abortReason = null;
 
         while (hasMore) {
@@ -259,7 +235,10 @@ public class GitHubProjectSyncService {
                     client
                         .documentName(GET_ORGANIZATION_PROJECTS_DOCUMENT)
                         .variable("login", organizationLogin)
-                        .variable("first", LARGE_PAGE_SIZE)
+                        .variable(
+                            "first",
+                            adaptPageSize(LARGE_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
+                        )
                         .variable("after", currentCursor)
                         .execute()
                 )
@@ -281,6 +260,20 @@ public class GitHubProjectSyncService {
                     .block(timeout);
 
                 if (graphQlResponse == null || !graphQlResponse.isValid()) {
+                    ClassificationResult classification = exceptionClassifier.classifyGraphQlResponse(graphQlResponse);
+                    if (classification != null && classification.category() == Category.NOT_FOUND) {
+                        log.info(
+                            "Organization not found via GraphQL (may have been renamed/deleted): orgLogin={}",
+                            safeOrgLogin
+                        );
+                        abortReason = SyncResult.Status.ABORTED_ERROR;
+                        break;
+                    }
+                    if (classification != null && classification.category() == Category.RATE_LIMITED) {
+                        log.warn("Rate limited during project list sync: orgLogin={}", safeOrgLogin);
+                        abortReason = SyncResult.Status.ABORTED_RATE_LIMIT;
+                        break;
+                    }
                     log.warn(
                         "Received invalid GraphQL response: orgLogin={}, errors={}",
                         safeOrgLogin,
@@ -307,6 +300,10 @@ public class GitHubProjectSyncService {
 
                 if (response == null || response.getNodes() == null || response.getNodes().isEmpty()) {
                     break;
+                }
+
+                if (reportedTotalCount < 0) {
+                    reportedTotalCount = response.getTotalCount();
                 }
 
                 // Process this page of projects in its own transaction
@@ -510,6 +507,16 @@ public class GitHubProjectSyncService {
             }
         }
 
+        // Check for overflow
+        if (reportedTotalCount >= 0) {
+            GraphQlConnectionOverflowDetector.check(
+                "projects",
+                totalSynced,
+                reportedTotalCount,
+                "orgLogin=" + safeOrgLogin
+            );
+        }
+
         // Only remove stale projects if sync completed without abort
         boolean syncCompletedNormally = !hasMore && abortReason == null;
         if (syncCompletedNormally && !syncedProjectIds.isEmpty()) {
@@ -692,6 +699,7 @@ public class GitHubProjectSyncService {
         boolean hasMore = true;
         int pageCount = 0;
         int retryAttempt = 0;
+        int reportedTotalCount = -1;
         SyncResult.Status abortReason = null;
         final Instant syncThreshold = incrementalSyncThreshold; // Final for lambda capture
         final boolean incrementalSync = isIncrementalSync;
@@ -721,7 +729,10 @@ public class GitHubProjectSyncService {
                     client
                         .documentName(GET_PROJECT_ITEMS_DOCUMENT)
                         .variable("nodeId", projectNodeId)
-                        .variable("first", PROJECT_ITEM_PAGE_SIZE)
+                        .variable(
+                            "first",
+                            adaptPageSize(PROJECT_ITEM_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
+                        )
                         .variable("after", currentCursor)
                         .variable("filterQuery", filterQuery)
                         .execute()
@@ -744,6 +755,17 @@ public class GitHubProjectSyncService {
                     .block(timeout);
 
                 if (graphQlResponse == null || !graphQlResponse.isValid()) {
+                    ClassificationResult classification = exceptionClassifier.classifyGraphQlResponse(graphQlResponse);
+                    if (classification != null && classification.category() == Category.NOT_FOUND) {
+                        log.info("Project not found via GraphQL (may have been deleted): projectId={}", projectId);
+                        abortReason = SyncResult.Status.ABORTED_ERROR;
+                        break;
+                    }
+                    if (classification != null && classification.category() == Category.RATE_LIMITED) {
+                        log.warn("Rate limited during project items sync: projectId={}", projectId);
+                        abortReason = SyncResult.Status.ABORTED_RATE_LIMIT;
+                        break;
+                    }
                     log.warn(
                         "Received invalid GraphQL response for project items: projectId={}, errors={}",
                         projectId,
@@ -788,6 +810,10 @@ public class GitHubProjectSyncService {
                     }
                     hasMore = false;
                     break;
+                }
+
+                if (reportedTotalCount < 0) {
+                    reportedTotalCount = itemsConnection.getTotalCount();
                 }
 
                 // Process this page of items in its own transaction
@@ -985,6 +1011,16 @@ public class GitHubProjectSyncService {
             }
         }
 
+        // Check for overflow
+        if (reportedTotalCount >= 0) {
+            GraphQlConnectionOverflowDetector.check(
+                "projectItems",
+                totalSynced,
+                reportedTotalCount,
+                "projectId=" + projectId
+            );
+        }
+
         // Process remaining field values for Draft Issues that had truncated inline data
         // This follows the nested pagination pattern from GitHubIssueSyncService (comments)
         // and GitHubPullRequestSyncService (review threads)
@@ -1110,6 +1146,7 @@ public class GitHubProjectSyncService {
             String cursor = null;
             boolean hasMore = true;
             int pageCount = 0;
+            int reportedTotalCount = -1;
 
             while (hasMore) {
                 pageCount++;
@@ -1152,6 +1189,18 @@ public class GitHubProjectSyncService {
                     .block(syncProperties.graphqlTimeout());
 
                 if (graphQlResponse == null || !graphQlResponse.isValid()) {
+                    ClassificationResult classification = exceptionClassifier.classifyGraphQlResponse(graphQlResponse);
+                    if (classification != null && classification.category() == Category.NOT_FOUND) {
+                        log.info(
+                            "Project not found via GraphQL for fields sync (may have been deleted): projectId={}",
+                            projectId
+                        );
+                        return PhaseResult.FAILED;
+                    }
+                    if (classification != null && classification.category() == Category.RATE_LIMITED) {
+                        log.warn("Rate limited during project fields sync: projectId={}", projectId);
+                        return PhaseResult.FAILED;
+                    }
                     log.warn(
                         "Received invalid GraphQL response for project fields: projectId={}, errors={}",
                         projectId,
@@ -1189,6 +1238,10 @@ public class GitHubProjectSyncService {
                     }
                     completedNormally = true;
                     break;
+                }
+
+                if (reportedTotalCount < 0) {
+                    reportedTotalCount = fieldsConnection.getTotalCount();
                 }
 
                 // Process this page of fields in a transaction
@@ -1229,6 +1282,16 @@ public class GitHubProjectSyncService {
             // Set completedNormally only if not already set (e.g., by empty response branch)
             // This preserves true if already set via early break, otherwise uses hasMore state
             completedNormally = completedNormally || !hasMore;
+
+            // Check for overflow
+            if (reportedTotalCount >= 0) {
+                GraphQlConnectionOverflowDetector.check(
+                    "projectFields",
+                    allSyncedFieldIds.size(),
+                    reportedTotalCount,
+                    "projectId=" + project.getId()
+                );
+            }
 
             // On successful completion, handle cleanup and update timestamp
             if (completedNormally) {
@@ -1298,6 +1361,7 @@ public class GitHubProjectSyncService {
             String cursor = null;
             boolean hasMore = true;
             int pageCount = 0;
+            int reportedTotalCount = -1;
 
             while (hasMore) {
                 pageCount++;
@@ -1318,7 +1382,10 @@ public class GitHubProjectSyncService {
                     client
                         .documentName(GET_PROJECT_STATUS_UPDATES_DOCUMENT)
                         .variable("nodeId", projectNodeId)
-                        .variable("first", STATUS_UPDATE_PAGE_SIZE)
+                        .variable(
+                            "first",
+                            adaptPageSize(STATUS_UPDATE_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
+                        )
                         .variable("after", currentCursor)
                         .execute()
                 )
@@ -1339,6 +1406,18 @@ public class GitHubProjectSyncService {
                     .block(syncProperties.graphqlTimeout());
 
                 if (graphQlResponse == null || !graphQlResponse.isValid()) {
+                    ClassificationResult classification = exceptionClassifier.classifyGraphQlResponse(graphQlResponse);
+                    if (classification != null && classification.category() == Category.NOT_FOUND) {
+                        log.info(
+                            "Project not found via GraphQL for status updates (may have been deleted): projectId={}",
+                            projectId
+                        );
+                        return false;
+                    }
+                    if (classification != null && classification.category() == Category.RATE_LIMITED) {
+                        log.warn("Rate limited during status updates sync: projectId={}", projectId);
+                        return false;
+                    }
                     log.warn(
                         "Received invalid GraphQL response for status updates: projectId={}, errors={}",
                         projectId,
@@ -1366,6 +1445,10 @@ public class GitHubProjectSyncService {
                 ) {
                     completedNormally = true;
                     break;
+                }
+
+                if (reportedTotalCount < 0) {
+                    reportedTotalCount = statusUpdatesConnection.getTotalCount();
                 }
 
                 // Process this page of status updates in a transaction
@@ -1409,6 +1492,16 @@ public class GitHubProjectSyncService {
             // Set completedNormally only if not already set (e.g., by empty response branch)
             // This preserves true if already set via early break, otherwise uses hasMore state
             completedNormally = completedNormally || !hasMore;
+
+            // Check for overflow
+            if (reportedTotalCount >= 0) {
+                GraphQlConnectionOverflowDetector.check(
+                    "statusUpdates",
+                    syncedStatusUpdateNodeIds.size(),
+                    reportedTotalCount,
+                    "projectId=" + project.getId()
+                );
+            }
 
             // On successful completion, handle cleanup and update timestamp
             if (completedNormally) {

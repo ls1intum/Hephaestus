@@ -261,6 +261,18 @@ hephaestus:
         allowed-origins:
             - ${APPLICATION_HOST_URL:http://localhost:4200}
 
+    # ═══════════════════════════════════════════════════════════════════════════
+    # LOCAL GIT REPOSITORY STORAGE
+    # ═══════════════════════════════════════════════════════════════════════════
+    # When enabled, repositories are cloned as bare git repos for file-level
+    # commit analysis. The intelligence-service can read these repos directly.
+    git:
+        # Whether local git checkout is enabled (default: false)
+        enabled: ${GIT_CHECKOUT_ENABLED:false}
+        # Base path for bare git repositories
+        # Each repo stored at: {storage-path}/{repositoryId}.git
+        storage-path: ${GIT_STORAGE_PATH:/data/git-repos}
+
     webapp:
         url: ${APPLICATION_HOST_URL:http://localhost:4200}
 

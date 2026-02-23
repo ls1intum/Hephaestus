@@ -94,6 +94,7 @@ public record ExperiencePointProperties(
      * @param projectCreated            XP for creating a project (default: 0.0)
      * @param projectItemCreated        XP for adding an item to a project (default: 0.0)
      * @param projectStatusUpdateCreated XP for creating a project status update (default: 0.0)
+     * @param commitCreated             XP for creating a commit (pushed to default branch) (default: 0.0)
      */
     @Validated
     public record XpAwards(
@@ -104,7 +105,8 @@ public record ExperiencePointProperties(
         @PositiveOrZero @Max(1000) @DefaultValue("0.0") double issueCreated,
         @PositiveOrZero @Max(1000) @DefaultValue("0.0") double projectCreated,
         @PositiveOrZero @Max(1000) @DefaultValue("0.0") double projectItemCreated,
-        @PositiveOrZero @Max(1000) @DefaultValue("0.0") double projectStatusUpdateCreated
+        @PositiveOrZero @Max(1000) @DefaultValue("0.0") double projectStatusUpdateCreated,
+        @PositiveOrZero @Max(1000) @DefaultValue("0.0") double commitCreated
     ) {}
 
     /** Compact constructor ensuring nested records are never null. */
@@ -116,8 +118,8 @@ public record ExperiencePointProperties(
             reviewWeights = new ReviewWeights(2.0, 2.5, 1.5);
         }
         if (xpAwards == null) {
-            // PR/issue/project activities are 0 by default; only review comments earn XP
-            xpAwards = new XpAwards(0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.0);
+            // PR/issue/project/commit activities are 0 by default; only review comments earn XP
+            xpAwards = new XpAwards(0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0);
         }
     }
 }

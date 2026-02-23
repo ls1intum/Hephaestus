@@ -54,8 +54,30 @@ query GetRepositoryPullRequests(
                 }
 
                 # Merge commit (available when PR is merged)
+                # All flat fields on the Commit type — zero additional rate limit cost
                 mergeCommit {
                     oid
+                    message
+                    messageHeadline
+                    messageBody
+                    url
+                    authoredDate
+                    committedDate
+                    additions
+                    deletions
+                    changedFilesIfAvailable
+                    author {
+                        email
+                        user {
+                            login
+                        }
+                    }
+                    committer {
+                        email
+                        user {
+                            login
+                        }
+                    }
                 }
 
                 # Head and base refs
@@ -66,123 +88,35 @@ query GetRepositoryPullRequests(
 
                 # Author
                 author {
-                    __typename
-                    ... on User {
-                        id
-                        databaseId
-                        login
-                        avatarUrl
-                        name
-                        email
-                        createdAt
-                        updatedAt
-                    }
-                    ... on Bot {
-                        id
-                        databaseId
-                        login
-                        avatarUrl
-                    }
-                    ... on Mannequin {
-                        id
-                        databaseId
-                        login
-                        avatarUrl
-                    }
-                    ... on Organization {
-                        id
-                        databaseId
-                        login
-                        avatarUrl
-                    }
+                    ...ActorFields
                 }
 
                 # Merged by
                 mergedBy {
-                    __typename
-                    ... on User {
-                        id
-                        databaseId
-                        login
-                        avatarUrl
-                        name
-                        email
-                        createdAt
-                        updatedAt
-                    }
-                    ... on Bot {
-                        id
-                        databaseId
-                        login
-                        avatarUrl
-                    }
-                    ... on Mannequin {
-                        id
-                        databaseId
-                        login
-                        avatarUrl
-                    }
-                    ... on Organization {
-                        id
-                        databaseId
-                        login
-                        avatarUrl
-                    }
+                    ...ActorFields
                 }
 
                 # Assignees
                 assignees(first: 20) {
+                    totalCount
                     nodes {
-                        id
-                        databaseId
-                        login
-                        avatarUrl
-                        name
-                        email
-                        createdAt
-                        updatedAt
+                        ...UserFields
                     }
                 }
 
                 # Requested reviewers (RequestedReviewer union: User, Team, Mannequin, Bot)
-                reviewRequests(first: 20) {
+                reviewRequests(first: 100) {
+                    totalCount
                     nodes {
                         requestedReviewer {
-                            __typename
-                            ... on User {
-                                id
-                                databaseId
-                                login
-                                avatarUrl
-                                name
-                                email
-                                createdAt
-                                updatedAt
-                            }
-                            ... on Team {
-                                id
-                                databaseId
-                                name
-                                slug
-                            }
-                            ... on Bot {
-                                id
-                                databaseId
-                                login
-                                avatarUrl
-                            }
-                            ... on Mannequin {
-                                id
-                                databaseId
-                                login
-                                avatarUrl
-                            }
+                            ...RequestedReviewerFields
                         }
                     }
                 }
 
                 # Labels
                 labels(first: 50) {
+                    totalCount
                     nodes {
                         id
                         name
@@ -203,8 +137,8 @@ query GetRepositoryPullRequests(
                 }
 
                 # Reviews (embedded to avoid N+1 queries)
-                # Most PRs have <10 reviews; we'll paginate for PRs with more
-                reviews(first: 10) {
+                # Most PRs have <5 reviews; follow-up pagination handles PRs with more
+                reviews(first: 5) {
                     totalCount
                     pageInfo {
                         hasNextPage
@@ -217,6 +151,9 @@ query GetRepositoryPullRequests(
                         state
                         url
                         submittedAt
+                        createdAt
+                        updatedAt
+                        authorCanPushToRepository
 
                         # Commit
                         commit {
@@ -225,42 +162,14 @@ query GetRepositoryPullRequests(
 
                         # Author
                         author {
-                            __typename
-                            ... on User {
-                                id
-                                databaseId
-                                login
-                                avatarUrl
-                                name
-                                email
-                                createdAt
-                                updatedAt
-                            }
-                            ... on Bot {
-                                id
-                                databaseId
-                                login
-                                avatarUrl
-                            }
-                            ... on Mannequin {
-                                id
-                                databaseId
-                                login
-                                avatarUrl
-                            }
-                            ... on Organization {
-                                id
-                                databaseId
-                                login
-                                avatarUrl
-                            }
+                            ...ActorFields
                         }
                     }
                 }
 
                 # Review threads (embedded to avoid N+1 queries)
-                # Most PRs have <10 threads; pagination handled by GetPullRequestReviewComments for PRs with more
-                reviewThreads(first: 10) {
+                # Most PRs have <5 threads; pagination handled by GetPullRequestReviewComments for PRs with more
+                reviewThreads(first: 5) {
                     totalCount
                     pageInfo {
                         hasNextPage
@@ -281,18 +190,11 @@ query GetRepositoryPullRequests(
 
                         # User who resolved the thread
                         resolvedBy {
-                            id
-                            databaseId
-                            login
-                            avatarUrl
-                            name
-                            email
-                            createdAt
-                            updatedAt
+                            ...UserFields
                         }
 
-                        # Comments in thread (first 10)
-                        comments(first: 10) {
+                        # Comments in thread (first 5)
+                        comments(first: 5) {
                             totalCount
                             pageInfo {
                                 hasNextPage
@@ -308,6 +210,7 @@ query GetRepositoryPullRequests(
                                 startLine
                                 originalStartLine
                                 diffHunk
+                                outdated
                                 createdAt
                                 updatedAt
                                 state
@@ -316,35 +219,7 @@ query GetRepositoryPullRequests(
 
                                 # Comment author
                                 author {
-                                    __typename
-                                    ... on User {
-                                        id
-                                        databaseId
-                                        login
-                                        avatarUrl
-                                        name
-                                        email
-                                        createdAt
-                                        updatedAt
-                                    }
-                                    ... on Bot {
-                                        id
-                                        databaseId
-                                        login
-                                        avatarUrl
-                                    }
-                                    ... on Mannequin {
-                                        id
-                                        databaseId
-                                        login
-                                        avatarUrl
-                                    }
-                                    ... on Organization {
-                                        id
-                                        databaseId
-                                        login
-                                        avatarUrl
-                                    }
+                                    ...ActorFields
                                 }
 
                                 # Reply to (for threading)
@@ -389,30 +264,12 @@ query GetRepositoryPullRequests(
 
                         # Project reference - needed to link item to correct project
                         project {
-                            id
-                            fullDatabaseId
-                            number
-                            title
-                            url
-                            # Owner for project identification
-                            owner {
-                                __typename
-                                ... on Organization {
-                                    id
-                                    databaseId
-                                    login
-                                }
-                                ... on User {
-                                    id
-                                    databaseId
-                                    login
-                                }
-                            }
+                            ...ProjectV2RefFields
                         }
 
-                        # Field values (embedded, first 10) - pagination for items with more
+                        # Field values (embedded, first 20) - pagination for items with more
                         # Uses shared FieldValueFieldsCostOptimized fragment (all 11 field value types)
-                        fieldValues(first: 10) {
+                        fieldValues(first: 20) {
                             totalCount
                             pageInfo {
                                 hasNextPage
