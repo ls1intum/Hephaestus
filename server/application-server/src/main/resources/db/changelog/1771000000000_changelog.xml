@@ -23,18 +23,12 @@
         </addColumn>
     </changeSet>
 
-    <changeSet id="1771000000000-2-add-discussion-answer-unique-constraint" author="GitHubDiscussionFeature">
-        <comment>Add unique constraint on answer_comment_id for @OneToOne relationship</comment>
-        <addUniqueConstraint tableName="discussion"
-                             columnNames="answer_comment_id"
-                             constraintName="uk_discussion_answer_comment_id"/>
-    </changeSet>
+    <!--
+    Changeset 1771000000000-2 removed: uk_discussion_answer_comment_id is already created
+    in 1770000000000_changelog.xml changeset 1770000000000-6-add-unique-constraints.
 
-    <changeSet id="1771000000000-3-make-discussion-comment-body-nullable" author="GitHubDiscussionFeature">
-        <comment>Allow discussion comment body to be nullable (e.g., for minimized or deleted comments)</comment>
-        <dropNotNullConstraint tableName="discussion_comment"
-                               columnName="body"
-                               columnDataType="clob"/>
-    </changeSet>
+    Changeset 1771000000000-3 removed: discussion_comment.body was declared as TEXT (nullable)
+    in 1770000000000_changelog.xml, so there is no NOT NULL constraint to drop.
+    -->
 
 </databaseChangeLog>

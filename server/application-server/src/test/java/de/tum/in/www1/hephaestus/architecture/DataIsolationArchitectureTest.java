@@ -75,7 +75,11 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         "ProjectFieldValue", // through ProjectItem.project OR ProjectField.project
         // Through repository (commit -> Repository -> Organization <- Workspace)
         "Commit", // through Repository -> Organization <- Workspace
-        "CommitFileChange" // through Commit -> Repository -> Organization <- Workspace
+        "CommitFileChange", // through Commit -> Repository -> Organization <- Workspace
+        // Through repository (discussion -> Repository -> Organization <- Workspace)
+        "Discussion", // through Repository -> Organization <- Workspace
+        "DiscussionCategory", // through Repository -> Organization <- Workspace
+        "DiscussionComment" // through Discussion -> Repository -> Organization <- Workspace
     );
 
     /**
