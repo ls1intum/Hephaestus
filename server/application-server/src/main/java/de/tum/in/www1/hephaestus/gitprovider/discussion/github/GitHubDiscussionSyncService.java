@@ -3,7 +3,11 @@ package de.tum.in.www1.hephaestus.gitprovider.discussion.github;
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.DEFAULT_PAGE_SIZE;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.DISCUSSION_SYNC_PAGE_SIZE;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.JITTER_FACTOR;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.MAX_PAGINATION_PAGES;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_INITIAL_BACKOFF;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.adaptPageSize;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
@@ -72,10 +76,6 @@ public class GitHubDiscussionSyncService {
 
     /** Maximum number of retry attempts for transient failures. */
     private static final int MAX_RETRY_ATTEMPTS = 3;
-
-    /** Retry configuration for transport-level errors during body streaming. */
-    private static final int TRANSPORT_MAX_RETRIES = 2;
-    private static final Duration TRANSPORT_INITIAL_BACKOFF = Duration.ofMillis(500);
 
     /**
      * Container for discussions that need additional comment pagination.
@@ -266,7 +266,9 @@ public class GitHubDiscussionSyncService {
                 )
                     .retryWhen(
                         Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
-                            .filter(this::isTransportError)
+                            .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                            .jitter(JITTER_FACTOR)
+                            .filter(GitHubTransportErrors::isTransportError)
                             .doBeforeRetry(signal ->
                                 log.warn(
                                     "Retrying discussion sync after transport error: repoName={}, page={}, attempt={}, error={}",
@@ -463,9 +465,33 @@ public class GitHubDiscussionSyncService {
                         );
                         abortReason = SyncResult.Status.ABORTED_RATE_LIMIT;
                     }
-                    default -> {
+                    case NOT_FOUND -> {
+                        log.warn(
+                            "Resource not found during discussion sync, skipping: repoName={}, error={}",
+                            safeNameWithOwner,
+                            classification.message()
+                        );
+                        abortReason = SyncResult.Status.ABORTED_ERROR;
+                    }
+                    case AUTH_ERROR -> {
                         log.error(
-                            "Failed to sync discussions: repoName={}, error={}",
+                            "Aborting discussion sync due to auth error: repoName={}, error={}",
+                            safeNameWithOwner,
+                            classification.message()
+                        );
+                        abortReason = SyncResult.Status.ABORTED_ERROR;
+                    }
+                    case CLIENT_ERROR -> {
+                        log.error(
+                            "Aborting discussion sync due to client error: repoName={}, error={}",
+                            safeNameWithOwner,
+                            classification.message()
+                        );
+                        abortReason = SyncResult.Status.ABORTED_ERROR;
+                    }
+                    case UNKNOWN -> {
+                        log.error(
+                            "Aborting discussion sync due to unknown error: repoName={}, error={}",
                             safeNameWithOwner,
                             classification.message(),
                             e
@@ -870,23 +896,5 @@ public class GitHubDiscussionSyncService {
             backfillStateProvider.updateDiscussionSyncCursor(syncTargetId, null);
             log.debug("Cleared discussion sync cursor checkpoint: syncTargetId={}", syncTargetId);
         });
-    }
-
-    // ========================================================================
-    // Transport Error Detection
-    // ========================================================================
-
-    /**
-     * Determines if an exception is a transport-level error that should be retried.
-     * <p>
-     * Delegates to the shared {@link GitHubTransportErrors} utility which covers all
-     * known transport failure modes including connection resets, premature closes,
-     * aborted connections, stream closures, and blocking read timeouts.
-     *
-     * @param throwable the exception to check
-     * @return true if this is a retryable transport error
-     */
-    private boolean isTransportError(Throwable throwable) {
-        return GitHubTransportErrors.isTransportError(throwable);
     }
 }

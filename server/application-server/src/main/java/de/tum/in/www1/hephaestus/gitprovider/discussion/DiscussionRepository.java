@@ -62,12 +62,12 @@ public interface DiscussionRepository extends JpaRepository<Discussion, Long> {
         INSERT INTO discussion (
             id, repository_id, number, title, body, html_url, state, state_reason,
             is_locked, active_lock_reason, closed_at, answer_chosen_at, comment_count,
-            last_sync_at, created_at, updated_at, author_id, category_id, answer_chosen_by_id
+            upvote_count, last_sync_at, created_at, updated_at, author_id, category_id, answer_chosen_by_id
         )
         VALUES (
             :id, :repositoryId, :number, :title, :body, :htmlUrl, :state, :stateReason,
             :isLocked, :activeLockReason, :closedAt, :answerChosenAt, :commentCount,
-            :lastSyncAt, :createdAt, :updatedAt, :authorId, :categoryId, :answerChosenById
+            :upvoteCount, :lastSyncAt, :createdAt, :updatedAt, :authorId, :categoryId, :answerChosenById
         )
         ON CONFLICT (repository_id, number) DO UPDATE SET
             title = EXCLUDED.title,
@@ -80,6 +80,7 @@ public interface DiscussionRepository extends JpaRepository<Discussion, Long> {
             closed_at = EXCLUDED.closed_at,
             answer_chosen_at = EXCLUDED.answer_chosen_at,
             comment_count = EXCLUDED.comment_count,
+            upvote_count = EXCLUDED.upvote_count,
             last_sync_at = EXCLUDED.last_sync_at,
             updated_at = EXCLUDED.updated_at,
             author_id = COALESCE(EXCLUDED.author_id, discussion.author_id),
@@ -102,6 +103,7 @@ public interface DiscussionRepository extends JpaRepository<Discussion, Long> {
         @Param("closedAt") Instant closedAt,
         @Param("answerChosenAt") Instant answerChosenAt,
         @Param("commentCount") int commentCount,
+        @Param("upvoteCount") int upvoteCount,
         @Param("lastSyncAt") Instant lastSyncAt,
         @Param("createdAt") Instant createdAt,
         @Param("updatedAt") Instant updatedAt,

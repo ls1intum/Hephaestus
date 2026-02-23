@@ -20,8 +20,7 @@ import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserProcessor;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.Set;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
@@ -40,10 +39,9 @@ import org.springframework.transaction.annotation.Transactional;
  * <li>Categories are resolved or created before the discussion</li>
  * </ul>
  */
+@Slf4j
 @Service
 public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
-
-    private static final Logger log = LoggerFactory.getLogger(GitHubDiscussionProcessor.class);
 
     private final DiscussionRepository discussionRepository;
     private final DiscussionCategoryRepository categoryRepository;
@@ -135,6 +133,7 @@ public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
             dto.closedAt(),
             dto.answerChosenAt(),
             dto.commentsCount(),
+            dto.upvoteCount(),
             now,
             dto.createdAt(),
             dto.updatedAt(),

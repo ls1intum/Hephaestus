@@ -391,6 +391,7 @@ export const discussion = pgTable(
 		answerChosenById: bigint("answer_chosen_by_id", { mode: "number" }),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		answerCommentId: bigint("answer_comment_id", { mode: "number" }),
+		upvoteCount: integer("upvote_count").default(0).notNull(),
 	},
 	(table) => [
 		index("idx_discussion_author").using("btree", table.authorId.asc().nullsLast()),

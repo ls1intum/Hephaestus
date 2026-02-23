@@ -119,6 +119,7 @@ erDiagram
         VARCHAR(128) category_id FK
         BIGINT answer_chosen_by_id FK
         BIGINT answer_comment_id FK,UK
+        INTEGER upvote_count "NOT NULL"
     }
 
     DiscussionCategory {

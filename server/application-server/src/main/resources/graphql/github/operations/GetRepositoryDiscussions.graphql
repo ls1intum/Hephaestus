@@ -36,6 +36,8 @@ query GetRepositoryDiscussions($owner: String!, $name: String!, $first: Int!, $a
                 activeLockReason
                 stateReason
 
+                upvoteCount
+
                 # Answer information (for Q&A discussions)
                 answerChosenAt
                 answerChosenBy {
@@ -230,7 +232,7 @@ query GetRepositoryDiscussions($owner: String!, $name: String!, $first: Int!, $a
                         }
 
                         # Replies to this comment (first 10, embedded)
-                        replies(first: 10) {
+                        replies(first: 100) {
                             totalCount
                             pageInfo {
                                 hasNextPage

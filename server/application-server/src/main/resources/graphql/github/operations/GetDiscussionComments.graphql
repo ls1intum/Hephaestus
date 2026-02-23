@@ -68,7 +68,7 @@ query GetDiscussionComments($owner: String!, $name: String!, $discussionNumber: 
                     }
 
                     # Replies to this comment
-                    replies(first: 10) {
+                    replies(first: 100) {
                         totalCount
                         pageInfo {
                             hasNextPage

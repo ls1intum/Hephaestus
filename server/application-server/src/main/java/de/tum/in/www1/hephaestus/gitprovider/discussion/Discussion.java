@@ -92,6 +92,12 @@ public class Discussion extends BaseGitServiceEntity {
     private int commentsCount;
 
     /**
+     * The number of upvotes on this discussion.
+     */
+    @Column(name = "upvote_count")
+    private int upvoteCount;
+
+    /**
      * The last time the discussion and its comments were synced.
      */
     private Instant lastSyncAt;
