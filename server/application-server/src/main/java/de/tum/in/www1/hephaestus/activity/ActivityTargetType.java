@@ -70,7 +70,12 @@ public enum ActivityTargetType {
     /**
      * Target is a git commit.
      */
-    COMMIT("commit");
+    COMMIT("commit"),
+
+    /**
+     * Target is a discussion (GitHub Discussions).
+     */
+    DISCUSSION("discussion");
 
     private final String value;
 

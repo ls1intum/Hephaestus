@@ -139,6 +139,20 @@ public enum ActivityEventType {
     PROJECT_STATUS_UPDATE_DELETED("project_status_update.deleted"),
 
     // ========================================================================
+    // Discussion Lifecycle (Community engagement tracking)
+    // ========================================================================
+    /** Discussion created - community engagement signal */
+    DISCUSSION_CREATED("discussion.created"),
+    /** Discussion closed - discussion resolved or archived */
+    DISCUSSION_CLOSED("discussion.closed"),
+    /** Discussion reopened - discussion reactivated */
+    DISCUSSION_REOPENED("discussion.reopened"),
+    /** Discussion answered - marks a reply as the accepted answer */
+    DISCUSSION_ANSWERED("discussion.answered"),
+    /** Discussion deleted - audit trail */
+    DISCUSSION_DELETED("discussion.deleted"),
+
+    // ========================================================================
     // Commit Events (Code contribution tracking)
     // ========================================================================
     /** Commit created (pushed to default branch) */

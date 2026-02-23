@@ -1646,6 +1646,178 @@ public class ActivityEventListener {
     }
 
     // ========================================================================
+    // Discussion Events (Community Engagement Tracking)
+    // ========================================================================
+
+    /**
+     * Handle discussion created events.
+     *
+     * <p>Records DISCUSSION_CREATED activity event. Discussions are a community
+     * engagement signal, tracked for activity completeness and optional XP.
+     *
+     * <p>Events are recorded even when author is unknown (null actor).
+     */
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onDiscussionCreated(DomainEvent.DiscussionCreated event) {
+        var discussion = event.discussion();
+        if (!hasValidScopeId("Discussion created", discussion.id(), event.context().scopeId())) {
+            return;
+        }
+        Instant occurredAt = discussion.createdAt() != null ? discussion.createdAt() : Instant.now();
+        User actor = getActorOrNull(discussion.authorId());
+        safeRecord("discussion created", discussion.id(), () ->
+            activityEventService.record(
+                event.context().scopeId(),
+                ActivityEventType.DISCUSSION_CREATED,
+                occurredAt,
+                actor,
+                repositoryRepository.getReferenceById(discussion.repository().id()),
+                ActivityTargetType.DISCUSSION,
+                discussion.id(),
+                xpForActor(actor, xpCalc.getXpDiscussionCreated())
+            )
+        );
+    }
+
+    /**
+     * Handle discussion closed events.
+     *
+     * <p>Records DISCUSSION_CLOSED activity event with 0 XP. Closing a discussion
+     * is lifecycle tracking, not a value-adding activity.
+     *
+     * <p>Events are recorded even when author is unknown (null actor).
+     */
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onDiscussionClosed(DomainEvent.DiscussionClosed event) {
+        var discussion = event.discussion();
+        if (!hasValidScopeId("Discussion closed", discussion.id(), event.context().scopeId())) {
+            return;
+        }
+        Instant occurredAt =
+            discussion.closedAt() != null
+                ? discussion.closedAt()
+                : discussion.updatedAt() != null
+                    ? discussion.updatedAt()
+                    : Instant.now();
+        safeRecord("discussion closed", discussion.id(), () ->
+            activityEventService.record(
+                event.context().scopeId(),
+                ActivityEventType.DISCUSSION_CLOSED,
+                occurredAt,
+                getActorOrNull(discussion.authorId()),
+                repositoryRepository.getReferenceById(discussion.repository().id()),
+                ActivityTargetType.DISCUSSION,
+                discussion.id(),
+                0.0 // Discussion closure is lifecycle tracking, no XP reward
+            )
+        );
+    }
+
+    /**
+     * Handle discussion reopened events.
+     *
+     * <p>Records DISCUSSION_REOPENED activity event with 0 XP. Reopening is
+     * lifecycle tracking indicating resumed community engagement.
+     *
+     * <p>Events are recorded even when author is unknown (null actor).
+     */
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onDiscussionReopened(DomainEvent.DiscussionReopened event) {
+        var discussion = event.discussion();
+        if (!hasValidScopeId("Discussion reopened", discussion.id(), event.context().scopeId())) {
+            return;
+        }
+        Instant occurredAt = discussion.updatedAt() != null ? discussion.updatedAt() : Instant.now();
+        safeRecord("discussion reopened", discussion.id(), () ->
+            activityEventService.record(
+                event.context().scopeId(),
+                ActivityEventType.DISCUSSION_REOPENED,
+                occurredAt,
+                getActorOrNull(discussion.authorId()),
+                repositoryRepository.getReferenceById(discussion.repository().id()),
+                ActivityTargetType.DISCUSSION,
+                discussion.id(),
+                0.0 // Reopening is lifecycle tracking, no XP reward
+            )
+        );
+    }
+
+    /**
+     * Handle discussion answered events.
+     *
+     * <p>Records DISCUSSION_ANSWERED activity event. Having a discussion answered
+     * is a valuable community engagement signal, indicating that the discussion
+     * author's question was resolved.
+     *
+     * <p>XP is awarded to the discussion author (the person who asked the question)
+     * when an answer is chosen, since creating discussions that get answered
+     * demonstrates effective community engagement. The actual answerer would be
+     * tracked via discussion comment events (future enhancement).
+     *
+     * <p>Events are recorded even when author is unknown (null actor).
+     */
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onDiscussionAnswered(DomainEvent.DiscussionAnswered event) {
+        var discussion = event.discussion();
+        if (!hasValidScopeId("Discussion answered", discussion.id(), event.context().scopeId())) {
+            return;
+        }
+        Instant occurredAt =
+            discussion.answerChosenAt() != null
+                ? discussion.answerChosenAt()
+                : discussion.updatedAt() != null
+                    ? discussion.updatedAt()
+                    : Instant.now();
+        User actor = getActorOrNull(discussion.authorId());
+        safeRecord("discussion answered", discussion.id(), () ->
+            activityEventService.record(
+                event.context().scopeId(),
+                ActivityEventType.DISCUSSION_ANSWERED,
+                occurredAt,
+                actor,
+                repositoryRepository.getReferenceById(discussion.repository().id()),
+                ActivityTargetType.DISCUSSION,
+                discussion.id(),
+                xpForActor(actor, xpCalc.getXpDiscussionAnswered())
+            )
+        );
+    }
+
+    /**
+     * Handle discussion deleted events.
+     *
+     * <p>Records audit trail event with 0 XP. Note that we only have the
+     * discussion ID since the entity was deleted.
+     */
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onDiscussionDeleted(DomainEvent.DiscussionDeleted event) {
+        Long discussionId = event.discussionId();
+        if (!hasValidScopeId("Discussion deleted", discussionId, event.context().scopeId())) {
+            return;
+        }
+        log.debug("Recording discussion deleted event: discussionId={}", discussionId);
+        safeRecord("discussion deleted", discussionId, () ->
+            activityEventService.recordDeleted(
+                event.context().scopeId(),
+                ActivityEventType.DISCUSSION_DELETED,
+                Instant.now(),
+                ActivityTargetType.DISCUSSION,
+                discussionId
+            )
+        );
+    }
+
+    // ========================================================================
     // Project Status Update Events
     // ========================================================================
 
