@@ -12,6 +12,7 @@ import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -276,13 +277,13 @@ public abstract class BaseGitHubProcessor {
      * Shared between Issue and PullRequest processors to avoid code duplication.
      *
      * @param labelDtos the label DTOs from GitHub (null means don't update)
-     * @param currentLabels the current label set to update (modified in place)
+     * @param currentLabels the current label collection to update (modified in place)
      * @param repository the repository context for label lookup/creation
      * @return true if labels changed, false otherwise
      */
     protected boolean updateLabels(
         @Nullable List<GitHubLabelDTO> labelDtos,
-        Set<Label> currentLabels,
+        Collection<Label> currentLabels,
         Repository repository
     ) {
         if (labelDtos == null) {
@@ -297,7 +298,7 @@ public abstract class BaseGitHubProcessor {
             }
         }
 
-        if (!currentLabels.equals(newLabels)) {
+        if (!new HashSet<>(currentLabels).equals(newLabels)) {
             currentLabels.clear();
             currentLabels.addAll(newLabels);
             return true;

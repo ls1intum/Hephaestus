@@ -20,8 +20,8 @@ import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.ArrayList;
+import java.util.List;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -129,7 +129,7 @@ public class Discussion extends BaseGitServiceEntity {
 
     @OneToMany(mappedBy = "discussion", cascade = CascadeType.REMOVE, orphanRemoval = true)
     @ToString.Exclude
-    private Set<DiscussionComment> comments = new HashSet<>();
+    private List<DiscussionComment> comments = new ArrayList<>();
 
     @ManyToMany
     @JoinTable(
@@ -138,7 +138,7 @@ public class Discussion extends BaseGitServiceEntity {
         inverseJoinColumns = @JoinColumn(name = "label_id")
     )
     @ToString.Exclude
-    private Set<Label> labels = new HashSet<>();
+    private List<Label> labels = new ArrayList<>();
 
     // ========== Enums ==========
 

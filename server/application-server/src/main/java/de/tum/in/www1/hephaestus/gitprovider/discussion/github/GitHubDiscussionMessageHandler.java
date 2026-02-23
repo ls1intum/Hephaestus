@@ -8,7 +8,6 @@ import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContextFactory;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
-import de.tum.in.www1.hephaestus.gitprovider.discussion.DiscussionRepository;
 import de.tum.in.www1.hephaestus.gitprovider.discussion.github.dto.GitHubDiscussionDTO;
 import de.tum.in.www1.hephaestus.gitprovider.discussion.github.dto.GitHubDiscussionEventDTO;
 import org.slf4j.Logger;
@@ -30,19 +29,16 @@ public class GitHubDiscussionMessageHandler extends GitHubMessageHandler<GitHubD
 
     private final ProcessingContextFactory contextFactory;
     private final GitHubDiscussionProcessor discussionProcessor;
-    private final DiscussionRepository discussionRepository;
 
     public GitHubDiscussionMessageHandler(
         ProcessingContextFactory contextFactory,
         GitHubDiscussionProcessor discussionProcessor,
-        DiscussionRepository discussionRepository,
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate
     ) {
         super(GitHubDiscussionEventDTO.class, deserializer, transactionTemplate);
         this.contextFactory = contextFactory;
         this.discussionProcessor = discussionProcessor;
-        this.discussionRepository = discussionRepository;
     }
 
     @Override
@@ -80,7 +76,10 @@ public class GitHubDiscussionMessageHandler extends GitHubMessageHandler<GitHubD
         ProcessingContext context
     ) {
         switch (event.actionType()) {
-            case GitHubEventAction.Discussion.DELETED -> processDeleted(discussionDto, context);
+            case GitHubEventAction.Discussion.DELETED -> discussionProcessor.processDeleted(discussionDto, context);
+            case GitHubEventAction.Discussion.CLOSED -> discussionProcessor.processClosed(discussionDto, context);
+            case GitHubEventAction.Discussion.REOPENED -> discussionProcessor.processReopened(discussionDto, context);
+            case GitHubEventAction.Discussion.ANSWERED -> discussionProcessor.processAnswered(discussionDto, context);
             case
                 GitHubEventAction.Discussion.CREATED,
                 GitHubEventAction.Discussion.EDITED,
@@ -90,36 +89,13 @@ public class GitHubDiscussionMessageHandler extends GitHubMessageHandler<GitHubD
                 GitHubEventAction.Discussion.UNLOCKED,
                 GitHubEventAction.Discussion.TRANSFERRED,
                 GitHubEventAction.Discussion.CATEGORY_CHANGED,
-                GitHubEventAction.Discussion.ANSWERED,
                 GitHubEventAction.Discussion.UNANSWERED,
                 GitHubEventAction.Discussion.LABELED,
-                GitHubEventAction.Discussion.UNLABELED,
-                GitHubEventAction.Discussion.CLOSED,
-                GitHubEventAction.Discussion.REOPENED -> discussionProcessor.process(discussionDto, context);
+                GitHubEventAction.Discussion.UNLABELED -> discussionProcessor.process(discussionDto, context);
             default -> {
                 log.debug("Skipped discussion event: reason=unhandledAction, action={}", event.action());
                 discussionProcessor.process(discussionDto, context);
             }
-        }
-    }
-
-    private void processDeleted(GitHubDiscussionDTO discussionDto, ProcessingContext context) {
-        Long dbId = discussionDto.getDatabaseId();
-        if (dbId != null) {
-            discussionRepository.deleteById(dbId);
-            log.info("Deleted discussion: discussionId={}, discussionNumber={}", dbId, discussionDto.number());
-        } else {
-            // Try to find by repository ID and number if database ID is not available
-            discussionRepository
-                .findByRepositoryIdAndNumber(context.repository().getId(), discussionDto.number())
-                .ifPresent(discussion -> {
-                    discussionRepository.delete(discussion);
-                    log.info(
-                        "Deleted discussion: discussionId={}, discussionNumber={}",
-                        discussion.getId(),
-                        discussionDto.number()
-                    );
-                });
         }
     }
 }

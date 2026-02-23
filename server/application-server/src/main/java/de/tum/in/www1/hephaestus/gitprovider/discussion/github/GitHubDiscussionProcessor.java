@@ -16,7 +16,9 @@ import de.tum.in.www1.hephaestus.gitprovider.milestone.MilestoneRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserProcessor;
 import java.time.Instant;
+import java.util.Optional;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,11 +53,12 @@ public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
         UserRepository userRepository,
         LabelRepository labelRepository,
         MilestoneRepository milestoneRepository,
+        GitHubUserProcessor gitHubUserProcessor,
         DiscussionRepository discussionRepository,
         DiscussionCategoryRepository categoryRepository,
         ApplicationEventPublisher eventPublisher
     ) {
-        super(userRepository, labelRepository, milestoneRepository);
+        super(userRepository, labelRepository, milestoneRepository, gitHubUserProcessor);
         this.discussionRepository = discussionRepository;
         this.categoryRepository = categoryRepository;
         this.eventPublisher = eventPublisher;
@@ -81,8 +84,30 @@ public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
 
         Repository repository = context.repository();
 
-        // Check if this is an update (for logging purposes)
-        boolean isNew = !discussionRepository.existsByRepositoryIdAndNumber(repository.getId(), dto.number());
+        // Check if this is an update and apply stale-data protection
+        Optional<Discussion> existingOpt = discussionRepository.findByRepositoryIdAndNumber(
+            repository.getId(),
+            dto.number()
+        );
+        boolean isNew = existingOpt.isEmpty();
+
+        // Skip update if existing data is newer (prevents stale webhooks from overwriting)
+        if (!isNew) {
+            Discussion existing = existingOpt.get();
+            if (
+                existing.getUpdatedAt() != null &&
+                dto.updatedAt() != null &&
+                !dto.updatedAt().isAfter(existing.getUpdatedAt())
+            ) {
+                log.debug(
+                    "Skipped stale discussion update: discussionId={}, existingUpdatedAt={}, dtoUpdatedAt={}",
+                    existing.getId(),
+                    existing.getUpdatedAt(),
+                    dto.updatedAt()
+                );
+                return existing;
+            }
+        }
 
         // Resolve related entities BEFORE the upsert
         User author = dto.author() != null ? findOrCreateUser(dto.author()) : null;
@@ -149,6 +174,109 @@ public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
             eventPublisher.publishEvent(new DomainEvent.DiscussionUpdated(discussionData, Set.of(), eventContext));
         }
 
+        return discussion;
+    }
+
+    /**
+     * Process a deleted discussion event.
+     * Removes the discussion from the database and publishes a DiscussionDeleted domain event.
+     *
+     * @param dto     the discussion DTO (used to locate the discussion)
+     * @param context the processing context
+     */
+    @Transactional
+    public void processDeleted(GitHubDiscussionDTO dto, ProcessingContext context) {
+        Long dbId = dto.getDatabaseId();
+        EventContext eventContext = EventContext.from(context);
+
+        if (dbId != null) {
+            discussionRepository.deleteById(dbId);
+            eventPublisher.publishEvent(new DomainEvent.DiscussionDeleted(dbId, eventContext));
+            log.info("Deleted discussion: discussionId={}, discussionNumber={}", dbId, dto.number());
+        } else {
+            // Try to find by repository ID and number if database ID is not available
+            discussionRepository
+                .findByRepositoryIdAndNumber(context.repository().getId(), dto.number())
+                .ifPresent(discussion -> {
+                    Long discussionId = discussion.getId();
+                    discussionRepository.delete(discussion);
+                    eventPublisher.publishEvent(new DomainEvent.DiscussionDeleted(discussionId, eventContext));
+                    log.info("Deleted discussion: discussionId={}, discussionNumber={}", discussionId, dto.number());
+                });
+        }
+    }
+
+    /**
+     * Process a closed discussion event.
+     * Publishes a DiscussionClosed domain event in addition to the standard update.
+     *
+     * @param dto     the discussion DTO
+     * @param context the processing context
+     * @return the updated Discussion entity, or null if processing failed
+     */
+    @Transactional
+    public Discussion processClosed(GitHubDiscussionDTO dto, ProcessingContext context) {
+        Discussion discussion = process(dto, context);
+        if (discussion != null) {
+            String stateReason = dto.stateReason() != null ? dto.stateReason() : null;
+            eventPublisher.publishEvent(
+                new DomainEvent.DiscussionClosed(
+                    EventPayload.DiscussionData.from(discussion),
+                    stateReason,
+                    EventContext.from(context)
+                )
+            );
+            log.debug("Closed discussion: discussionId={}, stateReason={}", discussion.getId(), stateReason);
+        }
+        return discussion;
+    }
+
+    /**
+     * Process a reopened discussion event.
+     * Publishes a DiscussionReopened domain event in addition to the standard update.
+     *
+     * @param dto     the discussion DTO
+     * @param context the processing context
+     * @return the updated Discussion entity, or null if processing failed
+     */
+    @Transactional
+    public Discussion processReopened(GitHubDiscussionDTO dto, ProcessingContext context) {
+        Discussion discussion = process(dto, context);
+        if (discussion != null) {
+            eventPublisher.publishEvent(
+                new DomainEvent.DiscussionReopened(
+                    EventPayload.DiscussionData.from(discussion),
+                    EventContext.from(context)
+                )
+            );
+            log.debug("Reopened discussion: discussionId={}", discussion.getId());
+        }
+        return discussion;
+    }
+
+    /**
+     * Process an answered discussion event.
+     * Publishes a DiscussionAnswered domain event in addition to the standard update.
+     *
+     * @param dto     the discussion DTO
+     * @param context the processing context
+     * @return the updated Discussion entity, or null if processing failed
+     */
+    @Transactional
+    public Discussion processAnswered(GitHubDiscussionDTO dto, ProcessingContext context) {
+        Discussion discussion = process(dto, context);
+        if (discussion != null) {
+            // The answer comment's database ID, if available from the DTO
+            Long answerCommentId = dto.answerComment() != null ? dto.answerComment().getDatabaseId() : null;
+            eventPublisher.publishEvent(
+                new DomainEvent.DiscussionAnswered(
+                    EventPayload.DiscussionData.from(discussion),
+                    answerCommentId != null ? answerCommentId : 0L,
+                    EventContext.from(context)
+                )
+            );
+            log.debug("Answered discussion: discussionId={}, answerCommentId={}", discussion.getId(), answerCommentId);
+        }
         return discussion;
     }
 

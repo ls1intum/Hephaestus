@@ -11,6 +11,7 @@ import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.MilestoneRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserProcessor;
 import java.time.Instant;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -38,9 +39,10 @@ public class GitHubDiscussionCommentProcessor extends BaseGitHubProcessor {
         UserRepository userRepository,
         LabelRepository labelRepository,
         MilestoneRepository milestoneRepository,
+        GitHubUserProcessor gitHubUserProcessor,
         DiscussionCommentRepository commentRepository
     ) {
-        super(userRepository, labelRepository, milestoneRepository);
+        super(userRepository, labelRepository, milestoneRepository, gitHubUserProcessor);
         this.commentRepository = commentRepository;
     }
 
@@ -101,6 +103,25 @@ public class GitHubDiscussionCommentProcessor extends BaseGitHubProcessor {
         }
 
         return comment;
+    }
+
+    /**
+     * Delete a discussion comment by its database ID.
+     * <p>
+     * This method is the single entry point for discussion comment deletion,
+     * following the pattern where all data mutations are handled by processors.
+     *
+     * @param commentDto the comment DTO containing the ID to delete
+     */
+    @Transactional
+    public void processDeleted(GitHubDiscussionCommentDTO commentDto) {
+        Long dbId = commentDto.getDatabaseId();
+        if (dbId != null) {
+            commentRepository.deleteById(dbId);
+            log.info("Deleted discussion comment: commentId={}", dbId);
+        } else {
+            log.warn("Cannot delete discussion comment: reason=missingDatabaseId");
+        }
     }
 
     /**

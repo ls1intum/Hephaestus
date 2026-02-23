@@ -11,8 +11,9 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.ArrayList;
+import java.util.List;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -34,6 +35,7 @@ import org.springframework.lang.NonNull;
 @Setter
 @NoArgsConstructor
 @ToString
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class DiscussionCategory {
 
     /**
@@ -42,6 +44,7 @@ public class DiscussionCategory {
      */
     @Id
     @Column(length = 128)
+    @EqualsAndHashCode.Include
     private String id;
 
     @NonNull
@@ -70,7 +73,7 @@ public class DiscussionCategory {
 
     @OneToMany(mappedBy = "category")
     @ToString.Exclude
-    private Set<Discussion> discussions = new HashSet<>();
+    private List<Discussion> discussions = new ArrayList<>();
 
     private Instant createdAt;
 

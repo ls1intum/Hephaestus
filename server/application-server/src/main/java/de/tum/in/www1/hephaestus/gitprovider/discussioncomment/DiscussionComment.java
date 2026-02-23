@@ -14,8 +14,8 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import java.time.Instant;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.ArrayList;
+import java.util.List;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -98,7 +98,7 @@ public class DiscussionComment extends BaseGitServiceEntity {
      */
     @OneToMany(mappedBy = "parentComment")
     @ToString.Exclude
-    private Set<DiscussionComment> replies = new HashSet<>();
+    private List<DiscussionComment> replies = new ArrayList<>();
 
     /**
      * Check if this is a top-level comment (not a reply).

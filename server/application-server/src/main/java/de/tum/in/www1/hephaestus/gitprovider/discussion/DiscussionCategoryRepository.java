@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Repository for DiscussionCategory entities.
@@ -33,6 +34,7 @@ public interface DiscussionCategoryRepository extends JpaRepository<DiscussionCa
      *
      * @return number of rows affected (1 for insert or update)
      */
+    @Transactional
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(
         value = """

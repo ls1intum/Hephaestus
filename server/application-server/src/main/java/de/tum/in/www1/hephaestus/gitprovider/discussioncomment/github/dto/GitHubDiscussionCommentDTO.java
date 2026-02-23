@@ -12,6 +12,7 @@ import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import org.springframework.lang.Nullable;
 
 /**
@@ -94,7 +95,7 @@ public record GitHubDiscussionCommentDTO(
             .getNodes()
             .stream()
             .map(GitHubDiscussionCommentDTO::fromDiscussionComment)
-            .filter(dto -> dto != null)
+            .filter(Objects::nonNull)
             .toList();
     }
 

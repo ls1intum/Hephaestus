@@ -5,6 +5,7 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncCons
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.MAX_PAGINATION_PAGES;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
+import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.ExponentialBackoff;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.Category;
@@ -13,6 +14,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientPr
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubTransportErrors;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.BackfillStateProvider;
 import de.tum.in.www1.hephaestus.gitprovider.discussion.Discussion;
 import de.tum.in.www1.hephaestus.gitprovider.discussion.DiscussionRepository;
@@ -27,16 +29,19 @@ import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPageInfo;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.sync.SyncResult;
+import de.tum.in.www1.hephaestus.gitprovider.sync.SyncSchedulerProperties;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.graphql.client.ClientGraphQlResponse;
-import org.springframework.graphql.client.GraphQlTransportException;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
@@ -55,13 +60,13 @@ import reactor.util.retry.Retry;
  * When a sync target ID is provided, the pagination cursor is persisted after
  * each page, allowing sync to resume from where it left off if interrupted.
  */
+@Slf4j
 @Service
+@RequiredArgsConstructor
 public class GitHubDiscussionSyncService {
 
-    private static final Logger log = LoggerFactory.getLogger(GitHubDiscussionSyncService.class);
     private static final String QUERY_DOCUMENT = "GetRepositoryDiscussions";
     private static final String COMMENTS_QUERY_DOCUMENT = "GetDiscussionComments";
-    private static final int EMBEDDED_COMMENTS_COUNT = 10;
 
     /** Maximum number of retry attempts for transient failures. */
     private static final int MAX_RETRY_ATTEMPTS = 3;
@@ -94,43 +99,20 @@ public class GitHubDiscussionSyncService {
     private final TransactionTemplate transactionTemplate;
     private final GitHubSyncProperties syncProperties;
     private final GitHubExceptionClassifier exceptionClassifier;
-
-    public GitHubDiscussionSyncService(
-        RepositoryRepository repositoryRepository,
-        DiscussionRepository discussionRepository,
-        DiscussionCommentRepository commentRepository,
-        GitHubGraphQlClientProvider graphQlClientProvider,
-        GitHubDiscussionProcessor discussionProcessor,
-        GitHubDiscussionCommentProcessor commentProcessor,
-        BackfillStateProvider backfillStateProvider,
-        TransactionTemplate transactionTemplate,
-        GitHubSyncProperties syncProperties,
-        GitHubExceptionClassifier exceptionClassifier
-    ) {
-        this.repositoryRepository = repositoryRepository;
-        this.discussionRepository = discussionRepository;
-        this.commentRepository = commentRepository;
-        this.graphQlClientProvider = graphQlClientProvider;
-        this.discussionProcessor = discussionProcessor;
-        this.commentProcessor = commentProcessor;
-        this.backfillStateProvider = backfillStateProvider;
-        this.transactionTemplate = transactionTemplate;
-        this.syncProperties = syncProperties;
-        this.exceptionClassifier = exceptionClassifier;
-    }
+    private final SyncSchedulerProperties syncSchedulerProperties;
 
     /**
      * Synchronizes all discussions for a repository without cursor persistence.
      * <p>
      * This method is kept for backward compatibility. For resumable sync with
-     * cursor persistence, use {@link #syncForRepository(Long, Long, Long, String)}.
+     * cursor persistence, use {@link #syncForRepository(Long, Long, Long, String, Instant)}.
      *
      * @param scopeId      the scope ID for authentication
      * @param repositoryId the repository ID to sync discussions for
      * @return sync result containing status and count of discussions synced
      */
     public SyncResult syncForRepository(Long scopeId, Long repositoryId) {
-        return syncForRepository(scopeId, repositoryId, null, null);
+        return syncForRepository(scopeId, repositoryId, null, null, null);
     }
 
     /**
@@ -154,6 +136,37 @@ public class GitHubDiscussionSyncService {
         @Nullable Long syncTargetId,
         @Nullable String initialCursor
     ) {
+        return syncForRepository(scopeId, repositoryId, syncTargetId, initialCursor, null);
+    }
+
+    /**
+     * Synchronizes discussions for a repository with incremental sync support.
+     * <p>
+     * When {@code lastSyncTimestamp} is provided and incremental sync is enabled,
+     * discussions whose {@code createdAt} is older than the effective timestamp are
+     * skipped during the first sync. Since GitHub's GraphQL API doesn't support
+     * filtering discussions by date, we implement client-side filtering.
+     * <p>
+     * When {@code syncTargetId} is provided, the pagination cursor is persisted after
+     * each successfully processed page. This allows sync to resume from where it left
+     * off if the process is interrupted (e.g., crash, timeout, deployment).
+     * <p>
+     * On successful completion, the cursor is cleared to indicate sync finished.
+     *
+     * @param scopeId           the scope ID for authentication
+     * @param repositoryId      the repository ID to sync discussions for
+     * @param syncTargetId      the sync target ID for cursor persistence (null to disable)
+     * @param initialCursor     the cursor to resume from (null to start from beginning)
+     * @param lastSyncTimestamp the timestamp of the last sync for incremental sync (null for full sync)
+     * @return sync result containing status and count of discussions synced
+     */
+    public SyncResult syncForRepository(
+        Long scopeId,
+        Long repositoryId,
+        @Nullable Long syncTargetId,
+        @Nullable String initialCursor,
+        @Nullable Instant lastSyncTimestamp
+    ) {
         // Fetch repository outside of transaction
         Repository repository = transactionTemplate.execute(status ->
             repositoryRepository.findById(repositoryId).orElse(null)
@@ -174,6 +187,25 @@ public class GitHubDiscussionSyncService {
 
         HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
         Duration timeout = syncProperties.graphqlTimeout();
+
+        // Determine the effective cutoff for first-sync timeframe limiting
+        // For first sync (lastSyncTimestamp == null), use configured timeframe as fallback
+        Instant firstSyncCutoff = null;
+        if (syncProperties.incrementalSyncEnabled()) {
+            if (lastSyncTimestamp == null) {
+                // First sync - use configured timeframe as fallback to limit initial data fetch
+                firstSyncCutoff = OffsetDateTime.now(ZoneOffset.UTC)
+                    .minusDays(syncSchedulerProperties.timeframeDays())
+                    .toInstant();
+                log.info(
+                    "Starting first discussion sync with timeframe fallback: repoName={}, timeframeDays={}, since={}",
+                    safeNameWithOwner,
+                    syncSchedulerProperties.timeframeDays(),
+                    firstSyncCutoff
+                );
+            }
+        }
+        final Instant effectiveFirstSyncCutoff = firstSyncCutoff;
 
         int totalDiscussionsSynced = 0;
         int totalCommentsSynced = 0;
@@ -266,7 +298,12 @@ public class GitHubDiscussionSyncService {
                         return new PageResult(0, 0);
                     }
                     ProcessingContext context = ProcessingContext.forSync(scopeId, repo);
-                    return processDiscussionPage(connection, context, pageDiscussionsNeedingPagination);
+                    return processDiscussionPage(
+                        connection,
+                        context,
+                        pageDiscussionsNeedingPagination,
+                        effectiveFirstSyncCutoff
+                    );
                 });
 
                 if (pageResult != null) {
@@ -286,6 +323,21 @@ public class GitHubDiscussionSyncService {
 
                 // Reset retry counter after successful page
                 retryAttempt = 0;
+
+                // Throttle between pagination requests to avoid hammering GitHub
+                // This reduces 502/504 errors caused by rapid-fire complex queries
+                if (hasMore && !syncProperties.paginationThrottle().isZero()) {
+                    try {
+                        Thread.sleep(syncProperties.paginationThrottle().toMillis());
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        log.debug("Discussion sync interrupted during throttle: repoName={}", safeNameWithOwner);
+                        break;
+                    }
+                }
+            } catch (InstallationNotFoundException e) {
+                // Re-throw to abort the entire sync operation
+                throw e;
             } catch (Exception e) {
                 ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
                 Category category = classification.category();
@@ -416,11 +468,17 @@ public class GitHubDiscussionSyncService {
     /**
      * Processes a page of discussions with embedded comments.
      * Also populates the list of discussions that need additional comment pagination.
+     *
+     * @param connection                  the GraphQL discussion connection
+     * @param context                     the processing context
+     * @param discussionsNeedingPagination list to populate with discussions needing comment pagination
+     * @param firstSyncCutoff             optional cutoff timestamp; discussions created before this are skipped
      */
     private PageResult processDiscussionPage(
         GHDiscussionConnection connection,
         ProcessingContext context,
-        List<DiscussionWithCommentCursor> discussionsNeedingPagination
+        List<DiscussionWithCommentCursor> discussionsNeedingPagination,
+        @Nullable Instant firstSyncCutoff
     ) {
         int discussionsSynced = 0;
         int commentsSynced = 0;
@@ -431,6 +489,15 @@ public class GitHubDiscussionSyncService {
         for (var graphQlDiscussion : connection.getNodes()) {
             GitHubDiscussionDTO discussionDTO = GitHubDiscussionDTO.fromDiscussion(graphQlDiscussion);
             if (discussionDTO == null) {
+                continue;
+            }
+
+            // Skip discussions created before the first-sync cutoff
+            if (
+                firstSyncCutoff != null &&
+                discussionDTO.createdAt() != null &&
+                discussionDTO.createdAt().isBefore(firstSyncCutoff)
+            ) {
                 continue;
             }
 
@@ -642,6 +709,23 @@ public class GitHubDiscussionSyncService {
                 GHPageInfo pageInfo = connection.getPageInfo();
                 hasMore = pageInfo != null && pageInfo.getHasNextPage();
                 cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
+
+                // Throttle between pagination requests to avoid hammering GitHub
+                if (hasMore && !syncProperties.paginationThrottle().isZero()) {
+                    try {
+                        Thread.sleep(syncProperties.paginationThrottle().toMillis());
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        log.debug(
+                            "Remaining comment sync interrupted during throttle: discussionNumber={}",
+                            discussionNumber
+                        );
+                        break;
+                    }
+                }
+            } catch (InstallationNotFoundException e) {
+                // Re-throw to abort the entire sync operation
+                throw e;
             } catch (Exception e) {
                 ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
                 log.error(
@@ -704,42 +788,15 @@ public class GitHubDiscussionSyncService {
 
     /**
      * Determines if an exception is a transport-level error that should be retried.
+     * <p>
+     * Delegates to the shared {@link GitHubTransportErrors} utility which covers all
+     * known transport failure modes including connection resets, premature closes,
+     * aborted connections, stream closures, and blocking read timeouts.
      *
      * @param throwable the exception to check
      * @return true if this is a retryable transport error
      */
     private boolean isTransportError(Throwable throwable) {
-        if (throwable instanceof GraphQlTransportException) {
-            return true;
-        }
-
-        Throwable cause = throwable;
-        while (cause != null) {
-            String className = cause.getClass().getName();
-            if (
-                className.contains("PrematureCloseException") ||
-                className.contains("AbortedException") ||
-                className.contains("ConnectionResetException")
-            ) {
-                return true;
-            }
-
-            if (cause instanceof java.io.IOException) {
-                String message = cause.getMessage();
-                if (message != null) {
-                    String lower = message.toLowerCase();
-                    if (
-                        lower.contains("connection reset") ||
-                        lower.contains("broken pipe") ||
-                        lower.contains("premature")
-                    ) {
-                        return true;
-                    }
-                }
-            }
-
-            cause = cause.getCause();
-        }
-        return false;
+        return GitHubTransportErrors.isTransportError(throwable);
     }
 }

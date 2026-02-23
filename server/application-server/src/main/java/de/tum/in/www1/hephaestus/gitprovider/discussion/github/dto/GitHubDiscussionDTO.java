@@ -94,7 +94,7 @@ public record GitHubDiscussionDTO(
             GitHubUserDTO.fromActor(discussion.getAuthor()),
             GitHubUserDTO.fromActor(discussion.getAnswerChosenBy()),
             GitHubDiscussionCategoryDTO.fromDiscussionCategory(discussion.getCategory()),
-            GitHubLabelDTO.fromLabelConnection(discussion.getLabels()),
+            GitHubLabelDTO.fromLabelConnection(discussion.getLabels(), "Discussion #" + discussion.getNumber()),
             GitHubDiscussionCommentDTO.fromDiscussionComment(discussion.getAnswer())
         );
     }

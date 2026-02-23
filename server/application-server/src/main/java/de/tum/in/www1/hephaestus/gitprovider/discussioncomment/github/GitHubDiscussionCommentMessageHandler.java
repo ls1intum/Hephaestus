@@ -9,10 +9,8 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
 import de.tum.in.www1.hephaestus.gitprovider.discussion.Discussion;
-import de.tum.in.www1.hephaestus.gitprovider.discussion.DiscussionRepository;
 import de.tum.in.www1.hephaestus.gitprovider.discussion.github.GitHubDiscussionProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.discussion.github.dto.GitHubDiscussionDTO;
-import de.tum.in.www1.hephaestus.gitprovider.discussioncomment.DiscussionCommentRepository;
 import de.tum.in.www1.hephaestus.gitprovider.discussioncomment.github.dto.GitHubDiscussionCommentDTO;
 import de.tum.in.www1.hephaestus.gitprovider.discussioncomment.github.dto.GitHubDiscussionCommentEventDTO;
 import org.slf4j.Logger;
@@ -36,15 +34,11 @@ public class GitHubDiscussionCommentMessageHandler extends GitHubMessageHandler<
     private final ProcessingContextFactory contextFactory;
     private final GitHubDiscussionProcessor discussionProcessor;
     private final GitHubDiscussionCommentProcessor commentProcessor;
-    private final DiscussionRepository discussionRepository;
-    private final DiscussionCommentRepository commentRepository;
 
     public GitHubDiscussionCommentMessageHandler(
         ProcessingContextFactory contextFactory,
         GitHubDiscussionProcessor discussionProcessor,
         GitHubDiscussionCommentProcessor commentProcessor,
-        DiscussionRepository discussionRepository,
-        DiscussionCommentRepository commentRepository,
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate
     ) {
@@ -52,8 +46,6 @@ public class GitHubDiscussionCommentMessageHandler extends GitHubMessageHandler<
         this.contextFactory = contextFactory;
         this.discussionProcessor = discussionProcessor;
         this.commentProcessor = commentProcessor;
-        this.discussionRepository = discussionRepository;
-        this.commentRepository = commentRepository;
     }
 
     @Override
@@ -86,7 +78,7 @@ public class GitHubDiscussionCommentMessageHandler extends GitHubMessageHandler<
 
         // Handle comment action
         if (event.actionType() == GitHubEventAction.DiscussionComment.DELETED) {
-            processDeleted(commentDto, context);
+            commentProcessor.processDeleted(commentDto);
         } else {
             // Process the discussion first to ensure it exists
             Discussion discussion = discussionProcessor.process(discussionDto, context);
@@ -100,16 +92,6 @@ public class GitHubDiscussionCommentMessageHandler extends GitHubMessageHandler<
 
             // Process the comment
             commentProcessor.process(commentDto, discussion, context);
-        }
-    }
-
-    private void processDeleted(GitHubDiscussionCommentDTO commentDto, ProcessingContext context) {
-        Long dbId = commentDto.getDatabaseId();
-        if (dbId != null) {
-            commentRepository.deleteById(dbId);
-            log.info("Deleted discussion comment: commentId={}", dbId);
-        } else {
-            log.warn("Cannot delete discussion comment: reason=missingDatabaseId");
         }
     }
 }
