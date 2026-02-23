@@ -2,7 +2,9 @@ package de.tum.in.www1.hephaestus.gitprovider.discussion.github;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.DEFAULT_PAGE_SIZE;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.DISCUSSION_SYNC_PAGE_SIZE;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.MAX_PAGINATION_PAGES;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.adaptPageSize;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
@@ -11,16 +13,18 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassi
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.Category;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoordinator;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoordinator.GraphQlClassificationContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubTransportErrors;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GraphQlConnectionOverflowDetector;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.BackfillStateProvider;
 import de.tum.in.www1.hephaestus.gitprovider.discussion.Discussion;
 import de.tum.in.www1.hephaestus.gitprovider.discussion.DiscussionRepository;
 import de.tum.in.www1.hephaestus.gitprovider.discussion.github.dto.GitHubDiscussionDTO;
 import de.tum.in.www1.hephaestus.gitprovider.discussioncomment.DiscussionComment;
-import de.tum.in.www1.hephaestus.gitprovider.discussioncomment.DiscussionCommentRepository;
 import de.tum.in.www1.hephaestus.gitprovider.discussioncomment.github.GitHubDiscussionCommentProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.discussioncomment.github.dto.GitHubDiscussionCommentDTO;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHDiscussionCommentConnection;
@@ -29,11 +33,9 @@ import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPageInfo;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.sync.SyncResult;
-import de.tum.in.www1.hephaestus.gitprovider.sync.SyncSchedulerProperties;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -91,7 +93,6 @@ public class GitHubDiscussionSyncService {
 
     private final RepositoryRepository repositoryRepository;
     private final DiscussionRepository discussionRepository;
-    private final DiscussionCommentRepository commentRepository;
     private final GitHubGraphQlClientProvider graphQlClientProvider;
     private final GitHubDiscussionProcessor discussionProcessor;
     private final GitHubDiscussionCommentProcessor commentProcessor;
@@ -99,7 +100,7 @@ public class GitHubDiscussionSyncService {
     private final TransactionTemplate transactionTemplate;
     private final GitHubSyncProperties syncProperties;
     private final GitHubExceptionClassifier exceptionClassifier;
-    private final SyncSchedulerProperties syncSchedulerProperties;
+    private final GitHubGraphQlSyncCoordinator graphQlSyncHelper;
 
     /**
      * Synchronizes all discussions for a repository without cursor persistence.
@@ -142,10 +143,15 @@ public class GitHubDiscussionSyncService {
     /**
      * Synchronizes discussions for a repository with incremental sync support.
      * <p>
+     * Discussions are ordered by {@code UPDATED_AT DESC} in the GraphQL query.
      * When {@code lastSyncTimestamp} is provided and incremental sync is enabled,
-     * discussions whose {@code createdAt} is older than the effective timestamp are
-     * skipped during the first sync. Since GitHub's GraphQL API doesn't support
-     * filtering discussions by date, we implement client-side filtering.
+     * pagination stops early once the oldest discussion on a page has an
+     * {@code updatedAt} before the effective sync timestamp (mirroring PR sync).
+     * All discussions on each fetched page are still processed — the timestamp
+     * is a <b>stop-condition</b>, not a skip-filter.
+     * <p>
+     * For the first sync ({@code lastSyncTimestamp == null}), ALL discussions are
+     * fetched with no time filter so historical data is not silently dropped.
      * <p>
      * When {@code syncTargetId} is provided, the pagination cursor is persisted after
      * each successfully processed page. This allows sync to resume from where it left
@@ -188,24 +194,26 @@ public class GitHubDiscussionSyncService {
         HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
         Duration timeout = syncProperties.graphqlTimeout();
 
-        // Determine the effective cutoff for first-sync timeframe limiting
-        // For first sync (lastSyncTimestamp == null), use configured timeframe as fallback
-        Instant firstSyncCutoff = null;
-        if (syncProperties.incrementalSyncEnabled()) {
-            if (lastSyncTimestamp == null) {
-                // First sync - use configured timeframe as fallback to limit initial data fetch
-                firstSyncCutoff = OffsetDateTime.now(ZoneOffset.UTC)
-                    .minusDays(syncSchedulerProperties.timeframeDays())
-                    .toInstant();
-                log.info(
-                    "Starting first discussion sync with timeframe fallback: repoName={}, timeframeDays={}, since={}",
-                    safeNameWithOwner,
-                    syncSchedulerProperties.timeframeDays(),
-                    firstSyncCutoff
-                );
-            }
+        // Determine the effective timestamp for incremental sync stop-condition.
+        // Discussions are ordered by UPDATED_AT DESC, so we stop pagination when the
+        // oldest discussion on a page has updatedAt < effectiveSyncTimestamp.
+        // For first sync (lastSyncTimestamp == null): fetch ALL discussions (no filter).
+        // For incremental sync: use lastSyncTimestamp minus safety buffer.
+        Instant effectiveSyncTimestamp = null;
+        boolean isIncrementalSync = false;
+        if (syncProperties.incrementalSyncEnabled() && lastSyncTimestamp != null) {
+            effectiveSyncTimestamp = lastSyncTimestamp.minus(syncProperties.incrementalSyncBuffer());
+            isIncrementalSync = true;
+            log.info(
+                "Starting incremental discussion sync: repoName={}, since={}, buffer={}",
+                safeNameWithOwner,
+                effectiveSyncTimestamp,
+                syncProperties.incrementalSyncBuffer()
+            );
+        } else {
+            log.info("Starting full discussion sync (no timeframe filter): repoName={}", safeNameWithOwner);
         }
-        final Instant effectiveFirstSyncCutoff = firstSyncCutoff;
+        final boolean incrementalSync = isIncrementalSync;
 
         int totalDiscussionsSynced = 0;
         int totalCommentsSynced = 0;
@@ -215,7 +223,9 @@ public class GitHubDiscussionSyncService {
         int pageCount = 0;
         int retryAttempt = 0;
         boolean resuming = initialCursor != null;
+        boolean stoppedByIncrementalSync = false;
         SyncResult.Status abortReason = null;
+        int reportedTotalCount = -1;
 
         if (resuming) {
             log.info(
@@ -244,7 +254,13 @@ public class GitHubDiscussionSyncService {
                         .documentName(QUERY_DOCUMENT)
                         .variable("owner", ownerAndName.owner())
                         .variable("name", ownerAndName.name())
-                        .variable("first", DEFAULT_PAGE_SIZE)
+                        .variable(
+                            "first",
+                            adaptPageSize(
+                                DISCUSSION_SYNC_PAGE_SIZE,
+                                graphQlClientProvider.getRateLimitRemaining(scopeId)
+                            )
+                        )
                         .variable("after", currentCursor)
                         .execute()
                 )
@@ -265,20 +281,42 @@ public class GitHubDiscussionSyncService {
                     .block(timeout);
 
                 if (response == null || !response.isValid()) {
-                    log.warn(
-                        "Received invalid GraphQL response: repoName={}, errors={}",
-                        safeNameWithOwner,
-                        response != null ? response.getErrors() : "null"
-                    );
+                    var classification = graphQlSyncHelper.classifyGraphQlErrors(response);
+                    if (classification != null) {
+                        boolean shouldRetry = graphQlSyncHelper.handleGraphQlClassification(
+                            new GraphQlClassificationContext(
+                                classification,
+                                retryAttempt,
+                                MAX_RETRY_ATTEMPTS,
+                                "discussion sync",
+                                "repoName",
+                                safeNameWithOwner,
+                                log
+                            )
+                        );
+                        if (shouldRetry) {
+                            retryAttempt++;
+                            continue;
+                        }
+                    }
+                    abortReason = SyncResult.Status.ABORTED_ERROR;
                     break;
                 }
 
                 // Track rate limit
                 graphQlClientProvider.trackRateLimit(scopeId, response);
                 if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
-                    log.warn("Aborting discussion sync due to critical rate limit: repoName={}", safeNameWithOwner);
-                    abortReason = SyncResult.Status.ABORTED_RATE_LIMIT;
-                    break;
+                    boolean canContinue = graphQlSyncHelper.waitForRateLimitIfNeeded(
+                        scopeId,
+                        "discussion sync",
+                        "repoName",
+                        safeNameWithOwner,
+                        log
+                    );
+                    if (!canContinue) {
+                        abortReason = SyncResult.Status.ABORTED_RATE_LIMIT;
+                        break;
+                    }
                 }
 
                 GHDiscussionConnection connection = response
@@ -287,6 +325,11 @@ public class GitHubDiscussionSyncService {
 
                 if (connection == null || connection.getNodes() == null || connection.getNodes().isEmpty()) {
                     break;
+                }
+
+                // Capture reported total count from the first page
+                if (reportedTotalCount < 0) {
+                    reportedTotalCount = connection.getTotalCount();
                 }
 
                 // Process page within transaction
@@ -298,12 +341,7 @@ public class GitHubDiscussionSyncService {
                         return new PageResult(0, 0);
                     }
                     ProcessingContext context = ProcessingContext.forSync(scopeId, repo);
-                    return processDiscussionPage(
-                        connection,
-                        context,
-                        pageDiscussionsNeedingPagination,
-                        effectiveFirstSyncCutoff
-                    );
+                    return processDiscussionPage(connection, context, pageDiscussionsNeedingPagination);
                 });
 
                 if (pageResult != null) {
@@ -315,6 +353,26 @@ public class GitHubDiscussionSyncService {
                 GHPageInfo pageInfo = connection.getPageInfo();
                 hasMore = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
                 cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
+
+                // For incremental sync: check if the oldest discussion on this page
+                // is older than effectiveSyncTimestamp. Discussions are ordered by
+                // updatedAt DESC, so the last item is the oldest on the page.
+                if (incrementalSync && hasMore && effectiveSyncTimestamp != null) {
+                    var nodes = connection.getNodes();
+                    if (!nodes.isEmpty()) {
+                        var oldestDiscussion = nodes.get(nodes.size() - 1);
+                        OffsetDateTime oldestUpdatedAt = oldestDiscussion.getUpdatedAt();
+                        if (oldestUpdatedAt != null && oldestUpdatedAt.toInstant().isBefore(effectiveSyncTimestamp)) {
+                            log.debug(
+                                "Stopping incremental discussion sync: oldestUpdatedAt={} is before effectiveSyncTimestamp={}",
+                                oldestUpdatedAt,
+                                effectiveSyncTimestamp
+                            );
+                            hasMore = false;
+                            stoppedByIncrementalSync = true;
+                        }
+                    }
+                }
 
                 // Persist cursor checkpoint after each successful page (uses REQUIRES_NEW)
                 if (syncTargetId != null && cursor != null && hasMore) {
@@ -419,6 +477,16 @@ public class GitHubDiscussionSyncService {
             }
         }
 
+        // Detect if pagination was incomplete (reported total vs actually synced)
+        if (reportedTotalCount >= 0) {
+            GraphQlConnectionOverflowDetector.check(
+                "discussions",
+                totalDiscussionsSynced,
+                reportedTotalCount,
+                safeNameWithOwner
+            );
+        }
+
         // Fetch remaining comments for discussions with >10 comments
         if (!discussionsNeedingCommentPagination.isEmpty()) {
             log.debug(
@@ -442,19 +510,20 @@ public class GitHubDiscussionSyncService {
         }
 
         // Clear cursor on successful completion (uses REQUIRES_NEW)
-        // Only clear if sync completed without abort
-        if (syncTargetId != null && !hasMore && abortReason == null) {
+        // Only clear if sync completed without abort (including incremental stop)
+        if (syncTargetId != null && (!hasMore || stoppedByIncrementalSync) && abortReason == null) {
             clearCursorCheckpoint(syncTargetId);
         }
 
         SyncResult.Status finalStatus = abortReason != null ? abortReason : SyncResult.Status.COMPLETED;
         log.info(
-            "Completed discussion sync: repoName={}, discussionCount={}, commentCount={}, discussionsWithPagination={}, resumed={}, status={}",
+            "Completed discussion sync: repoName={}, discussionCount={}, commentCount={}, discussionsWithPagination={}, resumed={}, stoppedByIncrementalSync={}, status={}",
             safeNameWithOwner,
             totalDiscussionsSynced,
             totalCommentsSynced,
             discussionsNeedingCommentPagination.size(),
             resuming,
+            stoppedByIncrementalSync,
             finalStatus
         );
         return new SyncResult(finalStatus, totalDiscussionsSynced);
@@ -472,13 +541,11 @@ public class GitHubDiscussionSyncService {
      * @param connection                  the GraphQL discussion connection
      * @param context                     the processing context
      * @param discussionsNeedingPagination list to populate with discussions needing comment pagination
-     * @param firstSyncCutoff             optional cutoff timestamp; discussions created before this are skipped
      */
     private PageResult processDiscussionPage(
         GHDiscussionConnection connection,
         ProcessingContext context,
-        List<DiscussionWithCommentCursor> discussionsNeedingPagination,
-        @Nullable Instant firstSyncCutoff
+        List<DiscussionWithCommentCursor> discussionsNeedingPagination
     ) {
         int discussionsSynced = 0;
         int commentsSynced = 0;
@@ -489,15 +556,6 @@ public class GitHubDiscussionSyncService {
         for (var graphQlDiscussion : connection.getNodes()) {
             GitHubDiscussionDTO discussionDTO = GitHubDiscussionDTO.fromDiscussion(graphQlDiscussion);
             if (discussionDTO == null) {
-                continue;
-            }
-
-            // Skip discussions created before the first-sync cutoff
-            if (
-                firstSyncCutoff != null &&
-                discussionDTO.createdAt() != null &&
-                discussionDTO.createdAt().isBefore(firstSyncCutoff)
-            ) {
                 continue;
             }
 
@@ -531,6 +589,21 @@ public class GitHubDiscussionSyncService {
                         DiscussionComment parent = nodeIdToComment.get(commentDTO.replyToNodeId());
                         if (comment != null && parent != null) {
                             commentProcessor.resolveParentComment(comment, parent);
+                        }
+                    }
+                }
+
+                // Detect overflow in reply sub-connections
+                for (var node : commentConn.getNodes()) {
+                    if (node != null && node.getReplies() != null) {
+                        var repliesPageInfo = node.getReplies().getPageInfo();
+                        if (repliesPageInfo != null && Boolean.TRUE.equals(repliesPageInfo.getHasNextPage())) {
+                            GraphQlConnectionOverflowDetector.check(
+                                "discussionComment.replies",
+                                node.getReplies().getNodes() != null ? node.getReplies().getNodes().size() : 0,
+                                true,
+                                "discussionNumber=" + graphQlDiscussion.getNumber() + ", commentId=" + node.getId()
+                            );
                         }
                     }
                 }
@@ -704,6 +777,23 @@ public class GitHubDiscussionSyncService {
 
                 if (pageSynced != null) {
                     totalSynced += pageSynced;
+                }
+
+                // Detect overflow in reply sub-connections
+                if (connection.getNodes() != null) {
+                    for (var node : connection.getNodes()) {
+                        if (node != null && node.getReplies() != null) {
+                            var repliesPageInfo = node.getReplies().getPageInfo();
+                            if (repliesPageInfo != null && Boolean.TRUE.equals(repliesPageInfo.getHasNextPage())) {
+                                GraphQlConnectionOverflowDetector.check(
+                                    "discussionComment.replies",
+                                    node.getReplies().getNodes() != null ? node.getReplies().getNodes().size() : 0,
+                                    true,
+                                    "discussionNumber=" + discussionNumber + ", commentId=" + node.getId()
+                                );
+                            }
+                        }
+                    }
                 }
 
                 GHPageInfo pageInfo = connection.getPageInfo();

@@ -103,6 +103,7 @@ erDiagram
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
         INTEGER number UK "NOT NULL"
+        INTEGER number UK "NOT NULL"
         VARCHAR(1024) title "NOT NULL"
         TEXT body
         VARCHAR(512) html_url "NOT NULL"
@@ -115,6 +116,7 @@ erDiagram
         INTEGER comment_count "NOT NULL"
         TIMESTAMPTZ last_sync_at
         BIGINT repository_id FK,UK
+        BIGINT repository_id FK,UK
         BIGINT author_id FK
         VARCHAR(128) category_id FK
         BIGINT answer_chosen_by_id FK
@@ -125,9 +127,11 @@ erDiagram
         VARCHAR(128) id PK
         VARCHAR(255) name "NOT NULL"
         VARCHAR(128) slug UK "NOT NULL"
+        VARCHAR(128) slug UK "NOT NULL"
         VARCHAR(32) emoji
         TEXT description
         BOOLEAN is_answerable "NOT NULL"
+        BIGINT repository_id FK,UK
         BIGINT repository_id FK,UK
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
@@ -487,6 +491,7 @@ erDiagram
         VARCHAR(255) visibility
         BIGINT organization_id FK
         TIMESTAMPTZ last_sync_at
+        BOOLEAN has_discussions_enabled "NOT NULL"
     }
 
     RepositoryCollaborator {
@@ -513,6 +518,7 @@ erDiagram
         VARCHAR(255) discussion_sync_cursor
         TIMESTAMPTZ issues_synced_at
         TIMESTAMPTZ pull_requests_synced_at
+        TIMESTAMPTZ discussions_synced_at
     }
 
     Team {

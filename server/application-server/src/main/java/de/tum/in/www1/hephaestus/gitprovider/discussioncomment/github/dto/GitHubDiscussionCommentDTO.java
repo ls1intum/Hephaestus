@@ -10,6 +10,7 @@ import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHDiscussionCo
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHDiscussionCommentConnection;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
@@ -84,6 +85,10 @@ public record GitHubDiscussionCommentDTO(
 
     /**
      * Creates a list of GitHubDiscussionCommentDTOs from a GraphQL DiscussionCommentConnection.
+     * <p>
+     * Extracts both top-level comment nodes AND their nested replies (from the
+     * {@code replies(first: 10)} sub-connection). Reply DTOs have their
+     * {@code replyToNodeId} set to the parent comment's node ID for threading.
      */
     public static List<GitHubDiscussionCommentDTO> fromDiscussionCommentConnection(
         @Nullable GHDiscussionCommentConnection connection
@@ -91,12 +96,53 @@ public record GitHubDiscussionCommentDTO(
         if (connection == null || connection.getNodes() == null) {
             return Collections.emptyList();
         }
-        return connection
-            .getNodes()
-            .stream()
-            .map(GitHubDiscussionCommentDTO::fromDiscussionComment)
-            .filter(Objects::nonNull)
-            .toList();
+        List<GitHubDiscussionCommentDTO> result = new ArrayList<>();
+        for (var comment : connection.getNodes()) {
+            GitHubDiscussionCommentDTO dto = fromDiscussionComment(comment);
+            if (dto != null) {
+                result.add(dto);
+                // Also extract nested replies
+                extractReplies(comment, result);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Extracts reply DTOs from a comment's {@code replies} sub-connection.
+     * <p>
+     * For each reply, the {@code replyToNodeId} is set to the parent comment's
+     * node ID (since the reply nodes in the GraphQL query may not include
+     * {@code replyTo { id }}).
+     */
+    private static void extractReplies(GHDiscussionComment parentComment, List<GitHubDiscussionCommentDTO> result) {
+        if (
+            parentComment == null || parentComment.getReplies() == null || parentComment.getReplies().getNodes() == null
+        ) {
+            return;
+        }
+        String parentNodeId = parentComment.getId();
+        for (var reply : parentComment.getReplies().getNodes()) {
+            if (reply == null) {
+                continue;
+            }
+            GitHubDiscussionCommentDTO replyDto = new GitHubDiscussionCommentDTO(
+                null,
+                reply.getDatabaseId() != null ? reply.getDatabaseId().longValue() : null,
+                reply.getId(),
+                reply.getBody(),
+                uriToString(reply.getUrl()),
+                false, // replies don't have isAnswer in the GraphQL query
+                reply.getIsMinimized(),
+                reply.getMinimizedReason(),
+                convertAuthorAssociation(reply.getAuthorAssociation()),
+                toInstant(reply.getCreatedAt()),
+                toInstant(reply.getUpdatedAt()),
+                GitHubUserDTO.fromActor(reply.getAuthor()),
+                parentNodeId // set replyToNodeId to the parent comment's node ID
+            );
+            result.add(replyDto);
+        }
     }
 
     // ========== CONVERSION HELPERS ==========

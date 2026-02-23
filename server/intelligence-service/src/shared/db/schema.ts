@@ -424,6 +424,7 @@ export const discussion = pgTable(
 			name: "fk_discussion_answer_comment",
 		}).onDelete("set null"),
 		unique("uq_discussion_repo_number").on(table.number, table.repositoryId),
+		unique("uknlcwyn2relkgw95s8okgpkqrt").on(table.number, table.repositoryId),
 		unique("uk_discussion_answer_comment_id").on(table.answerCommentId),
 	],
 );
@@ -453,6 +454,7 @@ export const discussionCategory = pgTable(
 			name: "fk_discussion_category_repository",
 		}).onDelete("cascade"),
 		unique("uq_discussion_category_repo_slug").on(table.slug, table.repositoryId),
+		unique("uk6cjmvjyh5jc9bfnn8i9wggbo5").on(table.slug, table.repositoryId),
 	],
 );
 
@@ -1400,6 +1402,7 @@ export const repository = pgTable(
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		organizationId: bigint("organization_id", { mode: "number" }),
 		lastSyncAt: timestamp("last_sync_at", { withTimezone: true, mode: "string" }),
+		hasDiscussionsEnabled: boolean("has_discussions_enabled").default(false).notNull(),
 	},
 	(table) => [
 		index("idx_repository_name_with_owner").using("btree", table.nameWithOwner.asc().nullsLast()),
@@ -1475,6 +1478,7 @@ export const repositoryToMonitor = pgTable(
 			withTimezone: true,
 			mode: "string",
 		}),
+		discussionsSyncedAt: timestamp("discussions_synced_at", { withTimezone: true, mode: "string" }),
 	},
 	(table) => [
 		foreignKey({

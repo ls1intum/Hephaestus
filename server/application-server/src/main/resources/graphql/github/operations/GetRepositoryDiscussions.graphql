@@ -228,6 +228,58 @@ query GetRepositoryDiscussions($owner: String!, $name: String!, $first: Int!, $a
                         replyTo {
                             id
                         }
+
+                        # Replies to this comment (first 10, embedded)
+                        replies(first: 10) {
+                            totalCount
+                            pageInfo {
+                                hasNextPage
+                                endCursor
+                            }
+                            nodes {
+                                id
+                                databaseId
+                                body
+                                url
+                                createdAt
+                                updatedAt
+                                isMinimized
+                                minimizedReason
+                                authorAssociation
+
+                                author {
+                                    __typename
+                                    ... on User {
+                                        id
+                                        databaseId
+                                        login
+                                        avatarUrl
+                                        name
+                                        email
+                                        createdAt
+                                        updatedAt
+                                    }
+                                    ... on Bot {
+                                        id
+                                        databaseId
+                                        login
+                                        avatarUrl
+                                    }
+                                    ... on Mannequin {
+                                        id
+                                        databaseId
+                                        login
+                                        avatarUrl
+                                    }
+                                    ... on Organization {
+                                        id
+                                        databaseId
+                                        login
+                                        avatarUrl
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }

@@ -1,0 +1,21 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                   http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+    =======================================================================================
+    Add discussions_synced_at to repository_to_monitor for incremental discussion sync
+    =======================================================================================
+    Tracks when discussion sync last completed for each repository, enabling incremental
+    sync (only fetching discussions updated since last sync) instead of always doing a
+    full sync on every cycle.
+    -->
+    <changeSet id="1771834903694_add_discussions_synced_at" author="hephaestus">
+        <addColumn tableName="repository_to_monitor">
+            <column name="discussions_synced_at" type="TIMESTAMP WITH TIME ZONE"/>
+        </addColumn>
+    </changeSet>
+
+</databaseChangeLog>

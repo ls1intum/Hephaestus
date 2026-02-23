@@ -345,12 +345,32 @@ public class GitHubDataSyncService {
             int commitsMetadataEnriched = enrichCommitMetadata(syncTarget, repository);
 
             // Sync discussions and comments (with cursor persistence for resumability)
-            SyncResult discussionResult = discussionSyncService.syncForRepository(
-                scopeId,
-                repositoryId,
-                syncTarget.id(),
-                syncTarget.discussionSyncCursor()
-            );
+            // Skip discussion sync for repos without discussions enabled
+            SyncResult discussionResult;
+            if (!repository.isHasDiscussionsEnabled()) {
+                log.debug("Skipped discussion sync: reason=discussionsNotEnabled, repoId={}", repositoryId);
+                discussionResult = SyncResult.completed(0);
+            } else {
+                discussionResult = discussionSyncService.syncForRepository(
+                    scopeId,
+                    repositoryId,
+                    syncTarget.id(),
+                    syncTarget.discussionSyncCursor(),
+                    syncTarget.lastDiscussionsSyncedAt()
+                );
+            }
+
+            // Update discussion sync timestamp independently
+            if (discussionResult.isCompleted()) {
+                syncTargetProvider.updateSyncTimestamp(syncTarget.id(), SyncType.DISCUSSIONS, Instant.now());
+            } else {
+                log.info(
+                    "Skipped discussion timestamp update due to incomplete sync: scopeId={}, repoId={}, discussionStatus={}",
+                    scopeId,
+                    repositoryId,
+                    discussionResult.status()
+                );
+            }
 
             log.info(
                 "Completed repository sync: scopeId={}, repoId={}, commitsBackfilled={}, commitsEnriched={}, commitsMetadataEnriched={}, collaborators={}, labels={}, milestones={}, issues={}, prs={}, discussions={}, issueStatus={}, prStatus={}",

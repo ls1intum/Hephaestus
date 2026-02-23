@@ -14,8 +14,7 @@ import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserProcessor;
 import java.time.Instant;
 import java.util.Optional;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,10 +27,9 @@ import org.springframework.transaction.annotation.Transactional;
  * Discussion comments can be top-level comments or replies to other comments.
  * Reply threading is handled via the parentComment relationship, resolved by node ID.
  */
+@Slf4j
 @Service
 public class GitHubDiscussionCommentProcessor extends BaseGitHubProcessor {
-
-    private static final Logger log = LoggerFactory.getLogger(GitHubDiscussionCommentProcessor.class);
 
     private final DiscussionCommentRepository commentRepository;
 
