@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.18.0](https://github.com/ls1intum/Hephaestus/compare/v0.17.0...v0.18.0) (2026-02-23)
+
+### 🚀 Features
+
+* **gitprovider:** add GitHub commits sync with local checkout support ([#694](https://github.com/ls1intum/Hephaestus/issues/694)) ([3fa1229](https://github.com/ls1intum/Hephaestus/commit/3fa12294078df08e30cfc14fb324ca0e80d800a0))
+
 ## [0.17.0](https://github.com/ls1intum/Hephaestus/compare/v0.16.0...v0.17.0) (2026-02-16)
 
 ### 🚀 Features
