@@ -589,6 +589,7 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                                 "DomainEvent", // Our domain events carry repository which has workspace
                                 "PullRequest", // Through repository.organization.workspaceId
                                 "Issue", // Through repository.organization.workspaceId
+                                "Discussion", // Through repository.organization.workspaceId
                                 "Review", // Through PR
                                 "Comment", // Through PR -> repository.organization.workspaceId
                                 "Commit", // Through repository.organization.workspaceId
