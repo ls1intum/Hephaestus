@@ -245,6 +245,7 @@ query GetRepositoryDiscussions($owner: String!, $name: String!, $first: Int!, $a
                                 url
                                 createdAt
                                 updatedAt
+                                isAnswer
                                 isMinimized
                                 minimizedReason
                                 authorAssociation

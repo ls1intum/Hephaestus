@@ -132,7 +132,7 @@ public record GitHubDiscussionCommentDTO(
                 reply.getId(),
                 reply.getBody(),
                 uriToString(reply.getUrl()),
-                false, // replies don't have isAnswer in the GraphQL query
+                reply.getIsAnswer(),
                 reply.getIsMinimized(),
                 reply.getMinimizedReason(),
                 convertAuthorAssociation(reply.getAuthorAssociation()),

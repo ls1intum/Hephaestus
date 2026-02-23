@@ -169,6 +169,8 @@ public class Discussion extends BaseGitServiceEntity {
         OUTDATED,
         /** The discussion is a duplicate. */
         DUPLICATE,
+        /** The discussion was reopened. */
+        REOPENED,
         /** Unknown or unspecified reason. */
         UNKNOWN,
     }

@@ -81,6 +81,7 @@ query GetDiscussionComments($owner: String!, $name: String!, $discussionNumber: 
                             url
                             createdAt
                             updatedAt
+                            isAnswer
                             isMinimized
                             minimizedReason
                             authorAssociation

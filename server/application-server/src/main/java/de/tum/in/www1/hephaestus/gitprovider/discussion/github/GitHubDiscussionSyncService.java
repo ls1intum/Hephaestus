@@ -29,6 +29,7 @@ import de.tum.in.www1.hephaestus.gitprovider.discussion.Discussion;
 import de.tum.in.www1.hephaestus.gitprovider.discussion.DiscussionRepository;
 import de.tum.in.www1.hephaestus.gitprovider.discussion.github.dto.GitHubDiscussionDTO;
 import de.tum.in.www1.hephaestus.gitprovider.discussioncomment.DiscussionComment;
+import de.tum.in.www1.hephaestus.gitprovider.discussioncomment.DiscussionCommentRepository;
 import de.tum.in.www1.hephaestus.gitprovider.discussioncomment.github.GitHubDiscussionCommentProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.discussioncomment.github.dto.GitHubDiscussionCommentDTO;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHDiscussionCommentConnection;
@@ -93,6 +94,7 @@ public class GitHubDiscussionSyncService {
 
     private final RepositoryRepository repositoryRepository;
     private final DiscussionRepository discussionRepository;
+    private final DiscussionCommentRepository discussionCommentRepository;
     private final GitHubGraphQlClientProvider graphQlClientProvider;
     private final GitHubDiscussionProcessor discussionProcessor;
     private final GitHubDiscussionCommentProcessor commentProcessor;
@@ -533,6 +535,12 @@ public class GitHubDiscussionSyncService {
                 );
                 totalCommentsSynced += additionalComments;
             }
+
+            // Resolve answer comment FK for discussions where the answer arrived
+            // via comment pagination (beyond the first embedded page of 10 comments).
+            // The initial processDiscussionPage only sets answerComment from its
+            // nodeIdToComment map which is limited to the first page of comments.
+            resolveAnswerCommentsAfterPagination(discussionsNeedingCommentPagination);
         }
 
         // Clear cursor on successful completion (uses REQUIRES_NEW)
@@ -860,6 +868,47 @@ public class GitHubDiscussionSyncService {
             totalSynced
         );
         return totalSynced;
+    }
+
+    /**
+     * Resolves the answer comment FK for discussions whose answer comment was
+     * fetched via pagination (beyond the first embedded page of 10 comments).
+     * <p>
+     * During {@link #processDiscussionPage}, the answer comment is looked up
+     * in a {@code nodeIdToComment} map that only contains comments from the
+     * first embedded page. If the answer is the 11th+ top-level comment, it
+     * arrives via {@link #syncRemainingComments} and has {@code is_answer=true}
+     * on the comment entity, but the discussion's {@code answer_comment_id} FK
+     * remains {@code null}.
+     * <p>
+     * This method checks each paginated discussion and resolves the FK by
+     * querying for the comment marked as the answer.
+     */
+    private void resolveAnswerCommentsAfterPagination(
+        List<DiscussionWithCommentCursor> discussionsNeedingCommentPagination
+    ) {
+        for (DiscussionWithCommentCursor dCursor : discussionsNeedingCommentPagination) {
+            transactionTemplate.executeWithoutResult(status -> {
+                Discussion discussion = discussionRepository.findById(dCursor.discussionId()).orElse(null);
+                if (discussion == null) {
+                    return;
+                }
+                // Only resolve if the discussion has an answer but no FK set yet
+                if (discussion.getAnswerChosenAt() != null && discussion.getAnswerComment() == null) {
+                    discussionCommentRepository
+                        .findByDiscussionIdAndIsAnswerTrue(dCursor.discussionId())
+                        .ifPresent(answerComment -> {
+                            discussion.setAnswerComment(answerComment);
+                            discussionRepository.save(discussion);
+                            log.debug(
+                                "Resolved answer comment FK after pagination: discussionNumber={}, commentId={}",
+                                dCursor.discussionNumber(),
+                                answerComment.getId()
+                            );
+                        });
+                }
+            });
+        }
     }
 
     // ========================================================================

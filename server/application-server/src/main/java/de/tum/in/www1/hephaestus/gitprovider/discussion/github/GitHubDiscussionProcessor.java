@@ -325,6 +325,7 @@ public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
             case "RESOLVED" -> Discussion.StateReason.RESOLVED;
             case "OUTDATED" -> Discussion.StateReason.OUTDATED;
             case "DUPLICATE" -> Discussion.StateReason.DUPLICATE;
+            case "REOPENED" -> Discussion.StateReason.REOPENED;
             default -> Discussion.StateReason.UNKNOWN;
         };
     }
