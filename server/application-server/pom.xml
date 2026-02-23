@@ -6,7 +6,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.5.10</version>
+        <version>3.5.11</version>
         <relativePath/>
         <!-- lookup parent from repository -->
     </parent>
@@ -103,7 +103,7 @@
         <dependency>
             <groupId>com.auth0</groupId>
             <artifactId>java-jwt</artifactId>
-            <version>4.5.0</version>
+            <version>4.5.1</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -161,7 +161,7 @@
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
-            <version>42.7.9</version>
+            <version>42.7.10</version>
             <scope>runtime</scope>
         </dependency>
         <dependency>
@@ -244,7 +244,7 @@
         <dependency>
             <groupId>io.hypersistence</groupId>
             <artifactId>hypersistence-utils-hibernate-63</artifactId>
-            <version>3.14.1</version>
+            <version>3.15.2</version>
         </dependency>
         <dependency>
             <groupId>io.nats</groupId>
@@ -254,12 +254,12 @@
         <dependency>
             <groupId>com.slack.api</groupId>
             <artifactId>bolt</artifactId>
-            <version>1.46.0</version>
+            <version>1.47.0</version>
         </dependency>
         <dependency>
             <groupId>org.openapitools</groupId>
             <artifactId>openapi-generator-maven-plugin</artifactId>
-            <version>7.19.0</version>
+            <version>7.20.0</version>
             <exclusions>
                 <exclusion>
                     <groupId>com.github.jknack</groupId>
@@ -282,7 +282,7 @@
         <dependency>
             <groupId>org.openapitools</groupId>
             <artifactId>openapi-generator</artifactId>
-            <version>7.19.0</version>
+            <version>7.20.0</version>
             <exclusions>
                 <exclusion>
                     <groupId>org.slf4j</groupId>
@@ -332,7 +332,7 @@
         <dependency>
             <groupId>org.openapitools</groupId>
             <artifactId>jackson-databind-nullable</artifactId>
-            <version>0.2.8</version>
+            <version>0.2.9</version>
         </dependency>
         <dependency>
             <groupId>org.glassfish.jersey.core</groupId>
@@ -350,12 +350,12 @@
         <dependency>
             <groupId>io.sentry</groupId>
             <artifactId>sentry-spring-boot-starter-jakarta</artifactId>
-            <version>8.29.0</version>
+            <version>8.32.0</version>
         </dependency>
         <dependency>
             <groupId>com.langfuse</groupId>
             <artifactId>langfuse-java</artifactId>
-            <version>0.0.6</version>
+            <version>0.1.2</version>
         </dependency>
         <!-- Spring GraphQL Client for GitHub GraphQL API -->
         <dependency>
@@ -407,7 +407,7 @@
             <dependency>
                 <groupId>org.springframework.modulith</groupId>
                 <artifactId>spring-modulith-bom</artifactId>
-                <version>1.4.7</version>
+                <version>1.4.8</version>
                 <scope>import</scope>
                 <type>pom</type>
             </dependency>
@@ -857,7 +857,7 @@
                     <dependency>
                         <groupId>org.springframework.boot</groupId>
                         <artifactId>spring-boot-starter-data-jpa</artifactId>
-                        <version>3.5.10</version>
+                        <version>3.5.11</version>
                     </dependency>
                     <dependency>
                         <groupId>jakarta.validation</groupId>
