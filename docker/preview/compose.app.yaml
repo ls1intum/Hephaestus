@@ -46,7 +46,7 @@ services:
   # after postgres starts, rather than relying on /docker-entrypoint-initdb.d
   # ---------------------------------------------------------------------------
   postgres:
-    image: postgres:17-alpine
+    image: postgres:17-alpine@sha256:3430fe182f5065a6ea505c3d432d2c7fff18fbab954df8f277c1dbf4c70124af
     hostname: postgres
     restart: unless-stopped
     environment:
@@ -75,7 +75,7 @@ services:
   # If dump not found, postgres starts empty and Liquibase creates schema.
   # ---------------------------------------------------------------------------
   seed-loader:
-    image: postgres:17-alpine
+    image: postgres:17-alpine@sha256:3430fe182f5065a6ea505c3d432d2c7fff18fbab954df8f277c1dbf4c70124af
     depends_on:
       postgres:
         condition: service_healthy

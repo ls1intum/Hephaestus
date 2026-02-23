@@ -169,7 +169,7 @@ services:
         max-file: "5"
 
   postgres:
-    image: "postgres:16"
+    image: "postgres:16@sha256:e4842c8a99ca99339e1693e6fe5fe62c7becb31991f066f989047dfb2fbf47af"
     environment:
       - POSTGRES_DB=hephaestus
       - POSTGRES_PASSWORD=root
