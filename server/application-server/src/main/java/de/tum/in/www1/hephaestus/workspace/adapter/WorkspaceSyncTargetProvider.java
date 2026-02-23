@@ -352,6 +352,25 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
             );
     }
 
+    @Override
+    @Transactional
+    public void updateDiscussionSyncCursor(Long syncTargetId, String cursor) {
+        repositoryToMonitorRepository
+            .findById(syncTargetId)
+            .ifPresentOrElse(
+                rtm -> {
+                    rtm.setDiscussionSyncCursor(cursor);
+                    repositoryToMonitorRepository.save(rtm);
+                },
+                () ->
+                    // DEBUG: Expected during workspace reconfiguration when repository is removed mid-sync
+                    log.debug(
+                        "Skipped discussion sync cursor update: reason=syncTargetNotFound, syncTargetId={}",
+                        syncTargetId
+                    )
+            );
+    }
+
     // ═══════════════════════════════════════════════════════════════════════════
     // SYNC SESSIONS
     // ═══════════════════════════════════════════════════════════════════════════

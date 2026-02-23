@@ -6,6 +6,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
 import org.springframework.aop.interceptor.AsyncUncaughtExceptionHandler;
 import org.springframework.aop.interceptor.SimpleAsyncUncaughtExceptionHandler;
+import org.springframework.boot.autoconfigure.task.TaskExecutionAutoConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
@@ -35,6 +36,8 @@ import org.springframework.scheduling.annotation.EnableAsync;
  * executor for ALL @Async method dispatch, not just for beans resolved by name.
  * The production {@link de.tum.in.www1.hephaestus.config.SpringAsyncConfig} is excluded
  * via {@code @Profile("!test")}, so this is the sole {@code AsyncConfigurer} in tests.
+ * The monitoringExecutor is replaced with a no-op to skip sync
+ * operations entirely (which would otherwise cause transaction rollback issues).
  *
  * <p><b>Benefits:</b>
  * <ul>
@@ -48,12 +51,17 @@ import org.springframework.scheduling.annotation.EnableAsync;
  * @see org.springframework.core.task.SyncTaskExecutor
  */
 @Configuration
-@Profile("test")
 @EnableAsync
+@Profile("test")
 public class TestAsyncConfiguration implements AsyncConfigurer {
 
     private final SyncAsyncTaskExecutor syncExecutor = new SyncAsyncTaskExecutor();
 
+    /**
+     * Configures the default executor for all @Async annotated methods.
+     * This returns our synchronous executor to ensure all async methods
+     * run in the calling thread during tests.
+     */
     @Override
     public Executor getAsyncExecutor() {
         return syncExecutor;
@@ -66,19 +74,39 @@ public class TestAsyncConfiguration implements AsyncConfigurer {
 
     /**
      * Primary synchronous executor that makes @Async methods run synchronously.
+     *
+     * <p>This bean uses the same name as Spring Boot's auto-configured task executor
+     * to ensure it takes precedence. The {@code @Primary} annotation ensures it is
+     * used by default for @Async methods that don't specify a qualifier.
+     *
+     * <p>@Async event listeners (like ActivityEventListener) will execute synchronously
+     * in the calling thread, ensuring all database operations complete before test cleanup.
      */
-    @Bean
+    @Bean(name = TaskExecutionAutoConfiguration.APPLICATION_TASK_EXECUTOR_BEAN_NAME)
     @Primary
     public AsyncTaskExecutor taskExecutor() {
         return syncExecutor;
     }
 
     /**
-     * Synchronous executor for monitoring tasks in tests.
+     * No-op monitoring executor that skips all submitted sync tasks.
+     *
+     * <p>The production {@code monitoringExecutor} uses virtual threads for efficient
+     * I/O-bound operations. In tests, we face two problems with sync operations:
+     * <ol>
+     *   <li><b>Async deadlocks:</b> If async, sync operations from one test can
+     *       conflict with the next test's database cleanup (TRUNCATE)</li>
+     *   <li><b>Sync transaction issues:</b> If sync, operations that fail (e.g.,
+     *       due to missing GitHub credentials) mark the transaction for rollback,
+     *       causing UnexpectedRollbackException</li>
+     * </ol>
+     *
+     * <p>The solution is to skip sync operations entirely in tests. Tests that need
+     * to verify sync behavior should mock the sync service directly.
      */
     @Bean(name = "monitoringExecutor")
     public AsyncTaskExecutor monitoringExecutor() {
-        return syncExecutor;
+        return new NoOpAsyncTaskExecutor();
     }
 
     /**
@@ -110,6 +138,28 @@ public class TestAsyncConfiguration implements AsyncConfigurer {
                 failed.completeExceptionally(e);
                 return failed;
             }
+        }
+    }
+
+    /**
+     * An executor that ignores all submitted tasks.
+     * Used for monitoring tasks that shouldn't run during tests.
+     */
+    private static class NoOpAsyncTaskExecutor implements AsyncTaskExecutor {
+
+        @Override
+        public void execute(Runnable task) {
+            // Skip execution
+        }
+
+        @Override
+        public Future<?> submit(Runnable task) {
+            return CompletableFuture.completedFuture(null);
+        }
+
+        @Override
+        public <T> Future<T> submit(Callable<T> task) {
+            return CompletableFuture.completedFuture(null);
         }
     }
 }

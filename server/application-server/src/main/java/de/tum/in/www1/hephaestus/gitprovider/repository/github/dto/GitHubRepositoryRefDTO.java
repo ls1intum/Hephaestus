@@ -19,7 +19,8 @@ public record GitHubRepositoryRefDTO(
     @JsonProperty("name") String name,
     @JsonProperty("full_name") String fullName,
     @JsonProperty("private") boolean isPrivate,
-    @JsonProperty("html_url") String htmlUrl
+    @JsonProperty("html_url") String htmlUrl,
+    @JsonProperty("default_branch") String defaultBranch
 ) {
     /**
      * Creates a GitHubRepositoryRefDTO from a GraphQL GHRepository model.
@@ -42,7 +43,8 @@ public record GitHubRepositoryRefDTO(
             repository.getName(),
             repository.getNameWithOwner(),
             repository.getIsPrivate(),
-            uriToString(repository.getUrl())
+            uriToString(repository.getUrl()),
+            null // defaultBranch not available in GraphQL GHRepository
         );
     }
 }

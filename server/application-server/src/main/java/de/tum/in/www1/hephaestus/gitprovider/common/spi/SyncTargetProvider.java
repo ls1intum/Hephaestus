@@ -227,6 +227,7 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
      * @param backfillLastRunAt                   when backfill last executed
      * @param issueSyncCursor                     pagination cursor for resuming issue sync
      * @param pullRequestSyncCursor               pagination cursor for resuming PR sync
+     * @param discussionSyncCursor                pagination cursor for resuming discussion sync
      */
     record SyncTarget(
         Long id,
@@ -247,7 +248,8 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
         Integer pullRequestBackfillCheckpoint,
         Instant backfillLastRunAt,
         String issueSyncCursor,
-        String pullRequestSyncCursor
+        String pullRequestSyncCursor,
+        String discussionSyncCursor
     ) {
         /**
          * Checks if a full sync is needed based on staleness threshold.

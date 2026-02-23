@@ -19,6 +19,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncMetadata;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncTarget;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncType;
+import de.tum.in.www1.hephaestus.gitprovider.discussion.github.GitHubDiscussionSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.issue.github.GitHubIssueSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.issuedependency.github.GitHubIssueDependencySyncService;
 import de.tum.in.www1.hephaestus.gitprovider.issuetype.github.GitHubIssueTypeSyncService;
@@ -94,6 +95,7 @@ public class GitHubDataSyncService {
     private final GitHubIssueTypeSyncService issueTypeSyncService;
     private final GitHubSubIssueSyncService subIssueSyncService;
     private final GitHubPullRequestSyncService pullRequestSyncService;
+    private final GitHubDiscussionSyncService discussionSyncService;
     private final GitHubTeamSyncService teamSyncService;
     private final GitHubProjectSyncService projectSyncService;
     private final GitHubOrganizationSyncService organizationSyncService;
@@ -122,6 +124,7 @@ public class GitHubDataSyncService {
         GitHubIssueTypeSyncService issueTypeSyncService,
         GitHubSubIssueSyncService subIssueSyncService,
         GitHubPullRequestSyncService pullRequestSyncService,
+        GitHubDiscussionSyncService discussionSyncService,
         GitHubTeamSyncService teamSyncService,
         GitHubProjectSyncService projectSyncService,
         GitHubOrganizationSyncService organizationSyncService,
@@ -148,6 +151,7 @@ public class GitHubDataSyncService {
         this.issueTypeSyncService = issueTypeSyncService;
         this.subIssueSyncService = subIssueSyncService;
         this.pullRequestSyncService = pullRequestSyncService;
+        this.discussionSyncService = discussionSyncService;
         this.teamSyncService = teamSyncService;
         this.projectSyncService = projectSyncService;
         this.organizationSyncService = organizationSyncService;
@@ -340,8 +344,16 @@ public class GitHubDataSyncService {
             // Runs AFTER commit author enrichment so that users are already resolved.
             int commitsMetadataEnriched = enrichCommitMetadata(syncTarget, repository);
 
+            // Sync discussions and comments (with cursor persistence for resumability)
+            SyncResult discussionResult = discussionSyncService.syncForRepository(
+                scopeId,
+                repositoryId,
+                syncTarget.id(),
+                syncTarget.discussionSyncCursor()
+            );
+
             log.info(
-                "Completed repository sync: scopeId={}, repoId={}, commitsBackfilled={}, commitsEnriched={}, commitsMetadataEnriched={}, collaborators={}, labels={}, milestones={}, issues={}, prs={}, issueStatus={}, prStatus={}",
+                "Completed repository sync: scopeId={}, repoId={}, commitsBackfilled={}, commitsEnriched={}, commitsMetadataEnriched={}, collaborators={}, labels={}, milestones={}, issues={}, prs={}, discussions={}, issueStatus={}, prStatus={}",
                 scopeId,
                 repositoryId,
                 commitsBackfilled >= 0 ? commitsBackfilled : "skipped",
@@ -352,6 +364,7 @@ public class GitHubDataSyncService {
                 milestonesCount >= 0 ? milestonesCount : "skipped",
                 issueResult.count(),
                 prResult.count(),
+                discussionResult.count(),
                 issueResult.status(),
                 prResult.status()
             );
