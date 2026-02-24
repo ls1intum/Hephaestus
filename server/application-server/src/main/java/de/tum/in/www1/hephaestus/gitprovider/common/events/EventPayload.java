@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.gitprovider.common.events;
 
 import de.tum.in.www1.hephaestus.gitprovider.commit.Commit;
 import de.tum.in.www1.hephaestus.gitprovider.discussion.Discussion;
+import de.tum.in.www1.hephaestus.gitprovider.discussioncomment.DiscussionComment;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
 import de.tum.in.www1.hephaestus.gitprovider.issuetype.IssueType;
@@ -561,6 +562,39 @@ public final class EventPayload {
                 discussion.getUpdatedAt(),
                 discussion.getClosedAt(),
                 discussion.getAnswerChosenAt()
+            );
+        }
+    }
+
+    // ========================================================================
+    // Discussion Comment Event Payload
+    // ========================================================================
+
+    /**
+     * Immutable snapshot of a DiscussionComment for event handling.
+     */
+    public record DiscussionCommentData(
+        @NonNull Long id,
+        @Nullable String body,
+        @NonNull String htmlUrl,
+        boolean isAnswer,
+        @Nullable Long authorId,
+        @Nullable Instant createdAt,
+        @Nullable Long discussionId,
+        @Nullable Long repositoryId
+    ) {
+        public static DiscussionCommentData from(DiscussionComment comment) {
+            return new DiscussionCommentData(
+                comment.getId(),
+                comment.getBody(),
+                comment.getHtmlUrl(),
+                comment.isAnswer(),
+                comment.getAuthor() != null ? comment.getAuthor().getId() : null,
+                comment.getCreatedAt(),
+                comment.getDiscussion() != null ? comment.getDiscussion().getId() : null,
+                comment.getDiscussion() != null && comment.getDiscussion().getRepository() != null
+                    ? comment.getDiscussion().getRepository().getId()
+                    : null
             );
         }
     }

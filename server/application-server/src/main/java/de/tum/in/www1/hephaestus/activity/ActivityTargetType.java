@@ -75,7 +75,12 @@ public enum ActivityTargetType {
     /**
      * Target is a discussion (GitHub Discussions).
      */
-    DISCUSSION("discussion");
+    DISCUSSION("discussion"),
+
+    /**
+     * Target is a discussion comment (comment on a GitHub Discussion).
+     */
+    DISCUSSION_COMMENT("discussion_comment");
 
     private final String value;
 

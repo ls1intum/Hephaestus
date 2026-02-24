@@ -153,6 +153,16 @@ public enum ActivityEventType {
     DISCUSSION_DELETED("discussion.deleted"),
 
     // ========================================================================
+    // Discussion Comment Events (Community engagement tracking)
+    // ========================================================================
+    /** Discussion comment created - community engagement signal */
+    DISCUSSION_COMMENT_CREATED("discussion_comment.created"),
+    /** Discussion comment edited - audit trail */
+    DISCUSSION_COMMENT_EDITED("discussion_comment.edited"),
+    /** Discussion comment deleted - audit trail */
+    DISCUSSION_COMMENT_DELETED("discussion_comment.deleted"),
+
+    // ========================================================================
     // Commit Events (Code contribution tracking)
     // ========================================================================
     /** Commit created (pushed to default branch) */

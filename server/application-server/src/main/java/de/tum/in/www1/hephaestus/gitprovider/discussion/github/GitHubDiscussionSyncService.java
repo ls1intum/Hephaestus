@@ -623,6 +623,14 @@ public class GitHubDiscussionSyncService {
                         DiscussionComment parent = nodeIdToComment.get(commentDTO.replyToNodeId());
                         if (comment != null && parent != null) {
                             commentProcessor.resolveParentComment(comment, parent);
+                        } else if (comment != null && parent == null) {
+                            log.warn(
+                                "Cross-page reply threading miss: could not resolve parent comment." +
+                                    " commentNodeId={}, replyToNodeId={}, discussionNumber={}",
+                                commentDTO.nodeId(),
+                                commentDTO.replyToNodeId(),
+                                graphQlDiscussion.getNumber()
+                            );
                         }
                     }
                 }
@@ -802,6 +810,14 @@ public class GitHubDiscussionSyncService {
                             // processed in the embedded comments during main sync
                             if (comment != null && parent != null) {
                                 commentProcessor.resolveParentComment(comment, parent);
+                            } else if (comment != null && parent == null) {
+                                log.warn(
+                                    "Cross-page reply threading miss: could not resolve parent comment." +
+                                        " commentNodeId={}, replyToNodeId={}, discussionNumber={}",
+                                    commentDTO.nodeId(),
+                                    commentDTO.replyToNodeId(),
+                                    discussionNumber
+                                );
                             }
                         }
                     }

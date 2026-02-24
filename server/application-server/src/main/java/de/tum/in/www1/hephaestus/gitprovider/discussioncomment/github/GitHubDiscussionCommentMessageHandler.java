@@ -13,8 +13,7 @@ import de.tum.in.www1.hephaestus.gitprovider.discussion.github.GitHubDiscussionP
 import de.tum.in.www1.hephaestus.gitprovider.discussion.github.dto.GitHubDiscussionDTO;
 import de.tum.in.www1.hephaestus.gitprovider.discussioncomment.github.dto.GitHubDiscussionCommentDTO;
 import de.tum.in.www1.hephaestus.gitprovider.discussioncomment.github.dto.GitHubDiscussionCommentEventDTO;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -26,10 +25,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  * This handler processes the parent discussion first to ensure it exists
  * before attaching comments, similar to how issue comments are handled.
  */
+@Slf4j
 @Component
 public class GitHubDiscussionCommentMessageHandler extends GitHubMessageHandler<GitHubDiscussionCommentEventDTO> {
-
-    private static final Logger log = LoggerFactory.getLogger(GitHubDiscussionCommentMessageHandler.class);
 
     private final ProcessingContextFactory contextFactory;
     private final GitHubDiscussionProcessor discussionProcessor;
@@ -78,7 +76,7 @@ public class GitHubDiscussionCommentMessageHandler extends GitHubMessageHandler<
 
         // Handle comment action
         if (event.actionType() == GitHubEventAction.DiscussionComment.DELETED) {
-            commentProcessor.processDeleted(commentDto);
+            commentProcessor.processDeleted(commentDto, context);
         } else {
             // Process the discussion first to ensure it exists
             Discussion discussion = discussionProcessor.process(discussionDto, context);

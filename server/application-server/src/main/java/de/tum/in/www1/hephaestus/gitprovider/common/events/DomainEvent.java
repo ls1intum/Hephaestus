@@ -61,7 +61,8 @@ public final class DomainEvent {
             ProjectItemEvent,
             ProjectStatusUpdateEvent,
             CommitEvent,
-            DiscussionEvent {}
+            DiscussionEvent,
+            DiscussionCommentEvent {}
 
     /** Events that carry context information. */
     public interface ContextualEvent {
@@ -584,4 +585,35 @@ public final class DomainEvent {
             return null; // Entity no longer exists
         }
     }
+
+    // ========================================================================
+    // Discussion Comment Events
+    // ========================================================================
+
+    /** All discussion comment-related events. Subscribe to handle any discussion comment event. */
+    public sealed interface DiscussionCommentEvent
+        extends Event, ContextualEvent
+        permits DiscussionCommentCreated, DiscussionCommentEdited, DiscussionCommentDeleted
+    {
+        Long discussionId();
+    }
+
+    public record DiscussionCommentCreated(
+        EventPayload.DiscussionCommentData comment,
+        Long discussionId,
+        EventContext context
+    ) implements DiscussionCommentEvent {}
+
+    public record DiscussionCommentEdited(
+        EventPayload.DiscussionCommentData comment,
+        Long discussionId,
+        Set<String> changedFields,
+        EventContext context
+    ) implements DiscussionCommentEvent {}
+
+    public record DiscussionCommentDeleted(
+        Long commentId,
+        Long discussionId,
+        EventContext context
+    ) implements DiscussionCommentEvent {}
 }

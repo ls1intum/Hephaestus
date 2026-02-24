@@ -31,6 +31,7 @@ query GetRepositoryDiscussions($owner: String!, $name: String!, $first: Int!, $a
                 url
                 createdAt
                 updatedAt
+                closed
                 closedAt
                 locked
                 activeLockReason
@@ -124,7 +125,6 @@ query GetRepositoryDiscussions($owner: String!, $name: String!, $first: Int!, $a
                     name
                     slug
                     emoji
-                    emojiHTML
                     description
                     isAnswerable
                     createdAt

@@ -97,6 +97,7 @@ public record ExperiencePointProperties(
      * @param commitCreated             XP for creating a commit (pushed to default branch) (default: 0.0)
      * @param discussionCreated         XP for creating a discussion (default: 0.0)
      * @param discussionAnswered        XP for answering a discussion (default: 0.0)
+     * @param discussionCommentCreated  XP for creating a discussion comment (default: 0.0)
      */
     @Validated
     public record XpAwards(
@@ -110,7 +111,8 @@ public record ExperiencePointProperties(
         @PositiveOrZero @Max(1000) @DefaultValue("0.0") double projectStatusUpdateCreated,
         @PositiveOrZero @Max(1000) @DefaultValue("0.0") double commitCreated,
         @PositiveOrZero @Max(1000) @DefaultValue("0.0") double discussionCreated,
-        @PositiveOrZero @Max(1000) @DefaultValue("0.0") double discussionAnswered
+        @PositiveOrZero @Max(1000) @DefaultValue("0.0") double discussionAnswered,
+        @PositiveOrZero @Max(1000) @DefaultValue("0.0") double discussionCommentCreated
     ) {}
 
     /** Compact constructor ensuring nested records are never null. */
@@ -123,7 +125,7 @@ public record ExperiencePointProperties(
         }
         if (xpAwards == null) {
             // PR/issue/project/commit/discussion activities are 0 by default; only review comments earn XP
-            xpAwards = new XpAwards(0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+            xpAwards = new XpAwards(0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
         }
     }
 }

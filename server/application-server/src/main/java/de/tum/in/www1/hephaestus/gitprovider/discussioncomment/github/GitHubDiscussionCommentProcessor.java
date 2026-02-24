@@ -2,6 +2,9 @@ package de.tum.in.www1.hephaestus.gitprovider.discussioncomment.github;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.AuthorAssociation;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.EventContext;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.EventPayload;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.BaseGitHubProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.discussion.Discussion;
 import de.tum.in.www1.hephaestus.gitprovider.discussioncomment.DiscussionComment;
@@ -13,8 +16,11 @@ import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserProcessor;
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.Optional;
+import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,16 +38,19 @@ import org.springframework.transaction.annotation.Transactional;
 public class GitHubDiscussionCommentProcessor extends BaseGitHubProcessor {
 
     private final DiscussionCommentRepository commentRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     public GitHubDiscussionCommentProcessor(
         UserRepository userRepository,
         LabelRepository labelRepository,
         MilestoneRepository milestoneRepository,
         GitHubUserProcessor gitHubUserProcessor,
-        DiscussionCommentRepository commentRepository
+        DiscussionCommentRepository commentRepository,
+        ApplicationEventPublisher eventPublisher
     ) {
         super(userRepository, labelRepository, milestoneRepository, gitHubUserProcessor);
         this.commentRepository = commentRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     /**
@@ -74,6 +83,20 @@ public class GitHubDiscussionCommentProcessor extends BaseGitHubProcessor {
             return c;
         });
 
+        // Track changed fields for edit events
+        Set<String> changedFields = new HashSet<>();
+        if (!isNew) {
+            if (dto.body() != null && !dto.body().equals(comment.getBody())) {
+                changedFields.add("body");
+            }
+            if (dto.isAnswer() != comment.isAnswer()) {
+                changedFields.add("isAnswer");
+            }
+            if (dto.isMinimized() != comment.isMinimized()) {
+                changedFields.add("isMinimized");
+            }
+        }
+
         // Update fields
         comment.setBody(sanitize(dto.body()));
         comment.setHtmlUrl(dto.htmlUrl());
@@ -94,10 +117,27 @@ public class GitHubDiscussionCommentProcessor extends BaseGitHubProcessor {
         // Save the comment
         comment = commentRepository.save(comment);
 
+        // Publish domain events
+        Long discussionId = discussion.getId();
         if (isNew) {
+            eventPublisher.publishEvent(
+                new DomainEvent.DiscussionCommentCreated(
+                    EventPayload.DiscussionCommentData.from(comment),
+                    discussionId,
+                    EventContext.from(context)
+                )
+            );
             log.debug("Created discussion comment: commentId={}", dbId);
-        } else {
-            log.debug("Updated discussion comment: commentId={}", dbId);
+        } else if (!changedFields.isEmpty()) {
+            eventPublisher.publishEvent(
+                new DomainEvent.DiscussionCommentEdited(
+                    EventPayload.DiscussionCommentData.from(comment),
+                    discussionId,
+                    changedFields,
+                    EventContext.from(context)
+                )
+            );
+            log.debug("Updated discussion comment: commentId={}, changedFields={}", dbId, changedFields);
         }
 
         return comment;
@@ -110,12 +150,20 @@ public class GitHubDiscussionCommentProcessor extends BaseGitHubProcessor {
      * following the pattern where all data mutations are handled by processors.
      *
      * @param commentDto the comment DTO containing the ID to delete
+     * @param context    the processing context for event publishing
      */
     @Transactional
-    public void processDeleted(GitHubDiscussionCommentDTO commentDto) {
+    public void processDeleted(GitHubDiscussionCommentDTO commentDto, ProcessingContext context) {
         Long dbId = commentDto.getDatabaseId();
         if (dbId != null) {
+            Long discussionId = commentRepository
+                .findById(dbId)
+                .map(c -> c.getDiscussion() != null ? c.getDiscussion().getId() : null)
+                .orElse(null);
             commentRepository.deleteById(dbId);
+            eventPublisher.publishEvent(
+                new DomainEvent.DiscussionCommentDeleted(dbId, discussionId, EventContext.from(context))
+            );
             log.info("Deleted discussion comment: commentId={}", dbId);
         } else {
             log.warn("Cannot delete discussion comment: reason=missingDatabaseId");

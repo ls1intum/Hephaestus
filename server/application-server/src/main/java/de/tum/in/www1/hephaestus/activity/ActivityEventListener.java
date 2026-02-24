@@ -1818,6 +1818,112 @@ public class ActivityEventListener {
     }
 
     // ========================================================================
+    // Discussion Comment Events
+    // ========================================================================
+
+    /**
+     * Handle discussion comment created events.
+     *
+     * <p>Records DISCUSSION_COMMENT_CREATED activity event. Discussion comments
+     * are a community engagement signal, tracked for activity and XP.
+     */
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onDiscussionCommentCreated(DomainEvent.DiscussionCommentCreated event) {
+        var commentData = event.comment();
+        if (!hasValidScopeId("Discussion comment created", commentData.id(), event.context().scopeId())) {
+            return;
+        }
+        if (commentData.authorId() == null || commentData.repositoryId() == null) {
+            log.debug(
+                "Skipping discussion comment created event (author may be deleted): commentId={}, authorId={}, repositoryId={}",
+                commentData.id(),
+                commentData.authorId(),
+                commentData.repositoryId()
+            );
+            return;
+        }
+        Instant occurredAt = commentData.createdAt() != null ? commentData.createdAt() : Instant.now();
+        safeRecord("discussion comment created", commentData.id(), () ->
+            activityEventService.record(
+                event.context().scopeId(),
+                ActivityEventType.DISCUSSION_COMMENT_CREATED,
+                occurredAt,
+                userRepository.getReferenceById(commentData.authorId()),
+                repositoryRepository.getReferenceById(commentData.repositoryId()),
+                ActivityTargetType.DISCUSSION_COMMENT,
+                commentData.id(),
+                xpCalc.getXpDiscussionCommentCreated()
+            )
+        );
+    }
+
+    /**
+     * Handle discussion comment edited events.
+     *
+     * <p>Records audit trail event with 0 XP - the original comment creation
+     * already captured XP, edits don't add additional value.
+     */
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onDiscussionCommentEdited(DomainEvent.DiscussionCommentEdited event) {
+        var commentData = event.comment();
+        if (!hasValidScopeId("Discussion comment edited", commentData.id(), event.context().scopeId())) {
+            return;
+        }
+        if (commentData.authorId() == null || commentData.repositoryId() == null) {
+            log.debug(
+                "Skipping discussion comment edited event (author may be deleted): commentId={}, authorId={}, repositoryId={}",
+                commentData.id(),
+                commentData.authorId(),
+                commentData.repositoryId()
+            );
+            return;
+        }
+        Instant occurredAt = Instant.now(); // Use current time for edits
+        safeRecord("discussion comment edited", commentData.id(), () ->
+            activityEventService.record(
+                event.context().scopeId(),
+                ActivityEventType.DISCUSSION_COMMENT_EDITED,
+                occurredAt,
+                userRepository.getReferenceById(commentData.authorId()),
+                repositoryRepository.getReferenceById(commentData.repositoryId()),
+                ActivityTargetType.DISCUSSION_COMMENT,
+                commentData.id(),
+                0.0 // No XP for edits - original creation already counted
+            )
+        );
+    }
+
+    /**
+     * Handle discussion comment deleted events.
+     *
+     * <p>Records audit trail event with 0 XP. Note that we may not have full
+     * comment data since the entity was deleted - we rely on the event metadata.
+     */
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onDiscussionCommentDeleted(DomainEvent.DiscussionCommentDeleted event) {
+        Long commentId = event.commentId();
+        if (!hasValidScopeId("Discussion comment deleted", commentId, event.context().scopeId())) {
+            return;
+        }
+        log.debug("Recording discussion comment deleted event: commentId={}", commentId);
+        safeRecord("discussion comment deleted", commentId, () ->
+            activityEventService.recordDeleted(
+                event.context().scopeId(),
+                ActivityEventType.DISCUSSION_COMMENT_DELETED,
+                Instant.now(),
+                ActivityTargetType.DISCUSSION_COMMENT,
+                commentId
+            )
+        );
+    }
+
+    // ========================================================================
     // Project Status Update Events
     // ========================================================================
 
