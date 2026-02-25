@@ -1,0 +1,5 @@
+{
+	"scripts": {
+		"setup": "bash \"$JEAN_ROOT_PATH/scripts/jean-setup.sh\""
+	}
+}
