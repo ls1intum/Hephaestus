@@ -1,0 +1,69 @@
+# GraphQL query for fetching paginated replies for a specific discussion comment.
+# Used to handle nested pagination when a comment has more than 100 replies.
+# Uses node(id:) approach since GitHub's GraphQL API doesn't expose
+# discussionComment(id:) directly on Repository.
+
+query GetDiscussionCommentReplies($commentId: ID!, $first: Int!, $after: String) {
+    rateLimit {
+        cost
+        limit
+        remaining
+        resetAt
+    }
+    node(id: $commentId) {
+        ... on DiscussionComment {
+            id
+            replies(first: $first, after: $after) {
+                totalCount
+                pageInfo {
+                    hasNextPage
+                    endCursor
+                }
+                nodes {
+                    id
+                    databaseId
+                    body
+                    url
+                    createdAt
+                    updatedAt
+                    isAnswer
+                    isMinimized
+                    minimizedReason
+                    authorAssociation
+
+                    author {
+                        __typename
+                        ... on User {
+                            id
+                            databaseId
+                            login
+                            avatarUrl
+                            name
+                            email
+                            createdAt
+                            updatedAt
+                        }
+                        ... on Bot {
+                            id
+                            databaseId
+                            login
+                            avatarUrl
+                        }
+                        ... on Mannequin {
+                            id
+                            databaseId
+                            login
+                            avatarUrl
+                        }
+                        ... on Organization {
+                            id
+                            databaseId
+                            login
+                            avatarUrl
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

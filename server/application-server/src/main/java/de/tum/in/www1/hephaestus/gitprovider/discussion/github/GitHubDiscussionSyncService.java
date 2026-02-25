@@ -1,6 +1,8 @@
 package de.tum.in.www1.hephaestus.gitprovider.discussion.github;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
+import static de.tum.in.www1.hephaestus.gitprovider.common.DateTimeUtils.toInstant;
+import static de.tum.in.www1.hephaestus.gitprovider.common.DateTimeUtils.uriToString;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.DEFAULT_PAGE_SIZE;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.DISCUSSION_SYNC_PAGE_SIZE;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.JITTER_FACTOR;
@@ -38,6 +40,7 @@ import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPageInfo;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.sync.SyncResult;
+import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -74,6 +77,7 @@ public class GitHubDiscussionSyncService {
 
     private static final String QUERY_DOCUMENT = "GetRepositoryDiscussions";
     private static final String COMMENTS_QUERY_DOCUMENT = "GetDiscussionComments";
+    private static final String COMMENT_REPLIES_QUERY_DOCUMENT = "GetDiscussionCommentReplies";
 
     /** Maximum number of retry attempts for transient failures. */
     private static final int MAX_RETRY_ATTEMPTS = 3;
@@ -90,6 +94,22 @@ public class GitHubDiscussionSyncService {
         int discussionNumber,
         Long repositoryId,
         String commentCursor
+    ) {}
+
+    /**
+     * Container for discussion comments that need additional reply pagination.
+     * <p>
+     * Stores the comment's GraphQL node ID, database ID, and the cursor from the
+     * embedded replies sub-connection so that remaining replies can be fetched via
+     * {@link #syncRemainingReplies}.
+     */
+    private record CommentWithReplyCursor(
+        String commentNodeId,
+        Long commentDatabaseId,
+        Long discussionId,
+        int discussionNumber,
+        Long repositoryId,
+        String replyCursor
     ) {}
 
     private final RepositoryRepository repositoryRepository;
@@ -220,6 +240,7 @@ public class GitHubDiscussionSyncService {
         int totalDiscussionsSynced = 0;
         int totalCommentsSynced = 0;
         List<DiscussionWithCommentCursor> discussionsNeedingCommentPagination = new ArrayList<>();
+        List<CommentWithReplyCursor> commentsNeedingReplyPagination = new ArrayList<>();
         String cursor = initialCursor;
         boolean hasMore = true;
         int pageCount = 0;
@@ -339,13 +360,19 @@ public class GitHubDiscussionSyncService {
                 // Process page within transaction
                 final Long repoId = repositoryId;
                 final List<DiscussionWithCommentCursor> pageDiscussionsNeedingPagination = new ArrayList<>();
+                final List<CommentWithReplyCursor> pageCommentsNeedingReplyPagination = new ArrayList<>();
                 PageResult pageResult = transactionTemplate.execute(status -> {
                     Repository repo = repositoryRepository.findById(repoId).orElse(null);
                     if (repo == null) {
                         return new PageResult(0, 0);
                     }
                     ProcessingContext context = ProcessingContext.forSync(scopeId, repo);
-                    return processDiscussionPage(connection, context, pageDiscussionsNeedingPagination);
+                    return processDiscussionPage(
+                        connection,
+                        context,
+                        pageDiscussionsNeedingPagination,
+                        pageCommentsNeedingReplyPagination
+                    );
                 });
 
                 if (pageResult != null) {
@@ -353,6 +380,7 @@ public class GitHubDiscussionSyncService {
                     totalCommentsSynced += pageResult.commentCount;
                 }
                 discussionsNeedingCommentPagination.addAll(pageDiscussionsNeedingPagination);
+                commentsNeedingReplyPagination.addAll(pageCommentsNeedingReplyPagination);
 
                 GHPageInfo pageInfo = connection.getPageInfo();
                 hasMore = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
@@ -531,7 +559,8 @@ public class GitHubDiscussionSyncService {
                     discussionWithCursor.commentCursor(),
                     ownerAndName,
                     client,
-                    timeout
+                    timeout,
+                    commentsNeedingReplyPagination
                 );
                 totalCommentsSynced += additionalComments;
             }
@@ -543,6 +572,29 @@ public class GitHubDiscussionSyncService {
             resolveAnswerCommentsAfterPagination(discussionsNeedingCommentPagination);
         }
 
+        // Fetch remaining replies for comments with >100 replies
+        if (!commentsNeedingReplyPagination.isEmpty()) {
+            log.debug(
+                "Starting additional reply fetch for comments with pagination: repoName={}, commentCount={}",
+                safeNameWithOwner,
+                commentsNeedingReplyPagination.size()
+            );
+            for (CommentWithReplyCursor commentWithCursor : commentsNeedingReplyPagination) {
+                int additionalReplies = syncRemainingReplies(
+                    scopeId,
+                    commentWithCursor.commentNodeId(),
+                    commentWithCursor.commentDatabaseId(),
+                    commentWithCursor.discussionId(),
+                    commentWithCursor.discussionNumber(),
+                    commentWithCursor.repositoryId(),
+                    commentWithCursor.replyCursor(),
+                    client,
+                    timeout
+                );
+                totalCommentsSynced += additionalReplies;
+            }
+        }
+
         // Clear cursor on successful completion (uses REQUIRES_NEW)
         // Only clear if sync completed without abort (including incremental stop)
         if (syncTargetId != null && (!hasMore || stoppedByIncrementalSync) && abortReason == null) {
@@ -551,11 +603,12 @@ public class GitHubDiscussionSyncService {
 
         SyncResult.Status finalStatus = abortReason != null ? abortReason : SyncResult.Status.COMPLETED;
         log.info(
-            "Completed discussion sync: repoName={}, discussionCount={}, commentCount={}, discussionsWithPagination={}, resumed={}, stoppedByIncrementalSync={}, status={}",
+            "Completed discussion sync: repoName={}, discussionCount={}, commentCount={}, discussionsWithPagination={}, commentsWithReplyPagination={}, resumed={}, stoppedByIncrementalSync={}, status={}",
             safeNameWithOwner,
             totalDiscussionsSynced,
             totalCommentsSynced,
             discussionsNeedingCommentPagination.size(),
+            commentsNeedingReplyPagination.size(),
             resuming,
             stoppedByIncrementalSync,
             finalStatus
@@ -570,16 +623,19 @@ public class GitHubDiscussionSyncService {
 
     /**
      * Processes a page of discussions with embedded comments.
-     * Also populates the list of discussions that need additional comment pagination.
+     * Also populates the list of discussions that need additional comment pagination
+     * and comments that need additional reply pagination.
      *
-     * @param connection                  the GraphQL discussion connection
-     * @param context                     the processing context
-     * @param discussionsNeedingPagination list to populate with discussions needing comment pagination
+     * @param connection                      the GraphQL discussion connection
+     * @param context                         the processing context
+     * @param discussionsNeedingPagination    list to populate with discussions needing comment pagination
+     * @param commentsNeedingReplyPagination  list to populate with comments needing reply pagination
      */
     private PageResult processDiscussionPage(
         GHDiscussionConnection connection,
         ProcessingContext context,
-        List<DiscussionWithCommentCursor> discussionsNeedingPagination
+        List<DiscussionWithCommentCursor> discussionsNeedingPagination,
+        List<CommentWithReplyCursor> commentsNeedingReplyPagination
     ) {
         int discussionsSynced = 0;
         int commentsSynced = 0;
@@ -635,7 +691,7 @@ public class GitHubDiscussionSyncService {
                     }
                 }
 
-                // Detect overflow in reply sub-connections
+                // Detect overflow in reply sub-connections and track for follow-up pagination
                 for (var node : commentConn.getNodes()) {
                     if (node != null && node.getReplies() != null) {
                         var repliesPageInfo = node.getReplies().getPageInfo();
@@ -646,6 +702,19 @@ public class GitHubDiscussionSyncService {
                                 true,
                                 "discussionNumber=" + graphQlDiscussion.getNumber() + ", commentId=" + node.getId()
                             );
+                            // Track for follow-up reply pagination
+                            if (node.getId() != null && repliesPageInfo.getEndCursor() != null) {
+                                commentsNeedingReplyPagination.add(
+                                    new CommentWithReplyCursor(
+                                        node.getId(),
+                                        node.getDatabaseId() != null ? node.getDatabaseId().longValue() : null,
+                                        discussion.getId(),
+                                        discussion.getNumber(),
+                                        context.repository().getId(),
+                                        repliesPageInfo.getEndCursor()
+                                    )
+                                );
+                            }
                         }
                     }
                 }
@@ -697,6 +766,7 @@ public class GitHubDiscussionSyncService {
      * @param ownerAndName     the parsed repository owner and name
      * @param client           the GraphQL client
      * @param timeout          the request timeout
+     * @param commentsNeedingReplyPagination list to populate with comments needing reply pagination
      * @return number of additional comments synced
      */
     private int syncRemainingComments(
@@ -707,7 +777,8 @@ public class GitHubDiscussionSyncService {
         String startCursor,
         RepositoryOwnerAndName ownerAndName,
         HttpGraphQlClient client,
-        Duration timeout
+        Duration timeout,
+        List<CommentWithReplyCursor> commentsNeedingReplyPagination
     ) {
         int totalSynced = 0;
         String cursor = startCursor;
@@ -829,7 +900,7 @@ public class GitHubDiscussionSyncService {
                     totalSynced += pageSynced;
                 }
 
-                // Detect overflow in reply sub-connections
+                // Detect overflow in reply sub-connections and track for follow-up pagination
                 if (connection.getNodes() != null) {
                     for (var node : connection.getNodes()) {
                         if (node != null && node.getReplies() != null) {
@@ -841,6 +912,19 @@ public class GitHubDiscussionSyncService {
                                     true,
                                     "discussionNumber=" + discussionNumber + ", commentId=" + node.getId()
                                 );
+                                // Track for follow-up reply pagination
+                                if (node.getId() != null && repliesPageInfo.getEndCursor() != null) {
+                                    commentsNeedingReplyPagination.add(
+                                        new CommentWithReplyCursor(
+                                            node.getId(),
+                                            node.getDatabaseId() != null ? node.getDatabaseId().longValue() : null,
+                                            discussionId,
+                                            discussionNumber,
+                                            repositoryId,
+                                            repliesPageInfo.getEndCursor()
+                                        )
+                                    );
+                                }
                             }
                         }
                     }
@@ -881,6 +965,202 @@ public class GitHubDiscussionSyncService {
         log.debug(
             "Completed remaining comment sync: discussionNumber={}, additionalComments={}",
             discussionNumber,
+            totalSynced
+        );
+        return totalSynced;
+    }
+
+    /**
+     * Synchronizes remaining replies for a discussion comment, starting from the given cursor.
+     * <p>
+     * This method is called when a comment has more than 100 replies (the embedded limit
+     * in GetRepositoryDiscussions and GetDiscussionComments queries). It uses the
+     * {@code node(id:)} GraphQL pattern to fetch additional reply pages for a specific
+     * comment identified by its GraphQL node ID.
+     * <p>
+     * Each reply is processed as a DiscussionComment with the parent comment relationship
+     * set to the comment whose replies we are paginating.
+     *
+     * @param scopeId              the scope ID for authentication
+     * @param commentNodeId        the GraphQL node ID of the parent comment
+     * @param commentDatabaseId    the database ID of the parent comment (for lookup)
+     * @param discussionId         the discussion database ID
+     * @param discussionNumber     the discussion number (for logging)
+     * @param repositoryId         the repository ID (for re-fetching)
+     * @param startCursor          the pagination cursor to start from (from embedded replies)
+     * @param client               the GraphQL client
+     * @param timeout              the request timeout
+     * @return number of additional replies synced
+     */
+    private int syncRemainingReplies(
+        Long scopeId,
+        String commentNodeId,
+        Long commentDatabaseId,
+        Long discussionId,
+        int discussionNumber,
+        Long repositoryId,
+        String startCursor,
+        HttpGraphQlClient client,
+        Duration timeout
+    ) {
+        int totalSynced = 0;
+        String cursor = startCursor;
+        boolean hasMore = true;
+        int pageCount = 0;
+
+        log.debug(
+            "Starting remaining reply sync: discussionNumber={}, commentNodeId={}, startCursor={}",
+            discussionNumber,
+            commentNodeId,
+            startCursor != null ? startCursor.substring(0, Math.min(20, startCursor.length())) + "..." : "null"
+        );
+
+        while (hasMore) {
+            pageCount++;
+            if (pageCount >= MAX_PAGINATION_PAGES) {
+                log.warn(
+                    "Reached maximum pagination limit for remaining reply sync: discussionNumber={}, commentNodeId={}, limit={}",
+                    discussionNumber,
+                    commentNodeId,
+                    MAX_PAGINATION_PAGES
+                );
+                break;
+            }
+
+            try {
+                ClientGraphQlResponse response = client
+                    .documentName(COMMENT_REPLIES_QUERY_DOCUMENT)
+                    .variable("commentId", commentNodeId)
+                    .variable("first", DEFAULT_PAGE_SIZE)
+                    .variable("after", cursor)
+                    .execute()
+                    .block(timeout);
+
+                if (response == null || !response.isValid()) {
+                    log.warn(
+                        "Invalid GraphQL response for remaining reply sync: discussionNumber={}, commentNodeId={}, errors={}",
+                        discussionNumber,
+                        commentNodeId,
+                        response != null ? response.getErrors() : "null"
+                    );
+                    break;
+                }
+
+                // Track rate limit
+                graphQlClientProvider.trackRateLimit(scopeId, response);
+                if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
+                    log.warn(
+                        "Aborting remaining reply sync due to critical rate limit: discussionNumber={}, commentNodeId={}",
+                        discussionNumber,
+                        commentNodeId
+                    );
+                    break;
+                }
+
+                GHDiscussionCommentConnection connection = response
+                    .field("node.replies")
+                    .toEntity(GHDiscussionCommentConnection.class);
+
+                if (connection == null || connection.getNodes() == null || connection.getNodes().isEmpty()) {
+                    break;
+                }
+
+                // Process replies within transaction
+                final Long finalDiscussionId = discussionId;
+                final Long finalRepositoryId = repositoryId;
+                final String parentNodeId = commentNodeId;
+                final Long parentDbId = commentDatabaseId;
+                Integer pageSynced = transactionTemplate.execute(status -> {
+                    Repository repo = repositoryRepository.findById(finalRepositoryId).orElse(null);
+                    if (repo == null) {
+                        return 0;
+                    }
+                    Discussion discussion = discussionRepository.findById(finalDiscussionId).orElse(null);
+                    if (discussion == null) {
+                        return 0;
+                    }
+                    // Look up the parent comment once for this page
+                    DiscussionComment parentComment =
+                        parentDbId != null ? discussionCommentRepository.findById(parentDbId).orElse(null) : null;
+                    ProcessingContext context = ProcessingContext.forSync(scopeId, repo);
+
+                    int synced = 0;
+                    for (var replyNode : connection.getNodes()) {
+                        if (replyNode == null) {
+                            continue;
+                        }
+                        // Build DTO for the reply, setting the parent node ID for threading
+                        GitHubDiscussionCommentDTO replyDTO = new GitHubDiscussionCommentDTO(
+                            null,
+                            replyNode.getDatabaseId() != null ? replyNode.getDatabaseId().longValue() : null,
+                            replyNode.getId(),
+                            replyNode.getBody(),
+                            uriToString(replyNode.getUrl()),
+                            replyNode.getIsAnswer(),
+                            replyNode.getIsMinimized(),
+                            replyNode.getMinimizedReason(),
+                            replyNode.getAuthorAssociation() != null ? replyNode.getAuthorAssociation().name() : null,
+                            toInstant(replyNode.getCreatedAt()),
+                            toInstant(replyNode.getUpdatedAt()),
+                            GitHubUserDTO.fromActor(replyNode.getAuthor()),
+                            parentNodeId
+                        );
+
+                        DiscussionComment comment = commentProcessor.process(replyDTO, discussion, context);
+                        if (comment != null) {
+                            synced++;
+                            // Resolve parent comment relationship
+                            if (parentComment != null) {
+                                commentProcessor.resolveParentComment(comment, parentComment);
+                            }
+                        }
+                    }
+
+                    return synced;
+                });
+
+                if (pageSynced != null) {
+                    totalSynced += pageSynced;
+                }
+
+                GHPageInfo pageInfo = connection.getPageInfo();
+                hasMore = pageInfo != null && pageInfo.getHasNextPage();
+                cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
+
+                // Throttle between pagination requests to avoid hammering GitHub
+                if (hasMore && !syncProperties.paginationThrottle().isZero()) {
+                    try {
+                        Thread.sleep(syncProperties.paginationThrottle().toMillis());
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        log.debug(
+                            "Remaining reply sync interrupted during throttle: discussionNumber={}, commentNodeId={}",
+                            discussionNumber,
+                            commentNodeId
+                        );
+                        break;
+                    }
+                }
+            } catch (InstallationNotFoundException e) {
+                // Re-throw to abort the entire sync operation
+                throw e;
+            } catch (Exception e) {
+                ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
+                log.error(
+                    "Failed to sync remaining replies: discussionNumber={}, commentNodeId={}, error={}",
+                    discussionNumber,
+                    commentNodeId,
+                    classification.message(),
+                    e
+                );
+                break;
+            }
+        }
+
+        log.debug(
+            "Completed remaining reply sync: discussionNumber={}, commentNodeId={}, additionalReplies={}",
+            discussionNumber,
+            commentNodeId,
             totalSynced
         );
         return totalSynced;
