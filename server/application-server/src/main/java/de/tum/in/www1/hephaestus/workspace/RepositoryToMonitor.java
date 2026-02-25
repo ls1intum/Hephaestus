@@ -41,6 +41,9 @@ public class RepositoryToMonitor {
     // The time up to which pull requests have been synced in the recent sync
     private Instant pullRequestsSyncedAt;
 
+    // The time up to which discussions have been synced in the recent sync
+    private Instant discussionsSyncedAt;
+
     // ========================================================================
     // Issue Backfill Tracking
     // ========================================================================
@@ -91,6 +94,12 @@ public class RepositoryToMonitor {
      * fails mid-pagination. Cleared when sync completes successfully.
      */
     private String pullRequestSyncCursor;
+
+    /**
+     * Pagination cursor for discussion sync. Persisted to allow resumption if sync
+     * fails mid-pagination. Cleared when sync completes successfully.
+     */
+    private String discussionSyncCursor;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "workspace_id", nullable = false)

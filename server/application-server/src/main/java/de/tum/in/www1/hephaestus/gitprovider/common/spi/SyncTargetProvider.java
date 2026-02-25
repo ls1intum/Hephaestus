@@ -218,6 +218,7 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
      * @param lastMilestonesSyncedAt              last milestones sync timestamp
      * @param lastIssuesSyncedAt                  last issues sync timestamp
      * @param lastPullRequestsSyncedAt            last pull requests sync timestamp
+     * @param lastDiscussionsSyncedAt             last discussions sync timestamp
      * @param lastCollaboratorsSyncedAt           last collaborators sync timestamp
      * @param lastFullSyncAt                      last full repository sync timestamp
      * @param issueBackfillHighWaterMark          highest issue number at issue backfill start
@@ -227,6 +228,7 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
      * @param backfillLastRunAt                   when backfill last executed
      * @param issueSyncCursor                     pagination cursor for resuming issue sync
      * @param pullRequestSyncCursor               pagination cursor for resuming PR sync
+     * @param discussionSyncCursor                pagination cursor for resuming discussion sync
      */
     record SyncTarget(
         Long id,
@@ -239,6 +241,7 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
         Instant lastMilestonesSyncedAt,
         Instant lastIssuesSyncedAt,
         Instant lastPullRequestsSyncedAt,
+        Instant lastDiscussionsSyncedAt,
         Instant lastCollaboratorsSyncedAt,
         Instant lastFullSyncAt,
         Integer issueBackfillHighWaterMark,
@@ -247,7 +250,8 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
         Integer pullRequestBackfillCheckpoint,
         Instant backfillLastRunAt,
         String issueSyncCursor,
-        String pullRequestSyncCursor
+        String pullRequestSyncCursor,
+        String discussionSyncCursor
     ) {
         /**
          * Checks if a full sync is needed based on staleness threshold.
@@ -373,6 +377,8 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
         ISSUES,
         /** Pull requests incremental sync */
         PULL_REQUESTS,
+        /** Discussions incremental sync */
+        DISCUSSIONS,
         /** Repository collaborators sync */
         COLLABORATORS,
         /** Full repository metadata sync */

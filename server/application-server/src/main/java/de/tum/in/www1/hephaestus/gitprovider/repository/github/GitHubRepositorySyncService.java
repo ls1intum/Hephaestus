@@ -214,6 +214,9 @@ public class GitHubRepositorySyncService {
             // Set disabled status
             repository.setDisabled(repoData.getIsDisabled());
 
+            // Set discussions enabled status
+            repository.setHasDiscussionsEnabled(repoData.getHasDiscussionsEnabled());
+
             // Set created at timestamp
             if (repoData.getCreatedAt() != null) {
                 repository.setCreatedAt(repoData.getCreatedAt().toInstant());

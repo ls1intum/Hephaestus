@@ -1,6 +1,8 @@
 package de.tum.in.www1.hephaestus.gitprovider.common.events;
 
 import de.tum.in.www1.hephaestus.gitprovider.commit.Commit;
+import de.tum.in.www1.hephaestus.gitprovider.discussion.Discussion;
+import de.tum.in.www1.hephaestus.gitprovider.discussioncomment.DiscussionComment;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueComment;
 import de.tum.in.www1.hephaestus.gitprovider.issuetype.IssueType;
@@ -513,6 +515,86 @@ public final class EventPayload {
                 commit.getAuthor() != null ? commit.getAuthor().getId() : null,
                 commit.getCommitter() != null ? commit.getCommitter().getId() : null,
                 commit.getRepository().getId()
+            );
+        }
+    }
+
+    // ========================================================================
+    // Discussion Event Payload
+    // ========================================================================
+
+    /**
+     * Immutable snapshot of a Discussion for event handling.
+     */
+    public record DiscussionData(
+        @NonNull Long id,
+        int number,
+        @NonNull String title,
+        @Nullable String body,
+        @NonNull Discussion.State state,
+        @Nullable String stateReason,
+        boolean isLocked,
+        int commentsCount,
+        @NonNull String htmlUrl,
+        @NonNull RepositoryRef repository,
+        @Nullable Long authorId,
+        @Nullable String categoryName,
+        @Nullable Instant createdAt,
+        @Nullable Instant updatedAt,
+        @Nullable Instant closedAt,
+        @Nullable Instant answerChosenAt
+    ) {
+        public static DiscussionData from(Discussion discussion) {
+            return new DiscussionData(
+                discussion.getId(),
+                discussion.getNumber(),
+                discussion.getTitle(),
+                discussion.getBody(),
+                discussion.getState(),
+                discussion.getStateReason() != null ? discussion.getStateReason().name() : null,
+                discussion.isLocked(),
+                discussion.getCommentsCount(),
+                discussion.getHtmlUrl(),
+                RepositoryRef.from(discussion.getRepository()),
+                discussion.getAuthor() != null ? discussion.getAuthor().getId() : null,
+                discussion.getCategory() != null ? discussion.getCategory().getName() : null,
+                discussion.getCreatedAt(),
+                discussion.getUpdatedAt(),
+                discussion.getClosedAt(),
+                discussion.getAnswerChosenAt()
+            );
+        }
+    }
+
+    // ========================================================================
+    // Discussion Comment Event Payload
+    // ========================================================================
+
+    /**
+     * Immutable snapshot of a DiscussionComment for event handling.
+     */
+    public record DiscussionCommentData(
+        @NonNull Long id,
+        @Nullable String body,
+        @NonNull String htmlUrl,
+        boolean isAnswer,
+        @Nullable Long authorId,
+        @Nullable Instant createdAt,
+        @Nullable Long discussionId,
+        @Nullable Long repositoryId
+    ) {
+        public static DiscussionCommentData from(DiscussionComment comment) {
+            return new DiscussionCommentData(
+                comment.getId(),
+                comment.getBody(),
+                comment.getHtmlUrl(),
+                comment.isAnswer(),
+                comment.getAuthor() != null ? comment.getAuthor().getId() : null,
+                comment.getCreatedAt(),
+                comment.getDiscussion() != null ? comment.getDiscussion().getId() : null,
+                comment.getDiscussion() != null && comment.getDiscussion().getRepository() != null
+                    ? comment.getDiscussion().getRepository().getId()
+                    : null
             );
         }
     }

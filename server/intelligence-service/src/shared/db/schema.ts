@@ -363,6 +363,172 @@ export const commitPullRequest = pgTable(
 	],
 );
 
+export const discussion = pgTable(
+	"discussion",
+	{
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		id: bigint({ mode: "number" }).primaryKey().notNull(),
+		createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }),
+		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }),
+		number: integer().notNull(),
+		title: varchar({ length: 1024 }).notNull(),
+		body: text(),
+		htmlUrl: varchar("html_url", { length: 512 }).notNull(),
+		state: varchar({ length: 16 }).notNull(),
+		stateReason: varchar("state_reason", { length: 32 }),
+		upvoteCount: integer("upvote_count").default(0).notNull(),
+		isLocked: boolean("is_locked").default(false).notNull(),
+		activeLockReason: varchar("active_lock_reason", { length: 32 }),
+		closedAt: timestamp("closed_at", { withTimezone: true, mode: "string" }),
+		answerChosenAt: timestamp("answer_chosen_at", { withTimezone: true, mode: "string" }),
+		commentCount: integer("comment_count").default(0).notNull(),
+		lastSyncAt: timestamp("last_sync_at", { withTimezone: true, mode: "string" }),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		repositoryId: bigint("repository_id", { mode: "number" }),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		authorId: bigint("author_id", { mode: "number" }),
+		categoryId: varchar("category_id", { length: 128 }),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		answerChosenById: bigint("answer_chosen_by_id", { mode: "number" }),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		answerCommentId: bigint("answer_comment_id", { mode: "number" }),
+	},
+	(table) => [
+		index("idx_discussion_author").using("btree", table.authorId.asc().nullsLast()),
+		index("idx_discussion_category").using("btree", table.categoryId.asc().nullsLast()),
+		index("idx_discussion_created_at").using("btree", table.createdAt.asc().nullsLast()),
+		index("idx_discussion_repository").using("btree", table.repositoryId.asc().nullsLast()),
+		index("idx_discussion_state").using("btree", table.state.asc().nullsLast()),
+		foreignKey({
+			columns: [table.repositoryId],
+			foreignColumns: [repository.id],
+			name: "fk_discussion_repository",
+		}).onDelete("cascade"),
+		foreignKey({
+			columns: [table.authorId],
+			foreignColumns: [user.id],
+			name: "fk_discussion_author",
+		}).onDelete("set null"),
+		foreignKey({
+			columns: [table.categoryId],
+			foreignColumns: [discussionCategory.id],
+			name: "fk_discussion_category",
+		}).onDelete("set null"),
+		foreignKey({
+			columns: [table.answerChosenById],
+			foreignColumns: [user.id],
+			name: "fk_discussion_answer_chosen_by",
+		}).onDelete("set null"),
+		foreignKey({
+			columns: [table.answerCommentId],
+			foreignColumns: [discussionComment.id],
+			name: "fk_discussion_answer_comment",
+		}).onDelete("set null"),
+		unique("uq_discussion_repo_number").on(table.number, table.repositoryId),
+		unique("uk_discussion_answer_comment_id").on(table.answerCommentId),
+	],
+);
+
+export const discussionCategory = pgTable(
+	"discussion_category",
+	{
+		id: varchar({ length: 128 }).primaryKey().notNull(),
+		name: varchar({ length: 255 }).notNull(),
+		slug: varchar({ length: 128 }).notNull(),
+		emoji: varchar({ length: 32 }),
+		description: text(),
+		isAnswerable: boolean("is_answerable").default(false).notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		repositoryId: bigint("repository_id", { mode: "number" }),
+		createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }),
+		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }),
+	},
+	(table) => [
+		index("idx_discussion_category_repository").using(
+			"btree",
+			table.repositoryId.asc().nullsLast(),
+		),
+		foreignKey({
+			columns: [table.repositoryId],
+			foreignColumns: [repository.id],
+			name: "fk_discussion_category_repository",
+		}).onDelete("cascade"),
+		unique("uq_discussion_category_repo_slug").on(table.slug, table.repositoryId),
+	],
+);
+
+export const discussionComment = pgTable(
+	"discussion_comment",
+	{
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		id: bigint({ mode: "number" }).primaryKey().notNull(),
+		createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }),
+		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }),
+		body: text(),
+		htmlUrl: varchar("html_url", { length: 512 }).notNull(),
+		isAnswer: boolean("is_answer").default(false).notNull(),
+		isMinimized: boolean("is_minimized").default(false).notNull(),
+		minimizedReason: varchar("minimized_reason", { length: 64 }),
+		authorAssociation: varchar("author_association", { length: 32 }),
+		lastSyncAt: timestamp("last_sync_at", { withTimezone: true, mode: "string" }),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		discussionId: bigint("discussion_id", { mode: "number" }),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		authorId: bigint("author_id", { mode: "number" }),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		parentCommentId: bigint("parent_comment_id", { mode: "number" }),
+	},
+	(table) => [
+		index("idx_discussion_comment_author").using("btree", table.authorId.asc().nullsLast()),
+		index("idx_discussion_comment_discussion").using("btree", table.discussionId.asc().nullsLast()),
+		index("idx_discussion_comment_discussion_created").using(
+			"btree",
+			table.discussionId.asc().nullsLast(),
+			table.createdAt.asc().nullsLast(),
+		),
+		index("idx_discussion_comment_is_answer").using("btree", table.isAnswer.asc().nullsLast()),
+		index("idx_discussion_comment_parent").using("btree", table.parentCommentId.asc().nullsLast()),
+		foreignKey({
+			columns: [table.discussionId],
+			foreignColumns: [discussion.id],
+			name: "fk_discussion_comment_discussion",
+		}).onDelete("cascade"),
+		foreignKey({
+			columns: [table.authorId],
+			foreignColumns: [user.id],
+			name: "fk_discussion_comment_author",
+		}).onDelete("set null"),
+		foreignKey({
+			columns: [table.parentCommentId],
+			foreignColumns: [table.id],
+			name: "fk_discussion_comment_parent",
+		}).onDelete("set null"),
+	],
+);
+
+export const discussionLabel = pgTable(
+	"discussion_label",
+	{
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		discussionId: bigint("discussion_id", { mode: "number" }).notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		labelId: bigint("label_id", { mode: "number" }).notNull(),
+	},
+	(table) => [
+		foreignKey({
+			columns: [table.discussionId],
+			foreignColumns: [discussion.id],
+			name: "fk_discussion_label_discussion",
+		}).onDelete("cascade"),
+		foreignKey({
+			columns: [table.labelId],
+			foreignColumns: [label.id],
+			name: "fk_discussion_label_label",
+		}).onDelete("cascade"),
+		primaryKey({ columns: [table.discussionId, table.labelId], name: "discussion_label_pkey" }),
+	],
+);
+
 export const document = pgTable(
 	"document",
 	{
@@ -1235,6 +1401,7 @@ export const repository = pgTable(
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		organizationId: bigint("organization_id", { mode: "number" }),
 		lastSyncAt: timestamp("last_sync_at", { withTimezone: true, mode: "string" }),
+		hasDiscussionsEnabled: boolean("has_discussions_enabled").default(false).notNull(),
 	},
 	(table) => [
 		index("idx_repository_name_with_owner").using("btree", table.nameWithOwner.asc().nullsLast()),
@@ -1309,6 +1476,8 @@ export const repositoryToMonitor = pgTable(
 			withTimezone: true,
 			mode: "string",
 		}),
+		discussionSyncCursor: varchar("discussion_sync_cursor", { length: 255 }),
+		discussionsSyncedAt: timestamp("discussions_synced_at", { withTimezone: true, mode: "string" }),
 	},
 	(table) => [
 		foreignKey({

@@ -37,6 +37,7 @@ public final class SyncTargetFactory {
             rtm.getMilestonesSyncedAt(),
             rtm.getIssuesSyncedAt(),
             rtm.getPullRequestsSyncedAt(),
+            rtm.getDiscussionsSyncedAt(),
             rtm.getCollaboratorsSyncedAt(),
             rtm.getRepositorySyncedAt(),
             rtm.getIssueBackfillHighWaterMark(),
@@ -45,7 +46,8 @@ public final class SyncTargetFactory {
             rtm.getPullRequestBackfillCheckpoint(),
             rtm.getBackfillLastRunAt(),
             rtm.getIssueSyncCursor(),
-            rtm.getPullRequestSyncCursor()
+            rtm.getPullRequestSyncCursor(),
+            rtm.getDiscussionSyncCursor()
         );
     }
 }

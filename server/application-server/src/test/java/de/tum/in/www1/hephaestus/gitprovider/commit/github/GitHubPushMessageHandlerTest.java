@@ -107,7 +107,8 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
             fullName.split("/")[1],
             fullName,
             false,
-            "https://github.com/" + fullName
+            "https://github.com/" + fullName,
+            null
         );
     }
 
