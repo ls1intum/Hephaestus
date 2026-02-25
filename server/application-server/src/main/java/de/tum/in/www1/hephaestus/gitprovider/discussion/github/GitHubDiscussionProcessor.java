@@ -18,6 +18,8 @@ import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserProcessor;
 import java.time.Instant;
+import java.util.HashSet;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
@@ -169,8 +171,16 @@ public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
             log.debug("Created discussion: discussionId={}, discussionNumber={}", dbId, dto.number());
             eventPublisher.publishEvent(new DomainEvent.DiscussionCreated(discussionData, eventContext));
         } else {
-            log.debug("Updated discussion: discussionId={}, discussionNumber={}", dbId, dto.number());
-            eventPublisher.publishEvent(new DomainEvent.DiscussionUpdated(discussionData, Set.of(), eventContext));
+            Set<String> changedFields = computeChangedFields(existingOpt.get(), discussion);
+            if (labelsChanged) {
+                changedFields.add("labels");
+            }
+            if (!changedFields.isEmpty()) {
+                eventPublisher.publishEvent(
+                    new DomainEvent.DiscussionUpdated(discussionData, changedFields, eventContext)
+                );
+                log.debug("Updated discussion: discussionId={}, changedFields={}", dbId, changedFields);
+            }
         }
 
         return discussion;
@@ -311,6 +321,49 @@ public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
 
         // Fetch the managed entity after upsert
         return categoryRepository.findById(dto.nodeId()).orElse(null);
+    }
+
+    /**
+     * Computes which fields changed between the old and new discussion state.
+     */
+    private Set<String> computeChangedFields(Discussion oldDiscussion, Discussion newDiscussion) {
+        Set<String> changedFields = new HashSet<>();
+
+        if (!Objects.equals(oldDiscussion.getTitle(), newDiscussion.getTitle())) {
+            changedFields.add("title");
+        }
+        if (!Objects.equals(oldDiscussion.getBody(), newDiscussion.getBody())) {
+            changedFields.add("body");
+        }
+        if (oldDiscussion.getState() != newDiscussion.getState()) {
+            changedFields.add("state");
+        }
+        if (!Objects.equals(oldDiscussion.getStateReason(), newDiscussion.getStateReason())) {
+            changedFields.add("stateReason");
+        }
+        if (oldDiscussion.isLocked() != newDiscussion.isLocked()) {
+            changedFields.add("locked");
+        }
+        if (!Objects.equals(oldDiscussion.getActiveLockReason(), newDiscussion.getActiveLockReason())) {
+            changedFields.add("activeLockReason");
+        }
+        if (!Objects.equals(oldDiscussion.getClosedAt(), newDiscussion.getClosedAt())) {
+            changedFields.add("closedAt");
+        }
+        if (!Objects.equals(oldDiscussion.getAnswerChosenAt(), newDiscussion.getAnswerChosenAt())) {
+            changedFields.add("answerChosenAt");
+        }
+        if (oldDiscussion.getCommentsCount() != newDiscussion.getCommentsCount()) {
+            changedFields.add("commentsCount");
+        }
+        if (oldDiscussion.getUpvoteCount() != newDiscussion.getUpvoteCount()) {
+            changedFields.add("upvoteCount");
+        }
+        if (!Objects.equals(oldDiscussion.getCategory(), newDiscussion.getCategory())) {
+            changedFields.add("category");
+        }
+
+        return changedFields;
     }
 
     /**

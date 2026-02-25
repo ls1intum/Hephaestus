@@ -155,19 +155,29 @@ public class GitHubDiscussionCommentProcessor extends BaseGitHubProcessor {
     @Transactional
     public void processDeleted(GitHubDiscussionCommentDTO commentDto, ProcessingContext context) {
         Long dbId = commentDto.getDatabaseId();
-        if (dbId != null) {
-            Long discussionId = commentRepository
-                .findById(dbId)
-                .map(c -> c.getDiscussion() != null ? c.getDiscussion().getId() : null)
-                .orElse(null);
-            commentRepository.deleteById(dbId);
-            eventPublisher.publishEvent(
-                new DomainEvent.DiscussionCommentDeleted(dbId, discussionId, EventContext.from(context))
-            );
-            log.info("Deleted discussion comment: commentId={}", dbId);
-        } else {
+        if (dbId == null) {
             log.warn("Cannot delete discussion comment: reason=missingDatabaseId");
+            return;
         }
+
+        commentRepository
+            .findById(dbId)
+            .ifPresent(comment -> {
+                Long discussionId = comment.getDiscussion() != null ? comment.getDiscussion().getId() : null;
+
+                // CRITICAL: Remove from parent Discussion's collection BEFORE deleting
+                // to prevent TransientObjectException with orphanRemoval=true
+                Discussion parentDiscussion = comment.getDiscussion();
+                if (parentDiscussion != null) {
+                    parentDiscussion.getComments().remove(comment);
+                }
+
+                commentRepository.delete(comment);
+                eventPublisher.publishEvent(
+                    new DomainEvent.DiscussionCommentDeleted(dbId, discussionId, EventContext.from(context))
+                );
+                log.info("Deleted discussion comment: commentId={}", dbId);
+            });
     }
 
     /**

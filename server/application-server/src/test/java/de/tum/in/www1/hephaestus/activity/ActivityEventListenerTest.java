@@ -10,6 +10,8 @@ import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.EventContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.EventPayload;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.RepositoryRef;
+import de.tum.in.www1.hephaestus.gitprovider.discussion.Discussion;
+import de.tum.in.www1.hephaestus.gitprovider.discussioncomment.DiscussionComment;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueCommentRepository;
@@ -88,6 +90,9 @@ class ActivityEventListenerTest extends BaseUnitTest {
         when(experiencePointCalculator.getXpPullRequestReady()).thenReturn(0.5);
         when(experiencePointCalculator.getXpIssueCreated()).thenReturn(0.25);
         when(experiencePointCalculator.getXpCommitCreated()).thenReturn(0.5);
+        when(experiencePointCalculator.getXpDiscussionCreated()).thenReturn(0.25);
+        when(experiencePointCalculator.getXpDiscussionAnswered()).thenReturn(0.5);
+        when(experiencePointCalculator.getXpDiscussionCommentCreated()).thenReturn(0.25);
 
         listener = new ActivityEventListener(
             activityEventService,
@@ -521,6 +526,225 @@ class ActivityEventListenerTest extends BaseUnitTest {
         }
     }
 
+    @Nested
+    @DisplayName("Discussion Created Event")
+    class DiscussionCreatedTests {
+
+        @Test
+        @DisplayName("records discussion created with XP for known author")
+        void recordsDiscussionCreatedWithXp() {
+            Discussion discussion = createDiscussion(30L);
+
+            var event = new DomainEvent.DiscussionCreated(createDiscussionData(discussion), createContext());
+
+            listener.onDiscussionCreated(event);
+
+            verify(activityEventService).record(
+                eq(42L),
+                eq(ActivityEventType.DISCUSSION_CREATED),
+                any(Instant.class),
+                eq(testUser),
+                eq(testRepository),
+                eq(ActivityTargetType.DISCUSSION),
+                eq(30L),
+                eq(0.25) // XP from mock
+            );
+        }
+
+        @Test
+        @DisplayName("records discussion with null author and zero XP")
+        void recordsDiscussionWithNullAuthorAndZeroXp() {
+            Discussion discussion = createDiscussion(31L);
+            discussion.setAuthor(null);
+
+            var event = new DomainEvent.DiscussionCreated(createDiscussionData(discussion), createContext());
+
+            listener.onDiscussionCreated(event);
+
+            verify(activityEventService).record(
+                eq(42L),
+                eq(ActivityEventType.DISCUSSION_CREATED),
+                any(Instant.class),
+                isNull(),
+                eq(testRepository),
+                eq(ActivityTargetType.DISCUSSION),
+                eq(31L),
+                eq(0.0)
+            );
+        }
+    }
+
+    @Nested
+    @DisplayName("Discussion Closed Event")
+    class DiscussionClosedTests {
+
+        @Test
+        @DisplayName("records discussion closed with zero XP (lifecycle tracking)")
+        void recordsDiscussionClosedWithZeroXp() {
+            Discussion discussion = createDiscussion(32L);
+            discussion.setClosedAt(Instant.now());
+
+            var event = new DomainEvent.DiscussionClosed(createDiscussionData(discussion), "resolved", createContext());
+
+            listener.onDiscussionClosed(event);
+
+            verify(activityEventService).record(
+                eq(42L),
+                eq(ActivityEventType.DISCUSSION_CLOSED),
+                any(Instant.class),
+                eq(testUser),
+                eq(testRepository),
+                eq(ActivityTargetType.DISCUSSION),
+                eq(32L),
+                eq(0.0)
+            );
+        }
+    }
+
+    @Nested
+    @DisplayName("Discussion Reopened Event")
+    class DiscussionReopenedTests {
+
+        @Test
+        @DisplayName("records discussion reopened with zero XP (lifecycle tracking)")
+        void recordsDiscussionReopenedWithZeroXp() {
+            Discussion discussion = createDiscussion(33L);
+
+            var event = new DomainEvent.DiscussionReopened(createDiscussionData(discussion), createContext());
+
+            listener.onDiscussionReopened(event);
+
+            verify(activityEventService).record(
+                eq(42L),
+                eq(ActivityEventType.DISCUSSION_REOPENED),
+                any(Instant.class),
+                eq(testUser),
+                eq(testRepository),
+                eq(ActivityTargetType.DISCUSSION),
+                eq(33L),
+                eq(0.0)
+            );
+        }
+    }
+
+    @Nested
+    @DisplayName("Discussion Answered Event")
+    class DiscussionAnsweredTests {
+
+        @Test
+        @DisplayName("records discussion answered with XP for author")
+        void recordsDiscussionAnsweredWithXp() {
+            Discussion discussion = createDiscussion(34L);
+            discussion.setAnswerChosenAt(Instant.now());
+
+            var event = new DomainEvent.DiscussionAnswered(createDiscussionData(discussion), 999L, createContext());
+
+            listener.onDiscussionAnswered(event);
+
+            verify(activityEventService).record(
+                eq(42L),
+                eq(ActivityEventType.DISCUSSION_ANSWERED),
+                any(Instant.class),
+                eq(testUser),
+                eq(testRepository),
+                eq(ActivityTargetType.DISCUSSION),
+                eq(34L),
+                eq(0.5) // XP from mock
+            );
+        }
+
+        @Test
+        @DisplayName("records discussion answered with null author and zero XP")
+        void recordsDiscussionAnsweredWithNullAuthorAndZeroXp() {
+            Discussion discussion = createDiscussion(35L);
+            discussion.setAuthor(null);
+            discussion.setAnswerChosenAt(Instant.now());
+
+            var event = new DomainEvent.DiscussionAnswered(createDiscussionData(discussion), 999L, createContext());
+
+            listener.onDiscussionAnswered(event);
+
+            verify(activityEventService).record(
+                eq(42L),
+                eq(ActivityEventType.DISCUSSION_ANSWERED),
+                any(Instant.class),
+                isNull(),
+                eq(testRepository),
+                eq(ActivityTargetType.DISCUSSION),
+                eq(35L),
+                eq(0.0)
+            );
+        }
+    }
+
+    @Nested
+    @DisplayName("Discussion Deleted Event")
+    class DiscussionDeletedTests {
+
+        @Test
+        @DisplayName("records discussion deleted audit trail")
+        void recordsDiscussionDeleted() {
+            var event = new DomainEvent.DiscussionDeleted(36L, createContext());
+
+            listener.onDiscussionDeleted(event);
+
+            verify(activityEventService).recordDeleted(
+                eq(42L),
+                eq(ActivityEventType.DISCUSSION_DELETED),
+                any(Instant.class),
+                eq(ActivityTargetType.DISCUSSION),
+                eq(36L)
+            );
+        }
+    }
+
+    @Nested
+    @DisplayName("Discussion Comment Created Event")
+    class DiscussionCommentCreatedTests {
+
+        @Test
+        @DisplayName("records discussion comment created with XP")
+        void recordsDiscussionCommentCreatedWithXp() {
+            DiscussionComment comment = createDiscussionComment(37L);
+
+            var event = new DomainEvent.DiscussionCommentCreated(
+                createDiscussionCommentData(comment),
+                30L, // discussionId
+                createContext()
+            );
+
+            listener.onDiscussionCommentCreated(event);
+
+            verify(activityEventService).record(
+                eq(42L),
+                eq(ActivityEventType.DISCUSSION_COMMENT_CREATED),
+                any(Instant.class),
+                eq(testUser),
+                eq(testRepository),
+                eq(ActivityTargetType.DISCUSSION_COMMENT),
+                eq(37L),
+                eq(0.25) // XP from mock
+            );
+        }
+
+        @Test
+        @DisplayName("skips comment when author is null")
+        void skipsCommentWhenAuthorIsNull() {
+            DiscussionComment comment = createDiscussionComment(38L);
+            comment.setAuthor(null);
+
+            var event = new DomainEvent.DiscussionCommentCreated(
+                createDiscussionCommentData(comment),
+                30L,
+                createContext()
+            );
+
+            listener.onDiscussionCommentCreated(event);
+
+            verifyNoInteractions(activityEventService);
+        }
+    }
+
     // ========================================================================
     // Helpers
     // ========================================================================
@@ -602,5 +826,39 @@ class ActivityEventListenerTest extends BaseUnitTest {
             null,
             UUID.randomUUID().toString()
         );
+    }
+
+    private Discussion createDiscussion(Long id) {
+        Discussion discussion = new Discussion();
+        discussion.setId(id);
+        discussion.setNumber(100);
+        discussion.setTitle("Test Discussion");
+        discussion.setState(Discussion.State.OPEN);
+        discussion.setAuthor(testUser);
+        discussion.setRepository(testRepository);
+        discussion.setCreatedAt(Instant.now());
+        discussion.setUpdatedAt(Instant.now());
+        discussion.setHtmlUrl("https://github.com/test/test-repo/discussions/100");
+        return discussion;
+    }
+
+    private DiscussionComment createDiscussionComment(Long id) {
+        Discussion discussion = createDiscussion(30L);
+        DiscussionComment comment = new DiscussionComment();
+        comment.setId(id);
+        comment.setBody("Test comment");
+        comment.setHtmlUrl("https://github.com/test/test-repo/discussions/100#discussioncomment-" + id);
+        comment.setAuthor(testUser);
+        comment.setDiscussion(discussion);
+        comment.setCreatedAt(Instant.now());
+        return comment;
+    }
+
+    private EventPayload.DiscussionData createDiscussionData(Discussion discussion) {
+        return EventPayload.DiscussionData.from(discussion);
+    }
+
+    private EventPayload.DiscussionCommentData createDiscussionCommentData(DiscussionComment comment) {
+        return EventPayload.DiscussionCommentData.from(comment);
     }
 }

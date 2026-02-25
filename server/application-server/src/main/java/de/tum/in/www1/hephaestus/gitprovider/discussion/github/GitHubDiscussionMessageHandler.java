@@ -10,8 +10,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
 import de.tum.in.www1.hephaestus.gitprovider.discussion.github.dto.GitHubDiscussionDTO;
 import de.tum.in.www1.hephaestus.gitprovider.discussion.github.dto.GitHubDiscussionEventDTO;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -22,10 +21,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  * transferred, category_changed, answered, unanswered, labeled, unlabeled,
  * closed, reopened
  */
+@Slf4j
 @Component
 public class GitHubDiscussionMessageHandler extends GitHubMessageHandler<GitHubDiscussionEventDTO> {
-
-    private static final Logger log = LoggerFactory.getLogger(GitHubDiscussionMessageHandler.class);
 
     private final ProcessingContextFactory contextFactory;
     private final GitHubDiscussionProcessor discussionProcessor;
