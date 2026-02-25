@@ -177,6 +177,7 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             Instant.now(), // lastMilestonesSyncedAt
             Instant.now(), // lastIssuesSyncedAt (completed)
             Instant.now(), // lastPullRequestsSyncedAt (completed)
+            null, // lastDiscussionsSyncedAt
             Instant.now(), // lastCollaboratorsSyncedAt
             Instant.now(), // lastFullSyncAt
             null, // issueBackfillHighWaterMark (not initialized)
@@ -185,7 +186,8 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             null, // pullRequestBackfillCheckpoint
             null, // backfillLastRunAt
             null, // issueSyncCursor
-            null // pullRequestSyncCursor
+            null, // pullRequestSyncCursor
+            null // discussionSyncCursor
         );
     }
 
@@ -204,8 +206,10 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             null, // lastMilestonesSyncedAt
             null, // lastIssuesSyncedAt (NOT completed)
             null, // lastPullRequestsSyncedAt (NOT completed)
+            null, // lastDiscussionsSyncedAt
             null, // lastCollaboratorsSyncedAt
             null, // lastFullSyncAt
+            null,
             null,
             null,
             null,
@@ -231,6 +235,7 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             Instant.now(), // lastMilestonesSyncedAt
             Instant.now(), // lastIssuesSyncedAt
             Instant.now(), // lastPullRequestsSyncedAt
+            null, // lastDiscussionsSyncedAt
             Instant.now(), // lastCollaboratorsSyncedAt
             Instant.now(), // lastFullSyncAt
             100, // issueBackfillHighWaterMark
@@ -239,7 +244,8 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             0, // pullRequestBackfillCheckpoint = 0 means complete
             Instant.now(),
             null,
-            null
+            null,
+            null // discussionSyncCursor
         );
     }
 
@@ -258,6 +264,7 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             Instant.now(), // lastMilestonesSyncedAt
             Instant.now(), // lastIssuesSyncedAt (completed)
             Instant.now(), // lastPullRequestsSyncedAt (completed)
+            null, // lastDiscussionsSyncedAt
             Instant.now(), // lastCollaboratorsSyncedAt
             Instant.now(), // lastFullSyncAt
             100, // issueBackfillHighWaterMark
@@ -266,7 +273,8 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
             25, // pullRequestBackfillCheckpoint (in progress)
             Instant.now().minusSeconds(120),
             "cursor-issue-page-3", // issueSyncCursor
-            "cursor-pr-page-2" // pullRequestSyncCursor
+            "cursor-pr-page-2", // pullRequestSyncCursor
+            null // discussionSyncCursor
         );
     }
 
@@ -501,6 +509,7 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
                 null,
                 Instant.now(), // lastIssuesSyncedAt
                 Instant.now(), // lastPullRequestsSyncedAt
+                null, // lastDiscussionsSyncedAt
                 null,
                 null,
                 null,
@@ -509,7 +518,8 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
                 null,
                 null,
                 null,
-                null
+                null,
+                null // discussionSyncCursor
             );
 
             // Act
@@ -734,6 +744,7 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
                 null, // lastMilestonesSyncedAt
                 Instant.now(), // lastIssuesSyncedAt
                 Instant.now(), // lastPullRequestsSyncedAt
+                null, // lastDiscussionsSyncedAt
                 null, // lastCollaboratorsSyncedAt
                 null, // lastFullSyncAt
                 0, // issueBackfillHighWaterMark = 0 (no issues)
@@ -741,6 +752,7 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
                 0, // pullRequestBackfillHighWaterMark = 0 (no PRs)
                 0, // pullRequestBackfillCheckpoint = 0
                 Instant.now(),
+                null,
                 null,
                 null
             );
@@ -767,12 +779,14 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
                 null, // lastMilestonesSyncedAt
                 Instant.now(), // lastIssuesSyncedAt
                 Instant.now(), // lastPullRequestsSyncedAt
+                null, // lastDiscussionsSyncedAt
                 null, // lastCollaboratorsSyncedAt
                 null, // lastFullSyncAt
                 200, // issueBackfillHighWaterMark
                 null, // issueBackfillCheckpoint (not yet set)
                 80, // pullRequestBackfillHighWaterMark
                 null, // pullRequestBackfillCheckpoint (not yet set)
+                null,
                 null,
                 null,
                 null
@@ -852,6 +866,8 @@ class HistoricalBackfillServiceTest extends BaseUnitTest {
                 null,
                 null, // lastIssuesSyncedAt
                 null, // lastPullRequestsSyncedAt
+                null, // lastDiscussionsSyncedAt
+                null,
                 null,
                 null,
                 null,

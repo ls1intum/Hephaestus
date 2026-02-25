@@ -61,6 +61,15 @@ public final class GitHubSyncConstants {
     public static final int PR_SYNC_PAGE_SIZE = 10;
 
     /**
+     * Page size for discussion sync queries.
+     * <p>
+     * Set to 25 because discussion queries embed up to 10 comments with replies,
+     * categories, labels, and author details per discussion — similar weight to
+     * issue queries.
+     */
+    public static final int DISCUSSION_SYNC_PAGE_SIZE = 25;
+
+    /**
      * Large page size for GraphQL queries (100 items per page).
      * <p>
      * Used for bulk operations like labels, milestones, and other simpler entities.

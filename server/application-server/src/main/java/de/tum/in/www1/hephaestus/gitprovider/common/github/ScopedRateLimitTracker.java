@@ -1,19 +1,25 @@
 package de.tum.in.www1.hephaestus.gitprovider.common.github;
 
+import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.RateLimitTracker;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHRateLimit;
 import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.Meter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.lang.Nullable;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
@@ -29,9 +35,9 @@ import org.springframework.stereotype.Component;
  * safely access and update the same scope's rate limit concurrently.
  *
  * <h2>Memory Management</h2>
- * <p>State entries are created on first access and persist for the application
- * lifetime. For deployments with many short-lived workspaces, consider adding
- * time-based eviction in a future enhancement.
+ * <p>State entries are created on first access and automatically evicted after
+ * 24 hours of inactivity. This prevents unbounded memory growth in multi-tenant
+ * deployments with many short-lived workspaces. Eviction runs every hour.
  *
  * <h2>Metrics</h2>
  * <p>Micrometer gauges are registered per-scope with a {@code scope_id} tag,
@@ -41,6 +47,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @Slf4j
+@WorkspaceAgnostic("System-wide rate limit tracking - tracks GitHub API limits per-scope across all workspaces")
 public class ScopedRateLimitTracker implements RateLimitTracker {
 
     /**
@@ -68,6 +75,16 @@ public class ScopedRateLimitTracker implements RateLimitTracker {
      * Minimum wait to avoid busy-waiting.
      */
     private static final Duration MIN_WAIT_DURATION = Duration.ofSeconds(1);
+
+    /**
+     * Time after which inactive scope state is evicted (24 hours).
+     */
+    private static final Duration EVICTION_THRESHOLD = Duration.ofHours(24);
+
+    /**
+     * Metric name prefix for rate limit gauges.
+     */
+    private static final String METRIC_PREFIX = "github.graphql.ratelimit";
 
     private final MeterRegistry meterRegistry;
     private final ConcurrentHashMap<Long, ScopeRateLimitState> stateByScope = new ConcurrentHashMap<>();
@@ -261,6 +278,68 @@ public class ScopedRateLimitTracker implements RateLimitTracker {
      */
     public int getTrackedScopeCount() {
         return stateByScope.size();
+    }
+
+    /**
+     * Scheduled eviction of stale scope state to prevent unbounded memory growth.
+     * <p>
+     * Runs every hour and removes entries that haven't been updated in 24 hours.
+     * Also deregisters the associated Micrometer metrics to prevent gauge leaks.
+     */
+    @Scheduled(fixedRate = 3600000) // 1 hour in milliseconds
+    public void evictStaleEntries() {
+        Instant threshold = Instant.now().minus(EVICTION_THRESHOLD);
+        List<Long> scopesToEvict = new ArrayList<>();
+
+        // Identify stale entries
+        for (Map.Entry<Long, ScopeRateLimitState> entry : stateByScope.entrySet()) {
+            Instant lastUpdated = entry.getValue().lastUpdated.get();
+            if (lastUpdated != null && lastUpdated.isBefore(threshold)) {
+                scopesToEvict.add(entry.getKey());
+            }
+        }
+
+        if (scopesToEvict.isEmpty()) {
+            log.debug("Rate limit eviction: no stale entries found, tracked scopes={}", stateByScope.size());
+            return;
+        }
+
+        // Evict stale entries and their metrics
+        for (Long scopeId : scopesToEvict) {
+            stateByScope.remove(scopeId);
+            deregisterMetrics(scopeId);
+            log.info("Evicted stale rate limit state: scopeId={}", scopeId);
+        }
+
+        log.info("Rate limit eviction completed: evicted={}, remaining={}", scopesToEvict.size(), stateByScope.size());
+    }
+
+    /**
+     * Deregisters all Micrometer metrics for a scope.
+     */
+    private void deregisterMetrics(Long scopeId) {
+        String scopeTag = String.valueOf(scopeId);
+        List<Meter.Id> toRemove = new ArrayList<>();
+
+        // Find all meters with this scope_id tag
+        meterRegistry
+            .getMeters()
+            .forEach(meter -> {
+                String meterName = meter.getId().getName();
+                if (meterName.startsWith(METRIC_PREFIX)) {
+                    String tagValue = meter.getId().getTag("scope_id");
+                    if (scopeTag.equals(tagValue)) {
+                        toRemove.add(meter.getId());
+                    }
+                }
+            });
+
+        // Remove the meters
+        for (Meter.Id meterId : toRemove) {
+            meterRegistry.remove(meterId);
+        }
+
+        log.debug("Deregistered {} metrics for scopeId={}", toRemove.size(), scopeId);
     }
 
     private ScopeRateLimitState getOrCreateState(Long scopeId) {

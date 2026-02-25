@@ -60,7 +60,9 @@ public final class DomainEvent {
             ProjectEvent,
             ProjectItemEvent,
             ProjectStatusUpdateEvent,
-            CommitEvent {}
+            CommitEvent,
+            DiscussionEvent,
+            DiscussionCommentEvent {}
 
     /** Events that carry context information. */
     public interface ContextualEvent {
@@ -529,4 +531,89 @@ public final class DomainEvent {
     }
 
     public record CommitCreated(EventPayload.CommitData commit, EventContext context) implements CommitEvent {}
+
+    // ========================================================================
+    // Discussion Events
+    // ========================================================================
+
+    /** All discussion-related events. Subscribe to handle any discussion event. */
+    public sealed interface DiscussionEvent
+        extends Event, ContextualEvent
+        permits
+            DiscussionCreated,
+            DiscussionUpdated,
+            DiscussionClosed,
+            DiscussionReopened,
+            DiscussionAnswered,
+            DiscussionDeleted
+    {
+        EventPayload.DiscussionData discussion();
+    }
+
+    public record DiscussionCreated(
+        EventPayload.DiscussionData discussion,
+        EventContext context
+    ) implements DiscussionEvent {}
+
+    public record DiscussionUpdated(
+        EventPayload.DiscussionData discussion,
+        Set<String> changedFields,
+        EventContext context
+    ) implements DiscussionEvent {}
+
+    public record DiscussionClosed(
+        EventPayload.DiscussionData discussion,
+        @Nullable String stateReason,
+        EventContext context
+    ) implements DiscussionEvent {}
+
+    public record DiscussionReopened(
+        EventPayload.DiscussionData discussion,
+        EventContext context
+    ) implements DiscussionEvent {}
+
+    public record DiscussionAnswered(
+        EventPayload.DiscussionData discussion,
+        Long answerCommentId,
+        EventContext context
+    ) implements DiscussionEvent {}
+
+    /** Deleted event is separate - entity no longer exists, only ID available. */
+    public record DiscussionDeleted(Long discussionId, EventContext context) implements DiscussionEvent {
+        @Override
+        public EventPayload.DiscussionData discussion() {
+            return null; // Entity no longer exists
+        }
+    }
+
+    // ========================================================================
+    // Discussion Comment Events
+    // ========================================================================
+
+    /** All discussion comment-related events. Subscribe to handle any discussion comment event. */
+    public sealed interface DiscussionCommentEvent
+        extends Event, ContextualEvent
+        permits DiscussionCommentCreated, DiscussionCommentEdited, DiscussionCommentDeleted
+    {
+        Long discussionId();
+    }
+
+    public record DiscussionCommentCreated(
+        EventPayload.DiscussionCommentData comment,
+        Long discussionId,
+        EventContext context
+    ) implements DiscussionCommentEvent {}
+
+    public record DiscussionCommentEdited(
+        EventPayload.DiscussionCommentData comment,
+        Long discussionId,
+        Set<String> changedFields,
+        EventContext context
+    ) implements DiscussionCommentEvent {}
+
+    public record DiscussionCommentDeleted(
+        Long commentId,
+        Long discussionId,
+        EventContext context
+    ) implements DiscussionCommentEvent {}
 }

@@ -634,6 +634,78 @@ public sealed interface GitHubEventAction {
         }
     }
 
+    // ========== Discussion Events ==========
+
+    enum Discussion implements GitHubEventAction {
+        CREATED,
+        EDITED,
+        DELETED,
+        PINNED,
+        UNPINNED,
+        LOCKED,
+        UNLOCKED,
+        TRANSFERRED,
+        CATEGORY_CHANGED,
+        ANSWERED,
+        UNANSWERED,
+        LABELED,
+        UNLABELED,
+        CLOSED,
+        REOPENED,
+        UNKNOWN;
+
+        @Override
+        public String value() {
+            return name().toLowerCase();
+        }
+
+        public static Discussion fromString(String action) {
+            if (action == null || action.isBlank()) return UNKNOWN;
+            return switch (action.toLowerCase()) {
+                case "created" -> CREATED;
+                case "edited" -> EDITED;
+                case "deleted" -> DELETED;
+                case "pinned" -> PINNED;
+                case "unpinned" -> UNPINNED;
+                case "locked" -> LOCKED;
+                case "unlocked" -> UNLOCKED;
+                case "transferred" -> TRANSFERRED;
+                case "category_changed" -> CATEGORY_CHANGED;
+                case "answered" -> ANSWERED;
+                case "unanswered" -> UNANSWERED;
+                case "labeled" -> LABELED;
+                case "unlabeled" -> UNLABELED;
+                case "closed" -> CLOSED;
+                case "reopened" -> REOPENED;
+                default -> UNKNOWN;
+            };
+        }
+    }
+
+    // ========== Discussion Comment Events ==========
+
+    enum DiscussionComment implements GitHubEventAction {
+        CREATED,
+        EDITED,
+        DELETED,
+        UNKNOWN;
+
+        @Override
+        public String value() {
+            return name().toLowerCase();
+        }
+
+        public static DiscussionComment fromString(String action) {
+            if (action == null || action.isBlank()) return UNKNOWN;
+            return switch (action.toLowerCase()) {
+                case "created" -> CREATED;
+                case "edited" -> EDITED;
+                case "deleted" -> DELETED;
+                default -> UNKNOWN;
+            };
+        }
+    }
+
     // ========== Push Events ==========
 
     /**

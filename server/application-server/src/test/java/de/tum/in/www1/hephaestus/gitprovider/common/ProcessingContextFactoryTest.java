@@ -139,7 +139,15 @@ class ProcessingContextFactoryTest {
 
         private GitHubWebhookEvent createEventWithRepo(String fullName) {
             GitHubWebhookEvent event = mock(GitHubWebhookEvent.class);
-            GitHubRepositoryRefDTO repoInfo = new GitHubRepositoryRefDTO(1L, "node_id", "repo", fullName, false, "url");
+            GitHubRepositoryRefDTO repoInfo = new GitHubRepositoryRefDTO(
+                1L,
+                "node_id",
+                "repo",
+                fullName,
+                false,
+                "url",
+                null
+            );
             when(event.repository()).thenReturn(repoInfo);
             when(event.action()).thenReturn("opened");
             return event;
@@ -274,7 +282,15 @@ class ProcessingContextFactoryTest {
 
         private GitHubWebhookEvent createEventWithRepo(String fullName) {
             GitHubWebhookEvent event = mock(GitHubWebhookEvent.class);
-            GitHubRepositoryRefDTO repoInfo = new GitHubRepositoryRefDTO(1L, "node_id", "repo", fullName, false, "url");
+            GitHubRepositoryRefDTO repoInfo = new GitHubRepositoryRefDTO(
+                1L,
+                "node_id",
+                "repo",
+                fullName,
+                false,
+                "url",
+                null
+            );
             when(event.repository()).thenReturn(repoInfo);
             when(event.action()).thenReturn("opened");
             return event;

@@ -112,6 +112,7 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
                         case MILESTONES -> rtm.setMilestonesSyncedAt(syncedAt);
                         case ISSUES -> rtm.setIssuesSyncedAt(syncedAt);
                         case PULL_REQUESTS -> rtm.setPullRequestsSyncedAt(syncedAt);
+                        case DISCUSSIONS -> rtm.setDiscussionsSyncedAt(syncedAt);
                         case COLLABORATORS -> rtm.setCollaboratorsSyncedAt(syncedAt);
                         case FULL_REPOSITORY -> rtm.setRepositorySyncedAt(syncedAt);
                         default -> {
@@ -347,6 +348,25 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
                     // DEBUG: Expected during workspace reconfiguration when repository is removed mid-sync
                     log.debug(
                         "Skipped pull request sync cursor update: reason=syncTargetNotFound, syncTargetId={}",
+                        syncTargetId
+                    )
+            );
+    }
+
+    @Override
+    @Transactional
+    public void updateDiscussionSyncCursor(Long syncTargetId, String cursor) {
+        repositoryToMonitorRepository
+            .findById(syncTargetId)
+            .ifPresentOrElse(
+                rtm -> {
+                    rtm.setDiscussionSyncCursor(cursor);
+                    repositoryToMonitorRepository.save(rtm);
+                },
+                () ->
+                    // DEBUG: Expected during workspace reconfiguration when repository is removed mid-sync
+                    log.debug(
+                        "Skipped discussion sync cursor update: reason=syncTargetNotFound, syncTargetId={}",
                         syncTargetId
                     )
             );

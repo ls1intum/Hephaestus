@@ -414,6 +414,36 @@ fragment ProjectV2StatusUpdateFields on ProjectV2StatusUpdate {
     }
 }
 
+# Discussion category fields. Used by GetRepositoryDiscussions for inline categories.
+fragment DiscussionCategoryFields on DiscussionCategory {
+    id
+    name
+    slug
+    emoji
+    description
+    isAnswerable
+    createdAt
+    updatedAt
+}
+
+# Discussion comment fields (without nested replies).
+# Used by GetRepositoryDiscussions, GetDiscussionComments, and GetDiscussionCommentReplies.
+fragment DiscussionCommentFields on DiscussionComment {
+    id
+    databaseId
+    body
+    url
+    createdAt
+    updatedAt
+    isAnswer
+    isMinimized
+    minimizedReason
+    authorAssociation
+    author {
+        ...ActorFields
+    }
+}
+
 # Previously cost-optimized variant of FieldValueFields — now aligned with FieldValueFields
 # page sizes (labels: 50, users: 50, pullRequests: 20, reviewers: 50) to prevent
 # silent data truncation for projects with many field values.

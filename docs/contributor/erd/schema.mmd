@@ -98,6 +98,63 @@ erDiagram
         BIGINT pull_request_id PK,FK
     }
 
+    Discussion {
+        BIGINT id PK
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+        INTEGER number UK "NOT NULL"
+        VARCHAR(1024) title "NOT NULL"
+        TEXT body
+        VARCHAR(512) html_url "NOT NULL"
+        VARCHAR(16) state "NOT NULL"
+        VARCHAR(32) state_reason
+        INTEGER upvote_count "NOT NULL"
+        BOOLEAN is_locked "NOT NULL"
+        VARCHAR(32) active_lock_reason
+        TIMESTAMPTZ closed_at
+        TIMESTAMPTZ answer_chosen_at
+        INTEGER comment_count "NOT NULL"
+        TIMESTAMPTZ last_sync_at
+        BIGINT repository_id FK,UK
+        BIGINT author_id FK
+        VARCHAR(128) category_id FK
+        BIGINT answer_chosen_by_id FK
+        BIGINT answer_comment_id FK,UK
+    }
+
+    DiscussionCategory {
+        VARCHAR(128) id PK
+        VARCHAR(255) name "NOT NULL"
+        VARCHAR(128) slug UK "NOT NULL"
+        VARCHAR(32) emoji
+        TEXT description
+        BOOLEAN is_answerable "NOT NULL"
+        BIGINT repository_id FK,UK
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+    }
+
+    DiscussionComment {
+        BIGINT id PK
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+        TEXT body
+        VARCHAR(512) html_url "NOT NULL"
+        BOOLEAN is_answer "NOT NULL"
+        BOOLEAN is_minimized "NOT NULL"
+        VARCHAR(64) minimized_reason
+        VARCHAR(32) author_association
+        TIMESTAMPTZ last_sync_at
+        BIGINT discussion_id FK
+        BIGINT author_id FK
+        BIGINT parent_comment_id FK
+    }
+
+    DiscussionLabel {
+        BIGINT discussion_id PK,FK
+        BIGINT label_id PK,FK
+    }
+
     Document {
         UUID id PK
         INTEGER version_number PK
@@ -431,6 +488,7 @@ erDiagram
         VARCHAR(255) visibility
         BIGINT organization_id FK
         TIMESTAMPTZ last_sync_at
+        BOOLEAN has_discussions_enabled "NOT NULL"
     }
 
     RepositoryCollaborator {
@@ -456,6 +514,8 @@ erDiagram
         INTEGER pull_request_backfill_checkpoint
         TIMESTAMPTZ issues_synced_at
         TIMESTAMPTZ pull_requests_synced_at
+        VARCHAR(255) discussion_sync_cursor
+        TIMESTAMPTZ discussions_synced_at
     }
 
     Team {
@@ -575,6 +635,9 @@ erDiagram
     ChatMessage ||--|| ChatMessagePart : has
     ChatMessage ||--|| ChatThread : references
     GitCommit ||--|| CommitContributor : has
+    DiscussionComment ||--|| Discussion : references
+    Repository ||--|| Discussion : has
+    Repository ||--|| DiscussionCategory : has
     Repository ||--|| GitCommit : has
     Repository ||--|| Issue : has
     Repository ||--|| Label : labeled
@@ -600,6 +663,12 @@ erDiagram
     Workspace ||--o{ ChatThread : has
     User ||--o{ CommitContributor : has
     GitCommit ||--o{ CommitFileChange : has
+    User ||--o{ Discussion : references
+    User ||--o{ Discussion : authored_by
+    DiscussionCategory ||--o{ Discussion : has
+    User ||--o{ DiscussionComment : commented_on
+    Discussion ||--o{ DiscussionComment : commented_on
+    DiscussionComment ||--o{ DiscussionComment : commented_on
     User ||--o{ Document : has
     Workspace ||--o{ Document : has
     User ||--o{ GitCommit : authored_by
@@ -636,6 +705,8 @@ erDiagram
     %% Many-to-Many relationships
     GitCommit }o--o{ CommitPullRequest : has
     Issue }o--o{ CommitPullRequest : references
+    Discussion }o--o{ DiscussionLabel : labeled
+    Label }o--o{ DiscussionLabel : labeled
     Issue }o--o{ IssueAssignee : assigned_to
     User }o--o{ IssueAssignee : assigned_to
     Issue }o--o{ IssueBlocking : has

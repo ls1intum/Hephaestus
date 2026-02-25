@@ -142,6 +142,27 @@ public class ExperiencePointCalculator implements ExperiencePointStrategy {
         return properties.xpAwards().commitCreated();
     }
 
+    /**
+     * Get XP for discussion created (configurable).
+     */
+    public double getXpDiscussionCreated() {
+        return properties.xpAwards().discussionCreated();
+    }
+
+    /**
+     * Get XP for discussion answered (configurable).
+     */
+    public double getXpDiscussionAnswered() {
+        return properties.xpAwards().discussionAnswered();
+    }
+
+    /**
+     * Get XP for discussion comment created (configurable).
+     */
+    public double getXpDiscussionCommentCreated() {
+        return properties.xpAwards().discussionCommentCreated();
+    }
+
     // ========================================================================
     // Review Experience Points
     // ========================================================================
