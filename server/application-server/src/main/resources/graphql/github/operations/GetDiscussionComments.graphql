@@ -1,5 +1,5 @@
 # GraphQL query for fetching additional discussion comments (pagination)
-# Used when a discussion has more than 10 comments
+# Used when a discussion has more than 10 comments (follow-up to GetRepositoryDiscussions)
 
 query GetDiscussionComments($owner: String!, $name: String!, $discussionNumber: Int!, $first: Int!, $after: String) {
     rateLimit {
@@ -18,49 +18,7 @@ query GetDiscussionComments($owner: String!, $name: String!, $discussionNumber: 
                     endCursor
                 }
                 nodes {
-                    id
-                    databaseId
-                    body
-                    url
-                    createdAt
-                    updatedAt
-                    isAnswer
-                    isMinimized
-                    minimizedReason
-                    authorAssociation
-
-                    # Comment author
-                    author {
-                        __typename
-                        ... on User {
-                            id
-                            databaseId
-                            login
-                            avatarUrl
-                            name
-                            email
-                            createdAt
-                            updatedAt
-                        }
-                        ... on Bot {
-                            id
-                            databaseId
-                            login
-                            avatarUrl
-                        }
-                        ... on Mannequin {
-                            id
-                            databaseId
-                            login
-                            avatarUrl
-                        }
-                        ... on Organization {
-                            id
-                            databaseId
-                            login
-                            avatarUrl
-                        }
-                    }
+                    ...DiscussionCommentFields
 
                     # Reply to (for threading)
                     replyTo {
@@ -75,48 +33,7 @@ query GetDiscussionComments($owner: String!, $name: String!, $discussionNumber: 
                             endCursor
                         }
                         nodes {
-                            id
-                            databaseId
-                            body
-                            url
-                            createdAt
-                            updatedAt
-                            isAnswer
-                            isMinimized
-                            minimizedReason
-                            authorAssociation
-
-                            author {
-                                __typename
-                                ... on User {
-                                    id
-                                    databaseId
-                                    login
-                                    avatarUrl
-                                    name
-                                    email
-                                    createdAt
-                                    updatedAt
-                                }
-                                ... on Bot {
-                                    id
-                                    databaseId
-                                    login
-                                    avatarUrl
-                                }
-                                ... on Mannequin {
-                                    id
-                                    databaseId
-                                    login
-                                    avatarUrl
-                                }
-                                ... on Organization {
-                                    id
-                                    databaseId
-                                    login
-                                    avatarUrl
-                                }
-                            }
+                            ...DiscussionCommentFields
                         }
                     }
                 }

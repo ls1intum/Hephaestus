@@ -1,7 +1,7 @@
 # GraphQL query for fetching repository discussions with all fields
 # Used by GitHubDiscussionSyncService for GraphQL-based sync
 # Comments are embedded inline (first 10) to avoid N+1 queries - pagination handles discussions with more
-# Supports incremental sync via since parameter (but GitHub may not support direct filtering)
+# Supports incremental sync via ordering by UPDATED_AT DESC with timestamp stop-condition
 
 query GetRepositoryDiscussions($owner: String!, $name: String!, $first: Int!, $after: String, $categoryId: ID) {
     rateLimit {
@@ -42,126 +42,22 @@ query GetRepositoryDiscussions($owner: String!, $name: String!, $first: Int!, $a
                 # Answer information (for Q&A discussions)
                 answerChosenAt
                 answerChosenBy {
-                    __typename
-                    ... on User {
-                        id
-                        databaseId
-                        login
-                        avatarUrl
-                        name
-                        email
-                        createdAt
-                        updatedAt
-                    }
-                    ... on Bot {
-                        id
-                        databaseId
-                        login
-                        avatarUrl
-                    }
-                    ... on Mannequin {
-                        id
-                        databaseId
-                        login
-                        avatarUrl
-                    }
-                    ... on Organization {
-                        id
-                        databaseId
-                        login
-                        avatarUrl
-                    }
+                    ...ActorFields
                 }
 
                 # The accepted answer comment
                 answer {
-                    id
-                    databaseId
-                    body
-                    url
-                    createdAt
-                    updatedAt
-                    isAnswer
-                    isMinimized
-                    minimizedReason
-                    authorAssociation
-
-                    author {
-                        __typename
-                        ... on User {
-                            id
-                            databaseId
-                            login
-                            avatarUrl
-                            name
-                            email
-                            createdAt
-                            updatedAt
-                        }
-                        ... on Bot {
-                            id
-                            databaseId
-                            login
-                            avatarUrl
-                        }
-                        ... on Mannequin {
-                            id
-                            databaseId
-                            login
-                            avatarUrl
-                        }
-                        ... on Organization {
-                            id
-                            databaseId
-                            login
-                            avatarUrl
-                        }
-                    }
+                    ...DiscussionCommentFields
                 }
 
                 # Category
                 category {
-                    id
-                    name
-                    slug
-                    emoji
-                    description
-                    isAnswerable
-                    createdAt
-                    updatedAt
+                    ...DiscussionCategoryFields
                 }
 
                 # Author
                 author {
-                    __typename
-                    ... on User {
-                        id
-                        databaseId
-                        login
-                        avatarUrl
-                        name
-                        email
-                        createdAt
-                        updatedAt
-                    }
-                    ... on Bot {
-                        id
-                        databaseId
-                        login
-                        avatarUrl
-                    }
-                    ... on Mannequin {
-                        id
-                        databaseId
-                        login
-                        avatarUrl
-                    }
-                    ... on Organization {
-                        id
-                        databaseId
-                        login
-                        avatarUrl
-                    }
+                    ...ActorFields
                 }
 
                 # Labels
@@ -182,56 +78,14 @@ query GetRepositoryDiscussions($owner: String!, $name: String!, $first: Int!, $a
                         endCursor
                     }
                     nodes {
-                        id
-                        databaseId
-                        body
-                        url
-                        createdAt
-                        updatedAt
-                        isAnswer
-                        isMinimized
-                        minimizedReason
-                        authorAssociation
-
-                        # Comment author
-                        author {
-                            __typename
-                            ... on User {
-                                id
-                                databaseId
-                                login
-                                avatarUrl
-                                name
-                                email
-                                createdAt
-                                updatedAt
-                            }
-                            ... on Bot {
-                                id
-                                databaseId
-                                login
-                                avatarUrl
-                            }
-                            ... on Mannequin {
-                                id
-                                databaseId
-                                login
-                                avatarUrl
-                            }
-                            ... on Organization {
-                                id
-                                databaseId
-                                login
-                                avatarUrl
-                            }
-                        }
+                        ...DiscussionCommentFields
 
                         # Reply to (for threading)
                         replyTo {
                             id
                         }
 
-                        # Replies to this comment (first 10, embedded)
+                        # Replies to this comment (first 100, embedded)
                         replies(first: 100) {
                             totalCount
                             pageInfo {
@@ -239,48 +93,7 @@ query GetRepositoryDiscussions($owner: String!, $name: String!, $first: Int!, $a
                                 endCursor
                             }
                             nodes {
-                                id
-                                databaseId
-                                body
-                                url
-                                createdAt
-                                updatedAt
-                                isAnswer
-                                isMinimized
-                                minimizedReason
-                                authorAssociation
-
-                                author {
-                                    __typename
-                                    ... on User {
-                                        id
-                                        databaseId
-                                        login
-                                        avatarUrl
-                                        name
-                                        email
-                                        createdAt
-                                        updatedAt
-                                    }
-                                    ... on Bot {
-                                        id
-                                        databaseId
-                                        login
-                                        avatarUrl
-                                    }
-                                    ... on Mannequin {
-                                        id
-                                        databaseId
-                                        login
-                                        avatarUrl
-                                    }
-                                    ... on Organization {
-                                        id
-                                        databaseId
-                                        login
-                                        avatarUrl
-                                    }
-                                }
+                                ...DiscussionCommentFields
                             }
                         }
                     }
