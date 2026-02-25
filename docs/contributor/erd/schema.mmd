@@ -108,6 +108,7 @@ erDiagram
         VARCHAR(512) html_url "NOT NULL"
         VARCHAR(16) state "NOT NULL"
         VARCHAR(32) state_reason
+        INTEGER upvote_count "NOT NULL"
         BOOLEAN is_locked "NOT NULL"
         VARCHAR(32) active_lock_reason
         TIMESTAMPTZ closed_at
@@ -119,7 +120,6 @@ erDiagram
         VARCHAR(128) category_id FK
         BIGINT answer_chosen_by_id FK
         BIGINT answer_comment_id FK,UK
-        INTEGER upvote_count "NOT NULL"
     }
 
     DiscussionCategory {
@@ -512,9 +512,9 @@ erDiagram
         INTEGER issue_backfill_checkpoint
         INTEGER pull_request_backfill_high_water_mark
         INTEGER pull_request_backfill_checkpoint
-        VARCHAR(255) discussion_sync_cursor
         TIMESTAMPTZ issues_synced_at
         TIMESTAMPTZ pull_requests_synced_at
+        VARCHAR(255) discussion_sync_cursor
         TIMESTAMPTZ discussions_synced_at
     }
 

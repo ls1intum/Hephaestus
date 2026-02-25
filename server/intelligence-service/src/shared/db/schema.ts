@@ -376,6 +376,7 @@ export const discussion = pgTable(
 		htmlUrl: varchar("html_url", { length: 512 }).notNull(),
 		state: varchar({ length: 16 }).notNull(),
 		stateReason: varchar("state_reason", { length: 32 }),
+		upvoteCount: integer("upvote_count").default(0).notNull(),
 		isLocked: boolean("is_locked").default(false).notNull(),
 		activeLockReason: varchar("active_lock_reason", { length: 32 }),
 		closedAt: timestamp("closed_at", { withTimezone: true, mode: "string" }),
@@ -391,7 +392,6 @@ export const discussion = pgTable(
 		answerChosenById: bigint("answer_chosen_by_id", { mode: "number" }),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		answerCommentId: bigint("answer_comment_id", { mode: "number" }),
-		upvoteCount: integer("upvote_count").default(0).notNull(),
 	},
 	(table) => [
 		index("idx_discussion_author").using("btree", table.authorId.asc().nullsLast()),
@@ -1471,12 +1471,12 @@ export const repositoryToMonitor = pgTable(
 		issueBackfillCheckpoint: integer("issue_backfill_checkpoint"),
 		pullRequestBackfillHighWaterMark: integer("pull_request_backfill_high_water_mark"),
 		pullRequestBackfillCheckpoint: integer("pull_request_backfill_checkpoint"),
-		discussionSyncCursor: varchar("discussion_sync_cursor", { length: 255 }),
 		issuesSyncedAt: timestamp("issues_synced_at", { withTimezone: true, mode: "string" }),
 		pullRequestsSyncedAt: timestamp("pull_requests_synced_at", {
 			withTimezone: true,
 			mode: "string",
 		}),
+		discussionSyncCursor: varchar("discussion_sync_cursor", { length: 255 }),
 		discussionsSyncedAt: timestamp("discussions_synced_at", { withTimezone: true, mode: "string" }),
 	},
 	(table) => [
