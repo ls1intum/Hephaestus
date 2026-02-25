@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.19.0](https://github.com/ls1intum/Hephaestus/compare/v0.18.0...v0.19.0) (2026-02-25)
+
+### 🚀 Features
+
+* **gitprovider:** add GitHub Discussions synchronization ([#693](https://github.com/ls1intum/Hephaestus/issues/693)) ([5548634](https://github.com/ls1intum/Hephaestus/commit/5548634c6eb0b4d968feead17fb988f39ed9157b))
+
 ## [0.18.0](https://github.com/ls1intum/Hephaestus/compare/v0.17.0...v0.18.0) (2026-02-23)
 
 ### 🚀 Features
