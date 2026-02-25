@@ -13,8 +13,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.graphql.ResponseError;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.lang.Nullable;
@@ -57,9 +56,8 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
  * @see de.tum.in.www1.hephaestus.gitprovider.common.spi.RateLimitTracker
  */
 @Component
+@Slf4j
 public class GitHubExceptionClassifier {
-
-    private static final Logger log = LoggerFactory.getLogger(GitHubExceptionClassifier.class);
 
     /**
      * Error categories for GitHub API exceptions.
@@ -250,6 +248,13 @@ public class GitHubExceptionClassifier {
                     notFoundCounter.increment();
                     return ClassificationResult.of(Category.NOT_FOUND, "GraphQL NOT_FOUND: " + error.getMessage());
                 }
+                case "RATE_LIMIT", "RATE_LIMITED" -> {
+                    rateLimitedCounter.increment();
+                    return ClassificationResult.rateLimited(
+                        Duration.ofMinutes(1),
+                        "GraphQL rate limit: " + error.getMessage()
+                    );
+                }
                 case "FORBIDDEN" -> {
                     // Check if it's a rate limit error
                     String message = error.getMessage();
@@ -267,9 +272,25 @@ public class GitHubExceptionClassifier {
                     authErrorCounter.increment();
                     return ClassificationResult.of(Category.AUTH_ERROR, "GraphQL UNAUTHORIZED: " + error.getMessage());
                 }
+                case "MAX_NODE_LIMIT_EXCEEDED", "RESOURCE_LIMITS_EXCEEDED" -> {
+                    clientErrorCounter.increment();
+                    return ClassificationResult.of(
+                        Category.CLIENT_ERROR,
+                        "GraphQL resource limit: " + error.getMessage()
+                    );
+                }
                 default -> {
                     // Continue checking other errors
                 }
+            }
+        }
+
+        // Fallback: check all error messages for rate limit text (covers null extensions/type)
+        for (ResponseError error : errors) {
+            String message = error.getMessage();
+            if (message != null && message.toLowerCase().contains("rate limit")) {
+                rateLimitedCounter.increment();
+                return ClassificationResult.rateLimited(Duration.ofMinutes(1), "GraphQL rate limit: " + message);
             }
         }
 
@@ -311,6 +332,15 @@ public class GitHubExceptionClassifier {
             return ClassificationResult.of(
                 Category.RETRYABLE,
                 "Database deadlock detected - will retry: " + cause.getMessage()
+            );
+        }
+
+        // UnexpectedRollbackException is transient — typically caused by a nested
+        // transaction that was rolled back (e.g., deadlock in a sub-transaction)
+        if (cause instanceof org.springframework.transaction.UnexpectedRollbackException) {
+            return ClassificationResult.of(
+                Category.RETRYABLE,
+                "Transaction rollback detected - will retry: " + cause.getMessage()
             );
         }
 

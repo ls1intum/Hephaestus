@@ -1,0 +1,17 @@
+# Lightweight probe query to check if a repository has any issues updated since a given timestamp.
+# Costs ~1 rate limit point vs 59 for the full GetRepositoryIssues query.
+# Used by GitHubIssueSyncService to skip expensive syncs when totalCount is 0.
+
+query GetRepositoryIssueCount($owner: String!, $name: String!, $since: DateTime) {
+    rateLimit {
+        cost
+        limit
+        remaining
+        resetAt
+    }
+    repository(owner: $owner, name: $name) {
+        issues(first: 0, filterBy: { since: $since }) {
+            totalCount
+        }
+    }
+}

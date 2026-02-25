@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.18.0](https://github.com/ls1intum/Hephaestus/compare/v0.17.0...v0.18.0) (2026-02-23)
+
+### 🚀 Features
+
+* **gitprovider:** add GitHub commits sync with local checkout support ([#694](https://github.com/ls1intum/Hephaestus/issues/694)) ([3fa1229](https://github.com/ls1intum/Hephaestus/commit/3fa12294078df08e30cfc14fb324ca0e80d800a0))
+
+## [0.17.0](https://github.com/ls1intum/Hephaestus/compare/v0.16.0...v0.17.0) (2026-02-16)
+
+### 🚀 Features
+
+* **server:** add GitHub Projects V2 synchronization support ([#692](https://github.com/ls1intum/Hephaestus/issues/692)) ([fa602b3](https://github.com/ls1intum/Hephaestus/commit/fa602b387ecae0bdbd322c2f51ff785fc6a8077e))
+
+## [0.16.0](https://github.com/ls1intum/Hephaestus/compare/v0.15.0...v0.16.0) (2026-02-15)
+
+### 🚀 Features
+
+* **workspace:** auto-elevate super admins with membership to workspace ADMIN ([#759](https://github.com/ls1intum/Hephaestus/issues/759)) ([ca82899](https://github.com/ls1intum/Hephaestus/commit/ca82899ac39e046fb3b918ac842035ea609d5e77))
+* **config:** configurable host ports for local development ([#758](https://github.com/ls1intum/Hephaestus/issues/758)) ([19e7393](https://github.com/ls1intum/Hephaestus/commit/19e7393816fce4ca2fe5d997f8ff40123baf2ab1))
+
 ## [0.15.0](https://github.com/ls1intum/Hephaestus/compare/v0.14.0...v0.15.0) (2026-02-01)
 
 ### 🚀 Features

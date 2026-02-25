@@ -528,27 +528,36 @@ public class WorkspaceInstallationService {
             return existingUser.get().getId();
         }
 
-        // If we have the account ID, we can create the user directly from webhook data
+        // If we have the account ID, upsert the user using the three-step
+        // approach (lock, free conflicts, insert) to avoid uk_user_login_lower violations.
         if (accountId != null) {
-            User user = new User();
-            user.setId(accountId);
-            user.setLogin(accountLogin);
-            user.setName(accountLogin); // Use login as fallback name
-            user.setAvatarUrl(avatarUrl != null ? avatarUrl : "");
-            user.setHtmlUrl("https://github.com/" + accountLogin);
-            user.setType(
-                accountType == ProvisioningListener.AccountType.ORGANIZATION ? User.Type.ORGANIZATION : User.Type.USER
-            );
+            String htmlUrl = "https://github.com/" + accountLogin;
+            String typeStr =
+                accountType == ProvisioningListener.AccountType.ORGANIZATION
+                    ? User.Type.ORGANIZATION.name()
+                    : User.Type.USER.name();
 
-            User saved = userRepository.save(user);
+            userRepository.acquireLoginLock(accountLogin);
+            userRepository.freeLoginConflicts(accountLogin, accountId);
+            userRepository.upsertUser(
+                accountId,
+                accountLogin,
+                accountLogin, // Use login as fallback name
+                avatarUrl != null ? avatarUrl : "",
+                htmlUrl,
+                typeStr,
+                null, // email
+                null, // createdAt
+                null // updatedAt
+            );
             log.info(
-                "Created user for workspace ownership: userLogin={}, userId={}, userType={}, installationId={}",
+                "Upserted user for workspace ownership: userLogin={}, userId={}, userType={}, installationId={}",
                 LoggingUtils.sanitizeForLog(accountLogin),
-                saved.getId(),
-                saved.getType(),
+                accountId,
+                typeStr,
                 installationId
             );
-            return saved.getId();
+            return accountId;
         }
 
         log.warn(

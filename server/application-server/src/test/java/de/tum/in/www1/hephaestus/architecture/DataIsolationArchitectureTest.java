@@ -67,7 +67,15 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         "ChatMessagePart", // through ChatMessage.thread.workspace
         "ChatMessageVote", // through ChatMessage (via messageId) -> ChatThread.workspace
         // Through Workspace.organization (ID-based relationship via JOIN)
-        "OrganizationMembership" // organizationId -> Workspace.organization
+        "OrganizationMembership", // organizationId -> Workspace.organization
+        // Through project owner (ID-based: ownerId -> Organization/Repository/User)
+        "Project", // ownerId -> Organization/Repository -> Workspace.organization
+        "ProjectItem", // through Project.ownerId OR issue -> Repository
+        "ProjectField", // through Project.ownerId
+        "ProjectFieldValue", // through ProjectItem.project OR ProjectField.project
+        // Through repository (commit -> Repository -> Organization <- Workspace)
+        "Commit", // through Repository -> Organization <- Workspace
+        "CommitFileChange" // through Commit -> Repository -> Organization <- Workspace
     );
 
     /**

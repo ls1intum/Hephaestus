@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.Workspace.WorkspaceStatus;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembershipRepository;
@@ -186,13 +187,11 @@ public class WorkspaceContextFilter implements Filter {
     /**
      * Fetch workspace roles for the current authenticated user.
      *
-     * @param workspaceId Workspace ID
+     * @param workspace Workspace entity
+     * @param userOpt Optional user
      * @return Set of workspace roles (empty if user has no membership or not authenticated)
      */
-    private Set<WorkspaceRole> fetchUserRoles(
-        de.tum.in.www1.hephaestus.workspace.Workspace workspace,
-        Optional<User> userOpt
-    ) {
+    private Set<WorkspaceRole> fetchUserRoles(Workspace workspace, Optional<User> userOpt) {
         try {
             if (userOpt.isEmpty()) {
                 log.debug("Skipped role fetch: reason=noAuthenticatedUser");

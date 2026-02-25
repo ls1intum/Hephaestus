@@ -5,7 +5,9 @@ import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.ProvisioningListener;
+import de.tum.in.www1.hephaestus.gitprovider.git.GitRepositoryManager;
 import de.tum.in.www1.hephaestus.gitprovider.installation.github.GitHubInstallationRepositoryEnumerationService;
+import de.tum.in.www1.hephaestus.gitprovider.project.ProjectIntegrityService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.sync.GitHubDataSyncService;
@@ -56,6 +58,8 @@ public class WorkspaceRepositoryMonitorService {
     private final GitHubInstallationRepositoryEnumerationService installationRepositoryEnumerator;
     private final WorkspaceScopeFilter workspaceScopeFilter;
     private final GitHubAppTokenService gitHubAppTokenService;
+    private final ProjectIntegrityService projectIntegrityService;
+    private final GitRepositoryManager gitRepositoryManager;
 
     // Lazy-loaded dependencies (to break circular references)
     private final ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider;
@@ -69,6 +73,8 @@ public class WorkspaceRepositoryMonitorService {
         GitHubInstallationRepositoryEnumerationService installationRepositoryEnumerator,
         WorkspaceScopeFilter workspaceScopeFilter,
         GitHubAppTokenService gitHubAppTokenService,
+        ProjectIntegrityService projectIntegrityService,
+        GitRepositoryManager gitRepositoryManager,
         ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider
     ) {
         this.natsProperties = natsProperties;
@@ -79,6 +85,8 @@ public class WorkspaceRepositoryMonitorService {
         this.installationRepositoryEnumerator = installationRepositoryEnumerator;
         this.workspaceScopeFilter = workspaceScopeFilter;
         this.gitHubAppTokenService = gitHubAppTokenService;
+        this.projectIntegrityService = projectIntegrityService;
+        this.gitRepositoryManager = gitRepositoryManager;
         this.gitHubDataSyncServiceProvider = gitHubDataSyncServiceProvider;
     }
 
@@ -362,8 +370,10 @@ public class WorkspaceRepositoryMonitorService {
         // Create or update the Repository entity with organization linking
         ensureRepositoryFromProvisioningSnapshot(workspace, snapshot);
 
-        // Create the RepositoryToMonitor if it doesn't exist
-        ensureRepositoryMonitorForInstallation(installationId, snapshot.nameWithOwner());
+        // Create the RepositoryToMonitor if it doesn't exist.
+        // Defer sync: provisioning creates monitors in bulk; the activation phase
+        // will trigger a full sync for all repositories in the workspace.
+        ensureRepositoryMonitorForInstallation(installationId, snapshot.nameWithOwner(), true);
     }
 
     // ========================================================================
@@ -478,6 +488,9 @@ public class WorkspaceRepositoryMonitorService {
     /**
      * Deletes a repository only if no workspace is monitoring it.
      * This preserves repositories that are shared across multiple workspaces.
+     * <p>
+     * Also cascades deletion to any projects owned by this repository to maintain
+     * referential integrity for the polymorphic project ownership model.
      *
      * @param nameWithOwner the repository full name (e.g., "owner/repo")
      */
@@ -501,6 +514,22 @@ public class WorkspaceRepositoryMonitorService {
         repositoryRepository
             .findByNameWithOwner(nameWithOwner)
             .ifPresent(repository -> {
+                Long repoId = repository.getId();
+
+                // Clean up local git clone before deleting the DB entity
+                gitRepositoryManager.deleteClone(repoId);
+
+                // Cascade delete projects owned by this repository BEFORE deleting the repository
+                int deletedProjects = projectIntegrityService.cascadeDeleteProjectsForRepository(repoId);
+                if (deletedProjects > 0) {
+                    log.debug(
+                        "Cascade deleted projects for orphaned repository: repoId={}, repoName={}, projectCount={}",
+                        repoId,
+                        LoggingUtils.sanitizeForLog(nameWithOwner),
+                        deletedProjects
+                    );
+                }
+
                 repositoryRepository.delete(repository);
                 log.debug("Deleted orphaned repository: repoName={}", LoggingUtils.sanitizeForLog(nameWithOwner));
             });

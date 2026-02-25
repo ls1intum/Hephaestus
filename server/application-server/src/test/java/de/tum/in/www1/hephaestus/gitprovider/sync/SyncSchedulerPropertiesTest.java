@@ -202,7 +202,7 @@ class SyncSchedulerPropertiesTest {
         @Test
         @DisplayName("should allow all organizations when filter is empty")
         void emptyOrgFilter_allowsAll() {
-            var filters = new SyncSchedulerProperties.FilterProperties(Set.of(), Set.of());
+            var filters = new SyncSchedulerProperties.FilterProperties(Set.of(), Set.of(), Set.of());
 
             assertThat(filters.isOrganizationAllowed("any-org")).isTrue();
             assertThat(filters.isOrganizationAllowed("another-org")).isTrue();
@@ -211,7 +211,11 @@ class SyncSchedulerPropertiesTest {
         @Test
         @DisplayName("should only allow listed organizations when filter is set")
         void orgFilter_onlyAllowsListed() {
-            var filters = new SyncSchedulerProperties.FilterProperties(Set.of("ls1intum", "HephaestusTest"), Set.of());
+            var filters = new SyncSchedulerProperties.FilterProperties(
+                Set.of("ls1intum", "HephaestusTest"),
+                Set.of(),
+                Set.of()
+            );
 
             assertThat(filters.isOrganizationAllowed("ls1intum")).isTrue();
             assertThat(filters.isOrganizationAllowed("HephaestusTest")).isTrue();
@@ -221,7 +225,7 @@ class SyncSchedulerPropertiesTest {
         @Test
         @DisplayName("should allow all repositories when filter is empty")
         void emptyRepoFilter_allowsAll() {
-            var filters = new SyncSchedulerProperties.FilterProperties(Set.of(), Set.of());
+            var filters = new SyncSchedulerProperties.FilterProperties(Set.of(), Set.of(), Set.of());
 
             assertThat(filters.isRepositoryAllowed("any/repo")).isTrue();
         }
@@ -231,7 +235,8 @@ class SyncSchedulerPropertiesTest {
         void repoFilter_onlyAllowsListed() {
             var filters = new SyncSchedulerProperties.FilterProperties(
                 Set.of(),
-                Set.of("ls1intum/Hephaestus", "ls1intum/Artemis")
+                Set.of("ls1intum/Hephaestus", "ls1intum/Artemis"),
+                Set.of()
             );
 
             assertThat(filters.isRepositoryAllowed("ls1intum/Hephaestus")).isTrue();

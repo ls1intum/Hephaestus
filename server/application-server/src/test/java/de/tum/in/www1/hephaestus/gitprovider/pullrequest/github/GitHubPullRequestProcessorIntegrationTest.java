@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.*;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
+import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.label.github.dto.GitHubLabelDTO;
@@ -80,6 +81,9 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private MilestoneRepository milestoneRepository;
+
+    @Autowired
+    private IssueRepository issueRepository;
 
     @Autowired
     private TestPullRequestEventListener eventListener;
@@ -186,7 +190,8 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             null, // reviewDecision
             null, // mergeStateStatus
             null, // isMergeable
-            false // maintainerCanModify
+            false, // maintainerCanModify
+            null // mergeCommitInfo
         );
     }
 
@@ -237,7 +242,8 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 null, // reviewDecision
                 null, // mergeStateStatus
                 null, // isMergeable
-                false // maintainerCanModify
+                false, // maintainerCanModify
+                null // mergeCommitInfo
             );
 
             // When
@@ -290,7 +296,8 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 null, // reviewDecision
                 null, // mergeStateStatus
                 null, // isMergeable
-                false // maintainerCanModify
+                false, // maintainerCanModify
+                null // mergeCommitInfo
             );
 
             // Verify the fallback works
@@ -345,7 +352,8 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 null, // reviewDecision
                 null, // mergeStateStatus
                 null, // isMergeable
-                false // maintainerCanModify
+                false, // maintainerCanModify
+                null // mergeCommitInfo
             );
 
             // Verify fallback returns null
@@ -357,6 +365,66 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             // Then
             assertThat(result).isNull();
             assertThat(eventListener.getCreatedEvents()).isEmpty();
+        }
+    }
+
+    // ==================== Issue Type Promotion Tests ====================
+
+    @Nested
+    @DisplayName("Issue Type Promotion (ISSUE -> PULL_REQUEST)")
+    class IssueTypePromotion {
+
+        @Test
+        @DisplayName("Should promote ISSUE to PULL_REQUEST when PR event arrives for existing Issue")
+        void shouldPromoteIssueToPullRequestWhenPREventArrives() {
+            // Arrange - insert an entity with issue_type='ISSUE' using the Issue upsert
+            Long entityId = FIXTURE_PR_ID;
+            int number = 26;
+            Instant now = Instant.now();
+
+            issueRepository.upsertCore(
+                entityId,
+                number,
+                "Original Issue Title",
+                "Original issue body",
+                "OPEN",
+                null, // stateReason
+                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/issues/" + number,
+                false, // isLocked
+                null, // closedAt
+                0, // commentsCount
+                now, // lastSyncAt
+                now, // createdAt
+                now, // updatedAt
+                null, // authorId
+                FIXTURE_REPO_ID,
+                null, // milestoneId
+                null, // issueTypeId
+                null, // parentIssueId
+                null, // subIssuesTotal
+                null, // subIssuesCompleted
+                null // subIssuesPercentCompleted
+            );
+
+            // Verify entity exists as an Issue but NOT as a PullRequest
+            assertThat(issueRepository.findByRepositoryIdAndNumber(FIXTURE_REPO_ID, number)).isPresent();
+            assertThat(pullRequestRepository.findByRepositoryIdAndNumber(FIXTURE_REPO_ID, number)).isEmpty();
+
+            // Act - process as a pull request
+            GitHubPullRequestDTO dto = createBasicPullRequestDto(entityId, number);
+            PullRequest result = processor.process(dto, createContext());
+
+            // Assert - should succeed (no IllegalStateException) and return a valid PR
+            assertThat(result).isNotNull();
+            assertThat(result.getId()).isEqualTo(entityId);
+            assertThat(result.getNumber()).isEqualTo(number);
+            assertThat(result.getTitle()).isEqualTo("Test PR #" + number);
+
+            // Verify it's now findable as a PullRequest
+            assertThat(pullRequestRepository.findByRepositoryIdAndNumber(FIXTURE_REPO_ID, number)).isPresent();
+
+            // Verify Created event was published (treated as new from PR perspective)
+            assertThat(eventListener.getCreatedEvents()).hasSize(1);
         }
     }
 
@@ -458,7 +526,8 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 null, // reviewDecision
                 null, // mergeStateStatus
                 null, // isMergeable
-                false // maintainerCanModify
+                false, // maintainerCanModify
+                null // mergeCommitInfo
             );
 
             // When
@@ -527,7 +596,8 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 null, // reviewDecision
                 null, // mergeStateStatus
                 null, // isMergeable
-                false // maintainerCanModify
+                false, // maintainerCanModify
+                null // mergeCommitInfo
             );
 
             // When
@@ -589,7 +659,8 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 null, // reviewDecision
                 null, // mergeStateStatus
                 null, // isMergeable
-                false // maintainerCanModify
+                false, // maintainerCanModify
+                null // mergeCommitInfo
             );
 
             // When
@@ -646,7 +717,8 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 null, // reviewDecision
                 null, // mergeStateStatus
                 null, // isMergeable
-                false // maintainerCanModify
+                false, // maintainerCanModify
+                null // mergeCommitInfo
             );
 
             // When
@@ -706,7 +778,8 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 null, // reviewDecision
                 null, // mergeStateStatus
                 null, // isMergeable
-                false // maintainerCanModify
+                false, // maintainerCanModify
+                null // mergeCommitInfo
             );
             processor.process(draftDto, createContext());
             eventListener.clear();
@@ -747,7 +820,8 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 null, // reviewDecision
                 null, // mergeStateStatus
                 null, // isMergeable
-                false // maintainerCanModify
+                false, // maintainerCanModify
+                null // mergeCommitInfo
             );
 
             // When
@@ -808,7 +882,8 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 null, // reviewDecision
                 null, // mergeStateStatus
                 null, // isMergeable
-                false // maintainerCanModify
+                false, // maintainerCanModify
+                null // mergeCommitInfo
             );
 
             // When
@@ -869,7 +944,8 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 null, // reviewDecision
                 null, // mergeStateStatus
                 null, // isMergeable
-                false // maintainerCanModify
+                false, // maintainerCanModify
+                null // mergeCommitInfo
             );
 
             // When
@@ -941,7 +1017,8 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 null, // reviewDecision
                 null, // mergeStateStatus
                 null, // isMergeable
-                false // maintainerCanModify
+                false, // maintainerCanModify
+                null // mergeCommitInfo
             );
 
             // When
@@ -1002,7 +1079,8 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 null, // reviewDecision
                 null, // mergeStateStatus
                 null, // isMergeable
-                false // maintainerCanModify
+                false, // maintainerCanModify
+                null // mergeCommitInfo
             );
             processor.process(withLabelDto, createContext());
             eventListener.clear();
@@ -1043,7 +1121,8 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 null, // reviewDecision
                 null, // mergeStateStatus
                 null, // isMergeable
-                false // maintainerCanModify
+                false, // maintainerCanModify
+                null // mergeCommitInfo
             );
 
             // When

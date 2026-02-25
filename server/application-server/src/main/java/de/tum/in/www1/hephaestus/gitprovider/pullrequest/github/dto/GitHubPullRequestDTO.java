@@ -5,6 +5,7 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.DateTimeUtils.uriToSt
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GraphQlConnectionOverflowDetector;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHMergeStateStatus;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHMergeableState;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPullRequest;
@@ -71,8 +72,34 @@ public record GitHubPullRequestDTO(
     @Nullable ReviewDecision reviewDecision,
     @Nullable MergeStateStatus mergeStateStatus,
     @Nullable Boolean isMergeable,
-    boolean maintainerCanModify
+    boolean maintainerCanModify,
+    /**
+     * Merge commit metadata extracted from GraphQL.
+     * Null when the PR is not merged or when created from webhook payloads
+     * (which only provide the SHA via {@link #mergeCommitSha}).
+     */
+    @Nullable MergeCommitInfo mergeCommitInfo
 ) {
+    /**
+     * Merge commit metadata from GraphQL PR queries. All flat fields on the
+     * Commit type — zero additional rate limit cost.
+     */
+    public record MergeCommitInfo(
+        String sha,
+        @Nullable String message,
+        @Nullable String messageBody,
+        @Nullable String url,
+        @Nullable Instant authoredDate,
+        @Nullable Instant committedDate,
+        @Nullable Integer additions,
+        @Nullable Integer deletions,
+        @Nullable Integer changedFiles,
+        @Nullable String authorLogin,
+        @Nullable String committerLogin,
+        @Nullable String authorEmail,
+        @Nullable String committerEmail
+    ) {}
+
     /**
      * Get the database ID, preferring databaseId over id for GraphQL responses.
      */
@@ -128,9 +155,9 @@ public record GitHubPullRequestDTO(
             0, // comments count
             0, // review comments count
             GitHubUserDTO.fromActor(pr.getAuthor()),
-            extractAssignees(pr.getAssignees()),
-            extractRequestedReviewers(pr.getReviewRequests()),
-            GitHubLabelDTO.fromLabelConnection(pr.getLabels()),
+            extractAssignees(pr.getAssignees(), "PR #" + pr.getNumber()),
+            extractRequestedReviewers(pr.getReviewRequests(), "PR #" + pr.getNumber()),
+            GitHubLabelDTO.fromLabelConnection(pr.getLabels(), "PR #" + pr.getNumber()),
             GitHubMilestoneDTO.fromMilestone(pr.getMilestone()),
             new GitHubBranchRefDTO(pr.getHeadRefName(), pr.getHeadRefOid(), null),
             new GitHubBranchRefDTO(pr.getBaseRefName(), pr.getBaseRefOid(), null),
@@ -139,7 +166,59 @@ public record GitHubPullRequestDTO(
             convertReviewDecision(pr.getReviewDecision()),
             convertMergeStateStatus(pr.getMergeStateStatus()),
             convertMergeableState(pr.getMergeable()),
-            pr.getMaintainerCanModify()
+            pr.getMaintainerCanModify(),
+            extractMergeCommitInfo(pr)
+        );
+    }
+
+    /**
+     * Extracts merge commit metadata from a GraphQL PullRequest.
+     * All fields are flat on the Commit type — zero additional rate limit cost.
+     */
+    @Nullable
+    private static MergeCommitInfo extractMergeCommitInfo(GHPullRequest pr) {
+        var mc = pr.getMergeCommit();
+        if (mc == null) {
+            return null;
+        }
+
+        // R1: Use messageHeadline (subject) and messageBody directly from GraphQL
+        // instead of splitting the full message manually.
+        // Default to empty string if null — git_commit.message is NOT NULL.
+        String subject = mc.getMessageHeadline();
+        if (subject == null || subject.isBlank()) {
+            subject = "";
+        } else {
+            subject = subject.trim();
+            // Truncate subject to fit varchar(1024)
+            if (subject.length() > 1024) {
+                subject = subject.substring(0, 1024);
+            }
+        }
+        String body = mc.getMessageBody();
+        if (body != null) {
+            body = body.trim();
+            if (body.isEmpty()) {
+                body = null;
+            }
+        }
+
+        return new MergeCommitInfo(
+            mc.getOid(),
+            subject,
+            body,
+            uriToString(mc.getUrl()),
+            toInstant(mc.getAuthoredDate()),
+            toInstant(mc.getCommittedDate()),
+            mc.getAdditions(),
+            mc.getDeletions(),
+            mc.getChangedFilesIfAvailable(),
+            mc.getAuthor() != null && mc.getAuthor().getUser() != null ? mc.getAuthor().getUser().getLogin() : null,
+            mc.getCommitter() != null && mc.getCommitter().getUser() != null
+                ? mc.getCommitter().getUser().getLogin()
+                : null,
+            mc.getAuthor() != null ? mc.getAuthor().getEmail() : null,
+            mc.getCommitter() != null ? mc.getCommitter().getEmail() : null
         );
     }
 
@@ -209,18 +288,39 @@ public record GitHubPullRequestDTO(
         return state.name().toLowerCase();
     }
 
-    private static List<GitHubUserDTO> extractAssignees(@Nullable GHUserConnection connection) {
+    private static List<GitHubUserDTO> extractAssignees(@Nullable GHUserConnection connection, String context) {
         if (connection == null || connection.getNodes() == null) {
             return Collections.emptyList();
         }
-        return connection.getNodes().stream().map(GitHubUserDTO::fromUser).filter(Objects::nonNull).toList();
+        List<GitHubUserDTO> result = connection
+            .getNodes()
+            .stream()
+            .map(GitHubUserDTO::fromUser)
+            .filter(Objects::nonNull)
+            .toList();
+        GraphQlConnectionOverflowDetector.check("assignees", result.size(), connection.getTotalCount(), context);
+        return result;
     }
 
-    private static List<GitHubUserDTO> extractRequestedReviewers(@Nullable GHReviewRequestConnection connection) {
+    private static List<GitHubUserDTO> extractRequestedReviewers(
+        @Nullable GHReviewRequestConnection connection,
+        String context
+    ) {
         if (connection == null || connection.getNodes() == null) {
             return Collections.emptyList();
         }
-        return connection
+        // Check overflow using the pre-filter count (total nodes fetched, including
+        // Teams/Bots/Mannequins) against totalCount. The previous implementation
+        // compared the post-filter count (only Users) against totalCount, producing
+        // false-positive overflow warnings whenever non-User reviewers existed.
+        int fetchedCount = connection.getNodes().size();
+        GraphQlConnectionOverflowDetector.check(
+            "requestedReviewers",
+            fetchedCount,
+            connection.getTotalCount(),
+            context
+        );
+        List<GitHubUserDTO> result = connection
             .getNodes()
             .stream()
             .map(GHReviewRequest::getRequestedReviewer)
@@ -228,5 +328,6 @@ public record GitHubPullRequestDTO(
             .map(reviewer -> GitHubUserDTO.fromUser((GHUser) reviewer))
             .filter(Objects::nonNull)
             .toList();
+        return result;
     }
 }

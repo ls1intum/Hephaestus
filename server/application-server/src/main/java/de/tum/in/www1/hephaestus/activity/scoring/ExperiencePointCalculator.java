@@ -11,8 +11,7 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 /**
@@ -34,9 +33,8 @@ import org.springframework.stereotype.Component;
  * @see ExperiencePointStrategy
  */
 @Component
+@Slf4j
 public class ExperiencePointCalculator implements ExperiencePointStrategy {
-
-    private static final Logger log = LoggerFactory.getLogger(ExperiencePointCalculator.class);
 
     private final PullRequestRepository pullRequestRepository;
     private final Set<String> selfReviewAuthorLogins;
@@ -114,6 +112,34 @@ public class ExperiencePointCalculator implements ExperiencePointStrategy {
      */
     public double getXpIssueCreated() {
         return properties.xpAwards().issueCreated();
+    }
+
+    /**
+     * Get XP for project created (configurable).
+     */
+    public double getXpProjectCreated() {
+        return properties.xpAwards().projectCreated();
+    }
+
+    /**
+     * Get XP for project item created (configurable).
+     */
+    public double getXpProjectItemCreated() {
+        return properties.xpAwards().projectItemCreated();
+    }
+
+    /**
+     * Get XP for project status update created (configurable).
+     */
+    public double getXpProjectStatusUpdateCreated() {
+        return properties.xpAwards().projectStatusUpdateCreated();
+    }
+
+    /**
+     * Get XP for commit created (configurable).
+     */
+    public double getXpCommitCreated() {
+        return properties.xpAwards().commitCreated();
     }
 
     // ========================================================================

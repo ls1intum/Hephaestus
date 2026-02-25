@@ -1,14 +1,24 @@
 package de.tum.in.www1.hephaestus.gitprovider.organization.github;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.JITTER_FACTOR;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.LARGE_PAGE_SIZE;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.MAX_PAGINATION_PAGES;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_INITIAL_BACKOFF;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.adaptPageSize;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.ExponentialBackoff;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoordinator;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoordinator.GraphQlClassificationContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubTransportErrors;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GraphQlConnectionOverflowDetector;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHOrganization;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHOrganizationMemberConnection;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHOrganizationMemberEdge;
@@ -33,6 +43,8 @@ import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import reactor.core.publisher.Mono;
+import reactor.util.retry.Retry;
 
 /**
  * Service for synchronizing GitHub organizations via GraphQL API.
@@ -57,6 +69,8 @@ public class GitHubOrganizationSyncService {
     private final OrganizationMembershipRepository organizationMembershipRepository;
     private final GitHubSyncProperties syncProperties;
     private final GitHubExceptionClassifier exceptionClassifier;
+    private final GitHubGraphQlSyncCoordinator graphQlSyncHelper;
+    private static final int MAX_RETRY_ATTEMPTS = 3;
 
     public GitHubOrganizationSyncService(
         GitHubGraphQlClientProvider graphQlClientProvider,
@@ -64,7 +78,8 @@ public class GitHubOrganizationSyncService {
         GitHubUserProcessor userProcessor,
         OrganizationMembershipRepository organizationMembershipRepository,
         GitHubSyncProperties syncProperties,
-        GitHubExceptionClassifier exceptionClassifier
+        GitHubExceptionClassifier exceptionClassifier,
+        GitHubGraphQlSyncCoordinator graphQlSyncHelper
     ) {
         this.graphQlClientProvider = graphQlClientProvider;
         this.organizationProcessor = organizationProcessor;
@@ -72,6 +87,7 @@ public class GitHubOrganizationSyncService {
         this.organizationMembershipRepository = organizationMembershipRepository;
         this.syncProperties = syncProperties;
         this.exceptionClassifier = exceptionClassifier;
+        this.graphQlSyncHelper = graphQlSyncHelper;
     }
 
     /**
@@ -95,13 +111,45 @@ public class GitHubOrganizationSyncService {
         HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
 
         try {
-            ClientGraphQlResponse graphQlResponse = client
-                .documentName(GET_ORGANIZATION_DOCUMENT)
-                .variable("login", organizationLogin)
-                .execute()
+            ClientGraphQlResponse graphQlResponse = Mono.defer(() ->
+                client.documentName(GET_ORGANIZATION_DOCUMENT).variable("login", organizationLogin).execute()
+            )
+                .retryWhen(
+                    Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                        .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                        .jitter(JITTER_FACTOR)
+                        .filter(GitHubTransportErrors::isTransportError)
+                        .doBeforeRetry(signal ->
+                            log.warn(
+                                "Retrying after transport error: context=organizationSync, orgLogin={}, attempt={}, error={}",
+                                sanitizeForLog(organizationLogin),
+                                signal.totalRetries() + 1,
+                                signal.failure().getMessage()
+                            )
+                        )
+                )
                 .block(syncProperties.graphqlTimeout());
 
             if (graphQlResponse == null || !graphQlResponse.isValid()) {
+                ClassificationResult classification = graphQlSyncHelper.classifyGraphQlErrors(graphQlResponse);
+                if (classification != null) {
+                    if (
+                        graphQlSyncHelper.handleGraphQlClassification(
+                            new GraphQlClassificationContext(
+                                classification,
+                                0,
+                                MAX_RETRY_ATTEMPTS,
+                                "organization sync",
+                                "orgLogin",
+                                sanitizeForLog(organizationLogin),
+                                log
+                            )
+                        )
+                    ) {
+                        return syncOrganization(scopeId, organizationLogin);
+                    }
+                    return null;
+                }
                 log.warn(
                     "Received invalid GraphQL response: orgLogin={}, errors={}",
                     sanitizeForLog(organizationLogin),
@@ -115,11 +163,17 @@ public class GitHubOrganizationSyncService {
 
             // Check if we should pause due to rate limiting
             if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
-                log.warn(
-                    "Aborting organization sync due to critical rate limit: orgLogin={}",
-                    sanitizeForLog(organizationLogin)
-                );
-                return null;
+                if (
+                    !graphQlSyncHelper.waitForRateLimitIfNeeded(
+                        scopeId,
+                        "organization sync",
+                        "orgLogin",
+                        sanitizeForLog(organizationLogin),
+                        log
+                    )
+                ) {
+                    return null;
+                }
             }
 
             GHOrganization graphQlOrg = graphQlResponse.field("organization").toEntity(GHOrganization.class);
@@ -154,41 +208,20 @@ public class GitHubOrganizationSyncService {
             throw e;
         } catch (Exception e) {
             ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
-            switch (classification.category()) {
-                case RATE_LIMITED -> log.warn(
-                    "Rate limited during organization sync: orgLogin={}, scopeId={}, message={}",
-                    sanitizeForLog(organizationLogin),
-                    scopeId,
-                    classification.message()
-                );
-                case NOT_FOUND -> log.warn(
-                    "Resource not found during organization sync: orgLogin={}, scopeId={}, message={}",
-                    sanitizeForLog(organizationLogin),
-                    scopeId,
-                    classification.message()
-                );
-                case AUTH_ERROR -> {
-                    log.error(
-                        "Authentication error during organization sync: orgLogin={}, scopeId={}, message={}",
+            if (
+                !graphQlSyncHelper.handleGraphQlClassification(
+                    new GraphQlClassificationContext(
+                        classification,
+                        0,
+                        MAX_RETRY_ATTEMPTS,
+                        "organization sync",
+                        "orgLogin",
                         sanitizeForLog(organizationLogin),
-                        scopeId,
-                        classification.message()
-                    );
-                    throw e;
-                }
-                case RETRYABLE -> log.warn(
-                    "Retryable error during organization sync: orgLogin={}, scopeId={}, message={}",
-                    sanitizeForLog(organizationLogin),
-                    scopeId,
-                    classification.message()
-                );
-                default -> log.error(
-                    "Unexpected error during organization sync: orgLogin={}, scopeId={}, message={}",
-                    sanitizeForLog(organizationLogin),
-                    scopeId,
-                    classification.message(),
-                    e
-                );
+                        log
+                    )
+                )
+            ) {
+                return null;
             }
             return null;
         }
@@ -236,6 +269,7 @@ public class GitHubOrganizationSyncService {
         int pageCount = 0;
         int latestTotalCount = membersConnection.getTotalCount();
         boolean syncCompletedNormally = false;
+        int retryAttempt = 0;
 
         // Paginate through all remaining members if there are more pages
         while (pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage())) {
@@ -260,15 +294,58 @@ public class GitHubOrganizationSyncService {
                 break;
             }
 
-            ClientGraphQlResponse graphQlResponse = client
-                .documentName(GET_ORGANIZATION_MEMBERS_DOCUMENT)
-                .variable("login", organization.getLogin())
-                .variable("first", LARGE_PAGE_SIZE)
-                .variable("after", cursor)
-                .execute()
+            final String currentCursor = cursor;
+            final int currentPage = pageCount;
+
+            ClientGraphQlResponse graphQlResponse = Mono.defer(() ->
+                client
+                    .documentName(GET_ORGANIZATION_MEMBERS_DOCUMENT)
+                    .variable("login", organization.getLogin())
+                    .variable(
+                        "first",
+                        adaptPageSize(LARGE_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
+                    )
+                    .variable("after", currentCursor)
+                    .execute()
+            )
+                .retryWhen(
+                    Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                        .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                        .jitter(JITTER_FACTOR)
+                        .filter(GitHubTransportErrors::isTransportError)
+                        .doBeforeRetry(signal ->
+                            log.warn(
+                                "Retrying after transport error: context=orgMembersSync, orgLogin={}, page={}, attempt={}, error={}",
+                                sanitizeForLog(organization.getLogin()),
+                                currentPage,
+                                signal.totalRetries() + 1,
+                                signal.failure().getMessage()
+                            )
+                        )
+                )
                 .block(syncProperties.graphqlTimeout());
 
             if (graphQlResponse == null || !graphQlResponse.isValid()) {
+                ClassificationResult classification = graphQlSyncHelper.classifyGraphQlErrors(graphQlResponse);
+                if (classification != null) {
+                    if (
+                        graphQlSyncHelper.handleGraphQlClassification(
+                            new GraphQlClassificationContext(
+                                classification,
+                                retryAttempt,
+                                MAX_RETRY_ATTEMPTS,
+                                "organization members sync",
+                                "orgLogin",
+                                sanitizeForLog(organization.getLogin()),
+                                log
+                            )
+                        )
+                    ) {
+                        retryAttempt++;
+                        continue;
+                    }
+                    break;
+                }
                 log.warn(
                     "Received invalid GraphQL response for members: orgLogin={}, errors={}",
                     sanitizeForLog(organization.getLogin()),
@@ -282,11 +359,17 @@ public class GitHubOrganizationSyncService {
 
             // Check if we should pause due to rate limiting
             if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
-                log.warn(
-                    "Aborting organization members sync due to critical rate limit: orgLogin={}",
-                    sanitizeForLog(organization.getLogin())
-                );
-                break;
+                if (
+                    !graphQlSyncHelper.waitForRateLimitIfNeeded(
+                        scopeId,
+                        "organization members sync",
+                        "orgLogin",
+                        sanitizeForLog(organization.getLogin()),
+                        log
+                    )
+                ) {
+                    break;
+                }
             }
 
             GHOrganizationMemberConnection nextPage = graphQlResponse
@@ -312,10 +395,21 @@ public class GitHubOrganizationSyncService {
 
             pageInfo = nextPage.getPageInfo();
             cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
+            retryAttempt = 0;
         }
 
         // Mark sync as completed normally if we exhausted all pages (pageInfo.hasNextPage is false)
         syncCompletedNormally = pageInfo == null || !Boolean.TRUE.equals(pageInfo.getHasNextPage());
+
+        // Check for overflow
+        if (latestTotalCount >= 0) {
+            GraphQlConnectionOverflowDetector.check(
+                "members",
+                allMembers.size(),
+                latestTotalCount,
+                "orgLogin=" + sanitizeForLog(organization.getLogin())
+            );
+        }
 
         log.debug(
             "Fetched organization members: orgId={}, orgLogin={}, fetchedCount={}, totalCount={}, pages={}, complete={}",

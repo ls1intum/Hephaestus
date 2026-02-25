@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.workspace.authorization;
 
+import de.tum.in.www1.hephaestus.SecurityUtils;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContextHolder;
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Service;
 /**
  * Service for evaluating workspace-level access permissions based on user roles.
  * Uses role hierarchy: OWNER > ADMIN > MEMBER
+ * Global admins (users with Keycloak 'admin' realm role) are automatically elevated to workspace ADMIN level.
  */
 @Service
 public class WorkspaceAccessService {
@@ -25,6 +27,8 @@ public class WorkspaceAccessService {
     /**
      * Check if the current user has at least the specified role in the current workspace.
      * Uses role hierarchy: if user has OWNER, they also satisfy ADMIN and MEMBER checks.
+     * Super admins (Keycloak admin realm role) are automatically elevated to ADMIN level
+     * for workspaces where they have membership, but cannot satisfy OWNER checks (ownership remains explicit).
      *
      * @param requiredRole Minimum required role
      * @return true if user has the required role or higher
@@ -42,11 +46,21 @@ public class WorkspaceAccessService {
             return false;
         }
 
-        // Check role hierarchy
+        // Check role hierarchy based on database roles
         for (WorkspaceRole userRole : userRoles) {
             if (satisfiesRoleRequirement(userRole, requiredRole)) {
                 return true;
             }
+        }
+
+        // Super admins with membership are automatically elevated to ADMIN level (but not OWNER)
+        if (requiredRole != WorkspaceRole.OWNER && SecurityUtils.isSuperAdmin()) {
+            log.debug(
+                "Granted role check: reason=superAdminElevation, requiredRole={}, workspaceSlug={}",
+                requiredRole,
+                context.slug()
+            );
+            return true;
         }
 
         log.debug(
@@ -99,7 +113,7 @@ public class WorkspaceAccessService {
     /**
      * Check if user can assign or revoke the specified role.
      * OWNER can manage all roles.
-     * ADMIN can manage ADMIN and MEMBER roles (but not OWNER).
+     * ADMIN (including super admins with membership) can manage ADMIN and MEMBER roles (but not OWNER).
      *
      * @param targetRole Role to assign/revoke
      * @return true if user has permission to manage this role
@@ -123,6 +137,11 @@ public class WorkspaceAccessService {
         // ADMIN can manage ADMIN and MEMBER, but not OWNER
         if (userRoles.contains(WorkspaceRole.ADMIN)) {
             return targetRole != WorkspaceRole.OWNER;
+        }
+
+        // Super admins with membership can manage ADMIN and MEMBER roles (but not OWNER)
+        if (targetRole != WorkspaceRole.OWNER && SecurityUtils.isSuperAdmin()) {
+            return true;
         }
 
         return false;

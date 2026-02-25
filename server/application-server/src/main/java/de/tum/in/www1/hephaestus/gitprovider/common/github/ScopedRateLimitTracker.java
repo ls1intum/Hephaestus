@@ -11,8 +11,7 @@ import java.time.OffsetDateTime;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
@@ -41,9 +40,8 @@ import org.springframework.stereotype.Component;
  * @see RateLimitTracker
  */
 @Component
+@Slf4j
 public class ScopedRateLimitTracker implements RateLimitTracker {
-
-    private static final Logger log = LoggerFactory.getLogger(ScopedRateLimitTracker.class);
 
     /**
      * Default rate limit for GitHub App installations (5000 points/hour).
@@ -105,7 +103,28 @@ public class ScopedRateLimitTracker implements RateLimitTracker {
             return DEFAULT_LIMIT;
         }
         ScopeRateLimitState state = stateByScope.get(scopeId);
-        return state != null ? state.remaining.get() : DEFAULT_LIMIT;
+        if (state == null) {
+            return DEFAULT_LIMIT;
+        }
+        int remaining = state.remaining.get();
+        // Optimistic reset: if remaining is low and reset time has passed,
+        // reset remaining to full limit so callers don't stall on stale data.
+        if (remaining < DEFAULT_LOW_THRESHOLD) {
+            Instant resetAt = state.resetAt.get();
+            if (resetAt != null && !Instant.now().isBefore(resetAt)) {
+                int fullLimit = state.limit.get();
+                state.remaining.set(fullLimit);
+                log.info(
+                    "Rate limit reset time has passed, optimistically reset remaining: scopeId={}, oldRemaining={}, newRemaining={}, resetAt={}",
+                    scopeId,
+                    remaining,
+                    fullLimit,
+                    resetAt
+                );
+                return fullLimit;
+            }
+        }
+        return remaining;
     }
 
     @Override
@@ -158,8 +177,21 @@ public class ScopedRateLimitTracker implements RateLimitTracker {
 
         // Clamp to reasonable bounds
         if (waitTime.isNegative() || waitTime.isZero()) {
-            // Reset time has passed, limit should have reset
-            log.info("Rate limit reset time has passed, continuing: scopeId={}", scopeId);
+            // Reset time has passed — optimistically reset remaining to full limit.
+            // The next actual GraphQL call will update with the real remaining value.
+            ScopeRateLimitState state = stateByScope.get(scopeId);
+            if (state != null) {
+                int fullLimit = state.limit.get();
+                state.remaining.set(fullLimit);
+                log.info(
+                    "Rate limit reset time has passed, optimistically reset remaining: scopeId={}, remaining={}, resetAt={}",
+                    scopeId,
+                    fullLimit,
+                    reset
+                );
+            } else {
+                log.info("Rate limit reset time has passed, continuing: scopeId={}", scopeId);
+            }
             return false;
         }
 

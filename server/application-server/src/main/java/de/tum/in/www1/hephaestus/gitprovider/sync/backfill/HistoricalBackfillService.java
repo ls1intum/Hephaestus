@@ -2,6 +2,11 @@ package de.tum.in.www1.hephaestus.gitprovider.sync.backfill;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.DEFAULT_PAGE_SIZE;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.JITTER_FACTOR;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_INITIAL_BACKOFF;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.adaptPageSize;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
@@ -9,6 +14,8 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlErrorUti
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubRepositoryNameParser.RepositoryOwnerAndName;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubTransportErrors;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GraphQlConnectionOverflowDetector;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.BackfillStateProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncSession;
@@ -43,11 +50,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.graphql.client.ClientGraphQlResponse;
-import org.springframework.graphql.client.GraphQlTransportException;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -90,10 +95,9 @@ import reactor.util.retry.Retry;
  *
  * @see SyncSchedulerProperties.BackfillProperties
  */
+@Slf4j
 @Service
 public class HistoricalBackfillService {
-
-    private static final Logger log = LoggerFactory.getLogger(HistoricalBackfillService.class);
 
     /** GraphQL query document name for historical issue sync (CREATED_AT DESC). */
     private static final String ISSUES_HISTORICAL_QUERY = "GetRepositoryIssuesHistorical";
@@ -118,18 +122,6 @@ public class HistoricalBackfillService {
      * Extended cooldown period after max consecutive failures.
      */
     private static final Duration EXTENDED_COOLDOWN = Duration.ofMinutes(15);
-
-    /**
-     * Retry configuration for transport-level errors during body streaming.
-     * <p>
-     * CRITICAL: WebClient ExchangeFilterFunction retries DO NOT cover body streaming errors.
-     * PrematureCloseException occurs AFTER HTTP headers are received, during body consumption.
-     * We must retry at this level using Mono.defer() to wrap the entire execute() call.
-     */
-    private static final int TRANSPORT_MAX_RETRIES = 3;
-    private static final Duration TRANSPORT_INITIAL_BACKOFF = Duration.ofSeconds(2);
-    private static final Duration TRANSPORT_MAX_BACKOFF = Duration.ofSeconds(15);
-    private static final double JITTER_FACTOR = 0.5;
 
     /**
      * Tracks repository cooldown state to prevent hammering failing endpoints.
@@ -320,41 +312,34 @@ public class HistoricalBackfillService {
         Long scopeId = session.scopeId();
         List<SyncTarget> targets = session.syncTargets();
 
-        // Check if ALL repos have completed incremental sync before starting any backfill.
-        // This prevents backfill from consuming rate limit points that are needed for
-        // incremental sync of remaining repos, which would delay the initial sync.
+        // Log incremental sync progress for visibility. Repos that haven't completed
+        // their own incremental sync are skipped individually (per-repo gate below).
         long pendingIncrementalSync = targets
             .stream()
-            .filter(t -> t.lastIssuesAndPullRequestsSyncedAt() == null)
+            .filter(t -> t.lastIssuesSyncedAt() == null || t.lastPullRequestsSyncedAt() == null)
             .count();
 
         if (pendingIncrementalSync > 0) {
             long completed = targets.size() - pendingIncrementalSync;
             log.debug(
-                "Skipping backfill for scope: reason=incrementalSyncPending, scopeId={}, scopeSlug={}, " +
-                    "incrementalComplete={}, incrementalPending={}",
+                "Some repos pending incremental sync (backfill proceeds for completed repos): " +
+                    "scopeId={}, scopeSlug={}, incrementalComplete={}, incrementalPending={}",
                 scopeId,
                 session.slug(),
                 completed,
                 pendingIncrementalSync
             );
-            // Count repos that would need backfill once incremental sync completes
-            for (SyncTarget target : targets) {
-                if (!target.isBackfillComplete()) {
-                    pendingRepositories.incrementAndGet();
-                }
-            }
-            return;
         }
 
         // Check rate limit for this scope before processing its repositories
         int remainingPoints = graphQlClientProvider.getRateLimitRemaining(scopeId);
         if (remainingPoints < backfillProps.rateLimitThreshold()) {
             log.debug(
-                "Skipping backfill for scope: reason=rateLimitLow, scopeId={}, remaining={}, threshold={}",
+                "Skipping backfill for scope: reason=rateLimitLow, scopeId={}, remaining={}, threshold={}, resetsAt={}",
                 scopeId,
                 remainingPoints,
-                backfillProps.rateLimitThreshold()
+                backfillProps.rateLimitThreshold(),
+                graphQlClientProvider.getRateLimitResetAt(scopeId)
             );
             // Count pending repos in this scope for reporting
             for (SyncTarget target : targets) {
@@ -371,8 +356,16 @@ public class HistoricalBackfillService {
                 continue;
             }
 
-            // Note: No need to check lastIssuesAndPullRequestsSyncedAt() here because we
-            // already verified ALL repos have completed incremental sync at the top of this method.
+            // Skip repos that haven't completed their own incremental sync yet.
+            // Backfill should only run for repos that have their baseline data.
+            if (target.lastIssuesSyncedAt() == null || target.lastPullRequestsSyncedAt() == null) {
+                log.trace(
+                    "Skipping backfill: reason=incrementalSyncPending, repo={}",
+                    sanitizeForLog(target.repositoryNameWithOwner())
+                );
+                pendingRepositories.incrementAndGet();
+                continue;
+            }
 
             // Skip if repository is in cooldown after recent failures
             if (isInCooldown(target.id())) {
@@ -636,6 +629,7 @@ public class HistoricalBackfillService {
         int batchMaxNumber = Integer.MIN_VALUE;
         boolean hasMore = true;
         int pageCount = 0;
+        int reportedTotalCount = -1;
 
         while (hasMore && pageCount < maxPages) {
             pageCount++;
@@ -650,7 +644,10 @@ public class HistoricalBackfillService {
                         .documentName(ISSUES_HISTORICAL_QUERY)
                         .variable("owner", ownerAndName.owner())
                         .variable("name", ownerAndName.name())
-                        .variable("first", DEFAULT_PAGE_SIZE)
+                        .variable(
+                            "first",
+                            adaptPageSize(DEFAULT_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
+                        )
                         .variable("after", currentCursor)
                         .execute()
                 )
@@ -696,6 +693,9 @@ public class HistoricalBackfillService {
                 if (connection == null || connection.getNodes() == null || connection.getNodes().isEmpty()) {
                     hasMore = false;
                     break;
+                }
+                if (reportedTotalCount < 0) {
+                    reportedTotalCount = connection.getTotalCount();
                 }
 
                 GHPageInfo pageInfo = connection.getPageInfo();
@@ -749,6 +749,13 @@ public class HistoricalBackfillService {
                 );
             }
         }
+
+        GraphQlConnectionOverflowDetector.check(
+            "issues",
+            totalIssuesSynced,
+            reportedTotalCount,
+            "repo=" + repoNameForLog
+        );
 
         // Note: cursor is cleared inside the transaction when hasMore is false
         // (null cursor is passed to processIssuesPage when !hasMore)
@@ -808,6 +815,7 @@ public class HistoricalBackfillService {
         int batchMaxNumber = Integer.MIN_VALUE;
         boolean hasMore = true;
         int pageCount = 0;
+        int reportedTotalCount = -1;
         List<PullRequestWithReviewCursor> allPrsNeedingReviewPagination = new ArrayList<>();
 
         while (hasMore && pageCount < maxPages) {
@@ -816,12 +824,13 @@ public class HistoricalBackfillService {
             try {
                 // Use Mono.defer() to wrap the entire execute() call so retries cover body streaming.
                 final String currentCursor = cursor;
+                final int prPageSize = resolveBackfillPrPageSize(scopeId, syncTargetId);
                 ClientGraphQlResponse response = Mono.defer(() ->
                     client
                         .documentName(PRS_HISTORICAL_QUERY)
                         .variable("owner", ownerAndName.owner())
                         .variable("name", ownerAndName.name())
-                        .variable("first", syncProperties.backfillPrPageSize())
+                        .variable("first", prPageSize)
                         .variable("after", currentCursor)
                         .execute()
                 )
@@ -873,6 +882,9 @@ public class HistoricalBackfillService {
                     hasMore = false;
                     break;
                 }
+                if (reportedTotalCount < 0) {
+                    reportedTotalCount = connection.getTotalCount();
+                }
 
                 GHPageInfo pageInfo = connection.getPageInfo();
                 hasMore = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
@@ -917,10 +929,11 @@ public class HistoricalBackfillService {
                 // Rethrow to trigger cooldown mechanism in runBackfillCycle.
                 // Progress is preserved: cursor was saved in the last successful transaction.
                 log.warn(
-                    "Error during pull requests backfill, will retry after cooldown: repo={}, page={}, synced={}, error={}",
+                    "Error during pull requests backfill, will retry after cooldown: repo={}, page={}, synced={}, failures={}, error={}",
                     sanitizeForLog(repoNameForLog),
                     pageCount,
                     totalPRsSynced,
+                    consecutiveFailures.getOrDefault(syncTargetId, 0),
                     e.getMessage()
                 );
                 throw new BackfillTransientException(
@@ -929,6 +942,13 @@ public class HistoricalBackfillService {
                 );
             }
         }
+
+        GraphQlConnectionOverflowDetector.check(
+            "pullRequests",
+            totalPRsSynced,
+            reportedTotalCount,
+            "repo=" + repoNameForLog
+        );
 
         // Note: cursor is cleared inside the transaction when hasMore is false
         // (null cursor is passed to processPullRequestsPage when !hasMore)
@@ -1487,7 +1507,7 @@ public class HistoricalBackfillService {
         return Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
             .maxBackoff(TRANSPORT_MAX_BACKOFF)
             .jitter(JITTER_FACTOR)
-            .filter(this::isTransportError)
+            .filter(GitHubTransportErrors::isTransportError)
             .doBeforeRetry(signal ->
                 log.warn(
                     "Retrying {} after transport error: repo={}, page={}, attempt={}, error={}",
@@ -1501,67 +1521,26 @@ public class HistoricalBackfillService {
     }
 
     /**
-     * Determines if an exception is a transport-level error that should be retried.
-     * <p>
-     * Transport errors occur at the network/connection level during body streaming:
-     * <ul>
-     *   <li>{@code GraphQlTransportException}: Spring GraphQL wrapper for transport failures</li>
-     *   <li>{@code PrematureCloseException}: Connection closed during response body streaming</li>
-     *   <li>Connection reset/abort exceptions</li>
-     *   <li>Timeouts during body consumption</li>
-     * </ul>
+     * Resolves the effective pull request page size for backfill.
      *
-     * @param throwable the exception to check
-     * @return true if this is a retryable transport error
+     * <p>Base sizing follows rate-limit-aware adaptation. Additionally, when a repository has
+     * consecutive transient failures we reduce PR page size further so large payloads can progress
+     * instead of repeatedly timing out and entering cooldown.
      */
-    private boolean isTransportError(Throwable throwable) {
-        // GraphQlTransportException is Spring GraphQL's wrapper for transport failures
-        if (throwable instanceof GraphQlTransportException) {
-            return true;
+    private int resolveBackfillPrPageSize(Long scopeId, Long syncTargetId) {
+        int rateLimitAdjusted = adaptPageSize(
+            syncProperties.backfillPrPageSize(),
+            graphQlClientProvider.getRateLimitRemaining(scopeId)
+        );
+        int failures = consecutiveFailures.getOrDefault(syncTargetId, 0);
+
+        if (failures >= MAX_CONSECUTIVE_FAILURES) {
+            return Math.max(1, rateLimitAdjusted / 4);
         }
-
-        // Walk the cause chain for wrapped transport errors
-        Throwable cause = throwable;
-        while (cause != null) {
-            String className = cause.getClass().getName();
-            String message = cause.getMessage();
-
-            // PrematureCloseException: Connection closed during response streaming
-            if (className.contains("PrematureCloseException")) {
-                return true;
-            }
-
-            // Other reactor-netty transport errors
-            if (className.contains("AbortedException") || className.contains("ConnectionResetException")) {
-                return true;
-            }
-
-            // Timeout during blocking read (body consumption timeout)
-            if (
-                cause instanceof IllegalStateException &&
-                message != null &&
-                message.toLowerCase().contains("timeout on blocking read")
-            ) {
-                return true;
-            }
-
-            // Check for IOException indicating connection issues
-            if (cause instanceof java.io.IOException && message != null) {
-                String lower = message.toLowerCase();
-                if (
-                    lower.contains("connection reset") ||
-                    lower.contains("broken pipe") ||
-                    lower.contains("connection abort") ||
-                    lower.contains("premature") ||
-                    lower.contains("stream closed")
-                ) {
-                    return true;
-                }
-            }
-
-            cause = cause.getCause();
+        if (failures > 0) {
+            return Math.max(2, rateLimitAdjusted / 2);
         }
-        return false;
+        return rateLimitAdjusted;
     }
 
     // ========================================================================

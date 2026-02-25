@@ -1,13 +1,13 @@
 spring:
     application:
         name: Hephaestus
-        version: "0.15.0"
+        version: "0.18.0"
 
     config:
         import: optional:file:.env[.properties]
 
     datasource:
-        url: jdbc:postgresql://localhost:5432/hephaestus
+        url: jdbc:postgresql://localhost:${POSTGRES_PORT:5432}/hephaestus
         username: ${DB_USERNAME:root}
         password: ${DB_PASSWORD:}
         hikari:
@@ -19,7 +19,10 @@ spring:
 
     jpa:
         hibernate:
-            # We use update for development and none for production, as we use liquibase
+            # Liquibase handles DDL migrations; Hibernate validates the schema.
+            # Use 'update' for development convenience (adds missing columns/tables).
+            # If you hit a Hibernate NPE in EnumHelper.getEnumeratedValues on startup,
+            # the database schema is stale — recreate the database from scratch.
             ddl-auto: update
         # Disable open-in-view to prevent lazy loading during view rendering
         # and avoid the warning. Database queries should be completed in the service layer.
@@ -52,7 +55,7 @@ spring:
         oauth2:
             resourceserver:
                 jwt:
-                    issuer-uri: http://localhost:8081/realms/hephaestus
+                    issuer-uri: http://localhost:${KEYCLOAK_PORT:8081}/realms/hephaestus
 
     thymeleaf:
         prefix: ${MAIL_TEMPLATE_FOLDER:classpath:/mail-templates/}
@@ -91,6 +94,7 @@ spring:
         timeout-per-shutdown-phase: ${SHUTDOWN_TIMEOUT:20s}
 
 server:
+    port: ${SERVER_PORT:8080}
     shutdown: graceful
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -174,9 +178,15 @@ hephaestus:
         # ═══════════════════════════════════════════════════════════════════════════
         # BACKFILL CONFIGURATION
         # ═══════════════════════════════════════════════════════════════════════════
-        # Historical data synchronization settings.
+        # Historical data synchronization settings for ISSUES and PULL REQUESTS only.
         # When enabled, backfill runs AFTER recent sync completes, in small batches
         # to avoid exhausting GitHub API rate limits.
+        #
+        # NOTE: Backfill does NOT affect GitHub Projects V2 sync. Projects are always
+        # fully synced during incremental sync because:
+        # 1. GitHub API doesn't support server-side filtering for project items
+        # 2. Project items are metadata views on issues/PRs, not source data
+        # 3. Subsequent syncs use client-side incremental filtering (skip unchanged items)
         backfill:
             # Whether to backfill historical issues and pull requests
             enabled: false
@@ -251,6 +261,18 @@ hephaestus:
         allowed-origins:
             - ${APPLICATION_HOST_URL:http://localhost:4200}
 
+    # ═══════════════════════════════════════════════════════════════════════════
+    # LOCAL GIT REPOSITORY STORAGE
+    # ═══════════════════════════════════════════════════════════════════════════
+    # When enabled, repositories are cloned as bare git repos for file-level
+    # commit analysis. The intelligence-service can read these repos directly.
+    git:
+        # Whether local git checkout is enabled (default: false)
+        enabled: ${GIT_CHECKOUT_ENABLED:false}
+        # Base path for bare git repositories
+        # Each repo stored at: {storage-path}/{repositoryId}.git
+        storage-path: ${GIT_STORAGE_PATH:/data/git-repos}
+
     webapp:
         url: ${APPLICATION_HOST_URL:http://localhost:4200}
 
@@ -305,7 +327,7 @@ hephaestus:
                 - ls1intum/Artemis
 
     intelligence-service:
-        url: http://localhost:8000
+        url: http://localhost:${INTELLIGENCE_SERVICE_PORT:8000}
 
     cache:
         contributors:
@@ -352,7 +374,7 @@ hephaestus:
     # KEYCLOAK IDENTITY PROVIDER
     # ═══════════════════════════════════════════════════════════════════════════
     keycloak:
-        url: http://localhost:8081
+        url: http://localhost:${KEYCLOAK_PORT:8081}
         realm: hephaestus
         client-id: hephaestus-confidential
         # SECURITY: Never commit secrets. Use environment variables in production.

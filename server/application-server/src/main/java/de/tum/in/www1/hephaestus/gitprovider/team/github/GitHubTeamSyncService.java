@@ -1,15 +1,25 @@
 package de.tum.in.www1.hephaestus.gitprovider.team.github;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.JITTER_FACTOR;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.LARGE_PAGE_SIZE;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.MAX_PAGINATION_PAGES;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_INITIAL_BACKOFF;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.adaptPageSize;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.ExponentialBackoff;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoordinator;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoordinator.GraphQlClassificationContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubTransportErrors;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GraphQlConnectionOverflowDetector;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHRepositoryPermission;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHTeam;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHTeamConnection;
@@ -44,6 +54,8 @@ import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import reactor.core.publisher.Mono;
+import reactor.util.retry.Retry;
 
 /**
  * Service for synchronizing GitHub teams via GraphQL API.
@@ -71,6 +83,8 @@ public class GitHubTeamSyncService {
     private final GitHubUserProcessor userProcessor;
     private final GitHubSyncProperties syncProperties;
     private final GitHubExceptionClassifier exceptionClassifier;
+    private final GitHubGraphQlSyncCoordinator graphQlSyncHelper;
+    private static final int MAX_RETRY_ATTEMPTS = 3;
 
     public GitHubTeamSyncService(
         TeamRepository teamRepository,
@@ -80,7 +94,8 @@ public class GitHubTeamSyncService {
         GitHubTeamProcessor teamProcessor,
         GitHubUserProcessor userProcessor,
         GitHubSyncProperties syncProperties,
-        GitHubExceptionClassifier exceptionClassifier
+        GitHubExceptionClassifier exceptionClassifier,
+        GitHubGraphQlSyncCoordinator graphQlSyncHelper
     ) {
         this.teamRepository = teamRepository;
         this.teamMembershipRepository = teamMembershipRepository;
@@ -90,6 +105,7 @@ public class GitHubTeamSyncService {
         this.userProcessor = userProcessor;
         this.syncProperties = syncProperties;
         this.exceptionClassifier = exceptionClassifier;
+        this.graphQlSyncHelper = graphQlSyncHelper;
     }
 
     /**
@@ -122,6 +138,8 @@ public class GitHubTeamSyncService {
             boolean hasNextPage = true;
             int pageCount = 0;
             boolean syncCompletedNormally = false;
+            int retryAttempt = 0;
+            int reportedTotalCount = -1;
 
             while (hasNextPage) {
                 pageCount++;
@@ -134,15 +152,58 @@ public class GitHubTeamSyncService {
                     break;
                 }
 
-                ClientGraphQlResponse graphQlResponse = client
-                    .documentName(GET_ORGANIZATION_TEAMS_DOCUMENT)
-                    .variable("login", organizationLogin)
-                    .variable("first", LARGE_PAGE_SIZE)
-                    .variable("after", cursor)
-                    .execute()
+                final String currentCursor = cursor;
+                final int currentPage = pageCount;
+
+                ClientGraphQlResponse graphQlResponse = Mono.defer(() ->
+                    client
+                        .documentName(GET_ORGANIZATION_TEAMS_DOCUMENT)
+                        .variable("login", organizationLogin)
+                        .variable(
+                            "first",
+                            adaptPageSize(LARGE_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
+                        )
+                        .variable("after", currentCursor)
+                        .execute()
+                )
+                    .retryWhen(
+                        Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                            .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                            .jitter(JITTER_FACTOR)
+                            .filter(GitHubTransportErrors::isTransportError)
+                            .doBeforeRetry(signal ->
+                                log.warn(
+                                    "Retrying team sync after transport error: orgLogin={}, page={}, attempt={}, error={}",
+                                    safeOrgLogin,
+                                    currentPage,
+                                    signal.totalRetries() + 1,
+                                    signal.failure().getMessage()
+                                )
+                            )
+                    )
                     .block(syncProperties.graphqlTimeout());
 
                 if (graphQlResponse == null || !graphQlResponse.isValid()) {
+                    ClassificationResult classification = graphQlSyncHelper.classifyGraphQlErrors(graphQlResponse);
+                    if (classification != null) {
+                        if (
+                            graphQlSyncHelper.handleGraphQlClassification(
+                                new GraphQlClassificationContext(
+                                    classification,
+                                    retryAttempt,
+                                    MAX_RETRY_ATTEMPTS,
+                                    "team sync",
+                                    "orgLogin",
+                                    safeOrgLogin,
+                                    log
+                                )
+                            )
+                        ) {
+                            retryAttempt++;
+                            continue;
+                        }
+                        break;
+                    }
                     log.warn(
                         "Received invalid GraphQL response: orgLogin={}, errors={}",
                         safeOrgLogin,
@@ -156,8 +217,11 @@ public class GitHubTeamSyncService {
 
                 // Check if we should pause due to rate limiting
                 if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
-                    log.warn("Aborting team sync due to critical rate limit: orgLogin={}", safeOrgLogin);
-                    break;
+                    if (
+                        !graphQlSyncHelper.waitForRateLimitIfNeeded(scopeId, "team sync", "orgLogin", safeOrgLogin, log)
+                    ) {
+                        break;
+                    }
                 }
 
                 GHTeamConnection response = graphQlResponse
@@ -166,6 +230,10 @@ public class GitHubTeamSyncService {
 
                 if (response == null || response.getNodes() == null) {
                     break;
+                }
+
+                if (reportedTotalCount < 0) {
+                    reportedTotalCount = response.getTotalCount();
                 }
 
                 for (var graphQlTeam : response.getNodes()) {
@@ -187,6 +255,17 @@ public class GitHubTeamSyncService {
                 var pageInfo = response.getPageInfo();
                 hasNextPage = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
                 cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
+                retryAttempt = 0;
+            }
+
+            // Check for overflow
+            if (reportedTotalCount >= 0) {
+                GraphQlConnectionOverflowDetector.check(
+                    "teams",
+                    totalSynced,
+                    reportedTotalCount,
+                    "orgLogin=" + safeOrgLogin
+                );
             }
 
             // Mark sync as completed normally if we exhausted all pages
@@ -219,41 +298,20 @@ public class GitHubTeamSyncService {
             throw e;
         } catch (Exception e) {
             ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
-            switch (classification.category()) {
-                case RATE_LIMITED -> log.warn(
-                    "Rate limited during team sync: orgLogin={}, scopeId={}, message={}",
-                    safeOrgLogin,
-                    scopeId,
-                    classification.message()
-                );
-                case NOT_FOUND -> log.warn(
-                    "Resource not found during team sync: orgLogin={}, scopeId={}, message={}",
-                    safeOrgLogin,
-                    scopeId,
-                    classification.message()
-                );
-                case AUTH_ERROR -> {
-                    log.error(
-                        "Authentication error during team sync: orgLogin={}, scopeId={}, message={}",
+            if (
+                !graphQlSyncHelper.handleGraphQlClassification(
+                    new GraphQlClassificationContext(
+                        classification,
+                        0,
+                        MAX_RETRY_ATTEMPTS,
+                        "team sync",
+                        "orgLogin",
                         safeOrgLogin,
-                        scopeId,
-                        classification.message()
-                    );
-                    throw e;
-                }
-                case RETRYABLE -> log.warn(
-                    "Retryable error during team sync: orgLogin={}, scopeId={}, message={}",
-                    safeOrgLogin,
-                    scopeId,
-                    classification.message()
-                );
-                default -> log.error(
-                    "Unexpected error during team sync: orgLogin={}, scopeId={}, message={}",
-                    safeOrgLogin,
-                    scopeId,
-                    classification.message(),
-                    e
-                );
+                        log
+                    )
+                )
+            ) {
+                return 0;
             }
             return 0;
         }
@@ -539,6 +597,8 @@ public class GitHubTeamSyncService {
         String cursor = startCursor;
         boolean hasNextPage = true;
         int pageCount = 0;
+        int retryAttempt = 0;
+        int reportedTotalCount = -1;
 
         while (hasNextPage) {
             pageCount++;
@@ -551,16 +611,59 @@ public class GitHubTeamSyncService {
                 break;
             }
 
-            ClientGraphQlResponse graphQlResponse = client
-                .documentName(GET_TEAM_MEMBERS_DOCUMENT)
-                .variable("orgLogin", organizationLogin)
-                .variable("teamSlug", teamSlug)
-                .variable("first", LARGE_PAGE_SIZE)
-                .variable("after", cursor)
-                .execute()
+            final String currentCursor = cursor;
+            final int currentPage = pageCount;
+
+            ClientGraphQlResponse graphQlResponse = Mono.defer(() ->
+                client
+                    .documentName(GET_TEAM_MEMBERS_DOCUMENT)
+                    .variable("orgLogin", organizationLogin)
+                    .variable("teamSlug", teamSlug)
+                    .variable(
+                        "first",
+                        adaptPageSize(LARGE_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
+                    )
+                    .variable("after", currentCursor)
+                    .execute()
+            )
+                .retryWhen(
+                    Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                        .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                        .jitter(JITTER_FACTOR)
+                        .filter(GitHubTransportErrors::isTransportError)
+                        .doBeforeRetry(signal ->
+                            log.warn(
+                                "Retrying team members fetch after transport error: teamSlug={}, page={}, attempt={}, error={}",
+                                teamSlug,
+                                currentPage,
+                                signal.totalRetries() + 1,
+                                signal.failure().getMessage()
+                            )
+                        )
+                )
                 .block(syncProperties.graphqlTimeout());
 
             if (graphQlResponse == null || !graphQlResponse.isValid()) {
+                ClassificationResult classification = graphQlSyncHelper.classifyGraphQlErrors(graphQlResponse);
+                if (classification != null) {
+                    if (
+                        graphQlSyncHelper.handleGraphQlClassification(
+                            new GraphQlClassificationContext(
+                                classification,
+                                retryAttempt,
+                                MAX_RETRY_ATTEMPTS,
+                                "team members fetch",
+                                "teamSlug",
+                                teamSlug,
+                                log
+                            )
+                        )
+                    ) {
+                        retryAttempt++;
+                        continue;
+                    }
+                    break;
+                }
                 log.warn(
                     "Received invalid GraphQL response for team members: teamSlug={}, errors={}",
                     teamSlug,
@@ -574,8 +677,17 @@ public class GitHubTeamSyncService {
 
             // Check if we should pause due to rate limiting
             if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
-                log.warn("Aborting team members fetch due to critical rate limit: teamSlug={}", teamSlug);
-                break;
+                if (
+                    !graphQlSyncHelper.waitForRateLimitIfNeeded(
+                        scopeId,
+                        "team members fetch",
+                        "teamSlug",
+                        teamSlug,
+                        log
+                    )
+                ) {
+                    break;
+                }
             }
 
             GHTeamMemberConnection response = graphQlResponse
@@ -586,11 +698,26 @@ public class GitHubTeamSyncService {
                 break;
             }
 
+            if (reportedTotalCount < 0) {
+                reportedTotalCount = response.getTotalCount();
+            }
+
             allMemberEdges.addAll(response.getEdges());
 
             var pageInfo = response.getPageInfo();
             hasNextPage = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
             cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
+            retryAttempt = 0;
+        }
+
+        // Check for overflow
+        if (reportedTotalCount >= 0) {
+            GraphQlConnectionOverflowDetector.check(
+                "teamMembers",
+                allMemberEdges.size(),
+                reportedTotalCount,
+                "teamSlug=" + teamSlug
+            );
         }
 
         return allMemberEdges;
@@ -616,6 +743,8 @@ public class GitHubTeamSyncService {
         String cursor = startCursor;
         boolean hasNextPage = true;
         int pageCount = 0;
+        int retryAttempt = 0;
+        int reportedTotalCount = -1;
 
         while (hasNextPage) {
             pageCount++;
@@ -628,16 +757,59 @@ public class GitHubTeamSyncService {
                 break;
             }
 
-            ClientGraphQlResponse graphQlResponse = client
-                .documentName(GET_TEAM_REPOSITORIES_DOCUMENT)
-                .variable("orgLogin", organizationLogin)
-                .variable("teamSlug", teamSlug)
-                .variable("first", LARGE_PAGE_SIZE)
-                .variable("after", cursor)
-                .execute()
+            final String currentCursor = cursor;
+            final int currentPage = pageCount;
+
+            ClientGraphQlResponse graphQlResponse = Mono.defer(() ->
+                client
+                    .documentName(GET_TEAM_REPOSITORIES_DOCUMENT)
+                    .variable("orgLogin", organizationLogin)
+                    .variable("teamSlug", teamSlug)
+                    .variable(
+                        "first",
+                        adaptPageSize(LARGE_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
+                    )
+                    .variable("after", currentCursor)
+                    .execute()
+            )
+                .retryWhen(
+                    Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                        .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                        .jitter(JITTER_FACTOR)
+                        .filter(GitHubTransportErrors::isTransportError)
+                        .doBeforeRetry(signal ->
+                            log.warn(
+                                "Retrying team repositories fetch after transport error: teamSlug={}, page={}, attempt={}, error={}",
+                                teamSlug,
+                                currentPage,
+                                signal.totalRetries() + 1,
+                                signal.failure().getMessage()
+                            )
+                        )
+                )
                 .block(syncProperties.graphqlTimeout());
 
             if (graphQlResponse == null || !graphQlResponse.isValid()) {
+                ClassificationResult classification = graphQlSyncHelper.classifyGraphQlErrors(graphQlResponse);
+                if (classification != null) {
+                    if (
+                        graphQlSyncHelper.handleGraphQlClassification(
+                            new GraphQlClassificationContext(
+                                classification,
+                                retryAttempt,
+                                MAX_RETRY_ATTEMPTS,
+                                "team repositories fetch",
+                                "teamSlug",
+                                teamSlug,
+                                log
+                            )
+                        )
+                    ) {
+                        retryAttempt++;
+                        continue;
+                    }
+                    break;
+                }
                 log.warn(
                     "Received invalid GraphQL response for team repositories: teamSlug={}, errors={}",
                     teamSlug,
@@ -651,8 +823,17 @@ public class GitHubTeamSyncService {
 
             // Check if we should pause due to rate limiting
             if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
-                log.warn("Aborting team repositories fetch due to critical rate limit: teamSlug={}", teamSlug);
-                break;
+                if (
+                    !graphQlSyncHelper.waitForRateLimitIfNeeded(
+                        scopeId,
+                        "team repositories fetch",
+                        "teamSlug",
+                        teamSlug,
+                        log
+                    )
+                ) {
+                    break;
+                }
             }
 
             GHTeamRepositoryConnection response = graphQlResponse
@@ -663,11 +844,26 @@ public class GitHubTeamSyncService {
                 break;
             }
 
+            if (reportedTotalCount < 0) {
+                reportedTotalCount = response.getTotalCount();
+            }
+
             allEdges.addAll(response.getEdges());
 
             var pageInfo = response.getPageInfo();
             hasNextPage = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
             cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
+            retryAttempt = 0;
+        }
+
+        // Check for overflow
+        if (reportedTotalCount >= 0) {
+            GraphQlConnectionOverflowDetector.check(
+                "teamRepositories",
+                allEdges.size(),
+                reportedTotalCount,
+                "teamSlug=" + teamSlug
+            );
         }
 
         return allEdges;

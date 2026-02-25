@@ -221,7 +221,7 @@ public class GitHubPullRequestReviewCommentProcessor {
                 return saved;
             })
             .orElseGet(() -> {
-                log.warn("Skipped comment edit: reason=commentNotFound, commentId={}", dto.id());
+                log.debug("Skipped comment edit: reason=commentNotFound, commentId={}", dto.id());
                 return null;
             });
     }
@@ -297,6 +297,9 @@ public class GitHubPullRequestReviewCommentProcessor {
         if (dto.originalStartLine() != null) {
             comment.setOriginalStartLine(dto.originalStartLine());
         }
+
+        // Outdated flag (whether the comment's code context has changed)
+        comment.setOutdated(dto.outdated());
 
         // Link to review if present
         if (dto.reviewId() != null) {

@@ -193,7 +193,7 @@ jobs:
         run: |
           npm ci --prefer-offline --no-audit
           cd server/application-server
-          [ ! -d "target" ] && mvn compile -DskipTests --quiet -Dmaven.build.cache.enabled=true
+          mvn compile -DskipTests --quiet -Dmaven.build.cache.enabled=true
           cd ../..
 
           npm run generate:api

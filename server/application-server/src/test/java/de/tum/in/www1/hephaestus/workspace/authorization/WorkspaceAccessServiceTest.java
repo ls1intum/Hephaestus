@@ -11,6 +11,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 @Tag("unit")
 class WorkspaceAccessServiceTest {
@@ -25,6 +26,7 @@ class WorkspaceAccessServiceTest {
     @AfterEach
     void tearDown() {
         WorkspaceContextHolder.clearContext();
+        SecurityContextHolder.clearContext();
     }
 
     @Test
@@ -311,5 +313,153 @@ class WorkspaceAccessServiceTest {
         assertThat(accessService.hasPermission(WorkspaceRole.OWNER)).isEqualTo(
             accessService.hasRole(WorkspaceRole.OWNER)
         );
+    }
+
+    @Test
+    void hasRole_WithSuperAdminButNoWorkspaceMembership_DeniesAccess() {
+        // Given: Global admin user with no workspace membership
+        SecurityContextHolder.setContext(
+            de.tum.in.www1.hephaestus.testconfig.MockSecurityContextUtils.createSecurityContext(
+                "admin-user",
+                "admin-123",
+                new String[] { "admin" },
+                "super-admin-token"
+            )
+        );
+
+        WorkspaceContext context = new WorkspaceContext(
+            1L,
+            "test",
+            "Test",
+            AccountType.ORG,
+            123L,
+            false,
+            Set.of() // No workspace roles - not a member
+        );
+        WorkspaceContextHolder.setContext(context);
+
+        // When & Then: Global admin without membership cannot access workspace
+        assertThat(accessService.hasRole(WorkspaceRole.MEMBER)).isFalse();
+        assertThat(accessService.hasRole(WorkspaceRole.ADMIN)).isFalse();
+        assertThat(accessService.isMember()).isFalse();
+        assertThat(accessService.isAdmin()).isFalse();
+        assertThat(accessService.hasRole(WorkspaceRole.OWNER)).isFalse();
+        assertThat(accessService.isOwner()).isFalse();
+    }
+
+    @Test
+    void hasRole_WithSuperAdminAndMemberRole_AllowsAdminAccess() {
+        // Given: Global admin user who is also a MEMBER of the workspace
+        SecurityContextHolder.setContext(
+            de.tum.in.www1.hephaestus.testconfig.MockSecurityContextUtils.createSecurityContext(
+                "admin-user",
+                "admin-123",
+                new String[] { "admin" },
+                "super-admin-token"
+            )
+        );
+
+        WorkspaceContext context = new WorkspaceContext(
+            1L,
+            "test",
+            "Test",
+            AccountType.ORG,
+            123L,
+            false,
+            Set.of(WorkspaceRole.MEMBER) // Only MEMBER role in workspace
+        );
+        WorkspaceContextHolder.setContext(context);
+
+        // When & Then: Global admin can access ADMIN endpoints even though workspace role is MEMBER
+        assertThat(accessService.hasRole(WorkspaceRole.MEMBER)).isTrue();
+        assertThat(accessService.hasRole(WorkspaceRole.ADMIN)).isTrue();
+        assertThat(accessService.hasRole(WorkspaceRole.OWNER)).isFalse();
+    }
+
+    @Test
+    void hasRole_WithSuperAdminAndOwnerRole_KeepsOwnerPermissions() {
+        // Given: Global admin user who is also OWNER of the workspace
+        SecurityContextHolder.setContext(
+            de.tum.in.www1.hephaestus.testconfig.MockSecurityContextUtils.createSecurityContext(
+                "admin-user",
+                "admin-123",
+                new String[] { "admin" },
+                "super-admin-token"
+            )
+        );
+
+        WorkspaceContext context = new WorkspaceContext(
+            1L,
+            "test",
+            "Test",
+            AccountType.ORG,
+            123L,
+            false,
+            Set.of(WorkspaceRole.OWNER)
+        );
+        WorkspaceContextHolder.setContext(context);
+
+        // When & Then: Workspace OWNER role still grants all permissions
+        assertThat(accessService.hasRole(WorkspaceRole.MEMBER)).isTrue();
+        assertThat(accessService.hasRole(WorkspaceRole.ADMIN)).isTrue();
+        assertThat(accessService.hasRole(WorkspaceRole.OWNER)).isTrue();
+    }
+
+    @Test
+    void canManageRole_WithSuperAdminAndMembership_CanManageAdminAndMember() {
+        // Given: Global admin user with MEMBER workspace role
+        SecurityContextHolder.setContext(
+            de.tum.in.www1.hephaestus.testconfig.MockSecurityContextUtils.createSecurityContext(
+                "admin-user",
+                "admin-123",
+                new String[] { "admin" },
+                "super-admin-token"
+            )
+        );
+
+        WorkspaceContext context = new WorkspaceContext(
+            1L,
+            "test",
+            "Test",
+            AccountType.ORG,
+            123L,
+            false,
+            Set.of(WorkspaceRole.MEMBER) // Has workspace membership
+        );
+        WorkspaceContextHolder.setContext(context);
+
+        // When & Then: Global admin with membership can manage ADMIN and MEMBER roles but not OWNER
+        assertThat(accessService.canManageRole(WorkspaceRole.MEMBER)).isTrue();
+        assertThat(accessService.canManageRole(WorkspaceRole.ADMIN)).isTrue();
+        assertThat(accessService.canManageRole(WorkspaceRole.OWNER)).isFalse();
+    }
+
+    @Test
+    void hasRole_WithNonAdminUser_DoesNotGetElevation() {
+        // Given: Regular user without admin realm role
+        SecurityContextHolder.setContext(
+            de.tum.in.www1.hephaestus.testconfig.MockSecurityContextUtils.createSecurityContext(
+                "regular-user",
+                "user-123",
+                new String[] { "user" }, // Not "admin"
+                "regular-user-token"
+            )
+        );
+
+        WorkspaceContext context = new WorkspaceContext(
+            1L,
+            "test",
+            "Test",
+            AccountType.ORG,
+            123L,
+            false,
+            Set.of(WorkspaceRole.MEMBER)
+        );
+        WorkspaceContextHolder.setContext(context);
+
+        // When & Then: Regular user with MEMBER role cannot access ADMIN endpoints
+        assertThat(accessService.hasRole(WorkspaceRole.MEMBER)).isTrue();
+        assertThat(accessService.hasRole(WorkspaceRole.ADMIN)).isFalse();
+        assertThat(accessService.hasRole(WorkspaceRole.OWNER)).isFalse();
     }
 }

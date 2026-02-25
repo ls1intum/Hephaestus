@@ -10,13 +10,13 @@ import de.tum.in.www1.hephaestus.gitprovider.milestone.github.dto.GitHubMileston
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.Nullable;
 
 /**
@@ -29,65 +29,36 @@ import org.springframework.lang.Nullable;
  * <b>Design rationale:</b> These operations are identical across processors,
  * extracting them eliminates duplication and ensures consistent behavior.
  */
+@Slf4j
 public abstract class BaseGitHubProcessor {
-
-    private static final Logger log = LoggerFactory.getLogger(BaseGitHubProcessor.class);
 
     protected final UserRepository userRepository;
     protected final LabelRepository labelRepository;
     protected final MilestoneRepository milestoneRepository;
+    private final GitHubUserProcessor gitHubUserProcessor;
 
     protected BaseGitHubProcessor(
         UserRepository userRepository,
         LabelRepository labelRepository,
-        MilestoneRepository milestoneRepository
+        MilestoneRepository milestoneRepository,
+        GitHubUserProcessor gitHubUserProcessor
     ) {
         this.userRepository = userRepository;
         this.labelRepository = labelRepository;
         this.milestoneRepository = milestoneRepository;
+        this.gitHubUserProcessor = gitHubUserProcessor;
     }
 
     /**
      * Find an existing user or create a new one from the DTO.
+     * <p>
+     * Delegates to {@link GitHubUserProcessor#findOrCreate(GitHubUserDTO)} which handles
+     * login conflicts (uk_user_login constraint) gracefully via INSERT ON CONFLICT DO NOTHING
+     * and automatic login conflict resolution.
      */
     @Nullable
     protected User findOrCreateUser(GitHubUserDTO dto) {
-        if (dto == null) {
-            return null;
-        }
-        Long userId = dto.getDatabaseId();
-        if (userId == null) {
-            return null;
-        }
-        return userRepository
-            .findById(userId)
-            .map(existingUser -> {
-                // Update email if available and not already set
-                if (dto.email() != null && existingUser.getEmail() == null) {
-                    existingUser.setEmail(dto.email());
-                    return userRepository.save(existingUser);
-                }
-                return existingUser;
-            })
-            .orElseGet(() -> {
-                User user = new User();
-                user.setId(userId);
-                user.setLogin(dto.login());
-                user.setAvatarUrl(dto.avatarUrl());
-                // Use login as fallback for name if null (name is @NonNull)
-                user.setName(dto.name() != null ? dto.name() : dto.login());
-                // Set email if available from DTO
-                user.setEmail(dto.email());
-                // Set htmlUrl if available
-                if (dto.htmlUrl() != null) {
-                    user.setHtmlUrl(dto.htmlUrl());
-                } else {
-                    user.setHtmlUrl("https://github.com/" + dto.login());
-                }
-                // Set type from DTO (BOT, USER, or ORGANIZATION)
-                user.setType(dto.getEffectiveType());
-                return userRepository.save(user);
-            });
+        return gitHubUserProcessor.findOrCreate(dto);
     }
 
     /**

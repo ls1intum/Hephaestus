@@ -51,13 +51,118 @@ Never commit `application-local.yml`. It may contain secrets and machine-specifi
 
 3. Access the API at `http://localhost:8080` or explore `http://localhost:8080/swagger-ui/index.html`.
 
+### Port overrides
+
+Every host-side port is configurable so multiple Hephaestus instances (or other services) can coexist on the same machine. Container-internal ports never change — only the `localhost` binding moves.
+
+#### Default port map
+
+| Service              | Default | Variable                    | Config location                  |
+| -------------------- | ------- | --------------------------- | -------------------------------- |
+| PostgreSQL           | 5432    | `POSTGRES_PORT`             | `server/application-server/.env` |
+| Keycloak             | 8081    | `KEYCLOAK_PORT`             | `server/application-server/.env` |
+| Application server   | 8080    | `SERVER_PORT`               | `server/application-server/.env` |
+| Intelligence service | 8000    | `INTELLIGENCE_SERVICE_PORT` | `server/application-server/.env` |
+| Webapp (Vite dev)    | 4200    | `WEBAPP_PORT`               | Shell env or `webapp/.env`       |
+
+:::tip Pre-flight check
+Run `npm run check:ports` before starting the stack to verify all ports are free.
+:::
+
+#### How it works
+
+The `.env` file in `server/application-server/` is read by **both** Docker Compose (for container port mappings) and Spring Boot (via `spring.config.import`). This means a single file controls the entire local stack.
+
+Ports flow through the system like this:
+
+```
+.env (POSTGRES_PORT=15432)
+  ├─► Docker Compose  →  '15432:5432' host mapping
+  └─► Spring Boot     →  jdbc:postgresql://localhost:15432/hephaestus
+```
+
+#### Changing ports
+
+**Basic example** — move PostgreSQL and Keycloak to non-standard ports:
+
+```bash
+# server/application-server/.env
+POSTGRES_PORT=15432
+KEYCLOAK_PORT=18081
+```
+
+That's it for these two. The application server automatically picks up the new ports from the same `.env` file.
+
+**Changing the application server port:**
+
+```bash
+# server/application-server/.env
+SERVER_PORT=18080
+```
+
+If the webapp also needs to reach the server at the new port, set the server URL in the webapp environment:
+
+```bash
+# webapp/.env (or shell)
+VITE_APPLICATION_SERVER_URL=http://localhost:18080
+```
+
+**Changing the webapp port:**
+
+The Vite dev server reads `WEBAPP_PORT` from the shell environment (not from `server/application-server/.env`):
+
+```bash
+WEBAPP_PORT=5200 npm -w webapp run dev
+```
+
+When changing the webapp port, the server's CORS origin must also be updated so API calls are not rejected:
+
+```bash
+# server/application-server/.env
+APPLICATION_HOST_URL=http://localhost:5200
+```
+
+**Changing the intelligence service port:**
+
+`INTELLIGENCE_SERVICE_PORT` in `server/application-server/.env` tells the **application server** where to find the intelligence service. You must also set `PORT` in the intelligence service's own `.env`:
+
+```bash
+# server/application-server/.env
+INTELLIGENCE_SERVICE_PORT=18000
+
+# server/intelligence-service/.env
+PORT=18000
+```
+
+#### Cascading effects reference
+
+Changing a port in one place may require updates elsewhere. This table shows the full picture:
+
+| When you change...          | Also update...                                             | Why                                      |
+| --------------------------- | ---------------------------------------------------------- | ---------------------------------------- |
+| `KEYCLOAK_PORT`             | GitHub OAuth callback URL                                  | Keycloak's broker endpoint moves         |
+| `WEBAPP_PORT`               | `APPLICATION_HOST_URL` in `.env`                           | CORS origin must match                   |
+| `SERVER_PORT`               | Webapp's `APPLICATION_SERVER_URL` (if connecting directly) | API base URL changes                     |
+| `INTELLIGENCE_SERVICE_PORT` | `PORT` in `server/intelligence-service/.env`               | Service must listen on same port         |
+| `POSTGRES_PORT`             | Nothing (automatic)                                        | Both Compose and Spring read from `.env` |
+
+Update the GitHub OAuth callback URL when changing `KEYCLOAK_PORT`:
+
+```
+http://localhost:<KEYCLOAK_PORT>/realms/hephaestus/broker/github/endpoint
+```
+
+:::warning Webapp defaults
+The webapp has hardcoded dev defaults in `webapp/src/environment/index.ts` for `APPLICATION_SERVER_URL` (`http://localhost:8080`) and `KEYCLOAK_URL` (`http://localhost:8081`). In production these are injected via `window.__ENV__`. For local development with non-standard ports, set these as Vite environment variables or update the defaults.
+:::
+
 ### GitHub configuration
 
 Hephaestus supports two GitHub authentication modes. Pick the one that fits your workflow:
 
-| Mode | Best for | Workspace creation | Repository monitors |
-|------|----------|-------------------|---------------------|
-| **PAT** | Quick local development | Manual (from config) | Manual (you list them) |
+| Mode           | Best for                     | Workspace creation             | Repository monitors                  |
+| -------------- | ---------------------------- | ------------------------------ | ------------------------------------ |
+| **PAT**        | Quick local development      | Manual (from config)           | Manual (you list them)               |
 | **GitHub App** | Testing webhooks, production | Automatic (from installations) | Automatic (from installation events) |
 
 #### Option A: Personal Access Token (simpler)
@@ -71,7 +176,7 @@ Hephaestus supports two GitHub authentication modes. Pick the one that fits your
      workspace:
        init-default: true
        default:
-         login: your-github-org      # e.g., "ls1intum" or "HephaestusTest"
+         login: your-github-org # e.g., "ls1intum" or "HephaestusTest"
          token: ghp_your_token
          repositories-to-monitor:
            - your-github-org/repo1
@@ -97,7 +202,7 @@ Hephaestus supports two GitHub authentication modes. Pick the one that fits your
 
    hephaestus:
      workspace:
-       init-default: false   # Workspaces created from installations
+       init-default: false # Workspaces created from installations
    ```
 
 3. Install the app on your organization. Workspaces and monitors are created automatically.
@@ -191,13 +296,13 @@ npm run dev
    npm install
    ```
 
-2. Start Vite on port 4200:
+2. Start Vite (defaults to port 4200):
 
    ```bash
    npm -w webapp run dev
    ```
 
-3. Visit `http://localhost:4200`.
+3. Visit `http://localhost:4200` (or your custom `WEBAPP_PORT`).
 
 ### UI foundations
 

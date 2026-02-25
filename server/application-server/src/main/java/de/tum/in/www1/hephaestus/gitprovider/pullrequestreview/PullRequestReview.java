@@ -32,7 +32,9 @@ public class PullRequestReview {
     @Id
     protected Long id;
 
-    // Note: This entity does not have a createdAt and updatedAt field
+    private Instant createdAt;
+
+    private Instant updatedAt;
 
     @Column(columnDefinition = "TEXT")
     private String body;
@@ -51,6 +53,8 @@ public class PullRequestReview {
     private Instant submittedAt;
 
     private String commitId;
+
+    private Boolean authorCanPushToRepository;
 
     @ManyToOne
     @JoinColumn(name = "author_id")
