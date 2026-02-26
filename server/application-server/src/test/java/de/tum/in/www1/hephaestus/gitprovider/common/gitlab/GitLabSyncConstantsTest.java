@@ -129,7 +129,6 @@ class GitLabSyncConstantsTest extends BaseUnitTest {
         @DisplayName("should have valid API paths")
         void shouldHaveValidApiPaths() {
             assertThat(GitLabSyncConstants.GITLAB_GRAPHQL_PATH).startsWith("/");
-            assertThat(GitLabSyncConstants.GITLAB_REST_API_PATH).startsWith("/");
         }
     }
 }

@@ -20,6 +20,7 @@ import org.springframework.validation.annotation.Validated;
  * <pre>{@code
  * hephaestus:
  *   gitlab:
+ *     enabled: true
  *     default-server-url: https://gitlab.com
  *     graphql-timeout: 30s
  *     extended-graphql-timeout: 60s

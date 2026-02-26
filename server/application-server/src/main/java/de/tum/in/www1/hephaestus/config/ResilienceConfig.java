@@ -16,6 +16,7 @@ import java.util.Set;
 import java.util.concurrent.TimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
@@ -231,6 +232,7 @@ public class ResilienceConfig {
      * GitLab API failure patterns are similar enough that the same thresholds apply.
      */
     @Bean
+    @ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
     public CircuitBreaker gitlabGraphQlCircuitBreaker(CircuitBreakerRegistry registry) {
         CircuitBreaker breaker = registry.circuitBreaker(GITLAB_GRAPHQL_CIRCUIT_BREAKER);
         registerEventListeners(breaker);

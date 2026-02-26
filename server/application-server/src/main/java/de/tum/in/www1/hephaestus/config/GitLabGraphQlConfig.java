@@ -8,10 +8,12 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncCons
 import static de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants.TRANSPORT_MAX_BACKOFF;
 import static de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants.TRANSPORT_MAX_RETRIES;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubTransportErrors;
 import java.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.graphql.client.HttpGraphQlClient;
@@ -19,8 +21,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
-import org.springframework.http.codec.json.Jackson2JsonDecoder;
-import org.springframework.http.codec.json.Jackson2JsonEncoder;
 import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
@@ -33,20 +33,12 @@ import reactor.util.retry.Retry;
 /**
  * Configuration for GitLab GraphQL API client.
  * <p>
- * Creates a base {@link WebClient} and {@link HttpGraphQlClient} for GitLab API access.
- * Unlike the GitHub configuration ({@link GitHubGraphQlConfig}), this client has
- * <b>no hardcoded base URL</b> because GitLab URLs are per-workspace (self-hosted support).
- * The URL is set at request time by {@link de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider}.
- *
- * <h2>Features</h2>
- * <ul>
- *   <li>Rate limit header logging ({@code RateLimit-Remaining}, {@code RateLimit-Reset})</li>
- *   <li>Retry with exponential backoff for 5xx errors and 429 rate limits</li>
- *   <li>Transport error retries for connection issues</li>
- *   <li>16MB response buffer for large GraphQL responses</li>
- * </ul>
+ * Only loaded when {@code hephaestus.gitlab.enabled=true}. Creates a base
+ * {@link WebClient} and {@link HttpGraphQlClient} for GitLab API access.
+ * No hardcoded base URL — URLs are per-workspace (self-hosted support).
  */
 @Configuration
+@ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
 public class GitLabGraphQlConfig {
 
     private static final Logger log = LoggerFactory.getLogger(GitLabGraphQlConfig.class);
@@ -62,23 +54,20 @@ public class GitLabGraphQlConfig {
     @Qualifier("gitLabGraphQlWebClient")
     public WebClient gitLabGraphQlWebClient() {
         ExchangeStrategies strategies = ExchangeStrategies.builder()
-            .codecs(config -> {
-                config.defaultCodecs().maxInMemorySize(MAX_BUFFER_SIZE);
-                config.defaultCodecs().jackson2JsonEncoder(new Jackson2JsonEncoder());
-                config.defaultCodecs().jackson2JsonDecoder(new Jackson2JsonDecoder());
-            })
+            .codecs(config -> config.defaultCodecs().maxInMemorySize(MAX_BUFFER_SIZE))
             .build();
 
+        // GitLab rate limit is 100 points/min — 10 connections is generous
         ConnectionProvider connectionProvider = ConnectionProvider.builder("gitlab-graphql")
-            .maxConnections(50)
+            .maxConnections(10)
             .maxIdleTime(Duration.ofSeconds(20))
             .maxLifeTime(Duration.ofMinutes(3))
             .pendingAcquireTimeout(Duration.ofSeconds(60))
             .evictInBackground(Duration.ofSeconds(60))
-            .lifo()
             .build();
 
-        HttpClient httpClient = HttpClient.create(connectionProvider).responseTimeout(Duration.ofSeconds(135));
+        // 75s response timeout covers the extended GraphQL timeout (60s) with margin
+        HttpClient httpClient = HttpClient.create(connectionProvider).responseTimeout(Duration.ofSeconds(75));
 
         return WebClient.builder()
             .clientConnector(new ReactorClientHttpConnector(httpClient))
@@ -97,16 +86,6 @@ public class GitLabGraphQlConfig {
         return HttpGraphQlClient.builder(webClient).build();
     }
 
-    /**
-     * Logs GitLab rate limit information from response headers.
-     * <p>
-     * GitLab uses standard rate limit headers (not X-prefixed):
-     * <ul>
-     *   <li>{@code RateLimit-Limit}: Total points allowed per minute</li>
-     *   <li>{@code RateLimit-Remaining}: Points remaining in current window</li>
-     *   <li>{@code RateLimit-Reset}: Unix timestamp when window resets</li>
-     * </ul>
-     */
     private ExchangeFilterFunction rateLimitLoggingFilter() {
         return ExchangeFilterFunction.ofResponseProcessor(response -> {
             logRateLimitInfo(response);
@@ -158,7 +137,7 @@ public class GitLabGraphQlConfig {
                     }
 
                     if (status.is5xxServerError() || status.value() == 429) {
-                        return response.releaseBody().then(Mono.error(new RetryableException(status.value())));
+                        return response.releaseBody().then(Mono.error(new RetryableStatusException(status.value())));
                     }
 
                     return Mono.just(response);
@@ -167,9 +146,9 @@ public class GitLabGraphQlConfig {
                     Retry.backoff(MAX_RETRIES, INITIAL_BACKOFF)
                         .maxBackoff(MAX_BACKOFF)
                         .jitter(JITTER_FACTOR)
-                        .filter(throwable -> throwable instanceof RetryableException)
+                        .filter(throwable -> throwable instanceof RetryableStatusException)
                         .doBeforeRetry(signal -> {
-                            RetryableException ex = (RetryableException) signal.failure();
+                            var ex = (RetryableStatusException) signal.failure();
                             log.warn(
                                 "Retrying GitLab GraphQL request: statusCode={}, attempt={}, maxRetries={}",
                                 ex.getStatusCode(),
@@ -178,15 +157,18 @@ public class GitLabGraphQlConfig {
                             );
                         })
                         .onRetryExhaustedThrow((spec, signal) -> {
-                            RetryableException ex = (RetryableException) signal.failure();
+                            var ex = (RetryableStatusException) signal.failure();
                             log.error(
                                 "Failed GitLab GraphQL request after retries exhausted: retryCount={}, statusCode={}",
                                 MAX_RETRIES,
                                 ex.getStatusCode()
                             );
-                            return new GitLabGraphQlException(
-                                "GitLab GraphQL request failed after " + MAX_RETRIES + " retries",
-                                ex.getStatusCode()
+                            return new RuntimeException(
+                                "GitLab GraphQL request failed after " +
+                                    MAX_RETRIES +
+                                    " retries (status=" +
+                                    ex.getStatusCode() +
+                                    ")"
                             );
                         })
                 );
@@ -200,7 +182,7 @@ public class GitLabGraphQlConfig {
                     Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
                         .maxBackoff(TRANSPORT_MAX_BACKOFF)
                         .jitter(JITTER_FACTOR)
-                        .filter(GitLabGraphQlConfig::isTransportError)
+                        .filter(GitHubTransportErrors::isTransportError)
                         .doBeforeRetry(signal -> {
                             Throwable failure = signal.failure();
                             log.warn(
@@ -217,7 +199,7 @@ public class GitLabGraphQlConfig {
                                 failure.getClass().getSimpleName(),
                                 failure.getMessage()
                             );
-                            return new TransportException(
+                            return new RuntimeException(
                                 "GitLab GraphQL request failed after transport retries: " + failure.getMessage(),
                                 failure
                             );
@@ -226,54 +208,19 @@ public class GitLabGraphQlConfig {
     }
 
     /**
-     * Determines if an exception is a transport-level error (connection reset, premature close).
+     * Internal exception for retryable HTTP status codes (5xx, 429).
      */
-    private static boolean isTransportError(Throwable throwable) {
-        if (throwable instanceof java.io.IOException) {
-            return true;
-        }
-        String className = throwable.getClass().getName();
-        return (
-            className.contains("PrematureCloseException") ||
-            className.contains("AbortedException") ||
-            className.contains("ConnectionResetException")
-        );
-    }
-
-    private static class RetryableException extends RuntimeException {
+    private static class RetryableStatusException extends RuntimeException {
 
         private final int statusCode;
 
-        RetryableException(int statusCode) {
+        RetryableStatusException(int statusCode) {
             super("Retryable HTTP error: " + statusCode);
             this.statusCode = statusCode;
         }
 
         int getStatusCode() {
             return statusCode;
-        }
-    }
-
-    /** Exception thrown when GitLab GraphQL requests fail after exhausting retries. */
-    public static class GitLabGraphQlException extends RuntimeException {
-
-        private final int statusCode;
-
-        public GitLabGraphQlException(String message, int statusCode) {
-            super(message);
-            this.statusCode = statusCode;
-        }
-
-        public int getStatusCode() {
-            return statusCode;
-        }
-    }
-
-    /** Exception thrown when GitLab requests fail due to transport-level errors. */
-    public static class TransportException extends RuntimeException {
-
-        public TransportException(String message, Throwable cause) {
-            super(message, cause);
         }
     }
 }

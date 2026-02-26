@@ -363,6 +363,8 @@ hephaestus:
     # Settings for GitLab API integration. Used by GitLab-mode workspaces
     # (GitProviderMode.GITLAB_PAT). Override default-server-url for self-hosted instances.
     gitlab:
+        # Set to true to enable GitLab integration (loads all GitLab beans)
+        enabled: ${GITLAB_ENABLED:false}
         # Default GitLab server URL (used when workspace has no custom serverUrl)
         default-server-url: ${GITLAB_DEFAULT_SERVER_URL:https://gitlab.com}
         # Timeout for standard GraphQL operations (default: 30s)

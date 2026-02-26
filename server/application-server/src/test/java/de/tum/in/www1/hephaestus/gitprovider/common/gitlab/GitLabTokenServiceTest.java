@@ -170,7 +170,7 @@ class GitLabTokenServiceTest extends BaseUnitTest {
             when(headersSpec.header(anyString(), anyString())).thenReturn((RequestHeadersSpec) headersSpec);
             when(headersSpec.retrieve()).thenReturn(responseSpec);
             when(responseSpec.bodyToMono(eq(GitLabTokenService.GitLabUserResponse.class))).thenReturn(
-                Mono.just(new GitLabTokenService.GitLabUserResponse(42L, "testuser", "Test User"))
+                Mono.just(new GitLabTokenService.GitLabUserResponse(42L, "testuser"))
             );
 
             // First call → makes HTTP request

@@ -35,9 +35,6 @@ public final class GitLabSyncConstants {
     /** Path to the GitLab GraphQL API endpoint. */
     public static final String GITLAB_GRAPHQL_PATH = "/api/graphql";
 
-    /** Path to the GitLab REST API v4 endpoint. */
-    public static final String GITLAB_REST_API_PATH = "/api/v4";
-
     // ========================================================================
     // Rate Limit Headers
     // ========================================================================
@@ -83,11 +80,6 @@ public final class GitLabSyncConstants {
      */
     public static final int CRITICAL_REMAINING_THRESHOLD = 5;
 
-    /**
-     * GitLab rate limit window duration (60 seconds).
-     */
-    public static final Duration RATE_LIMIT_WINDOW = Duration.ofSeconds(60);
-
     // ========================================================================
     // Pagination
     // ========================================================================
@@ -105,7 +97,7 @@ public final class GitLabSyncConstants {
      * Reduced from default because GitLab issue queries embed notes,
      * labels, assignees, and milestone data per issue.
      */
-    public static final int ISSUE_PAGE_SIZE = 20;
+    public static final int ISSUE_SYNC_PAGE_SIZE = 20;
 
     /**
      * Page size for merge request sync GraphQL queries.
@@ -113,7 +105,7 @@ public final class GitLabSyncConstants {
      * Reduced because MR queries have nested reviews, discussions,
      * and approval data — similar to GitHub PR sync constraints.
      */
-    public static final int MERGE_REQUEST_PAGE_SIZE = 10;
+    public static final int MERGE_REQUEST_SYNC_PAGE_SIZE = 10;
 
     /**
      * Large page size for simple entity queries (labels, milestones).

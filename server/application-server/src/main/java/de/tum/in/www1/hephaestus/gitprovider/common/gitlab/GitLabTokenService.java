@@ -3,8 +3,10 @@ package de.tum.in.www1.hephaestus.gitprovider.common.gitlab;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.InstallationTokenProvider;
+import java.time.Duration;
 import java.time.Instant;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.lang.Nullable;
@@ -31,6 +33,7 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
  */
 @Service
 @Slf4j
+@ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
 public class GitLabTokenService {
 
     private static final String USER_ENDPOINT = "/api/v4/user";
@@ -128,7 +131,7 @@ public class GitLabTokenService {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                 .retrieve()
                 .bodyToMono(GitLabUserResponse.class)
-                .block(properties.graphqlTimeout());
+                .block(Duration.ofSeconds(10));
 
             if (user != null) {
                 ValidatedToken validated = new ValidatedToken(token, user.id(), user.username(), Instant.now());
@@ -193,5 +196,5 @@ public class GitLabTokenService {
      * Minimal response from GitLab {@code GET /api/v4/user} endpoint.
      * Only includes fields needed for token validation.
      */
-    record GitLabUserResponse(long id, String username, String name) {}
+    record GitLabUserResponse(long id, String username) {}
 }
