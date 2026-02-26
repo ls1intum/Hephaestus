@@ -1660,6 +1660,7 @@ export const workspace = pgTable(
 			withTimezone: true,
 			mode: "string",
 		}),
+		serverUrl: varchar("server_url", { length: 512 }),
 	},
 	(table) => [
 		foreignKey({

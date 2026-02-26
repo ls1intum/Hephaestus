@@ -39,9 +39,14 @@ public class WorkspaceInstallationTokenProvider implements InstallationTokenProv
         return workspaceRepository
             .findById(scopeId)
             .map(ws ->
-                ws.getGitProviderMode() == GitProviderMode.GITHUB_APP_INSTALLATION
-                    ? AuthMode.GITHUB_APP
-                    : AuthMode.PERSONAL_ACCESS_TOKEN
+                switch (ws.getGitProviderMode()) {
+                    case GITHUB_APP_INSTALLATION -> AuthMode.GITHUB_APP;
+                    case PAT_ORG -> AuthMode.PERSONAL_ACCESS_TOKEN;
+                    case GITLAB_PAT -> throw new UnsupportedOperationException(
+                        "GitLab auth mode not yet supported: " + ws.getGitProviderMode()
+                    );
+                    case null -> AuthMode.GITHUB_APP;
+                }
             )
             .orElseGet(() -> {
                 log.warn("Defaulted to GITHUB_APP auth mode: reason=scopeNotFound, scopeId={}", scopeId);

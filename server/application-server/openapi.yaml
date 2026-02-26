@@ -3298,7 +3298,7 @@ components:
       properties:
         accountLogin:
           type: string
-          description: GitHub account login associated with this workspace
+          description: Git provider account login associated with this workspace
         createdAt:
           type: string
           format: date-time
@@ -3308,7 +3308,7 @@ components:
           description: Human-readable name of the workspace
         gitProviderMode:
           type: string
-          description: Git provider mode (INSTALLATION or PAT)
+          description: "Git provider mode (PAT_ORG, GITHUB_APP_INSTALLATION, GITLAB_PAT)"
         hasSlackSigningSecret:
           type: boolean
           description: Whether Slack signing secret is configured
@@ -3348,6 +3348,17 @@ components:
           type: string
           description: Time for leaderboard notifications in HH:mm format
           example: 09:00
+        providerType:
+          type: string
+          description: High-level git provider type derived from the authentication
+            mode
+          enum:
+          - GITHUB
+          - GITLAB
+        serverUrl:
+          type: string
+          description: Custom server URL for self-hosted instances (null for cloud
+            defaults)
         status:
           type: string
           description: "Current lifecycle status of the workspace (PENDING, ACTIVE,\
@@ -3368,6 +3379,7 @@ components:
       - hasSlackToken
       - id
       - isPubliclyViewable
+      - providerType
       - status
       - updatedAt
       - workspaceSlug
@@ -3377,7 +3389,7 @@ components:
       properties:
         accountLogin:
           type: string
-          description: GitHub account login associated with this workspace
+          description: Git provider account login associated with this workspace
         createdAt:
           type: string
           format: date-time
@@ -3389,6 +3401,12 @@ components:
           type: integer
           format: int64
           description: Unique identifier of the workspace
+        providerType:
+          type: string
+          description: High-level git provider type (GITHUB or GITLAB)
+          enum:
+          - GITHUB
+          - GITLAB
         status:
           type: string
           description: "Current lifecycle status of the workspace (PENDING, ACTIVE,\
@@ -3402,6 +3420,7 @@ components:
       - createdAt
       - displayName
       - id
+      - providerType
       - status
       - workspaceSlug
     WorkspaceMembership:

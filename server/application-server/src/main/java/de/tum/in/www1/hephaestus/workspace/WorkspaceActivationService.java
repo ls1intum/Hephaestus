@@ -152,14 +152,28 @@ public class WorkspaceActivationService {
             return true;
         }
 
-        if (
-            workspace.getGitProviderMode() == Workspace.GitProviderMode.PAT_ORG &&
-            isBlank(workspace.getPersonalAccessToken())
-        ) {
-            log.info("Skipped workspace activation: reason=patModeWithoutToken, workspaceId={}", workspace.getId());
-            return true;
-        }
-        return false;
+        return switch (workspace.getGitProviderMode()) {
+            case PAT_ORG -> {
+                if (isBlank(workspace.getPersonalAccessToken())) {
+                    log.info(
+                        "Skipped workspace activation: reason=patModeWithoutToken, workspaceId={}",
+                        workspace.getId()
+                    );
+                    yield true;
+                }
+                yield false;
+            }
+            case GITHUB_APP_INSTALLATION -> false;
+            case GITLAB_PAT -> {
+                log.info(
+                    "Skipped workspace activation: reason=gitlabNotYetSupported, workspaceId={}, mode={}",
+                    workspace.getId(),
+                    workspace.getGitProviderMode()
+                );
+                yield true;
+            }
+            case null -> false;
+        };
     }
 
     /**
