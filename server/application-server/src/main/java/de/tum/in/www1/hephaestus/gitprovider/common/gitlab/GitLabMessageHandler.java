@@ -61,9 +61,14 @@ public abstract class GitLabMessageHandler<T> implements MessageHandler {
         String eventKey = eventType.getValue();
         String subject = msg.getSubject();
         String safeSubject = sanitizeForLog(subject);
-        if (!subject.endsWith(eventKey)) {
+        // Extract last segment after final '.' for exact match.
+        // endsWith() is NOT safe here: "tag_push".endsWith("push") is true,
+        // which would let the wrong handler accept a misrouted message.
+        int lastDot = subject.lastIndexOf('.');
+        String subjectEventKey = lastDot >= 0 ? subject.substring(lastDot + 1) : subject;
+        if (!eventKey.equals(subjectEventKey)) {
             log.error(
-                "Rejected message: reason=unexpectedSubject, subject={}, expectedSuffix={}",
+                "Rejected message: reason=unexpectedSubject, subject={}, expectedEventKey={}",
                 safeSubject,
                 eventKey
             );

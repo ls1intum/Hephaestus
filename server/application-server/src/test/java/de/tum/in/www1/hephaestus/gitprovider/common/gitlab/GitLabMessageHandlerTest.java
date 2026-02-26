@@ -74,6 +74,25 @@ class GitLabMessageHandlerTest {
     }
 
     @Test
+    @DisplayName("tag_push subject does not match push handler (suffix overlap protection)")
+    void onMessage_tagPushDoesNotMatchPush_rejectsWithoutDeserialization() throws IOException {
+        // Regression test: endsWith("push") would incorrectly match "tag_push"
+        var pushHandler = new TestHandler(deserializer, transactionTemplate, capturedPayload) {
+            @Override
+            public GitLabEventType getEventType() {
+                return GitLabEventType.PUSH;
+            }
+        };
+        Message msg = mock(Message.class);
+        when(msg.getSubject()).thenReturn("gitlab.group.project.tag_push");
+
+        pushHandler.onMessage(msg);
+
+        verify(deserializer, never()).deserialize(any(), any());
+        assertThat(capturedPayload.get()).isNull();
+    }
+
+    @Test
     @DisplayName("deserialization failure throws PayloadParsingException")
     void onMessage_deserializationFailure_throwsPayloadParsingException() throws IOException {
         Message msg = mock(Message.class);
