@@ -164,7 +164,11 @@ public class GitLabGraphQlConfig {
                                 ex.getStatusCode()
                             );
                             return new GitLabGraphQlRetryExhaustedException(
-                                "GitLab GraphQL request failed after " + MAX_RETRIES + " retries (status=" + ex.getStatusCode() + ")"
+                                "GitLab GraphQL request failed after " +
+                                    MAX_RETRIES +
+                                    " retries (status=" +
+                                    ex.getStatusCode() +
+                                    ")"
                             );
                         })
                 );
