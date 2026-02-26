@@ -79,7 +79,7 @@ export type WorkspaceMembership = {
  */
 export type WorkspaceListItem = {
     /**
-     * GitHub account login associated with this workspace
+     * Git provider account login associated with this workspace
      */
     accountLogin: string;
     /**
@@ -95,6 +95,10 @@ export type WorkspaceListItem = {
      */
     id: number;
     /**
+     * High-level git provider type (GITHUB or GITLAB)
+     */
+    providerType: 'GITHUB' | 'GITLAB';
+    /**
      * Current lifecycle status of the workspace (PENDING, ACTIVE, ARCHIVED)
      */
     status: string;
@@ -109,7 +113,7 @@ export type WorkspaceListItem = {
  */
 export type Workspace = {
     /**
-     * GitHub account login associated with this workspace
+     * Git provider account login associated with this workspace
      */
     accountLogin: string;
     /**
@@ -121,7 +125,7 @@ export type Workspace = {
      */
     displayName: string;
     /**
-     * Git provider mode (INSTALLATION or PAT)
+     * Git provider mode (PAT_ORG, GITHUB_APP_INSTALLATION, GITLAB_PAT, GITLAB_OAUTH)
      */
     gitProviderMode?: string;
     /**
@@ -168,6 +172,14 @@ export type Workspace = {
      * Time for leaderboard notifications in HH:mm format
      */
     leaderboardScheduleTime?: string;
+    /**
+     * High-level git provider type derived from the authentication mode
+     */
+    providerType: 'GITHUB' | 'GITLAB';
+    /**
+     * Custom server URL for self-hosted instances (null for cloud defaults)
+     */
+    serverUrl?: string;
     /**
      * Current lifecycle status of the workspace (PENDING, ACTIVE, ARCHIVED)
      */

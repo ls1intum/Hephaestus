@@ -45,10 +45,11 @@ import lombok.ToString;
  * </ul>
  *
  * <h2>Authentication Modes</h2>
- * The workspace supports two authentication modes for GitHub API access:
+ * The workspace supports multiple authentication modes for git provider API access:
  * <ul>
- *   <li>{@link GitProviderMode#PAT_ORG} – Personal Access Token for local development (stored encrypted)</li>
+ *   <li>{@link GitProviderMode#PAT_ORG} – GitHub PAT for local development (stored encrypted)</li>
  *   <li>{@link GitProviderMode#GITHUB_APP_INSTALLATION} – GitHub App installation for production (preferred)</li>
+ *   <li>{@link GitProviderMode#GITLAB_PAT} – GitLab Personal Access Token</li>
  * </ul>
  *
  * <p>See {@link WorkspaceProperties} for configuration of local development PAT mode.
@@ -168,20 +169,33 @@ public class Workspace {
     private Set<RepositoryToMonitor> repositoriesToMonitor = new HashSet<>();
 
     // ========================================================================
-    // GitHub Integration
+    // Git Provider Configuration
     // ========================================================================
 
     /**
-     * Authentication mode for GitHub API access.
-     * Determines whether to use PAT or GitHub App installation tokens.
+     * Authentication mode for git provider API access.
+     * Determines authentication strategy (PAT, GitHub App, OAuth) and provider identity.
      */
     @Enumerated(EnumType.STRING)
     private GitProviderMode gitProviderMode = GitProviderMode.PAT_ORG;
 
-    /** GitHub App installation ID (null for PAT-based workspaces) */
+    /**
+     * Custom server URL for self-hosted git provider instances.
+     * <p>
+     * When {@code null}, defaults are derived from the provider type:
+     * <ul>
+     *   <li>GitHub: {@code https://api.github.com}</li>
+     *   <li>GitLab: {@code https://gitlab.com}</li>
+     * </ul>
+     * Set this for GitHub Enterprise Server or self-hosted GitLab instances.
+     */
+    @Column(name = "server_url", length = 512)
+    private String serverUrl;
+
+    /** GitHub App installation ID (null for PAT-based and GitLab workspaces) */
     private Long installationId;
 
-    /** GitHub account login (organization or user login, e.g., "ls1intum") */
+    /** Git provider account login (organization or user login, e.g., "ls1intum") */
     @Column(name = "account_login", nullable = false, length = 120)
     @NotBlank(message = "Account login is required")
     private String accountLogin;
@@ -274,6 +288,15 @@ public class Workspace {
     @ToString.Exclude
     private String slackSigningSecret;
 
+    /**
+     * Returns the high-level provider type (GITHUB or GITLAB) derived from the authentication mode.
+     *
+     * @return the provider type, defaulting to {@link GitProviderType#GITHUB} if mode is null
+     */
+    public GitProviderType getProviderType() {
+        return GitProviderType.fromGitProviderMode(gitProviderMode);
+    }
+
     @PrePersist
     public void prePersist() {
         this.createdAt = Instant.now();
@@ -328,6 +351,13 @@ public class Workspace {
          * Workspaces are automatically created when the GitHub App is installed.
          */
         GITHUB_APP_INSTALLATION,
+        /**
+         * GitLab Personal Access Token authentication.
+         * <p>
+         * Uses a long-lived PAT to access the GitLab API.
+         * Suitable for self-hosted GitLab instances or GitLab.com.
+         */
+        GITLAB_PAT,
     }
 
     /**
