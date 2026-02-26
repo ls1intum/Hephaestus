@@ -39,6 +39,11 @@ public class WorkspaceNatsSubscriptionProvider implements NatsSubscriptionProvid
             .filter(workspaceScopeFilter::isRepositoryAllowed)
             .collect(Collectors.toSet());
 
-        return new NatsSubscriptionInfo(workspace.getId(), repositoryNames, workspace.getAccountLogin());
+        String streamName = switch (workspace.getProviderType()) {
+            case GITHUB -> "github";
+            case GITLAB -> "gitlab";
+        };
+
+        return new NatsSubscriptionInfo(workspace.getId(), repositoryNames, workspace.getAccountLogin(), streamName);
     }
 }
