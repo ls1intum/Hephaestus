@@ -163,12 +163,8 @@ public class GitLabGraphQlConfig {
                                 MAX_RETRIES,
                                 ex.getStatusCode()
                             );
-                            return new RuntimeException(
-                                "GitLab GraphQL request failed after " +
-                                    MAX_RETRIES +
-                                    " retries (status=" +
-                                    ex.getStatusCode() +
-                                    ")"
+                            return new GitLabGraphQlRetryExhaustedException(
+                                "GitLab GraphQL request failed after " + MAX_RETRIES + " retries (status=" + ex.getStatusCode() + ")"
                             );
                         })
                 );
@@ -199,7 +195,7 @@ public class GitLabGraphQlConfig {
                                 failure.getClass().getSimpleName(),
                                 failure.getMessage()
                             );
-                            return new RuntimeException(
+                            return new GitLabTransportRetryExhaustedException(
                                 "GitLab GraphQL request failed after transport retries: " + failure.getMessage(),
                                 failure
                             );
@@ -221,6 +217,26 @@ public class GitLabGraphQlConfig {
 
         int getStatusCode() {
             return statusCode;
+        }
+    }
+
+    /**
+     * Thrown when GitLab GraphQL requests fail after exhausting HTTP-level retries.
+     */
+    private static class GitLabGraphQlRetryExhaustedException extends RuntimeException {
+
+        GitLabGraphQlRetryExhaustedException(String message) {
+            super(message);
+        }
+    }
+
+    /**
+     * Thrown when GitLab GraphQL requests fail after exhausting transport-level retries.
+     */
+    private static class GitLabTransportRetryExhaustedException extends RuntimeException {
+
+        GitLabTransportRetryExhaustedException(String message, Throwable cause) {
+            super(message, cause);
         }
     }
 }
