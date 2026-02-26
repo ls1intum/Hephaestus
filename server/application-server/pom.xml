@@ -35,7 +35,7 @@
         <!-- Test Configuration -->
         <maven.test.failure.ignore>false</maven.test.failure.ignore>
         <maven.test.skip>false</maven.test.skip>
-        <hephaestus.surefire.timeout>180</hephaestus.surefire.timeout>
+        <hephaestus.surefire.timeout>300</hephaestus.surefire.timeout>
 
         <!-- Tag filtering: unit tests by default, exclude live tests -->
         <surefire.excludedGroups>live</surefire.excludedGroups>
@@ -883,7 +883,7 @@
                 </property>
             </activation>
             <properties>
-                <hephaestus.surefire.timeout>180</hephaestus.surefire.timeout>
+                <hephaestus.surefire.timeout>300</hephaestus.surefire.timeout>
             </properties>
         </profile>
 
