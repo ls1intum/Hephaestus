@@ -35,7 +35,7 @@ import org.springframework.web.reactive.function.client.WebClient;
  * </ul>
  */
 @DisplayName("GitLab GraphQL Client (WireMock Integration)")
-class GitLabGraphQlClientIntegrationTest extends BaseUnitTest {
+class GitLabGraphQlClientWireMockTest extends BaseUnitTest {
 
     private WireMockServer wireMock;
     private HttpGraphQlClient graphQlClient;
