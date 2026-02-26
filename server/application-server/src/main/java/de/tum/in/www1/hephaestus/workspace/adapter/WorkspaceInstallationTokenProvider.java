@@ -41,10 +41,7 @@ public class WorkspaceInstallationTokenProvider implements InstallationTokenProv
             .map(ws ->
                 switch (ws.getGitProviderMode()) {
                     case GITHUB_APP_INSTALLATION -> AuthMode.GITHUB_APP;
-                    case PAT_ORG -> AuthMode.PERSONAL_ACCESS_TOKEN;
-                    case GITLAB_PAT -> throw new UnsupportedOperationException(
-                        "GitLab auth mode not yet supported: " + ws.getGitProviderMode()
-                    );
+                    case PAT_ORG, GITLAB_PAT -> AuthMode.PERSONAL_ACCESS_TOKEN;
                     case null -> AuthMode.GITHUB_APP;
                 }
             )
@@ -60,5 +57,13 @@ public class WorkspaceInstallationTokenProvider implements InstallationTokenProv
             .findById(scopeId)
             .map(ws -> ws.getStatus() == Workspace.WorkspaceStatus.ACTIVE)
             .orElse(false);
+    }
+
+    @Override
+    public Optional<String> getServerUrl(Long scopeId) {
+        return workspaceRepository
+            .findById(scopeId)
+            .map(Workspace::getServerUrl)
+            .filter(url -> url != null && !url.isBlank());
     }
 }

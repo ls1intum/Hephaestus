@@ -121,6 +121,11 @@ public class ResilienceConfig {
     public static final String GITHUB_GRAPHQL_CIRCUIT_BREAKER = "githubGraphQl";
 
     /**
+     * Name of the circuit breaker for GitLab GraphQL API calls.
+     */
+    public static final String GITLAB_GRAPHQL_CIRCUIT_BREAKER = "gitlabGraphQl";
+
+    /**
      * Name of the circuit breaker for Keycloak Admin API calls.
      */
     public static final String KEYCLOAK_CIRCUIT_BREAKER = "keycloak";
@@ -217,6 +222,20 @@ public class ResilienceConfig {
     @Bean
     public CircuitBreaker githubGraphQlCircuitBreaker(CircuitBreakerRegistry registry) {
         return registry.circuitBreaker(GITHUB_GRAPHQL_CIRCUIT_BREAKER);
+    }
+
+    /**
+     * Provides the GitLab GraphQL circuit breaker for injection.
+     * <p>
+     * Uses the default circuit breaker configuration (same as GitHub GraphQL).
+     * GitLab API failure patterns are similar enough that the same thresholds apply.
+     */
+    @Bean
+    public CircuitBreaker gitlabGraphQlCircuitBreaker(CircuitBreakerRegistry registry) {
+        CircuitBreaker breaker = registry.circuitBreaker(GITLAB_GRAPHQL_CIRCUIT_BREAKER);
+        registerEventListeners(breaker);
+        log.info("Initialized circuit breaker: name={}", GITLAB_GRAPHQL_CIRCUIT_BREAKER);
+        return breaker;
     }
 
     /**

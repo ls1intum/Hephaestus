@@ -23,10 +23,7 @@ public final class SyncTargetFactory {
     public static SyncTarget create(Workspace workspace, RepositoryToMonitor rtm) {
         AuthMode authMode = switch (workspace.getGitProviderMode()) {
             case GITHUB_APP_INSTALLATION -> AuthMode.GITHUB_APP;
-            case PAT_ORG -> AuthMode.PERSONAL_ACCESS_TOKEN;
-            case GITLAB_PAT -> throw new UnsupportedOperationException(
-                "GitLab sync not yet supported: " + workspace.getGitProviderMode()
-            );
+            case PAT_ORG, GITLAB_PAT -> AuthMode.PERSONAL_ACCESS_TOKEN;
             case null -> AuthMode.GITHUB_APP;
         };
 
