@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.common.gitlab;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -22,16 +23,18 @@ public class GitLabMessageHandlerRegistry {
 
     private static final Logger log = LoggerFactory.getLogger(GitLabMessageHandlerRegistry.class);
 
-    private final Map<String, GitLabMessageHandler<?>> handlerMap = new HashMap<>();
+    private final Map<String, GitLabMessageHandler<?>> handlerMap;
 
     public GitLabMessageHandlerRegistry(GitLabMessageHandler<?>[] handlers) {
+        Map<String, GitLabMessageHandler<?>> map = new HashMap<>();
         for (GitLabMessageHandler<?> handler : handlers) {
-            String eventKey = handler.getEventType().getValue();
+            String eventKey = normalize(handler.getEventType().getValue());
             if (eventKey == null || eventKey.isBlank()) {
                 throw new IllegalStateException(handler.getClass().getSimpleName() + " must declare an event key");
             }
-            handlerMap.put(normalize(eventKey), handler);
+            map.put(eventKey, handler);
         }
+        this.handlerMap = Collections.unmodifiableMap(map);
         log.info("Registered {} GitLab message handler(s)", handlers.length);
     }
 

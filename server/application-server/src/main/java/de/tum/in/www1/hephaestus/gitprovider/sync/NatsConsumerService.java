@@ -321,7 +321,12 @@ public class NatsConsumerService {
     /**
      * Updates the subjects for an existing scope consumer.
      * Call this when repositories are added/removed from a scope.
+     * <p>
      * NOTE: Does NOT start a consumer if one doesn't exist - use startConsumingScope for that.
+     * <p>
+     * LIMITATION: If a workspace's provider type changes (e.g., GitHub → GitLab), this method
+     * only updates subjects but does not recreate the consumer on the new stream. In that case,
+     * the consumer should be stopped and restarted via {@link #restartScopeConsumer(Long)}.
      *
      * @param scopeId The scope ID with updated repositories
      */
@@ -600,6 +605,9 @@ public class NatsConsumerService {
      * @throws IllegalArgumentException if nameWithOwner is null, empty, or has invalid format
      */
     static String buildSubjectPrefix(String streamName, String nameWithOwner) {
+        if (streamName == null || streamName.trim().isEmpty()) {
+            throw new IllegalArgumentException("Stream name cannot be null or empty.");
+        }
         if (nameWithOwner == null || nameWithOwner.trim().isEmpty()) {
             throw new IllegalArgumentException("Repository identifier cannot be null or empty.");
         }
@@ -643,12 +651,20 @@ public class NatsConsumerService {
             String subject = msg.getSubject();
             String eventKey = subject.substring(subject.lastIndexOf('.') + 1);
 
-            // Route to the correct handler registry based on subject prefix
+            // Route to the correct handler registry based on subject prefix.
+            // Unrecognized prefixes are acknowledged to prevent infinite redelivery.
             MessageHandler eventHandler;
             if (subject.startsWith("gitlab.")) {
                 eventHandler = gitlabHandlerRegistry.getHandler(eventKey);
-            } else {
+            } else if (subject.startsWith("github.")) {
                 eventHandler = githubHandlerRegistry.getHandler(eventKey);
+            } else {
+                log.warn(
+                    "Unknown subject prefix, acknowledging to prevent redelivery: subject={}",
+                    sanitizeForLog(subject)
+                );
+                msg.ack();
+                return;
             }
 
             if (eventHandler == null) {

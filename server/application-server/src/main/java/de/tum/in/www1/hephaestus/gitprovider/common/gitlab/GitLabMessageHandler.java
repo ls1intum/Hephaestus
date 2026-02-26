@@ -20,6 +20,11 @@ import org.springframework.transaction.support.TransactionTemplate;
  * and specify the event type.
  * <p>
  * All webhook payloads are parsed directly to DTOs using Jackson ObjectMapper.
+ * <p>
+ * Unlike {@link de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler},
+ * this class does not use domain-based routing (REPOSITORY/ORGANIZATION/INSTALLATION).
+ * GitLab uses PAT-based auth rather than app installations, so all events are routed
+ * via a flat event-type mapping in {@link GitLabMessageHandlerRegistry}.
  *
  * @param <T> The DTO type for the webhook event
  */

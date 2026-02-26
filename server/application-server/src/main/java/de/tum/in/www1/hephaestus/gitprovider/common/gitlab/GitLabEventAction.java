@@ -17,8 +17,11 @@ public enum GitLabEventAction {
     REOPEN("reopen"),
     MERGE("merge"),
     UPDATE("update"),
+    CREATE("create"),
     APPROVED("approved"),
     UNAPPROVED("unapproved"),
+    APPROVAL("approval"),
+    UNAPPROVAL("unapproval"),
     UNKNOWN("unknown");
 
     private final String value;

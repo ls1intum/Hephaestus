@@ -16,12 +16,14 @@ import java.io.IOException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @Tag("unit")
+@DisplayName("GitLabMessageHandler")
 class GitLabMessageHandlerTest {
 
     private NatsMessageDeserializer deserializer;
@@ -48,6 +50,7 @@ class GitLabMessageHandlerTest {
     }
 
     @Test
+    @DisplayName("matching subject deserializes payload and calls handleEvent")
     void onMessage_matchingSubject_deserializesAndCallsHandleEvent() throws IOException {
         Message msg = mock(Message.class);
         when(msg.getSubject()).thenReturn("gitlab.group.project.merge_request");
@@ -59,6 +62,7 @@ class GitLabMessageHandlerTest {
     }
 
     @Test
+    @DisplayName("non-matching subject rejects without deserialization")
     void onMessage_nonMatchingSubject_rejectsWithoutDeserialization() throws IOException {
         Message msg = mock(Message.class);
         when(msg.getSubject()).thenReturn("gitlab.group.project.issue");
@@ -70,6 +74,7 @@ class GitLabMessageHandlerTest {
     }
 
     @Test
+    @DisplayName("deserialization failure throws PayloadParsingException")
     void onMessage_deserializationFailure_throwsPayloadParsingException() throws IOException {
         Message msg = mock(Message.class);
         when(msg.getSubject()).thenReturn("gitlab.group.project.merge_request");
@@ -81,6 +86,7 @@ class GitLabMessageHandlerTest {
     }
 
     @Test
+    @DisplayName("handleEvent is called within TransactionTemplate")
     void onMessage_handleEventIsCalledWithinTransactionTemplate() throws IOException {
         Message msg = mock(Message.class);
         when(msg.getSubject()).thenReturn("gitlab.group.project.merge_request");
@@ -89,6 +95,20 @@ class GitLabMessageHandlerTest {
         handler.onMessage(msg);
 
         verify(transactionTemplate).executeWithoutResult(any());
+    }
+
+    @Test
+    @DisplayName("handleEvent RuntimeException propagates out of onMessage")
+    void onMessage_handlerException_propagatesUnwrapped() throws IOException {
+        Message msg = mock(Message.class);
+        when(msg.getSubject()).thenReturn("gitlab.group.project.merge_request");
+        when(deserializer.deserialize(msg, String.class)).thenReturn("payload");
+
+        var failingHandler = new FailingHandler(deserializer, transactionTemplate);
+
+        assertThatThrownBy(() -> failingHandler.onMessage(msg))
+            .isInstanceOf(RuntimeException.class)
+            .hasMessage("handler failure");
     }
 
     private static class TestHandler extends GitLabMessageHandler<String> {
@@ -107,6 +127,23 @@ class GitLabMessageHandlerTest {
         @Override
         protected void handleEvent(String eventPayload) {
             capturedPayload.set(eventPayload);
+        }
+
+        @Override
+        public GitLabEventType getEventType() {
+            return GitLabEventType.MERGE_REQUEST;
+        }
+    }
+
+    private static class FailingHandler extends GitLabMessageHandler<String> {
+
+        FailingHandler(NatsMessageDeserializer deserializer, TransactionTemplate transactionTemplate) {
+            super(String.class, deserializer, transactionTemplate);
+        }
+
+        @Override
+        protected void handleEvent(String eventPayload) {
+            throw new RuntimeException("handler failure");
         }
 
         @Override

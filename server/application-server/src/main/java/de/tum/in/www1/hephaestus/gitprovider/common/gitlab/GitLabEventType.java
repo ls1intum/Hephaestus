@@ -6,17 +6,28 @@ package de.tum.in.www1.hephaestus.gitprovider.common.gitlab;
  * <p>
  * GitLab determines the event type from the payload body ({@code object_kind}),
  * unlike GitHub which uses the {@code X-GitHub-Event} HTTP header.
+ * <p>
+ * This is an intentional subset of all GitLab webhook event types, covering only those
+ * needed by current or planned handlers. Unknown event types are gracefully acknowledged
+ * by {@link de.tum.in.www1.hephaestus.gitprovider.sync.NatsConsumerService} without
+ * retrying. Additional types (e.g., {@code wiki_page}, {@code deployment}, {@code build},
+ * {@code release}) can be added as handlers are implemented.
  *
  * @see <a href="https://docs.gitlab.com/ee/user/project/integrations/webhook_events.html">
  *      GitLab Webhook Events Reference</a>
  */
 public enum GitLabEventType {
+    // Core resource events
     MERGE_REQUEST("merge_request"),
     ISSUE("issue"),
     NOTE("note"),
+
+    // Git events
     PUSH("push"),
-    PIPELINE("pipeline"),
-    TAG_PUSH("tag_push");
+    TAG_PUSH("tag_push"),
+
+    // CI/CD events
+    PIPELINE("pipeline");
 
     private final String value;
 
