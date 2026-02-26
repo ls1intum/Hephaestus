@@ -125,7 +125,7 @@ export type Workspace = {
      */
     displayName: string;
     /**
-     * Git provider mode (PAT_ORG, GITHUB_APP_INSTALLATION, GITLAB_PAT, GITLAB_OAUTH)
+     * Git provider mode (PAT_ORG, GITHUB_APP_INSTALLATION, GITLAB_PAT)
      */
     gitProviderMode?: string;
     /**

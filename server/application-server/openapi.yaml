@@ -3308,8 +3308,7 @@ components:
           description: Human-readable name of the workspace
         gitProviderMode:
           type: string
-          description: "Git provider mode (PAT_ORG, GITHUB_APP_INSTALLATION, GITLAB_PAT,\
-            \ GITLAB_OAUTH)"
+          description: "Git provider mode (PAT_ORG, GITHUB_APP_INSTALLATION, GITLAB_PAT)"
         hasSlackSigningSecret:
           type: boolean
           description: Whether Slack signing secret is configured
