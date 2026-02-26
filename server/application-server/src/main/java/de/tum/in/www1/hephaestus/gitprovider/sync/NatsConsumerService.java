@@ -612,8 +612,13 @@ public class NatsConsumerService {
             throw new IllegalArgumentException("Repository identifier cannot be null or empty.");
         }
 
-        String sanitized = nameWithOwner.replace(".", "~");
-        String[] parts = sanitized.split("/");
+        String sanitized = nameWithOwner.trim().replace(".", "~");
+        String[] parts = sanitized.split("/", -1);
+        if (Arrays.stream(parts).anyMatch(String::isBlank)) {
+            throw new IllegalArgumentException(
+                String.format("Invalid repository format: '%s'. Empty path segments are not allowed.", nameWithOwner)
+            );
+        }
 
         if ("gitlab".equals(streamName)) {
             // GitLab: supports nested namespaces (group/subgroup/project)

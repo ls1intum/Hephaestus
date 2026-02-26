@@ -162,6 +162,30 @@ class NatsSubjectBuilderTest {
                 IllegalArgumentException.class
             );
         }
+
+        @Test
+        @DisplayName("rejects leading slash (empty first segment)")
+        void rejectsLeadingSlash() {
+            assertThatThrownBy(() -> NatsConsumerService.buildSubjectPrefix("github", "/repo"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Empty path segments");
+        }
+
+        @Test
+        @DisplayName("rejects trailing slash (empty last segment)")
+        void rejectsTrailingSlash() {
+            assertThatThrownBy(() -> NatsConsumerService.buildSubjectPrefix("github", "owner/"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Empty path segments");
+        }
+
+        @Test
+        @DisplayName("rejects consecutive slashes (empty middle segment)")
+        void rejectsConsecutiveSlashes() {
+            assertThatThrownBy(() -> NatsConsumerService.buildSubjectPrefix("gitlab", "group//project"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Empty path segments");
+        }
     }
 
     @Nested
