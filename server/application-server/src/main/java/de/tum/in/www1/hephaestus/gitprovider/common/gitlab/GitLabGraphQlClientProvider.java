@@ -1,0 +1,197 @@
+package de.tum.in.www1.hephaestus.gitprovider.common.gitlab;
+
+import static de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants.GITLAB_GRAPHQL_PATH;
+
+import de.tum.in.www1.hephaestus.gitprovider.common.exception.CircuitBreakerOpenException;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import java.util.concurrent.TimeUnit;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.graphql.client.HttpGraphQlClient;
+import org.springframework.http.HttpHeaders;
+import org.springframework.lang.Nullable;
+import org.springframework.stereotype.Component;
+
+/**
+ * Provides authenticated {@link HttpGraphQlClient} instances for GitLab GraphQL API.
+ *
+ * <p>This provider creates per-request authenticated clients by cloning the base client
+ * and injecting scope-specific authentication tokens and server URLs. Unlike GitHub's
+ * single-endpoint model, GitLab URLs vary per workspace (self-hosted support).
+ *
+ * <p><b>Circuit Breaker Protection:</b>
+ * All clients returned by this provider are protected by a circuit breaker that prevents
+ * cascading failures when the GitLab API is unavailable.
+ *
+ * <p><b>Key differences from {@link de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider}:</b>
+ * <ul>
+ *   <li>Per-workspace URL (not hardcoded) — supports self-hosted GitLab instances</li>
+ *   <li>PAT-only authentication (no App token minting)</li>
+ *   <li>Header-based rate limit tracking (not GraphQL response field)</li>
+ * </ul>
+ *
+ * <p>Usage:
+ * <pre>{@code
+ * @Service
+ * public class MergeRequestService {
+ *     private final GitLabGraphQlClientProvider clientProvider;
+ *
+ *     public Mono<MergeRequest> fetchMR(Long scopeId, String projectPath, String iid) {
+ *         return clientProvider.forScope(scopeId)
+ *             .document("query { project(fullPath: \"" + projectPath + "\") { ... } }")
+ *             .retrieve("project.mergeRequest")
+ *             .toEntity(MergeRequest.class);
+ *     }
+ * }
+ * }</pre>
+ */
+@Component
+@Slf4j
+@ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
+public class GitLabGraphQlClientProvider {
+
+    private final HttpGraphQlClient baseClient;
+    private final GitLabTokenService tokenService;
+    private final CircuitBreaker circuitBreaker;
+    private final GitLabRateLimitTracker rateLimitTracker;
+
+    public GitLabGraphQlClientProvider(
+        @Qualifier("gitLabGraphQlClient") HttpGraphQlClient gitLabGraphQlClient,
+        GitLabTokenService tokenService,
+        @Qualifier("gitlabGraphQlCircuitBreaker") CircuitBreaker circuitBreaker,
+        GitLabRateLimitTracker rateLimitTracker
+    ) {
+        this.baseClient = gitLabGraphQlClient;
+        this.tokenService = tokenService;
+        this.circuitBreaker = circuitBreaker;
+        this.rateLimitTracker = rateLimitTracker;
+    }
+
+    /**
+     * Checks if the circuit breaker allows calls to GitLab.
+     *
+     * @return true if circuit is closed or half-open, false if open
+     */
+    public boolean isCircuitClosed() {
+        return circuitBreaker.getState() != CircuitBreaker.State.OPEN;
+    }
+
+    /** Gets the current circuit breaker state. */
+    public CircuitBreaker.State getCircuitState() {
+        return circuitBreaker.getState();
+    }
+
+    /** Records a successful API call for the circuit breaker. */
+    public void recordSuccess() {
+        circuitBreaker.onSuccess(0, TimeUnit.MILLISECONDS);
+    }
+
+    /** Records a failed API call for the circuit breaker. */
+    public void recordFailure(Throwable throwable) {
+        circuitBreaker.onError(0, TimeUnit.MILLISECONDS, throwable);
+    }
+
+    /**
+     * Checks if the circuit breaker permits a call, throwing if not.
+     *
+     * @throws CircuitBreakerOpenException if the circuit is open
+     */
+    public void acquirePermission() {
+        try {
+            circuitBreaker.acquirePermission();
+        } catch (CallNotPermittedException e) {
+            log.warn("Rejected GitLab GraphQL call: reason=circuitBreakerOpen, state={}", circuitBreaker.getState());
+            throw new CircuitBreakerOpenException("GitLab GraphQL API circuit breaker is open", e);
+        }
+    }
+
+    /**
+     * Returns an authenticated HttpGraphQlClient for the given scope.
+     * <p>
+     * The client is created by cloning the base client and setting:
+     * <ul>
+     *   <li>The scope's GitLab server URL + {@code /api/graphql} path</li>
+     *   <li>The scope's PAT as a Bearer token in the Authorization header</li>
+     * </ul>
+     *
+     * @param scopeId the workspace/scope ID
+     * @return authenticated HttpGraphQlClient ready for use
+     * @throws IllegalStateException if scope is not active or has no token
+     */
+    public HttpGraphQlClient forScope(Long scopeId) {
+        String token = tokenService.getAccessToken(scopeId);
+        String serverUrl = tokenService.resolveServerUrl(scopeId);
+
+        return baseClient
+            .mutate()
+            .url(serverUrl + GITLAB_GRAPHQL_PATH)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+            .build();
+    }
+
+    /**
+     * Returns an authenticated HttpGraphQlClient using the provided token and server URL.
+     * <p>
+     * Use this method when you already have a valid token (e.g., from a cached context).
+     *
+     * @param token     the PAT
+     * @param serverUrl the GitLab server base URL (e.g., {@code https://gitlab.com})
+     * @return authenticated HttpGraphQlClient
+     */
+    public HttpGraphQlClient withToken(String token, String serverUrl) {
+        return baseClient
+            .mutate()
+            .url(serverUrl + GITLAB_GRAPHQL_PATH)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+            .build();
+    }
+
+    // ========================================================================
+    // Rate Limit Tracking (Per-Scope)
+    // ========================================================================
+
+    /**
+     * Updates the rate limit tracker from HTTP response headers.
+     * <p>
+     * Call this after every GraphQL query to keep rate limit tracking current.
+     *
+     * @param scopeId the scope that made the API call
+     * @param headers the HTTP response headers
+     */
+    public void updateRateLimit(Long scopeId, @Nullable HttpHeaders headers) {
+        rateLimitTracker.updateFromHeaders(scopeId, headers);
+    }
+
+    /** Gets the rate limit tracker instance. */
+    public GitLabRateLimitTracker getRateLimitTracker() {
+        return rateLimitTracker;
+    }
+
+    /**
+     * Waits if the rate limit is critically low for a scope.
+     *
+     * @return true if waited, false if no waiting was needed
+     * @throws InterruptedException if interrupted while waiting
+     */
+    public boolean waitIfRateLimitLow(Long scopeId) throws InterruptedException {
+        return rateLimitTracker.waitIfNeeded(scopeId);
+    }
+
+    /** Checks if the rate limit is critically low. */
+    public boolean isRateLimitCritical(Long scopeId) {
+        return rateLimitTracker.isCritical(scopeId);
+    }
+
+    /** Gets the remaining rate limit points. */
+    public int getRateLimitRemaining(Long scopeId) {
+        return rateLimitTracker.getRemaining(scopeId);
+    }
+
+    /** Gets the rate limit reset time. */
+    @Nullable
+    public java.time.Instant getRateLimitResetAt(Long scopeId) {
+        return rateLimitTracker.getResetAt(scopeId);
+    }
+}

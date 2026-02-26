@@ -358,6 +358,25 @@ hephaestus:
         personal-api-key: ${POSTHOG_PERSONAL_API_KEY:}
 
     # ═══════════════════════════════════════════════════════════════════════════
+    # GITLAB CONFIGURATION
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Settings for GitLab API integration. Used by GitLab-mode workspaces
+    # (GitProviderMode.GITLAB_PAT). Override default-server-url for self-hosted instances.
+    gitlab:
+        # Set to true to enable GitLab integration (loads all GitLab beans)
+        enabled: ${GITLAB_ENABLED:false}
+        # Default GitLab server URL (used when workspace has no custom serverUrl)
+        default-server-url: ${GITLAB_DEFAULT_SERVER_URL:https://gitlab.com}
+        # Timeout for standard GraphQL operations (default: 30s)
+        graphql-timeout: ${GITLAB_GRAPHQL_TIMEOUT:30s}
+        # Extended timeout for complex operations (default: 60s)
+        extended-graphql-timeout: ${GITLAB_EXTENDED_GRAPHQL_TIMEOUT:60s}
+        # Delay between pagination requests (default: 200ms)
+        pagination-throttle: ${GITLAB_PAGINATION_THROTTLE:200ms}
+        # Cache duration for token validation results (default: 5m)
+        token-validation-cache-duration: ${GITLAB_TOKEN_CACHE_DURATION:5m}
+
+    # ═══════════════════════════════════════════════════════════════════════════
     # GITHUB AUTHENTICATION
     # ═══════════════════════════════════════════════════════════════════════════
     # Can be any OAuth token, such as the PAT
@@ -414,6 +433,8 @@ resilience4j:
             githubGraphQl:
                 baseConfig: default
             githubRest:
+                baseConfig: default
+            gitlabGraphQl:
                 baseConfig: default
             intelligence-service:
                 baseConfig: default
