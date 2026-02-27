@@ -7,6 +7,7 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncCons
 
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncException;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabGroupResponse;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabPageInfo;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabProjectResponse;
@@ -96,7 +97,7 @@ public class GitLabGroupSyncService {
                     safeGroupPath,
                     response != null ? response.getErrors() : "null response"
                 );
-                graphQlClientProvider.recordFailure(new RuntimeException("Invalid GraphQL response"));
+                graphQlClientProvider.recordFailure(new GitLabSyncException("Invalid GraphQL response"));
                 return Optional.empty();
             }
 
@@ -189,7 +190,7 @@ public class GitLabGroupSyncService {
                         pageCount,
                         response != null ? response.getErrors() : "null response"
                     );
-                    graphQlClientProvider.recordFailure(new RuntimeException("Invalid GraphQL response"));
+                    graphQlClientProvider.recordFailure(new GitLabSyncException("Invalid GraphQL response"));
                     break;
                 }
 

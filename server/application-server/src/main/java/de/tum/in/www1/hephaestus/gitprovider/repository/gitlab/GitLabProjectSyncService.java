@@ -4,6 +4,7 @@ import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncException;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabGroupResponse;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabProjectResponse;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
@@ -85,7 +86,7 @@ public class GitLabProjectSyncService {
                     safeProjectPath,
                     response != null ? response.getErrors() : "null response"
                 );
-                graphQlClientProvider.recordFailure(new RuntimeException("Invalid GraphQL response"));
+                graphQlClientProvider.recordFailure(new GitLabSyncException("Invalid GraphQL response"));
                 return Optional.empty();
             }
 
