@@ -225,6 +225,7 @@ public class GitLabGroupSyncService {
                             scopeId,
                             safeGroupPath
                         );
+                        hadApiFailure = true;
                         break;
                     }
                     log.info(
@@ -254,7 +255,7 @@ public class GitLabGroupSyncService {
                         projectsSkipped++;
                         log.warn(
                             "Failed to process project: fullPath={}, error={}",
-                            project.fullPath(),
+                            sanitizeForLog(project.fullPath()),
                             e.getMessage()
                         );
                     }

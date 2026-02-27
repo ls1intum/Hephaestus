@@ -17,7 +17,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Service for syncing a single GitLab project via GraphQL API.
@@ -61,7 +60,6 @@ public class GitLabProjectSyncService {
      * @param projectFullPath the full path of the project (e.g., {@code org/my-project})
      * @return the synced Repository entity, or empty if not found or on error
      */
-    @Transactional
     public Optional<Repository> syncProject(Long scopeId, String projectFullPath) {
         if (projectFullPath == null || projectFullPath.isBlank()) {
             log.warn("Skipped project sync: reason=nullOrBlankProjectPath, scopeId={}", scopeId);
@@ -107,6 +105,14 @@ public class GitLabProjectSyncService {
             GitLabGroupResponse groupData = project.group();
             if (groupData != null) {
                 organization = groupProcessor.process(groupData);
+                if (organization == null) {
+                    log.warn(
+                        "Skipped project sync: reason=groupProcessingFailed, scopeId={}, projectPath={}",
+                        scopeId,
+                        safeProjectPath
+                    );
+                    return Optional.empty();
+                }
             }
 
             Repository repository = projectProcessor.processGraphQlResponse(project, organization);

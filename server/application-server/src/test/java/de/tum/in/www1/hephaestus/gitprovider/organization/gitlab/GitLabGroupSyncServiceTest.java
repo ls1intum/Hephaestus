@@ -86,7 +86,6 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
             org.setLogin("my-org");
 
             mockGraphQlGroupResponse(
-                "my-org",
                 new GitLabGroupResponse(
                     "gid://gitlab/Group/42",
                     "my-org",
@@ -110,7 +109,7 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
         @Test
         @DisplayName("group not found returns empty")
         void groupNotFound_returnsEmpty() {
-            mockGraphQlGroupResponse("non-existent", null);
+            mockGraphQlGroupResponse(null);
 
             Optional<Organization> result = service.syncGroup(1L, "non-existent");
 
@@ -125,7 +124,7 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
             when(response.isValid()).thenReturn(false);
             when(response.getErrors()).thenReturn(List.of());
 
-            HttpGraphQlClient.RequestSpec requestSpec = mockRequestSpec(client, response);
+            mockRequestSpec(client, response);
 
             Optional<Organization> result = service.syncGroup(1L, "my-org");
 
@@ -196,6 +195,7 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
 
             GitLabSyncResult result = service.syncGroupProjects(1L, "my-org");
 
+            assertThat(result.status()).isEqualTo(GitLabSyncResult.Status.ABORTED_ERROR);
             assertThat(result.synced()).isEmpty();
             verify(projectProcessor, never()).processGraphQlResponse(any(), any());
         }
@@ -493,7 +493,7 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
     }
 
     @SuppressWarnings("unchecked")
-    private void mockGraphQlGroupResponse(String groupPath, GitLabGroupResponse groupResponse) {
+    private void mockGraphQlGroupResponse(GitLabGroupResponse groupResponse) {
         HttpGraphQlClient client = mockClient();
         ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
         when(response.isValid()).thenReturn(true);

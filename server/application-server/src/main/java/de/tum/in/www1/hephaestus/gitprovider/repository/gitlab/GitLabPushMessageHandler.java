@@ -75,10 +75,11 @@ public class GitLabPushMessageHandler extends GitLabMessageHandler<GitLabPushEve
             return;
         }
 
+        String safeRef = sanitizeForLog(event.ref());
         log.info(
             "Received push event: projectPath={}, ref={}, commits={}",
             safeProjectPath,
-            event.ref(),
+            safeRef,
             event.totalCommitsCount()
         );
 
@@ -120,7 +121,7 @@ public class GitLabPushMessageHandler extends GitLabMessageHandler<GitLabPushEve
         if (org != null) {
             repository.setOrganization(org);
             repositoryRepository.save(repository);
-            log.debug("Linked org to repository: repoId={}, orgLogin={}", repository.getId(), groupPath);
+            log.debug("Linked org to repository: repoId={}, orgLogin={}", repository.getId(), sanitizeForLog(groupPath));
         } else {
             log.debug(
                 "Organization not yet synced, will be linked on next full sync: groupPath={}",

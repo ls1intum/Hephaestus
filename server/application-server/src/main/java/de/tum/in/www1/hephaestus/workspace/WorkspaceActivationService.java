@@ -239,18 +239,25 @@ public class WorkspaceActivationService {
                     // Group metadata is extracted from the first page response (no extra API call)
                     var syncService = gitLabGroupSyncServiceProvider.getIfAvailable();
                     if (syncService != null) {
-                        GitLabSyncResult result =
-                            syncService.syncGroupProjects(workspace.getId(), workspace.getAccountLogin());
-                        log.info(
-                            "GitLab sync result: workspaceId={}, status={}, synced={}, skipped={}, pages={}",
-                            workspace.getId(),
-                            result.status(),
-                            result.synced().size(),
-                            result.projectsSkipped(),
-                            result.pagesCompleted()
-                        );
-                        // Link workspace to organization after sync (org was created during sync)
-                        linkWorkspaceToOrganization(workspace);
+                        if (isBlank(workspace.getAccountLogin())) {
+                            log.warn(
+                                "Skipped GitLab sync: reason=missingAccountLogin, workspaceId={}",
+                                workspace.getId()
+                            );
+                        } else {
+                            GitLabSyncResult result =
+                                syncService.syncGroupProjects(workspace.getId(), workspace.getAccountLogin());
+                            log.info(
+                                "GitLab sync result: workspaceId={}, status={}, synced={}, skipped={}, pages={}",
+                                workspace.getId(),
+                                result.status(),
+                                result.synced().size(),
+                                result.projectsSkipped(),
+                                result.pagesCompleted()
+                            );
+                            // Link workspace to organization after sync (org was created during sync)
+                            linkWorkspaceToOrganization(workspace);
+                        }
                     } else {
                         log.warn(
                             "Skipped GitLab sync: reason=syncServiceUnavailable, workspaceId={}",
@@ -381,16 +388,25 @@ public class WorkspaceActivationService {
      * The organization is created during sync but not linked to the workspace at that point
      * because the sync service doesn't have access to the workspace entity.
      */
-    private void linkWorkspaceToOrganization(Workspace workspace) {
+    @Transactional
+    void linkWorkspaceToOrganization(Workspace workspace) {
         if (workspace.getOrganization() != null || isBlank(workspace.getAccountLogin())) {
             return;
         }
         organizationRepository
             .findByLoginIgnoreCase(workspace.getAccountLogin())
             .ifPresent(org -> {
-                workspace.setOrganization(org);
-                workspaceRepository.save(workspace);
-                log.info("Linked organization to workspace: orgId={}, workspaceId={}", org.getId(), workspace.getId());
+                workspaceRepository.findById(workspace.getId()).ifPresent(current -> {
+                    if (current.getOrganization() == null) {
+                        current.setOrganization(org);
+                        workspaceRepository.save(current);
+                        log.info(
+                            "Linked organization to workspace: orgId={}, workspaceId={}",
+                            org.getId(),
+                            current.getId()
+                        );
+                    }
+                });
             });
     }
 

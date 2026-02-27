@@ -191,8 +191,8 @@ class GitLabProjectSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("group processor returning null still syncs project with null org")
-        void groupProcessorReturnsNull_syncsWithNullOrg() {
+        @DisplayName("group processor returning null aborts project sync")
+        void groupProcessorReturnsNull_abortsSync() {
             var groupData = new GitLabGroupResponse(
                 "gid://gitlab/Group/42",
                 "my-org",
@@ -218,14 +218,11 @@ class GitLabProjectSyncServiceTest extends BaseUnitTest {
 
             mockGraphQlProjectResponse(projectData);
             when(groupProcessor.process(any())).thenReturn(null); // group processor rejects
-            Repository repo = new Repository();
-            repo.setId(789L);
-            when(projectProcessor.processGraphQlResponse(projectData, null)).thenReturn(repo);
 
             Optional<Repository> result = service.syncProject(1L, "my-org/proj");
 
-            assertThat(result).isPresent();
-            verify(projectProcessor).processGraphQlResponse(projectData, null);
+            assertThat(result).isEmpty();
+            verify(projectProcessor, never()).processGraphQlResponse(any(), any());
         }
 
         @Test

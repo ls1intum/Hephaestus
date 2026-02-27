@@ -1,5 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.repository.gitlab;
 
+import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
+
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabProjectResponse;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
@@ -65,7 +67,7 @@ public class GitLabProjectProcessor {
         try {
             numericId = GitLabSyncConstants.extractNumericId(project.id());
         } catch (IllegalArgumentException e) {
-            log.warn("Skipped project processing: reason=invalidGlobalId, gid={}", project.id());
+            log.warn("Skipped project processing: reason=invalidGlobalId, gid={}", sanitizeForLog(project.id()));
             return null;
         }
 
@@ -156,10 +158,11 @@ public class GitLabProjectProcessor {
             repository.setDefaultBranch("main");
         }
 
-        // Update pushedAt and updatedAt on every push event
+        // Update pushedAt, updatedAt, and lastSyncAt on every push event
         Instant now = Instant.now();
         repository.setPushedAt(now);
         repository.setUpdatedAt(now);
+        repository.setLastSyncAt(now);
 
         // Preserve existing archived status and organization — webhook payload doesn't carry these
         // Only set createdAt if this is a new entity
@@ -205,7 +208,7 @@ public class GitLabProjectProcessor {
         try {
             return OffsetDateTime.parse(timestamp).toInstant();
         } catch (DateTimeParseException e) {
-            log.warn("Could not parse timestamp: value={}", timestamp);
+            log.warn("Could not parse timestamp: value={}", sanitizeForLog(timestamp));
             return null;
         }
     }
