@@ -151,9 +151,7 @@ public class GitLabGroupSyncService {
     public GitLabSyncResult syncGroupProjects(Long scopeId, String groupFullPath) {
         if (groupFullPath == null || groupFullPath.isBlank()) {
             log.warn("Skipped group projects sync: reason=nullOrBlankGroupPath, scopeId={}", scopeId);
-            return GitLabSyncResult.aborted(
-                GitLabSyncResult.Status.ABORTED_ERROR, Collections.emptyList(), 0, 0
-            );
+            return GitLabSyncResult.aborted(GitLabSyncResult.Status.ABORTED_ERROR, Collections.emptyList(), 0, 0);
         }
         String safeGroupPath = sanitizeForLog(groupFullPath);
 
@@ -181,7 +179,9 @@ public class GitLabGroupSyncService {
                         log.warn("Interrupted while waiting for rate limit reset: scopeId={}", scopeId);
                         return GitLabSyncResult.aborted(
                             GitLabSyncResult.Status.ABORTED_RATE_LIMIT,
-                            syncedRepositories, pageCount, projectsSkipped
+                            syncedRepositories,
+                            pageCount,
+                            projectsSkipped
                         );
                     }
                 }
@@ -296,7 +296,9 @@ public class GitLabGroupSyncService {
                 );
                 return GitLabSyncResult.aborted(
                     GitLabSyncResult.Status.ABORTED_ERROR,
-                    syncedRepositories, totalPages, projectsSkipped
+                    syncedRepositories,
+                    totalPages,
+                    projectsSkipped
                 );
             }
 
@@ -313,7 +315,9 @@ public class GitLabGroupSyncService {
             if (hadApiFailure) {
                 return GitLabSyncResult.aborted(
                     GitLabSyncResult.Status.ABORTED_ERROR,
-                    syncedRepositories, totalPages, projectsSkipped
+                    syncedRepositories,
+                    totalPages,
+                    projectsSkipped
                 );
             }
             if (projectsSkipped > 0) {
@@ -324,7 +328,10 @@ public class GitLabGroupSyncService {
             Thread.currentThread().interrupt();
             log.warn("Interrupted during group project sync: scopeId={}, groupPath={}", scopeId, safeGroupPath);
             return GitLabSyncResult.aborted(
-                GitLabSyncResult.Status.ABORTED_ERROR, syncedRepositories, pageCount, projectsSkipped
+                GitLabSyncResult.Status.ABORTED_ERROR,
+                syncedRepositories,
+                pageCount,
+                projectsSkipped
             );
         } catch (Exception e) {
             graphQlClientProvider.recordFailure(e);
@@ -336,7 +343,10 @@ public class GitLabGroupSyncService {
                 e
             );
             return GitLabSyncResult.aborted(
-                GitLabSyncResult.Status.ABORTED_ERROR, syncedRepositories, pageCount, projectsSkipped
+                GitLabSyncResult.Status.ABORTED_ERROR,
+                syncedRepositories,
+                pageCount,
+                projectsSkipped
             );
         }
     }
@@ -349,10 +359,7 @@ public class GitLabGroupSyncService {
      * is used as fallback. This correctly handles nested group hierarchies like
      * {@code org/team/subteam/project}.
      */
-    private Organization resolveProjectOrganization(
-        GitLabProjectResponse project,
-        Organization topLevelOrganization
-    ) {
+    private Organization resolveProjectOrganization(GitLabProjectResponse project, Organization topLevelOrganization) {
         if (project.group() != null) {
             Organization subOrg = groupProcessor.process(project.group());
             if (subOrg != null) {

@@ -137,9 +137,7 @@ public class GitLabGraphQlClientProvider {
             .mutate()
             .url(serverUrl + GITLAB_GRAPHQL_PATH)
             .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-            .webClient(builder ->
-                builder.defaultRequest(spec -> spec.attribute(SCOPE_ID_ATTRIBUTE, scopeId))
-            )
+            .webClient(builder -> builder.defaultRequest(spec -> spec.attribute(SCOPE_ID_ATTRIBUTE, scopeId)))
             .build();
     }
 

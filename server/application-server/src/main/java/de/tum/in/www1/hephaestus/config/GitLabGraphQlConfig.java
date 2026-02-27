@@ -122,10 +122,7 @@ public class GitLabGraphQlConfig {
                     request
                         .attribute(GitLabGraphQlClientProvider.SCOPE_ID_ATTRIBUTE)
                         .ifPresent(scopeIdObj ->
-                            rateLimitTracker.updateFromHeaders(
-                                (Long) scopeIdObj,
-                                response.headers().asHttpHeaders()
-                            )
+                            rateLimitTracker.updateFromHeaders((Long) scopeIdObj, response.headers().asHttpHeaders())
                         );
                 });
     }

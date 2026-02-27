@@ -315,8 +315,7 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
 
             Repository repo2 = new Repository();
             repo2.setId(20L);
-            when(projectProcessor.processGraphQlResponse(eq(proj1), any()))
-                .thenThrow(new RuntimeException("DB error"));
+            when(projectProcessor.processGraphQlResponse(eq(proj1), any())).thenThrow(new RuntimeException("DB error"));
             when(projectProcessor.processGraphQlResponse(eq(proj2), any())).thenReturn(repo2);
 
             GitLabSyncResult result = service.syncGroupProjects(1L, "my-org");

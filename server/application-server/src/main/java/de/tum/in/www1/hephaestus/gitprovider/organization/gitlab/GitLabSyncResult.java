@@ -15,12 +15,7 @@ import java.util.List;
  * @param pagesCompleted  number of pagination pages successfully fetched
  * @param projectsSkipped number of individual projects that failed to process
  */
-public record GitLabSyncResult(
-    Status status,
-    List<Repository> synced,
-    int pagesCompleted,
-    int projectsSkipped
-) {
+public record GitLabSyncResult(Status status, List<Repository> synced, int pagesCompleted, int projectsSkipped) {
     public enum Status {
         /** All projects synced successfully. */
         COMPLETED,
@@ -38,11 +33,7 @@ public record GitLabSyncResult(
     }
 
     /** Sync finished but some projects or pages had errors. */
-    public static GitLabSyncResult withErrors(
-        List<Repository> synced,
-        int pagesCompleted,
-        int projectsSkipped
-    ) {
+    public static GitLabSyncResult withErrors(List<Repository> synced, int pagesCompleted, int projectsSkipped) {
         return new GitLabSyncResult(
             Status.COMPLETED_WITH_ERRORS,
             Collections.unmodifiableList(synced),
@@ -58,8 +49,6 @@ public record GitLabSyncResult(
         int pagesCompleted,
         int projectsSkipped
     ) {
-        return new GitLabSyncResult(
-            status, Collections.unmodifiableList(syncedSoFar), pagesCompleted, projectsSkipped
-        );
+        return new GitLabSyncResult(status, Collections.unmodifiableList(syncedSoFar), pagesCompleted, projectsSkipped);
     }
 }

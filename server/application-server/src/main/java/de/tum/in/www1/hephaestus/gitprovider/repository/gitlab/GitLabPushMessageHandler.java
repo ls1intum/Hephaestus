@@ -121,7 +121,11 @@ public class GitLabPushMessageHandler extends GitLabMessageHandler<GitLabPushEve
         if (org != null) {
             repository.setOrganization(org);
             repositoryRepository.save(repository);
-            log.debug("Linked org to repository: repoId={}, orgLogin={}", repository.getId(), sanitizeForLog(groupPath));
+            log.debug(
+                "Linked org to repository: repoId={}, orgLogin={}",
+                repository.getId(),
+                sanitizeForLog(groupPath)
+            );
         } else {
             log.debug(
                 "Organization not yet synced, will be linked on next full sync: groupPath={}",

@@ -123,10 +123,10 @@ public class WorkspaceActivationService {
             .collect(Collectors.toSet());
         if (providerTypes.contains(GitProviderType.GITLAB) && providerTypes.size() > 1) {
             throw new IllegalStateException(
-                "Mixed git providers detected: "
-                    + providerTypes
-                    + ". GitLab and GitHub use overlapping numeric ID spaces. "
-                    + "Use only one provider per deployment until schema migration adds a provider discriminator."
+                "Mixed git providers detected: " +
+                    providerTypes +
+                    ". GitLab and GitHub use overlapping numeric ID spaces. " +
+                    "Use only one provider per deployment until schema migration adds a provider discriminator."
             );
         }
 
@@ -245,8 +245,10 @@ public class WorkspaceActivationService {
                                 workspace.getId()
                             );
                         } else {
-                            GitLabSyncResult result =
-                                syncService.syncGroupProjects(workspace.getId(), workspace.getAccountLogin());
+                            GitLabSyncResult result = syncService.syncGroupProjects(
+                                workspace.getId(),
+                                workspace.getAccountLogin()
+                            );
                             log.info(
                                 "GitLab sync result: workspaceId={}, status={}, synced={}, skipped={}, pages={}",
                                 workspace.getId(),
@@ -396,17 +398,19 @@ public class WorkspaceActivationService {
         organizationRepository
             .findByLoginIgnoreCase(workspace.getAccountLogin())
             .ifPresent(org -> {
-                workspaceRepository.findById(workspace.getId()).ifPresent(current -> {
-                    if (current.getOrganization() == null) {
-                        current.setOrganization(org);
-                        workspaceRepository.save(current);
-                        log.info(
-                            "Linked organization to workspace: orgId={}, workspaceId={}",
-                            org.getId(),
-                            current.getId()
-                        );
-                    }
-                });
+                workspaceRepository
+                    .findById(workspace.getId())
+                    .ifPresent(current -> {
+                        if (current.getOrganization() == null) {
+                            current.setOrganization(org);
+                            workspaceRepository.save(current);
+                            log.info(
+                                "Linked organization to workspace: orgId={}, workspaceId={}",
+                                org.getId(),
+                                current.getId()
+                            );
+                        }
+                    });
             });
     }
 
