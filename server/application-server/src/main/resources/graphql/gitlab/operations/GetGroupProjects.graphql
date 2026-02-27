@@ -1,0 +1,40 @@
+query GetGroupProjects($fullPath: ID!, $first: Int!, $after: String, $includeSubgroups: Boolean) {
+    group(fullPath: $fullPath) {
+        id
+        fullPath
+        name
+        avatarUrl
+        webUrl
+        description
+        visibility
+        projects(first: $first, after: $after, includeSubgroups: $includeSubgroups) {
+            pageInfo {
+                hasNextPage
+                endCursor
+            }
+            nodes {
+                id
+                fullPath
+                name
+                webUrl
+                description
+                visibility
+                archived
+                createdAt
+                lastActivityAt
+                group {
+                    id
+                    fullPath
+                    name
+                    avatarUrl
+                    webUrl
+                    description
+                    visibility
+                }
+                repository {
+                    rootRef
+                }
+            }
+        }
+    }
+}

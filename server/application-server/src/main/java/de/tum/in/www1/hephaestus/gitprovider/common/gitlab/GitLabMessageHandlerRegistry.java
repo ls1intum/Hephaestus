@@ -33,11 +33,13 @@ public class GitLabMessageHandlerRegistry {
                 throw new IllegalStateException(handler.getClass().getSimpleName() + " must declare an event key");
             }
             if (map.containsKey(eventKey)) {
-                log.warn(
-                    "Duplicate handler for event key '{}': {} replaces {}",
-                    eventKey,
-                    handler.getClass().getSimpleName(),
-                    map.get(eventKey).getClass().getSimpleName()
+                throw new IllegalStateException(
+                    "Duplicate GitLab message handler for event key '" +
+                        eventKey +
+                        "': " +
+                        handler.getClass().getSimpleName() +
+                        " conflicts with " +
+                        map.get(eventKey).getClass().getSimpleName()
                 );
             }
             map.put(eventKey, handler);

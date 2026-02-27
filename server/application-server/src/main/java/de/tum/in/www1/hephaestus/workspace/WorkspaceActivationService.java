@@ -1,5 +1,8 @@
 package de.tum.in.www1.hephaestus.workspace;
 
+import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
+import de.tum.in.www1.hephaestus.gitprovider.organization.gitlab.GitLabGroupSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.organization.gitlab.GitLabSyncResult;
 import de.tum.in.www1.hephaestus.gitprovider.sync.GitHubDataSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.sync.NatsConsumerService;
 import de.tum.in.www1.hephaestus.gitprovider.sync.NatsProperties;
@@ -12,6 +15,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -34,15 +38,17 @@ public class WorkspaceActivationService {
     private final NatsProperties natsProperties;
     private final SyncSchedulerProperties syncSchedulerProperties;
 
-    // Core repository
+    // Core repositories
     private final WorkspaceRepository workspaceRepository;
+    private final OrganizationRepository organizationRepository;
 
     // Services
     private final NatsConsumerService natsConsumerService;
     private final WorkspaceScopeFilter workspaceScopeFilter;
 
-    // Lazy-loaded to break circular reference with GitHubDataSyncService
+    // Lazy-loaded to break circular reference with sync services
     private final ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider;
+    private final ObjectProvider<GitLabGroupSyncService> gitLabGroupSyncServiceProvider;
 
     // Infrastructure
     private final AsyncTaskExecutor monitoringExecutor;
@@ -51,17 +57,21 @@ public class WorkspaceActivationService {
         NatsProperties natsProperties,
         SyncSchedulerProperties syncSchedulerProperties,
         WorkspaceRepository workspaceRepository,
+        OrganizationRepository organizationRepository,
         NatsConsumerService natsConsumerService,
         WorkspaceScopeFilter workspaceScopeFilter,
         ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider,
+        ObjectProvider<GitLabGroupSyncService> gitLabGroupSyncServiceProvider,
         @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor
     ) {
         this.natsProperties = natsProperties;
         this.syncSchedulerProperties = syncSchedulerProperties;
         this.workspaceRepository = workspaceRepository;
+        this.organizationRepository = organizationRepository;
         this.natsConsumerService = natsConsumerService;
         this.workspaceScopeFilter = workspaceScopeFilter;
         this.gitHubDataSyncServiceProvider = gitHubDataSyncServiceProvider;
+        this.gitLabGroupSyncServiceProvider = gitLabGroupSyncServiceProvider;
         this.monitoringExecutor = monitoringExecutor;
     }
 
@@ -102,6 +112,22 @@ public class WorkspaceActivationService {
         if (workspacesToActivate.isEmpty()) {
             log.info("No workspaces to activate after filtering");
             return;
+        }
+
+        // Guard: GitLab and GitHub use overlapping numeric ID spaces for Organization/Repository.
+        // Until a provider discriminator column is added, mixed-provider deployments would corrupt data.
+        Set<GitProviderType> providerTypes = workspacesToActivate
+            .stream()
+            .map(Workspace::getProviderType)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+        if (providerTypes.contains(GitProviderType.GITLAB) && providerTypes.size() > 1) {
+            throw new IllegalStateException(
+                "Mixed git providers detected: " +
+                    providerTypes +
+                    ". GitLab and GitHub use overlapping numeric ID spaces. " +
+                    "Use only one provider per deployment until schema migration adds a provider discriminator."
+            );
         }
 
         log.info("Activating workspaces: count={}", workspacesToActivate.size());
@@ -165,12 +191,14 @@ public class WorkspaceActivationService {
             }
             case GITHUB_APP_INSTALLATION -> false;
             case GITLAB_PAT -> {
-                log.info(
-                    "Skipped workspace activation: reason=gitlabNotYetSupported, workspaceId={}, mode={}",
-                    workspace.getId(),
-                    workspace.getGitProviderMode()
-                );
-                yield true;
+                if (isBlank(workspace.getPersonalAccessToken())) {
+                    log.info(
+                        "Skipped workspace activation: reason=gitlabPatModeWithoutToken, workspaceId={}",
+                        workspace.getId()
+                    );
+                    yield true;
+                }
+                yield false;
             }
             case null -> false;
         };
@@ -206,11 +234,45 @@ public class WorkspaceActivationService {
             WorkspaceContext workspaceContext = WorkspaceContext.fromWorkspace(workspace, Set.of());
             WorkspaceContextHolder.setContext(workspaceContext);
             try {
-                // Use the central sync orchestrator which handles:
-                // 1. Organization and teams sync (via GraphQL)
-                // 2. Per-repository syncs (labels, milestones, issues, PRs, comments)
-                // 3. Workspace-level relationships (issue types, issue dependencies, sub-issues)
-                getGitHubDataSyncService().syncAllRepositories(workspace.getId());
+                if (workspace.getProviderType() == GitProviderType.GITLAB) {
+                    // GitLab: sync group and its projects via GraphQL
+                    // Group metadata is extracted from the first page response (no extra API call)
+                    var syncService = gitLabGroupSyncServiceProvider.getIfAvailable();
+                    if (syncService != null) {
+                        if (isBlank(workspace.getAccountLogin())) {
+                            log.warn(
+                                "Skipped GitLab sync: reason=missingAccountLogin, workspaceId={}",
+                                workspace.getId()
+                            );
+                        } else {
+                            GitLabSyncResult result = syncService.syncGroupProjects(
+                                workspace.getId(),
+                                workspace.getAccountLogin()
+                            );
+                            log.info(
+                                "GitLab sync result: workspaceId={}, status={}, synced={}, skipped={}, pages={}",
+                                workspace.getId(),
+                                result.status(),
+                                result.synced().size(),
+                                result.projectsSkipped(),
+                                result.pagesCompleted()
+                            );
+                            // Link workspace to organization after sync (org was created during sync)
+                            linkWorkspaceToOrganization(workspace);
+                        }
+                    } else {
+                        log.warn(
+                            "Skipped GitLab sync: reason=syncServiceUnavailable, workspaceId={}",
+                            workspace.getId()
+                        );
+                    }
+                } else {
+                    // GitHub: use the central sync orchestrator which handles:
+                    // 1. Organization and teams sync (via GraphQL)
+                    // 2. Per-repository syncs (labels, milestones, issues, PRs, comments)
+                    // 3. Workspace-level relationships (issue types, issue dependencies, sub-issues)
+                    getGitHubDataSyncService().syncAllRepositories(workspace.getId());
+                }
 
                 log.info("Completed monitoring on startup: workspaceId={}", workspace.getId());
             } catch (Exception e) {
@@ -321,6 +383,35 @@ public class WorkspaceActivationService {
      */
     private boolean shouldUseNats(Workspace workspace) {
         return natsProperties.enabled() && workspace != null;
+    }
+
+    /**
+     * Links a workspace to its organization after sync completes.
+     * The organization is created during sync but not linked to the workspace at that point
+     * because the sync service doesn't have access to the workspace entity.
+     */
+    @Transactional
+    void linkWorkspaceToOrganization(Workspace workspace) {
+        if (workspace.getOrganization() != null || isBlank(workspace.getAccountLogin())) {
+            return;
+        }
+        organizationRepository
+            .findByLoginIgnoreCase(workspace.getAccountLogin())
+            .ifPresent(org -> {
+                workspaceRepository
+                    .findById(workspace.getId())
+                    .ifPresent(current -> {
+                        if (current.getOrganization() == null) {
+                            current.setOrganization(org);
+                            workspaceRepository.save(current);
+                            log.info(
+                                "Linked organization to workspace: orgId={}, workspaceId={}",
+                                org.getId(),
+                                current.getId()
+                            );
+                        }
+                    });
+            });
     }
 
     private boolean isBlank(String value) {

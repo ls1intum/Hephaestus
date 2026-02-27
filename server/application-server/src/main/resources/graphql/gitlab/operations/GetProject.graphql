@@ -1,0 +1,25 @@
+query GetProject($fullPath: ID!) {
+    project(fullPath: $fullPath) {
+        id
+        fullPath
+        name
+        webUrl
+        description
+        visibility
+        archived
+        createdAt
+        lastActivityAt
+        group {
+            id
+            fullPath
+            name
+            avatarUrl
+            webUrl
+            description
+            visibility
+        }
+        repository {
+            rootRef
+        }
+    }
+}

@@ -4,10 +4,12 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncCons
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.ProvisioningListener;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import org.slf4j.Logger;
@@ -39,6 +41,7 @@ public class WorkspaceProvisioningService {
     private final WorkspaceMembershipRepository workspaceMembershipRepository;
     private final WorkspaceMembershipService workspaceMembershipService;
     private final WorkspaceScopeFilter workspaceScopeFilter;
+    private final GitLabProperties gitLabProperties;
     private final WebClient webClient;
 
     public WorkspaceProvisioningService(
@@ -52,7 +55,8 @@ public class WorkspaceProvisioningService {
         UserRepository userRepository,
         WorkspaceMembershipRepository workspaceMembershipRepository,
         WorkspaceMembershipService workspaceMembershipService,
-        WorkspaceScopeFilter workspaceScopeFilter
+        WorkspaceScopeFilter workspaceScopeFilter,
+        GitLabProperties gitLabProperties
     ) {
         this.workspaceProperties = workspaceProperties;
         this.workspaceRepository = workspaceRepository;
@@ -65,6 +69,7 @@ public class WorkspaceProvisioningService {
         this.workspaceMembershipRepository = workspaceMembershipRepository;
         this.workspaceMembershipService = workspaceMembershipService;
         this.workspaceScopeFilter = workspaceScopeFilter;
+        this.gitLabProperties = gitLabProperties;
         this.webClient = WebClient.builder()
             .baseUrl(GITHUB_API_BASE_URL)
             .defaultHeader(HttpHeaders.ACCEPT, "application/vnd.github+json")
@@ -145,6 +150,132 @@ public class WorkspaceProvisioningService {
         log.info("Completed PAT workspace provisioning: workspaceId={}", savedWorkspace.getId());
 
         ensureAdminMembership(savedWorkspace);
+    }
+
+    /**
+     * Bootstrap a default GitLab PAT workspace from configuration properties.
+     * Mirrors {@link #bootstrapDefaultPatWorkspace()} for GitLab.
+     */
+    @Transactional
+    public void bootstrapDefaultGitLabPatWorkspace() {
+        if (!workspaceProperties.initGitlabDefault()) {
+            log.debug("Skipped default GitLab PAT workspace bootstrap: reason=bootstrapDisabled");
+            return;
+        }
+
+        WorkspaceProperties.GitLabDefaultProperties config = workspaceProperties.gitlabDefault();
+
+        String groupPath = config.login() != null ? config.login().trim() : null;
+        if (isBlank(groupPath)) {
+            throw new IllegalStateException(
+                "Failed to derive group path for GitLab workspace bootstrap. Set hephaestus.workspace.gitlab-default.login."
+            );
+        }
+
+        if (isBlank(config.token())) {
+            throw new IllegalStateException(
+                "Missing PAT for GitLab workspace bootstrap. Set hephaestus.workspace.gitlab-default.token or GITLAB_PAT."
+            );
+        }
+
+        // Check if a workspace already exists for this group path
+        if (workspaceRepository.findByAccountLoginIgnoreCase(groupPath).isPresent()) {
+            log.debug("Skipped GitLab PAT workspace creation: reason=workspaceAlreadyExists, groupPath={}", groupPath);
+            return;
+        }
+
+        String serverUrl = resolveGitLabServerUrl(config.serverUrl());
+        Long ownerUserId = syncGitLabUserForPAT(config.token(), serverUrl, groupPath);
+
+        // Derive a valid slug from the group path (replace / with -)
+        String slug = groupPath.replace("/", "-");
+        // Use the last path segment as the display name
+        String displayName = groupPath.contains("/") ? groupPath.substring(groupPath.lastIndexOf('/') + 1) : groupPath;
+
+        Workspace workspace = workspaceService.createWorkspace(
+            slug,
+            displayName,
+            groupPath,
+            AccountType.ORG,
+            ownerUserId
+        );
+
+        workspace.setGitProviderMode(Workspace.GitProviderMode.GITLAB_PAT);
+        workspace.setPersonalAccessToken(config.token());
+        if (!isBlank(config.serverUrl())) {
+            workspace.setServerUrl(config.serverUrl().trim());
+        }
+
+        Workspace savedWorkspace = workspaceRepository.save(workspace);
+        log.info(
+            "Created default GitLab PAT workspace: groupPath={}, workspaceId={}",
+            savedWorkspace.getAccountLogin(),
+            savedWorkspace.getId()
+        );
+
+        ensureAdminMembership(savedWorkspace);
+    }
+
+    /**
+     * Resolves the GitLab server URL from the workspace config or falls back to the
+     * global default from {@link GitLabProperties}.
+     */
+    private String resolveGitLabServerUrl(String configServerUrl) {
+        if (!isBlank(configServerUrl)) {
+            String url = configServerUrl.trim();
+            return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
+        }
+        return gitLabProperties.defaultServerUrl();
+    }
+
+    /**
+     * Validates the GitLab PAT via {@code GET /api/v4/user} and upserts the token owner.
+     */
+    private Long syncGitLabUserForPAT(String patToken, String serverUrl, String accountLogin) {
+        return userRepository
+            .findByLogin(accountLogin)
+            .map(User::getId)
+            .orElseGet(() -> {
+                GitLabTokenUserResponse userInfo = WebClient.builder()
+                    .build()
+                    .get()
+                    .uri(serverUrl + "/api/v4/user")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + patToken)
+                    .retrieve()
+                    .bodyToMono(GitLabTokenUserResponse.class)
+                    .block(Duration.ofSeconds(10));
+
+                if (userInfo == null || userInfo.id() == null) {
+                    throw new IllegalStateException(
+                        "Failed to validate GitLab PAT against " + serverUrl + "/api/v4/user"
+                    );
+                }
+
+                String login = userInfo.username() != null ? userInfo.username() : accountLogin;
+                String name = userInfo.name() != null ? userInfo.name() : login;
+                String avatar = userInfo.avatarUrl() != null ? userInfo.avatarUrl() : "";
+                String webUrl = userInfo.webUrl() != null ? userInfo.webUrl() : "";
+
+                userRepository.acquireLoginLock(login);
+                userRepository.freeLoginConflicts(login, userInfo.id());
+                userRepository.upsertUser(
+                    userInfo.id(),
+                    login,
+                    name,
+                    avatar,
+                    webUrl,
+                    User.Type.USER.name(),
+                    null,
+                    null,
+                    null
+                );
+                log.info(
+                    "Upserted user for GitLab PAT workspace bootstrap: userLogin={}, userId={}",
+                    login,
+                    userInfo.id()
+                );
+                return userInfo.id();
+            });
     }
 
     private void ensureDefaultAdminMembershipIfPresent() {
@@ -427,4 +558,14 @@ public class WorkspaceProvisioningService {
     ) {}
 
     private record AccountDto(Long id, String login, String type, @JsonProperty("avatar_url") String avatarUrl) {}
+
+    // ============ DTOs for GitLab REST API ============
+
+    private record GitLabTokenUserResponse(
+        Long id,
+        String username,
+        String name,
+        @JsonProperty("avatar_url") String avatarUrl,
+        @JsonProperty("web_url") String webUrl
+    ) {}
 }
