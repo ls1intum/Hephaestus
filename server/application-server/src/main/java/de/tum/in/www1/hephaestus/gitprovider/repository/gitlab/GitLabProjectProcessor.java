@@ -205,7 +205,7 @@ public class GitLabProjectProcessor {
         try {
             return OffsetDateTime.parse(timestamp).toInstant();
         } catch (DateTimeParseException e) {
-            log.debug("Could not parse timestamp: value={}", timestamp);
+            log.warn("Could not parse timestamp: value={}", timestamp);
             return null;
         }
     }

@@ -152,7 +152,7 @@ public class GitLabGroupSyncService {
         if (groupFullPath == null || groupFullPath.isBlank()) {
             log.warn("Skipped group projects sync: reason=nullOrBlankGroupPath, scopeId={}", scopeId);
             return GitLabSyncResult.aborted(
-                GitLabSyncResult.Status.ABORTED_ERROR, Collections.emptyList(), 0
+                GitLabSyncResult.Status.ABORTED_ERROR, Collections.emptyList(), 0, 0
             );
         }
         String safeGroupPath = sanitizeForLog(groupFullPath);
@@ -165,6 +165,7 @@ public class GitLabGroupSyncService {
         String cursor = null;
         int pageCount = 0;
         int projectsSkipped = 0;
+        boolean hadApiFailure = false;
 
         try {
             graphQlClientProvider.acquirePermission();
@@ -173,7 +174,16 @@ public class GitLabGroupSyncService {
                 // Rate limit values are automatically updated by the WebClient exchange filter
                 // that parses RateLimit-* response headers per-request.
                 if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
-                    graphQlClientProvider.waitIfRateLimitLow(scopeId);
+                    try {
+                        graphQlClientProvider.waitIfRateLimitLow(scopeId);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        log.warn("Interrupted while waiting for rate limit reset: scopeId={}", scopeId);
+                        return GitLabSyncResult.aborted(
+                            GitLabSyncResult.Status.ABORTED_RATE_LIMIT,
+                            syncedRepositories, pageCount, projectsSkipped
+                        );
+                    }
                 }
 
                 int pageSize = adaptPageSize(DEFAULT_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId));
@@ -197,6 +207,7 @@ public class GitLabGroupSyncService {
                         response != null ? response.getErrors() : "null response"
                     );
                     graphQlClientProvider.recordFailure(new GitLabSyncException("Invalid GraphQL response"));
+                    hadApiFailure = true;
                     break;
                 }
 
@@ -272,6 +283,22 @@ public class GitLabGroupSyncService {
             } while (pageCount < MAX_PAGINATION_PAGES);
 
             int totalPages = pageCount + 1;
+
+            // Warn if pagination was truncated (more pages exist but we hit the safety limit)
+            if (pageCount >= MAX_PAGINATION_PAGES) {
+                log.warn(
+                    "Pagination truncated at {} pages for group: scopeId={}, groupPath={}, syncedSoFar={}",
+                    MAX_PAGINATION_PAGES,
+                    scopeId,
+                    safeGroupPath,
+                    syncedRepositories.size()
+                );
+                return GitLabSyncResult.aborted(
+                    GitLabSyncResult.Status.ABORTED_ERROR,
+                    syncedRepositories, totalPages, projectsSkipped
+                );
+            }
+
             log.info(
                 "Synced group projects: scopeId={}, groupPath={}, projectCount={}, skipped={}, pages={}",
                 scopeId,
@@ -281,6 +308,13 @@ public class GitLabGroupSyncService {
                 totalPages
             );
 
+            // API failure during pagination → report as aborted, not completed
+            if (hadApiFailure) {
+                return GitLabSyncResult.aborted(
+                    GitLabSyncResult.Status.ABORTED_ERROR,
+                    syncedRepositories, totalPages, projectsSkipped
+                );
+            }
             if (projectsSkipped > 0) {
                 return GitLabSyncResult.withErrors(syncedRepositories, totalPages, projectsSkipped);
             }
@@ -289,7 +323,7 @@ public class GitLabGroupSyncService {
             Thread.currentThread().interrupt();
             log.warn("Interrupted during group project sync: scopeId={}, groupPath={}", scopeId, safeGroupPath);
             return GitLabSyncResult.aborted(
-                GitLabSyncResult.Status.ABORTED_ERROR, syncedRepositories, pageCount
+                GitLabSyncResult.Status.ABORTED_ERROR, syncedRepositories, pageCount, projectsSkipped
             );
         } catch (Exception e) {
             graphQlClientProvider.recordFailure(e);
@@ -301,7 +335,7 @@ public class GitLabGroupSyncService {
                 e
             );
             return GitLabSyncResult.aborted(
-                GitLabSyncResult.Status.ABORTED_ERROR, syncedRepositories, pageCount
+                GitLabSyncResult.Status.ABORTED_ERROR, syncedRepositories, pageCount, projectsSkipped
             );
         }
     }

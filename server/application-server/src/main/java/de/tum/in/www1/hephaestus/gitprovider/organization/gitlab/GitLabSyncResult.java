@@ -52,7 +52,14 @@ public record GitLabSyncResult(
     }
 
     /** Sync aborted (returns whatever was synced before the abort). */
-    public static GitLabSyncResult aborted(Status status, List<Repository> syncedSoFar, int pagesCompleted) {
-        return new GitLabSyncResult(status, Collections.unmodifiableList(syncedSoFar), pagesCompleted, 0);
+    public static GitLabSyncResult aborted(
+        Status status,
+        List<Repository> syncedSoFar,
+        int pagesCompleted,
+        int projectsSkipped
+    ) {
+        return new GitLabSyncResult(
+            status, Collections.unmodifiableList(syncedSoFar), pagesCompleted, projectsSkipped
+        );
     }
 }

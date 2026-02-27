@@ -399,6 +399,7 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
             GitLabSyncResult result = service.syncGroupProjects(1L, "my-org");
 
             assertThat(result.synced()).isEmpty();
+            assertThat(result.status()).isEqualTo(GitLabSyncResult.Status.ABORTED_ERROR);
         }
 
         // -- SyncGroupProjects Helpers --

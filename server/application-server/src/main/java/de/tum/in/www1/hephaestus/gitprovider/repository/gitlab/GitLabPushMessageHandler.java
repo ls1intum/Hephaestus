@@ -5,16 +5,13 @@ import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabEventType;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabMessageHandler;
-import de.tum.in.www1.hephaestus.gitprovider.common.spi.ScopeIdResolver;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
-import de.tum.in.www1.hephaestus.gitprovider.organization.gitlab.GitLabGroupSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.gitlab.dto.GitLabPushEventDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
@@ -27,8 +24,10 @@ import org.springframework.transaction.support.TransactionTemplate;
  * using the embedded project metadata from the webhook payload. This ensures the repository
  * entity exists before any commit processing (future scope).
  * <p>
- * Also ensures the parent group is linked as an Organization. If the organization doesn't
- * exist yet (e.g., push arrives before full sync), it is fetched via GraphQL.
+ * Also ensures the parent group is linked as an Organization via DB lookup.
+ * If the organization doesn't exist yet (push arrives before full sync), it is left unlinked
+ * and will be resolved during the next scheduled sync — avoiding network calls inside the
+ * webhook transaction boundary.
  * <p>
  * Branch deletions are skipped. All other pushes (to any branch) trigger a project upsert
  * because the project metadata is branch-independent.
@@ -42,15 +41,11 @@ public class GitLabPushMessageHandler extends GitLabMessageHandler<GitLabPushEve
     private final GitLabProjectProcessor projectProcessor;
     private final OrganizationRepository organizationRepository;
     private final RepositoryRepository repositoryRepository;
-    private final ObjectProvider<GitLabGroupSyncService> groupSyncServiceProvider;
-    private final ScopeIdResolver scopeIdResolver;
 
     GitLabPushMessageHandler(
         GitLabProjectProcessor projectProcessor,
         OrganizationRepository organizationRepository,
         RepositoryRepository repositoryRepository,
-        ObjectProvider<GitLabGroupSyncService> groupSyncServiceProvider,
-        ScopeIdResolver scopeIdResolver,
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate
     ) {
@@ -58,8 +53,6 @@ public class GitLabPushMessageHandler extends GitLabMessageHandler<GitLabPushEve
         this.projectProcessor = projectProcessor;
         this.organizationRepository = organizationRepository;
         this.repositoryRepository = repositoryRepository;
-        this.groupSyncServiceProvider = groupSyncServiceProvider;
-        this.scopeIdResolver = scopeIdResolver;
     }
 
     @Override
@@ -106,10 +99,11 @@ public class GitLabPushMessageHandler extends GitLabMessageHandler<GitLabPushEve
     }
 
     /**
-     * Ensures the repository is linked to its parent group organization.
+     * Ensures the repository is linked to its parent group organization via DB lookup.
      * <p>
-     * Phase 1: Look up existing org in DB by group path (cheap).
-     * Phase 2: If not found, fetch via GraphQL (requires scopeId resolution).
+     * Only looks up existing organizations in the database — no network calls.
+     * If the org doesn't exist yet (push arrived before first full sync), the repository
+     * will be linked during the next scheduled sync run.
      */
     private void ensureOrganizationLinked(Repository repository, String projectPath) {
         if (repository.getOrganization() != null) {
@@ -121,45 +115,18 @@ public class GitLabPushMessageHandler extends GitLabMessageHandler<GitLabPushEve
             return; // user-owned project, no group
         }
 
-        // Phase 1: DB lookup (most common — org was created during full sync)
         Organization org = organizationRepository.findByLoginIgnoreCase(groupPath).orElse(null);
-
-        // Phase 2: GraphQL fetch (push arrived before full sync)
-        if (org == null) {
-            org = syncGroupViaApi(groupPath);
-        }
 
         if (org != null) {
             repository.setOrganization(org);
             repositoryRepository.save(repository);
             log.debug("Linked org to repository: repoId={}, orgLogin={}", repository.getId(), groupPath);
+        } else {
+            log.debug(
+                "Organization not yet synced, will be linked on next full sync: groupPath={}",
+                sanitizeForLog(groupPath)
+            );
         }
-    }
-
-    /**
-     * Attempts to sync a group via the GraphQL API.
-     * <p>
-     * Uses {@link ScopeIdResolver} to find the workspace that monitors this group,
-     * then delegates to {@link GitLabGroupSyncService#syncGroup}.
-     */
-    @Nullable
-    private Organization syncGroupViaApi(String groupPath) {
-        GitLabGroupSyncService syncService = groupSyncServiceProvider.getIfAvailable();
-        if (syncService == null) {
-            return null;
-        }
-
-        // Try org login first, then repository name fallback
-        var scopeId = scopeIdResolver
-            .findScopeIdByOrgLogin(groupPath)
-            .or(() -> scopeIdResolver.findScopeIdByRepositoryName(groupPath))
-            .orElse(null);
-        if (scopeId == null) {
-            log.debug("Cannot sync group: reason=noScopeId, groupPath={}", sanitizeForLog(groupPath));
-            return null;
-        }
-
-        return syncService.syncGroup(scopeId, groupPath).orElse(null);
     }
 
     /**

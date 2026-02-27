@@ -11,10 +11,8 @@ import static org.mockito.Mockito.when;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabEventType;
-import de.tum.in.www1.hephaestus.gitprovider.common.spi.ScopeIdResolver;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
-import de.tum.in.www1.hephaestus.gitprovider.organization.gitlab.GitLabGroupSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.gitlab.dto.GitLabPushEventDTO;
@@ -28,7 +26,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -43,12 +40,6 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
 
     @Mock
     private RepositoryRepository repositoryRepository;
-
-    @Mock
-    private ObjectProvider<GitLabGroupSyncService> groupSyncServiceProvider;
-
-    @Mock
-    private ScopeIdResolver scopeIdResolver;
 
     @Mock
     private NatsMessageDeserializer deserializer;
@@ -74,8 +65,6 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
             projectProcessor,
             organizationRepository,
             repositoryRepository,
-            groupSyncServiceProvider,
-            scopeIdResolver,
             deserializer,
             transactionTemplate
         );
@@ -274,8 +263,8 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("falls back to API sync when org not in DB")
-        void fallsBackToApiSync() throws IOException {
+        @DisplayName("skips linking when org not yet in DB (deferred to full sync)")
+        void skipsLinkingWhenOrgNotInDb() throws IOException {
             Repository repo = new Repository();
             repo.setId(1L);
 
@@ -283,19 +272,12 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
             when(projectProcessor.processPushEvent(projectInfo)).thenReturn(repo);
             when(organizationRepository.findByLoginIgnoreCase("org")).thenReturn(Optional.empty());
 
-            GitLabGroupSyncService syncService = mock(GitLabGroupSyncService.class);
-            when(groupSyncServiceProvider.getIfAvailable()).thenReturn(syncService);
-
-            Organization org = new Organization();
-            org.setId(42L);
-            when(scopeIdResolver.findScopeIdByOrgLogin("org")).thenReturn(Optional.of(99L));
-            when(syncService.syncGroup(99L, "org")).thenReturn(Optional.of(org));
-
             Message msg = mockMessage("gitlab.org.proj.push", createPushEvent(projectInfo));
             handler.onMessage(msg);
 
-            assertThat(repo.getOrganization()).isSameAs(org);
-            verify(syncService).syncGroup(99L, "org");
+            // Org not found in DB — repo stays unlinked, will be resolved on next full sync
+            assertThat(repo.getOrganization()).isNull();
+            verify(repositoryRepository, never()).save(any());
         }
 
         @Test
