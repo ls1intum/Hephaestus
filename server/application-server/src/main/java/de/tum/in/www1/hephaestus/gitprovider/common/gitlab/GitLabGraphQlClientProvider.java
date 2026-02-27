@@ -38,11 +38,14 @@ import org.springframework.stereotype.Component;
  * public class MergeRequestService {
  *     private final GitLabGraphQlClientProvider clientProvider;
  *
- *     public Mono<MergeRequest> fetchMR(Long scopeId, String projectPath, String iid) {
+ *     public MergeRequest fetchMR(Long scopeId, String projectPath, String iid) {
  *         return clientProvider.forScope(scopeId)
- *             .document("query { project(fullPath: \"" + projectPath + "\") { ... } }")
+ *             .documentName("GetMergeRequest")
+ *             .variable("fullPath", projectPath)
+ *             .variable("iid", iid)
  *             .retrieve("project.mergeRequest")
- *             .toEntity(MergeRequest.class);
+ *             .toEntity(MergeRequest.class)
+ *             .block();
  *     }
  * }
  * }</pre>

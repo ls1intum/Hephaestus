@@ -325,6 +325,15 @@ hephaestus:
             repositories-to-monitor:
                 - ls1intum/Hephaestus
                 - ls1intum/Artemis
+        # Set to true to bootstrap a GitLab PAT workspace on startup (for local development)
+        init-gitlab-default: ${GITLAB_WORKSPACE_INIT_DEFAULT:false}
+        gitlab-default:
+            # GitLab group full path (e.g., my-org/my-team)
+            login: ${GITLAB_GROUP_PATH:}
+            # GitLab Group or Personal Access Token
+            token: ${GITLAB_PAT:}
+            # Custom server URL for self-hosted GitLab (optional, defaults to https://gitlab.com)
+            server-url: ${GITLAB_SERVER_URL:}
 
     intelligence-service:
         url: http://localhost:${INTELLIGENCE_SERVICE_PORT:8000}

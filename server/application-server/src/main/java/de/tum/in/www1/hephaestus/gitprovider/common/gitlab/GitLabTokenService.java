@@ -190,7 +190,21 @@ public class GitLabTokenService {
      * @param username     the GitLab username
      * @param validatedAt  when the token was last validated
      */
-    public record ValidatedToken(String token, long gitlabUserId, String username, Instant validatedAt) {}
+    public record ValidatedToken(String token, long gitlabUserId, String username, Instant validatedAt) {
+        /** Excludes the token value to prevent accidental credential exposure in logs. */
+        @Override
+        public String toString() {
+            return (
+                "ValidatedToken[gitlabUserId=" +
+                gitlabUserId +
+                ", username=" +
+                username +
+                ", validatedAt=" +
+                validatedAt +
+                "]"
+            );
+        }
+    }
 
     /**
      * Minimal response from GitLab {@code GET /api/v4/user} endpoint.

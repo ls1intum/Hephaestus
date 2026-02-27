@@ -1,0 +1,11 @@
+query GetGroup($fullPath: ID!) {
+    group(fullPath: $fullPath) {
+        id
+        fullPath
+        name
+        avatarUrl
+        webUrl
+        description
+        visibility
+    }
+}

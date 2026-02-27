@@ -10,13 +10,16 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncCons
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubTransportErrors;
 import java.time.Duration;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.graphql.client.HttpGraphQlClient;
+import org.springframework.graphql.support.ResourceDocumentSource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
@@ -83,7 +86,13 @@ public class GitLabGraphQlConfig {
     @Bean
     @Qualifier("gitLabGraphQlClient")
     public HttpGraphQlClient gitLabGraphQlClient(@Qualifier("gitLabGraphQlWebClient") WebClient webClient) {
-        return HttpGraphQlClient.builder(webClient).build();
+        // Load .graphql operation files by name (e.g., documentName("GetGroup"))
+        // from the classpath. No fragment merging needed — GitLab operations are self-contained.
+        ResourceDocumentSource documentSource = new ResourceDocumentSource(
+            List.of(new ClassPathResource("graphql/gitlab/operations/")),
+            List.of(".graphql", ".gql")
+        );
+        return HttpGraphQlClient.builder(webClient).documentSource(documentSource).build();
     }
 
     private ExchangeFilterFunction rateLimitLoggingFilter() {

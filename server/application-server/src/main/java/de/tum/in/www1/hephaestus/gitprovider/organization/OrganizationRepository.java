@@ -8,10 +8,10 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Repository for GitHub organization entities.
+ * Repository for git provider organization entities (GitHub organizations, GitLab groups).
  *
  * <p>Organizations are linked to scopes via consuming modules. Lookups by
- * installation ID or login are used during sync/installation operations to resolve
+ * provider ID or login are used during sync/installation operations to resolve
  * organization identity.
  *
  * <p>Legitimately scope-agnostic: These lookups happen during webhook processing

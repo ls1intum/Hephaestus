@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.common.gitlab;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
@@ -74,15 +75,15 @@ class GitLabMessageHandlerRegistryTest {
     }
 
     @Test
-    @DisplayName("duplicate handler registration: last writer wins")
-    void constructor_duplicateHandlers_lastWriterWins() {
+    @DisplayName("duplicate handler registration throws IllegalStateException")
+    void constructor_duplicateHandlers_throwsIllegalStateException() {
         var handler1 = new StubMergeRequestHandler();
         var handler2 = new StubMergeRequestHandler();
-        var registry = new GitLabMessageHandlerRegistry(new GitLabMessageHandler<?>[] { handler1, handler2 });
 
-        // Last registered handler should win (HashMap.put semantics)
-        assertThat(registry.getHandler("merge_request")).isSameAs(handler2);
-        assertThat(registry.getSupportedEvents()).hasSize(1);
+        assertThatThrownBy(() -> new GitLabMessageHandlerRegistry(new GitLabMessageHandler<?>[] { handler1, handler2 }))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("Duplicate GitLab message handler")
+            .hasMessageContaining("merge_request");
     }
 
     /**
