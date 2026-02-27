@@ -22,6 +22,15 @@ query GetGroupProjects($fullPath: ID!, $first: Int!, $after: String, $includeSub
                 archived
                 createdAt
                 lastActivityAt
+                group {
+                    id
+                    fullPath
+                    name
+                    avatarUrl
+                    webUrl
+                    description
+                    visibility
+                }
                 repository {
                     rootRef
                 }

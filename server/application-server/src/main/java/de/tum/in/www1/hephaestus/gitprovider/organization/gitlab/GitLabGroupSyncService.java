@@ -131,41 +131,47 @@ public class GitLabGroupSyncService {
     }
 
     /**
-     * Syncs all projects in a GitLab group using cursor-based pagination.
+     * Syncs all projects in a GitLab group (including subgroups) using cursor-based pagination.
      * <p>
-     * For each project, the parent group is also persisted as an Organization.
-     * Rate limits are tracked between pages, and page size adapts to remaining budget.
+     * For each project, the immediate parent group is resolved and persisted as an Organization.
+     * Subgroup projects are included automatically — each project's {@code group} field provides
+     * the immediate parent, which is upserted independently of the top-level group.
+     * <p>
+     * Rate limits are tracked between pages and page size adapts to remaining budget.
+     * Individual project failures do not abort the sync — they are counted in the result.
      *
      * @param scopeId       the workspace/scope ID for authentication
      * @param groupFullPath the full path of the group
-     * @return list of synced Repository entities (may be empty on error)
+     * @return structured result with synced repositories, page counts, and error counts
      */
     // Note: intentionally NOT @Transactional — this is an orchestrator that makes multiple
     // API calls with throttle delays between pages. Each project upsert and the group sync
     // have their own @Transactional boundaries, so we don't hold a DB connection during
     // network calls or Thread.sleep().
-    public List<Repository> syncGroupProjects(Long scopeId, String groupFullPath) {
+    public GitLabSyncResult syncGroupProjects(Long scopeId, String groupFullPath) {
         if (groupFullPath == null || groupFullPath.isBlank()) {
             log.warn("Skipped group projects sync: reason=nullOrBlankGroupPath, scopeId={}", scopeId);
-            return Collections.emptyList();
+            return GitLabSyncResult.aborted(
+                GitLabSyncResult.Status.ABORTED_ERROR, Collections.emptyList(), 0
+            );
         }
         String safeGroupPath = sanitizeForLog(groupFullPath);
 
-        // Organization is extracted from the first page response (group fields are inlined
-        // in GetGroupProjects query), eliminating a separate API call.
-        Organization organization = null;
+        // Top-level organization is extracted from the first page response (group fields are
+        // inlined in GetGroupProjects query), eliminating a separate API call.
+        Organization topLevelOrganization = null;
 
         List<Repository> syncedRepositories = new ArrayList<>();
         String cursor = null;
         int pageCount = 0;
+        int projectsSkipped = 0;
 
         try {
             graphQlClientProvider.acquirePermission();
 
             do {
-                // Rate limit tracking: values are populated when the WebClient exchange filter
-                // is enhanced to call updateRateLimit(scopeId, headers) per-request.
-                // Until then, getRateLimitRemaining returns the default budget.
+                // Rate limit values are automatically updated by the WebClient exchange filter
+                // that parses RateLimit-* response headers per-request.
                 if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
                     graphQlClientProvider.waitIfRateLimitLow(scopeId);
                 }
@@ -178,7 +184,7 @@ public class GitLabGroupSyncService {
                     .variable("fullPath", groupFullPath)
                     .variable("first", pageSize)
                     .variable("after", cursor)
-                    .variable("includeSubgroups", false)
+                    .variable("includeSubgroups", true)
                     .execute()
                     .block(gitLabProperties.extendedGraphqlTimeout());
 
@@ -196,13 +202,13 @@ public class GitLabGroupSyncService {
 
                 graphQlClientProvider.recordSuccess();
 
-                // On the first page, extract and persist the group from the inlined fields
+                // On the first page, extract and persist the top-level group from inlined fields
                 if (pageCount == 0) {
                     GitLabGroupResponse groupData = response.field("group").toEntity(GitLabGroupResponse.class);
                     if (groupData != null) {
-                        organization = groupProcessor.process(groupData);
+                        topLevelOrganization = groupProcessor.process(groupData);
                     }
-                    if (organization == null) {
+                    if (topLevelOrganization == null) {
                         log.warn(
                             "Failed to resolve group on first page, aborting sync: scopeId={}, groupPath={}",
                             scopeId,
@@ -213,20 +219,33 @@ public class GitLabGroupSyncService {
                     log.info(
                         "Synced group: scopeId={}, orgId={}, groupPath={}",
                         scopeId,
-                        organization.getId(),
+                        topLevelOrganization.getId(),
                         safeGroupPath
                     );
                 }
 
-                // Parse project nodes
+                // Parse project nodes — each project may belong to a different subgroup
                 List<GitLabProjectResponse> projects = response
                     .field("group.projects.nodes")
                     .toEntityList(GitLabProjectResponse.class);
 
                 for (GitLabProjectResponse project : projects) {
-                    Repository repo = projectProcessor.processGraphQlResponse(project, organization);
-                    if (repo != null) {
-                        syncedRepositories.add(repo);
+                    try {
+                        // Resolve the project's immediate parent group (may differ from top-level)
+                        Organization projectOrg = resolveProjectOrganization(project, topLevelOrganization);
+                        Repository repo = projectProcessor.processGraphQlResponse(project, projectOrg);
+                        if (repo != null) {
+                            syncedRepositories.add(repo);
+                        } else {
+                            projectsSkipped++;
+                        }
+                    } catch (Exception e) {
+                        projectsSkipped++;
+                        log.warn(
+                            "Failed to process project: fullPath={}, error={}",
+                            project.fullPath(),
+                            e.getMessage()
+                        );
                     }
                 }
 
@@ -252,16 +271,26 @@ public class GitLabGroupSyncService {
                 Thread.sleep(gitLabProperties.paginationThrottle().toMillis());
             } while (pageCount < MAX_PAGINATION_PAGES);
 
+            int totalPages = pageCount + 1;
             log.info(
-                "Synced group projects: scopeId={}, groupPath={}, projectCount={}, pages={}",
+                "Synced group projects: scopeId={}, groupPath={}, projectCount={}, skipped={}, pages={}",
                 scopeId,
                 safeGroupPath,
                 syncedRepositories.size(),
-                pageCount + 1
+                projectsSkipped,
+                totalPages
             );
+
+            if (projectsSkipped > 0) {
+                return GitLabSyncResult.withErrors(syncedRepositories, totalPages, projectsSkipped);
+            }
+            return GitLabSyncResult.completed(syncedRepositories, totalPages);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             log.warn("Interrupted during group project sync: scopeId={}, groupPath={}", scopeId, safeGroupPath);
+            return GitLabSyncResult.aborted(
+                GitLabSyncResult.Status.ABORTED_ERROR, syncedRepositories, pageCount
+            );
         } catch (Exception e) {
             graphQlClientProvider.recordFailure(e);
             log.error(
@@ -271,8 +300,30 @@ public class GitLabGroupSyncService {
                 syncedRepositories.size(),
                 e
             );
+            return GitLabSyncResult.aborted(
+                GitLabSyncResult.Status.ABORTED_ERROR, syncedRepositories, pageCount
+            );
         }
+    }
 
-        return Collections.unmodifiableList(syncedRepositories);
+    /**
+     * Resolves the Organization for a project.
+     * <p>
+     * If the project has an inline {@code group} field (from GetGroupProjects with subgroups),
+     * that group is upserted as the project's organization. Otherwise, the top-level group
+     * is used as fallback. This correctly handles nested group hierarchies like
+     * {@code org/team/subteam/project}.
+     */
+    private Organization resolveProjectOrganization(
+        GitLabProjectResponse project,
+        Organization topLevelOrganization
+    ) {
+        if (project.group() != null) {
+            Organization subOrg = groupProcessor.process(project.group());
+            if (subOrg != null) {
+                return subOrg;
+            }
+        }
+        return topLevelOrganization;
     }
 }

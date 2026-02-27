@@ -158,26 +158,26 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("null group path returns empty list")
-        void nullGroupPath_returnsEmptyList() {
-            List<Repository> result = service.syncGroupProjects(1L, null);
-            assertThat(result).isEmpty();
+        @DisplayName("null group path returns aborted result")
+        void nullGroupPath_returnsAborted() {
+            GitLabSyncResult result = service.syncGroupProjects(1L, null);
+            assertThat(result.status()).isEqualTo(GitLabSyncResult.Status.ABORTED_ERROR);
+            assertThat(result.synced()).isEmpty();
             verify(graphQlClientProvider, never()).acquirePermission();
         }
 
         @Test
-        @DisplayName("blank group path returns empty list")
-        void blankGroupPath_returnsEmptyList() {
-            List<Repository> result = service.syncGroupProjects(1L, "   ");
-            assertThat(result).isEmpty();
+        @DisplayName("blank group path returns aborted result")
+        void blankGroupPath_returnsAborted() {
+            GitLabSyncResult result = service.syncGroupProjects(1L, "   ");
+            assertThat(result.status()).isEqualTo(GitLabSyncResult.Status.ABORTED_ERROR);
+            assertThat(result.synced()).isEmpty();
             verify(graphQlClientProvider, never()).acquirePermission();
         }
 
         @Test
         @DisplayName("null group on first page aborts sync")
         void nullGroupOnFirstPage_abortsSyncWithEmptyList() {
-            // Build a valid response where the group field resolves to a group,
-            // but the processor rejects it (returns null) — sync should abort
             ClientGraphQlResponse resp = mock(ClientGraphQlResponse.class);
             when(resp.isValid()).thenReturn(true);
 
@@ -191,18 +191,18 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
             when(requestSpec.variable(anyString(), any())).thenReturn(requestSpec);
             when(requestSpec.execute()).thenReturn(Mono.just(resp));
 
-            when(groupProcessor.process(any())).thenReturn(null); // group processing fails
+            when(groupProcessor.process(any())).thenReturn(null);
             when(graphQlClientProvider.getRateLimitRemaining(1L)).thenReturn(100);
 
-            List<Repository> result = service.syncGroupProjects(1L, "my-org");
+            GitLabSyncResult result = service.syncGroupProjects(1L, "my-org");
 
-            assertThat(result).isEmpty();
+            assertThat(result.synced()).isEmpty();
             verify(projectProcessor, never()).processGraphQlResponse(any(), any());
         }
 
         @Test
-        @DisplayName("empty group returns empty list")
-        void emptyGroup_returnsEmptyList() {
+        @DisplayName("empty group returns completed with empty list")
+        void emptyGroup_returnsCompleted() {
             ClientGraphQlResponse projectsResp = mockProjectsPageWithGroup(List.of(), null);
 
             HttpGraphQlClient client = mockClient();
@@ -210,9 +210,10 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
             when(groupProcessor.process(any())).thenReturn(org);
             when(graphQlClientProvider.getRateLimitRemaining(1L)).thenReturn(100);
 
-            List<Repository> result = service.syncGroupProjects(1L, "my-org");
+            GitLabSyncResult result = service.syncGroupProjects(1L, "my-org");
 
-            assertThat(result).isEmpty();
+            assertThat(result.status()).isEqualTo(GitLabSyncResult.Status.COMPLETED);
+            assertThat(result.synced()).isEmpty();
         }
 
         @Test
@@ -235,10 +236,12 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
             when(projectProcessor.processGraphQlResponse(eq(proj1), any())).thenReturn(repo1);
             when(projectProcessor.processGraphQlResponse(eq(proj2), any())).thenReturn(repo2);
 
-            List<Repository> result = service.syncGroupProjects(1L, "my-org");
+            GitLabSyncResult result = service.syncGroupProjects(1L, "my-org");
 
-            assertThat(result).hasSize(2);
-            assertThat(result).extracting(Repository::getId).containsExactly(10L, 20L);
+            assertThat(result.status()).isEqualTo(GitLabSyncResult.Status.COMPLETED);
+            assertThat(result.synced()).hasSize(2);
+            assertThat(result.synced()).extracting(Repository::getId).containsExactly(10L, 20L);
+            assertThat(result.projectsSkipped()).isZero();
         }
 
         @Test
@@ -265,15 +268,16 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
             when(projectProcessor.processGraphQlResponse(eq(proj1), any())).thenReturn(repo1);
             when(projectProcessor.processGraphQlResponse(eq(proj2), any())).thenReturn(repo2);
 
-            List<Repository> result = service.syncGroupProjects(1L, "my-org");
+            GitLabSyncResult result = service.syncGroupProjects(1L, "my-org");
 
-            assertThat(result).hasSize(2);
-            assertThat(result).extracting(Repository::getId).containsExactly(10L, 20L);
+            assertThat(result.status()).isEqualTo(GitLabSyncResult.Status.COMPLETED);
+            assertThat(result.synced()).hasSize(2);
+            assertThat(result.pagesCompleted()).isEqualTo(2);
         }
 
         @Test
-        @DisplayName("null processor result is filtered out")
-        void nullProcessorResult_filteredOut() {
+        @DisplayName("null processor result is counted as skipped")
+        void nullProcessorResult_countedAsSkipped() {
             var proj1 = createMinimalProject("gid://gitlab/Project/10", "my-org/proj-a", "proj-a");
             var proj2 = createMinimalProject("gid://gitlab/Project/20", "my-org/proj-b", "proj-b");
 
@@ -287,16 +291,98 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
             Repository repo1 = new Repository();
             repo1.setId(10L);
             when(projectProcessor.processGraphQlResponse(eq(proj1), any())).thenReturn(repo1);
-            when(projectProcessor.processGraphQlResponse(eq(proj2), any())).thenReturn(null); // invalid project
+            when(projectProcessor.processGraphQlResponse(eq(proj2), any())).thenReturn(null);
 
-            List<Repository> result = service.syncGroupProjects(1L, "my-org");
+            GitLabSyncResult result = service.syncGroupProjects(1L, "my-org");
 
-            assertThat(result).hasSize(1);
-            assertThat(result.get(0).getId()).isEqualTo(10L);
+            assertThat(result.status()).isEqualTo(GitLabSyncResult.Status.COMPLETED_WITH_ERRORS);
+            assertThat(result.synced()).hasSize(1);
+            assertThat(result.projectsSkipped()).isEqualTo(1);
         }
 
         @Test
-        @DisplayName("invalid first page response returns empty list")
+        @DisplayName("processor exception counts as skipped, does not abort sync")
+        void processorException_countedAsSkipped() {
+            var proj1 = createMinimalProject("gid://gitlab/Project/10", "my-org/proj-a", "proj-a");
+            var proj2 = createMinimalProject("gid://gitlab/Project/20", "my-org/proj-b", "proj-b");
+
+            ClientGraphQlResponse projectsResp = mockProjectsPageWithGroup(List.of(proj1, proj2), null);
+
+            HttpGraphQlClient client = mockClient();
+            mockSequentialExecute(client, projectsResp);
+            when(groupProcessor.process(any())).thenReturn(org);
+            when(graphQlClientProvider.getRateLimitRemaining(1L)).thenReturn(100);
+
+            Repository repo2 = new Repository();
+            repo2.setId(20L);
+            when(projectProcessor.processGraphQlResponse(eq(proj1), any()))
+                .thenThrow(new RuntimeException("DB error"));
+            when(projectProcessor.processGraphQlResponse(eq(proj2), any())).thenReturn(repo2);
+
+            GitLabSyncResult result = service.syncGroupProjects(1L, "my-org");
+
+            assertThat(result.status()).isEqualTo(GitLabSyncResult.Status.COMPLETED_WITH_ERRORS);
+            assertThat(result.synced()).hasSize(1);
+            assertThat(result.synced().get(0).getId()).isEqualTo(20L);
+            assertThat(result.projectsSkipped()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("subgroup project uses its own group, not top-level")
+        void subgroupProject_usesOwnGroup() {
+            var subGroupResponse = new GitLabGroupResponse(
+                "gid://gitlab/Group/99",
+                "my-org/sub-team",
+                "Sub Team",
+                null,
+                "https://gitlab.com/my-org/sub-team",
+                null,
+                "public"
+            );
+
+            // Project has its own group (from subgroup)
+            var proj1 = new GitLabProjectResponse(
+                "gid://gitlab/Project/10",
+                "my-org/sub-team/proj-a",
+                "proj-a",
+                "https://gitlab.com/my-org/sub-team/proj-a",
+                null,
+                "public",
+                false,
+                null,
+                null,
+                subGroupResponse, // subgroup
+                null
+            );
+
+            ClientGraphQlResponse projectsResp = mockProjectsPageWithGroup(List.of(proj1), null);
+
+            HttpGraphQlClient client = mockClient();
+            mockSequentialExecute(client, projectsResp);
+
+            Organization subOrg = new Organization();
+            subOrg.setId(99L);
+            subOrg.setLogin("my-org/sub-team");
+
+            // First call: top-level group; subsequent calls: subgroup
+            when(groupProcessor.process(DEFAULT_GROUP)).thenReturn(org);
+            when(groupProcessor.process(subGroupResponse)).thenReturn(subOrg);
+            when(graphQlClientProvider.getRateLimitRemaining(1L)).thenReturn(100);
+
+            Repository repo1 = new Repository();
+            repo1.setId(10L);
+            when(projectProcessor.processGraphQlResponse(eq(proj1), eq(subOrg))).thenReturn(repo1);
+
+            GitLabSyncResult result = service.syncGroupProjects(1L, "my-org");
+
+            assertThat(result.status()).isEqualTo(GitLabSyncResult.Status.COMPLETED);
+            assertThat(result.synced()).hasSize(1);
+            // Verify processor was called with the subgroup org, not the top-level org
+            verify(projectProcessor).processGraphQlResponse(proj1, subOrg);
+        }
+
+        @Test
+        @DisplayName("invalid first page response returns empty synced list")
         void invalidFirstPage_returnsEmptyList() {
             HttpGraphQlClient client = mockClient();
             ClientGraphQlResponse invalidResp = mock(ClientGraphQlResponse.class);
@@ -310,9 +396,9 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
 
             when(graphQlClientProvider.getRateLimitRemaining(1L)).thenReturn(100);
 
-            List<Repository> result = service.syncGroupProjects(1L, "my-org");
+            GitLabSyncResult result = service.syncGroupProjects(1L, "my-org");
 
-            assertThat(result).isEmpty();
+            assertThat(result.synced()).isEmpty();
         }
 
         // -- SyncGroupProjects Helpers --

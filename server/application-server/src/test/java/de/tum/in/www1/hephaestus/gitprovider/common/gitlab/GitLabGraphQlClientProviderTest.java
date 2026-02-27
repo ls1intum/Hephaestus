@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.gitprovider.common.gitlab;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
@@ -65,6 +66,7 @@ class GitLabGraphQlClientProviderTest extends BaseUnitTest {
             doReturn(mutateBuilder).when(baseClient).mutate();
             doReturn(mutateBuilder).when(mutateBuilder).url("https://gitlab.example.com/api/graphql");
             doReturn(mutateBuilder).when(mutateBuilder).header("Authorization", "Bearer glpat-test-token");
+            doReturn(mutateBuilder).when(mutateBuilder).webClient(any());
             doReturn(builtClient).when(mutateBuilder).build();
 
             HttpGraphQlClient result = provider.forScope(1L);
@@ -72,6 +74,7 @@ class GitLabGraphQlClientProviderTest extends BaseUnitTest {
             assertThat(result).isSameAs(builtClient);
             verify(mutateBuilder).url("https://gitlab.example.com/api/graphql");
             verify(mutateBuilder).header("Authorization", "Bearer glpat-test-token");
+            verify(mutateBuilder).webClient(any());
         }
 
         @Test

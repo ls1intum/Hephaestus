@@ -27,9 +27,9 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * @implNote The {@code Organization} entity uses {@code id} and {@code githubId} as
  * provider-specific numeric IDs. GitLab group IDs and GitHub organization IDs are
- * independent sequences that may produce overlapping values. Concurrent use of both
- * providers in the same database requires a future schema migration to add a provider
- * discriminator column. Until then, deployments should use only one git provider.
+ * independent sequences that may produce overlapping values. A runtime guard in
+ * {@code WorkspaceActivationService.activateAllWorkspaces()} prevents mixed-provider
+ * deployments from starting. A future schema migration will add a provider discriminator column.
  */
 @Service
 @ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")

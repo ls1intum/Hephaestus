@@ -9,6 +9,8 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncCons
 import static de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants.TRANSPORT_MAX_RETRIES;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubTransportErrors;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabRateLimitTracker;
 import java.time.Duration;
 import java.util.List;
 import org.slf4j.Logger;
@@ -17,6 +19,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.graphql.support.ResourceDocumentSource;
@@ -53,6 +56,12 @@ public class GitLabGraphQlConfig {
     private static final Duration INITIAL_BACKOFF = Duration.ofSeconds(5);
     private static final Duration MAX_BACKOFF = Duration.ofSeconds(60);
 
+    private final GitLabRateLimitTracker rateLimitTracker;
+
+    public GitLabGraphQlConfig(@Lazy GitLabRateLimitTracker rateLimitTracker) {
+        this.rateLimitTracker = rateLimitTracker;
+    }
+
     @Bean
     @Qualifier("gitLabGraphQlWebClient")
     public WebClient gitLabGraphQlWebClient() {
@@ -77,7 +86,7 @@ public class GitLabGraphQlConfig {
             .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
             .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
             .exchangeStrategies(strategies)
-            .filter(rateLimitLoggingFilter())
+            .filter(rateLimitTrackingFilter())
             .filter(retryFilter())
             .filter(transportErrorRetryFilter())
             .build();
@@ -95,11 +104,30 @@ public class GitLabGraphQlConfig {
         return HttpGraphQlClient.builder(webClient).documentSource(documentSource).build();
     }
 
-    private ExchangeFilterFunction rateLimitLoggingFilter() {
-        return ExchangeFilterFunction.ofResponseProcessor(response -> {
-            logRateLimitInfo(response);
-            return Mono.just(response);
-        });
+    /**
+     * Exchange filter that logs rate limit info AND updates the per-scope rate limit tracker.
+     * <p>
+     * Uses the {@code (request, next)} filter pattern (not just response processor) to access
+     * the scopeId from the request's {@link GitLabGraphQlClientProvider#SCOPE_ID_ATTRIBUTE}.
+     * The tracker update is a non-blocking side-effect via {@code doOnNext}.
+     */
+    private ExchangeFilterFunction rateLimitTrackingFilter() {
+        return (request, next) ->
+            next
+                .exchange(request)
+                .doOnNext(response -> {
+                    logRateLimitInfo(response);
+
+                    // Update per-scope rate limit tracker from response headers
+                    request
+                        .attribute(GitLabGraphQlClientProvider.SCOPE_ID_ATTRIBUTE)
+                        .ifPresent(scopeIdObj ->
+                            rateLimitTracker.updateFromHeaders(
+                                (Long) scopeIdObj,
+                                response.headers().asHttpHeaders()
+                            )
+                        );
+                });
     }
 
     private void logRateLimitInfo(ClientResponse response) {

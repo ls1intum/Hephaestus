@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.workspace;
 
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
 import de.tum.in.www1.hephaestus.gitprovider.organization.gitlab.GitLabGroupSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.organization.gitlab.GitLabSyncResult;
 import de.tum.in.www1.hephaestus.gitprovider.sync.GitHubDataSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.sync.NatsConsumerService;
 import de.tum.in.www1.hephaestus.gitprovider.sync.NatsProperties;
@@ -14,6 +15,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -110,6 +112,22 @@ public class WorkspaceActivationService {
         if (workspacesToActivate.isEmpty()) {
             log.info("No workspaces to activate after filtering");
             return;
+        }
+
+        // Guard: GitLab and GitHub use overlapping numeric ID spaces for Organization/Repository.
+        // Until a provider discriminator column is added, mixed-provider deployments would corrupt data.
+        Set<GitProviderType> providerTypes = workspacesToActivate
+            .stream()
+            .map(Workspace::getProviderType)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+        if (providerTypes.contains(GitProviderType.GITLAB) && providerTypes.size() > 1) {
+            throw new IllegalStateException(
+                "Mixed git providers detected: "
+                    + providerTypes
+                    + ". GitLab and GitHub use overlapping numeric ID spaces. "
+                    + "Use only one provider per deployment until schema migration adds a provider discriminator."
+            );
         }
 
         log.info("Activating workspaces: count={}", workspacesToActivate.size());
@@ -221,7 +239,16 @@ public class WorkspaceActivationService {
                     // Group metadata is extracted from the first page response (no extra API call)
                     var syncService = gitLabGroupSyncServiceProvider.getIfAvailable();
                     if (syncService != null) {
-                        syncService.syncGroupProjects(workspace.getId(), workspace.getAccountLogin());
+                        GitLabSyncResult result =
+                            syncService.syncGroupProjects(workspace.getId(), workspace.getAccountLogin());
+                        log.info(
+                            "GitLab sync result: workspaceId={}, status={}, synced={}, skipped={}, pages={}",
+                            workspace.getId(),
+                            result.status(),
+                            result.synced().size(),
+                            result.projectsSkipped(),
+                            result.pagesCompleted()
+                        );
                         // Link workspace to organization after sync (org was created during sync)
                         linkWorkspaceToOrganization(workspace);
                     } else {

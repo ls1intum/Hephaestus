@@ -55,6 +55,12 @@ import org.springframework.stereotype.Component;
 @ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
 public class GitLabGraphQlClientProvider {
 
+    /**
+     * WebClient request attribute key for passing scopeId through to exchange filters.
+     * This attribute is internal to the HTTP client pipeline — never sent on the wire.
+     */
+    public static final String SCOPE_ID_ATTRIBUTE = "hephaestus.gitlab.scopeId";
+
     private final HttpGraphQlClient baseClient;
     private final GitLabTokenService tokenService;
     private final CircuitBreaker circuitBreaker;
@@ -131,6 +137,9 @@ public class GitLabGraphQlClientProvider {
             .mutate()
             .url(serverUrl + GITLAB_GRAPHQL_PATH)
             .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+            .webClient(builder ->
+                builder.defaultRequest(spec -> spec.attribute(SCOPE_ID_ATTRIBUTE, scopeId))
+            )
             .build();
     }
 
