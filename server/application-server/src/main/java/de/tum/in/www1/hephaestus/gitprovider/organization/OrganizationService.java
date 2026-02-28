@@ -23,11 +23,11 @@ public class OrganizationService {
         }
 
         Organization organization = organizations
-            .findByGithubId(githubId)
+            .findByProviderId(githubId)
             .orElseGet(() -> {
                 Organization o = new Organization();
                 o.setId(githubId);
-                o.setGithubId(githubId);
+                o.setProviderId(githubId);
                 return o;
             });
 
@@ -40,7 +40,7 @@ public class OrganizationService {
             return organizations.saveAndFlush(organization);
         } catch (DataIntegrityViolationException ex) {
             // Another thread saved the same org in parallel; reuse the persisted row
-            return organizations.findByGithubId(githubId).orElseThrow(() -> ex); // rethrow if genuinely unavailable
+            return organizations.findByProviderId(githubId).orElseThrow(() -> ex); // rethrow if genuinely unavailable
         }
     }
 }

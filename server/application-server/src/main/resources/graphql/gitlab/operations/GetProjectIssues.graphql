@@ -1,0 +1,46 @@
+query GetProjectIssues($fullPath: ID!, $first: Int!, $after: String, $updatedAfter: Time) {
+    project(fullPath: $fullPath) {
+        issues(first: $first, after: $after, updatedAfter: $updatedAfter, sort: UPDATED_DESC) {
+            pageInfo {
+                hasNextPage
+                endCursor
+            }
+            nodes {
+                id
+                iid
+                title
+                description
+                state
+                confidential
+                webUrl
+                createdAt
+                updatedAt
+                closedAt
+                author {
+                    id
+                    username
+                    name
+                    avatarUrl
+                    webUrl
+                }
+                labels(first: 100) {
+                    nodes {
+                        id
+                        title
+                        color
+                    }
+                }
+                assignees(first: 20) {
+                    nodes {
+                        id
+                        username
+                        name
+                        avatarUrl
+                        webUrl
+                    }
+                }
+                userNotesCount
+            }
+        }
+    }
+}

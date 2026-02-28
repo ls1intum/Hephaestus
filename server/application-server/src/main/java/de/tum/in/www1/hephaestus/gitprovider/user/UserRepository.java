@@ -130,8 +130,11 @@ public interface UserRepository extends JpaRepository<User, Long> {
      *
      * @return true if the lock was acquired, false if another transaction holds it
      */
-    @Query(value = "SELECT pg_try_advisory_xact_lock(hashtext(LOWER(:login)))", nativeQuery = true)
-    boolean tryAcquireLoginLock(@Param("login") String login);
+    @Query(
+        value = "SELECT pg_try_advisory_xact_lock(hashtext(CONCAT(:provider, ':', LOWER(:login))))",
+        nativeQuery = true
+    )
+    boolean tryAcquireLoginLock(@Param("login") String login, @Param("provider") String provider);
 
     /**
      * Acquire a transaction-scoped advisory lock on the given login.
@@ -148,8 +151,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
      * Must be called before {@link #freeLoginConflicts} and {@link #upsertUser}
      * to prevent cross-scope race conditions.
      */
-    @Query(value = "SELECT pg_advisory_xact_lock(hashtext(LOWER(:login)))", nativeQuery = true)
-    void acquireLoginLock(@Param("login") String login);
+    @Query(value = "SELECT pg_advisory_xact_lock(hashtext(CONCAT(:provider, ':', LOWER(:login))))", nativeQuery = true)
+    void acquireLoginLock(@Param("login") String login, @Param("provider") String provider);
 
     /**
      * Rename any user that currently holds the target login (other than the given id)
@@ -163,11 +166,11 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query(
         value = """
         UPDATE "user" SET login = 'RENAMED_' || id
-        WHERE LOWER("user".login) = LOWER(:login) AND "user".id != :id
+        WHERE LOWER("user".login) = LOWER(:login) AND "user".id != :id AND "user".provider = :provider
         """,
         nativeQuery = true
     )
-    void freeLoginConflicts(@Param("login") String login, @Param("id") Long id);
+    void freeLoginConflicts(@Param("login") String login, @Param("id") Long id, @Param("provider") String provider);
 
     /**
      * Insert or update a user via {@code INSERT ... ON CONFLICT (id) DO UPDATE}.
@@ -194,8 +197,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Modifying
     @Query(
         value = """
-        INSERT INTO "user" (id, login, name, avatar_url, html_url, type, email, created_at, updated_at)
-        VALUES (:id, :login, :name, :avatarUrl, :htmlUrl, :type, :email, :createdAt, :updatedAt)
+        INSERT INTO "user" (id, login, name, avatar_url, html_url, type, email, created_at, updated_at, provider)
+        VALUES (:id, :login, :name, :avatarUrl, :htmlUrl, :type, :email, :createdAt, :updatedAt, :provider)
         ON CONFLICT (id) DO UPDATE SET
             login = EXCLUDED.login,
             name = EXCLUDED.name,
@@ -217,6 +220,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
         @Param("type") String type,
         @Param("email") String email,
         @Param("createdAt") Instant createdAt,
-        @Param("updatedAt") Instant updatedAt
+        @Param("updatedAt") Instant updatedAt,
+        @Param("provider") String provider
     );
 }

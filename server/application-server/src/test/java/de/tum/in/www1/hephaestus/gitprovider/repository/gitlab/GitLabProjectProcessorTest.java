@@ -68,12 +68,12 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
             Organization org = new Organization();
             org.setId(42L);
 
-            when(repositoryRepository.findById(123L)).thenReturn(Optional.empty());
+            when(repositoryRepository.findById(-123L)).thenReturn(Optional.empty());
 
             Repository result = processor.processGraphQlResponse(project, org);
 
             assertThat(result).isNotNull();
-            assertThat(result.getId()).isEqualTo(123L);
+            assertThat(result.getId()).isEqualTo(-123L);
             assertThat(result.getName()).isEqualTo("my-project");
             assertThat(result.getNameWithOwner()).isEqualTo("my-org/my-project");
             assertThat(result.getHtmlUrl()).isEqualTo("https://gitlab.com/my-org/my-project");
@@ -95,7 +95,7 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
         @DisplayName("private visibility sets isPrivate true")
         void privateVisibility_setsIsPrivateTrue() {
             var project = createMinimalProject("private");
-            when(repositoryRepository.findById(123L)).thenReturn(Optional.empty());
+            when(repositoryRepository.findById(-123L)).thenReturn(Optional.empty());
 
             Repository result = processor.processGraphQlResponse(project, null);
 
@@ -107,7 +107,7 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
         @DisplayName("internal visibility maps correctly")
         void internalVisibility_mapsCorrectly() {
             var project = createMinimalProject("internal");
-            when(repositoryRepository.findById(123L)).thenReturn(Optional.empty());
+            when(repositoryRepository.findById(-123L)).thenReturn(Optional.empty());
 
             Repository result = processor.processGraphQlResponse(project, null);
 
@@ -131,7 +131,7 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
                 null,
                 null // no repository info
             );
-            when(repositoryRepository.findById(123L)).thenReturn(Optional.empty());
+            when(repositoryRepository.findById(-123L)).thenReturn(Optional.empty());
 
             Repository result = processor.processGraphQlResponse(project, null);
 
@@ -154,7 +154,7 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
                 null,
                 null
             );
-            when(repositoryRepository.findById(123L)).thenReturn(Optional.empty());
+            when(repositoryRepository.findById(-123L)).thenReturn(Optional.empty());
 
             Repository result = processor.processGraphQlResponse(project, null);
 
@@ -166,9 +166,9 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
         void existingEntity_isUpdated() {
             var project = createMinimalProject("public");
             Repository existing = new Repository();
-            existing.setId(123L);
+            existing.setId(-123L);
             existing.setName("old-name");
-            when(repositoryRepository.findById(123L)).thenReturn(Optional.of(existing));
+            when(repositoryRepository.findById(-123L)).thenReturn(Optional.of(existing));
 
             Repository result = processor.processGraphQlResponse(project, null);
 
@@ -176,7 +176,7 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
             // Verify save was called (not insert)
             ArgumentCaptor<Repository> captor = ArgumentCaptor.forClass(Repository.class);
             verify(repositoryRepository).save(captor.capture());
-            assertThat(captor.getValue().getId()).isEqualTo(123L);
+            assertThat(captor.getValue().getId()).isEqualTo(-123L);
         }
 
         @Test
@@ -225,9 +225,9 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
 
             Instant existingCreatedAt = Instant.parse("2024-01-01T00:00:00Z");
             Repository existing = new Repository();
-            existing.setId(123L);
+            existing.setId(-123L);
             existing.setCreatedAt(existingCreatedAt);
-            when(repositoryRepository.findById(123L)).thenReturn(Optional.of(existing));
+            when(repositoryRepository.findById(-123L)).thenReturn(Optional.of(existing));
 
             Repository result = processor.processGraphQlResponse(project, null);
 
@@ -318,12 +318,12 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
                 0 // private
             );
 
-            when(repositoryRepository.findById(246765L)).thenReturn(Optional.empty());
+            when(repositoryRepository.findById(-246765L)).thenReturn(Optional.empty());
 
             Repository result = processor.processPushEvent(projectInfo);
 
             assertThat(result).isNotNull();
-            assertThat(result.getId()).isEqualTo(246765L);
+            assertThat(result.getId()).isEqualTo(-246765L);
             assertThat(result.getName()).isEqualTo("demo-repository");
             assertThat(result.getNameWithOwner()).isEqualTo("hephaestustest/demo-repository");
             assertThat(result.getHtmlUrl()).isEqualTo("https://gitlab.lrz.de/hephaestustest/demo-repository");
@@ -346,7 +346,7 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
                 "main",
                 20
             );
-            when(repositoryRepository.findById(1L)).thenReturn(Optional.empty());
+            when(repositoryRepository.findById(-1L)).thenReturn(Optional.empty());
 
             Repository result = processor.processPushEvent(projectInfo);
 
@@ -417,10 +417,10 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
                 20
             );
             Repository existing = new Repository();
-            existing.setId(1L);
+            existing.setId(-1L);
             existing.setName("old-name");
             existing.setArchived(true); // should be preserved
-            when(repositoryRepository.findById(1L)).thenReturn(Optional.of(existing));
+            when(repositoryRepository.findById(-1L)).thenReturn(Optional.of(existing));
 
             Repository result = processor.processPushEvent(projectInfo);
 

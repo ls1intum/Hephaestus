@@ -76,7 +76,7 @@ class GitHubProjectMessageHandlerIntegrationTest extends BaseIntegrationTest {
         // Create organization matching the fixture data
         testOrganization = new Organization();
         testOrganization.setId(215361191L);
-        testOrganization.setGithubId(215361191L);
+        testOrganization.setProviderId(215361191L);
         testOrganization.setLogin("HephaestusTest");
         testOrganization.setCreatedAt(Instant.now());
         testOrganization.setUpdatedAt(Instant.now());

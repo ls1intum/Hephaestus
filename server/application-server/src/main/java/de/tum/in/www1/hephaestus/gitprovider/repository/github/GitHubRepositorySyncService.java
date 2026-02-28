@@ -303,7 +303,7 @@ public class GitHubRepositorySyncService {
             String avatarUrl = graphQlOrg.getAvatarUrl() != null ? graphQlOrg.getAvatarUrl().toString() : null;
 
             // Use upsert for thread-safe concurrent inserts
-            organizationRepository.upsert(databaseId, databaseId, login, name, avatarUrl, url);
+            organizationRepository.upsert(databaseId, databaseId, login, name, avatarUrl, url, "GITHUB");
             return organizationRepository.findById(databaseId).orElse(null);
         } else if (owner instanceof GHUser graphQlUser) {
             // User repositories - create a "virtual" organization from the user
@@ -319,7 +319,7 @@ public class GitHubRepositorySyncService {
             String avatarUrl = graphQlUser.getAvatarUrl() != null ? graphQlUser.getAvatarUrl().toString() : null;
 
             // Use upsert for thread-safe concurrent inserts
-            organizationRepository.upsert(databaseId, databaseId, login, name, avatarUrl, url);
+            organizationRepository.upsert(databaseId, databaseId, login, name, avatarUrl, url, "GITHUB");
             return organizationRepository.findById(databaseId).orElse(null);
         }
 

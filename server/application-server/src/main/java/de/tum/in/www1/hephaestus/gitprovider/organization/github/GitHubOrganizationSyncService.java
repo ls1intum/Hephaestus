@@ -196,7 +196,7 @@ public class GitHubOrganizationSyncService {
 
                 log.info(
                     "Synced organization: orgId={}, orgLogin={}, memberCount={}",
-                    organization.getGithubId(),
+                    organization.getProviderId(),
                     sanitizeForLog(organization.getLogin()),
                     membersSynced
                 );
@@ -249,7 +249,7 @@ public class GitHubOrganizationSyncService {
         if (membersConnection == null || membersConnection.getEdges() == null) {
             log.debug(
                 "No members found for organization: orgId={}, orgLogin={}",
-                organization.getGithubId(),
+                organization.getProviderId(),
                 sanitizeForLog(organization.getLogin())
             );
             return 0;
@@ -413,7 +413,7 @@ public class GitHubOrganizationSyncService {
 
         log.debug(
             "Fetched organization members: orgId={}, orgLogin={}, fetchedCount={}, totalCount={}, pages={}, complete={}",
-            organization.getGithubId(),
+            organization.getProviderId(),
             sanitizeForLog(organization.getLogin()),
             allMembers.size(),
             latestTotalCount,
@@ -449,7 +449,7 @@ public class GitHubOrganizationSyncService {
                 memberCount++;
                 log.debug(
                     "Synced organization membership: orgId={}, userId={}, userLogin={}, role={}",
-                    organization.getGithubId(),
+                    organization.getProviderId(),
                     user.getId(),
                     sanitizeForLog(user.getLogin()),
                     role
@@ -489,7 +489,7 @@ public class GitHubOrganizationSyncService {
             organizationMembershipRepository.deleteByOrganizationIdAndUserIdIn(organization.getId(), staleUserIds);
             log.debug(
                 "Removed stale organization memberships: orgId={}, orgLogin={}, removedCount={}",
-                organization.getGithubId(),
+                organization.getProviderId(),
                 sanitizeForLog(organization.getLogin()),
                 staleUserIds.size()
             );

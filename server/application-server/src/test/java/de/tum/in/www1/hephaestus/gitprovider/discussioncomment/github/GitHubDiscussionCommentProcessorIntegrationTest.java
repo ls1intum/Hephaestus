@@ -92,7 +92,7 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
         // Create organization
         Organization org = new Organization();
         org.setId(TEST_ORG_ID);
-        org.setGithubId(TEST_ORG_ID);
+        org.setProviderId(TEST_ORG_ID);
         org.setLogin(TEST_ORG_LOGIN);
         org.setCreatedAt(Instant.now());
         org.setUpdatedAt(Instant.now());

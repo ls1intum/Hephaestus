@@ -150,12 +150,48 @@ public final class GitLabSyncConstants {
     private static final Pattern GID_PATTERN = Pattern.compile("^gid://gitlab/[A-Za-z]+/(\\d+)$");
 
     /**
-     * Extracts the numeric ID from a GitLab Global ID string.
+     * Converts a raw GitLab numeric ID to a Hephaestus entity ID by negation.
      * <p>
-     * Example: {@code "gid://gitlab/Project/123"} → {@code 123L}
+     * This prevents ID collisions between GitHub and GitLab entities that share
+     * the same database tables. GitHub IDs are always positive; negated GitLab
+     * IDs are always negative.
+     * <p>
+     * Example: {@code toEntityId(42)} → {@code -42}
+     *
+     * @param rawGitLabId the raw GitLab numeric ID (positive)
+     * @return the negated entity ID (negative)
+     */
+    public static long toEntityId(long rawGitLabId) {
+        return -rawGitLabId;
+    }
+
+    /**
+     * Extracts the numeric ID from a GitLab Global ID string and converts it
+     * to a Hephaestus entity ID (negated).
+     * <p>
+     * Convenience method combining {@link #extractNumericId(String)} and
+     * {@link #toEntityId(long)}.
+     * <p>
+     * Example: {@code "gid://gitlab/Project/123"} → {@code -123L}
      *
      * @param globalId the GitLab Global ID (e.g., {@code "gid://gitlab/User/42"})
-     * @return the numeric database ID
+     * @return the negated entity ID
+     * @throws IllegalArgumentException if the format is invalid
+     */
+    public static long extractEntityId(String globalId) {
+        return toEntityId(extractNumericId(globalId));
+    }
+
+    /**
+     * Extracts the raw numeric ID from a GitLab Global ID string.
+     * <p>
+     * Example: {@code "gid://gitlab/Project/123"} → {@code 123L}
+     * <p>
+     * Note: This returns the <b>raw</b> GitLab ID. Use {@link #extractEntityId(String)}
+     * or {@link #toEntityId(long)} to convert to a Hephaestus entity ID before persisting.
+     *
+     * @param globalId the GitLab Global ID (e.g., {@code "gid://gitlab/User/42"})
+     * @return the numeric database ID (positive)
      * @throws IllegalArgumentException if the format is invalid
      */
     public static long extractNumericId(String globalId) {

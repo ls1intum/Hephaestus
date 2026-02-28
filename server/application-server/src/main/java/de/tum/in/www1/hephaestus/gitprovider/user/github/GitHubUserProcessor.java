@@ -178,7 +178,7 @@ public class GitHubUserProcessor {
 
                     if (lockAcquired) {
                         // Step 2: Rename any other user that holds this login (different id).
-                        userRepository.freeLoginConflicts(login, userId);
+                        userRepository.freeLoginConflicts(login, userId, "GITHUB");
                     } else {
                         log.debug(
                             "Could not acquire advisory lock after {} attempts, proceeding with upsert: login={}",
@@ -197,7 +197,8 @@ public class GitHubUserProcessor {
                         userType.name(),
                         dto.email(),
                         dto.createdAt(),
-                        dto.updatedAt()
+                        dto.updatedAt(),
+                        "GITHUB"
                     );
                 });
                 // Success — exit the retry loop
@@ -246,7 +247,7 @@ public class GitHubUserProcessor {
      */
     private boolean tryAcquireWithRetry(String login) {
         for (int attempt = 0; attempt < MAX_LOCK_ATTEMPTS; attempt++) {
-            if (userRepository.tryAcquireLoginLock(login)) {
+            if (userRepository.tryAcquireLoginLock(login, "GITHUB")) {
                 return true;
             }
             if (attempt < MAX_LOCK_ATTEMPTS - 1) {

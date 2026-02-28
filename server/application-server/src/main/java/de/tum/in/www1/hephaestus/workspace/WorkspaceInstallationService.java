@@ -537,8 +537,8 @@ public class WorkspaceInstallationService {
                     ? User.Type.ORGANIZATION.name()
                     : User.Type.USER.name();
 
-            userRepository.acquireLoginLock(accountLogin);
-            userRepository.freeLoginConflicts(accountLogin, accountId);
+            userRepository.acquireLoginLock(accountLogin, "GITHUB");
+            userRepository.freeLoginConflicts(accountLogin, accountId, "GITHUB");
             userRepository.upsertUser(
                 accountId,
                 accountLogin,
@@ -548,7 +548,8 @@ public class WorkspaceInstallationService {
                 typeStr,
                 null, // email
                 null, // createdAt
-                null // updatedAt
+                null, // updatedAt
+                "GITHUB"
             );
             log.info(
                 "Upserted user for workspace ownership: userLogin={}, userId={}, userType={}, installationId={}",

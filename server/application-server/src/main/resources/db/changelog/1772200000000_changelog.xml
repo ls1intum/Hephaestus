@@ -1,0 +1,257 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                   http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+    =======================================================================================
+    Multi-Provider Support (Issue #715)
+    =======================================================================================
+
+    Adds a provider discriminator column to all git service entity tables so that
+    GitHub and GitLab entities can coexist in the same database. Updates unique
+    constraints that previously assumed a single provider to include the provider
+    column. Renames organization.github_id to organization.provider_id.
+
+    ID collision prevention is handled at the application layer via ID negation
+    (all GitLab entity IDs are negated before storage). The provider column
+    enables provider-scoped queries and provider-aware unique constraints.
+
+    Existing data defaults to 'GITHUB' — no data migration needed.
+    =======================================================================================
+    -->
+
+    <!-- ==================== Step 1: Add provider column to all entity tables ==================== -->
+
+    <changeSet author="issue-715" id="1772200000000-1">
+        <preConditions onFail="MARK_RAN">
+            <not><columnExists tableName="user" columnName="provider"/></not>
+        </preConditions>
+        <addColumn tableName="user">
+            <column name="provider" type="VARCHAR(10)" defaultValue="GITHUB">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <changeSet author="issue-715" id="1772200000000-2">
+        <preConditions onFail="MARK_RAN">
+            <not><columnExists tableName="repository" columnName="provider"/></not>
+        </preConditions>
+        <addColumn tableName="repository">
+            <column name="provider" type="VARCHAR(10)" defaultValue="GITHUB">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <changeSet author="issue-715" id="1772200000000-3">
+        <preConditions onFail="MARK_RAN">
+            <not><columnExists tableName="organization" columnName="provider"/></not>
+        </preConditions>
+        <addColumn tableName="organization">
+            <column name="provider" type="VARCHAR(10)" defaultValue="GITHUB">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <changeSet author="issue-715" id="1772200000000-4">
+        <preConditions onFail="MARK_RAN">
+            <not><columnExists tableName="issue" columnName="provider"/></not>
+        </preConditions>
+        <addColumn tableName="issue">
+            <column name="provider" type="VARCHAR(10)" defaultValue="GITHUB">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <changeSet author="issue-715" id="1772200000000-6">
+        <preConditions onFail="MARK_RAN">
+            <not><columnExists tableName="milestone" columnName="provider"/></not>
+        </preConditions>
+        <addColumn tableName="milestone">
+            <column name="provider" type="VARCHAR(10)" defaultValue="GITHUB">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <changeSet author="issue-715" id="1772200000000-7">
+        <preConditions onFail="MARK_RAN">
+            <not><columnExists tableName="issue_comment" columnName="provider"/></not>
+        </preConditions>
+        <addColumn tableName="issue_comment">
+            <column name="provider" type="VARCHAR(10)" defaultValue="GITHUB">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <changeSet author="issue-715" id="1772200000000-9">
+        <preConditions onFail="MARK_RAN">
+            <not><columnExists tableName="pull_request_review_comment" columnName="provider"/></not>
+        </preConditions>
+        <addColumn tableName="pull_request_review_comment">
+            <column name="provider" type="VARCHAR(10)" defaultValue="GITHUB">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <changeSet author="issue-715" id="1772200000000-10">
+        <preConditions onFail="MARK_RAN">
+            <not><columnExists tableName="pull_request_review_thread" columnName="provider"/></not>
+        </preConditions>
+        <addColumn tableName="pull_request_review_thread">
+            <column name="provider" type="VARCHAR(10)" defaultValue="GITHUB">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <changeSet author="issue-715" id="1772200000000-11">
+        <preConditions onFail="MARK_RAN">
+            <not><columnExists tableName="discussion" columnName="provider"/></not>
+        </preConditions>
+        <addColumn tableName="discussion">
+            <column name="provider" type="VARCHAR(10)" defaultValue="GITHUB">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <changeSet author="issue-715" id="1772200000000-12">
+        <preConditions onFail="MARK_RAN">
+            <not><columnExists tableName="discussion_comment" columnName="provider"/></not>
+        </preConditions>
+        <addColumn tableName="discussion_comment">
+            <column name="provider" type="VARCHAR(10)" defaultValue="GITHUB">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <changeSet author="issue-715" id="1772200000000-13">
+        <preConditions onFail="MARK_RAN">
+            <not><columnExists tableName="team" columnName="provider"/></not>
+        </preConditions>
+        <addColumn tableName="team">
+            <column name="provider" type="VARCHAR(10)" defaultValue="GITHUB">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <changeSet author="issue-715" id="1772200000000-14">
+        <preConditions onFail="MARK_RAN">
+            <not><columnExists tableName="project" columnName="provider"/></not>
+        </preConditions>
+        <addColumn tableName="project">
+            <column name="provider" type="VARCHAR(10)" defaultValue="GITHUB">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <changeSet author="issue-715" id="1772200000000-15">
+        <preConditions onFail="MARK_RAN">
+            <not><columnExists tableName="project_item" columnName="provider"/></not>
+        </preConditions>
+        <addColumn tableName="project_item">
+            <column name="provider" type="VARCHAR(10)" defaultValue="GITHUB">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <changeSet author="issue-715" id="1772200000000-16">
+        <preConditions onFail="MARK_RAN">
+            <not><columnExists tableName="project_status_update" columnName="provider"/></not>
+        </preConditions>
+        <addColumn tableName="project_status_update">
+            <column name="provider" type="VARCHAR(10)" defaultValue="GITHUB">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <!-- ==================== Step 2: Rename organization.github_id → provider_id ==================== -->
+
+    <changeSet author="issue-715" id="1772200000000-20">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="organization" columnName="github_id"/>
+        </preConditions>
+        <renameColumn tableName="organization" oldColumnName="github_id" newColumnName="provider_id"
+                      columnDataType="BIGINT"/>
+    </changeSet>
+
+    <!-- ==================== Step 3: Update unique constraints for multi-provider ==================== -->
+
+    <!-- User: uk_user_login_lower → uk_user_provider_login (provider, LOWER(login)) -->
+    <changeSet author="issue-715" id="1772200000000-30">
+        <preConditions onFail="MARK_RAN">
+            <indexExists indexName="uk_user_login_lower"/>
+        </preConditions>
+        <dropIndex tableName="user" indexName="uk_user_login_lower"/>
+    </changeSet>
+    <changeSet author="issue-715" id="1772200000000-31">
+        <preConditions onFail="MARK_RAN">
+            <not><indexExists indexName="uk_user_provider_login"/></not>
+        </preConditions>
+        <sql>
+            CREATE UNIQUE INDEX uk_user_provider_login ON "user" (provider, LOWER(login));
+        </sql>
+        <rollback>
+            <dropIndex tableName="user" indexName="uk_user_provider_login"/>
+        </rollback>
+    </changeSet>
+
+    <!-- Organization: uq_organization_github_id → uq_organization_provider_id -->
+    <changeSet author="issue-715" id="1772200000000-32">
+        <preConditions onFail="MARK_RAN">
+            <indexExists indexName="uq_organization_github_id"/>
+        </preConditions>
+        <dropUniqueConstraint tableName="organization" constraintName="uq_organization_github_id"/>
+    </changeSet>
+    <changeSet author="issue-715" id="1772200000000-33">
+        <preConditions onFail="MARK_RAN">
+            <not><indexExists indexName="uq_organization_provider_provider_id"/></not>
+        </preConditions>
+        <addUniqueConstraint tableName="organization" columnNames="provider, provider_id"
+                             constraintName="uq_organization_provider_provider_id"/>
+    </changeSet>
+
+    <!-- Organization: uq_organization_login → uq_organization_provider_login -->
+    <changeSet author="issue-715" id="1772200000000-34">
+        <preConditions onFail="MARK_RAN">
+            <indexExists indexName="uq_organization_login"/>
+        </preConditions>
+        <dropUniqueConstraint tableName="organization" constraintName="uq_organization_login"/>
+    </changeSet>
+    <changeSet author="issue-715" id="1772200000000-35">
+        <preConditions onFail="MARK_RAN">
+            <not><indexExists indexName="uq_organization_provider_login"/></not>
+        </preConditions>
+        <addUniqueConstraint tableName="organization" columnNames="provider, login"
+                             constraintName="uq_organization_provider_login"/>
+    </changeSet>
+
+    <!-- Repository: uq_repository_name_with_owner → uq_repository_provider_name_with_owner -->
+    <changeSet author="issue-715" id="1772200000000-36">
+        <preConditions onFail="MARK_RAN">
+            <indexExists indexName="uq_repository_name_with_owner"/>
+        </preConditions>
+        <dropUniqueConstraint tableName="repository" constraintName="uq_repository_name_with_owner"/>
+    </changeSet>
+    <changeSet author="issue-715" id="1772200000000-37">
+        <preConditions onFail="MARK_RAN">
+            <not><indexExists indexName="uq_repository_provider_name_with_owner"/></not>
+        </preConditions>
+        <addUniqueConstraint tableName="repository" columnNames="provider, name_with_owner"
+                             constraintName="uq_repository_provider_name_with_owner"/>
+    </changeSet>
+
+</databaseChangeLog>

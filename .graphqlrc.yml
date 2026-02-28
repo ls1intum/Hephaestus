@@ -1,5 +1,5 @@
 # GraphQL Configuration for Hephaestus
-# Enables VSCode IntelliSense for GraphQL operations against GitHub API
+# Enables VSCode IntelliSense for GraphQL operations against GitHub and GitLab APIs
 # Extension: GraphQL.vscode-graphql
 # Docs: https://the-guild.dev/graphql/config
 
@@ -7,10 +7,33 @@ projects:
   github:
     # GitHub GraphQL API schema (downloaded from docs.github.com)
     schema: "server/application-server/src/main/resources/graphql/github/schema.github.graphql"
-    
-    # GraphQL operations (Spring's standard location)
-    documents: "server/application-server/src/main/resources/graphql-documents/**/*.graphql"
-    
+
+    # GraphQL operations (queries, mutations, fragments)
+    documents:
+      - "server/application-server/src/main/resources/graphql/github/operations/**/*.graphql"
+      - "server/application-server/src/main/resources/graphql/github/fragments/**/*.graphql"
+
+    # Restrict this project to GitHub files only (prevents cross-schema validation)
+    include:
+      - "server/application-server/src/main/resources/graphql/github/**"
+
+    extensions:
+      languageService:
+        enableHover: true
+        enableAutoComplete: true
+        enableValidation: true
+
+  gitlab:
+    # GitLab GraphQL API schema
+    schema: "server/application-server/src/main/resources/graphql/gitlab/schema.gitlab.graphql"
+
+    # GitLab GraphQL operations
+    documents: "server/application-server/src/main/resources/graphql/gitlab/operations/**/*.graphql"
+
+    # Restrict this project to GitLab files only (prevents cross-schema validation)
+    include:
+      - "server/application-server/src/main/resources/graphql/gitlab/**"
+
     extensions:
       languageService:
         enableHover: true

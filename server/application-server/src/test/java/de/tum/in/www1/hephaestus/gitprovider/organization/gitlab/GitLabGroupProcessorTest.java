@@ -50,21 +50,22 @@ class GitLabGroupProcessorTest extends BaseUnitTest {
             );
 
             Organization expected = new Organization();
-            expected.setId(42L);
-            when(organizationRepository.findById(42L)).thenReturn(Optional.of(expected));
+            expected.setId(-42L);
+            when(organizationRepository.findById(-42L)).thenReturn(Optional.of(expected));
 
             Organization result = processor.process(group);
 
             verify(organizationRepository).upsert(
-                eq(42L),
-                eq(42L),
+                eq(-42L),
+                eq(-42L),
                 eq("my-org/my-team"),
                 eq("My Team"),
                 eq("https://gitlab.com/avatar.png"),
-                eq("https://gitlab.com/my-org/my-team")
+                eq("https://gitlab.com/my-org/my-team"),
+                eq("GITLAB")
             );
             assertThat(result).isNotNull();
-            assertThat(result.getId()).isEqualTo(42L);
+            assertThat(result.getId()).isEqualTo(-42L);
             assertThat(result.getLastSyncAt()).isNotNull();
             assertThat(result.getUpdatedAt()).isNotNull();
             assertThat(result.getCreatedAt()).isNotNull();
@@ -85,9 +86,9 @@ class GitLabGroupProcessorTest extends BaseUnitTest {
 
             Instant existingCreatedAt = Instant.parse("2024-01-01T00:00:00Z");
             Organization existing = new Organization();
-            existing.setId(42L);
+            existing.setId(-42L);
             existing.setCreatedAt(existingCreatedAt);
-            when(organizationRepository.findById(42L)).thenReturn(Optional.of(existing));
+            when(organizationRepository.findById(-42L)).thenReturn(Optional.of(existing));
 
             Organization result = processor.process(group);
 
@@ -110,12 +111,12 @@ class GitLabGroupProcessorTest extends BaseUnitTest {
                 "public"
             );
 
-            when(organizationRepository.findById(42L)).thenReturn(Optional.empty());
+            when(organizationRepository.findById(-42L)).thenReturn(Optional.empty());
 
             Organization result = processor.process(group);
 
             assertThat(result).isNull();
-            verify(organizationRepository).upsert(any(), any(), any(), any(), any(), any());
+            verify(organizationRepository).upsert(any(), any(), any(), any(), any(), any(), any());
         }
 
         @Test
@@ -131,17 +132,18 @@ class GitLabGroupProcessorTest extends BaseUnitTest {
                 "private"
             );
 
-            when(organizationRepository.findById(99L)).thenReturn(Optional.of(new Organization()));
+            when(organizationRepository.findById(-99L)).thenReturn(Optional.of(new Organization()));
 
             processor.process(group);
 
             verify(organizationRepository).upsert(
-                eq(99L),
-                eq(99L),
+                eq(-99L),
+                eq(-99L),
                 eq("org/team"),
                 eq("org/team"), // name falls back to fullPath
                 eq(null),
-                eq("https://gitlab.com/org/team")
+                eq("https://gitlab.com/org/team"),
+                eq("GITLAB")
             );
         }
 
@@ -149,7 +151,7 @@ class GitLabGroupProcessorTest extends BaseUnitTest {
         @DisplayName("null response returns null")
         void nullResponse_returnsNull() {
             assertThat(processor.process(null)).isNull();
-            verify(organizationRepository, never()).upsert(any(), any(), any(), any(), any(), any());
+            verify(organizationRepository, never()).upsert(any(), any(), any(), any(), any(), any(), any());
         }
 
         @Test
@@ -165,7 +167,7 @@ class GitLabGroupProcessorTest extends BaseUnitTest {
                 "public"
             );
             assertThat(processor.process(group)).isNull();
-            verify(organizationRepository, never()).upsert(any(), any(), any(), any(), any(), any());
+            verify(organizationRepository, never()).upsert(any(), any(), any(), any(), any(), any(), any());
         }
 
         @Test
@@ -181,7 +183,7 @@ class GitLabGroupProcessorTest extends BaseUnitTest {
                 "public"
             );
             assertThat(processor.process(group)).isNull();
-            verify(organizationRepository, never()).upsert(any(), any(), any(), any(), any(), any());
+            verify(organizationRepository, never()).upsert(any(), any(), any(), any(), any(), any(), any());
         }
 
         @Test
@@ -197,7 +199,7 @@ class GitLabGroupProcessorTest extends BaseUnitTest {
                 "public"
             );
             assertThat(processor.process(group)).isNull();
-            verify(organizationRepository, never()).upsert(any(), any(), any(), any(), any(), any());
+            verify(organizationRepository, never()).upsert(any(), any(), any(), any(), any(), any(), any());
         }
 
         @Test
@@ -213,7 +215,7 @@ class GitLabGroupProcessorTest extends BaseUnitTest {
                 "public"
             );
             assertThat(processor.process(group)).isNull();
-            verify(organizationRepository, never()).upsert(any(), any(), any(), any(), any(), any());
+            verify(organizationRepository, never()).upsert(any(), any(), any(), any(), any(), any(), any());
         }
 
         @Test
@@ -229,17 +231,18 @@ class GitLabGroupProcessorTest extends BaseUnitTest {
                 "internal"
             );
 
-            when(organizationRepository.findById(7L)).thenReturn(Optional.of(new Organization()));
+            when(organizationRepository.findById(-7L)).thenReturn(Optional.of(new Organization()));
 
             processor.process(group);
 
             verify(organizationRepository).upsert(
-                eq(7L),
-                eq(7L),
+                eq(-7L),
+                eq(-7L),
                 eq("org/team/subteam/deepteam"),
                 eq("Deep Team"),
                 eq(null),
-                eq("https://gitlab.com/org/team/subteam/deepteam")
+                eq("https://gitlab.com/org/team/subteam/deepteam"),
+                eq("GITLAB")
             );
         }
     }

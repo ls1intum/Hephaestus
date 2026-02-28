@@ -256,8 +256,8 @@ public class WorkspaceProvisioningService {
                 String avatar = userInfo.avatarUrl() != null ? userInfo.avatarUrl() : "";
                 String webUrl = userInfo.webUrl() != null ? userInfo.webUrl() : "";
 
-                userRepository.acquireLoginLock(login);
-                userRepository.freeLoginConflicts(login, userInfo.id());
+                userRepository.acquireLoginLock(login, "GITHUB");
+                userRepository.freeLoginConflicts(login, userInfo.id(), "GITHUB");
                 userRepository.upsertUser(
                     userInfo.id(),
                     login,
@@ -267,7 +267,8 @@ public class WorkspaceProvisioningService {
                     User.Type.USER.name(),
                     null,
                     null,
-                    null
+                    null,
+                    "GITHUB"
                 );
                 log.info(
                     "Upserted user for GitLab PAT workspace bootstrap: userLogin={}, userId={}",
@@ -518,8 +519,8 @@ public class WorkspaceProvisioningService {
 
                 // Use the three-step upsert (lock, free conflicts, insert)
                 // to avoid uk_user_login_lower violations under concurrency.
-                userRepository.acquireLoginLock(login);
-                userRepository.freeLoginConflicts(login, userInfo.id());
+                userRepository.acquireLoginLock(login, "GITHUB");
+                userRepository.freeLoginConflicts(login, userInfo.id(), "GITHUB");
                 userRepository.upsertUser(
                     userInfo.id(),
                     login,
@@ -529,7 +530,8 @@ public class WorkspaceProvisioningService {
                     User.Type.USER.name(),
                     null, // email
                     null, // createdAt
-                    null // updatedAt
+                    null, // updatedAt
+                    "GITHUB"
                 );
                 log.info("Upserted user for PAT workspace bootstrap: userLogin={}, userId={}", login, userInfo.id());
                 return userInfo.id();

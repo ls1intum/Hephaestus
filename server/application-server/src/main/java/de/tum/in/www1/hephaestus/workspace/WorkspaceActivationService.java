@@ -1,8 +1,10 @@
 package de.tum.in.www1.hephaestus.workspace;
 
+import de.tum.in.www1.hephaestus.gitprovider.issue.gitlab.GitLabIssueSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
 import de.tum.in.www1.hephaestus.gitprovider.organization.gitlab.GitLabGroupSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.organization.gitlab.GitLabSyncResult;
+import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.sync.GitHubDataSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.sync.NatsConsumerService;
 import de.tum.in.www1.hephaestus.gitprovider.sync.NatsProperties;
@@ -15,7 +17,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -49,6 +50,7 @@ public class WorkspaceActivationService {
     // Lazy-loaded to break circular reference with sync services
     private final ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider;
     private final ObjectProvider<GitLabGroupSyncService> gitLabGroupSyncServiceProvider;
+    private final ObjectProvider<GitLabIssueSyncService> gitLabIssueSyncServiceProvider;
 
     // Infrastructure
     private final AsyncTaskExecutor monitoringExecutor;
@@ -62,6 +64,7 @@ public class WorkspaceActivationService {
         WorkspaceScopeFilter workspaceScopeFilter,
         ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider,
         ObjectProvider<GitLabGroupSyncService> gitLabGroupSyncServiceProvider,
+        ObjectProvider<GitLabIssueSyncService> gitLabIssueSyncServiceProvider,
         @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor
     ) {
         this.natsProperties = natsProperties;
@@ -72,6 +75,7 @@ public class WorkspaceActivationService {
         this.workspaceScopeFilter = workspaceScopeFilter;
         this.gitHubDataSyncServiceProvider = gitHubDataSyncServiceProvider;
         this.gitLabGroupSyncServiceProvider = gitLabGroupSyncServiceProvider;
+        this.gitLabIssueSyncServiceProvider = gitLabIssueSyncServiceProvider;
         this.monitoringExecutor = monitoringExecutor;
     }
 
@@ -112,22 +116,6 @@ public class WorkspaceActivationService {
         if (workspacesToActivate.isEmpty()) {
             log.info("No workspaces to activate after filtering");
             return;
-        }
-
-        // Guard: GitLab and GitHub use overlapping numeric ID spaces for Organization/Repository.
-        // Until a provider discriminator column is added, mixed-provider deployments would corrupt data.
-        Set<GitProviderType> providerTypes = workspacesToActivate
-            .stream()
-            .map(Workspace::getProviderType)
-            .filter(Objects::nonNull)
-            .collect(Collectors.toSet());
-        if (providerTypes.contains(GitProviderType.GITLAB) && providerTypes.size() > 1) {
-            throw new IllegalStateException(
-                "Mixed git providers detected: " +
-                    providerTypes +
-                    ". GitLab and GitHub use overlapping numeric ID spaces. " +
-                    "Use only one provider per deployment until schema migration adds a provider discriminator."
-            );
         }
 
         log.info("Activating workspaces: count={}", workspacesToActivate.size());
@@ -259,6 +247,30 @@ public class WorkspaceActivationService {
                             );
                             // Link workspace to organization after sync (org was created during sync)
                             linkWorkspaceToOrganization(workspace);
+
+                            // Sync issues for each project
+                            var issueSyncService = gitLabIssueSyncServiceProvider.getIfAvailable();
+                            if (issueSyncService != null && !result.synced().isEmpty()) {
+                                int totalIssues = 0;
+                                for (Repository repo : result.synced()) {
+                                    try {
+                                        totalIssues += issueSyncService.syncIssues(workspace.getId(), repo, null);
+                                    } catch (Exception e) {
+                                        log.warn(
+                                            "Failed to sync issues for project: workspaceId={}, repoName={}",
+                                            workspace.getId(),
+                                            repo.getNameWithOwner(),
+                                            e
+                                        );
+                                    }
+                                }
+                                log.info(
+                                    "GitLab issue sync complete: workspaceId={}, projects={}, totalIssues={}",
+                                    workspace.getId(),
+                                    result.synced().size(),
+                                    totalIssues
+                                );
+                            }
                         }
                     } else {
                         log.warn(

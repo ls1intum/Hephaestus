@@ -120,6 +120,7 @@ erDiagram
         VARCHAR(128) category_id FK
         BIGINT answer_chosen_by_id FK
         BIGINT answer_comment_id FK,UK
+        VARCHAR(10) provider "NOT NULL"
     }
 
     DiscussionCategory {
@@ -148,6 +149,7 @@ erDiagram
         BIGINT discussion_id FK
         BIGINT author_id FK
         BIGINT parent_comment_id FK
+        VARCHAR(10) provider "NOT NULL"
     }
 
     DiscussionLabel {
@@ -235,6 +237,7 @@ erDiagram
         VARCHAR(40) head_ref_oid
         VARCHAR(255) base_ref_name
         VARCHAR(40) base_ref_oid
+        VARCHAR(10) provider "NOT NULL"
     }
 
     IssueAssignee {
@@ -256,6 +259,7 @@ erDiagram
         BIGINT author_id FK
         BIGINT issue_id FK
         TEXT body
+        VARCHAR(10) provider "NOT NULL"
     }
 
     IssueLabel {
@@ -300,6 +304,7 @@ erDiagram
         INTEGER closed_issues_count "NOT NULL"
         INTEGER open_issues_count "NOT NULL"
         TIMESTAMPTZ last_sync_at
+        VARCHAR(10) provider "NOT NULL"
     }
 
     Organization {
@@ -307,11 +312,13 @@ erDiagram
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
         VARCHAR(255) avatar_url
-        BIGINT github_id UK "NOT NULL"
+        BIGINT provider_id UK "NOT NULL"
         VARCHAR(255) html_url
         VARCHAR(255) login UK "NOT NULL"
         VARCHAR(255) name
         TIMESTAMPTZ last_sync_at
+        VARCHAR(10) provider UK "NOT NULL"
+        VARCHAR(10) provider UK "NOT NULL"
     }
 
     OrganizationMembership {
@@ -344,6 +351,7 @@ erDiagram
         TIMESTAMPTZ status_updates_synced_at
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
+        VARCHAR(10) provider "NOT NULL"
     }
 
     ProjectField {
@@ -381,6 +389,7 @@ erDiagram
         BIGINT creator_id FK
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
+        VARCHAR(10) provider "NOT NULL"
     }
 
     ProjectStatusUpdate {
@@ -395,6 +404,7 @@ erDiagram
         BIGINT creator_id FK
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
+        VARCHAR(10) provider "NOT NULL"
     }
 
     PullRequestBadPractice {
@@ -452,6 +462,7 @@ erDiagram
         TEXT body
         TEXT diff_hunk
         BOOLEAN outdated
+        VARCHAR(10) provider "NOT NULL"
     }
 
     PullRequestReviewThread {
@@ -470,6 +481,7 @@ erDiagram
         BOOLEAN outdated
         BOOLEAN collapsed
         BIGINT resolved_by_id FK
+        VARCHAR(10) provider "NOT NULL"
     }
 
     Repository {
@@ -489,6 +501,7 @@ erDiagram
         BIGINT organization_id FK
         TIMESTAMPTZ last_sync_at
         BOOLEAN has_discussions_enabled "NOT NULL"
+        VARCHAR(10) provider UK "NOT NULL"
     }
 
     RepositoryCollaborator {
@@ -529,6 +542,7 @@ erDiagram
         BIGINT parent_id
         VARCHAR(32) privacy
         TIMESTAMPTZ updated_at
+        VARCHAR(10) provider "NOT NULL"
     }
 
     TeamMembership {
@@ -553,6 +567,7 @@ erDiagram
         VARCHAR(255) login
         VARCHAR(255) name
         VARCHAR(255) type
+        VARCHAR(10) provider "NOT NULL"
     }
 
     UserPreference {

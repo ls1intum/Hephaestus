@@ -62,7 +62,7 @@ class GitHubSubIssuesMessageHandlerIntegrationTest extends BaseIntegrationTest {
         // Create organization
         Organization org = new Organization();
         org.setId(215361191L);
-        org.setGithubId(215361191L);
+        org.setProviderId(215361191L);
         org.setLogin("HephaestusTest");
         org.setCreatedAt(Instant.now());
         org.setUpdatedAt(Instant.now());

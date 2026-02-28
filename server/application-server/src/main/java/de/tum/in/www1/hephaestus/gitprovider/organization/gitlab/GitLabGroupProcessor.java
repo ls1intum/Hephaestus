@@ -4,6 +4,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabGroupResponse;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
+import de.tum.in.www1.hephaestus.workspace.GitProviderType;
 import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,15 +22,10 @@ import org.springframework.transaction.annotation.Transactional;
  * <b>Key mapping decisions:</b>
  * <ul>
  *   <li>{@code fullPath} → {@code login} (unique identifier, supports nested groups)</li>
- *   <li>Numeric ID extracted from GID → {@code id} and {@code githubId}</li>
+ *   <li>Numeric ID extracted from GID, negated via {@link GitLabSyncConstants#toEntityId} → {@code id}</li>
  *   <li>{@code webUrl} → {@code htmlUrl}</li>
+ *   <li>{@code provider} = {@link GitProviderType#GITLAB}</li>
  * </ul>
- *
- * @implNote The {@code Organization} entity uses {@code id} and {@code githubId} as
- * provider-specific numeric IDs. GitLab group IDs and GitHub organization IDs are
- * independent sequences that may produce overlapping values. A runtime guard in
- * {@code WorkspaceActivationService.activateAllWorkspaces()} prevents mixed-provider
- * deployments from starting. A future schema migration will add a provider discriminator column.
  */
 @Service
 @ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
@@ -47,7 +43,8 @@ public class GitLabGroupProcessor {
      * Processes a GitLab group GraphQL response into an Organization entity.
      * <p>
      * Uses upsert for thread-safe concurrent inserts. If the group already exists,
-     * its mutable fields (name, avatar, URL) are updated.
+     * its mutable fields (name, avatar, URL) are updated. IDs are negated to avoid
+     * collision with GitHub organization IDs.
      *
      * @param group the GitLab group GraphQL response
      * @return the persisted Organization entity, or null if the response is invalid
@@ -60,9 +57,9 @@ public class GitLabGroupProcessor {
             return null;
         }
 
-        long numericId;
+        long entityId;
         try {
-            numericId = GitLabSyncConstants.extractNumericId(group.id());
+            entityId = GitLabSyncConstants.extractEntityId(group.id());
         } catch (IllegalArgumentException e) {
             log.warn("Skipped group processing: reason=invalidGlobalId, gid={}", group.id());
             return null;
@@ -73,8 +70,16 @@ public class GitLabGroupProcessor {
         String avatarUrl = group.avatarUrl();
         String htmlUrl = group.webUrl();
 
-        organizationRepository.upsert(numericId, numericId, login, name, avatarUrl, htmlUrl);
-        Organization organization = organizationRepository.findById(numericId).orElse(null);
+        organizationRepository.upsert(
+            entityId,
+            entityId,
+            login,
+            name,
+            avatarUrl,
+            htmlUrl,
+            GitProviderType.GITLAB.name()
+        );
+        Organization organization = organizationRepository.findById(entityId).orElse(null);
         if (organization != null) {
             Instant now = Instant.now();
             organization.setLastSyncAt(now);

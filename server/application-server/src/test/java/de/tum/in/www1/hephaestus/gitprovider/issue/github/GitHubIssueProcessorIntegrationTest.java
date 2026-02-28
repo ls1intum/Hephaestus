@@ -106,7 +106,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
         // Create organization matching fixture data
         testOrganization = new Organization();
         testOrganization.setId(FIXTURE_ORG_ID);
-        testOrganization.setGithubId(FIXTURE_ORG_ID);
+        testOrganization.setProviderId(FIXTURE_ORG_ID);
         testOrganization.setLogin(FIXTURE_ORG_LOGIN);
         testOrganization.setCreatedAt(Instant.now());
         testOrganization.setUpdatedAt(Instant.now());

@@ -99,7 +99,7 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
         // Create organization matching fixture data
         Organization org = new Organization();
         org.setId(FIXTURE_ORG_ID);
-        org.setGithubId(FIXTURE_ORG_ID);
+        org.setProviderId(FIXTURE_ORG_ID);
         org.setLogin(FIXTURE_ORG_LOGIN);
         org.setCreatedAt(Instant.now());
         org.setUpdatedAt(Instant.now());

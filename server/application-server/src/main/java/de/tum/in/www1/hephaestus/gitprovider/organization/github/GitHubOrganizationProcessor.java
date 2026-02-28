@@ -55,11 +55,11 @@ public class GitHubOrganizationProcessor {
         }
 
         Organization organization = organizationRepository
-            .findByGithubId(dto.id())
+            .findByProviderId(dto.id())
             .orElseGet(() -> {
                 Organization org = new Organization();
                 org.setId(dto.id()); // Set the primary key ID
-                org.setGithubId(dto.id());
+                org.setProviderId(dto.id());
                 return org;
             });
 
@@ -89,9 +89,9 @@ public class GitHubOrganizationProcessor {
 
         Organization saved = organizationRepository.save(organization);
         if (isNew) {
-            log.debug("Created organization: orgId={}, orgLogin={}", saved.getGithubId(), saved.getLogin());
+            log.debug("Created organization: orgId={}, orgLogin={}", saved.getProviderId(), saved.getLogin());
         } else {
-            log.debug("Updated organization: orgId={}, orgLogin={}", saved.getGithubId(), saved.getLogin());
+            log.debug("Updated organization: orgId={}, orgLogin={}", saved.getProviderId(), saved.getLogin());
         }
         return saved;
     }
@@ -110,7 +110,7 @@ public class GitHubOrganizationProcessor {
         }
 
         return organizationRepository
-            .findByGithubId(githubId)
+            .findByProviderId(githubId)
             .map(org -> {
                 String oldLogin = org.getLogin();
                 org.setLogin(newLogin);
@@ -142,7 +142,7 @@ public class GitHubOrganizationProcessor {
         }
 
         organizationRepository
-            .findByGithubId(githubId)
+            .findByProviderId(githubId)
             .ifPresent(org -> {
                 Long orgId = org.getId();
                 String orgLogin = org.getLogin();

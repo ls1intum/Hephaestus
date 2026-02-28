@@ -146,7 +146,7 @@ class PracticesControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             // Create organizations for each workspace
             Organization orgAlpha = new Organization();
             orgAlpha.setId(idGenerator.incrementAndGet());
-            orgAlpha.setGithubId(idGenerator.incrementAndGet());
+            orgAlpha.setProviderId(idGenerator.incrementAndGet());
             orgAlpha.setLogin("alpha-org");
             orgAlpha.setName("Alpha Org");
             orgAlpha.setAvatarUrl("https://example.com/alpha.png");
@@ -157,7 +157,7 @@ class PracticesControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
 
             Organization orgBeta = new Organization();
             orgBeta.setId(idGenerator.incrementAndGet());
-            orgBeta.setGithubId(idGenerator.incrementAndGet());
+            orgBeta.setProviderId(idGenerator.incrementAndGet());
             orgBeta.setLogin("beta-org");
             orgBeta.setName("Beta Org");
             orgBeta.setAvatarUrl("https://example.com/beta.png");

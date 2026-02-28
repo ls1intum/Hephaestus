@@ -8,6 +8,7 @@ import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.gitlab.dto.GitLabPushEventDTO;
+import de.tum.in.www1.hephaestus.workspace.GitProviderType;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
@@ -63,17 +64,18 @@ public class GitLabProjectProcessor {
             return null;
         }
 
-        long numericId;
+        long entityId;
         try {
-            numericId = GitLabSyncConstants.extractNumericId(project.id());
+            entityId = GitLabSyncConstants.extractEntityId(project.id());
         } catch (IllegalArgumentException e) {
             log.warn("Skipped project processing: reason=invalidGlobalId, gid={}", sanitizeForLog(project.id()));
             return null;
         }
 
-        Repository repository = repositoryRepository.findById(numericId).orElseGet(Repository::new);
+        Repository repository = repositoryRepository.findById(entityId).orElseGet(Repository::new);
 
-        repository.setId(numericId);
+        repository.setId(entityId);
+        repository.setProvider(GitProviderType.GITLAB);
         repository.setName(project.name());
         repository.setNameWithOwner(project.fullPath());
         repository.setHtmlUrl(project.webUrl());
@@ -139,10 +141,11 @@ public class GitLabProjectProcessor {
             return null;
         }
 
-        Long projectId = projectInfo.id();
-        Repository repository = repositoryRepository.findById(projectId).orElseGet(Repository::new);
+        long entityId = GitLabSyncConstants.toEntityId(projectInfo.id());
+        Repository repository = repositoryRepository.findById(entityId).orElseGet(Repository::new);
 
-        repository.setId(projectId);
+        repository.setId(entityId);
+        repository.setProvider(GitProviderType.GITLAB);
         repository.setName(projectInfo.name());
         repository.setNameWithOwner(projectInfo.pathWithNamespace());
         repository.setHtmlUrl(projectInfo.webUrl());

@@ -19,26 +19,27 @@ import org.springframework.transaction.annotation.Transactional;
  * DISCOVER which scope the event belongs to.
  */
 public interface OrganizationRepository extends JpaRepository<Organization, Long> {
-    Optional<Organization> findByGithubId(Long githubId);
+    Optional<Organization> findByProviderId(Long providerId);
     Optional<Organization> findByLoginIgnoreCase(String login);
 
     /**
      * Upsert an organization using PostgreSQL ON CONFLICT.
      * This is thread-safe for concurrent inserts of the same organization.
      *
-     * @param id the primary key (GitHub database ID)
-     * @param githubId the GitHub database ID
-     * @param login the organization/user login
+     * @param id the primary key (provider database ID, negated for GitLab)
+     * @param providerId the provider-specific database ID (negated for GitLab)
+     * @param login the organization/group login
      * @param name the display name
      * @param avatarUrl the avatar URL
      * @param htmlUrl the HTML URL
+     * @param provider the git provider type (GITHUB or GITLAB)
      */
     @Modifying
     @Transactional
     @Query(
         value = """
-        INSERT INTO organization (id, github_id, login, name, avatar_url, html_url)
-        VALUES (:id, :githubId, :login, :name, :avatarUrl, :htmlUrl)
+        INSERT INTO organization (id, provider_id, login, name, avatar_url, html_url, provider)
+        VALUES (:id, :providerId, :login, :name, :avatarUrl, :htmlUrl, :provider)
         ON CONFLICT (id) DO UPDATE SET
             login = EXCLUDED.login,
             name = EXCLUDED.name,
@@ -49,10 +50,11 @@ public interface OrganizationRepository extends JpaRepository<Organization, Long
     )
     void upsert(
         @Param("id") Long id,
-        @Param("githubId") Long githubId,
+        @Param("providerId") Long providerId,
         @Param("login") String login,
         @Param("name") String name,
         @Param("avatarUrl") String avatarUrl,
-        @Param("htmlUrl") String htmlUrl
+        @Param("htmlUrl") String htmlUrl,
+        @Param("provider") String provider
     );
 }
