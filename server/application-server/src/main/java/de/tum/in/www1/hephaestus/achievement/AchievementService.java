@@ -292,4 +292,18 @@ public class AchievementService {
     public List<String> getAllAchievementDefinitionIds() {
         return Arrays.stream(AchievementDefinition.values()).map(AchievementDefinition::getId).toList();
     }
+
+    /**
+     * Return all definitions as LOCKED with 0 progress
+     */
+    public List<AchievementDTO> getAllAchievementDefinitions() {
+        return Arrays.stream(AchievementDefinition.values())
+            .map(def -> AchievementDTO.fromDefinition(
+                def,
+                AchievementStatus.LOCKED,
+                def.getRequirements(),
+                Optional.empty()
+            ))
+            .toList();
+    }
 }

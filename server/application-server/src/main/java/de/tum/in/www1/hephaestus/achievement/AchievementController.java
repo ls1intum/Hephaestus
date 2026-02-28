@@ -101,14 +101,7 @@ public class AchievementController {
         log.debug("Getting all achievement definitions for designer mode in workspace: {}", workspaceContext.slug());
 
         // Return all definitions as LOCKED with 0 progress
-        List<AchievementDTO> definitions = Arrays.stream(AchievementDefinition.values())
-            .map(def -> AchievementDTO.fromDefinition(
-                def,
-                AchievementStatus.LOCKED,
-                def.getRequirements(),
-                Optional.empty()
-            ))
-            .toList();
+        List<AchievementDTO> definitions = achievementService.getAllAchievementDefinitions();
 
         return ResponseEntity.ok(definitions);
     }
