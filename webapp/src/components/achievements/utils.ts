@@ -229,3 +229,5 @@ export function calculateStats(achievementList: Achievement[]) {
 		byCategory,
 	};
 }
+
+export class categoryMeta {}

@@ -9,9 +9,9 @@ import {
 } from "lucide-react";
 import type React from "react";
 import type { AchievementCategory, UIAchievement } from "@/components/achievements/types";
+import { calculateStats, categoryMeta } from "@/components/achievements/utils";
 import { Progress, ProgressIndicator, ProgressTrack } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
-import { calculateStats, categoryMeta } from "./data";
 
 const categoryIcons: Record<AchievementCategory, React.ElementType> = {
 	pull_requests: GitPullRequest,

@@ -9,9 +9,12 @@ import {
 	useNodesState,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { useEffect, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { ACHIEVEMENT_REGISTRY } from "@/components/achievements/definitions.ts";
 import type { UIAchievement } from "@/components/achievements/types";
 import { generateSkillTreeData } from "@/components/achievements/utils";
+import { Label } from "@/components/ui/label.tsx";
+import { Switch } from "@/components/ui/switch.tsx";
 import { AchievementEdge } from "./AchievementEdge.tsx";
 import { AchievementNode } from "./AchievementNode.tsx";
 import { AvatarNode } from "./AvatarNode.tsx";
@@ -61,16 +64,9 @@ export function SkillTree({ user, achievements }: SkillTreeProps) {
 	const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
 	const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
-	// Update nodes when user or achievements props change
-	useEffect(() => {
-		const { nodes: newNodes, edges: newEdges } = generateSkillTreeData(user, achievements);
-		setNodes(newNodes);
-		setEdges(newEdges);
-	}, [user, achievements, setNodes, setEdges]);
-
-	const isDark = useSyncExternalStore(subscribeToTheme, getIsDarkMode, () => true);
-
-	const isDev = import.meta.env.DEV;
+	// Toolbar and functionality for the designer mode
+	const isDevEnv = import.meta.env.DEV;
+	const [isDesignerMode, setIsDesignerMode] = useState(false);
 
 	const saveLayout = async () => {
 		// Map ReactFlow node IDs back to raw achievement IDs
@@ -80,7 +76,10 @@ export function SkillTree({ user, achievements }: SkillTreeProps) {
 				if (node.type === "achievement") {
 					// const rawId = node.id.replace("-node", "");
 					const rawId = node.data.achievement.id;
-					coords[rawId] = { x: Math.round(node.position.x), y: Math.round(node.position.y) };
+					coords[rawId] = {
+						x: Math.round(node.position.x),
+						y: Math.round(node.position.y),
+					};
 				}
 				return coords;
 			},
@@ -94,8 +93,53 @@ export function SkillTree({ user, achievements }: SkillTreeProps) {
 		alert("Layout saved to coordinates.json!");
 	};
 
+	// Update nodes when user or achievements props change
+	useEffect(() => {
+		//Force achievements to "unlocked" to display all in designer mode
+		const displayAchievements = isDesignerMode
+			? (Object.entries(ACHIEVEMENT_REGISTRY).map(([id, def]) => ({
+					...def,
+					id,
+					status: "unlocked",
+				})) as UIAchievement[])
+			: achievements;
+
+		const { nodes: newNodes, edges: newEdges } = generateSkillTreeData(user, displayAchievements);
+
+		setNodes(newNodes);
+		setEdges(newEdges);
+	}, [user, achievements, setNodes, setEdges, isDesignerMode]);
+
+	const isDark = useSyncExternalStore(subscribeToTheme, getIsDarkMode, () => true);
+
 	return (
-		<div className="w-full h-full">
+		<div className="w-full h-full relative">
+			{/* Dev Mode Toolbar*/}
+			{isDevEnv && (
+				<div className="absolute top-4 right-4 z-50 flex items-center gap-4 bg-background p-3 rounded-lg shadow-lg border border-border">
+					<div className="flex items-center space-x-2">
+						<Switch
+							id="designer-mode"
+							checked={isDesignerMode}
+							onCheckedChange={setIsDesignerMode}
+						/>
+						<Label htmlFor="designer-mode" className="cursor-pointer">
+							Designer Mode
+						</Label>
+					</div>
+
+					{isDesignerMode && (
+						<button
+							type="button"
+							onClick={saveLayout}
+							className="px-3 py-1.5 bg-green-600 text-white text-sm font-semibold rounded shadow hover:bg-green-700 transition-colors"
+						>
+							Save Layout
+						</button>
+					)}
+				</div>
+			)}
+
 			<ReactFlow
 				nodes={nodes}
 				edges={edges}
@@ -112,7 +156,7 @@ export function SkillTree({ user, achievements }: SkillTreeProps) {
 				className="bg-background"
 				// Nodes should be not accessible besides selection for tooltip
 				elementsSelectable={true}
-				nodesDraggable={isDev}
+				nodesDraggable={isDesignerMode}
 				nodesConnectable={false}
 				// Disable all keyboard props
 				deleteKeyCode={null}
@@ -174,15 +218,6 @@ export function SkillTree({ user, achievements }: SkillTreeProps) {
 					zoomable={true}
 				/>
 			</ReactFlow>
-			{isDev && (
-				<button
-					onClick={saveLayout}
-					type="button"
-					className="absolute top-4 right-4 z-50 px-4 py-2 bg-blue-500 text-white rounded"
-				>
-					Save Layout
-				</button>
-			)}
 		</div>
 	);
 }
