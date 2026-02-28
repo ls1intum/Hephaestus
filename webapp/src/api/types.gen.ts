@@ -2721,3 +2721,25 @@ export type GetUserAchievementsResponses = {
 };
 
 export type GetUserAchievementsResponse = GetUserAchievementsResponses[keyof GetUserAchievementsResponses];
+
+export type GetAllAchievementDefinitionsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        login: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/users/{login}/achievements/definitions';
+};
+
+export type GetAllAchievementDefinitionsResponses = {
+    /**
+     * OK
+     */
+    200: Array<Achievement>;
+};
+
+export type GetAllAchievementDefinitionsResponse = GetAllAchievementDefinitionsResponses[keyof GetAllAchievementDefinitionsResponses];

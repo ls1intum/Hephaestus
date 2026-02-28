@@ -2157,6 +2157,37 @@ paths:
       summary: Get user achievements
       tags:
       - Achievements
+  /workspaces/{workspaceSlug}/users/{login}/achievements/definitions:
+    get:
+      description: Returns the master list of all available achievements. Restricted
+        to non-prod environments.
+      operationId: getAllAchievementDefinitions
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: login
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Achievement"
+          description: OK
+      security: []
+      summary: Get all achievement definitions
+      tags:
+      - Achievements
 components:
   schemas:
     Achievement:
