@@ -9,22 +9,26 @@
     Multi-Provider Support (Issue #715)
     =======================================================================================
 
-    Adds a provider discriminator column to all git service entity tables so that
-    GitHub and GitLab entities can coexist in the same database. Updates unique
-    constraints that previously assumed a single provider to include the provider
-    column. Renames organization.github_id to organization.provider_id.
+    Adds a provider discriminator column to all BaseGitServiceEntity tables so
+    that GitHub and GitLab entities can coexist in the same database. Updates
+    unique constraints that previously assumed a single provider to include the
+    provider column. Renames organization.github_id to organization.provider_id.
 
     ID collision prevention is handled at the application layer via ID negation
     (all GitLab entity IDs are negated before storage). The provider column
     enables provider-scoped queries and provider-aware unique constraints.
 
     Existing data defaults to 'GITHUB' — no data migration needed.
+
+    Tables that do NOT get a provider column:
+      - label, pull_request_review: plain entities, not BaseGitServiceEntity
+      - pull_request: extends Issue (JPA SINGLE_TABLE), shares issue table
     =======================================================================================
     -->
 
     <!-- ==================== Step 1: Add provider column to all entity tables ==================== -->
 
-    <changeSet author="issue-715" id="1772200000000-1">
+    <changeSet author="issue-715" id="1772284124265-1">
         <preConditions onFail="MARK_RAN">
             <not><columnExists tableName="user" columnName="provider"/></not>
         </preConditions>
@@ -35,7 +39,7 @@
         </addColumn>
     </changeSet>
 
-    <changeSet author="issue-715" id="1772200000000-2">
+    <changeSet author="issue-715" id="1772284124265-2">
         <preConditions onFail="MARK_RAN">
             <not><columnExists tableName="repository" columnName="provider"/></not>
         </preConditions>
@@ -46,7 +50,7 @@
         </addColumn>
     </changeSet>
 
-    <changeSet author="issue-715" id="1772200000000-3">
+    <changeSet author="issue-715" id="1772284124265-3">
         <preConditions onFail="MARK_RAN">
             <not><columnExists tableName="organization" columnName="provider"/></not>
         </preConditions>
@@ -57,7 +61,7 @@
         </addColumn>
     </changeSet>
 
-    <changeSet author="issue-715" id="1772200000000-4">
+    <changeSet author="issue-715" id="1772284124265-4">
         <preConditions onFail="MARK_RAN">
             <not><columnExists tableName="issue" columnName="provider"/></not>
         </preConditions>
@@ -68,7 +72,7 @@
         </addColumn>
     </changeSet>
 
-    <changeSet author="issue-715" id="1772200000000-6">
+    <changeSet author="issue-715" id="1772284124265-5">
         <preConditions onFail="MARK_RAN">
             <not><columnExists tableName="milestone" columnName="provider"/></not>
         </preConditions>
@@ -79,7 +83,7 @@
         </addColumn>
     </changeSet>
 
-    <changeSet author="issue-715" id="1772200000000-7">
+    <changeSet author="issue-715" id="1772284124265-6">
         <preConditions onFail="MARK_RAN">
             <not><columnExists tableName="issue_comment" columnName="provider"/></not>
         </preConditions>
@@ -90,7 +94,7 @@
         </addColumn>
     </changeSet>
 
-    <changeSet author="issue-715" id="1772200000000-9">
+    <changeSet author="issue-715" id="1772284124265-7">
         <preConditions onFail="MARK_RAN">
             <not><columnExists tableName="pull_request_review_comment" columnName="provider"/></not>
         </preConditions>
@@ -101,7 +105,7 @@
         </addColumn>
     </changeSet>
 
-    <changeSet author="issue-715" id="1772200000000-10">
+    <changeSet author="issue-715" id="1772284124265-8">
         <preConditions onFail="MARK_RAN">
             <not><columnExists tableName="pull_request_review_thread" columnName="provider"/></not>
         </preConditions>
@@ -112,7 +116,7 @@
         </addColumn>
     </changeSet>
 
-    <changeSet author="issue-715" id="1772200000000-11">
+    <changeSet author="issue-715" id="1772284124265-9">
         <preConditions onFail="MARK_RAN">
             <not><columnExists tableName="discussion" columnName="provider"/></not>
         </preConditions>
@@ -123,7 +127,7 @@
         </addColumn>
     </changeSet>
 
-    <changeSet author="issue-715" id="1772200000000-12">
+    <changeSet author="issue-715" id="1772284124265-10">
         <preConditions onFail="MARK_RAN">
             <not><columnExists tableName="discussion_comment" columnName="provider"/></not>
         </preConditions>
@@ -134,7 +138,7 @@
         </addColumn>
     </changeSet>
 
-    <changeSet author="issue-715" id="1772200000000-13">
+    <changeSet author="issue-715" id="1772284124265-11">
         <preConditions onFail="MARK_RAN">
             <not><columnExists tableName="team" columnName="provider"/></not>
         </preConditions>
@@ -145,7 +149,7 @@
         </addColumn>
     </changeSet>
 
-    <changeSet author="issue-715" id="1772200000000-14">
+    <changeSet author="issue-715" id="1772284124265-12">
         <preConditions onFail="MARK_RAN">
             <not><columnExists tableName="project" columnName="provider"/></not>
         </preConditions>
@@ -156,7 +160,7 @@
         </addColumn>
     </changeSet>
 
-    <changeSet author="issue-715" id="1772200000000-15">
+    <changeSet author="issue-715" id="1772284124265-13">
         <preConditions onFail="MARK_RAN">
             <not><columnExists tableName="project_item" columnName="provider"/></not>
         </preConditions>
@@ -167,7 +171,7 @@
         </addColumn>
     </changeSet>
 
-    <changeSet author="issue-715" id="1772200000000-16">
+    <changeSet author="issue-715" id="1772284124265-14">
         <preConditions onFail="MARK_RAN">
             <not><columnExists tableName="project_status_update" columnName="provider"/></not>
         </preConditions>
@@ -180,7 +184,7 @@
 
     <!-- ==================== Step 2: Rename organization.github_id → provider_id ==================== -->
 
-    <changeSet author="issue-715" id="1772200000000-20">
+    <changeSet author="issue-715" id="1772284124265-15">
         <preConditions onFail="MARK_RAN">
             <columnExists tableName="organization" columnName="github_id"/>
         </preConditions>
@@ -191,13 +195,13 @@
     <!-- ==================== Step 3: Update unique constraints for multi-provider ==================== -->
 
     <!-- User: uk_user_login_lower → uk_user_provider_login (provider, LOWER(login)) -->
-    <changeSet author="issue-715" id="1772200000000-30">
+    <changeSet author="issue-715" id="1772284124265-16">
         <preConditions onFail="MARK_RAN">
             <indexExists indexName="uk_user_login_lower"/>
         </preConditions>
         <dropIndex tableName="user" indexName="uk_user_login_lower"/>
     </changeSet>
-    <changeSet author="issue-715" id="1772200000000-31">
+    <changeSet author="issue-715" id="1772284124265-17">
         <preConditions onFail="MARK_RAN">
             <not><indexExists indexName="uk_user_provider_login"/></not>
         </preConditions>
@@ -209,14 +213,14 @@
         </rollback>
     </changeSet>
 
-    <!-- Organization: uq_organization_github_id → uq_organization_provider_id -->
-    <changeSet author="issue-715" id="1772200000000-32">
+    <!-- Organization: uq_organization_github_id → uq_organization_provider_provider_id -->
+    <changeSet author="issue-715" id="1772284124265-18">
         <preConditions onFail="MARK_RAN">
             <indexExists indexName="uq_organization_github_id"/>
         </preConditions>
         <dropUniqueConstraint tableName="organization" constraintName="uq_organization_github_id"/>
     </changeSet>
-    <changeSet author="issue-715" id="1772200000000-33">
+    <changeSet author="issue-715" id="1772284124265-19">
         <preConditions onFail="MARK_RAN">
             <not><indexExists indexName="uq_organization_provider_provider_id"/></not>
         </preConditions>
@@ -225,13 +229,13 @@
     </changeSet>
 
     <!-- Organization: uq_organization_login → uq_organization_provider_login -->
-    <changeSet author="issue-715" id="1772200000000-34">
+    <changeSet author="issue-715" id="1772284124265-20">
         <preConditions onFail="MARK_RAN">
             <indexExists indexName="uq_organization_login"/>
         </preConditions>
         <dropUniqueConstraint tableName="organization" constraintName="uq_organization_login"/>
     </changeSet>
-    <changeSet author="issue-715" id="1772200000000-35">
+    <changeSet author="issue-715" id="1772284124265-21">
         <preConditions onFail="MARK_RAN">
             <not><indexExists indexName="uq_organization_provider_login"/></not>
         </preConditions>
@@ -240,13 +244,13 @@
     </changeSet>
 
     <!-- Repository: uq_repository_name_with_owner → uq_repository_provider_name_with_owner -->
-    <changeSet author="issue-715" id="1772200000000-36">
+    <changeSet author="issue-715" id="1772284124265-22">
         <preConditions onFail="MARK_RAN">
             <indexExists indexName="uq_repository_name_with_owner"/>
         </preConditions>
         <dropUniqueConstraint tableName="repository" constraintName="uq_repository_name_with_owner"/>
     </changeSet>
-    <changeSet author="issue-715" id="1772200000000-37">
+    <changeSet author="issue-715" id="1772284124265-23">
         <preConditions onFail="MARK_RAN">
             <not><indexExists indexName="uq_repository_provider_name_with_owner"/></not>
         </preConditions>
