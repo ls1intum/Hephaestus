@@ -215,9 +215,7 @@ class GitHubProjectStatusUpdateMessageHandlerIntegrationTest extends BaseIntegra
         // Create GitHub provider
         GitProvider gitProvider = gitProviderRepository
             .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
-            .orElseGet(
-                () -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com"))
-            );
+            .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com")));
 
         testOrganization = new Organization();
         testOrganization.setNativeId(215361191L);

@@ -5,10 +5,10 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
@@ -337,7 +337,9 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
 
             Repository repo2 = new Repository();
             repo2.setId(20L);
-            when(projectProcessor.processGraphQlResponse(eq(proj1), any(), any())).thenThrow(new RuntimeException("DB error"));
+            when(projectProcessor.processGraphQlResponse(eq(proj1), any(), any())).thenThrow(
+                new RuntimeException("DB error")
+            );
             when(projectProcessor.processGraphQlResponse(eq(proj2), any(), any())).thenReturn(repo2);
 
             GitLabSyncResult result = service.syncGroupProjects(1L, "my-org");

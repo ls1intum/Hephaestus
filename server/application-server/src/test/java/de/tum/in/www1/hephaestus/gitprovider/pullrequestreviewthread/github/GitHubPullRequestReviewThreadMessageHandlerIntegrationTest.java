@@ -75,9 +75,7 @@ class GitHubPullRequestReviewThreadMessageHandlerIntegrationTest extends BaseInt
         // Create GitHub provider
         gitProvider = gitProviderRepository
             .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
-            .orElseGet(
-                () -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com"))
-            );
+            .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com")));
 
         // Create organization - use ID from fixture
         Organization org = new Organization();

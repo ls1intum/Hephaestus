@@ -374,7 +374,9 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(result.getAuthor()).isNotNull();
             assertThat(result.getAuthor().getNativeId()).isEqualTo(FIXTURE_AUTHOR_ID);
             assertThat(result.getAuthor().getLogin()).isEqualTo(FIXTURE_AUTHOR_LOGIN);
-            assertThat(userRepository.findByNativeIdAndProviderId(FIXTURE_AUTHOR_ID, githubProvider.getId())).isPresent();
+            assertThat(
+                userRepository.findByNativeIdAndProviderId(FIXTURE_AUTHOR_ID, githubProvider.getId())
+            ).isPresent();
         }
 
         @Test
@@ -612,7 +614,9 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             // Then
             assertThat(result.getMilestone()).isNotNull();
             assertThat(result.getMilestone().getTitle()).isEqualTo("Webhook Fixtures");
-            assertThat(milestoneRepository.findByNativeIdAndProviderId(milestoneId, githubProvider.getId())).isPresent();
+            assertThat(
+                milestoneRepository.findByNativeIdAndProviderId(milestoneId, githubProvider.getId())
+            ).isPresent();
         }
     }
 

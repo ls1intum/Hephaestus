@@ -192,7 +192,9 @@ class GitHubIssueCommentMessageHandlerIntegrationTest extends BaseIntegrationTes
         handler.handleEvent(createEvent);
 
         // Verify it exists
-        assertThat(commentRepository.findByNativeIdAndProviderId(createEvent.comment().id(), gitProvider.getId())).isPresent();
+        assertThat(
+            commentRepository.findByNativeIdAndProviderId(createEvent.comment().id(), gitProvider.getId())
+        ).isPresent();
 
         // Load deleted event
         GitHubIssueCommentEventDTO deleteEvent = loadPayload("issue_comment.deleted");
@@ -201,7 +203,9 @@ class GitHubIssueCommentMessageHandlerIntegrationTest extends BaseIntegrationTes
         handler.handleEvent(deleteEvent);
 
         // Then
-        assertThat(commentRepository.findByNativeIdAndProviderId(deleteEvent.comment().id(), gitProvider.getId())).isEmpty();
+        assertThat(
+            commentRepository.findByNativeIdAndProviderId(deleteEvent.comment().id(), gitProvider.getId())
+        ).isEmpty();
     }
 
     private GitHubIssueCommentEventDTO loadPayload(String filename) throws IOException {

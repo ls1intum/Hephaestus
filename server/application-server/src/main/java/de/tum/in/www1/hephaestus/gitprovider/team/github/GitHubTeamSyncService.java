@@ -410,7 +410,10 @@ public class GitHubTeamSyncService {
 
             // Convert GraphQL User to GitHubUserDTO and ensure user exists
             GitHubUserDTO userDTO = convertUserToDTO(graphQlUser);
-            de.tum.in.www1.hephaestus.gitprovider.user.User user = userProcessor.ensureExists(userDTO, team.getProvider().getId());
+            de.tum.in.www1.hephaestus.gitprovider.user.User user = userProcessor.ensureExists(
+                userDTO,
+                team.getProvider().getId()
+            );
 
             if (user != null) {
                 syncedMemberIds.add(user.getId());

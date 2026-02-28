@@ -258,7 +258,11 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
     ) {
         boolean assigneesChanged = updateAssignees(dto.assignees(), pr.getAssignees(), providerId);
         boolean labelsChanged = updateLabels(dto.labels(), pr.getLabels(), repository);
-        boolean reviewersChanged = updateRequestedReviewers(dto.requestedReviewers(), pr.getRequestedReviewers(), providerId);
+        boolean reviewersChanged = updateRequestedReviewers(
+            dto.requestedReviewers(),
+            pr.getRequestedReviewers(),
+            providerId
+        );
         return assigneesChanged || labelsChanged || reviewersChanged;
     }
 

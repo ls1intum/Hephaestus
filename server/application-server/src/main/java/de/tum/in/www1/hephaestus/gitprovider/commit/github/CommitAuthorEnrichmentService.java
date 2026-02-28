@@ -282,7 +282,13 @@ public class CommitAuthorEnrichmentService {
         );
 
         // Fetch commit authors in batches via GraphQL
-        Map<String, String> emailToLogin = fetchCommitAuthorsBatched(nameWithOwner, scopeId, validShas, shaToEmail, providerId);
+        Map<String, String> emailToLogin = fetchCommitAuthorsBatched(
+            nameWithOwner,
+            scopeId,
+            validShas,
+            shaToEmail,
+            providerId
+        );
 
         // Bulk update: for each email → login, resolve login → user_id,
         // then update all commits with that email

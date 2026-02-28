@@ -80,11 +80,10 @@ public class GitLabGroupSyncService {
     private GitProvider resolveProvider() {
         return gitProviderRepository
             .findByTypeAndServerUrl(GitProviderType.GITLAB, gitLabProperties.defaultServerUrl())
-            .orElseThrow(
-                () ->
-                    new IllegalStateException(
-                        "GitProvider not found for type=GITLAB, serverUrl=" + gitLabProperties.defaultServerUrl()
-                    )
+            .orElseThrow(() ->
+                new IllegalStateException(
+                    "GitProvider not found for type=GITLAB, serverUrl=" + gitLabProperties.defaultServerUrl()
+                )
             );
     }
 

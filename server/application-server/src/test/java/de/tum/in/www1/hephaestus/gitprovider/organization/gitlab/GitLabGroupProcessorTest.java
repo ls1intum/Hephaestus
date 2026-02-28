@@ -53,7 +53,9 @@ class GitLabGroupProcessorTest extends BaseUnitTest {
 
             Organization expected = new Organization();
             expected.setId(100L);
-            when(organizationRepository.findByNativeIdAndProviderId(42L, PROVIDER_ID)).thenReturn(Optional.of(expected));
+            when(organizationRepository.findByNativeIdAndProviderId(42L, PROVIDER_ID)).thenReturn(
+                Optional.of(expected)
+            );
 
             Organization result = processor.process(group, PROVIDER_ID);
 
@@ -88,7 +90,9 @@ class GitLabGroupProcessorTest extends BaseUnitTest {
             Organization existing = new Organization();
             existing.setId(100L);
             existing.setCreatedAt(existingCreatedAt);
-            when(organizationRepository.findByNativeIdAndProviderId(42L, PROVIDER_ID)).thenReturn(Optional.of(existing));
+            when(organizationRepository.findByNativeIdAndProviderId(42L, PROVIDER_ID)).thenReturn(
+                Optional.of(existing)
+            );
 
             Organization result = processor.process(group, PROVIDER_ID);
 
@@ -132,7 +136,9 @@ class GitLabGroupProcessorTest extends BaseUnitTest {
                 "private"
             );
 
-            when(organizationRepository.findByNativeIdAndProviderId(99L, PROVIDER_ID)).thenReturn(Optional.of(new Organization()));
+            when(organizationRepository.findByNativeIdAndProviderId(99L, PROVIDER_ID)).thenReturn(
+                Optional.of(new Organization())
+            );
 
             processor.process(group, PROVIDER_ID);
 
@@ -230,7 +236,9 @@ class GitLabGroupProcessorTest extends BaseUnitTest {
                 "internal"
             );
 
-            when(organizationRepository.findByNativeIdAndProviderId(7L, PROVIDER_ID)).thenReturn(Optional.of(new Organization()));
+            when(organizationRepository.findByNativeIdAndProviderId(7L, PROVIDER_ID)).thenReturn(
+                Optional.of(new Organization())
+            );
 
             processor.process(group, PROVIDER_ID);
 

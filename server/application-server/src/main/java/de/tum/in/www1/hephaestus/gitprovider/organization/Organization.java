@@ -20,14 +20,8 @@ import org.springframework.lang.NonNull;
 @Table(
     name = "organization",
     uniqueConstraints = {
-        @UniqueConstraint(
-            name = "uq_organization_provider_native_id",
-            columnNames = { "provider_id", "native_id" }
-        ),
-        @UniqueConstraint(
-            name = "uq_organization_provider_login",
-            columnNames = { "provider_id", "login" }
-        ),
+        @UniqueConstraint(name = "uq_organization_provider_native_id", columnNames = { "provider_id", "native_id" }),
+        @UniqueConstraint(name = "uq_organization_provider_login", columnNames = { "provider_id", "login" }),
     }
 )
 public class Organization extends BaseGitServiceEntity {

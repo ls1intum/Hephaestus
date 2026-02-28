@@ -111,7 +111,8 @@ public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
 
         // Resolve related entities BEFORE the upsert
         User author = dto.author() != null ? findOrCreateUser(dto.author(), context.providerId()) : null;
-        User answerChosenBy = dto.answerChosenBy() != null ? findOrCreateUser(dto.answerChosenBy(), context.providerId()) : null;
+        User answerChosenBy =
+            dto.answerChosenBy() != null ? findOrCreateUser(dto.answerChosenBy(), context.providerId()) : null;
         DiscussionCategory category = dto.category() != null ? findOrCreateCategory(dto.category(), repository) : null;
 
         // Use atomic upsert to handle concurrent inserts

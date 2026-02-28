@@ -694,7 +694,9 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             handler.handleEvent(loadPayload("issues.opened"));
 
             // Then - author created with exact fixture values
-            var author = userRepository.findByNativeIdAndProviderId(FIXTURE_AUTHOR_ID, gitProvider.getId()).orElseThrow();
+            var author = userRepository
+                .findByNativeIdAndProviderId(FIXTURE_AUTHOR_ID, gitProvider.getId())
+                .orElseThrow();
             assertThat(author.getLogin()).isEqualTo(FIXTURE_AUTHOR_LOGIN);
             assertThat(author.getAvatarUrl()).isEqualTo(FIXTURE_AUTHOR_AVATAR_URL);
             assertThat(author.getHtmlUrl()).isEqualTo(FIXTURE_AUTHOR_HTML_URL);

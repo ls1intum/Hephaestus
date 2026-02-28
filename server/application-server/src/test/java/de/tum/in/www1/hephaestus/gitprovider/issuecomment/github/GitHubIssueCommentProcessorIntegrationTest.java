@@ -364,7 +364,9 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(result.getNativeId()).isEqualTo(TEST_COMMENT_ID);
 
             // Verify PullRequest stub was created (not Issue!)
-            PullRequest createdPR = pullRequestRepository.findByRepositoryIdAndNumber(testRepository.getId(), 100).orElseThrow();
+            PullRequest createdPR = pullRequestRepository
+                .findByRepositoryIdAndNumber(testRepository.getId(), 100)
+                .orElseThrow();
             assertThat(createdPR.getNativeId()).isEqualTo(NEW_PR_ID);
             assertThat(createdPR.getNumber()).isEqualTo(100);
             assertThat(createdPR.getTitle()).isEqualTo("New Issue from Comment Webhook");
@@ -449,7 +451,9 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
             processor.delete(TEST_COMMENT_ID, createContext());
 
             // Verify comment is deleted
-            assertThat(commentRepository.findByNativeIdAndProviderId(TEST_COMMENT_ID, githubProvider.getId())).isEmpty();
+            assertThat(
+                commentRepository.findByNativeIdAndProviderId(TEST_COMMENT_ID, githubProvider.getId())
+            ).isEmpty();
 
             // Verify CommentDeleted event was published
             assertThat(eventListener.getDeletedEvents())
@@ -485,7 +489,9 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
             assertThatCode(() -> processor.delete(TEST_COMMENT_ID, createContext())).doesNotThrowAnyException();
 
             // Verify comment is deleted
-            assertThat(commentRepository.findByNativeIdAndProviderId(TEST_COMMENT_ID, githubProvider.getId())).isEmpty();
+            assertThat(
+                commentRepository.findByNativeIdAndProviderId(TEST_COMMENT_ID, githubProvider.getId())
+            ).isEmpty();
         }
 
         @Test

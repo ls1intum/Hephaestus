@@ -203,11 +203,8 @@ public class GitHubDataSyncService {
         // Resolve the GitHub provider entity
         GitProvider provider = gitProviderRepository
             .findByTypeAndServerUrl(GitProviderType.GITHUB, GITHUB_SERVER_URL)
-            .orElseThrow(
-                () ->
-                    new IllegalStateException(
-                        "GitProvider not found for type=GITHUB, serverUrl=" + GITHUB_SERVER_URL
-                    )
+            .orElseThrow(() ->
+                new IllegalStateException("GitProvider not found for type=GITHUB, serverUrl=" + GITHUB_SERVER_URL)
             );
 
         Repository repository = repositoryRepository.findByNameWithOwner(nameWithOwner).orElse(null);

@@ -10,6 +10,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
  * {@link #findByTypeAndServerUrl} lookup is the primary resolution path.
  */
 public interface GitProviderRepository extends JpaRepository<GitProvider, Long> {
-
     Optional<GitProvider> findByTypeAndServerUrl(GitProviderType type, String serverUrl);
 }

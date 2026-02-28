@@ -82,9 +82,7 @@ class GitHubProjectMessageHandlerIntegrationTest extends BaseIntegrationTest {
         // Create GitHub provider
         GitProvider gitProvider = gitProviderRepository
             .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
-            .orElseGet(
-                () -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com"))
-            );
+            .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com")));
 
         // Create organization matching the fixture data
         testOrganization = new Organization();

@@ -74,9 +74,7 @@ class GitHubPullRequestReviewCommentMessageHandlerIntegrationTest extends BaseIn
         // Create GitHub provider
         gitProvider = gitProviderRepository
             .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
-            .orElseGet(
-                () -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com"))
-            );
+            .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com")));
 
         // Create organization
         Organization org = new Organization();

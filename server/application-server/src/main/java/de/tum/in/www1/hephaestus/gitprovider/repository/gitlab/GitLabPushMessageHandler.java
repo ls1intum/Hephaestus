@@ -97,11 +97,10 @@ public class GitLabPushMessageHandler extends GitLabMessageHandler<GitLabPushEve
         // This ensures the repository exists for future commit/MR processing.
         GitProvider provider = gitProviderRepository
             .findByTypeAndServerUrl(GitProviderType.GITLAB, gitLabProperties.defaultServerUrl())
-            .orElseThrow(
-                () ->
-                    new IllegalStateException(
-                        "GitProvider not found for type=GITLAB, serverUrl=" + gitLabProperties.defaultServerUrl()
-                    )
+            .orElseThrow(() ->
+                new IllegalStateException(
+                    "GitProvider not found for type=GITLAB, serverUrl=" + gitLabProperties.defaultServerUrl()
+                )
             );
         var repository = projectProcessor.processPushEvent(event.project(), provider);
 

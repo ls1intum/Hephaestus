@@ -15,6 +15,7 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface IssueCommentRepository extends JpaRepository<IssueComment, Long> {
     Optional<IssueComment> findByNativeIdAndProviderId(Long nativeId, Long providerId);
+
     /**
      * Batch fetch comments by IDs with all related entities eagerly loaded.
      *

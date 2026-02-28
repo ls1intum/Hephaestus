@@ -69,15 +69,10 @@ public class GitLabGroupProcessor {
         String avatarUrl = group.avatarUrl();
         String htmlUrl = group.webUrl();
 
-        organizationRepository.upsert(
-            nativeId,
-            providerId,
-            login,
-            name,
-            avatarUrl,
-            htmlUrl
-        );
-        Organization organization = organizationRepository.findByNativeIdAndProviderId(nativeId, providerId).orElse(null);
+        organizationRepository.upsert(nativeId, providerId, login, name, avatarUrl, htmlUrl);
+        Organization organization = organizationRepository
+            .findByNativeIdAndProviderId(nativeId, providerId)
+            .orElse(null);
         if (organization != null) {
             Instant now = Instant.now();
             organization.setLastSyncAt(now);

@@ -186,7 +186,9 @@ class GitHubDiscussionCommentMessageHandlerIntegrationTest extends BaseIntegrati
         });
 
         // Parent discussion should also have been created by the handler
-        assertThat(discussionRepository.findByRepositoryIdAndNumber(testRepository.getId(), FIXTURE_DISCUSSION_NUMBER)).isPresent();
+        assertThat(
+            discussionRepository.findByRepositoryIdAndNumber(testRepository.getId(), FIXTURE_DISCUSSION_NUMBER)
+        ).isPresent();
 
         // Domain event published
         assertThat(eventListener.getCreatedEvents()).hasSize(1);

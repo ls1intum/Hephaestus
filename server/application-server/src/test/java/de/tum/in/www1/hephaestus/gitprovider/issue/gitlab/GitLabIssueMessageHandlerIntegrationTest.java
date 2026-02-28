@@ -293,7 +293,9 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
             handler.handleEvent(loadPayload("issue.open"));
 
-            var author = userRepository.findByNativeIdAndProviderId(NATIVE_USER_ID, savedProvider.getId()).orElseThrow();
+            var author = userRepository
+                .findByNativeIdAndProviderId(NATIVE_USER_ID, savedProvider.getId())
+                .orElseThrow();
             assertThat(author.getLogin()).isEqualTo(FIXTURE_AUTHOR_LOGIN);
             assertThat(author.getProvider().getType()).isEqualTo(GitProviderType.GITLAB);
             assertThat(author.getHtmlUrl()).isEqualTo("https://gitlab.lrz.de/ga84xah");
@@ -305,7 +307,9 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             handler.handleEvent(loadPayload("issue.open"));
 
             transactionTemplate.executeWithoutResult(status -> {
-                var label = labelRepository.findByRepositoryIdAndName(savedRepo.getId(), FIXTURE_LABEL_NAME).orElseThrow();
+                var label = labelRepository
+                    .findByRepositoryIdAndName(savedRepo.getId(), FIXTURE_LABEL_NAME)
+                    .orElseThrow();
                 assertThat(label.getName()).isEqualTo(FIXTURE_LABEL_NAME);
                 assertThat(label.getColor()).isEqualTo(FIXTURE_LABEL_COLOR);
             });
@@ -346,15 +350,19 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
         @DisplayName("full lifecycle: open → close → reopen → update")
         void shouldHandleFullLifecycle() throws Exception {
             handler.handleEvent(loadPayload("issue.open"));
-            assertThat(issueRepository.findByRepositoryIdAndNumber(savedRepo.getId(), ISSUE_IID).orElseThrow().getState()).isEqualTo(Issue.State.OPEN);
+            assertThat(
+                issueRepository.findByRepositoryIdAndNumber(savedRepo.getId(), ISSUE_IID).orElseThrow().getState()
+            ).isEqualTo(Issue.State.OPEN);
 
             handler.handleEvent(loadPayload("issue.close"));
-            assertThat(issueRepository.findByRepositoryIdAndNumber(savedRepo.getId(), ISSUE_IID).orElseThrow().getState()).isEqualTo(
-                Issue.State.CLOSED
-            );
+            assertThat(
+                issueRepository.findByRepositoryIdAndNumber(savedRepo.getId(), ISSUE_IID).orElseThrow().getState()
+            ).isEqualTo(Issue.State.CLOSED);
 
             handler.handleEvent(loadPayload("issue.reopen"));
-            assertThat(issueRepository.findByRepositoryIdAndNumber(savedRepo.getId(), ISSUE_IID).orElseThrow().getState()).isEqualTo(Issue.State.OPEN);
+            assertThat(
+                issueRepository.findByRepositoryIdAndNumber(savedRepo.getId(), ISSUE_IID).orElseThrow().getState()
+            ).isEqualTo(Issue.State.OPEN);
 
             handler.handleEvent(loadPayload("issue.update"));
             assertThat(issueRepository.findByRepositoryIdAndNumber(savedRepo.getId(), ISSUE_IID)).isPresent();
@@ -374,7 +382,9 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     private void setupTestData() {
         savedProvider = gitProviderRepository
             .findByTypeAndServerUrl(GitProviderType.GITLAB, "https://gitlab.lrz.de")
-            .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITLAB, "https://gitlab.lrz.de")));
+            .orElseGet(() ->
+                gitProviderRepository.save(new GitProvider(GitProviderType.GITLAB, "https://gitlab.lrz.de"))
+            );
 
         Organization org = new Organization();
         org.setNativeId(1L);

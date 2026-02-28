@@ -452,7 +452,12 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
     /**
      * Populates base Issue fields common to both Issue and PullRequest entities.
      */
-    private void populateBaseIssueFields(Issue issue, GitHubIssueDTO dto, Repository repository, ProcessingContext context) {
+    private void populateBaseIssueFields(
+        Issue issue,
+        GitHubIssueDTO dto,
+        Repository repository,
+        ProcessingContext context
+    ) {
         issue.setNativeId(dto.getDatabaseId());
         issue.setProvider(context.provider());
         issue.setNumber(dto.number());

@@ -446,7 +446,9 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
             processor.processDeleted(dto, createContext());
 
             // Verify comment is deleted
-            assertThat(commentRepository.findByNativeIdAndProviderId(TEST_COMMENT_ID, githubProvider.getId())).isEmpty();
+            assertThat(
+                commentRepository.findByNativeIdAndProviderId(TEST_COMMENT_ID, githubProvider.getId())
+            ).isEmpty();
 
             // Verify DiscussionCommentDeleted event was published
             assertThat(eventListener.getDeletedEvents())
@@ -485,7 +487,9 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
             assertThatCode(() -> processor.processDeleted(dto, createContext())).doesNotThrowAnyException();
 
             // Verify comment is deleted
-            assertThat(commentRepository.findByNativeIdAndProviderId(TEST_COMMENT_ID, githubProvider.getId())).isEmpty();
+            assertThat(
+                commentRepository.findByNativeIdAndProviderId(TEST_COMMENT_ID, githubProvider.getId())
+            ).isEmpty();
         }
 
         @Test
@@ -567,7 +571,9 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
             processor.resolveParentComment(reply, parent);
 
             // Verify parent was set
-            DiscussionComment savedReply = commentRepository.findByNativeIdAndProviderId(replyId, githubProvider.getId()).orElseThrow();
+            DiscussionComment savedReply = commentRepository
+                .findByNativeIdAndProviderId(replyId, githubProvider.getId())
+                .orElseThrow();
             assertThat(savedReply.getParentComment()).isNotNull();
             assertThat(savedReply.getParentComment().getNativeId()).isEqualTo(parentId);
         }

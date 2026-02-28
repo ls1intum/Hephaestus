@@ -130,7 +130,11 @@ public class GitHubOrganizationMessageHandler extends GitHubMessageHandler<GitHu
                     );
                 }
             }
-            case GitHubEventAction.Organization.RENAMED -> organizationProcessor.rename(orgDto.id(), orgDto.login(), providerId);
+            case GitHubEventAction.Organization.RENAMED -> organizationProcessor.rename(
+                orgDto.id(),
+                orgDto.login(),
+                providerId
+            );
             case GitHubEventAction.Organization.DELETED -> organizationProcessor.delete(orgDto.id(), providerId);
             default -> organizationProcessor.process(orgDto, providerId);
         }

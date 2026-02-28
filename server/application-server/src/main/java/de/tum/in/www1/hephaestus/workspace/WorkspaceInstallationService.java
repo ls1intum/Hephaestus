@@ -573,7 +573,12 @@ public class WorkspaceInstallationService {
                 typeStr,
                 installationId
             );
-            return accountId;
+            // Retrieve the JPA-managed entity to get the auto-generated PK
+            // (upsertUser is a native SQL INSERT that doesn't return the generated id)
+            return userRepository
+                .findByLogin(accountLogin)
+                .map(User::getId)
+                .orElseThrow(() -> new IllegalStateException("User not found after upsert: login=" + accountLogin));
         }
 
         log.warn(
