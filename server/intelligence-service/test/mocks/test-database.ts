@@ -201,6 +201,9 @@ export async function cleanupTestFixtures(fixtures: TestFixtures): Promise<void>
 		await cleanupTestThread(thread.id);
 	}
 
+	// Delete documents (FK to user and workspace) before deleting user/workspace
+	await db.execute(sql`DELETE FROM document WHERE user_id = ${fixtures.user.id}`);
+
 	// Now safe to delete workspace, user, and git_provider (in FK order)
 	await db.execute(sql`DELETE FROM "user" WHERE id = ${fixtures.user.id}`);
 	await db.execute(sql`DELETE FROM workspace WHERE id = ${fixtures.workspace.id}`);
