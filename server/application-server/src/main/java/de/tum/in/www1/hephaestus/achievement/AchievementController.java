@@ -97,12 +97,9 @@ public class AchievementController {
         if (isProd) {
             throw new AccessForbiddenException("Designer mode endpoints are restricted to development environments.");
         }
-
         log.debug("Getting all achievement definitions for designer mode in workspace: {}", workspaceContext.slug());
 
-        // Return all definitions as LOCKED with 0 progress
         List<AchievementDTO> definitions = achievementService.getAllAchievementDefinitions();
-
         return ResponseEntity.ok(definitions);
     }
 }
