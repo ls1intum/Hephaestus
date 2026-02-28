@@ -6,12 +6,18 @@ import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository
 import de.tum.in.www1.hephaestus.gitprovider.organization.gitlab.GitLabGroupSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.organization.gitlab.GitLabSyncResult;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
+import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.sync.GitHubDataSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.sync.NatsConsumerService;
 import de.tum.in.www1.hephaestus.gitprovider.sync.NatsProperties;
+import de.tum.in.www1.hephaestus.gitprovider.sync.SyncResult;
 import de.tum.in.www1.hephaestus.gitprovider.sync.SyncSchedulerProperties;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContextHolder;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -43,6 +49,7 @@ public class WorkspaceActivationService {
     // Core repositories
     private final WorkspaceRepository workspaceRepository;
     private final OrganizationRepository organizationRepository;
+    private final RepositoryRepository repositoryRepository;
 
     // Services
     private final NatsConsumerService natsConsumerService;
@@ -61,6 +68,7 @@ public class WorkspaceActivationService {
         SyncSchedulerProperties syncSchedulerProperties,
         WorkspaceRepository workspaceRepository,
         OrganizationRepository organizationRepository,
+        RepositoryRepository repositoryRepository,
         NatsConsumerService natsConsumerService,
         WorkspaceScopeFilter workspaceScopeFilter,
         ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider,
@@ -72,6 +80,7 @@ public class WorkspaceActivationService {
         this.syncSchedulerProperties = syncSchedulerProperties;
         this.workspaceRepository = workspaceRepository;
         this.organizationRepository = organizationRepository;
+        this.repositoryRepository = repositoryRepository;
         this.natsConsumerService = natsConsumerService;
         this.workspaceScopeFilter = workspaceScopeFilter;
         this.gitHubDataSyncServiceProvider = gitHubDataSyncServiceProvider;
@@ -253,9 +262,31 @@ public class WorkspaceActivationService {
                             var issueSyncService = gitLabIssueSyncServiceProvider.getIfAvailable();
                             if (issueSyncService != null && !result.synced().isEmpty()) {
                                 int totalIssues = 0;
+                                int completedRepos = 0;
                                 for (Repository repo : result.synced()) {
                                     try {
-                                        totalIssues += issueSyncService.syncIssues(workspace.getId(), repo, null);
+                                        // Compute updatedAfter from the repository's last sync timestamp.
+                                        // Subtract a safety buffer to catch issues updated during the
+                                        // previous sync window (mirrors GitHub's incrementalSyncBuffer).
+                                        OffsetDateTime updatedAfter = null;
+                                        if (repo.getLastSyncAt() != null) {
+                                            Instant buffered = repo.getLastSyncAt().minus(Duration.ofMinutes(5));
+                                            updatedAfter = buffered.atOffset(ZoneOffset.UTC);
+                                        }
+
+                                        SyncResult issueResult = issueSyncService.syncIssues(
+                                            workspace.getId(),
+                                            repo,
+                                            updatedAfter
+                                        );
+                                        totalIssues += issueResult.count();
+
+                                        // Update lastSyncAt only on successful completion so that
+                                        // aborted syncs retry from the same point next run.
+                                        if (issueResult.isCompleted()) {
+                                            repositoryRepository.updateLastSyncAt(repo.getId(), Instant.now());
+                                            completedRepos++;
+                                        }
                                     } catch (Exception e) {
                                         log.warn(
                                             "Failed to sync issues for project: workspaceId={}, repoName={}",
@@ -266,9 +297,10 @@ public class WorkspaceActivationService {
                                     }
                                 }
                                 log.info(
-                                    "GitLab issue sync complete: workspaceId={}, projects={}, totalIssues={}",
+                                    "GitLab issue sync complete: workspaceId={}, projects={}, completedRepos={}, totalIssues={}",
                                     workspace.getId(),
                                     result.synced().size(),
+                                    completedRepos,
                                     totalIssues
                                 );
                             }

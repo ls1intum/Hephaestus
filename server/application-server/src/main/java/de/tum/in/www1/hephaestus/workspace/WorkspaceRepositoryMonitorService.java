@@ -3,6 +3,9 @@ package de.tum.in.www1.hephaestus.workspace;
 import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.ProvisioningListener;
 import de.tum.in.www1.hephaestus.gitprovider.git.GitRepositoryManager;
@@ -16,7 +19,6 @@ import de.tum.in.www1.hephaestus.gitprovider.sync.NatsProperties;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.in.www1.hephaestus.workspace.exception.RepositoryAlreadyMonitoredException;
 import de.tum.in.www1.hephaestus.workspace.exception.RepositoryManagementNotAllowedException;
-import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
@@ -52,6 +54,7 @@ public class WorkspaceRepositoryMonitorService {
     private final WorkspaceRepository workspaceRepository;
     private final RepositoryToMonitorRepository repositoryToMonitorRepository;
     private final RepositoryRepository repositoryRepository;
+    private final GitProviderRepository gitProviderRepository;
 
     // Services
     private final NatsConsumerService natsConsumerService;
@@ -69,6 +72,7 @@ public class WorkspaceRepositoryMonitorService {
         WorkspaceRepository workspaceRepository,
         RepositoryToMonitorRepository repositoryToMonitorRepository,
         RepositoryRepository repositoryRepository,
+        GitProviderRepository gitProviderRepository,
         NatsConsumerService natsConsumerService,
         GitHubInstallationRepositoryEnumerationService installationRepositoryEnumerator,
         WorkspaceScopeFilter workspaceScopeFilter,
@@ -81,6 +85,7 @@ public class WorkspaceRepositoryMonitorService {
         this.workspaceRepository = workspaceRepository;
         this.repositoryToMonitorRepository = repositoryToMonitorRepository;
         this.repositoryRepository = repositoryRepository;
+        this.gitProviderRepository = gitProviderRepository;
         this.natsConsumerService = natsConsumerService;
         this.installationRepositoryEnumerator = installationRepositoryEnumerator;
         this.workspaceScopeFilter = workspaceScopeFilter;
@@ -643,6 +648,10 @@ public class WorkspaceRepositoryMonitorService {
      * <p>The organization is obtained from the workspace to ensure repositories from
      * organization installations have the proper organization_id set.
      *
+     * <p>Uses a native SQL upsert ({@code INSERT ... ON CONFLICT DO UPDATE}) to atomically
+     * handle concurrent inserts from NATS event processing and GraphQL sync, eliminating
+     * optimistic locking errors.
+     *
      * @param workspace the workspace (used to get the organization)
      * @param snapshot  the installation repository snapshot
      */
@@ -654,59 +663,30 @@ public class WorkspaceRepositoryMonitorService {
             return;
         }
 
-        var existingRepo = repositoryRepository.findByNameWithOwner(snapshot.nameWithOwner());
-        if (existingRepo.isPresent()) {
-            // Repository already exists, update basic fields if needed
-            Repository repo = existingRepo.get();
-            boolean changed = false;
+        GitProvider provider = resolveGitHubProvider();
+        Repository.Visibility visibility = snapshot.isPrivate()
+            ? Repository.Visibility.PRIVATE
+            : Repository.Visibility.PUBLIC;
 
-            if (repo.getName() == null || !repo.getName().equals(snapshot.name())) {
-                repo.setName(snapshot.name());
-                changed = true;
-            }
-            if (repo.isPrivate() != snapshot.isPrivate()) {
-                repo.setPrivate(snapshot.isPrivate());
-                changed = true;
-            }
-            // Link organization if not already set and workspace has one
-            if (repo.getOrganization() == null && workspace.getOrganization() != null) {
-                repo.setOrganization(workspace.getOrganization());
-                changed = true;
-            }
-
-            if (changed) {
-                repositoryRepository.save(repo);
-            }
-        } else {
-            // Create new repository with basic metadata from installation payload
-            Repository repo = new Repository();
-            repo.setId(snapshot.id());
-            repo.setNameWithOwner(snapshot.nameWithOwner());
-            repo.setName(snapshot.name());
-            repo.setPrivate(snapshot.isPrivate());
-            repo.setDefaultBranch("main"); // Will be updated by GraphQL sync
-            repo.setHtmlUrl("https://github.com/" + snapshot.nameWithOwner());
-            repo.setVisibility(snapshot.isPrivate() ? Repository.Visibility.PRIVATE : Repository.Visibility.PUBLIC);
-            repo.setPushedAt(Instant.now()); // Placeholder, will be updated by sync
-
-            // Link organization from workspace (null for USER type accounts, which is OK)
-            repo.setOrganization(workspace.getOrganization());
-
-            repositoryRepository.save(repo);
-            log.debug(
-                "Created repository from installation snapshot: repoName={}, orgId={}",
-                LoggingUtils.sanitizeForLog(snapshot.nameWithOwner()),
-                workspace.getOrganization() != null ? workspace.getOrganization().getId() : null
-            );
-        }
+        repositoryRepository.upsertFromSnapshot(
+            snapshot.id(),
+            provider.getId(),
+            snapshot.nameWithOwner(),
+            snapshot.name(),
+            snapshot.isPrivate(),
+            "https://github.com/" + snapshot.nameWithOwner(),
+            visibility.name(),
+            workspace.getOrganization() != null ? workspace.getOrganization().getId() : null
+        );
     }
 
     /**
      * Creates or updates a Repository entity from a provisioning snapshot.
      * This is used during installation provisioning to create repositories from webhook metadata.
      *
-     * <p>The organization is obtained from the workspace to ensure repositories from
-     * organization installations have the proper organization_id set.
+     * <p>Uses a native SQL upsert ({@code INSERT ... ON CONFLICT DO UPDATE}) to atomically
+     * handle concurrent inserts from NATS event processing and GraphQL sync, eliminating
+     * optimistic locking errors.
      *
      * @param workspace the workspace (used to get the organization)
      * @param snapshot  the repository snapshot from the SPI
@@ -719,51 +699,35 @@ public class WorkspaceRepositoryMonitorService {
             return;
         }
 
-        var existingRepo = repositoryRepository.findByNameWithOwner(snapshot.nameWithOwner());
-        if (existingRepo.isPresent()) {
-            // Repository already exists, update basic fields if needed
-            Repository repo = existingRepo.get();
-            boolean changed = false;
+        GitProvider provider = resolveGitHubProvider();
+        Repository.Visibility visibility = snapshot.isPrivate()
+            ? Repository.Visibility.PRIVATE
+            : Repository.Visibility.PUBLIC;
 
-            if (repo.getName() == null || !repo.getName().equals(snapshot.name())) {
-                repo.setName(snapshot.name());
-                changed = true;
-            }
-            if (repo.isPrivate() != snapshot.isPrivate()) {
-                repo.setPrivate(snapshot.isPrivate());
-                changed = true;
-            }
-            // Link organization if not already set and workspace has one
-            if (repo.getOrganization() == null && workspace.getOrganization() != null) {
-                repo.setOrganization(workspace.getOrganization());
-                changed = true;
-            }
+        repositoryRepository.upsertFromSnapshot(
+            snapshot.id(),
+            provider.getId(),
+            snapshot.nameWithOwner(),
+            snapshot.name(),
+            snapshot.isPrivate(),
+            "https://github.com/" + snapshot.nameWithOwner(),
+            visibility.name(),
+            workspace.getOrganization() != null ? workspace.getOrganization().getId() : null
+        );
+    }
 
-            if (changed) {
-                repositoryRepository.save(repo);
-            }
-        } else {
-            // Create new repository with basic metadata from provisioning snapshot
-            Repository repo = new Repository();
-            repo.setId(snapshot.id());
-            repo.setNameWithOwner(snapshot.nameWithOwner());
-            repo.setName(snapshot.name());
-            repo.setPrivate(snapshot.isPrivate());
-            repo.setDefaultBranch("main"); // Will be updated by GraphQL sync
-            repo.setHtmlUrl("https://github.com/" + snapshot.nameWithOwner());
-            repo.setVisibility(snapshot.isPrivate() ? Repository.Visibility.PRIVATE : Repository.Visibility.PUBLIC);
-            repo.setPushedAt(Instant.now()); // Placeholder, will be updated by sync
-
-            // Link organization from workspace (null for USER type accounts, which is OK)
-            repo.setOrganization(workspace.getOrganization());
-
-            repositoryRepository.save(repo);
-            log.debug(
-                "Created repository from provisioning snapshot: repoName={}, orgId={}",
-                LoggingUtils.sanitizeForLog(snapshot.nameWithOwner()),
-                workspace.getOrganization() != null ? workspace.getOrganization().getId() : null
+    /**
+     * Resolves the GitHub GitProvider entity. Cached per call since it rarely changes.
+     *
+     * @return the GitHub GitProvider entity
+     * @throws IllegalStateException if the GitHub provider is not found
+     */
+    private GitProvider resolveGitHubProvider() {
+        return gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
+            .orElseThrow(() ->
+                new IllegalStateException("GitProvider not found for type=GITHUB, serverUrl=https://github.com")
             );
-        }
     }
 
     private Workspace requireWorkspace(String slug) {

@@ -8,6 +8,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncException;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabPageInfo;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
+import de.tum.in.www1.hephaestus.gitprovider.sync.SyncResult;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -55,9 +56,9 @@ public class GitLabIssueSyncService {
      * @param scopeId      the workspace/scope ID for authentication
      * @param repository   the repository to sync issues for
      * @param updatedAfter optional timestamp for incremental sync (null = full sync)
-     * @return number of issues synced
+     * @return sync result indicating completion status and count
      */
-    public int syncIssues(Long scopeId, Repository repository, @Nullable OffsetDateTime updatedAfter) {
+    public SyncResult syncIssues(Long scopeId, Repository repository, @Nullable OffsetDateTime updatedAfter) {
         String projectPath = repository.getNameWithOwner();
         String safeProjectPath = sanitizeForLog(projectPath);
 
@@ -71,6 +72,8 @@ public class GitLabIssueSyncService {
         int totalSynced = 0;
         String cursor = null;
         int page = 0;
+        boolean rateLimitAborted = false;
+        boolean errorAborted = false;
 
         try {
             do {
@@ -87,6 +90,7 @@ public class GitLabIssueSyncService {
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     log.warn("Issue sync interrupted: scopeId={}, projectPath={}", scopeId, safeProjectPath);
+                    rateLimitAborted = true;
                     break;
                 }
 
@@ -112,6 +116,7 @@ public class GitLabIssueSyncService {
                         response != null ? response.getErrors() : "null response"
                     );
                     graphQlClientProvider.recordFailure(new GitLabSyncException("Invalid GraphQL response"));
+                    errorAborted = true;
                     break;
                 }
 
@@ -153,22 +158,34 @@ public class GitLabIssueSyncService {
                     Thread.sleep(gitLabProperties.paginationThrottle().toMillis());
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
+                    rateLimitAborted = true;
                     break;
                 }
             } while (true);
         } catch (Exception e) {
             graphQlClientProvider.recordFailure(e);
             log.error("Issue sync failed: scopeId={}, projectPath={}", scopeId, safeProjectPath, e);
+            errorAborted = true;
+        }
+
+        SyncResult result;
+        if (errorAborted) {
+            result = SyncResult.abortedError(totalSynced);
+        } else if (rateLimitAborted) {
+            result = SyncResult.abortedRateLimit(totalSynced);
+        } else {
+            result = SyncResult.completed(totalSynced);
         }
 
         log.info(
-            "Completed issue sync: scopeId={}, projectPath={}, totalSynced={}",
+            "Completed issue sync: scopeId={}, projectPath={}, status={}, totalSynced={}",
             scopeId,
             safeProjectPath,
+            result.status(),
             totalSynced
         );
 
-        return totalSynced;
+        return result;
     }
 
     /**
