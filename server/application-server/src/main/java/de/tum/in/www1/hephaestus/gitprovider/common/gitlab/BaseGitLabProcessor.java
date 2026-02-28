@@ -194,7 +194,7 @@ public abstract class BaseGitLabProcessor {
     }
 
     /**
-     * Finds or creates a label from GraphQL data (globalId, title, color).
+     * Finds or creates a label from GraphQL data (title, color).
      * <p>
      * Public because sync services need to resolve labels from GraphQL response data.
      * <p>
@@ -205,12 +205,7 @@ public abstract class BaseGitLabProcessor {
      * multiple projects.
      */
     @Nullable
-    public Label findOrCreateLabel(
-        @Nullable String globalId,
-        @Nullable String title,
-        @Nullable String color,
-        Repository repository
-    ) {
+    public Label findOrCreateLabel(@Nullable String title, @Nullable String color, Repository repository) {
         if (title == null || title.isBlank()) {
             return null;
         }

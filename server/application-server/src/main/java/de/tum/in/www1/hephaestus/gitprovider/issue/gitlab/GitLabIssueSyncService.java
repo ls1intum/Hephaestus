@@ -7,6 +7,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncException;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabPageInfo;
+import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.sync.SyncResult;
 import java.time.OffsetDateTime;
@@ -132,8 +133,9 @@ public class GitLabIssueSyncService {
 
                 for (Map<String, Object> issueNode : nodes) {
                     try {
-                        processIssueNode(issueNode, repository);
-                        totalSynced++;
+                        if (processIssueNode(issueNode, repository) != null) {
+                            totalSynced++;
+                        }
                     } catch (Exception e) {
                         log.warn(
                             "Error processing issue: projectPath={}, issueId={}",
@@ -193,9 +195,12 @@ public class GitLabIssueSyncService {
      * <p>
      * Label and assignee data is extracted here and passed to the processor, which
      * handles persistence within its {@code @Transactional} boundary.
+     *
+     * @return the persisted Issue, or {@code null} if the issue was skipped (e.g. confidential)
      */
     @SuppressWarnings("unchecked")
-    private void processIssueNode(Map<String, Object> node, Repository repository) {
+    @Nullable
+    private Issue processIssueNode(Map<String, Object> node, Repository repository) {
         String globalId = (String) node.get("id");
         String iid = String.valueOf(node.get("iid"));
         String title = (String) node.get("title");
@@ -206,8 +211,7 @@ public class GitLabIssueSyncService {
         String createdAt = node.get("createdAt") != null ? node.get("createdAt").toString() : null;
         String updatedAt = node.get("updatedAt") != null ? node.get("updatedAt").toString() : null;
         String closedAt = node.get("closedAt") != null ? node.get("closedAt").toString() : null;
-        Integer userNotesCount =
-            node.get("userNotesCount") != null ? ((Number) node.get("userNotesCount")).intValue() : 0;
+        int userNotesCount = node.get("userNotesCount") != null ? ((Number) node.get("userNotesCount")).intValue() : 0;
 
         // Author
         String authorGlobalId = null,
@@ -284,6 +288,6 @@ public class GitLabIssueSyncService {
             syncLabels,
             syncAssignees
         );
-        issueProcessor.processFromSync(syncData, repository);
+        return issueProcessor.processFromSync(syncData, repository);
     }
 }

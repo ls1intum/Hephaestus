@@ -3,6 +3,9 @@ package de.tum.in.www1.hephaestus.gitprovider.installation.github;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler.GitHubMessageDomain;
 import de.tum.in.www1.hephaestus.gitprovider.installation.github.dto.GitHubInstallationEventDTO;
@@ -29,9 +32,16 @@ class GitHubInstallationMessageHandlerIntegrationTest extends BaseIntegrationTes
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private GitProviderRepository gitProviderRepository;
+
     @BeforeEach
     void setUp() {
         databaseTestUtils.cleanDatabase();
+        // Ensure GitHub GitProvider exists - required by WorkspaceInstallationService
+        gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
+            .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com")));
     }
 
     @Test

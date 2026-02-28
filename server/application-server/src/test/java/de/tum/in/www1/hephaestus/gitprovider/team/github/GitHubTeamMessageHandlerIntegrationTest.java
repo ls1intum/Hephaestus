@@ -121,17 +121,17 @@ class GitHubTeamMessageHandlerIntegrationTest extends BaseIntegrationTest {
         GitHubTeamEventDTO event = loadPayload("team.org.created");
 
         // Verify team doesn't exist initially
-        assertThat(teamRepository.findById(event.team().id())).isEmpty();
+        assertThat(teamRepository.findByNativeIdAndProviderId(event.team().id(), gitProvider.getId())).isEmpty();
 
         // When
         handler.handleEvent(event);
 
         // Then
-        assertThat(teamRepository.findById(event.team().id()))
+        assertThat(teamRepository.findByNativeIdAndProviderId(event.team().id(), gitProvider.getId()))
             .isPresent()
             .get()
             .satisfies(team -> {
-                assertThat(team.getId()).isEqualTo(event.team().id());
+                assertThat(team.getNativeId()).isEqualTo(event.team().id());
                 assertThat(team.getName()).isEqualTo(event.team().name());
                 assertThat(team.getDescription()).isEqualTo(event.team().description());
             });
@@ -151,7 +151,7 @@ class GitHubTeamMessageHandlerIntegrationTest extends BaseIntegrationTest {
         handler.handleEvent(editEvent);
 
         // Then
-        assertThat(teamRepository.findById(editEvent.team().id()))
+        assertThat(teamRepository.findByNativeIdAndProviderId(editEvent.team().id(), gitProvider.getId()))
             .isPresent()
             .get()
             .satisfies(team -> {
@@ -168,7 +168,9 @@ class GitHubTeamMessageHandlerIntegrationTest extends BaseIntegrationTest {
         handler.handleEvent(createEvent);
 
         // Verify it exists
-        assertThat(teamRepository.findById(createEvent.team().id())).isPresent();
+        assertThat(
+            teamRepository.findByNativeIdAndProviderId(createEvent.team().id(), gitProvider.getId())
+        ).isPresent();
 
         // Load deleted event
         GitHubTeamEventDTO deleteEvent = loadPayload("team.org.deleted");
@@ -177,7 +179,7 @@ class GitHubTeamMessageHandlerIntegrationTest extends BaseIntegrationTest {
         handler.handleEvent(deleteEvent);
 
         // Then
-        assertThat(teamRepository.findById(deleteEvent.team().id())).isEmpty();
+        assertThat(teamRepository.findByNativeIdAndProviderId(deleteEvent.team().id(), gitProvider.getId())).isEmpty();
     }
 
     private GitHubTeamEventDTO loadPayload(String filename) throws IOException {

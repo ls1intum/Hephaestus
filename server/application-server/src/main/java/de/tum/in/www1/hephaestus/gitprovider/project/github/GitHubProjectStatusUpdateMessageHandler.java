@@ -2,6 +2,9 @@ package de.tum.in.www1.hephaestus.gitprovider.project.github;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
@@ -42,11 +45,13 @@ public class GitHubProjectStatusUpdateMessageHandler extends GitHubMessageHandle
     private final ProjectRepository projectRepository;
     private final GitHubProjectStatusUpdateProcessor statusUpdateProcessor;
     private final ScopeIdResolver scopeIdResolver;
+    private final GitProviderRepository gitProviderRepository;
 
     GitHubProjectStatusUpdateMessageHandler(
         ProjectRepository projectRepository,
         GitHubProjectStatusUpdateProcessor statusUpdateProcessor,
         ScopeIdResolver scopeIdResolver,
+        GitProviderRepository gitProviderRepository,
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate
     ) {
@@ -54,6 +59,7 @@ public class GitHubProjectStatusUpdateMessageHandler extends GitHubMessageHandle
         this.projectRepository = projectRepository;
         this.statusUpdateProcessor = statusUpdateProcessor;
         this.scopeIdResolver = scopeIdResolver;
+        this.gitProviderRepository = gitProviderRepository;
     }
 
     @Override
@@ -117,7 +123,10 @@ public class GitHubProjectStatusUpdateMessageHandler extends GitHubMessageHandle
             return;
         }
 
-        ProcessingContext context = ProcessingContext.forWebhook(scopeId, null, event.action());
+        GitProvider gitHubProvider = gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
+            .orElseThrow(() -> new IllegalStateException("GitHub provider not configured"));
+        ProcessingContext context = ProcessingContext.forWebhook(scopeId, gitHubProvider, event.action());
 
         switch (action) {
             case CREATED, EDITED -> {

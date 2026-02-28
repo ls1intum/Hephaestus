@@ -387,7 +387,7 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
 
         Set<Label> newLabels = new HashSet<>();
         for (SyncLabelData data : syncLabels) {
-            Label label = findOrCreateLabel(data.globalId(), data.title(), data.color(), repository);
+            Label label = findOrCreateLabel(data.title(), data.color(), repository);
             if (label != null) {
                 newLabels.add(label);
             }

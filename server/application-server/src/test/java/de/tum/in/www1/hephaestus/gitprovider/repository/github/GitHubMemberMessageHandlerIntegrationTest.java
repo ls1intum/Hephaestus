@@ -129,7 +129,9 @@ class GitHubMemberMessageHandlerIntegrationTest extends BaseIntegrationTest {
         assertThat(event.action()).isEqualTo("added");
         // User should be created if member contains user info
         if (event.member() != null) {
-            assertThat(userRepository.findById(event.member().id())).isPresent();
+            assertThat(
+                userRepository.findByNativeIdAndProviderId(event.member().id(), gitProvider.getId())
+            ).isPresent();
         }
     }
 

@@ -72,14 +72,16 @@ public interface RepositoryRepository extends JpaRepository<Repository, Long> {
      * <p>
      * On conflict, only lightweight fields from the snapshot are updated; fields populated by
      * the full GraphQL sync (description, pushed_at, default_branch, etc.) are preserved.
+     * <p>
+     * {@code visibility} is derived from {@code isPrivate} and {@code html_url} is derived
+     * from {@code nameWithOwner} (with a {@code https://github.com/} prefix) inside the SQL
+     * to keep the parameter count within architecture limits.
      *
      * @param nativeId       the provider's original numeric ID for the repository
      * @param providerId     the GitProvider entity ID
      * @param nameWithOwner  the full name (e.g., "owner/repo")
      * @param name           the short repository name
      * @param isPrivate      whether the repository is private
-     * @param htmlUrl        the repository URL
-     * @param visibility     the visibility string (PUBLIC, PRIVATE, etc.)
      * @param organizationId the organization ID (nullable)
      */
     @Transactional
@@ -89,8 +91,10 @@ public interface RepositoryRepository extends JpaRepository<Repository, Long> {
         INSERT INTO repository (native_id, provider_id, name_with_owner, name, is_private, html_url,
                                 visibility, default_branch, pushed_at, is_archived, is_disabled,
                                 has_discussions_enabled, organization_id)
-        VALUES (:nativeId, :providerId, :nameWithOwner, :name, :isPrivate, :htmlUrl,
-                :visibility, 'main', NOW(), false, false, false, :organizationId)
+        VALUES (:nativeId, :providerId, :nameWithOwner, :name, :isPrivate,
+                'https://github.com/' || :nameWithOwner,
+                CASE WHEN :isPrivate THEN 'PRIVATE' ELSE 'PUBLIC' END,
+                'main', NOW(), false, false, false, :organizationId)
         ON CONFLICT (provider_id, name_with_owner) DO UPDATE SET
             name = EXCLUDED.name,
             is_private = EXCLUDED.is_private,
@@ -104,8 +108,6 @@ public interface RepositoryRepository extends JpaRepository<Repository, Long> {
         @Param("nameWithOwner") String nameWithOwner,
         @Param("name") String name,
         @Param("isPrivate") boolean isPrivate,
-        @Param("htmlUrl") String htmlUrl,
-        @Param("visibility") String visibility,
         @Param("organizationId") Long organizationId
     );
 }

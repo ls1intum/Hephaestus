@@ -775,6 +775,7 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
         newTeam.setDescription("Test team: " + name);
         newTeam.setHtmlUrl("https://github.com/orgs/" + organization + "/teams/" + name);
         newTeam.setPrivacy(Team.Privacy.VISIBLE);
+        newTeam.setProvider(ensureGitHubProvider());
         return teamRepository.save(newTeam);
     }
 
@@ -797,6 +798,7 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
         repo.setPushedAt(Instant.now());
         repo.setCreatedAt(Instant.now());
         repo.setUpdatedAt(Instant.now());
+        repo.setProvider(ensureGitHubProvider());
         return repositoryRepository.save(repo);
     }
 

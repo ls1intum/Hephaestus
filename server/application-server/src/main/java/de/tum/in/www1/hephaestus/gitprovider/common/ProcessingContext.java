@@ -89,6 +89,22 @@ public record ProcessingContext(
     }
 
     /**
+     * Creates a context for webhook events that are not repository-scoped
+     * (e.g., organization-level project events).
+     */
+    public static ProcessingContext forWebhook(Long scopeId, GitProvider provider, String action) {
+        return new ProcessingContext(
+            scopeId,
+            null,
+            provider,
+            Instant.now(),
+            UUID.randomUUID().toString(),
+            action,
+            DataSource.WEBHOOK
+        );
+    }
+
+    /**
      * Checks if this processing was triggered by a webhook.
      */
     public boolean isWebhook() {

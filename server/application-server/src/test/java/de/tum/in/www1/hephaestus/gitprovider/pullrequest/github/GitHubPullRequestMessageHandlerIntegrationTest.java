@@ -4,6 +4,9 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
@@ -139,6 +142,9 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
 
     @Autowired
     private OrganizationRepository organizationRepository;
+
+    @Autowired
+    private GitProviderRepository gitProviderRepository;
 
     @Autowired
     private WorkspaceRepository workspaceRepository;
@@ -855,15 +861,20 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
     }
 
     private void setupTestData() {
+        // Create GitHub provider
+        GitProvider gitProvider = gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
+            .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com")));
+
         // Create organization matching fixture data
         Organization org = new Organization();
-        org.setNativeId(FIXTURE_ORG_ID);
         org.setNativeId(FIXTURE_ORG_ID);
         org.setLogin(FIXTURE_ORG_LOGIN);
         org.setCreatedAt(Instant.now());
         org.setUpdatedAt(Instant.now());
         org.setName("Hephaestus Test");
         org.setAvatarUrl("https://avatars.githubusercontent.com/u/" + FIXTURE_ORG_ID);
+        org.setProvider(gitProvider);
         org = organizationRepository.save(org);
 
         // Create repository matching fixture data
@@ -878,6 +889,7 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
         testRepository.setUpdatedAt(Instant.now());
         testRepository.setPushedAt(Instant.now());
         testRepository.setOrganization(org);
+        testRepository.setProvider(gitProvider);
         testRepository = repositoryRepository.save(testRepository);
 
         // Create workspace

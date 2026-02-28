@@ -104,7 +104,7 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
         @DisplayName("open action routes to process()")
         void openAction_routesToProcess() throws IOException {
             GitLabIssueEventDTO event = createEvent("open", "opened", false);
-            Repository repo = setupRepository();
+            setupRepository();
 
             Message msg = mockMessage(event);
             handler.onMessage(msg);
@@ -118,7 +118,7 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
         @DisplayName("update action routes to process()")
         void updateAction_routesToProcess() throws IOException {
             GitLabIssueEventDTO event = createEvent("update", "closed", false);
-            Repository repo = setupRepository();
+            setupRepository();
 
             Message msg = mockMessage(event);
             handler.onMessage(msg);
@@ -130,7 +130,7 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
         @DisplayName("close action routes to processClosed()")
         void closeAction_routesToProcessClosed() throws IOException {
             GitLabIssueEventDTO event = createEvent("close", "closed", false);
-            Repository repo = setupRepository();
+            setupRepository();
 
             Message msg = mockMessage(event);
             handler.onMessage(msg);
@@ -143,7 +143,7 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
         @DisplayName("reopen action routes to processReopened()")
         void reopenAction_routesToProcessReopened() throws IOException {
             GitLabIssueEventDTO event = createEvent("reopen", "opened", false);
-            Repository repo = setupRepository();
+            setupRepository();
 
             Message msg = mockMessage(event);
             handler.onMessage(msg);
@@ -156,7 +156,7 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
         @DisplayName("unknown action skips processing")
         void unknownAction_skipsProcessing() throws IOException {
             GitLabIssueEventDTO event = createEvent("unknown_action", "opened", false);
-            Repository repo = setupRepository();
+            setupRepository();
 
             Message msg = mockMessage(event);
             handler.onMessage(msg);

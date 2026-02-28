@@ -2,6 +2,9 @@ package de.tum.in.www1.hephaestus.gitprovider.project.github;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
@@ -9,6 +12,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.ScopeIdResolver;
 import de.tum.in.www1.hephaestus.gitprovider.project.Project;
+import de.tum.in.www1.hephaestus.gitprovider.project.ProjectItemRepository;
 import de.tum.in.www1.hephaestus.gitprovider.project.ProjectRepository;
 import de.tum.in.www1.hephaestus.gitprovider.project.github.dto.GitHubProjectItemEventDTO;
 import lombok.extern.slf4j.Slf4j;
@@ -37,19 +41,25 @@ public class GitHubProjectItemMessageHandler extends GitHubMessageHandler<GitHub
 
     private final GitHubProjectItemProcessor itemProcessor;
     private final ProjectRepository projectRepository;
+    private final ProjectItemRepository projectItemRepository;
     private final ScopeIdResolver scopeIdResolver;
+    private final GitProviderRepository gitProviderRepository;
 
     GitHubProjectItemMessageHandler(
         GitHubProjectItemProcessor itemProcessor,
         ProjectRepository projectRepository,
+        ProjectItemRepository projectItemRepository,
         ScopeIdResolver scopeIdResolver,
+        GitProviderRepository gitProviderRepository,
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate
     ) {
         super(GitHubProjectItemEventDTO.class, deserializer, transactionTemplate);
         this.itemProcessor = itemProcessor;
         this.projectRepository = projectRepository;
+        this.projectItemRepository = projectItemRepository;
         this.scopeIdResolver = scopeIdResolver;
+        this.gitProviderRepository = gitProviderRepository;
     }
 
     @Override
@@ -94,7 +104,10 @@ public class GitHubProjectItemMessageHandler extends GitHubMessageHandler<GitHub
             return;
         }
 
-        ProcessingContext context = ProcessingContext.forWebhook(scopeId, null, event.action());
+        GitProvider gitHubProvider = gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
+            .orElseThrow(() -> new IllegalStateException("GitHub provider not configured"));
+        ProcessingContext context = ProcessingContext.forWebhook(scopeId, gitHubProvider, event.action());
 
         // Extract the actor (sender) ID from the webhook event
         Long actorId = event.sender() != null ? event.sender().getDatabaseId() : null;
@@ -106,11 +119,18 @@ public class GitHubProjectItemMessageHandler extends GitHubMessageHandler<GitHub
 
         switch (actionType) {
             case DELETED -> {
-                Long itemId = itemDto.getDatabaseId();
-                // Delete events lack a project ID, so we look up the item by its database ID
-                if (itemId != null) {
-                    // Look up the item's project association before removing it
-                    itemProcessor.delete(itemId, null, context);
+                // Resolve the item's synthetic PK via nodeId since getDatabaseId() returns the native ID.
+                // Delete events include project_node_id, so we can resolve the project first.
+                String itemNodeId = itemDto.nodeId();
+                String projNodeId = itemDto.projectNodeId();
+                if (itemNodeId != null && projNodeId != null) {
+                    projectRepository
+                        .findByNodeId(projNodeId)
+                        .ifPresent(project ->
+                            projectItemRepository
+                                .findByProjectIdAndNodeId(project.getId(), itemNodeId)
+                                .ifPresent(item -> itemProcessor.delete(item.getId(), project.getId(), context))
+                        );
                 }
             }
             case ARCHIVED -> {

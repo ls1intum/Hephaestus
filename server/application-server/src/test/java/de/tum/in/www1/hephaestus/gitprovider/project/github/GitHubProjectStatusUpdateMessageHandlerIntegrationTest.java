@@ -101,7 +101,7 @@ class GitHubProjectStatusUpdateMessageHandlerIntegrationTest extends BaseIntegra
             .isPresent()
             .get()
             .satisfies(update -> {
-                assertThat(update.getId()).isEqualTo(FIXTURE_STATUS_UPDATE_ID);
+                assertThat(update.getNativeId()).isEqualTo(FIXTURE_STATUS_UPDATE_ID);
                 assertThat(update.getNodeId()).isEqualTo(FIXTURE_STATUS_UPDATE_NODE_ID);
                 assertThat(update.getProject().getId()).isEqualTo(testProject.getId());
                 assertThat(update.getBody()).isEqualTo(FIXTURE_CREATED_BODY);
@@ -152,10 +152,10 @@ class GitHubProjectStatusUpdateMessageHandlerIntegrationTest extends BaseIntegra
 
         assertThat(statusUpdateRepository.findByNodeId(deletedEvent.statusUpdate().nodeId())).isEmpty();
 
-        // Verify domain event
+        // Verify domain event (statusUpdateId is the synthetic PK, not native ID)
         assertThat(eventListener.getDeletedEvents()).hasSize(1);
         assertThat(eventListener.getDeletedEvents().getFirst().projectId()).isEqualTo(testProject.getId());
-        assertThat(eventListener.getDeletedEvents().getFirst().statusUpdateId()).isEqualTo(FIXTURE_STATUS_UPDATE_ID);
+        assertThat(eventListener.getDeletedEvents().getFirst().statusUpdateId()).isNotNull();
     }
 
     @Test
