@@ -2,6 +2,9 @@ package de.tum.in.www1.hephaestus.practices;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
@@ -46,6 +49,9 @@ class PracticesControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
 
     @Autowired
     private PullRequestRepository pullRequestRepository;
+
+    @Autowired
+    private GitProviderRepository gitProviderRepository;
 
     private final AtomicLong idGenerator = new AtomicLong(100_000);
 
@@ -143,10 +149,17 @@ class PracticesControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             User ownerAlpha = persistUser("alpha-owner");
             User ownerBeta = persistUser("beta-owner");
 
+            // Ensure a GitProvider exists for GitHub
+            GitProvider githubProvider = gitProviderRepository
+                .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
+                .orElseGet(() ->
+                    gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com"))
+                );
+
             // Create organizations for each workspace
             Organization orgAlpha = new Organization();
-            orgAlpha.setId(idGenerator.incrementAndGet());
-            orgAlpha.setProviderId(idGenerator.incrementAndGet());
+            orgAlpha.setNativeId(idGenerator.incrementAndGet());
+            orgAlpha.setProvider(githubProvider);
             orgAlpha.setLogin("alpha-org");
             orgAlpha.setName("Alpha Org");
             orgAlpha.setAvatarUrl("https://example.com/alpha.png");
@@ -156,8 +169,8 @@ class PracticesControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             orgAlpha = organizationRepository.save(orgAlpha);
 
             Organization orgBeta = new Organization();
-            orgBeta.setId(idGenerator.incrementAndGet());
-            orgBeta.setProviderId(idGenerator.incrementAndGet());
+            orgBeta.setNativeId(idGenerator.incrementAndGet());
+            orgBeta.setProvider(githubProvider);
             orgBeta.setLogin("beta-org");
             orgBeta.setName("Beta Org");
             orgBeta.setAvatarUrl("https://example.com/beta.png");
@@ -188,7 +201,8 @@ class PracticesControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
 
             // Create repository for Alpha org
             Repository repoAlpha = new Repository();
-            repoAlpha.setId(idGenerator.incrementAndGet());
+            repoAlpha.setNativeId(idGenerator.incrementAndGet());
+            repoAlpha.setProvider(githubProvider);
             repoAlpha.setName("alpha-repo");
             repoAlpha.setNameWithOwner("alpha-org/alpha-repo");
             repoAlpha.setHtmlUrl("https://github.com/alpha-org/alpha-repo");
@@ -201,7 +215,8 @@ class PracticesControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
 
             // Create a pull request in Alpha workspace
             PullRequest prAlpha = new PullRequest();
-            prAlpha.setId(idGenerator.incrementAndGet());
+            prAlpha.setNativeId(idGenerator.incrementAndGet());
+            prAlpha.setProvider(githubProvider);
             prAlpha.setNumber(1);
             prAlpha.setTitle("Alpha PR");
             prAlpha.setState(Issue.State.OPEN);

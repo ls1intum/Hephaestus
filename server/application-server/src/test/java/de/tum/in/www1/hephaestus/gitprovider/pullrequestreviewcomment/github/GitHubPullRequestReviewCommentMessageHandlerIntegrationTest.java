@@ -3,6 +3,9 @@ package de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.github;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
@@ -52,8 +55,12 @@ class GitHubPullRequestReviewCommentMessageHandlerIntegrationTest extends BaseIn
     private WorkspaceRepository workspaceRepository;
 
     @Autowired
+    private GitProviderRepository gitProviderRepository;
+
+    @Autowired
     private ObjectMapper objectMapper;
 
+    private GitProvider gitProvider;
     private Repository testRepository;
     private PullRequest testPullRequest;
 
@@ -64,20 +71,27 @@ class GitHubPullRequestReviewCommentMessageHandlerIntegrationTest extends BaseIn
     }
 
     private void setupTestData() {
+        // Create GitHub provider
+        gitProvider = gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
+            .orElseGet(
+                () -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com"))
+            );
+
         // Create organization
         Organization org = new Organization();
-        org.setId(215361191L);
-        org.setProviderId(215361191L);
+        org.setNativeId(215361191L);
         org.setLogin("HephaestusTest");
         org.setCreatedAt(Instant.now());
         org.setUpdatedAt(Instant.now());
         org.setName("Hephaestus Test");
         org.setAvatarUrl("https://avatars.githubusercontent.com/u/215361191?v=4");
+        org.setProvider(gitProvider);
         org = organizationRepository.save(org);
 
         // Create repository
         testRepository = new Repository();
-        testRepository.setId(1000663383L);
+        testRepository.setNativeId(1000663383L);
         testRepository.setName("TestRepository");
         testRepository.setNameWithOwner("HephaestusTest/TestRepository");
         testRepository.setHtmlUrl("https://github.com/HephaestusTest/TestRepository");
@@ -87,6 +101,7 @@ class GitHubPullRequestReviewCommentMessageHandlerIntegrationTest extends BaseIn
         testRepository.setUpdatedAt(Instant.now());
         testRepository.setPushedAt(Instant.now());
         testRepository.setOrganization(org);
+        testRepository.setProvider(gitProvider);
         testRepository = repositoryRepository.save(testRepository);
 
         // Create workspace
@@ -103,13 +118,14 @@ class GitHubPullRequestReviewCommentMessageHandlerIntegrationTest extends BaseIn
 
     private void createTestPullRequest(Long prId, int number) {
         testPullRequest = new PullRequest();
-        testPullRequest.setId(prId);
+        testPullRequest.setNativeId(prId);
         testPullRequest.setNumber(number);
         testPullRequest.setTitle("Test Pull Request");
         testPullRequest.setState(PullRequest.State.OPEN);
         testPullRequest.setRepository(testRepository);
         testPullRequest.setCreatedAt(Instant.now());
         testPullRequest.setUpdatedAt(Instant.now());
+        testPullRequest.setProvider(gitProvider);
         testPullRequest = pullRequestRepository.save(testPullRequest);
     }
 

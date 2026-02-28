@@ -2,7 +2,7 @@ package de.tum.in.www1.hephaestus.gitprovider.repository.gitlab;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabProjectResponse;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
@@ -58,24 +58,30 @@ public class GitLabProjectProcessor {
      */
     @Transactional
     @Nullable
-    public Repository processGraphQlResponse(GitLabProjectResponse project, @Nullable Organization organization) {
+    public Repository processGraphQlResponse(
+        GitLabProjectResponse project,
+        @Nullable Organization organization,
+        GitProvider provider
+    ) {
         if (project == null || project.id() == null || project.fullPath() == null || project.webUrl() == null) {
             log.warn("Skipped project processing: reason=nullOrMissingFields");
             return null;
         }
 
-        long entityId;
+        long nativeId;
         try {
-            entityId = GitLabSyncConstants.extractEntityId(project.id());
+            nativeId = GitLabSyncConstants.extractEntityId(project.id());
         } catch (IllegalArgumentException e) {
             log.warn("Skipped project processing: reason=invalidGlobalId, gid={}", sanitizeForLog(project.id()));
             return null;
         }
 
-        Repository repository = repositoryRepository.findById(entityId).orElseGet(Repository::new);
+        Repository repository = repositoryRepository
+            .findByNativeIdAndProviderId(nativeId, provider.getId())
+            .orElseGet(Repository::new);
 
-        repository.setId(entityId);
-        repository.setProvider(GitProviderType.GITLAB);
+        repository.setNativeId(nativeId);
+        repository.setProvider(provider);
         repository.setName(project.name());
         repository.setNameWithOwner(project.fullPath());
         repository.setHtmlUrl(project.webUrl());
@@ -130,7 +136,7 @@ public class GitLabProjectProcessor {
      */
     @Transactional
     @Nullable
-    public Repository processPushEvent(GitLabPushEventDTO.ProjectInfo projectInfo) {
+    public Repository processPushEvent(GitLabPushEventDTO.ProjectInfo projectInfo, GitProvider provider) {
         if (
             projectInfo == null ||
             projectInfo.id() == null ||
@@ -141,11 +147,13 @@ public class GitLabProjectProcessor {
             return null;
         }
 
-        long entityId = GitLabSyncConstants.toEntityId(projectInfo.id());
-        Repository repository = repositoryRepository.findById(entityId).orElseGet(Repository::new);
+        long nativeId = GitLabSyncConstants.toEntityId(projectInfo.id());
+        Repository repository = repositoryRepository
+            .findByNativeIdAndProviderId(nativeId, provider.getId())
+            .orElseGet(Repository::new);
 
-        repository.setId(entityId);
-        repository.setProvider(GitProviderType.GITLAB);
+        repository.setNativeId(nativeId);
+        repository.setProvider(provider);
         repository.setName(projectInfo.name());
         repository.setNameWithOwner(projectInfo.pathWithNamespace());
         repository.setHtmlUrl(projectInfo.webUrl());

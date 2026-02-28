@@ -3,6 +3,9 @@ package de.tum.in.www1.hephaestus.gitprovider.label.github;
 import static org.assertj.core.api.Assertions.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
@@ -76,6 +79,9 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
     private OrganizationRepository organizationRepository;
 
     @Autowired
+    private GitProviderRepository gitProviderRepository;
+
+    @Autowired
     private WorkspaceRepository workspaceRepository;
 
     @Autowired
@@ -88,6 +94,7 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
     private org.springframework.transaction.support.TransactionTemplate transactionTemplate;
 
     private Repository testRepository;
+    private GitProvider gitProvider;
 
     @BeforeEach
     void setUp() {
@@ -96,20 +103,26 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
     }
 
     private void setupTestData() {
+        // Create GitHub provider
+        gitProvider = gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
+            .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com")));
+
         // Create organization matching fixture data
         Organization org = new Organization();
-        org.setId(FIXTURE_ORG_ID);
-        org.setProviderId(FIXTURE_ORG_ID);
+        org.setNativeId(FIXTURE_ORG_ID);
         org.setLogin(FIXTURE_ORG_LOGIN);
         org.setCreatedAt(Instant.now());
         org.setUpdatedAt(Instant.now());
         org.setName("Hephaestus Test");
         org.setAvatarUrl("https://avatars.githubusercontent.com/u/" + FIXTURE_ORG_ID + "?v=4");
+        org.setHtmlUrl("https://github.com/" + FIXTURE_ORG_LOGIN);
+        org.setProvider(gitProvider);
         org = organizationRepository.save(org);
 
         // Create repository matching fixture data
         testRepository = new Repository();
-        testRepository.setId(FIXTURE_REPO_ID);
+        testRepository.setNativeId(FIXTURE_REPO_ID);
         testRepository.setName(FIXTURE_REPO_NAME);
         testRepository.setNameWithOwner(FIXTURE_REPO_FULL_NAME);
         testRepository.setHtmlUrl("https://github.com/" + FIXTURE_REPO_FULL_NAME);
@@ -119,6 +132,7 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
         testRepository.setUpdatedAt(Instant.now());
         testRepository.setPushedAt(Instant.now());
         testRepository.setOrganization(org);
+        testRepository.setProvider(gitProvider);
         testRepository = repositoryRepository.save(testRepository);
 
         // Create workspace
@@ -160,7 +174,7 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
         // Repository association (foreign key)
         assertThat(label.getRepository()).isNotNull();
-        assertThat(label.getRepository().getId()).isEqualTo(FIXTURE_REPO_ID);
+        assertThat(label.getRepository().getId()).isEqualTo(testRepository.getId());
 
         // Note: createdAt/updatedAt are not provided in webhook payloads (only in GraphQL)
         // Note: lastSyncAt is ETL infrastructure, not set by webhook handler
@@ -191,7 +205,7 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
         assertThat(label.getDescription()).isEqualTo(event.label().description());
 
         // Verify repository association preserved (not overwritten)
-        assertThat(label.getRepository().getId()).isEqualTo(FIXTURE_REPO_ID);
+        assertThat(label.getRepository().getId()).isEqualTo(testRepository.getId());
     }
 
     @Test
@@ -408,7 +422,7 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
                 .get()
                 .satisfies(label -> {
                     assertThat(label.getRepository()).isNotNull();
-                    assertThat(label.getRepository().getId()).isEqualTo(FIXTURE_REPO_ID);
+                    assertThat(label.getRepository().getId()).isEqualTo(testRepository.getId());
                     assertThat(label.getRepository().getNameWithOwner()).isEqualTo(FIXTURE_REPO_FULL_NAME);
                 });
         }
@@ -421,7 +435,7 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
             handler.handleEvent(event);
 
             // When
-            var foundLabel = labelRepository.findByRepositoryIdAndName(FIXTURE_REPO_ID, event.label().name());
+            var foundLabel = labelRepository.findByRepositoryIdAndName(testRepository.getId(), event.label().name());
 
             // Then
             assertThat(foundLabel)
@@ -456,15 +470,17 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
             Label label = labelRepository.findById(createEvent.label().id()).orElseThrow();
 
             Issue issue = new Issue();
-            issue.setId(12345L);
+            issue.setNativeId(12345L);
             issue.setNumber(1);
             issue.setTitle("Test Issue");
             issue.setState(Issue.State.OPEN);
             issue.setRepository(testRepository);
             issue.setCreatedAt(Instant.now());
             issue.setUpdatedAt(Instant.now());
+            issue.setProvider(gitProvider);
             issue.getLabels().add(label);
-            issueRepository.save(issue);
+            Issue savedIssue = issueRepository.save(issue);
+            Long savedIssueId = savedIssue.getId();
 
             // When - edit the label
             GitHubLabelDTO editedDto = new GitHubLabelDTO(
@@ -482,7 +498,7 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
             // Then - issue should still have the label (now with updated name)
             // Use TransactionTemplate for lazy loading assertions
             transactionTemplate.executeWithoutResult(status -> {
-                Issue updatedIssue = issueRepository.findById(12345L).orElseThrow();
+                Issue updatedIssue = issueRepository.findById(savedIssueId).orElseThrow();
                 assertThat(updatedIssue.getLabels())
                     .hasSize(1)
                     .first()

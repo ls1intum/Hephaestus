@@ -24,6 +24,8 @@ public interface RepositoryRepository extends JpaRepository<Repository, Long> {
      */
     Optional<Repository> findByNameWithOwner(String nameWithOwner);
 
+    Optional<Repository> findByNativeIdAndProviderId(Long nativeId, Long providerId);
+
     /**
      * Finds a repository by ID with the organization eagerly fetched.
      * Used in backfill operations where the repository is passed across transaction boundaries.

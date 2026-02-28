@@ -857,8 +857,8 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
     private void setupTestData() {
         // Create organization matching fixture data
         Organization org = new Organization();
-        org.setId(FIXTURE_ORG_ID);
-        org.setProviderId(FIXTURE_ORG_ID);
+        org.setNativeId(FIXTURE_ORG_ID);
+        org.setNativeId(FIXTURE_ORG_ID);
         org.setLogin(FIXTURE_ORG_LOGIN);
         org.setCreatedAt(Instant.now());
         org.setUpdatedAt(Instant.now());
@@ -868,7 +868,7 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
 
         // Create repository matching fixture data
         testRepository = new Repository();
-        testRepository.setId(FIXTURE_REPO_ID);
+        testRepository.setNativeId(FIXTURE_REPO_ID);
         testRepository.setName("TestRepository");
         testRepository.setNameWithOwner(FIXTURE_REPO_FULL_NAME);
         testRepository.setHtmlUrl("https://github.com/" + FIXTURE_REPO_FULL_NAME);

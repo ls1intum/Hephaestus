@@ -769,7 +769,7 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
      */
     private Team createTeam(String name, String organization) {
         Team newTeam = new Team();
-        newTeam.setId(entityIdGenerator.incrementAndGet());
+        newTeam.setNativeId(entityIdGenerator.incrementAndGet());
         newTeam.setName(name);
         newTeam.setOrganization(organization);
         newTeam.setDescription("Test team: " + name);
@@ -789,7 +789,7 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
         String repoName = parts.length > 1 ? parts[1] : nameWithOwner;
 
         Repository repo = new Repository();
-        repo.setId(entityIdGenerator.incrementAndGet());
+        repo.setNativeId(entityIdGenerator.incrementAndGet());
         repo.setName(repoName);
         repo.setNameWithOwner(nameWithOwner);
         repo.setHtmlUrl("https://github.com/" + nameWithOwner);

@@ -11,6 +11,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
@@ -50,6 +51,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
     private static final int ISSUE_IID = 5;
     private static final long RAW_USER_ID = 18024L;
     private static final long ENTITY_USER_ID = -18024L;
+    private static final Long PROVIDER_ID = 2L;
 
     @Mock
     private IssueRepository issueRepository;
@@ -74,6 +76,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
 
     private GitLabIssueProcessor processor;
     private Repository testRepo;
+    private GitProvider gitLabProvider;
 
     @BeforeEach
     void setUp() {
@@ -96,14 +99,21 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
             eventPublisher
         );
 
+        gitLabProvider = new GitProvider();
+        gitLabProvider.setId(PROVIDER_ID);
+        gitLabProvider.setType(GitProviderType.GITLAB);
+        gitLabProvider.setServerUrl("https://gitlab.lrz.de");
+
         testRepo = new Repository();
         testRepo.setId(REPO_ID);
         testRepo.setNameWithOwner("hephaestustest/demo-repository");
+        testRepo.setProvider(gitLabProvider);
 
         // Default: upsertCore succeeds
         lenient()
             .when(
                 issueRepository.upsertCore(
+                    anyLong(),
                     anyLong(),
                     anyInt(),
                     any(),
@@ -150,6 +160,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
 
             assertThat(result).isNull();
             verify(issueRepository, never()).upsertCore(
+                anyLong(),
                 anyLong(),
                 anyInt(),
                 any(),
@@ -202,6 +213,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
             assertThat(result).isNull();
             verify(issueRepository, never()).upsertCore(
                 anyLong(),
+                anyLong(),
                 anyInt(),
                 any(),
                 any(),
@@ -246,7 +258,8 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
             processor.process(event, createContext());
 
             verify(issueRepository).upsertCore(
-                eq(ENTITY_ISSUE_ID),
+                eq(RAW_ISSUE_ID),
+                eq(PROVIDER_ID),
                 eq(ISSUE_IID),
                 any(),
                 any(),
@@ -282,7 +295,8 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
             processor.process(event, createContext());
 
             verify(issueRepository).upsertCore(
-                eq(ENTITY_ISSUE_ID),
+                eq(RAW_ISSUE_ID),
+                eq(PROVIDER_ID),
                 eq(ISSUE_IID),
                 any(),
                 any(),
@@ -318,7 +332,8 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
             processor.process(event, createContext());
 
             verify(issueRepository).upsertCore(
-                eq(ENTITY_ISSUE_ID),
+                eq(RAW_ISSUE_ID),
+                eq(PROVIDER_ID),
                 eq(ISSUE_IID),
                 any(),
                 any(),
@@ -362,13 +377,13 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 .thenReturn(Optional.of(issue));
 
             User author = createUserEntity();
-            when(userRepository.findById(ENTITY_USER_ID)).thenReturn(Optional.of(author));
+            when(userRepository.findByNativeIdAndProviderId(RAW_USER_ID, PROVIDER_ID)).thenReturn(Optional.of(author));
 
             GitLabIssueEventDTO event = createEvent("open", "opened", false);
             Issue result = processor.process(event, createContext());
 
             assertThat(result).isNotNull();
-            assertThat(result.getProvider()).isEqualTo(GitProviderType.GITLAB);
+            assertThat(result.getProvider()).isEqualTo(gitLabProvider);
 
             ArgumentCaptor<DomainEvent.IssueCreated> eventCaptor = ArgumentCaptor.forClass(
                 DomainEvent.IssueCreated.class
@@ -418,7 +433,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 .thenReturn(Optional.of(issue));
 
             User author = createUserEntity();
-            when(userRepository.findById(ENTITY_USER_ID)).thenReturn(Optional.of(author));
+            when(userRepository.findByNativeIdAndProviderId(RAW_USER_ID, PROVIDER_ID)).thenReturn(Optional.of(author));
 
             GitLabIssueEventDTO event = createEvent("close", "closed", false);
             Issue result = processor.processClosed(event, createContext());
@@ -440,7 +455,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 .thenReturn(Optional.of(issue));
 
             User author = createUserEntity();
-            when(userRepository.findById(ENTITY_USER_ID)).thenReturn(Optional.of(author));
+            when(userRepository.findByNativeIdAndProviderId(RAW_USER_ID, PROVIDER_ID)).thenReturn(Optional.of(author));
 
             GitLabIssueEventDTO event = createEvent("reopen", "opened", false);
             Issue result = processor.processReopened(event, createContext());
@@ -470,7 +485,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 .thenReturn(Optional.of(issue));
 
             User author = createUserEntity();
-            when(userRepository.findById(ENTITY_USER_ID)).thenReturn(Optional.of(author));
+            when(userRepository.findByNativeIdAndProviderId(RAW_USER_ID, PROVIDER_ID)).thenReturn(Optional.of(author));
 
             var syncData = new GitLabIssueProcessor.SyncIssueData(
                 "gid://gitlab/Issue/422296",
@@ -495,10 +510,11 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
             Issue result = processor.processFromSync(syncData, testRepo);
 
             assertThat(result).isNotNull();
-            assertThat(result.getProvider()).isEqualTo(GitProviderType.GITLAB);
+            assertThat(result.getProvider()).isEqualTo(gitLabProvider);
 
             verify(issueRepository).upsertCore(
-                eq(ENTITY_ISSUE_ID),
+                eq(RAW_ISSUE_ID),
+                eq(PROVIDER_ID),
                 eq(ISSUE_IID),
                 any(),
                 any(),

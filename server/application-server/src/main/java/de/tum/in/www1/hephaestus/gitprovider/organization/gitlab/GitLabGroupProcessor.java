@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.gitprovider.organization.gitlab;
 
-import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabGroupResponse;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
@@ -51,15 +50,15 @@ public class GitLabGroupProcessor {
      */
     @Transactional
     @Nullable
-    public Organization process(GitLabGroupResponse group) {
+    public Organization process(GitLabGroupResponse group, Long providerId) {
         if (group == null || group.id() == null || group.fullPath() == null || group.webUrl() == null) {
             log.warn("Skipped group processing: reason=nullOrMissingFields");
             return null;
         }
 
-        long entityId;
+        long nativeId;
         try {
-            entityId = GitLabSyncConstants.extractEntityId(group.id());
+            nativeId = GitLabSyncConstants.extractNumericId(group.id());
         } catch (IllegalArgumentException e) {
             log.warn("Skipped group processing: reason=invalidGlobalId, gid={}", group.id());
             return null;
@@ -71,15 +70,14 @@ public class GitLabGroupProcessor {
         String htmlUrl = group.webUrl();
 
         organizationRepository.upsert(
-            entityId,
-            entityId,
+            nativeId,
+            providerId,
             login,
             name,
             avatarUrl,
-            htmlUrl,
-            GitProviderType.GITLAB.name()
+            htmlUrl
         );
-        Organization organization = organizationRepository.findById(entityId).orElse(null);
+        Organization organization = organizationRepository.findByNativeIdAndProviderId(nativeId, providerId).orElse(null);
         if (organization != null) {
             Instant now = Instant.now();
             organization.setLastSyncAt(now);

@@ -3,6 +3,9 @@ package de.tum.in.www1.hephaestus.workspace;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.GITHUB_API_BASE_URL;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.ProvisioningListener;
@@ -38,6 +41,7 @@ public class WorkspaceProvisioningService {
     private final WorkspaceRepositoryMonitorService workspaceRepositoryMonitorService;
     private final GitHubAppTokenService gitHubAppTokenService;
     private final UserRepository userRepository;
+    private final GitProviderRepository gitProviderRepository;
     private final WorkspaceMembershipRepository workspaceMembershipRepository;
     private final WorkspaceMembershipService workspaceMembershipService;
     private final WorkspaceScopeFilter workspaceScopeFilter;
@@ -53,6 +57,7 @@ public class WorkspaceProvisioningService {
         WorkspaceRepositoryMonitorService workspaceRepositoryMonitorService,
         GitHubAppTokenService gitHubAppTokenService,
         UserRepository userRepository,
+        GitProviderRepository gitProviderRepository,
         WorkspaceMembershipRepository workspaceMembershipRepository,
         WorkspaceMembershipService workspaceMembershipService,
         WorkspaceScopeFilter workspaceScopeFilter,
@@ -66,6 +71,7 @@ public class WorkspaceProvisioningService {
         this.workspaceRepositoryMonitorService = workspaceRepositoryMonitorService;
         this.gitHubAppTokenService = gitHubAppTokenService;
         this.userRepository = userRepository;
+        this.gitProviderRepository = gitProviderRepository;
         this.workspaceMembershipRepository = workspaceMembershipRepository;
         this.workspaceMembershipService = workspaceMembershipService;
         this.workspaceScopeFilter = workspaceScopeFilter;
@@ -256,10 +262,18 @@ public class WorkspaceProvisioningService {
                 String avatar = userInfo.avatarUrl() != null ? userInfo.avatarUrl() : "";
                 String webUrl = userInfo.webUrl() != null ? userInfo.webUrl() : "";
 
-                userRepository.acquireLoginLock(login, "GITHUB");
-                userRepository.freeLoginConflicts(login, userInfo.id(), "GITHUB");
+                GitProvider provider = gitProviderRepository
+                    .findByTypeAndServerUrl(GitProviderType.GITLAB, serverUrl)
+                    .orElseThrow(() -> new IllegalStateException(
+                        "GitProvider for GitLab (" + serverUrl + ") not found"
+                    ));
+                Long providerId = provider.getId();
+
+                userRepository.acquireLoginLock(login, providerId);
+                userRepository.freeLoginConflicts(login, userInfo.id(), providerId);
                 userRepository.upsertUser(
                     userInfo.id(),
+                    providerId,
                     login,
                     name,
                     avatar,
@@ -267,8 +281,7 @@ public class WorkspaceProvisioningService {
                     User.Type.USER.name(),
                     null,
                     null,
-                    null,
-                    "GITHUB"
+                    null
                 );
                 log.info(
                     "Upserted user for GitLab PAT workspace bootstrap: userLogin={}, userId={}",
@@ -517,12 +530,18 @@ public class WorkspaceProvisioningService {
                 String avatar = userInfo.avatarUrl() != null ? userInfo.avatarUrl() : "";
                 String htmlUrl = userInfo.htmlUrl() != null ? userInfo.htmlUrl() : "";
 
+                GitProvider provider = gitProviderRepository
+                    .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
+                    .orElseThrow(() -> new IllegalStateException("GitProvider for GitHub not found"));
+                Long providerId = provider.getId();
+
                 // Use the three-step upsert (lock, free conflicts, insert)
                 // to avoid uk_user_login_lower violations under concurrency.
-                userRepository.acquireLoginLock(login, "GITHUB");
-                userRepository.freeLoginConflicts(login, userInfo.id(), "GITHUB");
+                userRepository.acquireLoginLock(login, providerId);
+                userRepository.freeLoginConflicts(login, userInfo.id(), providerId);
                 userRepository.upsertUser(
                     userInfo.id(),
+                    providerId,
                     login,
                     name,
                     avatar,
@@ -530,8 +549,7 @@ public class WorkspaceProvisioningService {
                     User.Type.USER.name(),
                     null, // email
                     null, // createdAt
-                    null, // updatedAt
-                    "GITHUB"
+                    null // updatedAt
                 );
                 log.info("Upserted user for PAT workspace bootstrap: userLogin={}, userId={}", login, userInfo.id());
                 return userInfo.id();

@@ -2,9 +2,13 @@ package de.tum.in.www1.hephaestus.gitprovider.repository.gitlab;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabEventType;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabMessageHandler;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
@@ -41,11 +45,15 @@ public class GitLabPushMessageHandler extends GitLabMessageHandler<GitLabPushEve
     private final GitLabProjectProcessor projectProcessor;
     private final OrganizationRepository organizationRepository;
     private final RepositoryRepository repositoryRepository;
+    private final GitProviderRepository gitProviderRepository;
+    private final GitLabProperties gitLabProperties;
 
     GitLabPushMessageHandler(
         GitLabProjectProcessor projectProcessor,
         OrganizationRepository organizationRepository,
         RepositoryRepository repositoryRepository,
+        GitProviderRepository gitProviderRepository,
+        GitLabProperties gitLabProperties,
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate
     ) {
@@ -53,6 +61,8 @@ public class GitLabPushMessageHandler extends GitLabMessageHandler<GitLabPushEve
         this.projectProcessor = projectProcessor;
         this.organizationRepository = organizationRepository;
         this.repositoryRepository = repositoryRepository;
+        this.gitProviderRepository = gitProviderRepository;
+        this.gitLabProperties = gitLabProperties;
     }
 
     @Override
@@ -85,7 +95,15 @@ public class GitLabPushMessageHandler extends GitLabMessageHandler<GitLabPushEve
 
         // Upsert the project as a Repository entity from the webhook payload.
         // This ensures the repository exists for future commit/MR processing.
-        var repository = projectProcessor.processPushEvent(event.project());
+        GitProvider provider = gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITLAB, gitLabProperties.defaultServerUrl())
+            .orElseThrow(
+                () ->
+                    new IllegalStateException(
+                        "GitProvider not found for type=GITLAB, serverUrl=" + gitLabProperties.defaultServerUrl()
+                    )
+            );
+        var repository = projectProcessor.processPushEvent(event.project(), provider);
 
         if (repository != null) {
             log.debug(

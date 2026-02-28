@@ -54,7 +54,7 @@ class GitHubLiveIssueSyncIntegrationTest extends AbstractGitHubLiveSyncIntegrati
         var createdIssue = fixtureService.createIssue(repoInfo.nodeId(), issueTitle, issueBody);
 
         // 3. Sync repository first
-        repositorySyncService.syncRepository(workspace.getId(), repository.fullName()).orElseThrow();
+        repositorySyncService.syncRepository(workspace.getId(), repository.fullName(), githubProvider).orElseThrow();
         var localRepo = repositoryRepository.findByNameWithOwner(repository.fullName()).orElseThrow();
 
         // 4. Sync issues
@@ -64,7 +64,9 @@ class GitHubLiveIssueSyncIntegrationTest extends AbstractGitHubLiveSyncIntegrati
         assertThat(syncResult.isCompleted()).isTrue();
         assertThat(syncResult.count()).isGreaterThanOrEqualTo(1);
 
-        Issue storedIssue = issueRepository.findById(createdIssue.databaseId()).orElseThrow();
+        Issue storedIssue = issueRepository
+            .findByRepositoryIdAndNumber(localRepo.getId(), createdIssue.number())
+            .orElseThrow();
         assertThat(storedIssue.getTitle()).isEqualTo(issueTitle);
         assertThat(storedIssue.getBody()).isEqualTo(issueBody);
         assertThat(storedIssue.getNumber()).isEqualTo(createdIssue.number());
@@ -79,7 +81,7 @@ class GitHubLiveIssueSyncIntegrationTest extends AbstractGitHubLiveSyncIntegrati
         var createdIssue = createIssueWithComment(repository);
 
         // 2. Sync repository first
-        repositorySyncService.syncRepository(workspace.getId(), repository.fullName()).orElseThrow();
+        repositorySyncService.syncRepository(workspace.getId(), repository.fullName(), githubProvider).orElseThrow();
         var localRepo = repositoryRepository.findByNameWithOwner(repository.fullName()).orElseThrow();
 
         // 3. Sync issues (this should include comments via the issue processor)
@@ -88,7 +90,9 @@ class GitHubLiveIssueSyncIntegrationTest extends AbstractGitHubLiveSyncIntegrati
         assertThat(syncResult.count()).isGreaterThanOrEqualTo(1);
 
         // 4. Verify issue is synced
-        Issue storedIssue = issueRepository.findById(createdIssue.issueId()).orElseThrow();
+        Issue storedIssue = issueRepository
+            .findByRepositoryIdAndNumber(localRepo.getId(), createdIssue.issueNumber())
+            .orElseThrow();
         assertThat(storedIssue.getTitle()).isEqualTo(createdIssue.issueTitle());
         assertThat(storedIssue.getNumber()).isEqualTo(createdIssue.issueNumber());
 
@@ -110,7 +114,7 @@ class GitHubLiveIssueSyncIntegrationTest extends AbstractGitHubLiveSyncIntegrati
         // A separate comment sync service may be needed for full comment sync.
         assertThat(comments).anyMatch(
             c ->
-                c.getId().equals(createdIssue.commentId()) ||
+                c.getNativeId().equals(createdIssue.commentId()) ||
                 c
                     .getBody()
                     .contains(
@@ -132,7 +136,7 @@ class GitHubLiveIssueSyncIntegrationTest extends AbstractGitHubLiveSyncIntegrati
         var issue2 = fixtureService.createIssue(repoInfo.nodeId(), issueTitle2, "Second issue body");
 
         // 3. Sync repository first
-        repositorySyncService.syncRepository(workspace.getId(), repository.fullName()).orElseThrow();
+        repositorySyncService.syncRepository(workspace.getId(), repository.fullName(), githubProvider).orElseThrow();
         var localRepo = repositoryRepository.findByNameWithOwner(repository.fullName()).orElseThrow();
 
         // 4. Sync issues
@@ -142,11 +146,15 @@ class GitHubLiveIssueSyncIntegrationTest extends AbstractGitHubLiveSyncIntegrati
         assertThat(syncResult.isCompleted()).isTrue();
         assertThat(syncResult.count()).isGreaterThanOrEqualTo(2);
 
-        Issue storedIssue1 = issueRepository.findById(issue1.databaseId()).orElseThrow();
+        Issue storedIssue1 = issueRepository
+            .findByRepositoryIdAndNumber(localRepo.getId(), issue1.number())
+            .orElseThrow();
         assertThat(storedIssue1.getTitle()).isEqualTo(issueTitle1);
         assertThat(storedIssue1.getNumber()).isEqualTo(issue1.number());
 
-        Issue storedIssue2 = issueRepository.findById(issue2.databaseId()).orElseThrow();
+        Issue storedIssue2 = issueRepository
+            .findByRepositoryIdAndNumber(localRepo.getId(), issue2.number())
+            .orElseThrow();
         assertThat(storedIssue2.getTitle()).isEqualTo(issueTitle2);
         assertThat(storedIssue2.getNumber()).isEqualTo(issue2.number());
     }

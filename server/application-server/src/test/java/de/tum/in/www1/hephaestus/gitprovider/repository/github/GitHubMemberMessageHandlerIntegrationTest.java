@@ -3,6 +3,9 @@ package de.tum.in.www1.hephaestus.gitprovider.repository.github;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
@@ -49,8 +52,12 @@ class GitHubMemberMessageHandlerIntegrationTest extends BaseIntegrationTest {
     private WorkspaceRepository workspaceRepository;
 
     @Autowired
+    private GitProviderRepository gitProviderRepository;
+
+    @Autowired
     private ObjectMapper objectMapper;
 
+    private GitProvider gitProvider;
     private Repository testRepository;
 
     @BeforeEach
@@ -60,10 +67,15 @@ class GitHubMemberMessageHandlerIntegrationTest extends BaseIntegrationTest {
     }
 
     private void setupTestData() {
+        // Create git provider
+        gitProvider = gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
+            .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com")));
+
         // Create organization
         Organization org = new Organization();
-        org.setId(215361191L);
-        org.setProviderId(215361191L);
+        org.setNativeId(215361191L);
+        org.setProvider(gitProvider);
         org.setLogin("HephaestusTest");
         org.setCreatedAt(Instant.now());
         org.setUpdatedAt(Instant.now());
@@ -73,7 +85,8 @@ class GitHubMemberMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
         // Create repository
         testRepository = new Repository();
-        testRepository.setId(1000663383L);
+        testRepository.setNativeId(1000663383L);
+        testRepository.setProvider(gitProvider);
         testRepository.setName("TestRepository");
         testRepository.setNameWithOwner("HephaestusTest/TestRepository");
         testRepository.setHtmlUrl("https://github.com/HephaestusTest/TestRepository");
@@ -127,7 +140,8 @@ class GitHubMemberMessageHandlerIntegrationTest extends BaseIntegrationTest {
         GitHubMemberEventDTO addEvent = loadPayload("member.added");
         if (addEvent.member() != null) {
             User member = new User();
-            member.setId(addEvent.member().id());
+            member.setNativeId(addEvent.member().id());
+            member.setProvider(gitProvider);
             member.setLogin(addEvent.member().login());
             member.setAvatarUrl(addEvent.member().avatarUrl());
             member.setCreatedAt(Instant.now());

@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabEventType;
@@ -69,11 +71,11 @@ import org.springframework.transaction.support.TransactionTemplate;
 )
 class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
-    // Negated IDs from GitLab fixtures
-    private static final long ENTITY_ISSUE_ID = -422296L;
+    // Native IDs from GitLab fixtures (positive, raw values)
+    private static final long NATIVE_ISSUE_ID = 422296L;
     private static final int ISSUE_IID = 5;
-    private static final long ENTITY_USER_ID = -18024L;
-    private static final long ENTITY_LABEL_ID = -85907L;
+    private static final long NATIVE_USER_ID = 18024L;
+    private static final long NATIVE_LABEL_ID = 85907L;
 
     // Fixture values
     private static final String FIXTURE_ISSUE_TITLE = "Feature: Add user authentication";
@@ -85,8 +87,6 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     private static final String FIXTURE_LABEL_COLOR = "#a2eeef";
 
     // Repository/org setup
-    private static final long FIXTURE_ORG_ID = -1L;
-    private static final long FIXTURE_REPO_ID = -246765L;
     private static final String FIXTURE_ORG_LOGIN = "hephaestustest";
     private static final String FIXTURE_REPO_FULL_NAME = "hephaestustest/demo-repository";
 
@@ -112,6 +112,9 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     private WorkspaceRepository workspaceRepository;
 
     @Autowired
+    private GitProviderRepository gitProviderRepository;
+
+    @Autowired
     private ObjectMapper objectMapper;
 
     @Autowired
@@ -119,6 +122,9 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private GitLabTestEventListener eventListener;
+
+    private Repository savedRepo;
+    private GitProvider savedProvider;
 
     @BeforeEach
     void setUp() {
@@ -154,10 +160,10 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             handler.handleEvent(event);
 
             transactionTemplate.executeWithoutResult(status -> {
-                Issue issue = issueRepository.findById(ENTITY_ISSUE_ID).orElseThrow();
+                Issue issue = issueRepository.findByRepositoryIdAndNumber(savedRepo.getId(), ISSUE_IID).orElseThrow();
 
                 // Core fields
-                assertThat(issue.getId()).isEqualTo(ENTITY_ISSUE_ID);
+                assertThat(issue.getNativeId()).isEqualTo(NATIVE_ISSUE_ID);
                 assertThat(issue.getNumber()).isEqualTo(ISSUE_IID);
                 assertThat(issue.getTitle()).isEqualTo(FIXTURE_ISSUE_TITLE);
                 assertThat(issue.getBody()).isEqualTo(FIXTURE_ISSUE_BODY);
@@ -165,7 +171,7 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
                 assertThat(issue.getHtmlUrl()).isEqualTo(FIXTURE_ISSUE_HTML_URL);
 
                 // Provider
-                assertThat(issue.getProvider()).isEqualTo(GitProviderType.GITLAB);
+                assertThat(issue.getProvider().getType()).isEqualTo(GitProviderType.GITLAB);
 
                 // Timestamps
                 assertThat(issue.getCreatedAt()).isNotNull();
@@ -173,11 +179,11 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
                 // Repository
                 assertThat(issue.getRepository()).isNotNull();
-                assertThat(issue.getRepository().getId()).isEqualTo(FIXTURE_REPO_ID);
+                assertThat(issue.getRepository().getId()).isEqualTo(savedRepo.getId());
 
                 // Author
                 assertThat(issue.getAuthor()).isNotNull();
-                assertThat(issue.getAuthor().getId()).isEqualTo(ENTITY_USER_ID);
+                assertThat(issue.getAuthor().getNativeId()).isEqualTo(NATIVE_USER_ID);
                 assertThat(issue.getAuthor().getLogin()).isEqualTo(FIXTURE_AUTHOR_LOGIN);
 
                 // Labels
@@ -199,7 +205,7 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             // Close
             handler.handleEvent(loadPayload("issue.close"));
 
-            Issue issue = issueRepository.findById(ENTITY_ISSUE_ID).orElse(null);
+            Issue issue = issueRepository.findByRepositoryIdAndNumber(savedRepo.getId(), ISSUE_IID).orElse(null);
             assertThat(issue).isNotNull();
             assertThat(issue.getState()).isEqualTo(Issue.State.CLOSED);
 
@@ -217,7 +223,7 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             // Reopen
             handler.handleEvent(loadPayload("issue.reopen"));
 
-            Issue issue = issueRepository.findById(ENTITY_ISSUE_ID).orElse(null);
+            Issue issue = issueRepository.findByRepositoryIdAndNumber(savedRepo.getId(), ISSUE_IID).orElse(null);
             assertThat(issue).isNotNull();
             assertThat(issue.getState()).isEqualTo(Issue.State.OPEN);
 
@@ -236,7 +242,7 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
             // Should still be one issue
             assertThat(issueRepository.count()).isEqualTo(1);
-            Issue issue = issueRepository.findById(ENTITY_ISSUE_ID).orElse(null);
+            Issue issue = issueRepository.findByRepositoryIdAndNumber(savedRepo.getId(), ISSUE_IID).orElse(null);
             assertThat(issue).isNotNull();
         }
     }
@@ -287,9 +293,9 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
             handler.handleEvent(loadPayload("issue.open"));
 
-            var author = userRepository.findById(ENTITY_USER_ID).orElseThrow();
+            var author = userRepository.findByNativeIdAndProviderId(NATIVE_USER_ID, savedProvider.getId()).orElseThrow();
             assertThat(author.getLogin()).isEqualTo(FIXTURE_AUTHOR_LOGIN);
-            assertThat(author.getProvider()).isEqualTo(GitProviderType.GITLAB);
+            assertThat(author.getProvider().getType()).isEqualTo(GitProviderType.GITLAB);
             assertThat(author.getHtmlUrl()).isEqualTo("https://gitlab.lrz.de/ga84xah");
         }
 
@@ -299,7 +305,7 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             handler.handleEvent(loadPayload("issue.open"));
 
             transactionTemplate.executeWithoutResult(status -> {
-                var label = labelRepository.findById(ENTITY_LABEL_ID).orElseThrow();
+                var label = labelRepository.findByRepositoryIdAndName(savedRepo.getId(), FIXTURE_LABEL_NAME).orElseThrow();
                 assertThat(label.getName()).isEqualTo(FIXTURE_LABEL_NAME);
                 assertThat(label.getColor()).isEqualTo(FIXTURE_LABEL_COLOR);
             });
@@ -340,18 +346,18 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
         @DisplayName("full lifecycle: open → close → reopen → update")
         void shouldHandleFullLifecycle() throws Exception {
             handler.handleEvent(loadPayload("issue.open"));
-            assertThat(issueRepository.findById(ENTITY_ISSUE_ID).orElseThrow().getState()).isEqualTo(Issue.State.OPEN);
+            assertThat(issueRepository.findByRepositoryIdAndNumber(savedRepo.getId(), ISSUE_IID).orElseThrow().getState()).isEqualTo(Issue.State.OPEN);
 
             handler.handleEvent(loadPayload("issue.close"));
-            assertThat(issueRepository.findById(ENTITY_ISSUE_ID).orElseThrow().getState()).isEqualTo(
+            assertThat(issueRepository.findByRepositoryIdAndNumber(savedRepo.getId(), ISSUE_IID).orElseThrow().getState()).isEqualTo(
                 Issue.State.CLOSED
             );
 
             handler.handleEvent(loadPayload("issue.reopen"));
-            assertThat(issueRepository.findById(ENTITY_ISSUE_ID).orElseThrow().getState()).isEqualTo(Issue.State.OPEN);
+            assertThat(issueRepository.findByRepositoryIdAndNumber(savedRepo.getId(), ISSUE_IID).orElseThrow().getState()).isEqualTo(Issue.State.OPEN);
 
             handler.handleEvent(loadPayload("issue.update"));
-            assertThat(issueRepository.findById(ENTITY_ISSUE_ID)).isPresent();
+            assertThat(issueRepository.findByRepositoryIdAndNumber(savedRepo.getId(), ISSUE_IID)).isPresent();
 
             assertThat(issueRepository.count()).isEqualTo(1);
         }
@@ -366,19 +372,23 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     }
 
     private void setupTestData() {
+        savedProvider = gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITLAB, "https://gitlab.lrz.de")
+            .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITLAB, "https://gitlab.lrz.de")));
+
         Organization org = new Organization();
-        org.setId(FIXTURE_ORG_ID);
-        org.setProviderId(FIXTURE_ORG_ID);
+        org.setNativeId(1L);
         org.setLogin(FIXTURE_ORG_LOGIN);
         org.setCreatedAt(Instant.now());
         org.setUpdatedAt(Instant.now());
         org.setName("HephaestusTest");
         org.setAvatarUrl("");
-        org.setProvider(GitProviderType.GITLAB);
+        org.setHtmlUrl("https://gitlab.lrz.de/hephaestustest");
+        org.setProvider(savedProvider);
         org = organizationRepository.save(org);
 
         Repository repo = new Repository();
-        repo.setId(FIXTURE_REPO_ID);
+        repo.setNativeId(246765L);
         repo.setName("demo-repository");
         repo.setNameWithOwner(FIXTURE_REPO_FULL_NAME);
         repo.setHtmlUrl("https://gitlab.lrz.de/hephaestustest/demo-repository");
@@ -388,8 +398,8 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
         repo.setUpdatedAt(Instant.now());
         repo.setPushedAt(Instant.now());
         repo.setOrganization(org);
-        repo.setProvider(GitProviderType.GITLAB);
-        repositoryRepository.save(repo);
+        repo.setProvider(savedProvider);
+        savedRepo = repositoryRepository.save(repo);
 
         Workspace workspace = new Workspace();
         workspace.setWorkspaceSlug("hephaestus-test-gitlab");

@@ -3,6 +3,9 @@ package de.tum.in.www1.hephaestus.gitprovider.discussion.github;
 import static org.assertj.core.api.Assertions.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.discussion.Discussion;
@@ -140,6 +143,9 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
 
     @Autowired
     private WorkspaceRepository workspaceRepository;
+
+    @Autowired
+    private GitProviderRepository gitProviderRepository;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -315,7 +321,7 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
             // Given - the deleted fixture uses discussion #28 (ID 9096674)
             // First, we create it by simulating it exists
             Discussion discussionToDelete = new Discussion();
-            discussionToDelete.setId(DISCUSSION_28_ID);
+            discussionToDelete.setNativeId(DISCUSSION_28_ID);
             discussionToDelete.setNumber(28);
             discussionToDelete.setTitle("Disposable discussion");
             discussionToDelete.setState(Discussion.State.OPEN);
@@ -643,20 +649,26 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
     }
 
     private void setupTestData() {
+        // Create GitHub provider
+        GitProvider gitProvider = gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
+            .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com")));
+
         // Create organization matching fixture data
         Organization org = new Organization();
-        org.setId(FIXTURE_ORG_ID);
-        org.setProviderId(FIXTURE_ORG_ID);
+        org.setNativeId(FIXTURE_ORG_ID);
         org.setLogin(FIXTURE_ORG_LOGIN);
         org.setCreatedAt(Instant.now());
         org.setUpdatedAt(Instant.now());
         org.setName("Hephaestus Test");
         org.setAvatarUrl("https://avatars.githubusercontent.com/u/" + FIXTURE_ORG_ID);
+        org.setHtmlUrl("https://github.com/" + FIXTURE_ORG_LOGIN);
+        org.setProvider(gitProvider);
         org = organizationRepository.save(org);
 
         // Create repository matching fixture data
         Repository repo = new Repository();
-        repo.setId(FIXTURE_REPO_ID);
+        repo.setNativeId(FIXTURE_REPO_ID);
         repo.setName("TestRepository");
         repo.setNameWithOwner(FIXTURE_REPO_FULL_NAME);
         repo.setHtmlUrl("https://github.com/" + FIXTURE_REPO_FULL_NAME);
@@ -666,6 +678,7 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
         repo.setUpdatedAt(Instant.now());
         repo.setPushedAt(Instant.now());
         repo.setOrganization(org);
+        repo.setProvider(gitProvider);
         repo = repositoryRepository.save(repo);
 
         // Create workspace

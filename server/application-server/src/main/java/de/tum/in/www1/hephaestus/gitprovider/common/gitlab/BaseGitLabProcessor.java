@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.gitprovider.common.gitlab;
 
-import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.PostgresStringUtils;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.dto.GitLabWebhookLabel;
@@ -34,8 +33,8 @@ import org.springframework.lang.Nullable;
  * Provides common functionality for finding or creating related entities
  * (users, labels) that is shared across GitLab Issue, MR, and Note processors.
  * <p>
- * All GitLab entity IDs are negated via {@link GitLabSyncConstants#toEntityId(long)}
- * before storage to prevent collision with GitHub IDs.
+ * All GitLab entity IDs are stored as positive {@code nativeId} values alongside
+ * a {@code provider_id} FK to the git_provider table, preventing collisions.
  */
 public abstract class BaseGitLabProcessor {
 
@@ -87,23 +86,24 @@ public abstract class BaseGitLabProcessor {
     /**
      * Finds or creates a user from webhook data.
      * <p>
-     * Uses negated IDs and sets provider to GITLAB.
+     * Stores the raw GitLab user ID as {@code nativeId} with the given {@code providerId}.
      * Constructs HTML URL from the GitLab server URL and username.
      */
     @Nullable
-    protected User findOrCreateUser(@Nullable GitLabWebhookUser dto) {
+    protected User findOrCreateUser(@Nullable GitLabWebhookUser dto, Long providerId) {
         if (dto == null || dto.id() == null || dto.username() == null) {
             return null;
         }
 
-        long entityId = GitLabSyncConstants.toEntityId(dto.id());
+        long nativeId = dto.id();
         String login = dto.username();
         String name = dto.name() != null ? dto.name() : login;
         String avatarUrl = dto.avatarUrl() != null ? dto.avatarUrl() : "";
         String htmlUrl = gitLabProperties.defaultServerUrl() + "/" + login;
 
         userRepository.upsertUser(
-            entityId,
+            nativeId,
+            providerId,
             login,
             name,
             avatarUrl,
@@ -111,11 +111,10 @@ public abstract class BaseGitLabProcessor {
             User.Type.USER.name(),
             dto.email(),
             null, // createdAt — not in webhook
-            null, // updatedAt — not in webhook
-            GitProviderType.GITLAB.name()
+            null // updatedAt — not in webhook
         );
 
-        return userRepository.findById(entityId).orElse(null);
+        return userRepository.findByNativeIdAndProviderId(nativeId, providerId).orElse(null);
     }
 
     /**
@@ -129,15 +128,16 @@ public abstract class BaseGitLabProcessor {
         String username,
         @Nullable String name,
         @Nullable String avatarUrl,
-        @Nullable String webUrl
+        @Nullable String webUrl,
+        Long providerId
     ) {
         if (globalId == null || username == null) {
             return null;
         }
 
-        long entityId;
+        long nativeId;
         try {
-            entityId = GitLabSyncConstants.extractEntityId(globalId);
+            nativeId = GitLabSyncConstants.extractNumericId(globalId);
         } catch (IllegalArgumentException e) {
             log.warn("Skipped user resolution: reason=invalidGlobalId, gid={}", globalId);
             return null;
@@ -148,19 +148,19 @@ public abstract class BaseGitLabProcessor {
         String resolvedHtmlUrl = webUrl != null ? webUrl : (gitLabProperties.defaultServerUrl() + "/" + username);
 
         userRepository.upsertUser(
-            entityId,
+            nativeId,
+            providerId,
             username,
             resolvedName,
             resolvedAvatarUrl,
             resolvedHtmlUrl,
             User.Type.USER.name(),
-            null,
-            null,
-            null,
-            GitProviderType.GITLAB.name()
+            null, // email — not available from GraphQL
+            null, // createdAt — not in GraphQL user data
+            null // updatedAt — not in GraphQL user data
         );
 
-        return userRepository.findById(entityId).orElse(null);
+        return userRepository.findByNativeIdAndProviderId(nativeId, providerId).orElse(null);
     }
 
     // ========================================================================
@@ -241,14 +241,18 @@ public abstract class BaseGitLabProcessor {
     /**
      * Updates assignees collection from webhook user list.
      */
-    protected boolean updateAssignees(@Nullable List<GitLabWebhookUser> assigneeDtos, Set<User> currentAssignees) {
+    protected boolean updateAssignees(
+        @Nullable List<GitLabWebhookUser> assigneeDtos,
+        Set<User> currentAssignees,
+        Long providerId
+    ) {
         if (assigneeDtos == null) {
             return false;
         }
 
         Set<User> newAssignees = new HashSet<>();
         for (GitLabWebhookUser dto : assigneeDtos) {
-            User assignee = findOrCreateUser(dto);
+            User assignee = findOrCreateUser(dto, providerId);
             if (assignee != null) {
                 newAssignees.add(assignee);
             }

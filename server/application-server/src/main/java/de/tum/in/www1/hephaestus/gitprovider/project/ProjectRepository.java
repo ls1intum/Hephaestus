@@ -77,12 +77,12 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
     @Query(
         value = """
         INSERT INTO project (
-            id, node_id, owner_type, owner_id, number, title, short_description,
+            native_id, provider_id, node_id, owner_type, owner_id, number, title, short_description,
             readme, template, url, closed, closed_at, is_public, creator_id, last_sync_at,
             created_at, updated_at
         )
         VALUES (
-            :id, :nodeId, :ownerType, :ownerId, :number, :title, :shortDescription,
+            :nativeId, :providerId, :nodeId, :ownerType, :ownerId, :number, :title, :shortDescription,
             :readme, :template, :url, :closed, :closedAt, :isPublic, :creatorId, :lastSyncAt,
             :createdAt, :updatedAt
         )
@@ -104,7 +104,8 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
         nativeQuery = true
     )
     int upsertCore(
-        @Param("id") Long id,
+        @Param("nativeId") Long nativeId,
+        @Param("providerId") Long providerId,
         @Param("nodeId") String nodeId,
         @Param("ownerType") String ownerType,
         @Param("ownerId") Long ownerId,

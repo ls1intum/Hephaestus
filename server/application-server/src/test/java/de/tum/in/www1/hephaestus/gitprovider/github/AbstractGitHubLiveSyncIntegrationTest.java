@@ -1,5 +1,8 @@
 package de.tum.in.www1.hephaestus.gitprovider.github;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
 import de.tum.in.www1.hephaestus.workspace.AccountType;
 import de.tum.in.www1.hephaestus.workspace.RepositorySelection;
@@ -42,6 +45,9 @@ public abstract class AbstractGitHubLiveSyncIntegrationTest extends BaseGitHubLi
     protected RepositoryToMonitorRepository repositoryToMonitorRepository;
 
     @Autowired
+    protected GitProviderRepository gitProviderRepository;
+
+    @Autowired
     protected HttpGraphQlClient gitHubGraphQlClient;
 
     protected final List<String> repositoriesToDelete = new ArrayList<>();
@@ -53,6 +59,7 @@ public abstract class AbstractGitHubLiveSyncIntegrationTest extends BaseGitHubLi
 
     protected GitHubTestFixtureService fixtureService;
     protected Workspace workspace;
+    protected GitProvider githubProvider;
 
     @BeforeAll
     void setUpFixtureService() {
@@ -69,6 +76,9 @@ public abstract class AbstractGitHubLiveSyncIntegrationTest extends BaseGitHubLi
         databaseTestUtils.cleanDatabase();
         repositoriesToDelete.clear();
         teamsToDelete.clear();
+        githubProvider = gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
+            .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com")));
         workspace = createWorkspace();
     }
 

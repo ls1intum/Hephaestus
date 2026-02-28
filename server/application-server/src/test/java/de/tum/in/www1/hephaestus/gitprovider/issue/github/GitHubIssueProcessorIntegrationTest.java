@@ -2,6 +2,9 @@ package de.tum.in.www1.hephaestus.gitprovider.issue.github;
 
 import static org.assertj.core.api.Assertions.*;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
@@ -74,6 +77,9 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
     private OrganizationRepository organizationRepository;
 
     @Autowired
+    private GitProviderRepository gitProviderRepository;
+
+    @Autowired
     private WorkspaceRepository workspaceRepository;
 
     @Autowired
@@ -94,6 +100,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
     private Repository testRepository;
     private Workspace testWorkspace;
     private Organization testOrganization;
+    private GitProvider githubProvider;
 
     @BeforeEach
     void setUp() {
@@ -103,20 +110,26 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
     }
 
     private void setupTestData() {
+        // Create GitHub provider
+        githubProvider = gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
+            .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com")));
+
         // Create organization matching fixture data
         testOrganization = new Organization();
-        testOrganization.setId(FIXTURE_ORG_ID);
-        testOrganization.setProviderId(FIXTURE_ORG_ID);
+        testOrganization.setNativeId(FIXTURE_ORG_ID);
         testOrganization.setLogin(FIXTURE_ORG_LOGIN);
         testOrganization.setCreatedAt(Instant.now());
         testOrganization.setUpdatedAt(Instant.now());
         testOrganization.setName("Hephaestus Test");
         testOrganization.setAvatarUrl("https://avatars.githubusercontent.com/u/" + FIXTURE_ORG_ID);
+        testOrganization.setHtmlUrl("https://github.com/" + FIXTURE_ORG_LOGIN);
+        testOrganization.setProvider(githubProvider);
         testOrganization = organizationRepository.save(testOrganization);
 
         // Create repository matching fixture data
         testRepository = new Repository();
-        testRepository.setId(FIXTURE_REPO_ID);
+        testRepository.setNativeId(FIXTURE_REPO_ID);
         testRepository.setName("TestRepository");
         testRepository.setNameWithOwner(FIXTURE_REPO_FULL_NAME);
         testRepository.setHtmlUrl("https://github.com/" + FIXTURE_REPO_FULL_NAME);
@@ -126,6 +139,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
         testRepository.setUpdatedAt(Instant.now());
         testRepository.setPushedAt(Instant.now());
         testRepository.setOrganization(testOrganization);
+        testRepository.setProvider(githubProvider);
         testRepository = repositoryRepository.save(testRepository);
 
         // Create workspace
@@ -222,8 +236,8 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
 
             // Then - should use databaseId
             assertThat(result).isNotNull();
-            assertThat(result.getId()).isEqualTo(databaseId);
-            assertThat(issueRepository.findById(databaseId)).isPresent();
+            assertThat(result.getNativeId()).isEqualTo(databaseId);
+            assertThat(issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 1)).isPresent();
         }
 
         @Test
@@ -263,8 +277,8 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
 
             // Then - should use id as fallback
             assertThat(result).isNotNull();
-            assertThat(result.getId()).isEqualTo(webhookId);
-            assertThat(issueRepository.findById(webhookId)).isPresent();
+            assertThat(result.getNativeId()).isEqualTo(webhookId);
+            assertThat(issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 20)).isPresent();
         }
 
         @Test
@@ -325,21 +339,21 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
 
             // Then - verify issue created
             assertThat(result).isNotNull();
-            assertThat(result.getId()).isEqualTo(issueId);
+            assertThat(result.getNativeId()).isEqualTo(issueId);
             assertThat(result.getNumber()).isEqualTo(20);
             assertThat(result.getTitle()).isEqualTo("Test Issue #20");
             assertThat(result.getState()).isEqualTo(Issue.State.OPEN);
-            assertThat(result.getRepository().getId()).isEqualTo(FIXTURE_REPO_ID);
+            assertThat(result.getRepository().getNativeId()).isEqualTo(FIXTURE_REPO_ID);
 
             // Verify persisted
-            assertThat(issueRepository.findById(issueId)).isPresent();
+            assertThat(issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 20)).isPresent();
 
             // Verify Created event published
             assertThat(eventListener.getCreatedEvents())
                 .hasSize(1)
                 .first()
                 .satisfies(event -> {
-                    assertThat(event.issue().id()).isEqualTo(issueId);
+                    assertThat(event.issue().id()).isEqualTo(result.getId());
                     assertThat(event.context().scopeId()).isEqualTo(testWorkspace.getId());
                 });
         }
@@ -348,7 +362,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
         @DisplayName("Should create author user if not exists")
         void shouldCreateAuthorIfNotExists() {
             // Given - no user exists
-            assertThat(userRepository.findById(FIXTURE_AUTHOR_ID)).isEmpty();
+            assertThat(userRepository.findByNativeIdAndProviderId(FIXTURE_AUTHOR_ID, githubProvider.getId())).isEmpty();
 
             Long issueId = 111222333L;
             GitHubIssueDTO dto = createBasicIssueDto(issueId, 1);
@@ -358,9 +372,9 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
 
             // Then
             assertThat(result.getAuthor()).isNotNull();
-            assertThat(result.getAuthor().getId()).isEqualTo(FIXTURE_AUTHOR_ID);
+            assertThat(result.getAuthor().getNativeId()).isEqualTo(FIXTURE_AUTHOR_ID);
             assertThat(result.getAuthor().getLogin()).isEqualTo(FIXTURE_AUTHOR_LOGIN);
-            assertThat(userRepository.findById(FIXTURE_AUTHOR_ID)).isPresent();
+            assertThat(userRepository.findByNativeIdAndProviderId(FIXTURE_AUTHOR_ID, githubProvider.getId())).isPresent();
         }
 
         @Test
@@ -368,9 +382,10 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
         void shouldReuseExistingAuthor() {
             // Given - create user first
             User existingUser = new User();
-            existingUser.setId(FIXTURE_AUTHOR_ID);
+            existingUser.setNativeId(FIXTURE_AUTHOR_ID);
             existingUser.setLogin(FIXTURE_AUTHOR_LOGIN);
             existingUser.setAvatarUrl("https://avatars.example.com");
+            existingUser.setProvider(githubProvider);
             userRepository.save(existingUser);
 
             long userCountBefore = userRepository.count();
@@ -382,7 +397,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             Issue result = processor.process(dto, createContext());
 
             // Then - should reuse existing user, not create new
-            assertThat(result.getAuthor().getId()).isEqualTo(FIXTURE_AUTHOR_ID);
+            assertThat(result.getAuthor().getNativeId()).isEqualTo(FIXTURE_AUTHOR_ID);
             assertThat(userRepository.count()).isEqualTo(userCountBefore);
         }
 
@@ -544,7 +559,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             // Then
             assertThat(result.getAssignees()).hasSize(1);
             assertThat(result.getAssignees().iterator().next().getLogin()).isEqualTo("assignee1");
-            assertThat(userRepository.findById(assigneeId)).isPresent();
+            assertThat(userRepository.findByNativeIdAndProviderId(assigneeId, githubProvider.getId())).isPresent();
         }
 
         @Test
@@ -597,7 +612,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             // Then
             assertThat(result.getMilestone()).isNotNull();
             assertThat(result.getMilestone().getTitle()).isEqualTo("Webhook Fixtures");
-            assertThat(milestoneRepository.findById(milestoneId)).isPresent();
+            assertThat(milestoneRepository.findByNativeIdAndProviderId(milestoneId, githubProvider.getId())).isPresent();
         }
     }
 
@@ -613,13 +628,14 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             // Given - create existing issue
             Long issueId = FIXTURE_ISSUE_ID;
             Issue existing = new Issue();
-            existing.setId(issueId);
+            existing.setNativeId(issueId);
             existing.setNumber(20);
             existing.setTitle("Old Title");
             existing.setBody("Old body");
             existing.setState(Issue.State.OPEN);
             existing.setHtmlUrl("https://github.com/" + FIXTURE_REPO_FULL_NAME + "/issues/20");
             existing.setRepository(testRepository);
+            existing.setProvider(githubProvider);
             issueRepository.save(existing);
 
             eventListener.clear();
@@ -670,7 +686,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             // Given - create existing issue
             Long issueId = FIXTURE_ISSUE_ID;
             Issue existing = new Issue();
-            existing.setId(issueId);
+            existing.setNativeId(issueId);
             existing.setNumber(20);
             existing.setTitle("Same Title");
             existing.setBody("Same body");
@@ -678,6 +694,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             existing.setCommentsCount(5);
             existing.setHtmlUrl("https://github.com/" + FIXTURE_REPO_FULL_NAME + "/issues/20");
             existing.setRepository(testRepository);
+            existing.setProvider(githubProvider);
             existing.setCreatedAt(Instant.parse("2025-11-01T21:42:45Z"));
             existing.setUpdatedAt(Instant.parse("2025-11-01T21:42:45Z"));
             issueRepository.save(existing);
@@ -744,13 +761,14 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             // Given - create issue without milestone
             Long issueId = 888999000L;
             Issue existing = new Issue();
-            existing.setId(issueId);
+            existing.setNativeId(issueId);
             existing.setNumber(8);
             existing.setTitle("Issue");
             existing.setState(Issue.State.OPEN);
             existing.setHtmlUrl("https://example.com");
             existing.setRepository(testRepository);
             existing.setMilestone(null);
+            existing.setProvider(githubProvider);
             issueRepository.save(existing);
 
             eventListener.clear();
@@ -811,23 +829,25 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             // Given - create milestone and issue with milestone
             Long milestoneId = 14028563L;
             Milestone milestone = new Milestone();
-            milestone.setId(milestoneId);
+            milestone.setNativeId(milestoneId);
             milestone.setNumber(2);
             milestone.setTitle("Existing Milestone");
             milestone.setState(Milestone.State.OPEN);
             milestone.setHtmlUrl("https://example.com/milestone/2");
             milestone.setRepository(testRepository);
+            milestone.setProvider(githubProvider);
             milestoneRepository.save(milestone);
 
             Long issueId = 999000111L;
             Issue existing = new Issue();
-            existing.setId(issueId);
+            existing.setNativeId(issueId);
             existing.setNumber(9);
             existing.setTitle("Issue");
             existing.setState(Issue.State.OPEN);
             existing.setHtmlUrl("https://example.com");
             existing.setRepository(testRepository);
             existing.setMilestone(milestone);
+            existing.setProvider(githubProvider);
             issueRepository.save(existing);
 
             eventListener.clear();
@@ -925,13 +945,14 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             // Given - create closed issue first
             Long issueId = 222333444L;
             Issue existing = new Issue();
-            existing.setId(issueId);
+            existing.setNativeId(issueId);
             existing.setNumber(2);
             existing.setTitle("Closed Issue");
             existing.setState(Issue.State.CLOSED);
             existing.setStateReason(Issue.StateReason.COMPLETED);
             existing.setHtmlUrl("https://example.com");
             existing.setRepository(testRepository);
+            existing.setProvider(githubProvider);
             issueRepository.save(existing);
 
             eventListener.clear();
@@ -1129,7 +1150,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 .first()
                 .satisfies(event -> {
                     assertThat(event.issueType().name()).isEqualTo("Task");
-                    assertThat(event.issue().id()).isEqualTo(issueId);
+                    assertThat(event.issue().id()).isEqualTo(result.getId());
                 });
         }
 
@@ -1149,13 +1170,14 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             // Create issue with type
             Long issueId = FIXTURE_ISSUE_ID;
             Issue existing = new Issue();
-            existing.setId(issueId);
+            existing.setNativeId(issueId);
             existing.setNumber(20);
             existing.setTitle("Typed Issue");
             existing.setState(Issue.State.OPEN);
             existing.setHtmlUrl("https://example.com");
             existing.setRepository(testRepository);
             existing.setIssueType(issueType);
+            existing.setProvider(githubProvider);
             issueRepository.save(existing);
 
             eventListener.clear();
@@ -1173,7 +1195,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 .first()
                 .satisfies(event -> {
                     assertThat(event.previousType().name()).isEqualTo("Bug");
-                    assertThat(event.issue().id()).isEqualTo(issueId);
+                    assertThat(event.issue().id()).isEqualTo(result.getId());
                 });
         }
     }
@@ -1190,15 +1212,16 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             // Given - create issue
             Long issueId = FIXTURE_ISSUE_ID;
             Issue existing = new Issue();
-            existing.setId(issueId);
+            existing.setNativeId(issueId);
             existing.setNumber(20);
             existing.setTitle("To Delete");
             existing.setState(Issue.State.OPEN);
             existing.setHtmlUrl("https://example.com");
             existing.setRepository(testRepository);
+            existing.setProvider(githubProvider);
             issueRepository.save(existing);
 
-            assertThat(issueRepository.findById(issueId)).isPresent();
+            assertThat(issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 20)).isPresent();
 
             GitHubIssueDTO dto = createBasicIssueDto(issueId, 20);
 
@@ -1206,7 +1229,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             processor.processDeleted(dto, createContext());
 
             // Then
-            assertThat(issueRepository.findById(issueId)).isEmpty();
+            assertThat(issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 20)).isEmpty();
         }
 
         @Test
@@ -1214,7 +1237,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
         void processDeletedShouldHandleNonExistent() {
             // Given - issue doesn't exist
             Long nonExistentId = 999999999L;
-            assertThat(issueRepository.findById(nonExistentId)).isEmpty();
+            assertThat(issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 99)).isEmpty();
 
             GitHubIssueDTO dto = createBasicIssueDto(nonExistentId, 99);
 
@@ -1260,12 +1283,13 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             // Given - create issue with labels (ManyToMany relationship)
             Long issueId = FIXTURE_ISSUE_ID;
             Issue existing = new Issue();
-            existing.setId(issueId);
+            existing.setNativeId(issueId);
             existing.setNumber(21);
             existing.setTitle("Issue with labels");
             existing.setState(Issue.State.OPEN);
             existing.setHtmlUrl("https://example.com");
             existing.setRepository(testRepository);
+            existing.setProvider(githubProvider);
             existing = issueRepository.save(existing);
 
             // Create a label and associate it with the issue
@@ -1282,7 +1306,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             existing = issueRepository.save(existing);
 
             // Verify setup
-            assertThat(issueRepository.findById(issueId)).isPresent();
+            assertThat(issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 21)).isPresent();
             assertThat(labelRepository.findById(label.getId())).isPresent();
 
             GitHubIssueDTO dto = createBasicIssueDto(issueId, 21);
@@ -1291,7 +1315,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             assertThatCode(() -> processor.processDeleted(dto, createContext())).doesNotThrowAnyException();
 
             // Then - issue deleted, label still exists
-            assertThat(issueRepository.findById(issueId)).isEmpty();
+            assertThat(issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 21)).isEmpty();
             assertThat(labelRepository.findById(100001L)).isPresent();
         }
     }

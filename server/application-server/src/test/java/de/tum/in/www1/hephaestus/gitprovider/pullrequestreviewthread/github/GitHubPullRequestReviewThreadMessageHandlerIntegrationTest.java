@@ -3,6 +3,9 @@ package de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.github;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
@@ -53,8 +56,12 @@ class GitHubPullRequestReviewThreadMessageHandlerIntegrationTest extends BaseInt
     private PullRequestReviewThreadRepository threadRepository;
 
     @Autowired
+    private GitProviderRepository gitProviderRepository;
+
+    @Autowired
     private ObjectMapper objectMapper;
 
+    private GitProvider gitProvider;
     private Repository testRepository;
     private PullRequest testPullRequest;
 
@@ -65,20 +72,27 @@ class GitHubPullRequestReviewThreadMessageHandlerIntegrationTest extends BaseInt
     }
 
     private void setupTestData() {
+        // Create GitHub provider
+        gitProvider = gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
+            .orElseGet(
+                () -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com"))
+            );
+
         // Create organization - use ID from fixture
         Organization org = new Organization();
-        org.setId(215361191L);
-        org.setProviderId(215361191L);
+        org.setNativeId(215361191L);
         org.setLogin("HephaestusTest");
         org.setCreatedAt(Instant.now());
         org.setUpdatedAt(Instant.now());
         org.setName("Hephaestus Test");
         org.setAvatarUrl("https://avatars.githubusercontent.com/u/215361191?v=4");
+        org.setProvider(gitProvider);
         org = organizationRepository.save(org);
 
         // Create repository matching the fixture's repository
         testRepository = new Repository();
-        testRepository.setId(1087937297L); // ID from fixture
+        testRepository.setNativeId(1087937297L); // ID from fixture
         testRepository.setName("payload-fixture-repo-renamed");
         testRepository.setNameWithOwner("HephaestusTest/payload-fixture-repo-renamed");
         testRepository.setHtmlUrl("https://github.com/HephaestusTest/payload-fixture-repo-renamed");
@@ -88,6 +102,7 @@ class GitHubPullRequestReviewThreadMessageHandlerIntegrationTest extends BaseInt
         testRepository.setUpdatedAt(Instant.now());
         testRepository.setPushedAt(Instant.now());
         testRepository.setOrganization(org);
+        testRepository.setProvider(gitProvider);
         testRepository = repositoryRepository.save(testRepository);
 
         // Create workspace
@@ -104,13 +119,14 @@ class GitHubPullRequestReviewThreadMessageHandlerIntegrationTest extends BaseInt
 
     private void createTestPullRequest(Long prId, int number) {
         testPullRequest = new PullRequest();
-        testPullRequest.setId(prId);
+        testPullRequest.setNativeId(prId);
         testPullRequest.setNumber(number);
         testPullRequest.setTitle("Test Pull Request");
         testPullRequest.setState(PullRequest.State.OPEN);
         testPullRequest.setRepository(testRepository);
         testPullRequest.setCreatedAt(Instant.now());
         testPullRequest.setUpdatedAt(Instant.now());
+        testPullRequest.setProvider(gitProvider);
         testPullRequest = pullRequestRepository.save(testPullRequest);
     }
 
@@ -136,7 +152,7 @@ class GitHubPullRequestReviewThreadMessageHandlerIntegrationTest extends BaseInt
 
         // Create the thread in UNRESOLVED state first
         PullRequestReviewThread thread = new PullRequestReviewThread();
-        thread.setId(threadId);
+        thread.setNativeId(threadId);
         thread.setNodeId(event.thread().nodeId());
         thread.setPullRequest(testPullRequest);
         thread.setState(PullRequestReviewThread.State.UNRESOLVED);
@@ -144,10 +160,11 @@ class GitHubPullRequestReviewThreadMessageHandlerIntegrationTest extends BaseInt
         thread.setLine(event.thread().line());
         thread.setCreatedAt(Instant.now());
         thread.setUpdatedAt(Instant.now());
-        threadRepository.save(thread);
+        thread.setProvider(gitProvider);
+        thread = threadRepository.save(thread);
 
         // Verify initial state
-        assertThat(threadRepository.findById(threadId))
+        assertThat(threadRepository.findById(thread.getId()))
             .isPresent()
             .get()
             .satisfies(t -> assertThat(t.getState()).isEqualTo(PullRequestReviewThread.State.UNRESOLVED));
@@ -156,7 +173,7 @@ class GitHubPullRequestReviewThreadMessageHandlerIntegrationTest extends BaseInt
         handler.handleEvent(event);
 
         // Then - thread should be resolved
-        assertThat(threadRepository.findById(threadId))
+        assertThat(threadRepository.findById(thread.getId()))
             .isPresent()
             .get()
             .satisfies(t -> assertThat(t.getState()).isEqualTo(PullRequestReviewThread.State.RESOLVED));
@@ -177,7 +194,7 @@ class GitHubPullRequestReviewThreadMessageHandlerIntegrationTest extends BaseInt
 
         // Create the thread in RESOLVED state first
         PullRequestReviewThread thread = new PullRequestReviewThread();
-        thread.setId(threadId);
+        thread.setNativeId(threadId);
         thread.setNodeId(event.thread().nodeId());
         thread.setPullRequest(testPullRequest);
         thread.setState(PullRequestReviewThread.State.RESOLVED);
@@ -185,10 +202,11 @@ class GitHubPullRequestReviewThreadMessageHandlerIntegrationTest extends BaseInt
         thread.setLine(event.thread().line());
         thread.setCreatedAt(Instant.now());
         thread.setUpdatedAt(Instant.now());
-        threadRepository.save(thread);
+        thread.setProvider(gitProvider);
+        thread = threadRepository.save(thread);
 
         // Verify initial state
-        assertThat(threadRepository.findById(threadId))
+        assertThat(threadRepository.findById(thread.getId()))
             .isPresent()
             .get()
             .satisfies(t -> assertThat(t.getState()).isEqualTo(PullRequestReviewThread.State.RESOLVED));
@@ -197,7 +215,7 @@ class GitHubPullRequestReviewThreadMessageHandlerIntegrationTest extends BaseInt
         handler.handleEvent(event);
 
         // Then - thread should be unresolved
-        assertThat(threadRepository.findById(threadId))
+        assertThat(threadRepository.findById(thread.getId()))
             .isPresent()
             .get()
             .satisfies(t -> assertThat(t.getState()).isEqualTo(PullRequestReviewThread.State.UNRESOLVED));
@@ -208,19 +226,20 @@ class GitHubPullRequestReviewThreadMessageHandlerIntegrationTest extends BaseInt
     void shouldResolveThreadWhenIdIsKnown() throws Exception {
         // Given - create a thread directly
         createTestPullRequest(12345L, 1);
-        Long threadId = 100L;
+        Long threadNativeId = 100L;
 
         PullRequestReviewThread thread = new PullRequestReviewThread();
-        thread.setId(threadId);
+        thread.setNativeId(threadNativeId);
         thread.setPullRequest(testPullRequest);
         thread.setState(PullRequestReviewThread.State.UNRESOLVED);
         thread.setPath("README.md");
         thread.setCreatedAt(Instant.now());
         thread.setUpdatedAt(Instant.now());
-        threadRepository.save(thread);
+        thread.setProvider(gitProvider);
+        thread = threadRepository.save(thread);
 
         // Verify initial state
-        assertThat(threadRepository.findById(threadId))
+        assertThat(threadRepository.findById(thread.getId()))
             .isPresent()
             .get()
             .satisfies(t -> assertThat(t.getState()).isEqualTo(PullRequestReviewThread.State.UNRESOLVED));
@@ -232,7 +251,7 @@ class GitHubPullRequestReviewThreadMessageHandlerIntegrationTest extends BaseInt
         // Then - thread should be resolved
         // Note: GitHub only provides isResolved (boolean), not a timestamp.
         // The state enum (RESOLVED/UNRESOLVED) is sufficient.
-        assertThat(threadRepository.findById(threadId))
+        assertThat(threadRepository.findById(thread.getId()))
             .isPresent()
             .get()
             .satisfies(t -> assertThat(t.getState()).isEqualTo(PullRequestReviewThread.State.RESOLVED));

@@ -2,12 +2,18 @@ package de.tum.in.www1.hephaestus.gitprovider.repository.gitlab;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabGroupResponse;
@@ -32,6 +38,8 @@ import reactor.core.publisher.Mono;
 @DisplayName("GitLabProjectSyncService")
 class GitLabProjectSyncServiceTest extends BaseUnitTest {
 
+    private static final Long TEST_PROVIDER_ID = 100L;
+
     @Mock
     private GitLabGraphQlClientProvider graphQlClientProvider;
 
@@ -40,6 +48,9 @@ class GitLabProjectSyncServiceTest extends BaseUnitTest {
 
     @Mock
     private GitLabGroupProcessor groupProcessor;
+
+    @Mock
+    private GitProviderRepository gitProviderRepository;
 
     private final GitLabProperties gitLabProperties = new GitLabProperties(
         "https://gitlab.com",
@@ -53,11 +64,18 @@ class GitLabProjectSyncServiceTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
+        GitProvider gitLabProvider = mock(GitProvider.class);
+        lenient().when(gitLabProvider.getId()).thenReturn(TEST_PROVIDER_ID);
+        lenient()
+            .when(gitProviderRepository.findByTypeAndServerUrl(GitProviderType.GITLAB, "https://gitlab.com"))
+            .thenReturn(Optional.of(gitLabProvider));
+
         service = new GitLabProjectSyncService(
             graphQlClientProvider,
             projectProcessor,
             groupProcessor,
-            gitLabProperties
+            gitLabProperties,
+            gitProviderRepository
         );
     }
 
@@ -111,12 +129,12 @@ class GitLabProjectSyncServiceTest extends BaseUnitTest {
 
             Organization org = new Organization();
             org.setId(42L);
-            when(groupProcessor.process(any(GitLabGroupResponse.class))).thenReturn(org);
+            when(groupProcessor.process(any(GitLabGroupResponse.class), anyLong())).thenReturn(org);
 
             Repository repo = new Repository();
             repo.setId(123L);
             repo.setNameWithOwner("my-org/my-project");
-            when(projectProcessor.processGraphQlResponse(any(), any())).thenReturn(repo);
+            when(projectProcessor.processGraphQlResponse(any(), any(), any())).thenReturn(repo);
 
             Optional<Repository> result = service.syncProject(1L, "my-org/my-project");
 
@@ -124,8 +142,8 @@ class GitLabProjectSyncServiceTest extends BaseUnitTest {
             assertThat(result.get().getId()).isEqualTo(123L);
             verify(graphQlClientProvider).acquirePermission();
             verify(graphQlClientProvider).recordSuccess();
-            verify(groupProcessor).process(groupData);
-            verify(projectProcessor).processGraphQlResponse(projectData, org);
+            verify(groupProcessor).process(groupData, TEST_PROVIDER_ID);
+            verify(projectProcessor).processGraphQlResponse(eq(projectData), eq(org), any());
         }
 
         @Test
@@ -149,13 +167,13 @@ class GitLabProjectSyncServiceTest extends BaseUnitTest {
 
             Repository repo = new Repository();
             repo.setId(456L);
-            when(projectProcessor.processGraphQlResponse(any(), any())).thenReturn(repo);
+            when(projectProcessor.processGraphQlResponse(any(), any(), any())).thenReturn(repo);
 
             Optional<Repository> result = service.syncProject(1L, "user/personal-project");
 
             assertThat(result).isPresent();
-            verify(groupProcessor, never()).process(any());
-            verify(projectProcessor).processGraphQlResponse(projectData, null);
+            verify(groupProcessor, never()).process(any(), anyLong());
+            verify(projectProcessor).processGraphQlResponse(eq(projectData), eq(null), any());
         }
 
         @Test
@@ -166,7 +184,7 @@ class GitLabProjectSyncServiceTest extends BaseUnitTest {
             Optional<Repository> result = service.syncProject(1L, "non-existent/project");
 
             assertThat(result).isEmpty();
-            verify(projectProcessor, never()).processGraphQlResponse(any(), any());
+            verify(projectProcessor, never()).processGraphQlResponse(any(), any(), any());
         }
 
         @Test
@@ -217,12 +235,12 @@ class GitLabProjectSyncServiceTest extends BaseUnitTest {
             );
 
             mockGraphQlProjectResponse(projectData);
-            when(groupProcessor.process(any())).thenReturn(null); // group processor rejects
+            when(groupProcessor.process(any(), anyLong())).thenReturn(null); // group processor rejects
 
             Optional<Repository> result = service.syncProject(1L, "my-org/proj");
 
             assertThat(result).isEmpty();
-            verify(projectProcessor, never()).processGraphQlResponse(any(), any());
+            verify(projectProcessor, never()).processGraphQlResponse(any(), any(), any());
         }
 
         @Test

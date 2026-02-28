@@ -239,7 +239,7 @@ public class GitHubTeamSyncService {
                 for (var graphQlTeam : response.getNodes()) {
                     Team team = processTeam(graphQlTeam, organizationLogin, context);
                     if (team != null) {
-                        syncedTeamIds.add(team.getId());
+                        syncedTeamIds.add(team.getNativeId());
                         syncTeamMemberships(client, team, graphQlTeam, organizationLogin, scopeId);
                         totalPermissions += syncTeamRepoPermissions(
                             client,
@@ -410,7 +410,7 @@ public class GitHubTeamSyncService {
 
             // Convert GraphQL User to GitHubUserDTO and ensure user exists
             GitHubUserDTO userDTO = convertUserToDTO(graphQlUser);
-            de.tum.in.www1.hephaestus.gitprovider.user.User user = userProcessor.ensureExists(userDTO);
+            de.tum.in.www1.hephaestus.gitprovider.user.User user = userProcessor.ensureExists(userDTO, team.getProvider().getId());
 
             if (user != null) {
                 syncedMemberIds.add(user.getId());
@@ -904,8 +904,8 @@ public class GitHubTeamSyncService {
         int removed = 0;
 
         for (Team team : existingTeams) {
-            if (!syncedTeamIds.contains(team.getId())) {
-                teamProcessor.delete(team.getId(), context);
+            if (!syncedTeamIds.contains(team.getNativeId())) {
+                teamProcessor.delete(team.getNativeId(), context);
                 removed++;
             }
         }

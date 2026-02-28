@@ -3,6 +3,9 @@ package de.tum.in.www1.hephaestus.gitprovider.project.github;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
@@ -61,6 +64,9 @@ class GitHubProjectStatusUpdateMessageHandlerIntegrationTest extends BaseIntegra
 
     @Autowired
     private WorkspaceRepository workspaceRepository;
+
+    @Autowired
+    private GitProviderRepository gitProviderRepository;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -206,15 +212,22 @@ class GitHubProjectStatusUpdateMessageHandlerIntegrationTest extends BaseIntegra
     }
 
     private void setupTestData() {
+        // Create GitHub provider
+        GitProvider gitProvider = gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
+            .orElseGet(
+                () -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com"))
+            );
+
         testOrganization = new Organization();
-        testOrganization.setId(215361191L);
-        testOrganization.setProviderId(215361191L);
+        testOrganization.setNativeId(215361191L);
         testOrganization.setLogin("HephaestusTest");
         testOrganization.setCreatedAt(Instant.now());
         testOrganization.setUpdatedAt(Instant.now());
         testOrganization.setName("Hephaestus Test");
         testOrganization.setAvatarUrl("https://avatars.githubusercontent.com/u/215361191?v=4");
         testOrganization.setHtmlUrl("https://github.com/HephaestusTest");
+        testOrganization.setProvider(gitProvider);
         testOrganization = organizationRepository.save(testOrganization);
 
         Workspace workspace = new Workspace();
@@ -228,7 +241,7 @@ class GitHubProjectStatusUpdateMessageHandlerIntegrationTest extends BaseIntegra
         workspaceRepository.save(workspace);
 
         testProject = new Project();
-        testProject.setId(18615912L);
+        testProject.setNativeId(18615912L);
         testProject.setNodeId("PVT_kwDODNYmp84BHA5o");
         testProject.setOwnerType(Project.OwnerType.ORGANIZATION);
         testProject.setOwnerId(testOrganization.getId());
@@ -238,6 +251,7 @@ class GitHubProjectStatusUpdateMessageHandlerIntegrationTest extends BaseIntegra
         testProject.setPublic(false);
         testProject.setCreatedAt(Instant.now());
         testProject.setUpdatedAt(Instant.now());
+        testProject.setProvider(gitProvider);
         testProject = projectRepository.save(testProject);
     }
 

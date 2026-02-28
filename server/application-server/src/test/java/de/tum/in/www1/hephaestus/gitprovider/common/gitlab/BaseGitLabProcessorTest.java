@@ -154,7 +154,7 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
             user.setId(-18024L);
             user.setLogin("ga84xah");
 
-            when(userRepository.findById(-18024L)).thenReturn(Optional.of(user));
+            when(userRepository.findByNativeIdAndProviderId(18024L, 1L)).thenReturn(Optional.of(user));
 
             GitLabWebhookUser dto = new GitLabWebhookUser(
                 18024L,
@@ -205,7 +205,7 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
             User user = new User();
             user.setId(-18024L);
 
-            when(userRepository.findById(-18024L)).thenReturn(Optional.of(user));
+            when(userRepository.findByNativeIdAndProviderId(18024L, 1L)).thenReturn(Optional.of(user));
 
             User result = processor.callFindOrCreateUser(
                 "gid://gitlab/User/18024",
@@ -261,24 +261,24 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("creates new label with negated ID")
-        void createsNewLabelWithNegatedId() {
+        @DisplayName("creates new label with native ID")
+        void createsNewLabelWithNativeId() {
             when(labelRepository.findByRepositoryIdAndName(testRepo.getId(), "enhancement")).thenReturn(
                 Optional.empty()
             );
 
             Label created = new Label();
-            created.setId(-85907L);
+            created.setId(85907L);
             created.setName("enhancement");
 
-            when(labelRepository.insertIfAbsent(-85907L, "enhancement", "#a2eeef", testRepo.getId())).thenReturn(1);
-            when(labelRepository.findById(-85907L)).thenReturn(Optional.of(created));
+            when(labelRepository.insertIfAbsent(85907L, "enhancement", "#a2eeef", testRepo.getId())).thenReturn(1);
+            when(labelRepository.findById(85907L)).thenReturn(Optional.of(created));
 
             GitLabWebhookLabel dto = new GitLabWebhookLabel(85907L, "enhancement", "#a2eeef");
             Label result = processor.callFindOrCreateLabel(dto, testRepo);
 
             assertThat(result).isNotNull();
-            assertThat(result.getId()).isEqualTo(-85907L);
+            assertThat(result.getId()).isEqualTo(85907L);
         }
 
         @Test
@@ -337,27 +337,27 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
     // ========================================================================
 
     @Nested
-    @DisplayName("ID negation")
-    class IdNegation {
+    @DisplayName("ID mapping")
+    class IdMapping {
 
         @ParameterizedTest(name = "toEntityId({0}) = {1}")
-        @CsvSource({ "1, -1", "42, -42", "18024, -18024", "422296, -422296" })
-        @DisplayName("negates raw GitLab IDs")
-        void negatesRawIds(long rawId, long expectedEntityId) {
+        @CsvSource({ "1, 1", "42, 42", "18024, 18024", "422296, 422296" })
+        @DisplayName("returns raw GitLab IDs as entity IDs")
+        void returnsRawIds(long rawId, long expectedEntityId) {
             assertThat(GitLabSyncConstants.toEntityId(rawId)).isEqualTo(expectedEntityId);
         }
 
         @ParameterizedTest(name = "extractEntityId(\"{0}\") = {1}")
         @CsvSource(
             {
-                "gid://gitlab/User/18024, -18024",
-                "gid://gitlab/Issue/422296, -422296",
-                "gid://gitlab/Project/246765, -246765",
-                "gid://gitlab/Label/85907, -85907",
+                "gid://gitlab/User/18024, 18024",
+                "gid://gitlab/Issue/422296, 422296",
+                "gid://gitlab/Project/246765, 246765",
+                "gid://gitlab/Label/85907, 85907",
             }
         )
-        @DisplayName("extracts and negates IDs from global IDs")
-        void extractsAndNegatesGlobalIds(String globalId, long expectedEntityId) {
+        @DisplayName("extracts numeric IDs from global IDs")
+        void extractsNumericIds(String globalId, long expectedEntityId) {
             assertThat(GitLabSyncConstants.extractEntityId(globalId)).isEqualTo(expectedEntityId);
         }
     }
@@ -391,11 +391,11 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
         }
 
         User callFindOrCreateUser(GitLabWebhookUser dto) {
-            return findOrCreateUser(dto);
+            return findOrCreateUser(dto, 1L);
         }
 
         User callFindOrCreateUser(String globalId, String username, String name, String avatarUrl, String webUrl) {
-            return findOrCreateUser(globalId, username, name, avatarUrl, webUrl);
+            return findOrCreateUser(globalId, username, name, avatarUrl, webUrl, 1L);
         }
 
         Label callFindOrCreateLabel(GitLabWebhookLabel dto, Repository repository) {

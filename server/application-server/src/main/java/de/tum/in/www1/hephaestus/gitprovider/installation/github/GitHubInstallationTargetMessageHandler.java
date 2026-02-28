@@ -2,6 +2,8 @@ package de.tum.in.www1.hephaestus.gitprovider.installation.github;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
@@ -22,18 +24,23 @@ public class GitHubInstallationTargetMessageHandler extends GitHubMessageHandler
 
     private static final Logger log = LoggerFactory.getLogger(GitHubInstallationTargetMessageHandler.class);
 
+    private static final String GITHUB_SERVER_URL = "https://github.com";
+
     private final ProvisioningListener provisioningListener;
     private final OrganizationService organizationService;
+    private final GitProviderRepository gitProviderRepository;
 
     GitHubInstallationTargetMessageHandler(
         ProvisioningListener provisioningListener,
         OrganizationService organizationService,
+        GitProviderRepository gitProviderRepository,
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate
     ) {
         super(GitHubInstallationTargetEventDTO.class, deserializer, transactionTemplate);
         this.provisioningListener = provisioningListener;
         this.organizationService = organizationService;
+        this.gitProviderRepository = gitProviderRepository;
     }
 
     @Override
@@ -95,6 +102,10 @@ public class GitHubInstallationTargetMessageHandler extends GitHubMessageHandler
             return;
         }
 
-        organizationService.upsertIdentity(account.id(), login);
+        Long providerId = gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITHUB, GITHUB_SERVER_URL)
+            .orElseThrow(() -> new IllegalStateException("GitProvider not found for GitHub"))
+            .getId();
+        organizationService.upsertIdentity(account.id(), login, providerId);
     }
 }

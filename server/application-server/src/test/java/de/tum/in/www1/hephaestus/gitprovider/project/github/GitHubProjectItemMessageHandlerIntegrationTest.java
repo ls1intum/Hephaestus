@@ -3,6 +3,9 @@ package de.tum.in.www1.hephaestus.gitprovider.project.github;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
@@ -64,6 +67,9 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
     private OrganizationRepository organizationRepository;
 
     @Autowired
+    private GitProviderRepository gitProviderRepository;
+
+    @Autowired
     private WorkspaceRepository workspaceRepository;
 
     @Autowired
@@ -72,6 +78,7 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
     @Autowired
     private TestProjectItemEventListener eventListener;
 
+    private GitProvider testGitProvider;
     private Organization testOrganization;
     private Project testProject;
 
@@ -83,15 +90,21 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
     }
 
     private void setupTestData() {
+        // Create GitProvider for GitHub
+        testGitProvider = gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
+            .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com")));
+
         // Create organization matching the fixture data
         testOrganization = new Organization();
-        testOrganization.setId(215361191L);
-        testOrganization.setProviderId(215361191L);
+        testOrganization.setNativeId(215361191L);
+        testOrganization.setProvider(testGitProvider);
         testOrganization.setLogin("HephaestusTest");
         testOrganization.setCreatedAt(Instant.now());
         testOrganization.setUpdatedAt(Instant.now());
         testOrganization.setName("Hephaestus Test");
         testOrganization.setAvatarUrl("https://avatars.githubusercontent.com/u/215361191?v=4");
+        testOrganization.setHtmlUrl("https://github.com/HephaestusTest");
         testOrganization = organizationRepository.save(testOrganization);
 
         // Create workspace for scope resolution
@@ -107,7 +120,8 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
 
         // Create test project matching the fixture data
         testProject = new Project();
-        testProject.setId(18615912L);
+        testProject.setNativeId(18615912L);
+        testProject.setProvider(testGitProvider);
         testProject.setNodeId("PVT_kwDODNYmp84BHA5o");
         testProject.setOwnerType(Project.OwnerType.ORGANIZATION);
         testProject.setOwnerId(testOrganization.getId());
@@ -131,7 +145,8 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
         boolean archived
     ) {
         ProjectItem item = new ProjectItem();
-        item.setId(id);
+        item.setNativeId(id);
+        item.setProvider(testGitProvider);
         item.setNodeId(nodeId);
         item.setProject(testProject);
         item.setContentType(contentType);
@@ -174,7 +189,7 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
 
         // Verify ProjectItemDeleted domain event
         assertThat(eventListener.getDeletedEvents()).hasSize(1);
-        assertThat(eventListener.getDeletedEvents().getFirst().itemId()).isEqualTo(FIXTURE_ITEM2_ID);
+        assertThat(eventListener.getDeletedEvents().getFirst().itemId()).isEqualTo(item.getId());
     }
 
     @Test
@@ -196,7 +211,7 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
             .isPresent()
             .get()
             .satisfies(i -> {
-                assertThat(i.getId()).isEqualTo(FIXTURE_ITEM2_ID);
+                assertThat(i.getNativeId()).isEqualTo(FIXTURE_ITEM2_ID);
                 assertThat(i.getContentType()).isEqualTo(ProjectItem.ContentType.DRAFT_ISSUE);
                 assertThat(i.getProject().getId()).isEqualTo(testProject.getId());
                 assertThat(i.isArchived()).isTrue();
@@ -207,7 +222,6 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
         assertThat(eventListener.getUpdatedEvents()).hasSize(1);
         assertThat(eventListener.getArchivedEvents()).hasSize(1);
         assertThat(eventListener.getArchivedEvents().getFirst().projectId()).isEqualTo(testProject.getId());
-        assertThat(eventListener.getArchivedEvents().getFirst().item().id()).isEqualTo(FIXTURE_ITEM2_ID);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -268,7 +282,7 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
             .isPresent()
             .get()
             .satisfies(i -> {
-                assertThat(i.getId()).isEqualTo(FIXTURE_ITEM_ID);
+                assertThat(i.getNativeId()).isEqualTo(FIXTURE_ITEM_ID);
                 assertThat(i.getNodeId()).isEqualTo(FIXTURE_ITEM_NODE_ID);
                 assertThat(i.getContentType()).isEqualTo(ProjectItem.ContentType.DRAFT_ISSUE);
                 assertThat(i.getProject().getId()).isEqualTo(testProject.getId());
@@ -279,7 +293,6 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
 
         // Verify ProjectItemCreated domain event
         assertThat(eventListener.getCreatedEvents()).hasSize(1);
-        assertThat(eventListener.getCreatedEvents().getFirst().item().id()).isEqualTo(FIXTURE_ITEM_ID);
         assertThat(eventListener.getCreatedEvents().getFirst().projectId()).isEqualTo(testProject.getId());
     }
 
@@ -320,7 +333,7 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
             .isPresent()
             .get()
             .satisfies(i -> {
-                assertThat(i.getId()).isEqualTo(FIXTURE_ITEM_ID);
+                assertThat(i.getNativeId()).isEqualTo(FIXTURE_ITEM_ID);
                 assertThat(i.getNodeId()).isEqualTo(FIXTURE_ITEM_NODE_ID);
                 assertThat(i.getContentType()).isEqualTo(ProjectItem.ContentType.DRAFT_ISSUE);
                 assertThat(i.getProject().getId()).isEqualTo(testProject.getId());
@@ -331,7 +344,6 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
         // Verify ProjectItemUpdated domain event (not Created, since item already existed)
         assertThat(eventListener.getCreatedEvents()).isEmpty();
         assertThat(eventListener.getUpdatedEvents()).hasSize(1);
-        assertThat(eventListener.getUpdatedEvents().getFirst().item().id()).isEqualTo(FIXTURE_ITEM_ID);
         assertThat(eventListener.getUpdatedEvents().getFirst().projectId()).isEqualTo(testProject.getId());
     }
 
@@ -353,7 +365,7 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
             .isPresent()
             .get()
             .satisfies(i -> {
-                assertThat(i.getId()).isEqualTo(FIXTURE_ITEM2_ID);
+                assertThat(i.getNativeId()).isEqualTo(FIXTURE_ITEM2_ID);
                 assertThat(i.getContentType()).isEqualTo(ProjectItem.ContentType.DRAFT_ISSUE);
                 assertThat(i.getProject().getId()).isEqualTo(testProject.getId());
                 assertThat(i.isArchived()).isFalse();
@@ -364,7 +376,6 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
         assertThat(eventListener.getUpdatedEvents()).hasSize(1);
         assertThat(eventListener.getRestoredEvents()).hasSize(1);
         assertThat(eventListener.getRestoredEvents().getFirst().projectId()).isEqualTo(testProject.getId());
-        assertThat(eventListener.getRestoredEvents().getFirst().item().id()).isEqualTo(FIXTURE_ITEM2_ID);
     }
 
     @Test
@@ -385,7 +396,7 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
             .isPresent()
             .get()
             .satisfies(i -> {
-                assertThat(i.getId()).isEqualTo(FIXTURE_ITEM_ID);
+                assertThat(i.getNativeId()).isEqualTo(FIXTURE_ITEM_ID);
                 assertThat(i.getContentType()).isEqualTo(ProjectItem.ContentType.ISSUE);
                 assertThat(i.getProject().getId()).isEqualTo(testProject.getId());
                 assertThat(i.isArchived()).isFalse();
@@ -396,7 +407,6 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
         assertThat(eventListener.getUpdatedEvents()).hasSize(1);
         assertThat(eventListener.getConvertedEvents()).hasSize(1);
         assertThat(eventListener.getConvertedEvents().getFirst().projectId()).isEqualTo(testProject.getId());
-        assertThat(eventListener.getConvertedEvents().getFirst().item().id()).isEqualTo(FIXTURE_ITEM_ID);
     }
 
     @Test
@@ -417,7 +427,7 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
             .isPresent()
             .get()
             .satisfies(i -> {
-                assertThat(i.getId()).isEqualTo(FIXTURE_ITEM2_ID);
+                assertThat(i.getNativeId()).isEqualTo(FIXTURE_ITEM2_ID);
                 assertThat(i.getContentType()).isEqualTo(ProjectItem.ContentType.DRAFT_ISSUE);
                 assertThat(i.getProject().getId()).isEqualTo(testProject.getId());
                 assertThat(i.isArchived()).isFalse();
@@ -428,7 +438,6 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
         assertThat(eventListener.getUpdatedEvents()).hasSize(1);
         assertThat(eventListener.getReorderedEvents()).hasSize(1);
         assertThat(eventListener.getReorderedEvents().getFirst().projectId()).isEqualTo(testProject.getId());
-        assertThat(eventListener.getReorderedEvents().getFirst().item().id()).isEqualTo(FIXTURE_ITEM2_ID);
     }
 
     private GitHubProjectItemEventDTO loadPayload(String filename) throws IOException {

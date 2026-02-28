@@ -59,7 +59,8 @@ class CodeQualityTest extends HephaestusArchitectureTest {
             Set<String> orchestratorExceptions = Set.of(
                 "GitHubDataSyncService", // Coordinates 15 entity-specific sync services
                 "HistoricalBackfillService", // Coordinates multiple sync services for historical data backfill
-                "GitHubPullRequestSyncService" // Coordinates review, review comment, and project item sub-sync services
+                "GitHubPullRequestSyncService", // Coordinates review, review comment, and project item sub-sync services
+                "WorkspaceProvisioningService" // Orchestrates provisioning across GitHub and GitLab providers
             );
 
             ArchRule rule = classes()

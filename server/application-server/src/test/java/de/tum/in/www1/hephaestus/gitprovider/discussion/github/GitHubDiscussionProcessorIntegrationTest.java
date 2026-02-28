@@ -2,6 +2,9 @@ package de.tum.in.www1.hephaestus.gitprovider.discussion.github;
 
 import static org.assertj.core.api.Assertions.*;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.discussion.Discussion;
@@ -76,6 +79,9 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
     private OrganizationRepository organizationRepository;
 
     @Autowired
+    private GitProviderRepository gitProviderRepository;
+
+    @Autowired
     private WorkspaceRepository workspaceRepository;
 
     @Autowired
@@ -90,6 +96,7 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
     private Repository testRepository;
     private Workspace testWorkspace;
     private Organization testOrganization;
+    private GitProvider githubProvider;
 
     @BeforeEach
     void setUp() {
@@ -99,20 +106,26 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
     }
 
     private void setupTestData() {
+        // Create GitHub provider
+        githubProvider = gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
+            .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com")));
+
         // Create organization matching fixture data
         testOrganization = new Organization();
-        testOrganization.setId(FIXTURE_ORG_ID);
-        testOrganization.setProviderId(FIXTURE_ORG_ID);
+        testOrganization.setNativeId(FIXTURE_ORG_ID);
         testOrganization.setLogin(FIXTURE_ORG_LOGIN);
         testOrganization.setCreatedAt(Instant.now());
         testOrganization.setUpdatedAt(Instant.now());
         testOrganization.setName("Hephaestus Test");
         testOrganization.setAvatarUrl("https://avatars.githubusercontent.com/u/" + FIXTURE_ORG_ID);
+        testOrganization.setHtmlUrl("https://github.com/" + FIXTURE_ORG_LOGIN);
+        testOrganization.setProvider(githubProvider);
         testOrganization = organizationRepository.save(testOrganization);
 
         // Create repository matching fixture data
         testRepository = new Repository();
-        testRepository.setId(FIXTURE_REPO_ID);
+        testRepository.setNativeId(FIXTURE_REPO_ID);
         testRepository.setName("TestRepository");
         testRepository.setNameWithOwner(FIXTURE_REPO_FULL_NAME);
         testRepository.setHtmlUrl("https://github.com/" + FIXTURE_REPO_FULL_NAME);
@@ -122,6 +135,7 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
         testRepository.setUpdatedAt(Instant.now());
         testRepository.setPushedAt(Instant.now());
         testRepository.setOrganization(testOrganization);
+        testRepository.setProvider(githubProvider);
         testRepository = repositoryRepository.save(testRepository);
 
         // Create workspace
@@ -220,8 +234,8 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
 
             // Then - should use databaseId
             assertThat(result).isNotNull();
-            assertThat(result.getId()).isEqualTo(databaseId);
-            assertThat(discussionRepository.findById(databaseId)).isPresent();
+            assertThat(result.getNativeId()).isEqualTo(databaseId);
+            assertThat(discussionRepository.findByRepositoryIdAndNumber(testRepository.getId(), 27)).isPresent();
         }
 
         @Test
@@ -262,8 +276,8 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
 
             // Then - should use id as fallback
             assertThat(result).isNotNull();
-            assertThat(result.getId()).isEqualTo(webhookId);
-            assertThat(discussionRepository.findById(webhookId)).isPresent();
+            assertThat(result.getNativeId()).isEqualTo(webhookId);
+            assertThat(discussionRepository.findByRepositoryIdAndNumber(testRepository.getId(), 27)).isPresent();
         }
 
         @Test
@@ -325,21 +339,21 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
 
             // Then - verify discussion created
             assertThat(result).isNotNull();
-            assertThat(result.getId()).isEqualTo(discussionId);
+            assertThat(result.getNativeId()).isEqualTo(discussionId);
             assertThat(result.getNumber()).isEqualTo(27);
             assertThat(result.getTitle()).isEqualTo("Test Discussion #27");
             assertThat(result.getState()).isEqualTo(Discussion.State.OPEN);
-            assertThat(result.getRepository().getId()).isEqualTo(FIXTURE_REPO_ID);
+            assertThat(result.getRepository().getNativeId()).isEqualTo(FIXTURE_REPO_ID);
 
             // Verify persisted
-            assertThat(discussionRepository.findById(discussionId)).isPresent();
+            assertThat(discussionRepository.findByRepositoryIdAndNumber(testRepository.getId(), 27)).isPresent();
 
             // Verify Created event published
             assertThat(eventListener.getCreatedEvents())
                 .hasSize(1)
                 .first()
                 .satisfies(event -> {
-                    assertThat(event.discussion().id()).isEqualTo(discussionId);
+                    assertThat(event.discussion().id()).isEqualTo(result.getId());
                     assertThat(event.context().scopeId()).isEqualTo(testWorkspace.getId());
                 });
         }
@@ -348,7 +362,7 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
         @DisplayName("Should create author user if not exists")
         void shouldCreateAuthorIfNotExists() {
             // Given - no user exists
-            assertThat(userRepository.findById(FIXTURE_AUTHOR_ID)).isEmpty();
+            assertThat(userRepository.findByNativeIdAndProviderId(FIXTURE_AUTHOR_ID, githubProvider.getId())).isEmpty();
 
             Long discussionId = 111222333L;
             GitHubDiscussionDTO dto = createBasicDiscussionDto(discussionId, 1);
@@ -358,9 +372,9 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
 
             // Then
             assertThat(result.getAuthor()).isNotNull();
-            assertThat(result.getAuthor().getId()).isEqualTo(FIXTURE_AUTHOR_ID);
+            assertThat(result.getAuthor().getNativeId()).isEqualTo(FIXTURE_AUTHOR_ID);
             assertThat(result.getAuthor().getLogin()).isEqualTo(FIXTURE_AUTHOR_LOGIN);
-            assertThat(userRepository.findById(FIXTURE_AUTHOR_ID)).isPresent();
+            assertThat(userRepository.findByNativeIdAndProviderId(FIXTURE_AUTHOR_ID, githubProvider.getId())).isPresent();
         }
 
         @Test
@@ -368,9 +382,10 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
         void shouldReuseExistingAuthor() {
             // Given - create user first
             User existingUser = new User();
-            existingUser.setId(FIXTURE_AUTHOR_ID);
+            existingUser.setNativeId(FIXTURE_AUTHOR_ID);
             existingUser.setLogin(FIXTURE_AUTHOR_LOGIN);
             existingUser.setAvatarUrl("https://avatars.example.com");
+            existingUser.setProvider(githubProvider);
             userRepository.save(existingUser);
 
             long userCountBefore = userRepository.count();
@@ -382,7 +397,7 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             Discussion result = processor.process(dto, createContext());
 
             // Then - should reuse existing user, not create new
-            assertThat(result.getAuthor().getId()).isEqualTo(FIXTURE_AUTHOR_ID);
+            assertThat(result.getAuthor().getNativeId()).isEqualTo(FIXTURE_AUTHOR_ID);
             assertThat(userRepository.count()).isEqualTo(userCountBefore);
         }
 
@@ -1127,7 +1142,7 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
                 .hasSize(1)
                 .first()
                 .satisfies(event -> {
-                    assertThat(event.discussion().id()).isEqualTo(discussionId);
+                    assertThat(event.discussion().id()).isEqualTo(result.getId());
                 });
         }
 
@@ -1188,7 +1203,7 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
                 .hasSize(1)
                 .first()
                 .satisfies(event -> {
-                    assertThat(event.discussion().id()).isEqualTo(discussionId);
+                    assertThat(event.discussion().id()).isEqualTo(result.getId());
                     assertThat(event.answerCommentId()).isEqualTo(14848457L);
                 });
         }
@@ -1208,7 +1223,7 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             GitHubDiscussionDTO createDto = createBasicDiscussionDto(discussionId, 27);
             processor.process(createDto, createContext());
 
-            assertThat(discussionRepository.findById(discussionId)).isPresent();
+            assertThat(discussionRepository.findByRepositoryIdAndNumber(testRepository.getId(), 27)).isPresent();
 
             eventListener.clear();
 
@@ -1218,7 +1233,7 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             processor.processDeleted(deleteDto, createContext());
 
             // Then
-            assertThat(discussionRepository.findById(discussionId)).isEmpty();
+            assertThat(discussionRepository.findByRepositoryIdAndNumber(testRepository.getId(), 27)).isEmpty();
 
             // Verify Deleted event
             assertThat(eventListener.getDeletedEvents())
@@ -1234,7 +1249,7 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
         void processDeletedShouldHandleNonExistentGracefully() {
             // Given - discussion doesn't exist
             Long nonExistentId = 999999999L;
-            assertThat(discussionRepository.findById(nonExistentId)).isEmpty();
+            assertThat(discussionRepository.findByRepositoryIdAndNumber(testRepository.getId(), 99)).isEmpty();
 
             GitHubDiscussionDTO dto = createBasicDiscussionDto(nonExistentId, 99);
 
@@ -1283,7 +1298,7 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             GitHubDiscussionDTO createDto = createBasicDiscussionDto(discussionId, 27);
             processor.process(createDto, createContext());
 
-            assertThat(discussionRepository.findById(discussionId)).isPresent();
+            assertThat(discussionRepository.findByRepositoryIdAndNumber(testRepository.getId(), 27)).isPresent();
 
             eventListener.clear();
 
@@ -1317,7 +1332,7 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             processor.processDeleted(deleteDto, createContext());
 
             // Then - discussion should be deleted via the fallback path
-            assertThat(discussionRepository.findById(discussionId)).isEmpty();
+            assertThat(discussionRepository.findByRepositoryIdAndNumber(testRepository.getId(), 27)).isEmpty();
 
             // Verify Deleted event
             assertThat(eventListener.getDeletedEvents())

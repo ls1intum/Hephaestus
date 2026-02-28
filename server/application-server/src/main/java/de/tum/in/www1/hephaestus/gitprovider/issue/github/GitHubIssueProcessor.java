@@ -156,7 +156,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
         boolean isNew = existingOpt.isEmpty();
 
         // Resolve related entities BEFORE the upsert
-        User author = dto.author() != null ? findOrCreateUser(dto.author()) : null;
+        User author = dto.author() != null ? findOrCreateUser(dto.author(), context.providerId()) : null;
         Milestone milestone = dto.milestone() != null ? findOrCreateMilestone(dto.milestone(), repository) : null;
         IssueType issueType = null;
         if (dto.issueType() != null && repository.getOrganization() != null) {
@@ -168,6 +168,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
         Instant now = Instant.now();
         issueRepository.upsertCore(
             dbId,
+            context.providerId(),
             dto.number(),
             sanitize(dto.title()),
             sanitize(dto.body()),
@@ -200,7 +201,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
             );
 
         // Handle ManyToMany relationships (labels, assignees) - these can't be done in the upsert
-        boolean relationshipsChanged = updateRelationships(dto, issue, repository);
+        boolean relationshipsChanged = updateRelationships(dto, issue, repository, context.providerId());
 
         // Save relationship changes
         if (relationshipsChanged) {
@@ -243,8 +244,8 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
      *
      * @return true if any relationships were changed
      */
-    private boolean updateRelationships(GitHubIssueDTO dto, Issue issue, Repository repository) {
-        boolean assigneesChanged = updateAssignees(dto.assignees(), issue.getAssignees());
+    private boolean updateRelationships(GitHubIssueDTO dto, Issue issue, Repository repository, Long providerId) {
+        boolean assigneesChanged = updateAssignees(dto.assignees(), issue.getAssignees(), providerId);
         boolean labelsChanged = updateLabels(dto.labels(), issue.getLabels(), repository);
         return assigneesChanged || labelsChanged;
     }

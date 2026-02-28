@@ -3,6 +3,9 @@ package de.tum.in.www1.hephaestus.gitprovider.project.github;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
@@ -58,6 +61,9 @@ class GitHubProjectMessageHandlerIntegrationTest extends BaseIntegrationTest {
     private WorkspaceRepository workspaceRepository;
 
     @Autowired
+    private GitProviderRepository gitProviderRepository;
+
+    @Autowired
     private ObjectMapper objectMapper;
 
     @Autowired
@@ -73,15 +79,22 @@ class GitHubProjectMessageHandlerIntegrationTest extends BaseIntegrationTest {
     }
 
     private void setupTestData() {
+        // Create GitHub provider
+        GitProvider gitProvider = gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
+            .orElseGet(
+                () -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com"))
+            );
+
         // Create organization matching the fixture data
         testOrganization = new Organization();
-        testOrganization.setId(215361191L);
-        testOrganization.setProviderId(215361191L);
+        testOrganization.setNativeId(215361191L);
         testOrganization.setLogin("HephaestusTest");
         testOrganization.setCreatedAt(Instant.now());
         testOrganization.setUpdatedAt(Instant.now());
         testOrganization.setName("Hephaestus Test");
         testOrganization.setAvatarUrl("https://avatars.githubusercontent.com/u/215361191?v=4");
+        testOrganization.setProvider(gitProvider);
         testOrganization = organizationRepository.save(testOrganization);
 
         // Create workspace for scope resolution

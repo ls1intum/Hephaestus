@@ -150,36 +150,33 @@ public final class GitLabSyncConstants {
     private static final Pattern GID_PATTERN = Pattern.compile("^gid://gitlab/[A-Za-z]+/(\\d+)$");
 
     /**
-     * Converts a raw GitLab numeric ID to a Hephaestus entity ID by negation.
+     * Returns the raw GitLab numeric ID as the native entity ID.
      * <p>
-     * This prevents ID collisions between GitHub and GitLab entities that share
-     * the same database tables. GitHub IDs are always positive; negated GitLab
-     * IDs are always negative.
-     * <p>
-     * Example: {@code toEntityId(42)} → {@code -42}
+     * With the multi-provider architecture, each entity stores its original
+     * provider ID as {@code nativeId} alongside a {@code provider_id} FK.
+     * No negation is needed — provider scoping prevents collisions.
      *
      * @param rawGitLabId the raw GitLab numeric ID (positive)
-     * @return the negated entity ID (negative)
+     * @return the same ID (identity function)
      */
     public static long toEntityId(long rawGitLabId) {
-        return -rawGitLabId;
+        return rawGitLabId;
     }
 
     /**
-     * Extracts the numeric ID from a GitLab Global ID string and converts it
-     * to a Hephaestus entity ID (negated).
+     * Extracts the numeric ID from a GitLab Global ID string.
      * <p>
-     * Convenience method combining {@link #extractNumericId(String)} and
-     * {@link #toEntityId(long)}.
+     * Convenience method combining {@link #extractNumericId(String)} with
+     * the identity {@link #toEntityId(long)}.
      * <p>
-     * Example: {@code "gid://gitlab/Project/123"} → {@code -123L}
+     * Example: {@code "gid://gitlab/Project/123"} → {@code 123L}
      *
      * @param globalId the GitLab Global ID (e.g., {@code "gid://gitlab/User/42"})
-     * @return the negated entity ID
+     * @return the numeric entity ID (positive)
      * @throws IllegalArgumentException if the format is invalid
      */
     public static long extractEntityId(String globalId) {
-        return toEntityId(extractNumericId(globalId));
+        return extractNumericId(globalId);
     }
 
     /**

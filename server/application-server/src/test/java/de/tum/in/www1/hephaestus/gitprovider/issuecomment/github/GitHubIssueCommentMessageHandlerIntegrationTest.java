@@ -3,6 +3,9 @@ package de.tum.in.www1.hephaestus.gitprovider.issuecomment.github;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
@@ -49,6 +52,9 @@ class GitHubIssueCommentMessageHandlerIntegrationTest extends BaseIntegrationTes
     private OrganizationRepository organizationRepository;
 
     @Autowired
+    private GitProviderRepository gitProviderRepository;
+
+    @Autowired
     private WorkspaceRepository workspaceRepository;
 
     @Autowired
@@ -56,6 +62,7 @@ class GitHubIssueCommentMessageHandlerIntegrationTest extends BaseIntegrationTes
 
     private Repository testRepository;
     private Issue testIssue;
+    private GitProvider gitProvider;
 
     @BeforeEach
     void setUp() {
@@ -64,20 +71,26 @@ class GitHubIssueCommentMessageHandlerIntegrationTest extends BaseIntegrationTes
     }
 
     private void setupTestData() {
+        // Create GitHub provider
+        gitProvider = gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
+            .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com")));
+
         // Create organization
         Organization org = new Organization();
-        org.setId(215361191L);
-        org.setProviderId(215361191L);
+        org.setNativeId(215361191L);
         org.setLogin("HephaestusTest");
         org.setCreatedAt(Instant.now());
         org.setUpdatedAt(Instant.now());
         org.setName("Hephaestus Test");
         org.setAvatarUrl("https://avatars.githubusercontent.com/u/215361191?v=4");
+        org.setHtmlUrl("https://github.com/HephaestusTest");
+        org.setProvider(gitProvider);
         org = organizationRepository.save(org);
 
         // Create repository
         testRepository = new Repository();
-        testRepository.setId(1000663383L);
+        testRepository.setNativeId(1000663383L);
         testRepository.setName("TestRepository");
         testRepository.setNameWithOwner("HephaestusTest/TestRepository");
         testRepository.setHtmlUrl("https://github.com/HephaestusTest/TestRepository");
@@ -87,6 +100,7 @@ class GitHubIssueCommentMessageHandlerIntegrationTest extends BaseIntegrationTes
         testRepository.setUpdatedAt(Instant.now());
         testRepository.setPushedAt(Instant.now());
         testRepository.setOrganization(org);
+        testRepository.setProvider(gitProvider);
         testRepository = repositoryRepository.save(testRepository);
 
         // Create workspace
@@ -103,13 +117,14 @@ class GitHubIssueCommentMessageHandlerIntegrationTest extends BaseIntegrationTes
 
     private void createTestIssue(Long issueId, int number) {
         testIssue = new Issue();
-        testIssue.setId(issueId);
+        testIssue.setNativeId(issueId);
         testIssue.setNumber(number);
         testIssue.setTitle("Test Issue");
         testIssue.setState(Issue.State.OPEN);
         testIssue.setRepository(testRepository);
         testIssue.setCreatedAt(Instant.now());
         testIssue.setUpdatedAt(Instant.now());
+        testIssue.setProvider(gitProvider);
         testIssue = issueRepository.save(testIssue);
     }
 
@@ -129,17 +144,17 @@ class GitHubIssueCommentMessageHandlerIntegrationTest extends BaseIntegrationTes
         createTestIssue(event.issue().getDatabaseId(), event.issue().number());
 
         // Verify comment doesn't exist initially
-        assertThat(commentRepository.findById(event.comment().id())).isEmpty();
+        assertThat(commentRepository.findByNativeIdAndProviderId(event.comment().id(), gitProvider.getId())).isEmpty();
 
         // When
         handler.handleEvent(event);
 
         // Then
-        assertThat(commentRepository.findById(event.comment().id()))
+        assertThat(commentRepository.findByNativeIdAndProviderId(event.comment().id(), gitProvider.getId()))
             .isPresent()
             .get()
             .satisfies(comment -> {
-                assertThat(comment.getId()).isEqualTo(event.comment().id());
+                assertThat(comment.getNativeId()).isEqualTo(event.comment().id());
                 assertThat(comment.getBody()).isEqualTo(event.comment().body());
                 assertThat(comment.getHtmlUrl()).isEqualTo(event.comment().htmlUrl());
             });
@@ -160,7 +175,7 @@ class GitHubIssueCommentMessageHandlerIntegrationTest extends BaseIntegrationTes
         handler.handleEvent(editEvent);
 
         // Then
-        assertThat(commentRepository.findById(editEvent.comment().id()))
+        assertThat(commentRepository.findByNativeIdAndProviderId(editEvent.comment().id(), gitProvider.getId()))
             .isPresent()
             .get()
             .satisfies(comment -> {
@@ -177,7 +192,7 @@ class GitHubIssueCommentMessageHandlerIntegrationTest extends BaseIntegrationTes
         handler.handleEvent(createEvent);
 
         // Verify it exists
-        assertThat(commentRepository.findById(createEvent.comment().id())).isPresent();
+        assertThat(commentRepository.findByNativeIdAndProviderId(createEvent.comment().id(), gitProvider.getId())).isPresent();
 
         // Load deleted event
         GitHubIssueCommentEventDTO deleteEvent = loadPayload("issue_comment.deleted");
@@ -186,7 +201,7 @@ class GitHubIssueCommentMessageHandlerIntegrationTest extends BaseIntegrationTes
         handler.handleEvent(deleteEvent);
 
         // Then
-        assertThat(commentRepository.findById(deleteEvent.comment().id())).isEmpty();
+        assertThat(commentRepository.findByNativeIdAndProviderId(deleteEvent.comment().id(), gitProvider.getId())).isEmpty();
     }
 
     private GitHubIssueCommentEventDTO loadPayload(String filename) throws IOException {

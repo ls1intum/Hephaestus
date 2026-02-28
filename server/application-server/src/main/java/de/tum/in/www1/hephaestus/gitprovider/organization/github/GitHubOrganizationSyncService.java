@@ -9,6 +9,8 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncCons
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.adaptPageSize;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.ExponentialBackoff;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
@@ -62,6 +64,7 @@ public class GitHubOrganizationSyncService {
     private static final Logger log = LoggerFactory.getLogger(GitHubOrganizationSyncService.class);
     private static final String GET_ORGANIZATION_DOCUMENT = "GetOrganization";
     private static final String GET_ORGANIZATION_MEMBERS_DOCUMENT = "GetOrganizationMembers";
+    private static final String GITHUB_SERVER_URL = "https://github.com";
 
     private final GitHubGraphQlClientProvider graphQlClientProvider;
     private final GitHubOrganizationProcessor organizationProcessor;
@@ -70,6 +73,7 @@ public class GitHubOrganizationSyncService {
     private final GitHubSyncProperties syncProperties;
     private final GitHubExceptionClassifier exceptionClassifier;
     private final GitHubGraphQlSyncCoordinator graphQlSyncHelper;
+    private final GitProviderRepository gitProviderRepository;
     private static final int MAX_RETRY_ATTEMPTS = 3;
 
     public GitHubOrganizationSyncService(
@@ -79,7 +83,8 @@ public class GitHubOrganizationSyncService {
         OrganizationMembershipRepository organizationMembershipRepository,
         GitHubSyncProperties syncProperties,
         GitHubExceptionClassifier exceptionClassifier,
-        GitHubGraphQlSyncCoordinator graphQlSyncHelper
+        GitHubGraphQlSyncCoordinator graphQlSyncHelper,
+        GitProviderRepository gitProviderRepository
     ) {
         this.graphQlClientProvider = graphQlClientProvider;
         this.organizationProcessor = organizationProcessor;
@@ -88,6 +93,7 @@ public class GitHubOrganizationSyncService {
         this.syncProperties = syncProperties;
         this.exceptionClassifier = exceptionClassifier;
         this.graphQlSyncHelper = graphQlSyncHelper;
+        this.gitProviderRepository = gitProviderRepository;
     }
 
     /**
@@ -183,9 +189,15 @@ public class GitHubOrganizationSyncService {
                 return null;
             }
 
+            // Resolve GitHub provider ID
+            Long providerId = gitProviderRepository
+                .findByTypeAndServerUrl(GitProviderType.GITHUB, GITHUB_SERVER_URL)
+                .orElseThrow(() -> new IllegalStateException("GitProvider not found for GitHub"))
+                .getId();
+
             // Convert GraphQL response to DTO and process
             GitHubOrganizationEventDTO.GitHubOrganizationDTO dto = convertToDTO(graphQlOrg);
-            Organization organization = organizationProcessor.process(dto);
+            Organization organization = organizationProcessor.process(dto, providerId);
 
             if (organization != null) {
                 // Sync organization memberships with full pagination
@@ -196,7 +208,7 @@ public class GitHubOrganizationSyncService {
 
                 log.info(
                     "Synced organization: orgId={}, orgLogin={}, memberCount={}",
-                    organization.getProviderId(),
+                    organization.getNativeId(),
                     sanitizeForLog(organization.getLogin()),
                     membersSynced
                 );
@@ -249,7 +261,7 @@ public class GitHubOrganizationSyncService {
         if (membersConnection == null || membersConnection.getEdges() == null) {
             log.debug(
                 "No members found for organization: orgId={}, orgLogin={}",
-                organization.getProviderId(),
+                organization.getNativeId(),
                 sanitizeForLog(organization.getLogin())
             );
             return 0;
@@ -413,7 +425,7 @@ public class GitHubOrganizationSyncService {
 
         log.debug(
             "Fetched organization members: orgId={}, orgLogin={}, fetchedCount={}, totalCount={}, pages={}, complete={}",
-            organization.getProviderId(),
+            organization.getNativeId(),
             sanitizeForLog(organization.getLogin()),
             allMembers.size(),
             latestTotalCount,
@@ -436,7 +448,7 @@ public class GitHubOrganizationSyncService {
 
             // Convert GraphQL User to GitHubUserDTO and ensure user exists
             GitHubUserDTO userDTO = convertUserToDTO(graphQlUser);
-            User user = userProcessor.ensureExists(userDTO);
+            User user = userProcessor.ensureExists(userDTO, organization.getProvider().getId());
 
             if (user != null) {
                 syncedUserIds.add(user.getId());
@@ -449,7 +461,7 @@ public class GitHubOrganizationSyncService {
                 memberCount++;
                 log.debug(
                     "Synced organization membership: orgId={}, userId={}, userLogin={}, role={}",
-                    organization.getProviderId(),
+                    organization.getNativeId(),
                     user.getId(),
                     sanitizeForLog(user.getLogin()),
                     role
@@ -489,7 +501,7 @@ public class GitHubOrganizationSyncService {
             organizationMembershipRepository.deleteByOrganizationIdAndUserIdIn(organization.getId(), staleUserIds);
             log.debug(
                 "Removed stale organization memberships: orgId={}, orgLogin={}, removedCount={}",
-                organization.getProviderId(),
+                organization.getNativeId(),
                 sanitizeForLog(organization.getLogin()),
                 staleUserIds.size()
             );

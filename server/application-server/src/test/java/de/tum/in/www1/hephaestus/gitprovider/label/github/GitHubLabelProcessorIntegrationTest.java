@@ -2,6 +2,9 @@ package de.tum.in.www1.hephaestus.gitprovider.label.github;
 
 import static org.assertj.core.api.Assertions.*;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
@@ -56,6 +59,9 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
     private OrganizationRepository organizationRepository;
 
     @Autowired
+    private GitProviderRepository gitProviderRepository;
+
+    @Autowired
     private WorkspaceRepository workspaceRepository;
 
     @Autowired
@@ -72,20 +78,26 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
     }
 
     private void setupTestData() {
+        // Create GitHub provider
+        GitProvider gitProvider = gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
+            .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com")));
+
         // Create organization
         Organization org = new Organization();
-        org.setId(TEST_ORG_ID);
-        org.setProviderId(TEST_ORG_ID);
+        org.setNativeId(TEST_ORG_ID);
         org.setLogin(TEST_ORG_LOGIN);
         org.setCreatedAt(Instant.now());
         org.setUpdatedAt(Instant.now());
         org.setName("Hephaestus Test");
         org.setAvatarUrl("https://avatars.githubusercontent.com/u/" + TEST_ORG_ID);
+        org.setHtmlUrl("https://github.com/" + TEST_ORG_LOGIN);
+        org.setProvider(gitProvider);
         org = organizationRepository.save(org);
 
         // Create repository
         testRepository = new Repository();
-        testRepository.setId(TEST_REPO_ID);
+        testRepository.setNativeId(TEST_REPO_ID);
         testRepository.setName("TestRepository");
         testRepository.setNameWithOwner(TEST_REPO_FULL_NAME);
         testRepository.setHtmlUrl("https://github.com/" + TEST_REPO_FULL_NAME);
@@ -95,6 +107,7 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
         testRepository.setUpdatedAt(Instant.now());
         testRepository.setPushedAt(Instant.now());
         testRepository.setOrganization(org);
+        testRepository.setProvider(gitProvider);
         testRepository = repositoryRepository.save(testRepository);
 
         // Create workspace
@@ -143,7 +156,7 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(result.getName()).isEqualTo("new-feature");
             assertThat(result.getColor()).isEqualTo("00ff00");
             assertThat(result.getDescription()).isEqualTo("A new feature label");
-            assertThat(result.getRepository().getId()).isEqualTo(TEST_REPO_ID);
+            assertThat(result.getRepository().getId()).isEqualTo(testRepository.getId());
 
             // Verify persisted
             assertThat(labelRepository.findById(labelId)).isPresent();
@@ -155,7 +168,7 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
                 .satisfies(event -> {
                     assertThat(event.label().id()).isEqualTo(labelId);
                     assertThat(event.context().scopeId()).isEqualTo(testWorkspace.getId());
-                    assertThat(event.context().repository().id()).isEqualTo(TEST_REPO_ID);
+                    assertThat(event.context().repository().id()).isEqualTo(testRepository.getId());
                 });
             assertThat(eventListener.getUpdatedEvents()).isEmpty();
         }
@@ -359,7 +372,7 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
                     assertThat(event.labelId()).isEqualTo(labelId);
                     assertThat(event.labelName()).isEqualTo("to-delete");
                     assertThat(event.context().scopeId()).isEqualTo(testWorkspace.getId());
-                    assertThat(event.context().repository().id()).isEqualTo(TEST_REPO_ID);
+                    assertThat(event.context().repository().id()).isEqualTo(testRepository.getId());
                 });
         }
 

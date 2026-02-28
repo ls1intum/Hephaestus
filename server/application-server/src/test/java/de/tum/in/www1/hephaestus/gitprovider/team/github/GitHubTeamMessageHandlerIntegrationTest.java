@@ -3,6 +3,9 @@ package de.tum.in.www1.hephaestus.gitprovider.team.github;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
@@ -47,8 +50,12 @@ class GitHubTeamMessageHandlerIntegrationTest extends BaseIntegrationTest {
     private WorkspaceRepository workspaceRepository;
 
     @Autowired
+    private GitProviderRepository gitProviderRepository;
+
+    @Autowired
     private ObjectMapper objectMapper;
 
+    private GitProvider gitProvider;
     private Organization testOrganization;
 
     @BeforeEach
@@ -58,10 +65,15 @@ class GitHubTeamMessageHandlerIntegrationTest extends BaseIntegrationTest {
     }
 
     private void setupTestData() {
+        // Create git provider
+        gitProvider = gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
+            .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com")));
+
         // Create organization
         testOrganization = new Organization();
-        testOrganization.setId(215361191L);
-        testOrganization.setProviderId(215361191L);
+        testOrganization.setNativeId(215361191L);
+        testOrganization.setProvider(gitProvider);
         testOrganization.setLogin("HephaestusTest");
         testOrganization.setCreatedAt(Instant.now());
         testOrganization.setUpdatedAt(Instant.now());
@@ -71,7 +83,8 @@ class GitHubTeamMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
         // Create repository (needed for team-repo events)
         Repository repo = new Repository();
-        repo.setId(1000663383L);
+        repo.setNativeId(1000663383L);
+        repo.setProvider(gitProvider);
         repo.setName("TestRepository");
         repo.setNameWithOwner("HephaestusTest/TestRepository");
         repo.setHtmlUrl("https://github.com/HephaestusTest/TestRepository");

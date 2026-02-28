@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.gitprovider.issue.gitlab;
 
-import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.EventContext;
@@ -102,7 +101,7 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
 
         // Update relationships
         boolean changed = updateLabels(event.labels(), issue.getLabels(), context.repository());
-        changed |= updateAssignees(event.assignees(), issue.getAssignees());
+        changed |= updateAssignees(event.assignees(), issue.getAssignees(), context.providerId());
         if (changed) {
             issue = issueRepository.save(issue);
         }
@@ -164,9 +163,9 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
             return null;
         }
 
-        long entityId;
+        long nativeId;
         try {
-            entityId = GitLabSyncConstants.extractEntityId(data.globalId());
+            nativeId = GitLabSyncConstants.extractNumericId(data.globalId());
         } catch (IllegalArgumentException e) {
             log.warn("Skipped issue processing: reason=invalidGlobalId, gid={}", data.globalId());
             return null;
@@ -180,6 +179,8 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
             return null;
         }
 
+        Long providerId = repository.getProvider().getId();
+
         // Check if existing
         Optional<Issue> existingOpt = issueRepository.findByRepositoryIdAndNumber(repository.getId(), issueNumber);
         boolean isNew = existingOpt.isEmpty();
@@ -190,7 +191,8 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
             data.authorUsername(),
             data.authorName(),
             data.authorAvatarUrl(),
-            data.authorWebUrl()
+            data.authorWebUrl(),
+            providerId
         );
 
         // State mapping
@@ -198,7 +200,8 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
 
         Instant now = Instant.now();
         issueRepository.upsertCore(
-            entityId,
+            nativeId,
+            providerId,
             issueNumber,
             sanitize(data.title()),
             sanitize(data.description()),
@@ -227,11 +230,11 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
             return null;
         }
 
-        issue.setProvider(GitProviderType.GITLAB);
+        issue.setProvider(repository.getProvider());
 
         // Resolve and persist labels/assignees within this transaction
         boolean changed = updateSyncLabels(data.syncLabels(), issue.getLabels(), repository);
-        changed |= updateSyncAssignees(data.syncAssignees(), issue.getAssignees());
+        changed |= updateSyncAssignees(data.syncAssignees(), issue.getAssignees(), providerId);
         if (changed) {
             issue = issueRepository.save(issue);
         }
@@ -241,7 +244,7 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
             eventPublisher.publishEvent(
                 new DomainEvent.IssueCreated(EventPayload.IssueData.from(issue), EventContext.from(ctx))
             );
-            log.debug("Created issue from sync: issueId={}, iid={}", entityId, data.iid());
+            log.debug("Created issue from sync: issueId={}, iid={}", nativeId, data.iid());
         }
 
         return issue;
@@ -302,18 +305,20 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
             return null;
         }
 
-        long entityId = GitLabSyncConstants.toEntityId(rawId);
+        long nativeId = rawId;
         int issueNumber = iid;
+        Long providerId = repository.getProvider().getId();
 
         Optional<Issue> existingOpt = issueRepository.findByRepositoryIdAndNumber(repository.getId(), issueNumber);
         boolean isNew = existingOpt.isEmpty();
 
-        User author = findOrCreateUser(authorDto);
+        User author = findOrCreateUser(authorDto, providerId);
         Issue.State issueState = convertState(state);
 
         Instant now = Instant.now();
         issueRepository.upsertCore(
-            entityId,
+            nativeId,
+            providerId,
             issueNumber,
             sanitize(title),
             sanitize(description),
@@ -339,7 +344,7 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
         Issue issue = issueRepository.findByRepositoryIdAndNumber(repository.getId(), issueNumber).orElse(null);
 
         if (issue != null) {
-            issue.setProvider(GitProviderType.GITLAB);
+            issue.setProvider(repository.getProvider());
 
             if (isNew) {
                 eventPublisher.publishEvent(
@@ -348,7 +353,7 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
                         EventContext.from(ProcessingContext.forSync(null, repository))
                     )
                 );
-                log.debug("Created issue: issueId={}, iid={}", entityId, issueNumber);
+                log.debug("Created issue: nativeId={}, iid={}", nativeId, issueNumber);
             }
         }
 
@@ -399,7 +404,11 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
     /**
      * Updates assignees from GraphQL sync data within the current transaction.
      */
-    private boolean updateSyncAssignees(@Nullable List<SyncAssigneeData> syncAssignees, Set<User> currentAssignees) {
+    private boolean updateSyncAssignees(
+        @Nullable List<SyncAssigneeData> syncAssignees,
+        Set<User> currentAssignees,
+        Long providerId
+    ) {
         if (syncAssignees == null) {
             return false;
         }
@@ -411,7 +420,8 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
                 data.username(),
                 data.name(),
                 data.avatarUrl(),
-                data.webUrl()
+                data.webUrl(),
+                providerId
             );
             if (user != null) {
                 newAssignees.add(user);
