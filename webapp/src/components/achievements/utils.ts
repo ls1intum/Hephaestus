@@ -197,3 +197,35 @@ export function generateSkillTreeData(
 
 	return { nodes, edges: processedEdges };
 }
+
+/**
+ * Calculates achievement statistics for the stats panel.
+ *
+ * @param achievementList - Array of achievements from the API
+ * @returns Statistics including totals and per-category breakdowns
+ */
+export function calculateStats(achievementList: Achievement[]) {
+	const total = achievementList.length;
+	const unlocked = achievementList.filter((a) => a.status === "unlocked").length;
+	const available = achievementList.filter((a) => a.status === "available").length;
+
+	const byCategory = ACHIEVEMENT_CATEGORIES.reduce(
+		(acc, cat) => {
+			const catAchievements = achievementList.filter((a) => (a.category ?? "milestones") === cat);
+			acc[cat] = {
+				total: catAchievements.length,
+				unlocked: catAchievements.filter((a) => a.status === "unlocked").length,
+			};
+			return acc;
+		},
+		{} as Record<AchievementCategory, { total: number; unlocked: number }>,
+	);
+
+	return {
+		total,
+		unlocked,
+		available,
+		percentage: total > 0 ? Math.round((unlocked / total) * 100) : 0,
+		byCategory,
+	};
+}
