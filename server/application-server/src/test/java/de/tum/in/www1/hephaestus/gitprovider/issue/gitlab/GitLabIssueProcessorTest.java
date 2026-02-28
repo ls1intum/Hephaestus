@@ -177,7 +177,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
         @Test
         @DisplayName("processFromSync() skips confidential issue")
         void processFromSyncSkipsConfidential() {
-            Issue result = processor.processFromSync(
+            var syncData = new GitLabIssueProcessor.SyncIssueData(
                 "gid://gitlab/Issue/422296",
                 "5",
                 "Title",
@@ -194,10 +194,10 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 null,
                 null,
                 0,
-                testRepo,
                 null,
                 null
             );
+            Issue result = processor.processFromSync(syncData, testRepo);
 
             assertThat(result).isNull();
             verify(issueRepository, never()).upsertCore(
@@ -472,7 +472,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
             User author = createUserEntity();
             when(userRepository.findById(ENTITY_USER_ID)).thenReturn(Optional.of(author));
 
-            Issue result = processor.processFromSync(
+            var syncData = new GitLabIssueProcessor.SyncIssueData(
                 "gid://gitlab/Issue/422296",
                 "5",
                 "Feature: Add user authentication",
@@ -489,10 +489,10 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 "https://gitlab.lrz.de/uploads/avatar.png",
                 "https://gitlab.lrz.de/ga84xah",
                 0,
-                testRepo,
                 null,
                 null
             );
+            Issue result = processor.processFromSync(syncData, testRepo);
 
             assertThat(result).isNotNull();
             assertThat(result.getProvider()).isEqualTo(GitProviderType.GITLAB);
@@ -525,7 +525,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
         @Test
         @DisplayName("processFromSync() with invalid globalId skips processing")
         void processFromSyncInvalidGlobalId() {
-            Issue result = processor.processFromSync(
+            var syncData = new GitLabIssueProcessor.SyncIssueData(
                 "invalid-id",
                 "5",
                 "Title",
@@ -542,10 +542,10 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 null,
                 null,
                 0,
-                testRepo,
                 null,
                 null
             );
+            Issue result = processor.processFromSync(syncData, testRepo);
 
             assertThat(result).isNull();
         }
@@ -553,7 +553,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
         @Test
         @DisplayName("processFromSync() with invalid iid skips processing")
         void processFromSyncInvalidIid() {
-            Issue result = processor.processFromSync(
+            var syncData = new GitLabIssueProcessor.SyncIssueData(
                 "gid://gitlab/Issue/422296",
                 "not-a-number",
                 "Title",
@@ -570,10 +570,10 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 null,
                 null,
                 0,
-                testRepo,
                 null,
                 null
             );
+            Issue result = processor.processFromSync(syncData, testRepo);
 
             assertThat(result).isNull();
         }
@@ -586,7 +586,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 .thenReturn(Optional.empty())
                 .thenReturn(Optional.of(issue));
 
-            processor.processFromSync(
+            var syncData = new GitLabIssueProcessor.SyncIssueData(
                 "gid://gitlab/Issue/422296",
                 "5",
                 "Title",
@@ -603,10 +603,10 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 null,
                 null,
                 0,
-                testRepo,
                 null,
                 null
             );
+            processor.processFromSync(syncData, testRepo);
 
             ArgumentCaptor<DomainEvent.IssueCreated> eventCaptor = ArgumentCaptor.forClass(
                 DomainEvent.IssueCreated.class
@@ -623,7 +623,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 .thenReturn(Optional.of(issue))
                 .thenReturn(Optional.of(issue));
 
-            processor.processFromSync(
+            var syncData = new GitLabIssueProcessor.SyncIssueData(
                 "gid://gitlab/Issue/422296",
                 "5",
                 "Title",
@@ -640,10 +640,10 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 null,
                 null,
                 0,
-                testRepo,
                 null,
                 null
             );
+            processor.processFromSync(syncData, testRepo);
 
             verify(eventPublisher, never()).publishEvent(any());
         }

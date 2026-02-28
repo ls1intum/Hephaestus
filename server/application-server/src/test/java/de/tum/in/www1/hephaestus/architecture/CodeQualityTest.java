@@ -159,6 +159,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                 "ProjectFieldValueRepository.upsertCore",
                 "ProjectStatusUpdateRepository.upsertCore",
                 "UserRepository.upsertUser",
+                "OrganizationRepository.upsert",
                 "CommitRepository.upsertCommit",
                 "CommitRepository.updateEnrichmentMetadata",
                 "DiscussionCategoryRepository.upsertCategory",

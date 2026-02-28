@@ -127,16 +127,9 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
     ) {}
 
     /**
-     * Process a GitLab issue from GraphQL sync.
-     * <p>
-     * Takes raw field values extracted from the GL-prefixed codegen types
-     * (which are not available at compile time until codegen runs).
-     * Labels and assignees are resolved and persisted within this method's
-     * transaction boundary to avoid detached-entity issues.
+     * All data needed to sync a single GitLab issue from GraphQL.
      */
-    @Transactional
-    @Nullable
-    public Issue processFromSync(
+    public record SyncIssueData(
         String globalId,
         String iid,
         String title,
@@ -153,28 +146,37 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
         @Nullable String authorAvatarUrl,
         @Nullable String authorWebUrl,
         int commentsCount,
-        Repository repository,
         @Nullable List<SyncLabelData> syncLabels,
         @Nullable List<SyncAssigneeData> syncAssignees
-    ) {
-        if (confidential) {
-            log.debug("Skipped confidential issue from sync: iid={}", iid);
+    ) {}
+
+    /**
+     * Process a GitLab issue from GraphQL sync.
+     * <p>
+     * Labels and assignees are resolved and persisted within this method's
+     * transaction boundary to avoid detached-entity issues.
+     */
+    @Transactional
+    @Nullable
+    public Issue processFromSync(SyncIssueData data, Repository repository) {
+        if (data.confidential()) {
+            log.debug("Skipped confidential issue from sync: iid={}", data.iid());
             return null;
         }
 
         long entityId;
         try {
-            entityId = GitLabSyncConstants.extractEntityId(globalId);
+            entityId = GitLabSyncConstants.extractEntityId(data.globalId());
         } catch (IllegalArgumentException e) {
-            log.warn("Skipped issue processing: reason=invalidGlobalId, gid={}", globalId);
+            log.warn("Skipped issue processing: reason=invalidGlobalId, gid={}", data.globalId());
             return null;
         }
 
         int issueNumber;
         try {
-            issueNumber = Integer.parseInt(iid);
+            issueNumber = Integer.parseInt(data.iid());
         } catch (NumberFormatException e) {
-            log.warn("Skipped issue processing: reason=invalidIid, iid={}", iid);
+            log.warn("Skipped issue processing: reason=invalidIid, iid={}", data.iid());
             return null;
         }
 
@@ -183,26 +185,32 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
         boolean isNew = existingOpt.isEmpty();
 
         // Resolve author
-        User author = findOrCreateUser(authorGlobalId, authorUsername, authorName, authorAvatarUrl, authorWebUrl);
+        User author = findOrCreateUser(
+            data.authorGlobalId(),
+            data.authorUsername(),
+            data.authorName(),
+            data.authorAvatarUrl(),
+            data.authorWebUrl()
+        );
 
         // State mapping
-        Issue.State issueState = convertState(state);
+        Issue.State issueState = convertState(data.state());
 
         Instant now = Instant.now();
         issueRepository.upsertCore(
             entityId,
             issueNumber,
-            sanitize(title),
-            sanitize(description),
+            sanitize(data.title()),
+            sanitize(data.description()),
             issueState.name(),
             null, // stateReason — not available in GitLab
-            webUrl,
+            data.webUrl(),
             false, // locked — not in query
-            parseGitLabTimestamp(closedAt),
-            commentsCount,
+            parseGitLabTimestamp(data.closedAt()),
+            data.commentsCount(),
             now,
-            parseGitLabTimestamp(createdAt),
-            parseGitLabTimestamp(updatedAt),
+            parseGitLabTimestamp(data.createdAt()),
+            parseGitLabTimestamp(data.updatedAt()),
             author != null ? author.getId() : null,
             repository.getId(),
             null, // milestoneId
@@ -222,8 +230,8 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
         issue.setProvider(GitProviderType.GITLAB);
 
         // Resolve and persist labels/assignees within this transaction
-        boolean changed = updateSyncLabels(syncLabels, issue.getLabels(), repository);
-        changed |= updateSyncAssignees(syncAssignees, issue.getAssignees());
+        boolean changed = updateSyncLabels(data.syncLabels(), issue.getLabels(), repository);
+        changed |= updateSyncAssignees(data.syncAssignees(), issue.getAssignees());
         if (changed) {
             issue = issueRepository.save(issue);
         }
@@ -233,7 +241,7 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
             eventPublisher.publishEvent(
                 new DomainEvent.IssueCreated(EventPayload.IssueData.from(issue), EventContext.from(ctx))
             );
-            log.debug("Created issue from sync: issueId={}, iid={}", entityId, iid);
+            log.debug("Created issue from sync: issueId={}, iid={}", entityId, data.iid());
         }
 
         return issue;

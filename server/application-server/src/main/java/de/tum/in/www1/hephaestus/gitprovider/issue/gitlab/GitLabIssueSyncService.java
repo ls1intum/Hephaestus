@@ -247,7 +247,7 @@ public class GitLabIssueSyncService {
             }
         }
 
-        issueProcessor.processFromSync(
+        var syncData = new GitLabIssueProcessor.SyncIssueData(
             globalId,
             iid,
             title,
@@ -264,9 +264,9 @@ public class GitLabIssueSyncService {
             authorAvatarUrl,
             authorWebUrl,
             userNotesCount,
-            repository,
             syncLabels,
             syncAssignees
         );
+        issueProcessor.processFromSync(syncData, repository);
     }
 }
