@@ -10,6 +10,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useEffect, useState, useSyncExternalStore } from "react";
+import type { Achievement } from "@/api/types.gen";
 import { ACHIEVEMENT_REGISTRY } from "@/components/achievements/definitions.ts";
 import type { UIAchievement } from "@/components/achievements/types";
 import { generateSkillTreeData } from "@/components/achievements/utils";
@@ -56,9 +57,15 @@ export interface SkillTreeProps {
 		leaguePoints: number;
 	};
 	achievements: UIAchievement[];
+	/**
+	 * All achievement definitions fetched from the backend (dev-only).
+	 * Used by Designer Mode to display the complete tree.
+	 * When undefined, falls back to the local ACHIEVEMENT_REGISTRY.
+	 */
+	allDefinitions?: Achievement[];
 }
 
-export function SkillTree({ user, achievements }: SkillTreeProps) {
+export function SkillTree({ user, achievements, allDefinitions }: SkillTreeProps) {
 	const { nodes: initialNodes, edges: initialEdges } = generateSkillTreeData(user, achievements); // removed memoization due to the compiler handling it
 
 	const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
@@ -96,19 +103,36 @@ export function SkillTree({ user, achievements }: SkillTreeProps) {
 	// Update nodes when user or achievements props change
 	useEffect(() => {
 		//Force achievements to "unlocked" to display all in designer mode
-		const displayAchievements = isDesignerMode
-			? (Object.entries(ACHIEVEMENT_REGISTRY).map(([id, def]) => ({
+		let displayAchievements: UIAchievement[];
+
+		if (isDesignerMode) {
+			if (allDefinitions && allDefinitions.length > 0) {
+				// Use backend definitions when available
+				displayAchievements = allDefinitions.map((def) => ({
 					...def,
-					id,
-					status: "unlocked",
-				})) as UIAchievement[])
-			: achievements;
+					status: "unlocked" as const,
+					...ACHIEVEMENT_REGISTRY[def.id],
+				})) as UIAchievement[];
+			} else {
+				// Fallback to the local registry while the API data is loading
+				displayAchievements = Object.entries(ACHIEVEMENT_REGISTRY).map(
+					([id, def]) =>
+						({
+							...def,
+							id,
+							status: "unlocked",
+						}) as UIAchievement,
+				);
+			}
+		} else {
+			displayAchievements = achievements;
+		}
 
 		const { nodes: newNodes, edges: newEdges } = generateSkillTreeData(user, displayAchievements);
 
 		setNodes(newNodes);
 		setEdges(newEdges);
-	}, [user, achievements, setNodes, setEdges, isDesignerMode]);
+	}, [user, achievements, allDefinitions, setNodes, setEdges, isDesignerMode]);
 
 	const isDark = useSyncExternalStore(subscribeToTheme, getIsDarkMode, () => true);
 
