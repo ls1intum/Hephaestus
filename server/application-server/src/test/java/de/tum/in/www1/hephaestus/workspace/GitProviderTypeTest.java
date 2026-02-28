@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.workspace;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
@@ -24,14 +25,18 @@ class GitProviderTypeTest {
     @Test
     @DisplayName("Should default to GITHUB when mode is null")
     void shouldDefaultToGitHubWhenModeIsNull() {
-        assertThat(GitProviderType.fromGitProviderMode(null)).isEqualTo(GitProviderType.GITHUB);
+        Workspace workspace = new Workspace();
+        workspace.setGitProviderMode(null);
+        assertThat(workspace.getProviderType()).isEqualTo(GitProviderType.GITHUB);
     }
 
     @ParameterizedTest(name = "{0} -> {1}")
     @MethodSource("modeToProviderTypeMapping")
     @DisplayName("Should derive correct provider type from mode")
     void shouldDeriveCorrectProviderType(Workspace.GitProviderMode mode, GitProviderType expectedType) {
-        assertThat(GitProviderType.fromGitProviderMode(mode)).isEqualTo(expectedType);
+        Workspace workspace = new Workspace();
+        workspace.setGitProviderMode(mode);
+        assertThat(workspace.getProviderType()).isEqualTo(expectedType);
     }
 
     static Stream<Arguments> modeToProviderTypeMapping() {
@@ -46,12 +51,14 @@ class GitProviderTypeTest {
     @EnumSource(Workspace.GitProviderMode.class)
     @DisplayName("Should handle every GitProviderMode value without error")
     void shouldHandleEveryModeValue(Workspace.GitProviderMode mode) {
-        GitProviderType result = GitProviderType.fromGitProviderMode(mode);
+        Workspace workspace = new Workspace();
+        workspace.setGitProviderMode(mode);
+        GitProviderType result = workspace.getProviderType();
         assertThat(result).isNotNull();
     }
 
     @Test
-    @DisplayName("Workspace.getProviderType() should delegate to GitProviderType derivation")
+    @DisplayName("Workspace.getProviderType() should derive from git provider mode")
     void workspaceGetProviderTypeShouldDelegate() {
         Workspace workspace = new Workspace();
 

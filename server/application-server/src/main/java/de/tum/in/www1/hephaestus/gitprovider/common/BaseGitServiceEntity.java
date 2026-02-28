@@ -1,6 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.common;
 
-import de.tum.in.www1.hephaestus.workspace.GitProviderType;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import jakarta.persistence.Column;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;

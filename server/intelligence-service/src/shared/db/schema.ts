@@ -392,6 +392,7 @@ export const discussion = pgTable(
 		answerChosenById: bigint("answer_chosen_by_id", { mode: "number" }),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		answerCommentId: bigint("answer_comment_id", { mode: "number" }),
+		provider: varchar({ length: 10 }).default("GITHUB").notNull(),
 	},
 	(table) => [
 		index("idx_discussion_author").using("btree", table.authorId.asc().nullsLast()),
@@ -477,6 +478,7 @@ export const discussionComment = pgTable(
 		authorId: bigint("author_id", { mode: "number" }),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		parentCommentId: bigint("parent_comment_id", { mode: "number" }),
+		provider: varchar({ length: 10 }).default("GITHUB").notNull(),
 	},
 	(table) => [
 		index("idx_discussion_comment_author").using("btree", table.authorId.asc().nullsLast()),
@@ -683,6 +685,7 @@ export const issue = pgTable(
 		headRefOid: varchar("head_ref_oid", { length: 40 }),
 		baseRefName: varchar("base_ref_name", { length: 255 }),
 		baseRefOid: varchar("base_ref_oid", { length: 40 }),
+		provider: varchar({ length: 10 }).default("GITHUB").notNull(),
 	},
 	(table) => [
 		index("idx_issue_author_id").using("btree", table.authorId.asc().nullsLast()),
@@ -797,6 +800,7 @@ export const issueComment = pgTable(
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		issueId: bigint("issue_id", { mode: "number" }),
 		body: text(),
+		provider: varchar({ length: 10 }).default("GITHUB").notNull(),
 	},
 	(table) => [
 		index("idx_issue_comment_author_id").using("btree", table.authorId.asc().nullsLast()),
@@ -904,6 +908,7 @@ export const milestone = pgTable(
 		closedIssuesCount: integer("closed_issues_count").default(0).notNull(),
 		openIssuesCount: integer("open_issues_count").default(0).notNull(),
 		lastSyncAt: timestamp("last_sync_at", { withTimezone: true, mode: "string" }),
+		provider: varchar({ length: 10 }).default("GITHUB").notNull(),
 	},
 	(table) => [
 		foreignKey({
@@ -929,15 +934,16 @@ export const organization = pgTable(
 		updatedAt: timestamp("updated_at", { precision: 6, withTimezone: true, mode: "string" }),
 		avatarUrl: varchar("avatar_url", { length: 255 }),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		githubId: bigint("github_id", { mode: "number" }).notNull(),
+		providerId: bigint("provider_id", { mode: "number" }).notNull(),
 		htmlUrl: varchar("html_url", { length: 255 }),
 		login: varchar({ length: 255 }).notNull(),
 		name: varchar({ length: 255 }),
 		lastSyncAt: timestamp("last_sync_at", { withTimezone: true, mode: "string" }),
+		provider: varchar({ length: 10 }).default("GITHUB").notNull(),
 	},
 	(table) => [
-		unique("uq_organization_github_id").on(table.githubId),
-		unique("uq_organization_login").on(table.login),
+		unique("uq_organization_provider_provider_id").on(table.providerId, table.provider),
+		unique("uq_organization_provider_login").on(table.login, table.provider),
 	],
 );
 
@@ -990,6 +996,7 @@ export const project = pgTable(
 		}),
 		createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }),
 		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }),
+		provider: varchar({ length: 10 }).default("GITHUB").notNull(),
 	},
 	(table) => [
 		index("idx_project_creator_id").using("btree", table.creatorId.asc().nullsLast()),
@@ -1088,6 +1095,7 @@ export const projectItem = pgTable(
 		creatorId: bigint("creator_id", { mode: "number" }),
 		createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }),
 		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }),
+		provider: varchar({ length: 10 }).default("GITHUB").notNull(),
 	},
 	(table) => [
 		index("idx_project_item_content_type_archived").using(
@@ -1144,6 +1152,7 @@ export const projectStatusUpdate = pgTable(
 		creatorId: bigint("creator_id", { mode: "number" }),
 		createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }),
 		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }),
+		provider: varchar({ length: 10 }).default("GITHUB").notNull(),
 	},
 	(table) => [
 		index("idx_project_status_update_created_at").using(
@@ -1296,6 +1305,7 @@ export const pullRequestReviewComment = pgTable(
 		body: text(),
 		diffHunk: text("diff_hunk"),
 		outdated: boolean(),
+		provider: varchar({ length: 10 }).default("GITHUB").notNull(),
 	},
 	(table) => [
 		index("idx_pull_request_review_comment_thread").using(
@@ -1352,6 +1362,7 @@ export const pullRequestReviewThread = pgTable(
 		collapsed: boolean(),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		resolvedById: bigint("resolved_by_id", { mode: "number" }),
+		provider: varchar({ length: 10 }).default("GITHUB").notNull(),
 	},
 	(table) => [
 		index("idx_pull_request_review_thread_pull_request").using(
@@ -1402,6 +1413,7 @@ export const repository = pgTable(
 		organizationId: bigint("organization_id", { mode: "number" }),
 		lastSyncAt: timestamp("last_sync_at", { withTimezone: true, mode: "string" }),
 		hasDiscussionsEnabled: boolean("has_discussions_enabled").default(false).notNull(),
+		provider: varchar({ length: 10 }).default("GITHUB").notNull(),
 	},
 	(table) => [
 		index("idx_repository_name_with_owner").using("btree", table.nameWithOwner.asc().nullsLast()),
@@ -1411,7 +1423,7 @@ export const repository = pgTable(
 			foreignColumns: [organization.id],
 			name: "fk_repository_organization",
 		}),
-		unique("uq_repository_name_with_owner").on(table.nameWithOwner),
+		unique("uq_repository_provider_name_with_owner").on(table.nameWithOwner, table.provider),
 	],
 );
 
@@ -1505,6 +1517,7 @@ export const team = pgTable(
 		parentId: bigint("parent_id", { mode: "number" }),
 		privacy: varchar({ length: 32 }),
 		updatedAt: timestamp("updated_at", { precision: 6, withTimezone: true, mode: "string" }),
+		provider: varchar({ length: 10 }).default("GITHUB").notNull(),
 	},
 	(table) => [unique("uk_team_organization_name").on(table.name, table.organization)],
 );
@@ -1573,8 +1586,11 @@ export const user = pgTable(
 		login: varchar({ length: 255 }),
 		name: varchar({ length: 255 }),
 		type: varchar({ length: 255 }),
+		provider: varchar({ length: 10 }).default("GITHUB").notNull(),
 	},
-	(table) => [uniqueIndex("uk_user_login_lower").using("btree", sql`lower((login)::text)`)],
+	(table) => [
+		uniqueIndex("uk_user_provider_login").using("btree", sql`provider`, sql`lower((login)::text)`),
+	],
 );
 
 export const userPreferences = pgTable(
