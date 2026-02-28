@@ -70,6 +70,30 @@ export function SkillTree({ user, achievements }: SkillTreeProps) {
 
 	const isDark = useSyncExternalStore(subscribeToTheme, getIsDarkMode, () => true);
 
+	const isDev = import.meta.env.DEV;
+
+	const saveLayout = async () => {
+		// Map ReactFlow node IDs back to raw achievement IDs
+		const layoutMap = nodes.reduce(
+			(coords, node) => {
+				if (node.type === "avatar") coords.avatar = { x: 0, y: 0 };
+				if (node.type === "achievement") {
+					// const rawId = node.id.replace("-node", "");
+					const rawId = node.data.achievement.id;
+					coords[rawId] = { x: Math.round(node.position.x), y: Math.round(node.position.y) };
+				}
+				return coords;
+			},
+			{} as Record<string, { x: number; y: number }>,
+		);
+
+		await fetch("/__save-coordinates", {
+			method: "POST",
+			body: JSON.stringify(layoutMap, null, 2),
+		});
+		alert("Layout saved to coordinates.json!");
+	};
+
 	return (
 		<div className="w-full h-full">
 			<ReactFlow
@@ -88,7 +112,7 @@ export function SkillTree({ user, achievements }: SkillTreeProps) {
 				className="bg-background"
 				// Nodes should be not accessible besides selection for tooltip
 				elementsSelectable={true}
-				nodesDraggable={false}
+				nodesDraggable={isDev}
 				nodesConnectable={false}
 				// Disable all keyboard props
 				deleteKeyCode={null}
@@ -150,6 +174,15 @@ export function SkillTree({ user, achievements }: SkillTreeProps) {
 					zoomable={true}
 				/>
 			</ReactFlow>
+			{isDev && (
+				<button
+					onClick={saveLayout}
+					type="button"
+					className="absolute top-4 right-4 z-50 px-4 py-2 bg-blue-500 text-white rounded"
+				>
+					Save Layout
+				</button>
+			)}
 		</div>
 	);
 }

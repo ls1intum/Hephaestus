@@ -1,10 +1,10 @@
-import type { Edge, Node } from "@xyflow/react";
-import type { Achievement } from "@/api/types.gen";
-import type {
-	AchievementCategory,
-	AchievementRarity,
-	AchievementStatus,
-} from "@/components/achievements/types";
+// import type { Edge, Node } from "@xyflow/react";
+// import type { Achievement } from "@/api/types.gen";
+// import type {
+// 	AchievementCategory,
+// 	AchievementRarity,
+// 	AchievementStatus,
+// } from "@/components/achievements/types";
 
 /**
  * Node data structure for the skill tree visualization.

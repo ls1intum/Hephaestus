@@ -3,13 +3,13 @@ import type { AchievementEdge } from "@/components/achievements/AchievementEdge.
 import type { AchievementNode } from "@/components/achievements/AchievementNode.tsx";
 import type { AvatarNode } from "@/components/achievements/AvatarNode.tsx";
 import { ACHIEVEMENT_REGISTRY } from "@/components/achievements/definitions.ts";
-import { categoryMeta } from "@/components/achievements/styles.ts";
 import {
 	type AchievementCategory,
 	type AchievementRarity,
 	rarityWeights,
 	type UIAchievement,
 } from "@/components/achievements/types.ts";
+import coordinatesData from "./coordinates.json";
 
 export function sortByRarity<T extends { rarity: AchievementRarity }>(achievements: T[]): T[] {
 	return [...achievements].sort((a, b) => rarityWeights[a.rarity] - rarityWeights[b.rarity]);
@@ -76,8 +76,6 @@ export function generateSkillTreeData(
 	edges: AchievementEdge[];
 } {
 	const nodes: (AchievementNode | AvatarNode)[] = [];
-	const centerX = 0;
-	const centerY = 0;
 
 	// Build lookup map for achievements by ID
 	const achievementMap = new Map(achievements.map((a) => [a.id, a]));
@@ -85,8 +83,8 @@ export function generateSkillTreeData(
 	const avatarNode = {
 		id: "root-avatar",
 		position: {
-			x: centerX,
-			y: centerY,
+			x: 0,
+			y: 0,
 		},
 		data: {
 			level: user?.level ?? 0,
@@ -119,12 +117,14 @@ export function generateSkillTreeData(
 		// Generated Achievement type does NOT have 'level'. It has 'rarity'.
 		// We can map Rarity -> Level (Common=1, Mythic=6).
 
-		const baseAngle = categoryMeta[category].angle;
+		// const baseAngle = categoryMeta[category].angle; // Deprecated! We use the coordinates dev tool serialization now
 
 		for (const achievement of categoryAchievements) {
-			const radians = (baseAngle * Math.PI) / 180;
-			const x = centerX + Math.cos(radians);
-			const y = centerY + Math.sin(radians);
+			const savedCoords = (coordinatesData as Record<string, { x: number; y: number }>)[
+				achievement.id
+			];
+			const x = savedCoords?.x ?? 0;
+			const y = savedCoords?.y ?? 0;
 
 			nodes.push({
 				id: `${achievement.id}-node`,
