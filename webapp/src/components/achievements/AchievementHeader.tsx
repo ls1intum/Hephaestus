@@ -1,5 +1,5 @@
 import { useReactFlow } from "@xyflow/react";
-import { List, Map as MapIcon, Maximize2, Sparkles, ZoomIn, ZoomOut } from "lucide-react";
+import { List, Loader2, Map as MapIcon, Maximize2, Sparkles, ZoomIn, ZoomOut } from "lucide-react";
 import type { ViewMode } from "@/components/achievements/types";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -8,12 +8,16 @@ interface HeaderProps {
 	viewMode?: ViewMode;
 	onViewModeChange?: (mode: ViewMode) => void;
 	showZoomControls?: boolean;
+	isError?: boolean;
+	isLoading?: boolean;
 }
 
 export function AchievementHeader({
 	viewMode = "tree",
 	onViewModeChange,
 	showZoomControls = true,
+	isError = false,
+	isLoading = false,
 }: HeaderProps) {
 	const reactFlow = useReactFlow();
 
@@ -42,6 +46,17 @@ export function AchievementHeader({
 			</div>
 
 			<div className="flex items-center gap-4">
+				{isLoading ? (
+					<div className="flex items-center gap-2 px-3 py-1 bg-secondary/30 text-muted-foreground rounded-full border border-border text-xs font-medium">
+						<Loader2 className="w-3.5 h-3.5 animate-spin" />
+						Loading achievements...
+					</div>
+				) : isError ? (
+					<div className="flex items-center gap-1.5 px-3 py-1 bg-destructive/10 text-destructive rounded-full border border-destructive/20 text-xs font-medium">
+						<div className="w-2 h-2 rounded-full bg-destructive animate-pulse" />
+						Failed to load achievement data
+					</div>
+				) : null}
 				{/* View Mode Toggle */}
 				{onViewModeChange && (
 					<ToggleGroup

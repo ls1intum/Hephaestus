@@ -16,7 +16,7 @@ import { useAllAchievementDefinitions } from "@/hooks/use-all-achievement-defini
 import { useAuth } from "@/integrations/auth/AuthContext";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
-export const Route = createFileRoute("/_authenticated/achievements")({
+export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/achievements")({
 	component: AchievementsPage,
 });
 
@@ -59,6 +59,8 @@ function AchievementsPage() {
 					viewMode={viewMode}
 					onViewModeChange={setViewMode}
 					showZoomControls={viewMode === "tree"}
+					isError={achievementsQuery.isError}
+					isLoading={achievementsQuery.isLoading}
 				/>
 
 				<div className="flex-1 flex overflow-hidden">
@@ -82,45 +84,19 @@ function AchievementsPage() {
 								{/* Category labels */}
 								<CategoryLabels />
 
-								{/* Loading/error states */}
-								{achievementsQuery.isLoading && (
-									<div className="absolute inset-0 flex items-center justify-center z-10">
-										<div className="text-muted-foreground">Loading achievements...</div>
-									</div>
-								)}
 
-								{achievementsQuery.isError && (
-									<div className="absolute inset-0 flex items-center justify-center z-10">
-										<div className="text-destructive">
-											Failed to load achievements. Please try again.
-										</div>
-									</div>
-								)}
 
 								{/* Skill tree */}
-								<SkillTree user={user} achievements={uiAchievements} allDefinitions={allDefinitionsQuery.data} />
+								<SkillTree
+									user={user}
+									achievements={uiAchievements}
+									allDefinitions={allDefinitionsQuery.data}
+								/>
 							</>
 						) : (
 							<>
-								{/* Loading/error states for list view */}
-								{achievementsQuery.isLoading && (
-									<div className="flex-1 flex items-center justify-center">
-										<div className="text-muted-foreground">Loading achievements...</div>
-									</div>
-								)}
-
-								{achievementsQuery.isError && (
-									<div className="flex-1 flex items-center justify-center">
-										<div className="text-destructive">
-											Failed to load achievements. Please try again.
-										</div>
-									</div>
-								)}
-
 								{/* List view */}
-								{!achievementsQuery.isLoading && !achievementsQuery.isError && (
-									<AchievementsListView achievements={uiAchievements} />
-								)}
+								<AchievementsListView achievements={uiAchievements} />
 							</>
 						)}
 					</div>

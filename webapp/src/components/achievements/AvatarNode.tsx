@@ -34,7 +34,7 @@ export function AvatarNode({ data }: NodeProps<AvatarNode>) {
 						render={
 							<div
 								className={cn(
-									"absolute -bottom-1 -right-1 flex size-9 items-center justify-center rounded-full border-4 border-background text-primary-foreground font-bold text-sm shadow-md cursor-help",
+									"absolute -bottom-1 -right-1 flex size-9 items-center justify-center rounded-full border-4 border-background text-primary-foreground font-bold text-sm cursor-help z-100",
 									getLeagueColor(leagueTier),
 								)}
 							/>
