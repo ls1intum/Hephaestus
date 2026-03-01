@@ -12,7 +12,6 @@ import type { ViewMode } from "@/components/achievements/types";
 import { enhanceAchievements } from "@/components/achievements/utils.ts";
 import { useAchievementNotifications } from "@/hooks/use-achievement-notifications";
 import { useAchievements } from "@/hooks/use-achievements";
-import { useAllAchievementDefinitions } from "@/hooks/use-all-achievement-definitions";
 import { useAuth } from "@/integrations/auth/AuthContext";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
@@ -35,9 +34,6 @@ function AchievementsPage() {
 
 	// Fetch achievements from the API
 	const achievementsQuery = useAchievements(selectedSlug || "", username || "");
-
-	// Fetch all achievement definitions (dev-only, for Designer Mode)
-	const allDefinitionsQuery = useAllAchievementDefinitions(selectedSlug || "", username || "");
 
 	const uiAchievements = enhanceAchievements(achievementsQuery.data ?? []);
 
@@ -90,7 +86,6 @@ function AchievementsPage() {
 								<SkillTree
 									user={user}
 									achievements={uiAchievements}
-									allDefinitions={allDefinitionsQuery.data}
 								/>
 							</>
 						) : (

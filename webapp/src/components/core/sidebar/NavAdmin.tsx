@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { BookUser, Settings2, Users } from "lucide-react";
+import { BookUser, Settings2, Users, Map as MapIcon } from "lucide-react";
 import {
 	SidebarGroup,
 	SidebarGroupLabel,
@@ -38,6 +38,15 @@ export function NavAdmin({ workspaceSlug }: { workspaceSlug: string }) {
 					>
 						<Users />
 						<span>Manage teams</span>
+					</SidebarMenuButton>
+				</SidebarMenuItem>
+				<SidebarMenuItem>
+					<SidebarMenuButton
+						tooltip="Achievement Designer"
+						render={<Link to="/w/$workspaceSlug/admin/achievement-designer" params={{ workspaceSlug }} />}
+					>
+						<MapIcon />
+						<span>Achievement Designer</span>
 					</SidebarMenuButton>
 				</SidebarMenuItem>
 			</SidebarMenu>

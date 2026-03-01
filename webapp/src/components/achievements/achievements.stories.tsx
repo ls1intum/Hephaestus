@@ -3,12 +3,15 @@ import { ReactFlowProvider } from "@xyflow/react";
 import type { Achievement } from "@/api/types.gen";
 import { AchievementHeader } from "./AchievementHeader.tsx";
 import { AchievementNode } from "./AchievementNode.tsx";
-import type { AchievementNodeData } from "./data";
+
 import { SkillTree } from "./SkillTree.tsx";
+
 import { StatsPanel } from "./stats-panel";
+import type { UIAchievement } from "./types.ts";
+import { enhanceAchievements } from "./utils.ts";
 
 // Mock achievements data for stories
-const mockAchievements: Achievement[] = [
+const mockAchievements = [
 	{
 		id: "commit-1",
 		name: "First Commit",
@@ -46,7 +49,6 @@ const mockAchievements: Achievement[] = [
 		icon: "GitCommit",
 		progress: 8,
 		maxProgress: 10,
-		unlockedAt: undefined,
 	},
 	{
 		id: "pr-1",
@@ -85,7 +87,6 @@ const mockAchievements: Achievement[] = [
 		icon: "CircleDot",
 		progress: 0,
 		maxProgress: 1,
-		unlockedAt: undefined,
 	},
 	{
 		id: "comment-1",
@@ -98,9 +99,8 @@ const mockAchievements: Achievement[] = [
 		icon: "MessageSquare",
 		progress: 0,
 		maxProgress: 1,
-		unlockedAt: undefined,
 	},
-];
+] as unknown as Achievement[];
 
 const meta: Meta<typeof SkillTree> = {
 	component: SkillTree,
@@ -127,7 +127,7 @@ type Story = StoryObj<typeof SkillTree>;
  */
 export const Default: Story = {
 	args: {
-		achievements: mockAchievements,
+		achievements: enhanceAchievements(mockAchievements),
 	},
 };
 
@@ -141,7 +141,7 @@ export const Empty: Story = {
 };
 
 // Achievement Node Stories
-const mockUnlockedAchievement: AchievementNodeData = {
+const mockUnlockedAchievement = {
 	id: "commit-1",
 	name: "First Commit",
 	description: "Make your first commit to the repository",
@@ -157,7 +157,7 @@ const mockUnlockedAchievement: AchievementNodeData = {
 	ring: 1,
 };
 
-const mockAvailableAchievement: AchievementNodeData = {
+const mockAvailableAchievement = {
 	id: "commit-50",
 	name: "Commit Specialist",
 	description: "Push 50 commits to the repository",
@@ -172,7 +172,7 @@ const mockAvailableAchievement: AchievementNodeData = {
 	ring: 5,
 };
 
-const mockLockedAchievement: AchievementNodeData = {
+const mockLockedAchievement = {
 	id: "commit-250",
 	name: "Code Veteran",
 	description: "Push 250 commits - A true dedication to the codebase",
@@ -207,7 +207,7 @@ export const UnlockedNode: StoryObj<typeof AchievementNode> = {
 	...nodeMetaBase,
 	args: {
 		id: mockUnlockedAchievement.id,
-		data: mockUnlockedAchievement,
+		data: { achievement: mockUnlockedAchievement as unknown as UIAchievement },
 		type: "achievement",
 		dragging: false,
 		zIndex: 0,
@@ -230,7 +230,7 @@ export const AvailableNode: StoryObj<typeof AchievementNode> = {
 	...nodeMetaBase,
 	args: {
 		id: mockAvailableAchievement.id,
-		data: mockAvailableAchievement,
+		data: { achievement: mockAvailableAchievement as unknown as UIAchievement },
 		type: "achievement",
 		dragging: false,
 		zIndex: 0,
@@ -253,7 +253,7 @@ export const LockedNode: StoryObj<typeof AchievementNode> = {
 	...nodeMetaBase,
 	args: {
 		id: mockLockedAchievement.id,
-		data: mockLockedAchievement,
+		data: { achievement: mockLockedAchievement as unknown as UIAchievement },
 		type: "achievement",
 		dragging: false,
 		zIndex: 0,
@@ -276,7 +276,7 @@ export const LockedNode: StoryObj<typeof AchievementNode> = {
 export const StatsPanelStory: StoryObj<typeof StatsPanel> = {
 	render: () => (
 		<div className="dark bg-background h-screen">
-			<StatsPanel achievements={mockAchievements} />
+			<StatsPanel achievements={enhanceAchievements(mockAchievements)} />
 		</div>
 	),
 	parameters: {
