@@ -276,7 +276,10 @@
     <!-- User: uk_user_login_lower → uk_user_provider_login (provider_id, LOWER(login))
               + add (provider_id, native_id) for upsert ON CONFLICT -->
     <changeSet author="issue-715" id="1772284124265-8">
+        <comment>Drop non-provider-scoped user login constraints before adding provider-scoped ones.
+            uk_user_login_lower existed pre-refactor; uk_user_login was added by the consolidated changelog.</comment>
         <sql>DROP INDEX IF EXISTS uk_user_login_lower;</sql>
+        <sql>ALTER TABLE "user" DROP CONSTRAINT IF EXISTS uk_user_login;</sql>
     </changeSet>
     <changeSet author="issue-715" id="1772284124265-9">
         <preConditions onFail="MARK_RAN">
@@ -308,6 +311,18 @@
         <sql>ALTER TABLE repository DROP CONSTRAINT IF EXISTS uq_repository_name_with_owner;</sql>
         <addUniqueConstraint tableName="repository" columnNames="provider_id, name_with_owner"
                              constraintName="uq_repository_provider_name_with_owner"/>
+    </changeSet>
+
+    <!-- Team: drop non-provider-scoped unique before adding provider-scoped constraints -->
+    <changeSet author="issue-715" id="1772284124265-11a">
+        <comment>Drop the global team uniqueness constraint so teams with the same
+            (organization, name) can exist across different providers.
+            Replace with provider-scoped (provider_id, organization, name).</comment>
+        <sql>ALTER TABLE team DROP CONSTRAINT IF EXISTS uk_team_organization_name;</sql>
+        <sql>DROP INDEX IF EXISTS uk_team_organization_name;</sql>
+        <addUniqueConstraint tableName="team"
+                             columnNames="provider_id, organization, name"
+                             constraintName="uk_team_provider_organization_name"/>
     </changeSet>
 
     <!-- (provider_id, native_id) unique constraints for all remaining tables -->

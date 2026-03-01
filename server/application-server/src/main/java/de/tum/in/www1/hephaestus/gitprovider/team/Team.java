@@ -24,7 +24,10 @@ import org.springframework.lang.NonNull;
 @Table(
     name = "team",
     uniqueConstraints = {
-        @UniqueConstraint(name = "uk_team_organization_name", columnNames = { "organization", "name" }),
+        @UniqueConstraint(
+            name = "uk_team_provider_organization_name",
+            columnNames = { "provider_id", "organization", "name" }
+        ),
         @UniqueConstraint(name = "uq_team_provider_native_id", columnNames = { "provider_id", "native_id" }),
     }
 )
