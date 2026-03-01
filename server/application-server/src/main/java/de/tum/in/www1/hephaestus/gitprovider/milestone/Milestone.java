@@ -8,6 +8,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
@@ -61,7 +62,7 @@ public class Milestone extends BaseGitServiceEntity {
     @Column(name = "closed_issues_count", nullable = false)
     private int closedIssuesCount;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "creator_id")
     @ToString.Exclude
     private User creator;
@@ -70,7 +71,7 @@ public class Milestone extends BaseGitServiceEntity {
     @ToString.Exclude
     private Set<Issue> issues = new HashSet<>();
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "repository_id")
     @ToString.Exclude
     private Repository repository;

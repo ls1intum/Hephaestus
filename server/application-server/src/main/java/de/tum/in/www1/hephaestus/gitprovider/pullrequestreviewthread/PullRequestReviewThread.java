@@ -9,6 +9,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
@@ -70,17 +71,17 @@ public class PullRequestReviewThread extends BaseGitServiceEntity {
 
     private Boolean collapsed;
 
-    @OneToOne
+    @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "root_comment_id")
     @ToString.Exclude
     private PullRequestReviewComment rootComment;
 
-    @ManyToOne(optional = false)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "pull_request_id")
     @ToString.Exclude
     private PullRequest pullRequest;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "resolved_by_id")
     @ToString.Exclude
     private User resolvedBy;
