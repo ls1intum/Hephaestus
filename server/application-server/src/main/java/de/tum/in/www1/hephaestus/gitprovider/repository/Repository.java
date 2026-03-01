@@ -58,6 +58,7 @@ import org.springframework.lang.NonNull;
             name = "uq_repository_provider_name_with_owner",
             columnNames = { "provider_id", "name_with_owner" }
         ),
+        @UniqueConstraint(name = "uq_repository_provider_native_id", columnNames = { "provider_id", "native_id" }),
     }
 )
 @Getter

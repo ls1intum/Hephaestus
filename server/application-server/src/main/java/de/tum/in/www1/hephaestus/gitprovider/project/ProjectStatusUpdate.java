@@ -26,7 +26,13 @@ import org.springframework.lang.NonNull;
 @Entity
 @Table(
     name = "project_status_update",
-    uniqueConstraints = { @UniqueConstraint(name = "uk_project_status_update_node_id", columnNames = { "node_id" }) },
+    uniqueConstraints = {
+        @UniqueConstraint(name = "uk_project_status_update_node_id", columnNames = { "node_id" }),
+        @UniqueConstraint(
+            name = "uq_project_status_update_provider_native_id",
+            columnNames = { "provider_id", "native_id" }
+        ),
+    },
     indexes = { @Index(name = "idx_project_status_update_created_at", columnList = "project_id, created_at DESC") }
 )
 @Getter

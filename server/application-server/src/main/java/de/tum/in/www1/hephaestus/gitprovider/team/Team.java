@@ -25,6 +25,7 @@ import org.springframework.lang.NonNull;
     name = "team",
     uniqueConstraints = {
         @UniqueConstraint(name = "uk_team_organization_name", columnNames = { "organization", "name" }),
+        @UniqueConstraint(name = "uq_team_provider_native_id", columnNames = { "provider_id", "native_id" }),
     }
 )
 @Getter

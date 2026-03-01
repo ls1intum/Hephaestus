@@ -120,8 +120,8 @@ erDiagram
         VARCHAR(128) category_id FK
         BIGINT answer_chosen_by_id FK
         BIGINT answer_comment_id FK,UK
-        BIGINT native_id "NOT NULL"
-        BIGINT provider_id FK "NOT NULL"
+        BIGINT native_id UK "NOT NULL"
+        BIGINT provider_id FK,UK "NOT NULL"
     }
 
     DiscussionCategory {
@@ -150,8 +150,8 @@ erDiagram
         BIGINT discussion_id FK
         BIGINT author_id FK
         BIGINT parent_comment_id FK
-        BIGINT native_id "NOT NULL"
-        BIGINT provider_id FK "NOT NULL"
+        BIGINT native_id UK "NOT NULL"
+        BIGINT provider_id FK,UK "NOT NULL"
     }
 
     DiscussionLabel {
@@ -246,8 +246,8 @@ erDiagram
         VARCHAR(40) head_ref_oid
         VARCHAR(255) base_ref_name
         VARCHAR(40) base_ref_oid
-        BIGINT native_id "NOT NULL"
-        BIGINT provider_id FK "NOT NULL"
+        BIGINT native_id UK "NOT NULL"
+        BIGINT provider_id FK,UK "NOT NULL"
     }
 
     IssueAssignee {
@@ -269,8 +269,8 @@ erDiagram
         BIGINT author_id FK
         BIGINT issue_id FK
         TEXT body
-        BIGINT native_id "NOT NULL"
-        BIGINT provider_id FK "NOT NULL"
+        BIGINT native_id UK "NOT NULL"
+        BIGINT provider_id FK,UK "NOT NULL"
     }
 
     IssueLabel {
@@ -315,8 +315,8 @@ erDiagram
         INTEGER closed_issues_count "NOT NULL"
         INTEGER open_issues_count "NOT NULL"
         TIMESTAMPTZ last_sync_at
-        BIGINT native_id "NOT NULL"
-        BIGINT provider_id FK "NOT NULL"
+        BIGINT native_id UK "NOT NULL"
+        BIGINT provider_id FK,UK "NOT NULL"
     }
 
     Organization {
@@ -362,8 +362,8 @@ erDiagram
         TIMESTAMPTZ status_updates_synced_at
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
-        BIGINT native_id "NOT NULL"
-        BIGINT provider_id FK "NOT NULL"
+        BIGINT native_id UK "NOT NULL"
+        BIGINT provider_id FK,UK "NOT NULL"
     }
 
     ProjectField {
@@ -401,8 +401,8 @@ erDiagram
         BIGINT creator_id FK
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
-        BIGINT native_id "NOT NULL"
-        BIGINT provider_id FK "NOT NULL"
+        BIGINT native_id UK "NOT NULL"
+        BIGINT provider_id FK,UK "NOT NULL"
     }
 
     ProjectStatusUpdate {
@@ -417,8 +417,8 @@ erDiagram
         BIGINT creator_id FK
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
-        BIGINT native_id "NOT NULL"
-        BIGINT provider_id FK "NOT NULL"
+        BIGINT native_id UK "NOT NULL"
+        BIGINT provider_id FK,UK "NOT NULL"
     }
 
     PullRequestBadPractice {
@@ -476,8 +476,8 @@ erDiagram
         TEXT body
         TEXT diff_hunk
         BOOLEAN outdated
-        BIGINT native_id "NOT NULL"
-        BIGINT provider_id FK "NOT NULL"
+        BIGINT native_id UK "NOT NULL"
+        BIGINT provider_id FK,UK "NOT NULL"
     }
 
     PullRequestReviewThread {
@@ -496,8 +496,8 @@ erDiagram
         BOOLEAN outdated
         BOOLEAN collapsed
         BIGINT resolved_by_id FK
-        BIGINT native_id "NOT NULL"
-        BIGINT provider_id FK "NOT NULL"
+        BIGINT native_id UK "NOT NULL"
+        BIGINT provider_id FK,UK "NOT NULL"
     }
 
     Repository {
@@ -517,7 +517,7 @@ erDiagram
         BIGINT organization_id FK
         TIMESTAMPTZ last_sync_at
         BOOLEAN has_discussions_enabled "NOT NULL"
-        BIGINT native_id "NOT NULL"
+        BIGINT native_id UK "NOT NULL"
         BIGINT provider_id FK,UK "NOT NULL"
     }
 
@@ -559,8 +559,8 @@ erDiagram
         BIGINT parent_id
         VARCHAR(32) privacy
         TIMESTAMPTZ updated_at
-        BIGINT native_id "NOT NULL"
-        BIGINT provider_id FK "NOT NULL"
+        BIGINT native_id UK "NOT NULL"
+        BIGINT provider_id FK,UK "NOT NULL"
     }
 
     TeamMembership {
@@ -671,19 +671,30 @@ erDiagram
     ChatMessage ||--|| ChatThread : references
     GitCommit ||--|| CommitContributor : has
     DiscussionComment ||--|| Discussion : references
+    GitProvider ||--|| Discussion : references
     Repository ||--|| Discussion : has
     Repository ||--|| DiscussionCategory : has
+    GitProvider ||--|| DiscussionComment : commented_on
     Repository ||--|| GitCommit : has
+    GitProvider ||--|| Issue : references
     Repository ||--|| Issue : has
+    GitProvider ||--|| IssueComment : commented_on
     Repository ||--|| Label : labeled
+    GitProvider ||--|| Milestone : references
     Repository ||--|| Milestone : has
     GitProvider ||--|| Organization : references
+    GitProvider ||--|| Project : references
     Project ||--|| ProjectField : has
     ProjectField ||--|| ProjectFieldValue : has
     ProjectItem ||--|| ProjectFieldValue : has
     Project ||--|| ProjectItem : has
+    GitProvider ||--|| ProjectItem : references
+    GitProvider ||--|| ProjectStatusUpdate : references
+    GitProvider ||--|| PullRequestReviewComment : commented_on
+    GitProvider ||--|| PullRequestReviewThread : reviewed
     PullRequestReviewComment ||--|| PullRequestReviewThread : reviewed
     GitProvider ||--|| Repository : references
+    GitProvider ||--|| Team : references
     GitProvider ||--|| User : references
     User ||--|| UserPreference : has
     Organization ||--|| Workspace : has
@@ -704,11 +715,9 @@ erDiagram
     User ||--o{ Discussion : references
     User ||--o{ Discussion : authored_by
     DiscussionCategory ||--o{ Discussion : has
-    GitProvider ||--o{ Discussion : references
     User ||--o{ DiscussionComment : commented_on
     Discussion ||--o{ DiscussionComment : commented_on
     DiscussionComment ||--o{ DiscussionComment : commented_on
-    GitProvider ||--o{ DiscussionComment : commented_on
     User ||--o{ Document : has
     Workspace ||--o{ Document : has
     User ||--o{ GitCommit : authored_by
@@ -718,37 +727,28 @@ erDiagram
     User ||--o{ Issue : merged_by
     Milestone ||--o{ Issue : has
     Issue ||--o{ Issue : has
-    GitProvider ||--o{ Issue : references
     User ||--o{ IssueComment : commented_on
     Issue ||--o{ IssueComment : commented_on
-    GitProvider ||--o{ IssueComment : commented_on
     Organization ||--o{ IssueType : has
     User ||--o{ Milestone : created_by
-    GitProvider ||--o{ Milestone : references
     User ||--o{ Project : created_by
-    GitProvider ||--o{ Project : references
     User ||--o{ ProjectItem : created_by
     Issue ||--o{ ProjectItem : has
-    GitProvider ||--o{ ProjectItem : references
     User ||--o{ ProjectStatusUpdate : created_by
     Project ||--o{ ProjectStatusUpdate : has
-    GitProvider ||--o{ ProjectStatusUpdate : references
     BadPracticeDetection ||--o{ PullRequestBadPractice : has
     Issue ||--o{ PullRequestBadPractice : references
     User ||--o{ PullRequestReview : reviewed
     Issue ||--o{ PullRequestReview : reviewed
     User ||--o{ PullRequestReviewComment : commented_on
     PullRequestReviewComment ||--o{ PullRequestReviewComment : commented_on
-    GitProvider ||--o{ PullRequestReviewComment : commented_on
     Issue ||--o{ PullRequestReviewComment : commented_on
     PullRequestReview ||--o{ PullRequestReviewComment : commented_on
     PullRequestReviewThread ||--o{ PullRequestReviewComment : commented_on
-    GitProvider ||--o{ PullRequestReviewThread : reviewed
     Issue ||--o{ PullRequestReviewThread : reviewed
     User ||--o{ PullRequestReviewThread : reviewed
     Organization ||--o{ Repository : has
     Workspace ||--o{ RepositoryToMonitor : monitors
-    GitProvider ||--o{ Team : references
     Workspace ||--o{ WorkspaceSlugHistory : has
 
     %% Many-to-Many relationships

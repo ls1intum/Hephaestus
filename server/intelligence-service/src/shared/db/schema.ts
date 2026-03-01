@@ -440,6 +440,7 @@ export const discussion = pgTable(
 		}),
 		unique("uq_discussion_repo_number").on(table.number, table.repositoryId),
 		unique("uk_discussion_answer_comment_id").on(table.answerCommentId),
+		unique("uq_discussion_provider_native_id").on(table.nativeId, table.providerId),
 	],
 );
 
@@ -531,6 +532,7 @@ export const discussionComment = pgTable(
 			foreignColumns: [gitProvider.id],
 			name: "fk_discussion_comment_provider",
 		}),
+		unique("uq_discussion_comment_provider_native_id").on(table.nativeId, table.providerId),
 	],
 );
 
@@ -779,6 +781,7 @@ export const issue = pgTable(
 			name: "fk_issue_provider",
 		}),
 		unique("uk_issue_repository_number").on(table.number, table.repositoryId),
+		unique("uq_issue_provider_native_id").on(table.nativeId, table.providerId),
 		check(
 			"issue_merge_state_status_check",
 			sql`(merge_state_status)::text = ANY (ARRAY['BEHIND'::text, 'BLOCKED'::text, 'CLEAN'::text, 'DIRTY'::text, 'HAS_HOOKS'::text, 'UNKNOWN'::text, 'UNSTABLE'::text])`,
@@ -883,6 +886,7 @@ export const issueComment = pgTable(
 			foreignColumns: [gitProvider.id],
 			name: "fk_issue_comment_provider",
 		}),
+		unique("uq_issue_comment_provider_native_id").on(table.nativeId, table.providerId),
 	],
 );
 
@@ -1003,6 +1007,7 @@ export const milestone = pgTable(
 			name: "fk_milestone_provider",
 		}),
 		unique("uk_milestone_number_repository").on(table.number, table.repositoryId),
+		unique("uq_milestone_provider_native_id").on(table.nativeId, table.providerId),
 	],
 );
 
@@ -1117,6 +1122,7 @@ export const project = pgTable(
 		}),
 		unique("uk_project_node_id").on(table.nodeId),
 		unique("uk_project_owner_number").on(table.ownerType, table.ownerId, table.number),
+		unique("uq_project_provider_native_id").on(table.nativeId, table.providerId),
 	],
 );
 
@@ -1250,6 +1256,7 @@ export const projectItem = pgTable(
 			name: "fk_project_item_provider",
 		}),
 		unique("uk_project_item_project_nodeid").on(table.nodeId, table.projectId),
+		unique("uq_project_item_provider_native_id").on(table.nativeId, table.providerId),
 	],
 );
 
@@ -1303,6 +1310,7 @@ export const projectStatusUpdate = pgTable(
 			name: "fk_project_status_update_provider",
 		}),
 		unique("uk_project_status_update_node_id").on(table.nodeId),
+		unique("uq_project_status_update_provider_native_id").on(table.nativeId, table.providerId),
 	],
 );
 
@@ -1481,6 +1489,7 @@ export const pullRequestReviewComment = pgTable(
 			foreignColumns: [gitProvider.id],
 			name: "fk_pr_review_comment_provider",
 		}),
+		unique("uq_pr_review_comment_provider_native_id").on(table.nativeId, table.providerId),
 	],
 );
 
@@ -1546,6 +1555,7 @@ export const pullRequestReviewThread = pgTable(
 			name: "fk_pr_review_thread_provider",
 		}),
 		unique("uq_pr_review_thread_root_comment").on(table.rootCommentId),
+		unique("uq_pr_review_thread_provider_native_id").on(table.nativeId, table.providerId),
 	],
 );
 
@@ -1594,6 +1604,7 @@ export const repository = pgTable(
 			name: "fk_repository_provider",
 		}),
 		unique("uq_repository_provider_name_with_owner").on(table.nameWithOwner, table.providerId),
+		unique("uq_repository_provider_native_id").on(table.nativeId, table.providerId),
 	],
 );
 
@@ -1699,6 +1710,7 @@ export const team = pgTable(
 			name: "fk_team_provider",
 		}),
 		unique("uk_team_organization_name").on(table.name, table.organization),
+		unique("uq_team_provider_native_id").on(table.nativeId, table.providerId),
 	],
 );
 

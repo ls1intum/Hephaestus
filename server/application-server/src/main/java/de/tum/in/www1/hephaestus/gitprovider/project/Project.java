@@ -61,6 +61,7 @@ import org.springframework.lang.NonNull;
     uniqueConstraints = {
         @UniqueConstraint(name = "uk_project_owner_number", columnNames = { "owner_type", "owner_id", "number" }),
         @UniqueConstraint(name = "uk_project_node_id", columnNames = { "node_id" }),
+        @UniqueConstraint(name = "uq_project_provider_native_id", columnNames = { "provider_id", "native_id" }),
     }
 )
 @Getter
