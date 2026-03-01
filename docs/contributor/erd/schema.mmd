@@ -100,6 +100,8 @@ erDiagram
 
     Discussion {
         BIGINT id PK
+        BIGINT native_id UK "NOT NULL"
+        BIGINT provider_id FK,UK "NOT NULL"
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
         INTEGER number UK "NOT NULL"
@@ -120,8 +122,6 @@ erDiagram
         VARCHAR(128) category_id FK
         BIGINT answer_chosen_by_id FK
         BIGINT answer_comment_id FK,UK
-        BIGINT native_id UK "NOT NULL"
-        BIGINT provider_id FK,UK "NOT NULL"
     }
 
     DiscussionCategory {
@@ -138,6 +138,8 @@ erDiagram
 
     DiscussionComment {
         BIGINT id PK
+        BIGINT native_id UK "NOT NULL"
+        BIGINT provider_id FK,UK "NOT NULL"
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
         TEXT body
@@ -150,8 +152,6 @@ erDiagram
         BIGINT discussion_id FK
         BIGINT author_id FK
         BIGINT parent_comment_id FK
-        BIGINT native_id UK "NOT NULL"
-        BIGINT provider_id FK,UK "NOT NULL"
     }
 
     DiscussionLabel {
@@ -340,6 +340,8 @@ erDiagram
 
     Project {
         BIGINT id PK
+        BIGINT native_id UK "NOT NULL"
+        BIGINT provider_id FK,UK "NOT NULL"
         VARCHAR(64) node_id UK
         VARCHAR(32) owner_type UK "NOT NULL"
         BIGINT owner_id UK "NOT NULL"
@@ -362,8 +364,6 @@ erDiagram
         TIMESTAMPTZ status_updates_synced_at
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
-        BIGINT native_id UK "NOT NULL"
-        BIGINT provider_id FK,UK "NOT NULL"
     }
 
     ProjectField {
@@ -390,6 +390,8 @@ erDiagram
 
     ProjectItem {
         BIGINT id PK
+        BIGINT native_id UK "NOT NULL"
+        BIGINT provider_id FK,UK "NOT NULL"
         VARCHAR(64) node_id UK
         BIGINT project_id FK,UK "NOT NULL"
         VARCHAR(32) content_type "NOT NULL"
@@ -401,12 +403,12 @@ erDiagram
         BIGINT creator_id FK
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
-        BIGINT native_id UK "NOT NULL"
-        BIGINT provider_id FK,UK "NOT NULL"
     }
 
     ProjectStatusUpdate {
         BIGINT id PK
+        BIGINT native_id UK "NOT NULL"
+        BIGINT provider_id FK,UK "NOT NULL"
         VARCHAR(64) node_id UK
         BIGINT project_id FK "NOT NULL"
         TEXT body
@@ -417,8 +419,6 @@ erDiagram
         BIGINT creator_id FK
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
-        BIGINT native_id UK "NOT NULL"
-        BIGINT provider_id FK,UK "NOT NULL"
     }
 
     PullRequestBadPractice {
@@ -475,9 +475,9 @@ erDiagram
         BIGINT in_reply_to_id FK
         TEXT body
         TEXT diff_hunk
-        BOOLEAN outdated
         BIGINT native_id UK "NOT NULL"
         BIGINT provider_id FK,UK "NOT NULL"
+        BOOLEAN outdated
     }
 
     PullRequestReviewThread {
@@ -516,9 +516,9 @@ erDiagram
         VARCHAR(255) visibility
         BIGINT organization_id FK
         TIMESTAMPTZ last_sync_at
-        BOOLEAN has_discussions_enabled "NOT NULL"
         BIGINT native_id UK "NOT NULL"
         BIGINT provider_id FK,UK "NOT NULL"
+        BOOLEAN has_discussions_enabled "NOT NULL"
     }
 
     RepositoryCollaborator {
