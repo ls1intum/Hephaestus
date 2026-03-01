@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.testconfig;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 
@@ -14,9 +15,13 @@ public final class TestUserFactory {
         return repository.findByLogin(login).orElseGet(() -> repository.save(createUser(fallbackId, login)));
     }
 
+    public static User ensureUser(UserRepository repository, String login, long fallbackId, GitProvider provider) {
+        return repository.findByLogin(login).orElseGet(() -> repository.save(createUser(fallbackId, login, provider)));
+    }
+
     public static User createUser(long id, String login) {
         User user = new User();
-        user.setId(id);
+        user.setNativeId(id);
         user.setLogin(login);
         user.setName(login);
         user.setAvatarUrl("https://github.com/" + login + ".png");
@@ -26,6 +31,12 @@ public final class TestUserFactory {
         // Note: User preferences (notificationsEnabled, participateInResearch) are now
         // stored in the UserPreferences entity in the account module.
         // Note: leaguePoints is set on WorkspaceMembership, not User
+        return user;
+    }
+
+    public static User createUser(long id, String login, GitProvider provider) {
+        User user = createUser(id, login);
+        user.setProvider(provider);
         return user;
     }
 }

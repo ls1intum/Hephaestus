@@ -111,7 +111,7 @@ public class CommitAuthorEnrichmentService {
      * @param scopeId          the scope ID for GraphQL client authentication
      * @return the number of commits enriched
      */
-    public int enrichCommitAuthors(Long repositoryId, String nameWithOwner, @Nullable Long scopeId) {
+    public int enrichCommitAuthors(Long repositoryId, String nameWithOwner, @Nullable Long scopeId, Long providerId) {
         // Phase 1: Find all distinct unresolved emails from the database
         List<String> unresolvedAuthorEmails = commitRepository.findDistinctUnresolvedAuthorEmailsByRepositoryId(
             repositoryId
@@ -175,7 +175,8 @@ public class CommitAuthorEnrichmentService {
             nameWithOwner,
             scopeId,
             stillUnresolvedAuthorEmails,
-            stillUnresolvedCommitterEmails
+            stillUnresolvedCommitterEmails,
+            providerId
         );
 
         int total = enrichedByEmail + enrichedByApi;
@@ -232,7 +233,8 @@ public class CommitAuthorEnrichmentService {
         String nameWithOwner,
         Long scopeId,
         List<String> unresolvedAuthorEmails,
-        List<String> unresolvedCommitterEmails
+        List<String> unresolvedCommitterEmails,
+        Long providerId
     ) {
         // Collect all unique unresolved emails
         Set<String> allUnresolvedEmails = new HashSet<>(unresolvedAuthorEmails);
@@ -280,7 +282,13 @@ public class CommitAuthorEnrichmentService {
         );
 
         // Fetch commit authors in batches via GraphQL
-        Map<String, String> emailToLogin = fetchCommitAuthorsBatched(nameWithOwner, scopeId, validShas, shaToEmail);
+        Map<String, String> emailToLogin = fetchCommitAuthorsBatched(
+            nameWithOwner,
+            scopeId,
+            validShas,
+            shaToEmail,
+            providerId
+        );
 
         // Bulk update: for each email → login, resolve login → user_id,
         // then update all commits with that email
@@ -351,7 +359,8 @@ public class CommitAuthorEnrichmentService {
         String nameWithOwner,
         Long scopeId,
         List<String> shas,
-        Map<String, String> shaToEmail
+        Map<String, String> shaToEmail,
+        Long providerId
     ) {
         Map<String, String> emailToLogin = new HashMap<>();
         Map<Long, GitHubUserDTO> usersToUpsert = new HashMap<>();
@@ -401,7 +410,7 @@ public class CommitAuthorEnrichmentService {
             emailToLogin.putAll(batchResult);
         }
 
-        upsertUsers(usersToUpsert, nameWithOwner);
+        upsertUsers(usersToUpsert, nameWithOwner, providerId);
 
         return emailToLogin;
     }
@@ -648,7 +657,7 @@ public class CommitAuthorEnrichmentService {
         }
     }
 
-    private void upsertUsers(Map<Long, GitHubUserDTO> usersToUpsert, String nameWithOwner) {
+    private void upsertUsers(Map<Long, GitHubUserDTO> usersToUpsert, String nameWithOwner, Long providerId) {
         if (usersToUpsert.isEmpty()) {
             return;
         }
@@ -658,7 +667,7 @@ public class CommitAuthorEnrichmentService {
                 continue;
             }
             try {
-                userProcessor.ensureExists(dto);
+                userProcessor.ensureExists(dto, providerId);
                 processed++;
             } catch (Exception e) {
                 log.debug(

@@ -71,7 +71,7 @@ public class GitHubMemberMessageHandler extends GitHubMessageHandler<GitHubMembe
         }
 
         // Ensure user exists via processor
-        User user = userProcessor.ensureExists(memberDto);
+        User user = userProcessor.ensureExists(memberDto, context.providerId());
         if (user == null) {
             log.warn("Skipped member event: reason=userNotFound, userLogin={}", sanitizeForLog(memberDto.login()));
             return;

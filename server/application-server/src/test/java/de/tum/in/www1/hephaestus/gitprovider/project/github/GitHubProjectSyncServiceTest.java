@@ -188,7 +188,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
     private Organization createOrganization() {
         Organization org = new Organization();
         org.setId(ORG_DB_ID);
-        org.setGithubId(ORG_ID);
+        org.setNativeId(ORG_ID);
         org.setLogin(ORG_LOGIN);
         org.setName("Test Organization");
         org.setHtmlUrl("https://github.com/test-org");

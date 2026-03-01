@@ -150,12 +150,45 @@ public final class GitLabSyncConstants {
     private static final Pattern GID_PATTERN = Pattern.compile("^gid://gitlab/[A-Za-z]+/(\\d+)$");
 
     /**
+     * Returns the raw GitLab numeric ID as the native entity ID.
+     * <p>
+     * With the multi-provider architecture, each entity stores its original
+     * provider ID as {@code nativeId} alongside a {@code provider_id} FK.
+     * No negation is needed — provider scoping prevents collisions.
+     *
+     * @param rawGitLabId the raw GitLab numeric ID (positive)
+     * @return the same ID (identity function)
+     */
+    public static long toEntityId(long rawGitLabId) {
+        return rawGitLabId;
+    }
+
+    /**
      * Extracts the numeric ID from a GitLab Global ID string.
+     * <p>
+     * Convenience method combining {@link #extractNumericId(String)} with
+     * the identity {@link #toEntityId(long)}.
      * <p>
      * Example: {@code "gid://gitlab/Project/123"} → {@code 123L}
      *
      * @param globalId the GitLab Global ID (e.g., {@code "gid://gitlab/User/42"})
-     * @return the numeric database ID
+     * @return the numeric entity ID (positive)
+     * @throws IllegalArgumentException if the format is invalid
+     */
+    public static long extractEntityId(String globalId) {
+        return extractNumericId(globalId);
+    }
+
+    /**
+     * Extracts the raw numeric ID from a GitLab Global ID string.
+     * <p>
+     * Example: {@code "gid://gitlab/Project/123"} → {@code 123L}
+     * <p>
+     * Note: This returns the <b>raw</b> GitLab ID. Use {@link #extractEntityId(String)}
+     * or {@link #toEntityId(long)} to convert to a Hephaestus entity ID before persisting.
+     *
+     * @param globalId the GitLab Global ID (e.g., {@code "gid://gitlab/User/42"})
+     * @return the numeric database ID (positive)
      * @throws IllegalArgumentException if the format is invalid
      */
     public static long extractNumericId(String globalId) {

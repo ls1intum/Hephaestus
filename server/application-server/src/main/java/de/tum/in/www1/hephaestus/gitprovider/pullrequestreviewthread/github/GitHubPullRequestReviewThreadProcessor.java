@@ -41,7 +41,7 @@ public class GitHubPullRequestReviewThreadProcessor {
         }
 
         return threadRepository
-            .findById(threadId)
+            .findByNativeIdAndProviderId(threadId, context.providerId())
             .map(thread -> {
                 thread.setState(PullRequestReviewThread.State.RESOLVED);
                 if (resolvedBy != null) {
@@ -74,7 +74,7 @@ public class GitHubPullRequestReviewThreadProcessor {
         }
 
         return threadRepository
-            .findById(threadId)
+            .findByNativeIdAndProviderId(threadId, context.providerId())
             .map(thread -> {
                 thread.setState(PullRequestReviewThread.State.UNRESOLVED);
                 thread.setResolvedBy(null);

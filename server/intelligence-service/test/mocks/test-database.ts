@@ -50,14 +50,24 @@ interface TestUser {
 	name: string | null;
 }
 
+interface TestGitProvider {
+	id: number;
+	type: string;
+	serverUrl: string;
+}
+
 export interface TestFixtures {
 	workspace: TestWorkspace;
 	user: TestUser;
+	gitProvider: TestGitProvider;
 }
 
 /**
- * Create minimal required test data (workspace, user).
+ * Create minimal required test data (git_provider, workspace, user).
  * Uses raw SQL to bypass foreign key setup complexity.
+ *
+ * The git_provider is created first because user.provider_id (NOT NULL)
+ * has a foreign key constraint referencing git_provider.id.
  *
  * Verifies inserts succeeded to avoid silent failures that can cause
  * FK constraint errors later in tests.
@@ -68,8 +78,30 @@ export async function createTestFixtures(): Promise<TestFixtures> {
 	const id = Date.now() + (randomValue % 1000);
 	const workspaceId = id;
 	const userId = id + 1;
+	const gitProviderId = id + 2;
 	const workspaceSlug = `test-ws-${id}`;
 	const userLogin = `test-user-${id}`;
+	const gitProviderServerUrl = `https://test-${id}.example.com`;
+
+	// Insert git_provider - required FK for user.provider_id (NOT NULL)
+	const gitProviderResult = await db.execute(sql`
+		INSERT INTO git_provider (id, type, server_url, created_at)
+		VALUES (${gitProviderId}, 'GITHUB', ${gitProviderServerUrl}, NOW())
+		ON CONFLICT (id) DO NOTHING
+		RETURNING id
+	`);
+
+	if (gitProviderResult.rowCount === 0) {
+		const existingProvider = await db.execute(
+			sql`SELECT id FROM git_provider WHERE id = ${gitProviderId}`,
+		);
+		if (existingProvider.rowCount === 0) {
+			throw new Error(
+				`Failed to create test git_provider: ID ${gitProviderId} conflicts but no row found. ` +
+					`This may indicate a unique constraint violation on another column (e.g., type + server_url).`,
+			);
+		}
+	}
 
 	// Insert workspace - using actual schema columns
 	// Use RETURNING to verify the insert succeeded
@@ -93,11 +125,11 @@ export async function createTestFixtures(): Promise<TestFixtures> {
 		}
 	}
 
-	// Insert user - include all NOT NULL columns
+	// Insert user - include all NOT NULL columns (native_id and provider_id are required)
 	// Note: notifications_enabled and participate_in_research moved to user_preferences table
 	const userResult = await db.execute(sql`
-		INSERT INTO "user" (id, created_at, updated_at, login, name, type)
-		VALUES (${userId}, NOW(), NOW(), ${userLogin}, 'Test User', 'USER')
+		INSERT INTO "user" (id, created_at, updated_at, login, name, type, native_id, provider_id)
+		VALUES (${userId}, NOW(), NOW(), ${userLogin}, 'Test User', 'USER', ${userId}, ${gitProviderId})
 		ON CONFLICT (id) DO NOTHING
 		RETURNING id
 	`);
@@ -116,6 +148,7 @@ export async function createTestFixtures(): Promise<TestFixtures> {
 	return {
 		workspace: { id: workspaceId, name: "Test Workspace" },
 		user: { id: userId, login: userLogin, name: "Test User" },
+		gitProvider: { id: gitProviderId, type: "GITHUB", serverUrl: gitProviderServerUrl },
 	};
 }
 
@@ -168,9 +201,15 @@ export async function cleanupTestFixtures(fixtures: TestFixtures): Promise<void>
 		await cleanupTestThread(thread.id);
 	}
 
-	// Now safe to delete workspace and user
-	await db.execute(sql`DELETE FROM workspace WHERE id = ${fixtures.workspace.id}`);
+	// Delete documents (FK to user and workspace) before deleting user/workspace
+	await db.execute(sql`DELETE FROM document WHERE user_id = ${fixtures.user.id}`);
+
+	// Now safe to delete workspace, user, and git_provider (in FK order)
 	await db.execute(sql`DELETE FROM "user" WHERE id = ${fixtures.user.id}`);
+	await db.execute(sql`DELETE FROM workspace WHERE id = ${fixtures.workspace.id}`);
+	if (fixtures.gitProvider) {
+		await db.execute(sql`DELETE FROM git_provider WHERE id = ${fixtures.gitProvider.id}`);
+	}
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

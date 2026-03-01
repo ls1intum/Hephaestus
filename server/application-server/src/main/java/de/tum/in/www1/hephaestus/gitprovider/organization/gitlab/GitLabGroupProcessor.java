@@ -21,15 +21,10 @@ import org.springframework.transaction.annotation.Transactional;
  * <b>Key mapping decisions:</b>
  * <ul>
  *   <li>{@code fullPath} → {@code login} (unique identifier, supports nested groups)</li>
- *   <li>Numeric ID extracted from GID → {@code id} and {@code githubId}</li>
+ *   <li>Numeric ID extracted from GID, negated via {@link GitLabSyncConstants#toEntityId} → {@code id}</li>
  *   <li>{@code webUrl} → {@code htmlUrl}</li>
+ *   <li>{@code provider} = {@link GitProviderType#GITLAB}</li>
  * </ul>
- *
- * @implNote The {@code Organization} entity uses {@code id} and {@code githubId} as
- * provider-specific numeric IDs. GitLab group IDs and GitHub organization IDs are
- * independent sequences that may produce overlapping values. A runtime guard in
- * {@code WorkspaceActivationService.activateAllWorkspaces()} prevents mixed-provider
- * deployments from starting. A future schema migration will add a provider discriminator column.
  */
 @Service
 @ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
@@ -47,22 +42,23 @@ public class GitLabGroupProcessor {
      * Processes a GitLab group GraphQL response into an Organization entity.
      * <p>
      * Uses upsert for thread-safe concurrent inserts. If the group already exists,
-     * its mutable fields (name, avatar, URL) are updated.
+     * its mutable fields (name, avatar, URL) are updated. IDs are negated to avoid
+     * collision with GitHub organization IDs.
      *
      * @param group the GitLab group GraphQL response
      * @return the persisted Organization entity, or null if the response is invalid
      */
     @Transactional
     @Nullable
-    public Organization process(GitLabGroupResponse group) {
+    public Organization process(GitLabGroupResponse group, Long providerId) {
         if (group == null || group.id() == null || group.fullPath() == null || group.webUrl() == null) {
             log.warn("Skipped group processing: reason=nullOrMissingFields");
             return null;
         }
 
-        long numericId;
+        long nativeId;
         try {
-            numericId = GitLabSyncConstants.extractNumericId(group.id());
+            nativeId = GitLabSyncConstants.extractNumericId(group.id());
         } catch (IllegalArgumentException e) {
             log.warn("Skipped group processing: reason=invalidGlobalId, gid={}", group.id());
             return null;
@@ -73,8 +69,10 @@ public class GitLabGroupProcessor {
         String avatarUrl = group.avatarUrl();
         String htmlUrl = group.webUrl();
 
-        organizationRepository.upsert(numericId, numericId, login, name, avatarUrl, htmlUrl);
-        Organization organization = organizationRepository.findById(numericId).orElse(null);
+        organizationRepository.upsert(nativeId, providerId, login, name, avatarUrl, htmlUrl);
+        Organization organization = organizationRepository
+            .findByNativeIdAndProviderId(nativeId, providerId)
+            .orElse(null);
         if (organization != null) {
             Instant now = Instant.now();
             organization.setLastSyncAt(now);

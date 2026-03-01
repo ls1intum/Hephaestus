@@ -3,6 +3,9 @@ package de.tum.in.www1.hephaestus.gitprovider.discussioncomment.github;
 import static org.assertj.core.api.Assertions.*;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.AuthorAssociation;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.discussion.Discussion;
@@ -32,6 +35,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Integration tests for GitHubDiscussionCommentProcessor.
@@ -69,10 +73,16 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
     private OrganizationRepository organizationRepository;
 
     @Autowired
+    private GitProviderRepository gitProviderRepository;
+
+    @Autowired
     private WorkspaceRepository workspaceRepository;
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private TransactionTemplate transactionTemplate;
 
     @Autowired
     private TestCommentEventListener eventListener;
@@ -80,6 +90,7 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
     private Repository testRepository;
     private Workspace testWorkspace;
     private Discussion testDiscussion;
+    private GitProvider githubProvider;
 
     @BeforeEach
     void setUp() {
@@ -89,20 +100,26 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
     }
 
     private void setupTestData() {
+        // Create GitHub provider
+        githubProvider = gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
+            .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com")));
+
         // Create organization
         Organization org = new Organization();
-        org.setId(TEST_ORG_ID);
-        org.setGithubId(TEST_ORG_ID);
+        org.setNativeId(TEST_ORG_ID);
         org.setLogin(TEST_ORG_LOGIN);
         org.setCreatedAt(Instant.now());
         org.setUpdatedAt(Instant.now());
         org.setName("Hephaestus Test");
         org.setAvatarUrl("https://avatars.githubusercontent.com/u/" + TEST_ORG_ID);
+        org.setHtmlUrl("https://github.com/" + TEST_ORG_LOGIN);
+        org.setProvider(githubProvider);
         org = organizationRepository.save(org);
 
         // Create repository
         testRepository = new Repository();
-        testRepository.setId(TEST_REPO_ID);
+        testRepository.setNativeId(TEST_REPO_ID);
         testRepository.setName("TestRepository");
         testRepository.setNameWithOwner(TEST_REPO_FULL_NAME);
         testRepository.setHtmlUrl("https://github.com/" + TEST_REPO_FULL_NAME);
@@ -112,6 +129,7 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
         testRepository.setUpdatedAt(Instant.now());
         testRepository.setPushedAt(Instant.now());
         testRepository.setOrganization(org);
+        testRepository.setProvider(githubProvider);
         testRepository = repositoryRepository.save(testRepository);
 
         // Create workspace
@@ -127,7 +145,7 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
 
         // Create discussion
         testDiscussion = new Discussion();
-        testDiscussion.setId(TEST_DISCUSSION_ID);
+        testDiscussion.setNativeId(TEST_DISCUSSION_ID);
         testDiscussion.setNumber(27);
         testDiscussion.setTitle("Test Discussion");
         testDiscussion.setState(Discussion.State.OPEN);
@@ -135,6 +153,7 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
         testDiscussion.setCreatedAt(Instant.now());
         testDiscussion.setUpdatedAt(Instant.now());
         testDiscussion.setRepository(testRepository);
+        testDiscussion.setProvider(githubProvider);
         testDiscussion = discussionRepository.save(testDiscussion);
     }
 
@@ -181,7 +200,7 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
             DiscussionComment result = processor.process(dto, testDiscussion, context);
 
             assertThat(result).isNotNull();
-            assertThat(result.getId()).isEqualTo(TEST_COMMENT_ID);
+            assertThat(result.getNativeId()).isEqualTo(TEST_COMMENT_ID);
             assertThat(result.getBody()).isEqualTo("This is a test comment.");
             assertThat(result.getDiscussion().getId()).isEqualTo(testDiscussion.getId());
 
@@ -190,7 +209,7 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
                 .hasSize(1)
                 .first()
                 .satisfies(event -> {
-                    assertThat(event.comment().id()).isEqualTo(TEST_COMMENT_ID);
+                    assertThat(event.comment().id()).isEqualTo(result.getId());
                     assertThat(event.discussionId()).isEqualTo(testDiscussion.getId());
                     assertThat(event.context().scopeId()).isEqualTo(testWorkspace.getId());
                 });
@@ -244,7 +263,7 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
             DiscussionComment result = processor.process(dto, testDiscussion, context);
 
             assertThat(result).isNotNull();
-            assertThat(result.getId()).isEqualTo(TEST_COMMENT_ID);
+            assertThat(result.getNativeId()).isEqualTo(TEST_COMMENT_ID);
             assertThat(result.getAuthor()).isNull();
             assertThat(eventListener.getCreatedEvents()).hasSize(1);
         }
@@ -259,7 +278,7 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
 
             assertThat(result).isNotNull();
             assertThat(result.getDiscussion()).isNotNull();
-            assertThat(result.getDiscussion().getId()).isEqualTo(TEST_DISCUSSION_ID);
+            assertThat(result.getDiscussion().getNativeId()).isEqualTo(TEST_DISCUSSION_ID);
             assertThat(result.getDiscussion().getTitle()).isEqualTo("Test Discussion");
         }
 
@@ -285,7 +304,8 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
         void shouldUpdateCommentAndPublishEditedEventWhenBodyChanges() {
             // Create initial comment
             DiscussionComment existing = new DiscussionComment();
-            existing.setId(TEST_COMMENT_ID);
+            existing.setNativeId(TEST_COMMENT_ID);
+            existing.setProvider(githubProvider);
             existing.setBody("Original body");
             existing.setHtmlUrl(
                 "https://github.com/" + TEST_REPO_FULL_NAME + "/discussions/27#discussioncomment-" + TEST_COMMENT_ID
@@ -308,7 +328,7 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
                 .hasSize(1)
                 .first()
                 .satisfies(event -> {
-                    assertThat(event.comment().id()).isEqualTo(TEST_COMMENT_ID);
+                    assertThat(event.comment().id()).isEqualTo(result.getId());
                     assertThat(event.changedFields()).contains("body");
                     assertThat(event.discussionId()).isEqualTo(testDiscussion.getId());
                 });
@@ -319,7 +339,8 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
         void shouldUpdateAnswerStatusAndPublishEditedEvent() {
             // Create initial comment that is not an answer
             DiscussionComment existing = new DiscussionComment();
-            existing.setId(TEST_COMMENT_ID);
+            existing.setNativeId(TEST_COMMENT_ID);
+            existing.setProvider(githubProvider);
             existing.setBody("Answer body");
             existing.setHtmlUrl(
                 "https://github.com/" + TEST_REPO_FULL_NAME + "/discussions/27#discussioncomment-" + TEST_COMMENT_ID
@@ -401,9 +422,9 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
             DiscussionComment result3 = processor.process(dto, testDiscussion, context);
 
             // All results should have the same ID and body
-            assertThat(result1.getId()).isEqualTo(TEST_COMMENT_ID);
-            assertThat(result2.getId()).isEqualTo(TEST_COMMENT_ID);
-            assertThat(result3.getId()).isEqualTo(TEST_COMMENT_ID);
+            assertThat(result1.getNativeId()).isEqualTo(TEST_COMMENT_ID);
+            assertThat(result2.getNativeId()).isEqualTo(TEST_COMMENT_ID);
+            assertThat(result3.getNativeId()).isEqualTo(TEST_COMMENT_ID);
             assertThat(result1.getBody()).isEqualTo("Idempotent body");
             assertThat(result2.getBody()).isEqualTo("Idempotent body");
             assertThat(result3.getBody()).isEqualTo("Idempotent body");
@@ -429,7 +450,9 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
             processor.processDeleted(dto, createContext());
 
             // Verify comment is deleted
-            assertThat(commentRepository.existsById(TEST_COMMENT_ID)).isFalse();
+            assertThat(
+                commentRepository.findByNativeIdAndProviderId(TEST_COMMENT_ID, githubProvider.getId())
+            ).isEmpty();
 
             // Verify DiscussionCommentDeleted event was published
             assertThat(eventListener.getDeletedEvents())
@@ -447,7 +470,8 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
         void shouldSyncBidirectionalRelationshipWhenDeleting() {
             // Create comment with bidirectional relationship set up
             DiscussionComment existing = new DiscussionComment();
-            existing.setId(TEST_COMMENT_ID);
+            existing.setNativeId(TEST_COMMENT_ID);
+            existing.setProvider(githubProvider);
             existing.setBody("Comment to test bidirectional sync");
             existing.setHtmlUrl(
                 "https://github.com/" + TEST_REPO_FULL_NAME + "/discussions/27#discussioncomment-" + TEST_COMMENT_ID
@@ -467,7 +491,9 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
             assertThatCode(() -> processor.processDeleted(dto, createContext())).doesNotThrowAnyException();
 
             // Verify comment is deleted
-            assertThat(commentRepository.existsById(TEST_COMMENT_ID)).isFalse();
+            assertThat(
+                commentRepository.findByNativeIdAndProviderId(TEST_COMMENT_ID, githubProvider.getId())
+            ).isEmpty();
         }
 
         @Test
@@ -548,10 +574,14 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
             // Resolve parent
             processor.resolveParentComment(reply, parent);
 
-            // Verify parent was set
-            DiscussionComment savedReply = commentRepository.findById(replyId).orElseThrow();
-            assertThat(savedReply.getParentComment()).isNotNull();
-            assertThat(savedReply.getParentComment().getId()).isEqualTo(parentId);
+            // Verify parent was set (wrap in transaction to avoid LazyInitializationException)
+            transactionTemplate.executeWithoutResult(status -> {
+                DiscussionComment savedReply = commentRepository
+                    .findByNativeIdAndProviderId(replyId, githubProvider.getId())
+                    .orElseThrow();
+                assertThat(savedReply.getParentComment()).isNotNull();
+                assertThat(savedReply.getParentComment().getNativeId()).isEqualTo(parentId);
+            });
         }
     }
 

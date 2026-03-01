@@ -2,6 +2,9 @@ package de.tum.in.www1.hephaestus.activity;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
@@ -47,7 +50,11 @@ class ActivityEventServiceIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private RepositoryRepository repositoryRepository;
 
+    @Autowired
+    private GitProviderRepository gitProviderRepository;
+
     private Workspace testWorkspace;
+    private GitProvider gitProvider;
     private User testUser;
     private Repository testRepository;
 
@@ -66,9 +73,14 @@ class ActivityEventServiceIntegrationTest extends BaseIntegrationTest {
         testWorkspace.setAccountType(AccountType.ORG);
         testWorkspace = workspaceRepository.save(testWorkspace);
 
+        // Create git provider
+        gitProvider = gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
+            .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com")));
+
         // Create user
         testUser = new User();
-        testUser.setId(12345L);
+        testUser.setNativeId(12345L);
         testUser.setLogin("test-user");
         testUser.setName("Test User");
         testUser.setAvatarUrl("https://example.com/avatar.png");
@@ -76,11 +88,12 @@ class ActivityEventServiceIntegrationTest extends BaseIntegrationTest {
         testUser.setType(User.Type.USER);
         testUser.setCreatedAt(Instant.now());
         testUser.setUpdatedAt(Instant.now());
+        testUser.setProvider(gitProvider);
         testUser = userRepository.save(testUser);
 
         // Create repository
         testRepository = new Repository();
-        testRepository.setId(67890L);
+        testRepository.setNativeId(67890L);
         testRepository.setName("test-repo");
         testRepository.setNameWithOwner("test-org/test-repo");
         testRepository.setHtmlUrl("https://github.com/test-org/test-repo");
@@ -89,6 +102,7 @@ class ActivityEventServiceIntegrationTest extends BaseIntegrationTest {
         testRepository.setPushedAt(Instant.now());
         testRepository.setCreatedAt(Instant.now());
         testRepository.setUpdatedAt(Instant.now());
+        testRepository.setProvider(gitProvider);
         testRepository = repositoryRepository.save(testRepository);
     }
 

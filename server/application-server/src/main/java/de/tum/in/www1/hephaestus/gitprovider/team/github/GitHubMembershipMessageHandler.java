@@ -2,6 +2,8 @@ package de.tum.in.www1.hephaestus.gitprovider.team.github;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
@@ -27,12 +29,16 @@ public class GitHubMembershipMessageHandler extends GitHubMessageHandler<GitHubM
 
     private static final Logger log = LoggerFactory.getLogger(GitHubMembershipMessageHandler.class);
 
+    private static final String GITHUB_SERVER_URL = "https://github.com";
+
     private final GitHubUserProcessor userProcessor;
+    private final GitProviderRepository gitProviderRepository;
     private final TeamRepository teamRepository;
     private final TeamMembershipRepository teamMembershipRepository;
 
     GitHubMembershipMessageHandler(
         GitHubUserProcessor userProcessor,
+        GitProviderRepository gitProviderRepository,
         TeamRepository teamRepository,
         TeamMembershipRepository teamMembershipRepository,
         NatsMessageDeserializer deserializer,
@@ -40,6 +46,7 @@ public class GitHubMembershipMessageHandler extends GitHubMessageHandler<GitHubM
     ) {
         super(GitHubMembershipEventDTO.class, deserializer, transactionTemplate);
         this.userProcessor = userProcessor;
+        this.gitProviderRepository = gitProviderRepository;
         this.teamRepository = teamRepository;
         this.teamMembershipRepository = teamMembershipRepository;
     }
@@ -73,8 +80,14 @@ public class GitHubMembershipMessageHandler extends GitHubMessageHandler<GitHubM
             event.organization() != null ? sanitizeForLog(event.organization().login()) : "unknown"
         );
 
+        // Resolve GitHub provider ID for user upsert
+        Long providerId = gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITHUB, GITHUB_SERVER_URL)
+            .orElseThrow(() -> new IllegalStateException("GitProvider not found for GitHub"))
+            .getId();
+
         // Ensure user exists via processor
-        User user = userProcessor.ensureExists(memberDto);
+        User user = userProcessor.ensureExists(memberDto, providerId);
         if (user == null) {
             log.warn("Skipped membership event: reason=userNotFound, userLogin={}", sanitizeForLog(memberDto.login()));
             return;

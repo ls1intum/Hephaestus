@@ -9,8 +9,12 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabEventType;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
@@ -19,6 +23,7 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.gitlab.dto.GitLabPushEve
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import io.nats.client.Message;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Optional;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,6 +37,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 @DisplayName("GitLabPushMessageHandler")
 class GitLabPushMessageHandlerTest extends BaseUnitTest {
 
+    private static final Long PROVIDER_ID = 2L;
+    private static final String DEFAULT_SERVER_URL = "https://gitlab.lrz.de";
+
     @Mock
     private GitLabProjectProcessor projectProcessor;
 
@@ -42,10 +50,14 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
     private RepositoryRepository repositoryRepository;
 
     @Mock
+    private GitProviderRepository gitProviderRepository;
+
+    @Mock
     private NatsMessageDeserializer deserializer;
 
     private TransactionTemplate transactionTemplate;
     private GitLabPushMessageHandler handler;
+    private GitProvider gitLabProvider;
 
     @BeforeEach
     void setUp() {
@@ -61,10 +73,30 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
             .when(transactionTemplate)
             .executeWithoutResult(any());
 
+        GitLabProperties properties = new GitLabProperties(
+            DEFAULT_SERVER_URL,
+            Duration.ofSeconds(30),
+            Duration.ofSeconds(60),
+            Duration.ofMillis(200),
+            Duration.ofMinutes(5)
+        );
+
+        gitLabProvider = new GitProvider();
+        gitLabProvider.setId(PROVIDER_ID);
+        gitLabProvider.setType(GitProviderType.GITLAB);
+        gitLabProvider.setServerUrl(DEFAULT_SERVER_URL);
+
+        // Default: provider lookup succeeds
+        lenient()
+            .when(gitProviderRepository.findByTypeAndServerUrl(GitProviderType.GITLAB, DEFAULT_SERVER_URL))
+            .thenReturn(Optional.of(gitLabProvider));
+
         handler = new GitLabPushMessageHandler(
             projectProcessor,
             organizationRepository,
             repositoryRepository,
+            gitProviderRepository,
+            properties,
             deserializer,
             transactionTemplate
         );
@@ -102,7 +134,7 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
 
         Repository repo = new Repository();
         repo.setId(246765L);
-        when(projectProcessor.processPushEvent(projectInfo)).thenReturn(repo);
+        when(projectProcessor.processPushEvent(projectInfo, gitLabProvider)).thenReturn(repo);
 
         // Org lookup — simulate existing org in DB
         Organization org = new Organization();
@@ -113,7 +145,7 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
         Message msg = mockMessage("gitlab.hephaestustest.demo-repository.push", pushEvent);
         handler.onMessage(msg);
 
-        verify(projectProcessor).processPushEvent(projectInfo);
+        verify(projectProcessor).processPushEvent(projectInfo, gitLabProvider);
         verify(repositoryRepository).save(repo);
         assertThat(repo.getOrganization()).isSameAs(org);
     }
@@ -145,7 +177,7 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
         Message msg = mockMessage("gitlab.org.proj.push", pushEvent);
         handler.onMessage(msg);
 
-        verify(projectProcessor, never()).processPushEvent(any());
+        verify(projectProcessor, never()).processPushEvent(any(), any());
     }
 
     @Test
@@ -165,7 +197,7 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
         Message msg = mockMessage("gitlab.org.proj.push", pushEvent);
         handler.onMessage(msg);
 
-        verify(projectProcessor, never()).processPushEvent(any());
+        verify(projectProcessor, never()).processPushEvent(any(), any());
     }
 
     @Test
@@ -192,12 +224,12 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
             1
         );
 
-        when(projectProcessor.processPushEvent(projectInfo)).thenReturn(null);
+        when(projectProcessor.processPushEvent(projectInfo, gitLabProvider)).thenReturn(null);
 
         Message msg = mockMessage("gitlab.org.proj.push", pushEvent);
         handler.onMessage(msg);
 
-        verify(projectProcessor).processPushEvent(projectInfo);
+        verify(projectProcessor).processPushEvent(projectInfo, gitLabProvider);
         // Processor returned null — no org linking attempted
         verify(organizationRepository, never()).findByLoginIgnoreCase(anyString());
     }
@@ -211,7 +243,7 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
         handler.onMessage(msg);
 
         verify(deserializer, never()).deserialize(any(), any());
-        verify(projectProcessor, never()).processPushEvent(any());
+        verify(projectProcessor, never()).processPushEvent(any(), any());
     }
 
     // ========================================================================
@@ -233,7 +265,7 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
             repo.setOrganization(existingOrg); // already linked
 
             var projectInfo = createProjectInfo(1L, "org/proj");
-            when(projectProcessor.processPushEvent(projectInfo)).thenReturn(repo);
+            when(projectProcessor.processPushEvent(projectInfo, gitLabProvider)).thenReturn(repo);
 
             Message msg = mockMessage("gitlab.org.proj.push", createPushEvent(projectInfo));
             handler.onMessage(msg);
@@ -249,7 +281,7 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
             repo.setId(1L);
 
             var projectInfo = createProjectInfo(1L, "org/proj");
-            when(projectProcessor.processPushEvent(projectInfo)).thenReturn(repo);
+            when(projectProcessor.processPushEvent(projectInfo, gitLabProvider)).thenReturn(repo);
 
             Organization org = new Organization();
             org.setId(42L);
@@ -269,7 +301,7 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
             repo.setId(1L);
 
             var projectInfo = createProjectInfo(1L, "org/proj");
-            when(projectProcessor.processPushEvent(projectInfo)).thenReturn(repo);
+            when(projectProcessor.processPushEvent(projectInfo, gitLabProvider)).thenReturn(repo);
             when(organizationRepository.findByLoginIgnoreCase("org")).thenReturn(Optional.empty());
 
             Message msg = mockMessage("gitlab.org.proj.push", createPushEvent(projectInfo));
@@ -288,7 +320,7 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
 
             // Project in nested group: org/team/subteam/project
             var projectInfo = createProjectInfo(1L, "org/team/subteam/project");
-            when(projectProcessor.processPushEvent(projectInfo)).thenReturn(repo);
+            when(projectProcessor.processPushEvent(projectInfo, gitLabProvider)).thenReturn(repo);
 
             Organization org = new Organization();
             org.setId(42L);
@@ -309,7 +341,7 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
 
             // User-owned project has no slash in path
             var projectInfo = createProjectInfo(1L, "myproject");
-            when(projectProcessor.processPushEvent(projectInfo)).thenReturn(repo);
+            when(projectProcessor.processPushEvent(projectInfo, gitLabProvider)).thenReturn(repo);
 
             Message msg = mockMessage("gitlab.myproject.push", createPushEvent(projectInfo));
             handler.onMessage(msg);

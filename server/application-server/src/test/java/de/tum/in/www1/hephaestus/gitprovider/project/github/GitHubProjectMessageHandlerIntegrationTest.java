@@ -3,6 +3,9 @@ package de.tum.in.www1.hephaestus.gitprovider.project.github;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
@@ -58,6 +61,9 @@ class GitHubProjectMessageHandlerIntegrationTest extends BaseIntegrationTest {
     private WorkspaceRepository workspaceRepository;
 
     @Autowired
+    private GitProviderRepository gitProviderRepository;
+
+    @Autowired
     private ObjectMapper objectMapper;
 
     @Autowired
@@ -73,15 +79,20 @@ class GitHubProjectMessageHandlerIntegrationTest extends BaseIntegrationTest {
     }
 
     private void setupTestData() {
+        // Create GitHub provider
+        GitProvider gitProvider = gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
+            .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com")));
+
         // Create organization matching the fixture data
         testOrganization = new Organization();
-        testOrganization.setId(215361191L);
-        testOrganization.setGithubId(215361191L);
+        testOrganization.setNativeId(215361191L);
         testOrganization.setLogin("HephaestusTest");
         testOrganization.setCreatedAt(Instant.now());
         testOrganization.setUpdatedAt(Instant.now());
         testOrganization.setName("Hephaestus Test");
         testOrganization.setAvatarUrl("https://avatars.githubusercontent.com/u/215361191?v=4");
+        testOrganization.setProvider(gitProvider);
         testOrganization = organizationRepository.save(testOrganization);
 
         // Create workspace for scope resolution
@@ -115,28 +126,28 @@ class GitHubProjectMessageHandlerIntegrationTest extends BaseIntegrationTest {
         assertThat(
             projectRepository.findByOwnerTypeAndOwnerIdAndNumber(
                 Project.OwnerType.ORGANIZATION,
-                testOrganization.getId(),
+                testOrganization.getNativeId(),
                 event.project().number()
             )
         )
             .isPresent()
             .get()
             .satisfies(project -> {
-                assertThat(project.getId()).isEqualTo(FIXTURE_PROJECT_ID);
+                assertThat(project.getNativeId()).isEqualTo(FIXTURE_PROJECT_ID);
                 assertThat(project.getNodeId()).isEqualTo(FIXTURE_PROJECT_NODE_ID);
                 assertThat(project.getTitle()).isEqualTo(FIXTURE_PROJECT_TITLE);
                 assertThat(project.getNumber()).isEqualTo(FIXTURE_PROJECT_NUMBER);
                 assertThat(project.getOwnerType()).isEqualTo(Project.OwnerType.ORGANIZATION);
-                assertThat(project.getOwnerId()).isEqualTo(testOrganization.getId());
+                assertThat(project.getOwnerId()).isEqualTo(testOrganization.getNativeId());
                 assertThat(project.isClosed()).isFalse();
                 assertThat(project.isPublic()).isFalse();
                 assertThat(project.getShortDescription()).isNull();
                 assertThat(project.getCreatedAt()).isEqualTo(FIXTURE_CREATED_AT);
             });
 
-        // Verify domain event
+        // Verify domain event (project().id() is the synthetic PK, not the native ID)
         assertThat(eventListener.getCreatedEvents()).hasSize(1);
-        assertThat(eventListener.getCreatedEvents().getFirst().project().id()).isEqualTo(FIXTURE_PROJECT_ID);
+        assertThat(eventListener.getCreatedEvents().getFirst().project().id()).isNotNull();
     }
 
     @Test
@@ -157,7 +168,7 @@ class GitHubProjectMessageHandlerIntegrationTest extends BaseIntegrationTest {
         assertThat(
             projectRepository.findByOwnerTypeAndOwnerIdAndNumber(
                 Project.OwnerType.ORGANIZATION,
-                testOrganization.getId(),
+                testOrganization.getNativeId(),
                 editEvent.project().number()
             )
         )
@@ -191,7 +202,7 @@ class GitHubProjectMessageHandlerIntegrationTest extends BaseIntegrationTest {
         assertThat(
             projectRepository.findByOwnerTypeAndOwnerIdAndNumber(
                 Project.OwnerType.ORGANIZATION,
-                testOrganization.getId(),
+                testOrganization.getNativeId(),
                 closedEvent.project().number()
             )
         )
@@ -199,9 +210,9 @@ class GitHubProjectMessageHandlerIntegrationTest extends BaseIntegrationTest {
             .get()
             .satisfies(project -> assertThat(project.isClosed()).isTrue());
 
-        // Verify ProjectClosed domain event
+        // Verify ProjectClosed domain event (project().id() is the synthetic PK)
         assertThat(eventListener.getClosedEvents()).hasSize(1);
-        assertThat(eventListener.getClosedEvents().getFirst().project().id()).isEqualTo(FIXTURE_PROJECT_ID);
+        assertThat(eventListener.getClosedEvents().getFirst().project().id()).isNotNull();
     }
 
     @Test
@@ -225,7 +236,7 @@ class GitHubProjectMessageHandlerIntegrationTest extends BaseIntegrationTest {
         assertThat(
             projectRepository.findByOwnerTypeAndOwnerIdAndNumber(
                 Project.OwnerType.ORGANIZATION,
-                testOrganization.getId(),
+                testOrganization.getNativeId(),
                 reopenedEvent.project().number()
             )
         )
@@ -233,9 +244,9 @@ class GitHubProjectMessageHandlerIntegrationTest extends BaseIntegrationTest {
             .get()
             .satisfies(project -> assertThat(project.isClosed()).isFalse());
 
-        // Verify ProjectReopened domain event
+        // Verify ProjectReopened domain event (project().id() is the synthetic PK)
         assertThat(eventListener.getReopenedEvents()).hasSize(1);
-        assertThat(eventListener.getReopenedEvents().getFirst().project().id()).isEqualTo(FIXTURE_PROJECT_ID);
+        assertThat(eventListener.getReopenedEvents().getFirst().project().id()).isNotNull();
     }
 
     @Test
@@ -246,9 +257,8 @@ class GitHubProjectMessageHandlerIntegrationTest extends BaseIntegrationTest {
         handler.handleEvent(createEvent);
         eventListener.clear();
 
-        // Verify project exists
-        Long projectId = createEvent.project().getDatabaseId();
-        assertThat(projectRepository.findById(projectId)).isPresent();
+        // Verify project exists (use nodeId since findById expects synthetic PK)
+        assertThat(projectRepository.findByNodeId(FIXTURE_PROJECT_NODE_ID)).isPresent();
 
         // Load and process deleted event
         GitHubProjectEventDTO deletedEvent = loadPayload("projects_v2.deleted");
@@ -257,11 +267,11 @@ class GitHubProjectMessageHandlerIntegrationTest extends BaseIntegrationTest {
         handler.handleEvent(deletedEvent);
 
         // Then - project should be deleted
-        assertThat(projectRepository.findById(projectId)).isEmpty();
+        assertThat(projectRepository.findByNodeId(FIXTURE_PROJECT_NODE_ID)).isEmpty();
 
-        // Verify ProjectDeleted domain event
+        // Verify ProjectDeleted domain event (projectId is the synthetic PK)
         assertThat(eventListener.getDeletedEvents()).hasSize(1);
-        assertThat(eventListener.getDeletedEvents().getFirst().projectId()).isEqualTo(FIXTURE_PROJECT_ID);
+        assertThat(eventListener.getDeletedEvents().getFirst().projectId()).isNotNull();
         assertThat(eventListener.getDeletedEvents().getFirst().projectTitle()).isEqualTo(FIXTURE_PROJECT_TITLE);
     }
 
@@ -296,7 +306,7 @@ class GitHubProjectMessageHandlerIntegrationTest extends BaseIntegrationTest {
         assertThat(
             projectRepository.findByOwnerTypeAndOwnerIdAndNumber(
                 Project.OwnerType.ORGANIZATION,
-                testOrganization.getId(),
+                testOrganization.getNativeId(),
                 event.project().number()
             )
         ).isPresent();

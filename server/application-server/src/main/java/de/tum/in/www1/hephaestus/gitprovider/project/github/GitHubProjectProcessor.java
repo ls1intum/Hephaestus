@@ -78,7 +78,7 @@ public class GitHubProjectProcessor extends BaseGitHubProcessor {
         ProcessingContext context,
         Long actorId
     ) {
-        UpsertResult result = upsertProject(dto, ownerType, ownerId);
+        UpsertResult result = upsertProject(dto, ownerType, ownerId, context);
         if (result == null) {
             return null;
         }
@@ -118,9 +118,15 @@ public class GitHubProjectProcessor extends BaseGitHubProcessor {
      * @param dto the GitHub project DTO
      * @param ownerType the type of owner
      * @param ownerId the ID of the owner entity
+     * @param context processing context with scope information
      * @return UpsertResult containing the project and whether it was new, or null if processing was skipped
      */
-    private UpsertResult upsertProject(GitHubProjectDTO dto, Project.OwnerType ownerType, Long ownerId) {
+    private UpsertResult upsertProject(
+        GitHubProjectDTO dto,
+        Project.OwnerType ownerType,
+        Long ownerId,
+        ProcessingContext context
+    ) {
         if (dto == null) {
             log.warn("Skipped project processing: reason=nullDto, ownerId={}", ownerId);
             return null;
@@ -136,11 +142,12 @@ public class GitHubProjectProcessor extends BaseGitHubProcessor {
         boolean isNew = !projectRepository.existsByOwnerTypeAndOwnerIdAndNumber(ownerType, ownerId, dto.number());
 
         // Find or create creator
-        User creator = dto.creator() != null ? findOrCreateUser(dto.creator()) : null;
+        User creator = dto.creator() != null ? findOrCreateUser(dto.creator(), context.providerId()) : null;
 
         // Perform atomic upsert
         projectRepository.upsertCore(
             dbId,
+            context.providerId(),
             dto.nodeId(),
             ownerType.name(),
             ownerId,
@@ -213,7 +220,7 @@ public class GitHubProjectProcessor extends BaseGitHubProcessor {
         ProcessingContext context,
         Long actorId
     ) {
-        UpsertResult result = upsertProject(dto, ownerType, ownerId);
+        UpsertResult result = upsertProject(dto, ownerType, ownerId, context);
         if (result == null) {
             return null;
         }
@@ -262,7 +269,7 @@ public class GitHubProjectProcessor extends BaseGitHubProcessor {
         ProcessingContext context,
         Long actorId
     ) {
-        UpsertResult result = upsertProject(dto, ownerType, ownerId);
+        UpsertResult result = upsertProject(dto, ownerType, ownerId, context);
         if (result == null) {
             return null;
         }

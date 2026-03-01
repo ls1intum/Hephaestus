@@ -8,6 +8,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
@@ -44,6 +45,9 @@ class WorkspaceProvisioningServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private GitProviderRepository gitProviderRepository;
 
     @Mock
     private WorkspaceMembershipRepository workspaceMembershipRepository;
@@ -84,6 +88,7 @@ class WorkspaceProvisioningServiceTest {
             workspaceRepositoryMonitorService,
             gitHubAppTokenService,
             userRepository,
+            gitProviderRepository,
             workspaceMembershipRepository,
             workspaceMembershipService,
             workspaceScopeFilter,

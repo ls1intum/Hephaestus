@@ -95,7 +95,7 @@ public class GitHubPullRequestReviewThreadMessageHandler
                     return;
                 }
                 // Ensure the sender (who resolved the thread) exists
-                User resolvedBy = userProcessor.ensureExists(event.sender());
+                User resolvedBy = userProcessor.ensureExists(event.sender(), context.providerId());
                 threadProcessor.resolve(threadId, resolvedBy, context);
             }
             case GitHubEventAction.PullRequestReviewThread.UNRESOLVED -> {

@@ -46,14 +46,15 @@ public class GitHubTeamProcessor {
             existingTeam = teamRepository.findByOrganizationIgnoreCaseAndName(orgLogin, dto.name());
         }
 
-        // Fall back to ID lookup if natural key not found (handles renames)
+        // Fall back to nativeId lookup if natural key not found (handles renames)
         if (existingTeam.isEmpty()) {
-            existingTeam = teamRepository.findById(dto.id());
+            existingTeam = teamRepository.findByNativeIdAndProviderId(dto.id(), context.providerId());
         }
 
         Team team = existingTeam.orElseGet(() -> {
             Team t = new Team();
-            t.setId(dto.id());
+            t.setNativeId(dto.id());
+            t.setProvider(context.provider());
             return t;
         });
 
@@ -139,18 +140,19 @@ public class GitHubTeamProcessor {
      * clearing the collections ensures no stale references remain in the
      * persistence context.
      *
-     * @param teamId the team database ID
+     * @param nativeId the team's native provider ID
      * @param context processing context with scope information
      */
     @Transactional
-    public void delete(Long teamId, @NonNull ProcessingContext context) {
-        if (teamId == null) {
+    public void delete(Long nativeId, @NonNull ProcessingContext context) {
+        if (nativeId == null) {
             return;
         }
 
         teamRepository
-            .findById(teamId)
+            .findByNativeIdAndProviderId(nativeId, context.providerId())
             .ifPresent(team -> {
+                Long teamId = team.getId();
                 String teamName = team.getName();
 
                 // Clear collections to avoid stale references in persistence context

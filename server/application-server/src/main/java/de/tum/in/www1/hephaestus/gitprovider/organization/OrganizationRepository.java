@@ -9,37 +9,24 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Repository for git provider organization entities (GitHub organizations, GitLab groups).
- *
- * <p>Organizations are linked to scopes via consuming modules. Lookups by
- * provider ID or login are used during sync/installation operations to resolve
- * organization identity.
- *
- * <p>Legitimately scope-agnostic: These lookups happen during webhook processing
- * BEFORE scope context is established - the organization lookup is used to
- * DISCOVER which scope the event belongs to.
  */
 public interface OrganizationRepository extends JpaRepository<Organization, Long> {
-    Optional<Organization> findByGithubId(Long githubId);
+    Optional<Organization> findByNativeIdAndProviderId(Long nativeId, Long providerId);
     Optional<Organization> findByLoginIgnoreCase(String login);
 
     /**
      * Upsert an organization using PostgreSQL ON CONFLICT.
-     * This is thread-safe for concurrent inserts of the same organization.
-     *
-     * @param id the primary key (GitHub database ID)
-     * @param githubId the GitHub database ID
-     * @param login the organization/user login
-     * @param name the display name
-     * @param avatarUrl the avatar URL
-     * @param htmlUrl the HTML URL
+     * <p>
+     * The {@code id} column is auto-generated on insert. On conflict (provider_id, native_id),
+     * the existing row is updated.
      */
     @Modifying
     @Transactional
     @Query(
         value = """
-        INSERT INTO organization (id, github_id, login, name, avatar_url, html_url)
-        VALUES (:id, :githubId, :login, :name, :avatarUrl, :htmlUrl)
-        ON CONFLICT (id) DO UPDATE SET
+        INSERT INTO organization (native_id, provider_id, login, name, avatar_url, html_url)
+        VALUES (:nativeId, :providerId, :login, :name, :avatarUrl, :htmlUrl)
+        ON CONFLICT (provider_id, native_id) DO UPDATE SET
             login = EXCLUDED.login,
             name = EXCLUDED.name,
             avatar_url = EXCLUDED.avatar_url,
@@ -48,8 +35,8 @@ public interface OrganizationRepository extends JpaRepository<Organization, Long
         nativeQuery = true
     )
     void upsert(
-        @Param("id") Long id,
-        @Param("githubId") Long githubId,
+        @Param("nativeId") Long nativeId,
+        @Param("providerId") Long providerId,
         @Param("login") String login,
         @Param("name") String name,
         @Param("avatarUrl") String avatarUrl,

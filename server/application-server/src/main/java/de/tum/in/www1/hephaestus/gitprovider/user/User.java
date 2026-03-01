@@ -18,6 +18,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.util.HashSet;
 import java.util.Set;
 import lombok.Getter;
@@ -46,9 +47,13 @@ import org.springframework.lang.NonNull;
  * @see de.tum.in.www1.hephaestus.gitprovider.repository.collaborator.RepositoryCollaborator
  */
 @Entity
-// Unique constraint on LOWER(login) is managed by Liquibase (uk_user_login_lower functional index).
-// JPA cannot express functional indexes, so we omit @UniqueConstraint here.
-@Table(name = "\"user\"")
+// Unique constraint on LOWER(login) is managed by Liquibase (functional index — not expressible in JPA).
+@Table(
+    name = "\"user\"",
+    uniqueConstraints = {
+        @UniqueConstraint(name = "uq_user_provider_native_id", columnNames = { "provider_id", "native_id" }),
+    }
+)
 @Getter
 @Setter
 @NoArgsConstructor

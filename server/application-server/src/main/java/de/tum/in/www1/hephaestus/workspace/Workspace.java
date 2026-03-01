@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.workspace;
 
 import de.tum.in.www1.hephaestus.core.security.EncryptedStringConverter;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -294,7 +295,13 @@ public class Workspace {
      * @return the provider type, defaulting to {@link GitProviderType#GITHUB} if mode is null
      */
     public GitProviderType getProviderType() {
-        return GitProviderType.fromGitProviderMode(gitProviderMode);
+        if (gitProviderMode == null) {
+            return GitProviderType.GITHUB;
+        }
+        return switch (gitProviderMode) {
+            case PAT_ORG, GITHUB_APP_INSTALLATION -> GitProviderType.GITHUB;
+            case GITLAB_PAT -> GitProviderType.GITLAB;
+        };
     }
 
     @PrePersist

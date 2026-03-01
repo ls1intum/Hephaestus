@@ -2,6 +2,9 @@ package de.tum.in.www1.hephaestus.gitprovider.team.github;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
@@ -24,16 +27,19 @@ public class GitHubTeamMessageHandler extends GitHubMessageHandler<GitHubTeamEve
 
     private final GitHubTeamProcessor teamProcessor;
     private final ScopeIdResolver scopeIdResolver;
+    private final GitProviderRepository gitProviderRepository;
 
     GitHubTeamMessageHandler(
         GitHubTeamProcessor teamProcessor,
         ScopeIdResolver scopeIdResolver,
+        GitProviderRepository gitProviderRepository,
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate
     ) {
         super(GitHubTeamEventDTO.class, deserializer, transactionTemplate);
         this.teamProcessor = teamProcessor;
         this.scopeIdResolver = scopeIdResolver;
+        this.gitProviderRepository = gitProviderRepository;
     }
 
     @Override
@@ -71,7 +77,10 @@ public class GitHubTeamMessageHandler extends GitHubMessageHandler<GitHubTeamEve
             return;
         }
         // Create context for team events (no repository context available, but scope is resolved)
-        ProcessingContext context = ProcessingContext.forWebhook(scopeId, null, event.action());
+        GitProvider gitHubProvider = gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
+            .orElseThrow(() -> new IllegalStateException("GitHub provider not configured"));
+        ProcessingContext context = ProcessingContext.forWebhook(scopeId, gitHubProvider, event.action());
 
         switch (event.actionType()) {
             case GitHubEventAction.Team.DELETED -> teamProcessor.delete(teamDto.id(), context);

@@ -3,6 +3,9 @@ package de.tum.in.www1.hephaestus.gitprovider.team.github;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
@@ -48,8 +51,12 @@ class GitHubMembershipMessageHandlerIntegrationTest extends BaseIntegrationTest 
     private WorkspaceRepository workspaceRepository;
 
     @Autowired
+    private GitProviderRepository gitProviderRepository;
+
+    @Autowired
     private ObjectMapper objectMapper;
 
+    private GitProvider gitProvider;
     private Organization testOrganization;
     private Team testTeam;
 
@@ -60,10 +67,15 @@ class GitHubMembershipMessageHandlerIntegrationTest extends BaseIntegrationTest 
     }
 
     private void setupTestData() {
+        // Create git provider
+        gitProvider = gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
+            .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com")));
+
         // Create organization
         testOrganization = new Organization();
-        testOrganization.setId(215361191L);
-        testOrganization.setGithubId(215361191L);
+        testOrganization.setNativeId(215361191L);
+        testOrganization.setProvider(gitProvider);
         testOrganization.setLogin("HephaestusTest");
         testOrganization.setCreatedAt(Instant.now());
         testOrganization.setUpdatedAt(Instant.now());
@@ -85,8 +97,10 @@ class GitHubMembershipMessageHandlerIntegrationTest extends BaseIntegrationTest 
 
     private void createTestTeam(Long teamId, String name) {
         testTeam = new Team();
-        testTeam.setId(teamId);
+        testTeam.setNativeId(teamId);
+        testTeam.setProvider(gitProvider);
         testTeam.setName(name);
+        testTeam.setHtmlUrl("https://github.com/orgs/HephaestusTest/teams/" + name);
         testTeam.setOrganization(testOrganization.getLogin());
         testTeam = teamRepository.save(testTeam);
     }
@@ -121,7 +135,8 @@ class GitHubMembershipMessageHandlerIntegrationTest extends BaseIntegrationTest 
         // Add a user to remove
         if (event.member() != null) {
             User member = new User();
-            member.setId(event.member().id());
+            member.setNativeId(event.member().id());
+            member.setProvider(gitProvider);
             member.setLogin(event.member().login());
             member.setAvatarUrl(event.member().avatarUrl());
             member.setCreatedAt(Instant.now());

@@ -5,6 +5,9 @@ import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 import de.tum.in.www1.hephaestus.gitprovider.commit.github.CommitAuthorEnrichmentService;
 import de.tum.in.www1.hephaestus.gitprovider.commit.github.CommitMetadataEnrichmentService;
 import de.tum.in.www1.hephaestus.gitprovider.commit.github.GitHubCommitBackfillService;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.ExponentialBackoff;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
@@ -81,8 +84,11 @@ public class GitHubDataSyncService {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubDataSyncService.class);
 
+    private static final String GITHUB_SERVER_URL = "https://github.com";
+
     private final SyncSchedulerProperties syncSchedulerProperties;
 
+    private final GitProviderRepository gitProviderRepository;
     private final SyncTargetProvider syncTargetProvider;
     private final OrganizationMembershipListener organizationMembershipListener;
     private final RepositoryRepository repositoryRepository;
@@ -113,6 +119,7 @@ public class GitHubDataSyncService {
 
     public GitHubDataSyncService(
         SyncSchedulerProperties syncSchedulerProperties,
+        GitProviderRepository gitProviderRepository,
         SyncTargetProvider syncTargetProvider,
         OrganizationMembershipListener organizationMembershipListener,
         RepositoryRepository repositoryRepository,
@@ -140,6 +147,7 @@ public class GitHubDataSyncService {
         @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor
     ) {
         this.syncSchedulerProperties = syncSchedulerProperties;
+        this.gitProviderRepository = gitProviderRepository;
         this.syncTargetProvider = syncTargetProvider;
         this.organizationMembershipListener = organizationMembershipListener;
         this.repositoryRepository = repositoryRepository;
@@ -192,6 +200,13 @@ public class GitHubDataSyncService {
             return;
         }
 
+        // Resolve the GitHub provider entity
+        GitProvider provider = gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITHUB, GITHUB_SERVER_URL)
+            .orElseThrow(() ->
+                new IllegalStateException("GitProvider not found for type=GITHUB, serverUrl=" + GITHUB_SERVER_URL)
+            );
+
         Repository repository = repositoryRepository.findByNameWithOwner(nameWithOwner).orElse(null);
         boolean repositoryCreatedDuringSync = false;
 
@@ -203,7 +218,7 @@ public class GitHubDataSyncService {
                 scopeId,
                 safeNameWithOwner
             );
-            var syncedRepository = repositorySyncService.syncRepository(scopeId, nameWithOwner);
+            var syncedRepository = repositorySyncService.syncRepository(scopeId, nameWithOwner, provider);
             if (syncedRepository.isEmpty()) {
                 log.debug(
                     "Skipped sync: reason=repositoryNotFoundOnGitHub, scopeId={}, repoName={}",
@@ -236,7 +251,7 @@ public class GitHubDataSyncService {
 
             // Sync repository metadata (skip if we just created it above)
             if (!repositoryCreatedDuringSync) {
-                var syncedRepository = repositorySyncService.syncRepository(scopeId, nameWithOwner);
+                var syncedRepository = repositorySyncService.syncRepository(scopeId, nameWithOwner, provider);
                 if (syncedRepository.isPresent()) {
                     repository = syncedRepository.get();
                     log.debug("Synced repository metadata: scopeId={}, repoId={}", scopeId, repositoryId);
@@ -1088,7 +1103,8 @@ public class GitHubDataSyncService {
             return commitAuthorEnrichmentService.enrichCommitAuthors(
                 repository.getId(),
                 repository.getNameWithOwner(),
-                syncTarget.scopeId()
+                syncTarget.scopeId(),
+                repository.getProvider().getId()
             );
         } catch (Exception e) {
             log.warn("Commit author enrichment failed: repoId={}, error={}", repository.getId(), e.getMessage());

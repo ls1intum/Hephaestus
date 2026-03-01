@@ -53,13 +53,16 @@ public abstract class BaseGitHubProcessor {
     /**
      * Find an existing user or create a new one from the DTO.
      * <p>
-     * Delegates to {@link GitHubUserProcessor#findOrCreate(GitHubUserDTO)} which handles
+     * Delegates to {@link GitHubUserProcessor#findOrCreate(GitHubUserDTO, Long)} which handles
      * login conflicts (uk_user_login constraint) gracefully via INSERT ON CONFLICT DO NOTHING
      * and automatic login conflict resolution.
+     *
+     * @param dto the GitHub user DTO
+     * @param providerId the git provider ID for multi-provider scoping
      */
     @Nullable
-    protected User findOrCreateUser(GitHubUserDTO dto) {
-        return gitHubUserProcessor.findOrCreate(dto);
+    protected User findOrCreateUser(GitHubUserDTO dto, Long providerId) {
+        return gitHubUserProcessor.findOrCreate(dto, providerId);
     }
 
     /**
@@ -173,8 +176,10 @@ public abstract class BaseGitHubProcessor {
         int openIssuesCount = dto.openIssuesCount() != null ? dto.openIssuesCount() : 0;
         int closedIssuesCount = dto.closedIssuesCount() != null ? dto.closedIssuesCount() : 0;
 
+        Long providerId = repository.getProvider().getId();
         int inserted = milestoneRepository.insertIfAbsent(
             milestoneId,
+            providerId,
             dto.number(),
             title,
             dto.description(),
@@ -193,8 +198,11 @@ public abstract class BaseGitHubProcessor {
             return milestoneRepository.findByNumberAndRepositoryId(dto.number(), repository.getId()).orElse(null);
         }
 
-        // We inserted - fetch the entity to return a managed instance
-        return milestoneRepository.findById(milestoneId).orElse(null);
+        // We inserted - fetch the entity to return a managed instance.
+        // Must look up by natural key (number + repository), not by milestoneId,
+        // because the table uses auto-generated synthetic PKs (the milestoneId here
+        // is the native provider ID stored in native_id, not the synthetic PK).
+        return milestoneRepository.findByNumberAndRepositoryId(dto.number(), repository.getId()).orElse(null);
     }
 
     /**
@@ -251,14 +259,18 @@ public abstract class BaseGitHubProcessor {
      * @param currentAssignees the current assignee set to update (modified in place)
      * @return true if assignments changed, false otherwise
      */
-    protected boolean updateAssignees(@Nullable List<GitHubUserDTO> assigneeDtos, Set<User> currentAssignees) {
+    protected boolean updateAssignees(
+        @Nullable List<GitHubUserDTO> assigneeDtos,
+        Set<User> currentAssignees,
+        Long providerId
+    ) {
         if (assigneeDtos == null) {
             return false;
         }
 
         Set<User> newAssignees = new HashSet<>();
         for (GitHubUserDTO assigneeDto : assigneeDtos) {
-            User assignee = findOrCreateUser(assigneeDto);
+            User assignee = findOrCreateUser(assigneeDto, providerId);
             if (assignee != null) {
                 newAssignees.add(assignee);
             }
@@ -314,14 +326,18 @@ public abstract class BaseGitHubProcessor {
      * @param currentReviewers the current reviewer set to update (modified in place)
      * @return true if reviewers changed, false otherwise
      */
-    protected boolean updateRequestedReviewers(@Nullable List<GitHubUserDTO> reviewerDtos, Set<User> currentReviewers) {
+    protected boolean updateRequestedReviewers(
+        @Nullable List<GitHubUserDTO> reviewerDtos,
+        Set<User> currentReviewers,
+        Long providerId
+    ) {
         if (reviewerDtos == null) {
             return false;
         }
 
         Set<User> newReviewers = new HashSet<>();
         for (GitHubUserDTO reviewerDto : reviewerDtos) {
-            User reviewer = findOrCreateUser(reviewerDto);
+            User reviewer = findOrCreateUser(reviewerDto, providerId);
             if (reviewer != null) {
                 newReviewers.add(reviewer);
             }

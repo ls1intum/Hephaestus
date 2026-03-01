@@ -34,7 +34,7 @@ class GitHubLiveLabelSyncIntegrationTest extends AbstractGitHubLiveSyncIntegrati
         var repository = seeded.repository();
         var createdLabel = seeded.label();
 
-        repositorySyncService.syncRepository(workspace.getId(), repository.fullName()).orElseThrow();
+        repositorySyncService.syncRepository(workspace.getId(), repository.fullName(), githubProvider).orElseThrow();
         var localRepo = repositoryRepository.findByNameWithOwner(repository.fullName()).orElseThrow();
         labelSyncService.syncLabelsForRepository(workspace.getId(), localRepo.getId());
 
@@ -50,7 +50,7 @@ class GitHubLiveLabelSyncIntegrationTest extends AbstractGitHubLiveSyncIntegrati
         var repository = seeded.repository();
         var createdLabel = seeded.label();
 
-        repositorySyncService.syncRepository(workspace.getId(), repository.fullName()).orElseThrow();
+        repositorySyncService.syncRepository(workspace.getId(), repository.fullName(), githubProvider).orElseThrow();
         var localRepo = repositoryRepository.findByNameWithOwner(repository.fullName()).orElseThrow();
         labelSyncService.syncLabelsForRepository(workspace.getId(), localRepo.getId());
 
@@ -70,7 +70,7 @@ class GitHubLiveLabelSyncIntegrationTest extends AbstractGitHubLiveSyncIntegrati
         var repository = seeded.repository();
         var createdLabel = seeded.label();
 
-        repositorySyncService.syncRepository(workspace.getId(), repository.fullName()).orElseThrow();
+        repositorySyncService.syncRepository(workspace.getId(), repository.fullName(), githubProvider).orElseThrow();
         var localRepo = repositoryRepository.findByNameWithOwner(repository.fullName()).orElseThrow();
         labelSyncService.syncLabelsForRepository(workspace.getId(), localRepo.getId());
 

@@ -117,86 +117,67 @@ public interface UserRepository extends JpaRepository<User, Long> {
     )
     List<User> findAllByLoginLowerIn(@Param("logins") Set<String> logins);
 
+    Optional<User> findByNativeIdAndProviderId(Long nativeId, Long providerId);
+
     /**
      * Try to acquire a transaction-scoped advisory lock on the given login.
      * <p>
-     * Returns {@code true} if the lock was acquired, {@code false} if it is
-     * already held by another transaction. Unlike {@link #acquireLoginLock},
-     * this method never blocks and cannot participate in a deadlock cycle.
-     * <p>
-     * The lock key is derived from {@code hashtext(LOWER(login))}, so only
-     * operations on the same (case-insensitive) login contend. The lock is
-     * automatically released when the enclosing transaction commits or rolls back.
+     * The lock key is derived from {@code hashtext(providerId || ':' || LOWER(login))}, so only
+     * operations on the same provider instance and (case-insensitive) login contend.
      *
      * @return true if the lock was acquired, false if another transaction holds it
      */
-    @Query(value = "SELECT pg_try_advisory_xact_lock(hashtext(LOWER(:login)))", nativeQuery = true)
-    boolean tryAcquireLoginLock(@Param("login") String login);
+    @Query(
+        value = "SELECT pg_try_advisory_xact_lock(hashtext(CONCAT(:providerId\\:\\:text, ':', LOWER(:login))))",
+        nativeQuery = true
+    )
+    boolean tryAcquireLoginLock(@Param("login") String login, @Param("providerId") Long providerId);
 
     /**
      * Acquire a transaction-scoped advisory lock on the given login.
      * <p>
-     * The lock key is derived from {@code hashtext(LOWER(login))}, so only
-     * operations on the same (case-insensitive) login contend. The lock is
-     * automatically released when the enclosing transaction commits or rolls back.
-     * <p>
-     * <b>Warning:</b> This method blocks until the lock is available and can
-     * participate in deadlock cycles when multiple transactions acquire locks
-     * in different orders. Prefer {@link #tryAcquireLoginLock} with retry logic
-     * to avoid deadlocks.
-     * <p>
      * Must be called before {@link #freeLoginConflicts} and {@link #upsertUser}
      * to prevent cross-scope race conditions.
      */
-    @Query(value = "SELECT pg_advisory_xact_lock(hashtext(LOWER(:login)))", nativeQuery = true)
-    void acquireLoginLock(@Param("login") String login);
+    @Query(
+        value = "SELECT pg_advisory_xact_lock(hashtext(CONCAT(:providerId\\:\\:text, ':', LOWER(:login))))",
+        nativeQuery = true
+    )
+    void acquireLoginLock(@Param("login") String login, @Param("providerId") Long providerId);
 
     /**
-     * Rename any user that currently holds the target login (other than the given id)
-     * by setting their login to {@code RENAMED_<their_id>}.
-     * <p>
-     * This resolves login conflicts before the actual upsert. Must be called
-     * after {@link #acquireLoginLock} and before {@link #upsertUser} within the
-     * same transaction.
+     * Rename any user that currently holds the target login (other than the given native_id
+     * on the same provider) by setting their login to {@code RENAMED_<their_id>}.
      */
     @Modifying
     @Query(
         value = """
         UPDATE "user" SET login = 'RENAMED_' || id
-        WHERE LOWER("user".login) = LOWER(:login) AND "user".id != :id
+        WHERE LOWER("user".login) = LOWER(:login)
+          AND "user".native_id != :nativeId
+          AND "user".provider_id = :providerId
         """,
         nativeQuery = true
     )
-    void freeLoginConflicts(@Param("login") String login, @Param("id") Long id);
+    void freeLoginConflicts(
+        @Param("login") String login,
+        @Param("nativeId") Long nativeId,
+        @Param("providerId") Long providerId
+    );
 
     /**
-     * Insert or update a user via {@code INSERT ... ON CONFLICT (id) DO UPDATE}.
+     * Insert or update a user via {@code INSERT ... ON CONFLICT (provider_id, native_id) DO UPDATE}.
      * <p>
-     * Must be called after {@link #freeLoginConflicts} within the same
-     * transaction to avoid unique constraint violations on {@code uk_user_login_lower}.
+     * Must be called after {@link #freeLoginConflicts} within the same transaction.
      * <p>
-     * The type field is updated on conflict to correct misclassified users
-     * (e.g., bots stored as USER). Optional fields (email, created_at, updated_at)
-     * use {@code COALESCE} so null parameters preserve existing database values,
-     * allowing webhooks (which lack timestamps) and GraphQL sync (which has full data)
-     * to share the same upsert path.
-     *
-     * @param id the primary key (GitHub database ID)
-     * @param login the user login
-     * @param name the display name
-     * @param avatarUrl the avatar URL
-     * @param htmlUrl the HTML URL
-     * @param type the user type (USER, BOT, ORGANIZATION)
-     * @param email the user email (nullable — null preserves existing value)
-     * @param createdAt the user creation timestamp (nullable — null preserves existing value)
-     * @param updatedAt the user update timestamp (nullable — null preserves existing value)
+     * The {@code id} column is auto-generated on insert. On conflict, the existing row is updated.
      */
     @Modifying
     @Query(
         value = """
-        INSERT INTO "user" (id, login, name, avatar_url, html_url, type, email, created_at, updated_at)
-        VALUES (:id, :login, :name, :avatarUrl, :htmlUrl, :type, :email, :createdAt, :updatedAt)
-        ON CONFLICT (id) DO UPDATE SET
+        INSERT INTO "user" (native_id, provider_id, login, name, avatar_url, html_url, type, email, created_at, updated_at)
+        VALUES (:nativeId, :providerId, :login, :name, :avatarUrl, :htmlUrl, :type, :email, :createdAt, :updatedAt)
+        ON CONFLICT (provider_id, native_id) DO UPDATE SET
             login = EXCLUDED.login,
             name = EXCLUDED.name,
             avatar_url = EXCLUDED.avatar_url,
@@ -209,7 +190,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
         nativeQuery = true
     )
     void upsertUser(
-        @Param("id") Long id,
+        @Param("nativeId") Long nativeId,
+        @Param("providerId") Long providerId,
         @Param("login") String login,
         @Param("name") String name,
         @Param("avatarUrl") String avatarUrl,

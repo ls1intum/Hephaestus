@@ -2,6 +2,9 @@ package de.tum.in.www1.hephaestus.gitprovider.repository.gitlab;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncException;
@@ -37,17 +40,36 @@ public class GitLabProjectSyncService {
     private final GitLabProjectProcessor projectProcessor;
     private final GitLabGroupProcessor groupProcessor;
     private final GitLabProperties gitLabProperties;
+    private final GitProviderRepository gitProviderRepository;
 
     public GitLabProjectSyncService(
         GitLabGraphQlClientProvider graphQlClientProvider,
         GitLabProjectProcessor projectProcessor,
         GitLabGroupProcessor groupProcessor,
-        GitLabProperties gitLabProperties
+        GitLabProperties gitLabProperties,
+        GitProviderRepository gitProviderRepository
     ) {
         this.graphQlClientProvider = graphQlClientProvider;
         this.projectProcessor = projectProcessor;
         this.groupProcessor = groupProcessor;
         this.gitLabProperties = gitLabProperties;
+        this.gitProviderRepository = gitProviderRepository;
+    }
+
+    /**
+     * Resolves the GitLab provider entity from the database.
+     *
+     * @return the GitLab provider
+     * @throws IllegalStateException if no GitLab provider is found
+     */
+    private GitProvider resolveProvider() {
+        return gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITLAB, gitLabProperties.defaultServerUrl())
+            .orElseThrow(() ->
+                new IllegalStateException(
+                    "GitProvider not found for type=GITLAB, serverUrl=" + gitLabProperties.defaultServerUrl()
+                )
+            );
     }
 
     /**
@@ -68,6 +90,8 @@ public class GitLabProjectSyncService {
         String safeProjectPath = sanitizeForLog(projectFullPath);
 
         try {
+            GitProvider provider = resolveProvider();
+            Long providerId = provider.getId();
             graphQlClientProvider.acquirePermission();
             HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
 
@@ -104,7 +128,7 @@ public class GitLabProjectSyncService {
             Organization organization = null;
             GitLabGroupResponse groupData = project.group();
             if (groupData != null) {
-                organization = groupProcessor.process(groupData);
+                organization = groupProcessor.process(groupData, providerId);
                 if (organization == null) {
                     log.warn(
                         "Skipped project sync: reason=groupProcessingFailed, scopeId={}, projectPath={}",
@@ -115,7 +139,7 @@ public class GitLabProjectSyncService {
                 }
             }
 
-            Repository repository = projectProcessor.processGraphQlResponse(project, organization);
+            Repository repository = projectProcessor.processGraphQlResponse(project, organization, provider);
             if (repository != null) {
                 log.info(
                     "Synced project: scopeId={}, repoId={}, projectPath={}",

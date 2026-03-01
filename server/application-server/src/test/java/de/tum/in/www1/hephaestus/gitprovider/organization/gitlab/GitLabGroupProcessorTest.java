@@ -22,6 +22,8 @@ import org.mockito.Mock;
 @DisplayName("GitLabGroupProcessor")
 class GitLabGroupProcessorTest extends BaseUnitTest {
 
+    private static final Long PROVIDER_ID = 1L;
+
     @Mock
     private OrganizationRepository organizationRepository;
 
@@ -50,21 +52,22 @@ class GitLabGroupProcessorTest extends BaseUnitTest {
             );
 
             Organization expected = new Organization();
-            expected.setId(42L);
-            when(organizationRepository.findById(42L)).thenReturn(Optional.of(expected));
+            expected.setId(100L);
+            when(organizationRepository.findByNativeIdAndProviderId(42L, PROVIDER_ID)).thenReturn(
+                Optional.of(expected)
+            );
 
-            Organization result = processor.process(group);
+            Organization result = processor.process(group, PROVIDER_ID);
 
             verify(organizationRepository).upsert(
                 eq(42L),
-                eq(42L),
+                eq(PROVIDER_ID),
                 eq("my-org/my-team"),
                 eq("My Team"),
                 eq("https://gitlab.com/avatar.png"),
                 eq("https://gitlab.com/my-org/my-team")
             );
             assertThat(result).isNotNull();
-            assertThat(result.getId()).isEqualTo(42L);
             assertThat(result.getLastSyncAt()).isNotNull();
             assertThat(result.getUpdatedAt()).isNotNull();
             assertThat(result.getCreatedAt()).isNotNull();
@@ -85,11 +88,13 @@ class GitLabGroupProcessorTest extends BaseUnitTest {
 
             Instant existingCreatedAt = Instant.parse("2024-01-01T00:00:00Z");
             Organization existing = new Organization();
-            existing.setId(42L);
+            existing.setId(100L);
             existing.setCreatedAt(existingCreatedAt);
-            when(organizationRepository.findById(42L)).thenReturn(Optional.of(existing));
+            when(organizationRepository.findByNativeIdAndProviderId(42L, PROVIDER_ID)).thenReturn(
+                Optional.of(existing)
+            );
 
-            Organization result = processor.process(group);
+            Organization result = processor.process(group, PROVIDER_ID);
 
             assertThat(result).isNotNull();
             assertThat(result.getCreatedAt()).isEqualTo(existingCreatedAt);
@@ -98,7 +103,7 @@ class GitLabGroupProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("findById returns empty after upsert returns null")
+        @DisplayName("findByNativeIdAndProviderId returns empty after upsert returns null")
         void findByIdEmpty_returnsNull() {
             var group = new GitLabGroupResponse(
                 "gid://gitlab/Group/42",
@@ -110,9 +115,9 @@ class GitLabGroupProcessorTest extends BaseUnitTest {
                 "public"
             );
 
-            when(organizationRepository.findById(42L)).thenReturn(Optional.empty());
+            when(organizationRepository.findByNativeIdAndProviderId(42L, PROVIDER_ID)).thenReturn(Optional.empty());
 
-            Organization result = processor.process(group);
+            Organization result = processor.process(group, PROVIDER_ID);
 
             assertThat(result).isNull();
             verify(organizationRepository).upsert(any(), any(), any(), any(), any(), any());
@@ -131,13 +136,15 @@ class GitLabGroupProcessorTest extends BaseUnitTest {
                 "private"
             );
 
-            when(organizationRepository.findById(99L)).thenReturn(Optional.of(new Organization()));
+            when(organizationRepository.findByNativeIdAndProviderId(99L, PROVIDER_ID)).thenReturn(
+                Optional.of(new Organization())
+            );
 
-            processor.process(group);
+            processor.process(group, PROVIDER_ID);
 
             verify(organizationRepository).upsert(
                 eq(99L),
-                eq(99L),
+                eq(PROVIDER_ID),
                 eq("org/team"),
                 eq("org/team"), // name falls back to fullPath
                 eq(null),
@@ -148,7 +155,7 @@ class GitLabGroupProcessorTest extends BaseUnitTest {
         @Test
         @DisplayName("null response returns null")
         void nullResponse_returnsNull() {
-            assertThat(processor.process(null)).isNull();
+            assertThat(processor.process(null, PROVIDER_ID)).isNull();
             verify(organizationRepository, never()).upsert(any(), any(), any(), any(), any(), any());
         }
 
@@ -164,7 +171,7 @@ class GitLabGroupProcessorTest extends BaseUnitTest {
                 null,
                 "public"
             );
-            assertThat(processor.process(group)).isNull();
+            assertThat(processor.process(group, PROVIDER_ID)).isNull();
             verify(organizationRepository, never()).upsert(any(), any(), any(), any(), any(), any());
         }
 
@@ -180,7 +187,7 @@ class GitLabGroupProcessorTest extends BaseUnitTest {
                 null,
                 "public"
             );
-            assertThat(processor.process(group)).isNull();
+            assertThat(processor.process(group, PROVIDER_ID)).isNull();
             verify(organizationRepository, never()).upsert(any(), any(), any(), any(), any(), any());
         }
 
@@ -196,7 +203,7 @@ class GitLabGroupProcessorTest extends BaseUnitTest {
                 null,
                 "public"
             );
-            assertThat(processor.process(group)).isNull();
+            assertThat(processor.process(group, PROVIDER_ID)).isNull();
             verify(organizationRepository, never()).upsert(any(), any(), any(), any(), any(), any());
         }
 
@@ -212,7 +219,7 @@ class GitLabGroupProcessorTest extends BaseUnitTest {
                 null,
                 "public"
             );
-            assertThat(processor.process(group)).isNull();
+            assertThat(processor.process(group, PROVIDER_ID)).isNull();
             verify(organizationRepository, never()).upsert(any(), any(), any(), any(), any(), any());
         }
 
@@ -229,13 +236,15 @@ class GitLabGroupProcessorTest extends BaseUnitTest {
                 "internal"
             );
 
-            when(organizationRepository.findById(7L)).thenReturn(Optional.of(new Organization()));
+            when(organizationRepository.findByNativeIdAndProviderId(7L, PROVIDER_ID)).thenReturn(
+                Optional.of(new Organization())
+            );
 
-            processor.process(group);
+            processor.process(group, PROVIDER_ID);
 
             verify(organizationRepository).upsert(
                 eq(7L),
-                eq(7L),
+                eq(PROVIDER_ID),
                 eq("org/team/subteam/deepteam"),
                 eq("Deep Team"),
                 eq(null),

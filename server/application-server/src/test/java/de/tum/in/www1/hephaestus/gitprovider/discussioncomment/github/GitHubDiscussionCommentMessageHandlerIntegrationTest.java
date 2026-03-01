@@ -3,6 +3,9 @@ package de.tum.in.www1.hephaestus.gitprovider.discussioncomment.github;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.discussion.DiscussionRepository;
@@ -78,6 +81,9 @@ class GitHubDiscussionCommentMessageHandlerIntegrationTest extends BaseIntegrati
     private OrganizationRepository organizationRepository;
 
     @Autowired
+    private GitProviderRepository gitProviderRepository;
+
+    @Autowired
     private WorkspaceRepository workspaceRepository;
 
     @Autowired
@@ -89,6 +95,11 @@ class GitHubDiscussionCommentMessageHandlerIntegrationTest extends BaseIntegrati
     @Autowired
     private TestEventListener eventListener;
 
+    private static final int FIXTURE_DISCUSSION_NUMBER = 27;
+
+    private Repository testRepository;
+    private GitProvider gitProvider;
+
     @BeforeEach
     void setUp() {
         databaseTestUtils.cleanDatabase();
@@ -97,20 +108,26 @@ class GitHubDiscussionCommentMessageHandlerIntegrationTest extends BaseIntegrati
     }
 
     private void setupTestData() {
+        // Create GitHub provider
+        gitProvider = gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
+            .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com")));
+
         // Create organization
         Organization org = new Organization();
-        org.setId(FIXTURE_ORG_ID);
-        org.setGithubId(FIXTURE_ORG_ID);
+        org.setNativeId(FIXTURE_ORG_ID);
         org.setLogin(FIXTURE_ORG_LOGIN);
         org.setCreatedAt(Instant.now());
         org.setUpdatedAt(Instant.now());
         org.setName("Hephaestus Test");
         org.setAvatarUrl("https://avatars.githubusercontent.com/u/" + FIXTURE_ORG_ID);
+        org.setHtmlUrl("https://github.com/" + FIXTURE_ORG_LOGIN);
+        org.setProvider(gitProvider);
         org = organizationRepository.save(org);
 
         // Create repository
         Repository repo = new Repository();
-        repo.setId(FIXTURE_REPO_ID);
+        repo.setNativeId(FIXTURE_REPO_ID);
         repo.setName("TestRepository");
         repo.setNameWithOwner(FIXTURE_REPO_FULL_NAME);
         repo.setHtmlUrl("https://github.com/" + FIXTURE_REPO_FULL_NAME);
@@ -120,7 +137,8 @@ class GitHubDiscussionCommentMessageHandlerIntegrationTest extends BaseIntegrati
         repo.setUpdatedAt(Instant.now());
         repo.setPushedAt(Instant.now());
         repo.setOrganization(org);
-        repositoryRepository.save(repo);
+        repo.setProvider(gitProvider);
+        testRepository = repositoryRepository.save(repo);
 
         // Create workspace
         Workspace workspace = new Workspace();
@@ -147,28 +165,30 @@ class GitHubDiscussionCommentMessageHandlerIntegrationTest extends BaseIntegrati
         GitHubDiscussionCommentEventDTO event = loadPayload("discussion_comment.created");
 
         // Verify comment doesn't exist initially
-        assertThat(commentRepository.findById(FIXTURE_COMMENT_ID)).isEmpty();
+        assertThat(commentRepository.findByNativeIdAndProviderId(FIXTURE_COMMENT_ID, gitProvider.getId())).isEmpty();
 
         // When
         handler.handleEvent(event);
 
         // Then - comment should be persisted with correct fields
         transactionTemplate.executeWithoutResult(status -> {
-            assertThat(commentRepository.findById(FIXTURE_COMMENT_ID))
+            assertThat(commentRepository.findByNativeIdAndProviderId(FIXTURE_COMMENT_ID, gitProvider.getId()))
                 .isPresent()
                 .get()
                 .satisfies(comment -> {
-                    assertThat(comment.getId()).isEqualTo(FIXTURE_COMMENT_ID);
+                    assertThat(comment.getNativeId()).isEqualTo(FIXTURE_COMMENT_ID);
                     assertThat(comment.getBody()).isEqualTo(FIXTURE_COMMENT_BODY);
                     assertThat(comment.getHtmlUrl()).isEqualTo(FIXTURE_COMMENT_HTML_URL);
                     assertThat(comment.getDiscussion()).isNotNull();
-                    assertThat(comment.getDiscussion().getId()).isEqualTo(FIXTURE_DISCUSSION_ID);
+                    assertThat(comment.getDiscussion().getNativeId()).isEqualTo(FIXTURE_DISCUSSION_ID);
                     assertThat(comment.getAuthor()).isNotNull();
                 });
         });
 
         // Parent discussion should also have been created by the handler
-        assertThat(discussionRepository.findById(FIXTURE_DISCUSSION_ID)).isPresent();
+        assertThat(
+            discussionRepository.findByRepositoryIdAndNumber(testRepository.getId(), FIXTURE_DISCUSSION_NUMBER)
+        ).isPresent();
 
         // Domain event published
         assertThat(eventListener.getCreatedEvents()).hasSize(1);
@@ -189,7 +209,7 @@ class GitHubDiscussionCommentMessageHandlerIntegrationTest extends BaseIntegrati
         handler.handleEvent(editEvent);
 
         // Then
-        assertThat(commentRepository.findById(FIXTURE_COMMENT_ID))
+        assertThat(commentRepository.findByNativeIdAndProviderId(FIXTURE_COMMENT_ID, gitProvider.getId()))
             .isPresent()
             .get()
             .satisfies(comment -> {
@@ -205,7 +225,7 @@ class GitHubDiscussionCommentMessageHandlerIntegrationTest extends BaseIntegrati
         handler.handleEvent(createEvent);
 
         // Verify it exists
-        assertThat(commentRepository.findById(FIXTURE_COMMENT_ID)).isPresent();
+        assertThat(commentRepository.findByNativeIdAndProviderId(FIXTURE_COMMENT_ID, gitProvider.getId())).isPresent();
         eventListener.clear();
 
         // Load deleted event
@@ -215,7 +235,7 @@ class GitHubDiscussionCommentMessageHandlerIntegrationTest extends BaseIntegrati
         handler.handleEvent(deleteEvent);
 
         // Then
-        assertThat(commentRepository.findById(FIXTURE_COMMENT_ID)).isEmpty();
+        assertThat(commentRepository.findByNativeIdAndProviderId(FIXTURE_COMMENT_ID, gitProvider.getId())).isEmpty();
 
         // Domain event published
         assertThat(eventListener.getDeletedEvents()).hasSize(1);

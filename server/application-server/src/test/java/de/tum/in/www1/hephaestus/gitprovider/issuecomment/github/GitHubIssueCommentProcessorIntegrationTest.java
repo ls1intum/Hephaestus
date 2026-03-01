@@ -2,6 +2,9 @@ package de.tum.in.www1.hephaestus.gitprovider.issuecomment.github;
 
 import static org.assertj.core.api.Assertions.*;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
@@ -70,6 +73,9 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
     private OrganizationRepository organizationRepository;
 
     @Autowired
+    private GitProviderRepository gitProviderRepository;
+
+    @Autowired
     private WorkspaceRepository workspaceRepository;
 
     @Autowired
@@ -78,6 +84,7 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
     private Repository testRepository;
     private Workspace testWorkspace;
     private Issue testIssue;
+    private GitProvider githubProvider;
 
     @BeforeEach
     void setUp() {
@@ -87,20 +94,26 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
     }
 
     private void setupTestData() {
+        // Create GitHub provider
+        githubProvider = gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
+            .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com")));
+
         // Create organization
         Organization org = new Organization();
-        org.setId(TEST_ORG_ID);
-        org.setGithubId(TEST_ORG_ID);
+        org.setNativeId(TEST_ORG_ID);
         org.setLogin(TEST_ORG_LOGIN);
         org.setCreatedAt(Instant.now());
         org.setUpdatedAt(Instant.now());
         org.setName("Hephaestus Test");
         org.setAvatarUrl("https://avatars.githubusercontent.com/u/" + TEST_ORG_ID);
+        org.setHtmlUrl("https://github.com/" + TEST_ORG_LOGIN);
+        org.setProvider(githubProvider);
         org = organizationRepository.save(org);
 
         // Create repository
         testRepository = new Repository();
-        testRepository.setId(TEST_REPO_ID);
+        testRepository.setNativeId(TEST_REPO_ID);
         testRepository.setName("TestRepository");
         testRepository.setNameWithOwner(TEST_REPO_FULL_NAME);
         testRepository.setHtmlUrl("https://github.com/" + TEST_REPO_FULL_NAME);
@@ -110,6 +123,7 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
         testRepository.setUpdatedAt(Instant.now());
         testRepository.setPushedAt(Instant.now());
         testRepository.setOrganization(org);
+        testRepository.setProvider(githubProvider);
         testRepository = repositoryRepository.save(testRepository);
 
         // Create workspace
@@ -125,7 +139,8 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
 
         // Create issue
         testIssue = new Issue();
-        testIssue.setId(TEST_ISSUE_ID);
+        testIssue.setNativeId(TEST_ISSUE_ID);
+        testIssue.setProvider(githubProvider);
         testIssue.setNumber(42);
         testIssue.setTitle("Test Issue");
         testIssue.setState(Issue.State.OPEN);
@@ -166,7 +181,7 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
             IssueComment result = processor.process(dto, testIssue.getNumber(), context);
 
             assertThat(result).isNotNull();
-            assertThat(result.getId()).isEqualTo(TEST_COMMENT_ID);
+            assertThat(result.getNativeId()).isEqualTo(TEST_COMMENT_ID);
             assertThat(result.getBody()).isEqualTo("This is a test comment.");
             assertThat(result.getIssue().getId()).isEqualTo(testIssue.getId());
 
@@ -175,7 +190,7 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
                 .hasSize(1)
                 .first()
                 .satisfies(event -> {
-                    assertThat(event.comment().id()).isEqualTo(TEST_COMMENT_ID);
+                    assertThat(event.comment().id()).isEqualTo(result.getId());
                     assertThat(event.issueId()).isEqualTo(testIssue.getId());
                     assertThat(event.context().scopeId()).isEqualTo(testWorkspace.getId());
                 });
@@ -211,7 +226,8 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
         void shouldUpdateCommentAndPublishEvent() {
             // Create initial comment
             IssueComment existing = new IssueComment();
-            existing.setId(TEST_COMMENT_ID);
+            existing.setNativeId(TEST_COMMENT_ID);
+            existing.setProvider(githubProvider);
             existing.setBody("Original body");
             existing.setHtmlUrl("https://github.com/test");
             existing.setCreatedAt(Instant.now());
@@ -232,7 +248,7 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
                 .hasSize(1)
                 .first()
                 .satisfies(event -> {
-                    assertThat(event.comment().id()).isEqualTo(TEST_COMMENT_ID);
+                    assertThat(event.comment().id()).isEqualTo(result.getId());
                     assertThat(event.changedFields()).contains("body");
                     assertThat(event.issueId()).isEqualTo(testIssue.getId());
                 });
@@ -243,7 +259,8 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
         void shouldNotPublishEventWhenNothingChanges() {
             // Create initial comment with matching data
             IssueComment existing = new IssueComment();
-            existing.setId(TEST_COMMENT_ID);
+            existing.setNativeId(TEST_COMMENT_ID);
+            existing.setProvider(githubProvider);
             existing.setBody("Same body");
             existing.setHtmlUrl(
                 "https://github.com/" + TEST_REPO_FULL_NAME + "/issues/42#issuecomment-" + TEST_COMMENT_ID
@@ -302,6 +319,32 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
             );
         }
 
+        private GitHubIssueDTO createIssueDTOForExistingIssue(Long issueId, int number) {
+            return new GitHubIssueDTO(
+                issueId,
+                issueId,
+                "node_id_" + issueId,
+                number,
+                "Existing Issue from Comment Webhook",
+                "Issue body",
+                "open",
+                null,
+                "https://github.com/" + TEST_REPO_FULL_NAME + "/issues/" + number,
+                0,
+                Instant.now(),
+                Instant.now(),
+                null,
+                false,
+                null,
+                Collections.emptyList(),
+                Collections.emptyList(),
+                null,
+                null,
+                null,
+                null
+            );
+        }
+
         @Test
         @DisplayName("should create Issue stub when parent does not exist")
         void shouldCreateIssueStubWhenParentDoesNotExist() {
@@ -310,25 +353,24 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
             ProcessingContext context = createContext();
 
             // Verify issue does not exist
-            assertThat(issueRepository.existsById(NEW_ISSUE_ID)).isFalse();
+            assertThat(issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 100)).isEmpty();
 
             IssueComment result = processor.processWithParentCreation(commentDto, issueDto, context);
 
             // Verify comment was created
             assertThat(result).isNotNull();
-            assertThat(result.getId()).isEqualTo(TEST_COMMENT_ID);
+            assertThat(result.getNativeId()).isEqualTo(TEST_COMMENT_ID);
             assertThat(result.getBody()).isEqualTo("Comment on new issue");
 
             // Verify Issue stub was created
-            assertThat(issueRepository.existsById(NEW_ISSUE_ID)).isTrue();
-            Issue createdIssue = issueRepository.findById(NEW_ISSUE_ID).orElseThrow();
+            Issue createdIssue = issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 100).orElseThrow();
+            assertThat(createdIssue.getNativeId()).isEqualTo(NEW_ISSUE_ID);
             assertThat(createdIssue.getNumber()).isEqualTo(100);
             assertThat(createdIssue.getTitle()).isEqualTo("New Issue from Comment Webhook");
             assertThat(createdIssue.isPullRequest()).isFalse();
-            assertThat(createdIssue.getRepository().getId()).isEqualTo(TEST_REPO_ID);
 
             // Verify comment is linked to the new issue
-            assertThat(result.getIssue().getId()).isEqualTo(NEW_ISSUE_ID);
+            assertThat(result.getIssue().getId()).isEqualTo(createdIssue.getId());
         }
 
         @Test
@@ -339,30 +381,33 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
             ProcessingContext context = createContext();
 
             // Verify PR does not exist
-            assertThat(pullRequestRepository.existsById(NEW_PR_ID)).isFalse();
+            assertThat(pullRequestRepository.findByRepositoryIdAndNumber(testRepository.getId(), 100)).isEmpty();
 
             IssueComment result = processor.processWithParentCreation(commentDto, issueDto, context);
 
             // Verify comment was created
             assertThat(result).isNotNull();
-            assertThat(result.getId()).isEqualTo(TEST_COMMENT_ID);
+            assertThat(result.getNativeId()).isEqualTo(TEST_COMMENT_ID);
 
             // Verify PullRequest stub was created (not Issue!)
-            assertThat(pullRequestRepository.existsById(NEW_PR_ID)).isTrue();
-            PullRequest createdPR = pullRequestRepository.findById(NEW_PR_ID).orElseThrow();
+            PullRequest createdPR = pullRequestRepository
+                .findByRepositoryIdAndNumber(testRepository.getId(), 100)
+                .orElseThrow();
+            assertThat(createdPR.getNativeId()).isEqualTo(NEW_PR_ID);
             assertThat(createdPR.getNumber()).isEqualTo(100);
             assertThat(createdPR.getTitle()).isEqualTo("New Issue from Comment Webhook");
             assertThat(createdPR.isPullRequest()).isTrue();
 
             // Verify comment is linked to the new PR (via Issue base class)
-            assertThat(result.getIssue().getId()).isEqualTo(NEW_PR_ID);
+            assertThat(result.getIssue().getId()).isEqualTo(createdPR.getId());
         }
 
         @Test
         @DisplayName("should use existing parent when it already exists")
         void shouldUseExistingParentWhenItAlreadyExists() {
             GitHubCommentDTO commentDto = createCommentDTO(TEST_COMMENT_ID, "Comment on existing issue");
-            GitHubIssueDTO issueDto = createIssueDTOForNewIssue(testIssue.getId(), false);
+            // Use testIssue's number (42) so that findByRepositoryIdAndNumber finds the existing issue
+            GitHubIssueDTO issueDto = createIssueDTOForExistingIssue(testIssue.getNativeId(), testIssue.getNumber());
             ProcessingContext context = createContext();
 
             // Get initial issue count
@@ -422,7 +467,8 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
         void shouldDeleteCommentAndPublishEvent() {
             // Create comment to delete
             IssueComment existing = new IssueComment();
-            existing.setId(TEST_COMMENT_ID);
+            existing.setNativeId(TEST_COMMENT_ID);
+            existing.setProvider(githubProvider);
             existing.setBody("To be deleted");
             existing.setHtmlUrl("https://github.com/test");
             existing.setCreatedAt(Instant.now());
@@ -432,7 +478,9 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
             processor.delete(TEST_COMMENT_ID, createContext());
 
             // Verify comment is deleted
-            assertThat(commentRepository.existsById(TEST_COMMENT_ID)).isFalse();
+            assertThat(
+                commentRepository.findByNativeIdAndProviderId(TEST_COMMENT_ID, githubProvider.getId())
+            ).isEmpty();
 
             // Verify CommentDeleted event was published
             assertThat(eventListener.getDeletedEvents())
@@ -450,7 +498,8 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
         void shouldSyncBidirectionalRelationshipWhenDeleting() {
             // Create comment with bidirectional relationship set up
             IssueComment existing = new IssueComment();
-            existing.setId(TEST_COMMENT_ID);
+            existing.setNativeId(TEST_COMMENT_ID);
+            existing.setProvider(githubProvider);
             existing.setBody("Comment to test bidirectional sync");
             existing.setHtmlUrl("https://github.com/test");
             existing.setCreatedAt(Instant.now());
@@ -467,7 +516,9 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
             assertThatCode(() -> processor.delete(TEST_COMMENT_ID, createContext())).doesNotThrowAnyException();
 
             // Verify comment is deleted
-            assertThat(commentRepository.existsById(TEST_COMMENT_ID)).isFalse();
+            assertThat(
+                commentRepository.findByNativeIdAndProviderId(TEST_COMMENT_ID, githubProvider.getId())
+            ).isEmpty();
         }
 
         @Test

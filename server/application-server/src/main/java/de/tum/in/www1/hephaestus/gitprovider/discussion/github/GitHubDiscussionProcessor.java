@@ -110,8 +110,9 @@ public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
         }
 
         // Resolve related entities BEFORE the upsert
-        User author = dto.author() != null ? findOrCreateUser(dto.author()) : null;
-        User answerChosenBy = dto.answerChosenBy() != null ? findOrCreateUser(dto.answerChosenBy()) : null;
+        User author = dto.author() != null ? findOrCreateUser(dto.author(), context.providerId()) : null;
+        User answerChosenBy =
+            dto.answerChosenBy() != null ? findOrCreateUser(dto.answerChosenBy(), context.providerId()) : null;
         DiscussionCategory category = dto.category() != null ? findOrCreateCategory(dto.category(), repository) : null;
 
         // Use atomic upsert to handle concurrent inserts
@@ -123,6 +124,7 @@ public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
 
         discussionRepository.upsertCore(
             dbId,
+            context.providerId(),
             repository.getId(),
             dto.number(),
             sanitize(dto.title()),
@@ -195,24 +197,18 @@ public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public void processDeleted(GitHubDiscussionDTO dto, ProcessingContext context) {
-        Long dbId = dto.getDatabaseId();
         EventContext eventContext = EventContext.from(context);
 
-        if (dbId != null) {
-            discussionRepository.deleteById(dbId);
-            eventPublisher.publishEvent(new DomainEvent.DiscussionDeleted(dbId, eventContext));
-            log.info("Deleted discussion: discussionId={}, discussionNumber={}", dbId, dto.number());
-        } else {
-            // Try to find by repository ID and number if database ID is not available
-            discussionRepository
-                .findByRepositoryIdAndNumber(context.repository().getId(), dto.number())
-                .ifPresent(discussion -> {
-                    Long discussionId = discussion.getId();
-                    discussionRepository.delete(discussion);
-                    eventPublisher.publishEvent(new DomainEvent.DiscussionDeleted(discussionId, eventContext));
-                    log.info("Deleted discussion: discussionId={}, discussionNumber={}", discussionId, dto.number());
-                });
-        }
+        // With synthetic PKs, we cannot use deleteById(nativeId) because the PK is
+        // auto-generated and differs from the native provider ID. Look up by natural key instead.
+        discussionRepository
+            .findByRepositoryIdAndNumber(context.repository().getId(), dto.number())
+            .ifPresent(discussion -> {
+                Long discussionId = discussion.getId();
+                discussionRepository.delete(discussion);
+                eventPublisher.publishEvent(new DomainEvent.DiscussionDeleted(discussionId, eventContext));
+                log.info("Deleted discussion: discussionId={}, discussionNumber={}", discussionId, dto.number());
+            });
     }
 
     /**
