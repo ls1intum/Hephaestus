@@ -58,22 +58,36 @@
   </changeSet>
 
   <changeSet id="1770916408627-1" author="Max Achterberg">
+    <preConditions onFail="MARK_RAN">
+      <columnExists tableName="user_achievement" columnName="unlocked_at"/>
+    </preConditions>
     <dropNotNullConstraint columnDataType="datetime"
                            columnName="unlocked_at"
                            tableName="user_achievement"/>
   </changeSet>
 
   <changeSet id="1770916408627-2" author="Max Achterberg">
+    <preConditions onFail="MARK_RAN">
+      <not>
+        <columnExists tableName="user_achievement" columnName="progress_data"/>
+      </not>
+    </preConditions>
     <addColumn tableName="user_achievement">
       <column name="progress_data"
               type="jsonb"/>
     </addColumn>
   </changeSet>
   <changeSet id="1770916408627-3" author="Max Achterberg">
+    <preConditions onFail="MARK_RAN">
+      <columnExists tableName="user_achievement" columnName="progress_data"/>
+    </preConditions>
     <addNotNullConstraint columnName="progress_data"
                           tableName="user_achievement"/>
   </changeSet>
   <changeSet id="1770916408627-4" author="Max Achterberg">
+    <preConditions onFail="MARK_RAN">
+      <columnExists tableName="user_achievement" columnName="current_value"/>
+    </preConditions>
     <dropColumn columnName="current_value"
                 tableName="user_achievement"/>
   </changeSet>
