@@ -162,6 +162,7 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
     private BadPracticeDetectorScheduler badPracticeDetectorScheduler;
 
     private Repository testRepository;
+    private GitProvider testProvider;
 
     @BeforeEach
     void setUp() {
@@ -202,10 +203,12 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             // Then - verify ALL persisted fields against hardcoded fixture values
             // Use TransactionTemplate for lazy-loading assertions
             transactionTemplate.executeWithoutResult(status -> {
-                PullRequest pr = pullRequestRepository.findById(PR_26_ID).orElseThrow();
+                PullRequest pr = pullRequestRepository
+                    .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
+                    .orElseThrow();
 
                 // Core identification fields (inherited from Issue)
-                assertThat(pr.getId()).isEqualTo(PR_26_ID);
+                assertThat(pr.getNativeId()).isEqualTo(PR_26_ID);
                 assertThat(pr.getNumber()).isEqualTo(PR_26_NUMBER);
 
                 // Content fields
@@ -241,11 +244,11 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
 
                 // Repository association (foreign key)
                 assertThat(pr.getRepository()).isNotNull();
-                assertThat(pr.getRepository().getId()).isEqualTo(FIXTURE_REPO_ID);
+                assertThat(pr.getRepository().getNativeId()).isEqualTo(FIXTURE_REPO_ID);
 
                 // Author association (foreign key) - verify exact fixture values
                 assertThat(pr.getAuthor()).isNotNull();
-                assertThat(pr.getAuthor().getId()).isEqualTo(FIXTURE_AUTHOR_ID);
+                assertThat(pr.getAuthor().getNativeId()).isEqualTo(FIXTURE_AUTHOR_ID);
                 assertThat(pr.getAuthor().getLogin()).isEqualTo(FIXTURE_AUTHOR_LOGIN);
                 assertThat(pr.getAuthor().getAvatarUrl()).isEqualTo(FIXTURE_AUTHOR_AVATAR_URL);
                 assertThat(pr.getAuthor().getHtmlUrl()).isEqualTo(FIXTURE_AUTHOR_HTML_URL);
@@ -275,7 +278,9 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             handler.handleEvent(closedEvent);
 
             // Then
-            PullRequest pr = pullRequestRepository.findById(PR_26_ID).orElse(null);
+            PullRequest pr = pullRequestRepository
+                .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
+                .orElse(null);
             assertThat(pr).isNotNull();
             assertThat(pr.getState()).isEqualTo(PullRequest.State.CLOSED);
             assertThat(pr.isMerged()).isFalse(); // closed.json has merged=false
@@ -298,7 +303,9 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             handler.handleEvent(reopenedEvent);
 
             // Then
-            PullRequest pr = pullRequestRepository.findById(PR_26_ID).orElse(null);
+            PullRequest pr = pullRequestRepository
+                .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
+                .orElse(null);
             assertThat(pr).isNotNull();
             assertThat(pr.getState()).isEqualTo(PullRequest.State.OPEN);
         }
@@ -323,7 +330,9 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             handler.handleEvent(readyEvent);
 
             // Then
-            PullRequest pr = pullRequestRepository.findById(PR_26_ID).orElse(null);
+            PullRequest pr = pullRequestRepository
+                .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
+                .orElse(null);
             assertThat(pr).isNotNull();
             assertThat(pr.isDraft()).isFalse();
 
@@ -341,7 +350,9 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             handler.handleEvent(draftEvent);
 
             // Then
-            PullRequest pr = pullRequestRepository.findById(PR_26_ID).orElse(null);
+            PullRequest pr = pullRequestRepository
+                .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
+                .orElse(null);
             assertThat(pr).isNotNull();
             assertThat(pr.isDraft()).isTrue();
 
@@ -369,7 +380,9 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             handler.handleEvent(syncEvent);
 
             // Then
-            PullRequest pr = pullRequestRepository.findById(PR_26_ID).orElse(null);
+            PullRequest pr = pullRequestRepository
+                .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
+                .orElse(null);
             assertThat(pr).isNotNull();
 
             // Verify PullRequestSynchronized event was published
@@ -397,7 +410,9 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
 
             // Then - use TransactionTemplate for lazy-loading assertions
             transactionTemplate.executeWithoutResult(status -> {
-                PullRequest pr = pullRequestRepository.findById(PR_26_ID).orElse(null);
+                PullRequest pr = pullRequestRepository
+                    .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
+                    .orElse(null);
                 assertThat(pr).isNotNull();
                 assertThat(labelNames(pr)).contains(FIXTURE_LABEL_NAME);
             });
@@ -445,7 +460,9 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             // Then - PR should be created with assignees from the DTO
             // Use TransactionTemplate for lazy-loading assertions
             transactionTemplate.executeWithoutResult(status -> {
-                PullRequest pr = pullRequestRepository.findById(PR_26_ID).orElse(null);
+                PullRequest pr = pullRequestRepository
+                    .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
+                    .orElse(null);
                 assertThat(pr).isNotNull();
                 assertThat(pr.getAssignees()).isNotEmpty();
                 assertThat(userLogins(pr.getAssignees())).contains(FIXTURE_AUTHOR_LOGIN);
@@ -464,7 +481,9 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             handler.handleEvent(unassignedEvent);
 
             // Then - PR still exists and was processed
-            PullRequest pr = pullRequestRepository.findById(PR_26_ID).orElse(null);
+            PullRequest pr = pullRequestRepository
+                .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
+                .orElse(null);
             assertThat(pr).isNotNull();
         }
     }
@@ -486,7 +505,9 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
 
             // Then - use TransactionTemplate for lazy-loading assertions
             transactionTemplate.executeWithoutResult(status -> {
-                PullRequest pr = pullRequestRepository.findById(PR_26_ID).orElse(null);
+                PullRequest pr = pullRequestRepository
+                    .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
+                    .orElse(null);
                 assertThat(pr).isNotNull();
                 assertThat(pr.getMilestone()).isNotNull();
                 assertThat(pr.getMilestone().getTitle()).isEqualTo(FIXTURE_MILESTONE_TITLE);
@@ -494,7 +515,9 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             });
 
             // Verify milestone was created in repository
-            assertThat(milestoneRepository.findById(FIXTURE_MILESTONE_ID)).isPresent();
+            assertThat(
+                milestoneRepository.findByNativeIdAndProviderId(FIXTURE_MILESTONE_ID, testProvider.getId())
+            ).isPresent();
         }
 
         @Test
@@ -511,7 +534,9 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             // Then - PR should be created and processed
             // Use TransactionTemplate for lazy-loading assertions
             transactionTemplate.executeWithoutResult(status -> {
-                PullRequest pr = pullRequestRepository.findById(PR_26_ID).orElse(null);
+                PullRequest pr = pullRequestRepository
+                    .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
+                    .orElse(null);
                 assertThat(pr).isNotNull();
                 // Milestone is null in the demilestoned payload itself
                 assertThat(pr.getMilestone()).isNull();
@@ -535,7 +560,9 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             handler.handleEvent(reviewRequestedEvent);
 
             // Then
-            PullRequest pr = pullRequestRepository.findById(PR_26_ID).orElse(null);
+            PullRequest pr = pullRequestRepository
+                .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
+                .orElse(null);
             assertThat(pr).isNotNull();
             // Note: The fixture has requested_teams but no user reviewers in requested_reviewers
             // The handler processes this via the generic process() method
@@ -553,7 +580,9 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             handler.handleEvent(reviewRequestRemovedEvent);
 
             // Then
-            PullRequest pr = pullRequestRepository.findById(PR_26_ID).orElse(null);
+            PullRequest pr = pullRequestRepository
+                .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
+                .orElse(null);
             assertThat(pr).isNotNull();
         }
     }
@@ -576,7 +605,9 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             handler.handleEvent(lockedEvent);
 
             // Then - PR processed successfully
-            PullRequest pr = pullRequestRepository.findById(PR_26_ID).orElse(null);
+            PullRequest pr = pullRequestRepository
+                .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
+                .orElse(null);
             assertThat(pr).isNotNull();
         }
 
@@ -593,7 +624,9 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             handler.handleEvent(unlockedEvent);
 
             // Then
-            PullRequest pr = pullRequestRepository.findById(PR_26_ID).orElse(null);
+            PullRequest pr = pullRequestRepository
+                .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
+                .orElse(null);
             assertThat(pr).isNotNull();
         }
     }
@@ -658,8 +691,10 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             // When
             handler.handleEvent(event);
 
-            // Then - PR should be persisted with the correct ID
-            assertThat(pullRequestRepository.findById(PR_26_ID)).isPresent();
+            // Then - PR should be persisted with the correct native ID
+            var pr = pullRequestRepository.findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER);
+            assertThat(pr).isPresent();
+            assertThat(pr.get().getNativeId()).isEqualTo(PR_26_ID);
         }
 
         @Test
@@ -672,7 +707,9 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             handler.handleEvent(loadPayload("pull_request.opened"));
 
             // Then - author created with exact fixture values
-            var author = userRepository.findById(FIXTURE_AUTHOR_ID).orElseThrow();
+            var author = userRepository
+                .findByNativeIdAndProviderId(FIXTURE_AUTHOR_ID, testProvider.getId())
+                .orElseThrow();
             assertThat(author.getLogin()).isEqualTo(FIXTURE_AUTHOR_LOGIN);
             assertThat(author.getAvatarUrl()).isEqualTo(FIXTURE_AUTHOR_AVATAR_URL);
             assertThat(author.getHtmlUrl()).isEqualTo(FIXTURE_AUTHOR_HTML_URL);
@@ -713,25 +750,29 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
         void shouldHandleCompletePullRequestLifecycle() throws Exception {
             // 1. Open PR
             handler.handleEvent(loadPayload("pull_request.opened"));
-            PullRequest pr = pullRequestRepository.findById(PR_26_ID).orElse(null);
+            PullRequest pr = pullRequestRepository
+                .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
+                .orElse(null);
             assertThat(pr).isNotNull();
             assertThat(pr.getState()).isEqualTo(PullRequest.State.OPEN);
 
             // 2. Add label
             handler.handleEvent(loadPayload("pull_request.labeled"));
             transactionTemplate.executeWithoutResult(status -> {
-                PullRequest prWithLabel = pullRequestRepository.findById(PR_26_ID).orElseThrow();
+                PullRequest prWithLabel = pullRequestRepository
+                    .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
+                    .orElseThrow();
                 assertThat(labelNames(prWithLabel)).contains(FIXTURE_LABEL_NAME);
             });
 
             // 3. Synchronize (push new commits)
             handler.handleEvent(loadPayload("pull_request.synchronize"));
-            pr = pullRequestRepository.findById(PR_26_ID).orElseThrow();
+            pr = pullRequestRepository.findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER).orElseThrow();
             assertThat(pr.getState()).isEqualTo(PullRequest.State.OPEN);
 
             // 4. Close
             handler.handleEvent(loadPayload("pull_request.closed"));
-            pr = pullRequestRepository.findById(PR_26_ID).orElseThrow();
+            pr = pullRequestRepository.findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER).orElseThrow();
             assertThat(pr.getState()).isEqualTo(PullRequest.State.CLOSED);
 
             // Verify events were published
@@ -746,12 +787,14 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
         void shouldHandleReadyForReviewAfterOpened() throws Exception {
             // 1. Open PR (which is not draft in opened.json)
             handler.handleEvent(loadPayload("pull_request.opened"));
-            PullRequest pr = pullRequestRepository.findById(PR_26_ID).orElseThrow();
+            PullRequest pr = pullRequestRepository
+                .findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER)
+                .orElseThrow();
             assertThat(pr.isDraft()).isFalse();
 
             // 2. Mark ready for review (even if not draft, event is processed)
             handler.handleEvent(loadPayload("pull_request.ready_for_review"));
-            pr = pullRequestRepository.findById(PR_26_ID).orElseThrow();
+            pr = pullRequestRepository.findByRepositoryIdAndNumber(testRepository.getId(), PR_26_NUMBER).orElseThrow();
             assertThat(pr.isDraft()).isFalse();
 
             // Verify events
@@ -862,9 +905,10 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
 
     private void setupTestData() {
         // Create GitHub provider
-        GitProvider gitProvider = gitProviderRepository
+        testProvider = gitProviderRepository
             .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
             .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com")));
+        GitProvider gitProvider = testProvider;
 
         // Create organization matching fixture data
         Organization org = new Organization();
