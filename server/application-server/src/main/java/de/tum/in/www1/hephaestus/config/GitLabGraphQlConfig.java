@@ -21,8 +21,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.Resource;
 import org.springframework.graphql.client.HttpGraphQlClient;
-import org.springframework.graphql.support.ResourceDocumentSource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
@@ -95,11 +95,18 @@ public class GitLabGraphQlConfig {
     @Bean
     @Qualifier("gitLabGraphQlClient")
     public HttpGraphQlClient gitLabGraphQlClient(@Qualifier("gitLabGraphQlWebClient") WebClient webClient) {
-        // Load .graphql operation files by name (e.g., documentName("GetGroup"))
-        // from the classpath. No fragment merging needed — GitLab operations are self-contained.
-        ResourceDocumentSource documentSource = new ResourceDocumentSource(
-            List.of(new ClassPathResource("graphql/gitlab/operations/")),
-            List.of(".graphql", ".gql")
+        // Operations are loaded from graphql/gitlab/operations/ by name.
+        // Shared fragments from graphql/gitlab/fragments/GitLabUserFields.graphql are
+        // selectively appended by FragmentMergingDocumentSource: only fragments that are
+        // actually referenced (transitively via ...FragmentName spreads) are included.
+        Resource fragmentFile = new ClassPathResource("graphql/gitlab/fragments/GitLabUserFields.graphql");
+        FragmentMergingDocumentSource documentSource = new FragmentMergingDocumentSource(
+            List.of(
+                new ClassPathResource("graphql/gitlab/operations/"),
+                new ClassPathResource("graphql/gitlab/fragments/")
+            ),
+            List.of(".graphql", ".gql"),
+            List.of(fragmentFile)
         );
         return HttpGraphQlClient.builder(webClient).documentSource(documentSource).build();
     }

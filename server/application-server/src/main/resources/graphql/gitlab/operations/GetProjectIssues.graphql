@@ -17,13 +17,12 @@ query GetProjectIssues($fullPath: ID!, $first: Int!, $after: String, $updatedAft
                 updatedAt
                 closedAt
                 author {
-                    id
-                    username
-                    name
-                    avatarUrl
-                    webUrl
+                    ...GitLabUserFields
                 }
                 labels(first: 100) {
+                    pageInfo {
+                        hasNextPage
+                    }
                     nodes {
                         id
                         title
@@ -31,12 +30,11 @@ query GetProjectIssues($fullPath: ID!, $first: Int!, $after: String, $updatedAft
                     }
                 }
                 assignees(first: 20) {
+                    pageInfo {
+                        hasNextPage
+                    }
                     nodes {
-                        id
-                        username
-                        name
-                        avatarUrl
-                        webUrl
+                        ...GitLabUserFields
                     }
                 }
                 userNotesCount

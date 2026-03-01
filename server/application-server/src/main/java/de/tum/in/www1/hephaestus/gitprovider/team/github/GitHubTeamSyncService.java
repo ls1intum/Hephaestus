@@ -9,6 +9,7 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncCons
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.adaptPageSize;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.ExponentialBackoff;
@@ -30,6 +31,8 @@ import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHTeamPrivacy;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHTeamRepositoryConnection;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHTeamRepositoryEdge;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHUser;
+import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
+import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.team.Team;
@@ -78,6 +81,7 @@ public class GitHubTeamSyncService {
     private final TeamRepository teamRepository;
     private final TeamMembershipRepository teamMembershipRepository;
     private final RepositoryRepository repositoryRepository;
+    private final OrganizationRepository organizationRepository;
     private final GitHubGraphQlClientProvider graphQlClientProvider;
     private final GitHubTeamProcessor teamProcessor;
     private final GitHubUserProcessor userProcessor;
@@ -90,6 +94,7 @@ public class GitHubTeamSyncService {
         TeamRepository teamRepository,
         TeamMembershipRepository teamMembershipRepository,
         RepositoryRepository repositoryRepository,
+        OrganizationRepository organizationRepository,
         GitHubGraphQlClientProvider graphQlClientProvider,
         GitHubTeamProcessor teamProcessor,
         GitHubUserProcessor userProcessor,
@@ -100,6 +105,7 @@ public class GitHubTeamSyncService {
         this.teamRepository = teamRepository;
         this.teamMembershipRepository = teamMembershipRepository;
         this.repositoryRepository = repositoryRepository;
+        this.organizationRepository = organizationRepository;
         this.graphQlClientProvider = graphQlClientProvider;
         this.teamProcessor = teamProcessor;
         this.userProcessor = userProcessor;
@@ -126,9 +132,17 @@ public class GitHubTeamSyncService {
         }
         String safeOrgLogin = sanitizeForLog(organizationLogin);
 
+        // Resolve the organization's provider for ProcessingContext (within @Transactional)
+        Organization organization = organizationRepository.findByLoginIgnoreCase(organizationLogin).orElse(null);
+        if (organization == null) {
+            log.warn("Skipped team sync: reason=organizationNotFound, orgLogin={}", safeOrgLogin);
+            return 0;
+        }
+        GitProvider provider = organization.getProvider();
+
         HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
         // Create processing context for sync operations (no repository for org-level teams)
-        ProcessingContext context = ProcessingContext.forSync(scopeId, null);
+        ProcessingContext context = ProcessingContext.forSync(scopeId, provider);
 
         try {
             Set<Long> syncedTeamIds = new HashSet<>();

@@ -1,0 +1,9 @@
+# Reusable fragment for GitLab UserCore fields.
+# Used for issue author, assignees, and any other user references.
+fragment GitLabUserFields on UserCore {
+    id
+    username
+    name
+    avatarUrl
+    webUrl
+}

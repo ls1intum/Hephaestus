@@ -15,6 +15,8 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
@@ -186,16 +188,27 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
     // ═══════════════════════════════════════════════════════════════
 
     private Organization createOrganization() {
+        GitProvider provider = new GitProvider();
+        provider.setId(1L);
+        provider.setType(GitProviderType.GITHUB);
+        provider.setServerUrl("https://api.github.com");
+
         Organization org = new Organization();
         org.setId(ORG_DB_ID);
         org.setNativeId(ORG_ID);
         org.setLogin(ORG_LOGIN);
         org.setName("Test Organization");
         org.setHtmlUrl("https://github.com/test-org");
+        org.setProvider(provider);
         return org;
     }
 
     private Project createProject(Long id, String nodeId, int number) {
+        GitProvider provider = new GitProvider();
+        provider.setId(1L);
+        provider.setType(GitProviderType.GITHUB);
+        provider.setServerUrl("https://api.github.com");
+
         Project project = new Project();
         project.setId(id);
         project.setNodeId(nodeId);
@@ -203,6 +216,7 @@ class GitHubProjectSyncServiceTest extends BaseUnitTest {
         project.setOwnerId(ORG_DB_ID);
         project.setNumber(number);
         project.setTitle("Project " + number);
+        project.setProvider(provider);
         return project;
     }
 

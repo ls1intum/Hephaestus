@@ -19,18 +19,56 @@ public interface UserRepository extends JpaRepository<User, Long> {
             SELECT u
             FROM User u
             WHERE u.login ILIKE :login
+            ORDER BY u.id
         """
     )
-    Optional<User> findByLogin(@Param("login") String login);
+    List<User> findAllByLogin(@Param("login") String login);
+
+    /**
+     * Finds a user by login. If multiple providers have the same login, returns the first match.
+     */
+    default Optional<User> findByLogin(String login) {
+        List<User> users = findAllByLogin(login);
+        return users.isEmpty() ? Optional.empty() : Optional.of(users.get(0));
+    }
+
+    @Query(
+        """
+            SELECT u
+            FROM User u
+            WHERE u.login ILIKE :login
+              AND u.provider.id = :providerId
+        """
+    )
+    Optional<User> findByLoginAndProviderId(@Param("login") String login, @Param("providerId") Long providerId);
 
     @Query(
         """
             SELECT u
             FROM User u
             WHERE u.email ILIKE :email
+            ORDER BY u.id
         """
     )
-    Optional<User> findByEmail(@Param("email") String email);
+    List<User> findAllByEmail(@Param("email") String email);
+
+    /**
+     * Finds a user by email. If multiple providers have the same email, returns the first match.
+     */
+    default Optional<User> findByEmail(String email) {
+        List<User> users = findAllByEmail(email);
+        return users.isEmpty() ? Optional.empty() : Optional.of(users.get(0));
+    }
+
+    @Query(
+        """
+            SELECT u
+            FROM User u
+            WHERE u.email ILIKE :email
+              AND u.provider.id = :providerId
+        """
+    )
+    Optional<User> findByEmailAndProviderId(@Param("email") String email, @Param("providerId") Long providerId);
 
     @Query(
         """

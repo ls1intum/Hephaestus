@@ -162,6 +162,12 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
         when(repo.getNameWithOwner()).thenReturn(nameWithOwner);
         when(repo.getDefaultBranch()).thenReturn(defaultBranch);
         when(repo.getOrganization()).thenReturn(null);
+        var provider = mock(
+            de.tum.in.www1.hephaestus.gitprovider.common.GitProvider.class,
+            org.mockito.Mockito.withSettings().lenient()
+        );
+        when(provider.getId()).thenReturn(1L);
+        when(repo.getProvider()).thenReturn(provider);
         return repo;
     }
 
@@ -437,8 +443,8 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
             when(repositoryRepository.findByIdWithOrganization(100L)).thenReturn(Optional.of(repo));
             when(gitRepositoryManager.isEnabled()).thenReturn(false);
 
-            when(authorResolver.resolveByLogin("authoruser")).thenReturn(42L);
-            when(authorResolver.resolveByLogin("committeruser")).thenReturn(43L);
+            when(authorResolver.resolveByLogin(eq("authoruser"), any())).thenReturn(42L);
+            when(authorResolver.resolveByLogin(eq("committeruser"), any())).thenReturn(43L);
 
             invokeHandleEvent(event);
 
@@ -482,7 +488,7 @@ class GitHubPushMessageHandlerTest extends BaseUnitTest {
             Repository repo = createMockRepository(100L, "owner/repo", "main");
             when(repositoryRepository.findByIdWithOrganization(100L)).thenReturn(Optional.of(repo));
             when(gitRepositoryManager.isEnabled()).thenReturn(false);
-            when(authorResolver.resolveByLogin(null)).thenReturn(null);
+            when(authorResolver.resolveByLogin(eq(null), any())).thenReturn(null);
 
             invokeHandleEvent(event);
 

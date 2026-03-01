@@ -249,11 +249,14 @@ public class GitHubPushMessageHandler extends GitHubMessageHandler<GitHubPushEve
             int changedFiles = added + removed + modified;
 
             // Resolve author/committer by username
+            Long providerId = repository.getProvider().getId();
             Long authorId = authorResolver.resolveByLogin(
-                webhookCommit.author() != null ? webhookCommit.author().username() : null
+                webhookCommit.author() != null ? webhookCommit.author().username() : null,
+                providerId
             );
             Long committerId = authorResolver.resolveByLogin(
-                webhookCommit.committer() != null ? webhookCommit.committer().username() : null
+                webhookCommit.committer() != null ? webhookCommit.committer().username() : null,
+                providerId
             );
 
             commitRepository.upsertCommit(
@@ -306,8 +309,9 @@ public class GitHubPushMessageHandler extends GitHubMessageHandler<GitHubPushEve
         }
 
         // Resolve author/committer IDs by email (with noreply fallback)
-        Long authorId = authorResolver.resolveByEmail(info.authorEmail());
-        Long committerId = authorResolver.resolveByEmail(info.committerEmail());
+        Long providerId = repository.getProvider().getId();
+        Long authorId = authorResolver.resolveByEmail(info.authorEmail(), providerId);
+        Long committerId = authorResolver.resolveByEmail(info.committerEmail(), providerId);
 
         // Upsert commit via native SQL (no exception on conflict)
         // Defense-in-depth: git_commit.message is NOT NULL; default to empty string

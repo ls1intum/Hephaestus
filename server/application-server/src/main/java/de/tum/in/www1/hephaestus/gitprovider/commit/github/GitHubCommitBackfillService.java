@@ -251,8 +251,9 @@ public class GitHubCommitBackfillService {
             }
 
             // Resolve author/committer IDs by email (with noreply fallback)
-            Long authorId = authorResolver.resolveByEmail(info.authorEmail());
-            Long committerId = authorResolver.resolveByEmail(info.committerEmail());
+            Long providerId = repository.getProvider().getId();
+            Long authorId = authorResolver.resolveByEmail(info.authorEmail(), providerId);
+            Long committerId = authorResolver.resolveByEmail(info.committerEmail(), providerId);
 
             // Upsert commit via native SQL (no exception on conflict)
             // Defense-in-depth: git_commit.message is NOT NULL; default to empty string

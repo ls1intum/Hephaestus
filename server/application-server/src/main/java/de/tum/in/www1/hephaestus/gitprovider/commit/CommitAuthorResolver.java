@@ -45,21 +45,25 @@ public class CommitAuthorResolver {
 
     /**
      * Resolve a user's database ID by email, with GitHub noreply fallback.
-     * <p>
-     * First tries a direct email match. If that fails and the email matches a GitHub
-     * noreply pattern, extracts the login and tries a login-based match.
+     * Scoped to a specific provider to avoid cross-provider ambiguity.
      *
-     * @param email the git author/committer email (from JGit {@code PersonIdent} or webhook payload)
+     * @param email      the git author/committer email
+     * @param providerId the provider to scope the lookup to
      * @return the user's database ID, or {@code null} if no match is found
      */
     @Nullable
-    public Long resolveByEmail(@Nullable String email) {
+    public Long resolveByEmail(@Nullable String email, @Nullable Long providerId) {
         if (email == null || email.isBlank()) {
             return null;
         }
 
-        // Strategy 1: direct email match
-        Long id = userRepository.findByEmail(email).map(User::getId).orElse(null);
+        // Strategy 1: direct email match (provider-scoped if available)
+        Long id;
+        if (providerId != null) {
+            id = userRepository.findByEmailAndProviderId(email, providerId).map(User::getId).orElse(null);
+        } else {
+            id = userRepository.findByEmail(email).map(User::getId).orElse(null);
+        }
         if (id != null) {
             return id;
         }
@@ -67,6 +71,9 @@ public class CommitAuthorResolver {
         // Strategy 2: parse GitHub noreply email → extract login → match by login
         String login = extractLoginFromNoreply(email);
         if (login != null) {
+            if (providerId != null) {
+                return userRepository.findByLoginAndProviderId(login, providerId).map(User::getId).orElse(null);
+            }
             return userRepository.findByLogin(login).map(User::getId).orElse(null);
         }
 
@@ -74,15 +81,20 @@ public class CommitAuthorResolver {
     }
 
     /**
-     * Resolve a user's database ID by GitHub login (username).
+     * Resolve a user's database ID by login (username).
+     * Scoped to a specific provider to avoid cross-provider ambiguity.
      *
-     * @param login the GitHub username (e.g., from webhook {@code CommitUser.username})
+     * @param login      the username (e.g., from webhook {@code CommitUser.username})
+     * @param providerId the provider to scope the lookup to
      * @return the user's database ID, or {@code null} if not found
      */
     @Nullable
-    public Long resolveByLogin(@Nullable String login) {
+    public Long resolveByLogin(@Nullable String login, @Nullable Long providerId) {
         if (login == null || login.isBlank()) {
             return null;
+        }
+        if (providerId != null) {
+            return userRepository.findByLoginAndProviderId(login, providerId).map(User::getId).orElse(null);
         }
         return userRepository.findByLogin(login).map(User::getId).orElse(null);
     }

@@ -98,7 +98,9 @@ class GitLabProjectProcessorTest extends BaseUnitTest {
             assertThat(result.getCreatedAt()).isEqualTo(Instant.parse("2024-01-15T10:30:00Z"));
             assertThat(result.getPushedAt()).isEqualTo(Instant.parse("2024-06-20T14:00:00Z"));
             assertThat(result.getUpdatedAt()).isEqualTo(Instant.parse("2024-06-20T14:00:00Z"));
-            assertThat(result.getLastSyncAt()).isNotNull();
+            // lastSyncAt is set AFTER issue sync completes (in WorkspaceActivationService),
+            // not during project discovery
+            assertThat(result.getLastSyncAt()).isNull();
         }
 
         @Test
