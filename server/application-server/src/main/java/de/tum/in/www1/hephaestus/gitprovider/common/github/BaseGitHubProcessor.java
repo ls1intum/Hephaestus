@@ -198,8 +198,11 @@ public abstract class BaseGitHubProcessor {
             return milestoneRepository.findByNumberAndRepositoryId(dto.number(), repository.getId()).orElse(null);
         }
 
-        // We inserted - fetch the entity to return a managed instance
-        return milestoneRepository.findById(milestoneId).orElse(null);
+        // We inserted - fetch the entity to return a managed instance.
+        // Must look up by natural key (number + repository), not by milestoneId,
+        // because the table uses auto-generated synthetic PKs (the milestoneId here
+        // is the native provider ID stored in native_id, not the synthetic PK).
+        return milestoneRepository.findByNumberAndRepositoryId(dto.number(), repository.getId()).orElse(null);
     }
 
     /**

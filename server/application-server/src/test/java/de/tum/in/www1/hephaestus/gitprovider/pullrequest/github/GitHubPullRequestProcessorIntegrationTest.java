@@ -263,10 +263,10 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             // When
             PullRequest result = processor.process(dto, createContext());
 
-            // Then - should use databaseId
+            // Then - should use databaseId as native_id
             assertThat(result).isNotNull();
-            assertThat(result.getId()).isEqualTo(databaseId);
-            assertThat(pullRequestRepository.findById(databaseId)).isPresent();
+            assertThat(result.getNativeId()).isEqualTo(databaseId);
+            assertThat(pullRequestRepository.findByRepositoryIdAndNumber(testRepository.getId(), 1)).isPresent();
         }
 
         @Test
@@ -320,10 +320,10 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             // When
             PullRequest result = processor.process(dto, createContext());
 
-            // Then - should use id as fallback
+            // Then - should use id as fallback for native_id
             assertThat(result).isNotNull();
-            assertThat(result.getId()).isEqualTo(webhookId);
-            assertThat(pullRequestRepository.findById(webhookId)).isPresent();
+            assertThat(result.getNativeId()).isEqualTo(webhookId);
+            assertThat(pullRequestRepository.findByRepositoryIdAndNumber(testRepository.getId(), 26)).isPresent();
         }
 
         @Test
@@ -412,7 +412,7 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 now, // createdAt
                 now, // updatedAt
                 null, // authorId
-                FIXTURE_REPO_ID,
+                testRepository.getId(), // use synthetic PK, not native ID
                 null, // milestoneId
                 null, // issueTypeId
                 null, // parentIssueId
@@ -422,8 +422,8 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             );
 
             // Verify entity exists as an Issue but NOT as a PullRequest
-            assertThat(issueRepository.findByRepositoryIdAndNumber(FIXTURE_REPO_ID, number)).isPresent();
-            assertThat(pullRequestRepository.findByRepositoryIdAndNumber(FIXTURE_REPO_ID, number)).isEmpty();
+            assertThat(issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), number)).isPresent();
+            assertThat(pullRequestRepository.findByRepositoryIdAndNumber(testRepository.getId(), number)).isEmpty();
 
             // Act - process as a pull request
             GitHubPullRequestDTO dto = createBasicPullRequestDto(entityId, number);
@@ -431,12 +431,12 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
 
             // Assert - should succeed (no IllegalStateException) and return a valid PR
             assertThat(result).isNotNull();
-            assertThat(result.getId()).isEqualTo(entityId);
+            assertThat(result.getNativeId()).isEqualTo(entityId);
             assertThat(result.getNumber()).isEqualTo(number);
             assertThat(result.getTitle()).isEqualTo("Test PR #" + number);
 
             // Verify it's now findable as a PullRequest
-            assertThat(pullRequestRepository.findByRepositoryIdAndNumber(FIXTURE_REPO_ID, number)).isPresent();
+            assertThat(pullRequestRepository.findByRepositoryIdAndNumber(testRepository.getId(), number)).isPresent();
 
             // Verify Created event was published (treated as new from PR perspective)
             assertThat(eventListener.getCreatedEvents()).hasSize(1);
@@ -460,13 +460,13 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
 
             // Then
             assertThat(result).isNotNull();
-            assertThat(result.getId()).isEqualTo(FIXTURE_PR_ID);
+            assertThat(result.getNativeId()).isEqualTo(FIXTURE_PR_ID);
             assertThat(result.getNumber()).isEqualTo(26);
             assertThat(result.getTitle()).isEqualTo("Test PR #26");
             assertThat(result.getState()).isEqualTo(PullRequest.State.OPEN);
             assertThat(result.isDraft()).isFalse();
             assertThat(result.isMerged()).isFalse();
-            assertThat(result.getRepository().getId()).isEqualTo(FIXTURE_REPO_ID);
+            assertThat(result.getRepository().getNativeId()).isEqualTo(FIXTURE_REPO_ID);
 
             // Verify Created event
             assertThat(eventListener.getCreatedEvents()).hasSize(1);
@@ -486,7 +486,9 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             // Then
             assertThat(result.getAuthor()).isNotNull();
             assertThat(result.getAuthor().getLogin()).isEqualTo(FIXTURE_AUTHOR_LOGIN);
-            assertThat(userRepository.findById(FIXTURE_AUTHOR_ID)).isPresent();
+            assertThat(
+                userRepository.findByNativeIdAndProviderId(FIXTURE_AUTHOR_ID, githubProvider.getId())
+            ).isPresent();
         }
 
         @Test
@@ -621,7 +623,9 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             // Then
             assertThat(result.getMilestone()).isNotNull();
             assertThat(result.getMilestone().getTitle()).isEqualTo("v1.0");
-            assertThat(milestoneRepository.findById(milestoneId)).isPresent();
+            assertThat(
+                milestoneRepository.findByNativeIdAndProviderId(milestoneId, githubProvider.getId())
+            ).isPresent();
         }
     }
 
