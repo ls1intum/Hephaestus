@@ -415,12 +415,16 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public void processDeleted(GitHubIssueDTO issueDto, ProcessingContext context) {
-        Long dbId = issueDto.getDatabaseId();
-        if (dbId != null) {
-            issueRepository.deleteById(dbId);
-            eventPublisher.publishEvent(new DomainEvent.IssueDeleted(dbId, EventContext.from(context)));
-            log.info("Deleted issue: issueId={}", dbId);
-        }
+        // With synthetic PKs, we cannot use deleteById(nativeId) because the PK is
+        // auto-generated and differs from the native provider ID. Look up by natural key instead.
+        issueRepository
+            .findByRepositoryIdAndNumber(context.repository().getId(), issueDto.number())
+            .ifPresent(issue -> {
+                Long syntheticId = issue.getId();
+                issueRepository.delete(issue);
+                eventPublisher.publishEvent(new DomainEvent.IssueDeleted(syntheticId, EventContext.from(context)));
+                log.info("Deleted issue: issueId={}, number={}", syntheticId, issueDto.number());
+            });
     }
 
     /**

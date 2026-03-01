@@ -35,6 +35,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Integration tests for GitHubDiscussionCommentProcessor.
@@ -79,6 +80,9 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private TransactionTemplate transactionTemplate;
 
     @Autowired
     private TestCommentEventListener eventListener;
@@ -570,12 +574,14 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
             // Resolve parent
             processor.resolveParentComment(reply, parent);
 
-            // Verify parent was set
-            DiscussionComment savedReply = commentRepository
-                .findByNativeIdAndProviderId(replyId, githubProvider.getId())
-                .orElseThrow();
-            assertThat(savedReply.getParentComment()).isNotNull();
-            assertThat(savedReply.getParentComment().getNativeId()).isEqualTo(parentId);
+            // Verify parent was set (wrap in transaction to avoid LazyInitializationException)
+            transactionTemplate.executeWithoutResult(status -> {
+                DiscussionComment savedReply = commentRepository
+                    .findByNativeIdAndProviderId(replyId, githubProvider.getId())
+                    .orElseThrow();
+                assertThat(savedReply.getParentComment()).isNotNull();
+                assertThat(savedReply.getParentComment().getNativeId()).isEqualTo(parentId);
+            });
         }
     }
 

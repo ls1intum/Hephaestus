@@ -305,7 +305,7 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             issueToDelete.setTitle("Issue to delete");
             issueToDelete.setState(Issue.State.OPEN);
             issueToDelete.setHtmlUrl("https://github.com/" + FIXTURE_REPO_FULL_NAME + "/issues/23");
-            issueToDelete.setRepository(repositoryRepository.findAll().getFirst());
+            issueToDelete.setRepository(testRepository);
             issueToDelete.setProvider(gitProvider);
             issueRepository.save(issueToDelete);
 
@@ -313,7 +313,7 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
             GitHubIssueEventDTO deletedEvent = loadPayload("issues.deleted");
 
-            // When
+            // When - delete via handler (exercises processDeleted with natural key lookup)
             handler.handleEvent(deletedEvent);
 
             // Then

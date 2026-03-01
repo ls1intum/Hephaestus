@@ -293,12 +293,15 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
             handler.handleEvent(loadPayload("issue.open"));
 
-            var author = userRepository
-                .findByNativeIdAndProviderId(NATIVE_USER_ID, savedProvider.getId())
-                .orElseThrow();
-            assertThat(author.getLogin()).isEqualTo(FIXTURE_AUTHOR_LOGIN);
-            assertThat(author.getProvider().getType()).isEqualTo(GitProviderType.GITLAB);
-            assertThat(author.getHtmlUrl()).isEqualTo("https://gitlab.lrz.de/ga84xah");
+            // Wrap in transaction to avoid LazyInitializationException when accessing provider
+            transactionTemplate.executeWithoutResult(status -> {
+                var author = userRepository
+                    .findByNativeIdAndProviderId(NATIVE_USER_ID, savedProvider.getId())
+                    .orElseThrow();
+                assertThat(author.getLogin()).isEqualTo(FIXTURE_AUTHOR_LOGIN);
+                assertThat(author.getProvider().getType()).isEqualTo(GitProviderType.GITLAB);
+                assertThat(author.getHtmlUrl()).isEqualTo("https://gitlab.lrz.de/ga84xah");
+            });
         }
 
         @Test

@@ -319,6 +319,32 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
             );
         }
 
+        private GitHubIssueDTO createIssueDTOForExistingIssue(Long issueId, int number) {
+            return new GitHubIssueDTO(
+                issueId,
+                issueId,
+                "node_id_" + issueId,
+                number,
+                "Existing Issue from Comment Webhook",
+                "Issue body",
+                "open",
+                null,
+                "https://github.com/" + TEST_REPO_FULL_NAME + "/issues/" + number,
+                0,
+                Instant.now(),
+                Instant.now(),
+                null,
+                false,
+                null,
+                Collections.emptyList(),
+                Collections.emptyList(),
+                null,
+                null,
+                null,
+                null
+            );
+        }
+
         @Test
         @DisplayName("should create Issue stub when parent does not exist")
         void shouldCreateIssueStubWhenParentDoesNotExist() {
@@ -380,7 +406,8 @@ class GitHubIssueCommentProcessorIntegrationTest extends BaseIntegrationTest {
         @DisplayName("should use existing parent when it already exists")
         void shouldUseExistingParentWhenItAlreadyExists() {
             GitHubCommentDTO commentDto = createCommentDTO(TEST_COMMENT_ID, "Comment on existing issue");
-            GitHubIssueDTO issueDto = createIssueDTOForNewIssue(testIssue.getNativeId(), false);
+            // Use testIssue's number (42) so that findByRepositoryIdAndNumber finds the existing issue
+            GitHubIssueDTO issueDto = createIssueDTOForExistingIssue(testIssue.getNativeId(), testIssue.getNumber());
             ProcessingContext context = createContext();
 
             // Get initial issue count

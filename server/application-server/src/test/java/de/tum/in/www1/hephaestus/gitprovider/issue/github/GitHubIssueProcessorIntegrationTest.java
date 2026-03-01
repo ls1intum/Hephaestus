@@ -1213,24 +1213,19 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
         @Test
         @DisplayName("processDeleted should delete issue")
         void processDeletedShouldDeleteIssue() {
-            // Given - create issue
+            // Given - create issue via process() to match real workflow
             Long issueId = FIXTURE_ISSUE_ID;
-            Issue existing = new Issue();
-            existing.setNativeId(issueId);
-            existing.setNumber(20);
-            existing.setTitle("To Delete");
-            existing.setState(Issue.State.OPEN);
-            existing.setHtmlUrl("https://example.com");
-            existing.setRepository(testRepository);
-            existing.setProvider(githubProvider);
-            issueRepository.save(existing);
+            GitHubIssueDTO createDto = createBasicIssueDto(issueId, 20);
+            processor.process(createDto, createContext());
 
-            assertThat(issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 20)).isPresent();
+            Issue existing = issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 20).orElseThrow();
+            assertThat(existing.getNativeId()).isEqualTo(issueId);
 
-            GitHubIssueDTO dto = createBasicIssueDto(issueId, 20);
+            eventListener.clear();
 
-            // When
-            processor.processDeleted(dto, createContext());
+            // When - delete via processDeleted (uses natural key lookup with synthetic PKs)
+            GitHubIssueDTO deleteDto = createBasicIssueDto(issueId, 20);
+            processor.processDeleted(deleteDto, createContext());
 
             // Then
             assertThat(issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 20)).isEmpty();
@@ -1313,14 +1308,13 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 21)).isPresent();
             assertThat(labelRepository.findById(label.getId())).isPresent();
 
-            GitHubIssueDTO dto = createBasicIssueDto(issueId, 21);
-
-            // When - delete should work without TransientObjectException
-            assertThatCode(() -> processor.processDeleted(dto, createContext())).doesNotThrowAnyException();
+            // When - delete via processDeleted (uses natural key lookup with synthetic PKs)
+            GitHubIssueDTO deleteDto = createBasicIssueDto(issueId, 21);
+            assertThatCode(() -> processor.processDeleted(deleteDto, createContext())).doesNotThrowAnyException();
 
             // Then - issue deleted, label still exists
             assertThat(issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 21)).isEmpty();
-            assertThat(labelRepository.findById(100001L)).isPresent();
+            assertThat(labelRepository.findById(label.getId())).isPresent();
         }
     }
 
