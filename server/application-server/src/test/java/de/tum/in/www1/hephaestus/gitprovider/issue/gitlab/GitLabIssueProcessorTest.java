@@ -45,12 +45,12 @@ import org.springframework.context.ApplicationEventPublisher;
 @DisplayName("GitLabIssueProcessor")
 class GitLabIssueProcessorTest extends BaseUnitTest {
 
-    private static final long REPO_ID = -246765L;
+    private static final long REPO_ID = 1L;
     private static final long RAW_ISSUE_ID = 422296L;
-    private static final long ENTITY_ISSUE_ID = -422296L;
+    private static final long ENTITY_ISSUE_ID = 100L;
     private static final int ISSUE_IID = 5;
     private static final long RAW_USER_ID = 18024L;
-    private static final long ENTITY_USER_ID = -18024L;
+    private static final long ENTITY_USER_ID = 200L;
     private static final Long PROVIDER_ID = 2L;
 
     @Mock
@@ -208,7 +208,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 null,
                 null
             );
-            Issue result = processor.processFromSync(syncData, testRepo);
+            Issue result = processor.processFromSync(syncData, testRepo, 1L);
 
             assertThat(result).isNull();
             verify(issueRepository, never()).upsertCore(
@@ -477,7 +477,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
     class SyncProcessing {
 
         @Test
-        @DisplayName("processFromSync() creates issue with negated ID")
+        @DisplayName("processFromSync() creates issue from GraphQL sync data")
         void processFromSyncCreatesIssue() {
             Issue issue = createIssueEntity();
             when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, ISSUE_IID))
@@ -507,7 +507,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 null,
                 null
             );
-            Issue result = processor.processFromSync(syncData, testRepo);
+            Issue result = processor.processFromSync(syncData, testRepo, 1L);
 
             assertThat(result).isNotNull();
             assertThat(result.getProvider()).isEqualTo(gitLabProvider);
@@ -561,7 +561,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 null,
                 null
             );
-            Issue result = processor.processFromSync(syncData, testRepo);
+            Issue result = processor.processFromSync(syncData, testRepo, 1L);
 
             assertThat(result).isNull();
         }
@@ -589,7 +589,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 null,
                 null
             );
-            Issue result = processor.processFromSync(syncData, testRepo);
+            Issue result = processor.processFromSync(syncData, testRepo, 1L);
 
             assertThat(result).isNull();
         }
@@ -622,7 +622,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 null,
                 null
             );
-            processor.processFromSync(syncData, testRepo);
+            processor.processFromSync(syncData, testRepo, 1L);
 
             ArgumentCaptor<DomainEvent.IssueCreated> eventCaptor = ArgumentCaptor.forClass(
                 DomainEvent.IssueCreated.class
@@ -659,7 +659,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 null,
                 null
             );
-            processor.processFromSync(syncData, testRepo);
+            processor.processFromSync(syncData, testRepo, 1L);
 
             verify(eventPublisher, never()).publishEvent(any());
         }

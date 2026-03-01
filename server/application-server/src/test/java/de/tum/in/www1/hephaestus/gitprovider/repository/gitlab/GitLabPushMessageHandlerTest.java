@@ -140,7 +140,9 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
         Organization org = new Organization();
         org.setId(1L);
         org.setLogin("hephaestustest");
-        when(organizationRepository.findByLoginIgnoreCase("hephaestustest")).thenReturn(Optional.of(org));
+        when(organizationRepository.findByLoginIgnoreCaseAndProviderId("hephaestustest", PROVIDER_ID)).thenReturn(
+            Optional.of(org)
+        );
 
         Message msg = mockMessage("gitlab.hephaestustest.demo-repository.push", pushEvent);
         handler.onMessage(msg);
@@ -231,7 +233,7 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
 
         verify(projectProcessor).processPushEvent(projectInfo, gitLabProvider);
         // Processor returned null — no org linking attempted
-        verify(organizationRepository, never()).findByLoginIgnoreCase(anyString());
+        verify(organizationRepository, never()).findByLoginIgnoreCaseAndProviderId(anyString(), any());
     }
 
     @Test
@@ -271,7 +273,7 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
             handler.onMessage(msg);
 
             // Should NOT look up org since it's already linked
-            verify(organizationRepository, never()).findByLoginIgnoreCase(anyString());
+            verify(organizationRepository, never()).findByLoginIgnoreCaseAndProviderId(anyString(), any());
         }
 
         @Test
@@ -285,7 +287,9 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
 
             Organization org = new Organization();
             org.setId(42L);
-            when(organizationRepository.findByLoginIgnoreCase("org")).thenReturn(Optional.of(org));
+            when(organizationRepository.findByLoginIgnoreCaseAndProviderId("org", PROVIDER_ID)).thenReturn(
+                Optional.of(org)
+            );
 
             Message msg = mockMessage("gitlab.org.proj.push", createPushEvent(projectInfo));
             handler.onMessage(msg);
@@ -302,7 +306,9 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
 
             var projectInfo = createProjectInfo(1L, "org/proj");
             when(projectProcessor.processPushEvent(projectInfo, gitLabProvider)).thenReturn(repo);
-            when(organizationRepository.findByLoginIgnoreCase("org")).thenReturn(Optional.empty());
+            when(organizationRepository.findByLoginIgnoreCaseAndProviderId("org", PROVIDER_ID)).thenReturn(
+                Optional.empty()
+            );
 
             Message msg = mockMessage("gitlab.org.proj.push", createPushEvent(projectInfo));
             handler.onMessage(msg);
@@ -325,7 +331,9 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
             Organization org = new Organization();
             org.setId(42L);
             // Should look up "org/team/subteam" (immediate parent)
-            when(organizationRepository.findByLoginIgnoreCase("org/team/subteam")).thenReturn(Optional.of(org));
+            when(organizationRepository.findByLoginIgnoreCaseAndProviderId("org/team/subteam", PROVIDER_ID)).thenReturn(
+                Optional.of(org)
+            );
 
             Message msg = mockMessage("gitlab.org.team.subteam.project.push", createPushEvent(projectInfo));
             handler.onMessage(msg);
@@ -346,7 +354,7 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
             Message msg = mockMessage("gitlab.myproject.push", createPushEvent(projectInfo));
             handler.onMessage(msg);
 
-            verify(organizationRepository, never()).findByLoginIgnoreCase(anyString());
+            verify(organizationRepository, never()).findByLoginIgnoreCaseAndProviderId(anyString(), any());
         }
     }
 

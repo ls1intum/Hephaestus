@@ -29,6 +29,8 @@ public interface RepositoryRepository extends JpaRepository<Repository, Long> {
 
     Optional<Repository> findByNativeIdAndProviderId(Long nativeId, Long providerId);
 
+    Optional<Repository> findByNameWithOwnerAndProviderId(String nameWithOwner, Long providerId);
+
     /**
      * Finds a repository by ID with the organization eagerly fetched.
      * Used in backfill operations where the repository is passed across transaction boundaries.
@@ -98,6 +100,7 @@ public interface RepositoryRepository extends JpaRepository<Repository, Long> {
         ON CONFLICT (provider_id, name_with_owner) DO UPDATE SET
             name = EXCLUDED.name,
             is_private = EXCLUDED.is_private,
+            visibility = EXCLUDED.visibility,
             organization_id = COALESCE(repository.organization_id, EXCLUDED.organization_id)
         """,
         nativeQuery = true

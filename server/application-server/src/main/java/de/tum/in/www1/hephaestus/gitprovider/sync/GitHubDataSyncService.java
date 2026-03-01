@@ -207,7 +207,9 @@ public class GitHubDataSyncService {
                 new IllegalStateException("GitProvider not found for type=GITHUB, serverUrl=" + GITHUB_SERVER_URL)
             );
 
-        Repository repository = repositoryRepository.findByNameWithOwner(nameWithOwner).orElse(null);
+        Repository repository = repositoryRepository
+            .findByNameWithOwnerAndProviderId(nameWithOwner, provider.getId())
+            .orElse(null);
         boolean repositoryCreatedDuringSync = false;
 
         // If repository doesn't exist locally, try to fetch and create it from GitHub

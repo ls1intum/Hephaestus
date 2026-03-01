@@ -16,7 +16,9 @@ public final class TestUserFactory {
     }
 
     public static User ensureUser(UserRepository repository, String login, long fallbackId, GitProvider provider) {
-        return repository.findByLogin(login).orElseGet(() -> repository.save(createUser(fallbackId, login, provider)));
+        return repository
+            .findByLoginAndProviderId(login, provider.getId())
+            .orElseGet(() -> repository.save(createUser(fallbackId, login, provider)));
     }
 
     public static User createUser(long id, String login) {

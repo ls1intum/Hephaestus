@@ -33,8 +33,10 @@ import org.springframework.lang.Nullable;
  * Provides common functionality for finding or creating related entities
  * (users, labels) that is shared across GitLab Issue, MR, and Note processors.
  * <p>
- * All GitLab entity IDs are stored as positive {@code nativeId} values alongside
- * a {@code provider_id} FK to the git_provider table, preventing collisions.
+ * GitLab entity IDs are stored as {@code nativeId} values alongside a
+ * {@code provider_id} FK to the git_provider table, preventing cross-provider
+ * collisions. Synthetic label IDs use negative deterministic hashes to avoid
+ * colliding with real provider-assigned IDs.
  */
 public abstract class BaseGitLabProcessor {
 
@@ -224,6 +226,7 @@ public abstract class BaseGitLabProcessor {
         return labelRepository.findById(labelId).orElse(null);
     }
 
+    /** Produces a negative deterministic ID from (repositoryId, labelName) to avoid collisions with real label IDs. */
     private Long generateDeterministicLabelId(Long repositoryId, String labelName) {
         long combined = (repositoryId << 32) | (labelName.hashCode() & 0xFFFFFFFFL);
         return -combined;
@@ -363,6 +366,7 @@ public abstract class BaseGitLabProcessor {
     // Sanitization
     // ========================================================================
 
+    /** Strips null bytes and other characters that are invalid in PostgreSQL text columns. */
     @Nullable
     protected String sanitize(@Nullable String input) {
         return PostgresStringUtils.sanitize(input);

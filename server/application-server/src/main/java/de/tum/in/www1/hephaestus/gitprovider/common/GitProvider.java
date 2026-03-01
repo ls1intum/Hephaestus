@@ -10,7 +10,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
-import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -24,8 +23,8 @@ import org.hibernate.annotations.CreationTimestamp;
  * This supports multiple instances of the same provider type (e.g., GitLab SaaS
  * and self-hosted GitLab Enterprise).
  * <p>
- * All git service entities reference a GitProvider via foreign key, replacing
- * the previous enum-based discriminator column.
+ * All git service entities reference a GitProvider via foreign key, scoping
+ * native IDs to prevent cross-provider collisions.
  */
 @Entity
 @Table(
@@ -38,12 +37,10 @@ import org.hibernate.annotations.CreationTimestamp;
 @Setter
 @NoArgsConstructor
 @ToString
-@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class GitProvider {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @EqualsAndHashCode.Include
     private Long id;
 
     @Enumerated(EnumType.STRING)
@@ -60,5 +57,18 @@ public class GitProvider {
     public GitProvider(GitProviderType type, String serverUrl) {
         this.type = type;
         this.serverUrl = serverUrl;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        GitProvider that = (GitProvider) o;
+        return id != null && id.equals(that.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return getClass().hashCode();
     }
 }

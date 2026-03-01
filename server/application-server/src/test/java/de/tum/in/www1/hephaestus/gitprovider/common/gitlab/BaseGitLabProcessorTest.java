@@ -333,7 +333,7 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
     }
 
     // ========================================================================
-    // ID Negation (delegated to GitLabSyncConstants)
+    // ID Mapping (delegated to GitLabSyncConstants)
     // ========================================================================
 
     @Nested

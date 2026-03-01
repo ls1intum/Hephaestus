@@ -109,6 +109,7 @@ public class CommitAuthorEnrichmentService {
      * @param repositoryId     the repository database ID
      * @param nameWithOwner    the repository name with owner (e.g. "owner/repo")
      * @param scopeId          the scope ID for GraphQL client authentication
+     * @param providerId       the provider ID for scoping user lookups
      * @return the number of commits enriched
      */
     public int enrichCommitAuthors(Long repositoryId, String nameWithOwner, @Nullable Long scopeId, Long providerId) {
@@ -143,7 +144,12 @@ public class CommitAuthorEnrichmentService {
         );
 
         // Phase 2: First pass — try resolving by email using existing DB users
-        int enrichedByEmail = enrichByEmail(repositoryId, unresolvedAuthorEmails, unresolvedCommitterEmails);
+        int enrichedByEmail = enrichByEmail(
+            repositoryId,
+            unresolvedAuthorEmails,
+            unresolvedCommitterEmails,
+            providerId
+        );
 
         // Phase 3: Re-check which emails are still unresolved after email pass
         List<String> stillUnresolvedAuthorEmails = commitRepository.findDistinctUnresolvedAuthorEmailsByRepositoryId(
@@ -198,12 +204,13 @@ public class CommitAuthorEnrichmentService {
     private int enrichByEmail(
         Long repositoryId,
         List<String> unresolvedAuthorEmails,
-        List<String> unresolvedCommitterEmails
+        List<String> unresolvedCommitterEmails,
+        Long providerId
     ) {
         int enriched = 0;
 
         for (String email : unresolvedAuthorEmails) {
-            Long userId = authorResolver.resolveByEmail(email);
+            Long userId = authorResolver.resolveByEmail(email, providerId);
             if (userId != null) {
                 int updated = commitRepository.bulkUpdateAuthorIdByEmail(email, repositoryId, userId);
                 enriched += updated;
@@ -212,7 +219,7 @@ public class CommitAuthorEnrichmentService {
         }
 
         for (String email : unresolvedCommitterEmails) {
-            Long userId = authorResolver.resolveByEmail(email);
+            Long userId = authorResolver.resolveByEmail(email, providerId);
             if (userId != null) {
                 int updated = commitRepository.bulkUpdateCommitterIdByEmail(email, repositoryId, userId);
                 enriched += updated;
@@ -300,7 +307,7 @@ public class CommitAuthorEnrichmentService {
             if (login == null) {
                 continue;
             }
-            Long userId = authorResolver.resolveByLogin(login);
+            Long userId = authorResolver.resolveByLogin(login, providerId);
             if (userId != null) {
                 int updated = commitRepository.bulkUpdateAuthorIdByEmail(email, repositoryId, userId);
                 enriched += updated;
@@ -320,7 +327,7 @@ public class CommitAuthorEnrichmentService {
             if (login == null) {
                 continue;
             }
-            Long userId = authorResolver.resolveByLogin(login);
+            Long userId = authorResolver.resolveByLogin(login, providerId);
             if (userId != null) {
                 int updated = commitRepository.bulkUpdateCommitterIdByEmail(email, repositoryId, userId);
                 enriched += updated;
@@ -612,12 +619,12 @@ public class CommitAuthorEnrichmentService {
     }
 
     /**
-     * Extracts the login from a nested path like {@code author.user.login} or
-     * {@code committer.user.login} from a GraphQL response field.
+     * Extracts user info from a nested path like {@code author.user} or
+     * {@code committer.user} in the GraphQL commit data.
      *
-     * @param commitField the commit response field
-     * @param role        "author" or "committer"
-     * @return the login string, or null if not present
+     * @param commitData the deserialized commit map from GraphQL
+     * @param role       "author" or "committer"
+     * @return the user snapshot, or null if not present
      */
     @Nullable
     private UserSnapshot extractUserSnapshot(Map<String, Object> commitData, String role) {

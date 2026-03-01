@@ -83,6 +83,7 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
         }
 
         var attrs = event.objectAttributes();
+        User author = resolveWebhookAuthor(event, context.providerId());
         Issue issue = upsertIssue(
             attrs.id(),
             attrs.iid(),
@@ -93,8 +94,9 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
             attrs.createdAt(),
             attrs.updatedAt(),
             attrs.closedAt(),
-            event.user(),
-            context.repository()
+            author,
+            context.repository(),
+            context
         );
 
         if (issue == null) return null;
@@ -157,7 +159,7 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
      */
     @Transactional
     @Nullable
-    public Issue processFromSync(SyncIssueData data, Repository repository) {
+    public Issue processFromSync(SyncIssueData data, Repository repository, @Nullable Long scopeId) {
         if (data.confidential()) {
             log.debug("Skipped confidential issue from sync: iid={}", data.iid());
             return null;
@@ -240,7 +242,7 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
         }
 
         if (isNew) {
-            ProcessingContext ctx = ProcessingContext.forSync(null, repository);
+            ProcessingContext ctx = ProcessingContext.forSync(scopeId, repository);
             eventPublisher.publishEvent(
                 new DomainEvent.IssueCreated(EventPayload.IssueData.from(issue), EventContext.from(ctx))
             );
@@ -286,6 +288,39 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
     // Private helpers
     // ========================================================================
 
+    /**
+     * Resolves the issue author from a webhook event.
+     * <p>
+     * GitLab webhook {@code user} is the <em>actor</em> (who triggered the event),
+     * not necessarily the issue author. The real author ID is in
+     * {@code object_attributes.author_id}.
+     * <p>
+     * Strategy:
+     * <ol>
+     *   <li>If the actor's ID matches {@code author_id}, use the actor DTO
+     *       (has full profile data) to upsert the user.</li>
+     *   <li>Otherwise look up the author by native ID from the database
+     *       (works when the author was previously synced).</li>
+     *   <li>If not found, return {@code null} — the {@code COALESCE} in the
+     *       upsert SQL will preserve any existing author.</li>
+     * </ol>
+     */
+    @Nullable
+    private User resolveWebhookAuthor(GitLabIssueEventDTO event, Long providerId) {
+        Long authorId = event.objectAttributes().authorId();
+        if (authorId == null) {
+            return null;
+        }
+
+        // If the actor IS the author, we have full profile data — upsert them
+        if (event.user() != null && authorId.equals(event.user().id())) {
+            return findOrCreateUser(event.user(), providerId);
+        }
+
+        // Otherwise, try to find the author by native ID (previously synced)
+        return userRepository.findByNativeIdAndProviderId(authorId, providerId).orElse(null);
+    }
+
     @Nullable
     private Issue upsertIssue(
         Long rawId,
@@ -297,8 +332,9 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
         @Nullable String createdAt,
         @Nullable String updatedAt,
         @Nullable String closedAt,
-        @Nullable de.tum.in.www1.hephaestus.gitprovider.common.gitlab.dto.GitLabWebhookUser authorDto,
-        Repository repository
+        @Nullable User author,
+        Repository repository,
+        ProcessingContext context
     ) {
         if (rawId == null || iid == null) {
             log.warn("Skipped issue processing: reason=missingIdOrIid");
@@ -312,7 +348,6 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
         Optional<Issue> existingOpt = issueRepository.findByRepositoryIdAndNumber(repository.getId(), issueNumber);
         boolean isNew = existingOpt.isEmpty();
 
-        User author = findOrCreateUser(authorDto, providerId);
         Issue.State issueState = convertState(state);
 
         Instant now = Instant.now();
@@ -348,10 +383,7 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
 
             if (isNew) {
                 eventPublisher.publishEvent(
-                    new DomainEvent.IssueCreated(
-                        EventPayload.IssueData.from(issue),
-                        EventContext.from(ProcessingContext.forSync(null, repository))
-                    )
+                    new DomainEvent.IssueCreated(EventPayload.IssueData.from(issue), EventContext.from(context))
                 );
                 log.debug("Created issue: nativeId={}, iid={}", nativeId, issueNumber);
             }
@@ -368,8 +400,12 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
             return Issue.State.OPEN;
         }
         return switch (state.toLowerCase()) {
+            case "opened" -> Issue.State.OPEN;
             case "closed" -> Issue.State.CLOSED;
-            default -> Issue.State.OPEN;
+            default -> {
+                log.warn("Unknown GitLab issue state '{}', defaulting to OPEN", state);
+                yield Issue.State.OPEN;
+            }
         };
     }
 

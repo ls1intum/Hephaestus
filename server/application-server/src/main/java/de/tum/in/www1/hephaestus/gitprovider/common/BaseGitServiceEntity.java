@@ -27,8 +27,7 @@ import lombok.ToString;
  * </ul>
  * <p>
  * The combination of {@code (provider_id, native_id)} is unique per entity table,
- * replacing the previous approach of using provider-native IDs as primary keys
- * with negation for GitLab.
+ * scoping native IDs to prevent cross-provider collisions.
  */
 @MappedSuperclass
 @Getter

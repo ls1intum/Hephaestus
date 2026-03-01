@@ -31,7 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
  * <b>Key mapping decisions:</b>
  * <ul>
  *   <li>{@code fullPath} → {@code nameWithOwner} (unique identifier)</li>
- *   <li>Numeric ID extracted from GID → {@code id} (primary key)</li>
+ *   <li>Numeric ID extracted from GID → {@code nativeId} (provider-scoped native ID)</li>
  *   <li>{@code webUrl} → {@code htmlUrl}</li>
  *   <li>{@code visibility} string → {@code Repository.Visibility} enum</li>
  *   <li>{@code repository.rootRef} → {@code defaultBranch} (fallback: {@code "main"})</li>
@@ -120,7 +120,10 @@ public class GitLabProjectProcessor {
             repository.setPushedAt(repository.getCreatedAt() != null ? repository.getCreatedAt() : Instant.now());
         }
 
-        repository.setLastSyncAt(Instant.now());
+        // Do NOT set lastSyncAt here — it is set after issue sync completes
+        // in WorkspaceActivationService. Setting it here would cause the first
+        // issue sync to use an updatedAfter filter of "just now", skipping all
+        // historical issues.
 
         return repositoryRepository.save(repository);
     }

@@ -100,7 +100,7 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
             return null;
         }
 
-        // Check for valid database ID - required for assigned ID strategy
+        // Check for valid native ID - required for provider-scoped upsert
         Long dbId = dto.getDatabaseId();
         if (dbId == null) {
             log.warn("Skipped pull request processing: reason=missingDatabaseId, prNumber={}", dto.number());
@@ -267,7 +267,8 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
     }
 
     /**
-     * Computes which fields changed between the old and new PR state.
+     * Computes which scalar fields changed between the old and new PR state.
+     * Relationship changes (labels, assignees, reviewers) are tracked separately.
      */
     private Set<String> computeChangedFields(PullRequest oldPr, PullRequest newPr) {
         Set<String> changedFields = new HashSet<>();
@@ -452,8 +453,9 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
             return;
         }
 
-        Long authorId = commitAuthorResolver.resolveByLogin(info.authorLogin());
-        Long committerId = commitAuthorResolver.resolveByLogin(info.committerLogin());
+        Long providerId = repository.getProvider().getId();
+        Long authorId = commitAuthorResolver.resolveByLogin(info.authorLogin(), providerId);
+        Long committerId = commitAuthorResolver.resolveByLogin(info.committerLogin(), providerId);
 
         String htmlUrl = "https://github.com/" + repository.getNameWithOwner() + "/commit/" + info.sha();
 

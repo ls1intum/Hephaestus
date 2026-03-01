@@ -373,9 +373,16 @@ public class WorkspaceRepositoryMonitorService {
 
         Workspace workspace = workspaceOpt.get();
 
+        GitProvider provider = gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
+            .orElseThrow(() ->
+                new IllegalStateException("GitProvider not found for type=GITHUB, serverUrl=https://github.com")
+            );
+
         // Create or update the Repository entity with organization linking
         ensureRepositoryFromSnapshot(
             workspace,
+            provider,
             snapshot.id(),
             snapshot.nameWithOwner(),
             snapshot.name(),
@@ -465,10 +472,17 @@ public class WorkspaceRepositoryMonitorService {
                 .forEach(desiredRepositories::add);
         }
 
+        GitProvider provider = gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
+            .orElseThrow(() ->
+                new IllegalStateException("GitProvider not found for type=GITHUB, serverUrl=https://github.com")
+            );
+
         allowedSnapshots.forEach(snapshot -> {
             // Create or update Repository entity with organization linking
             ensureRepositoryFromSnapshot(
                 workspace,
+                provider,
                 snapshot.id(),
                 snapshot.nameWithOwner(),
                 snapshot.name(),
@@ -667,6 +681,7 @@ public class WorkspaceRepositoryMonitorService {
      * {@code isPrivate} and {@code nameWithOwner} respectively.
      *
      * @param workspace     the workspace (used to get the organization)
+     * @param provider      the resolved GitProvider instance
      * @param nativeId      the provider's original numeric ID for the repository
      * @param nameWithOwner the full name (e.g., "owner/repo")
      * @param name          the short repository name
@@ -674,6 +689,7 @@ public class WorkspaceRepositoryMonitorService {
      */
     private void ensureRepositoryFromSnapshot(
         Workspace workspace,
+        GitProvider provider,
         long nativeId,
         String nameWithOwner,
         String name,
@@ -682,12 +698,6 @@ public class WorkspaceRepositoryMonitorService {
         if (StringUtils.isBlank(nameWithOwner)) {
             return;
         }
-
-        GitProvider provider = gitProviderRepository
-            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
-            .orElseThrow(() ->
-                new IllegalStateException("GitProvider not found for type=GITHUB, serverUrl=https://github.com")
-            );
 
         repositoryRepository.upsertFromSnapshot(
             nativeId,

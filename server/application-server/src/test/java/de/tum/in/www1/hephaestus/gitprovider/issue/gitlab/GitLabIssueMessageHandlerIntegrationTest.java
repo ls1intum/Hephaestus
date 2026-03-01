@@ -47,12 +47,12 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p>
  * <b>Fixture values (issue.open.json — Issue IID #5):</b>
  * <ul>
- *   <li>Raw ID: 422296 → Entity ID: -422296</li>
+ *   <li>Native ID: 422296 (stored as nativeId; synthetic auto-generated PK for id)</li>
  *   <li>IID: 5</li>
  *   <li>Title: "Feature: Add user authentication"</li>
  *   <li>State: opened → OPEN</li>
- *   <li>Author: ga84xah (raw ID 18024 → entity ID -18024)</li>
- *   <li>Label: enhancement (raw ID 85907 → entity ID -85907)</li>
+ *   <li>Author: ga84xah (native ID 18024)</li>
+ *   <li>Label: enhancement (native ID 85907)</li>
  *   <li>Provider: GITLAB</li>
  * </ul>
  * <p>
@@ -287,7 +287,7 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     class EntityResolution {
 
         @Test
-        @DisplayName("creates author with negated ID and GITLAB provider")
+        @DisplayName("creates author with native ID and GITLAB provider")
         void shouldCreateAuthorWithCorrectFields() throws Exception {
             assertThat(userRepository.count()).isZero();
 
@@ -305,8 +305,8 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("creates label with negated ID")
-        void shouldCreateLabelWithNegatedId() throws Exception {
+        @DisplayName("creates label with correct fields")
+        void shouldCreateLabelWithCorrectFields() throws Exception {
             handler.handleEvent(loadPayload("issue.open"));
 
             transactionTemplate.executeWithoutResult(status -> {

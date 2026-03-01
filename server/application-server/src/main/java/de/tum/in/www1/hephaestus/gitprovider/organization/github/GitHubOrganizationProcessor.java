@@ -54,7 +54,7 @@ public class GitHubOrganizationProcessor {
      */
     @Transactional
     public Organization process(GitHubOrganizationEventDTO.GitHubOrganizationDTO dto, Long providerId) {
-        if (dto == null || dto.id() == null) {
+        if (dto == null || dto.id() == null || providerId == null) {
             log.warn("Skipped organization processing: reason=nullOrMissingId");
             return null;
         }
@@ -111,7 +111,8 @@ public class GitHubOrganizationProcessor {
      */
     @Transactional
     public Organization rename(Long nativeId, String newLogin, Long providerId) {
-        if (nativeId == null || newLogin == null) {
+        if (nativeId == null || newLogin == null || providerId == null) {
+            log.warn("Skipped organization rename: reason=nullParameter");
             return null;
         }
 
@@ -144,7 +145,8 @@ public class GitHubOrganizationProcessor {
      */
     @Transactional
     public void delete(Long nativeId, Long providerId) {
-        if (nativeId == null) {
+        if (nativeId == null || providerId == null) {
+            log.warn("Skipped organization delete: reason=nullParameter");
             return;
         }
 

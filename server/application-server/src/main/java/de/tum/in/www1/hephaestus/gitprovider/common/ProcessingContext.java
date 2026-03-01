@@ -1,13 +1,12 @@
 package de.tum.in.www1.hephaestus.gitprovider.common;
 
-import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import java.time.Instant;
 import java.util.UUID;
 import org.springframework.lang.Nullable;
 
 /**
- * Unified context for processing GitHub data from any source (sync or webhook).
+ * Unified context for processing git provider data from any source (sync or webhook).
  * <p>
  * This context carries all the information needed to process data consistently,
  * regardless of whether it came from a scheduled GraphQL sync or a webhook
@@ -66,6 +65,22 @@ public record ProcessingContext(
             scopeId,
             repository,
             repository != null ? repository.getProvider() : null,
+            Instant.now(),
+            UUID.randomUUID().toString(),
+            null,
+            DataSource.GRAPHQL_SYNC
+        );
+    }
+
+    /**
+     * Creates a context for sync operations that are not repository-scoped
+     * (e.g., organization-level project sync, team sync).
+     */
+    public static ProcessingContext forSync(Long scopeId, GitProvider provider) {
+        return new ProcessingContext(
+            scopeId,
+            null,
+            provider,
             Instant.now(),
             UUID.randomUUID().toString(),
             null,

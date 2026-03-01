@@ -204,7 +204,7 @@ public class GitHubRepositorySyncService {
             }
 
             Repository repository = repositoryRepository
-                .findByNameWithOwner(repoData.getNameWithOwner())
+                .findByNativeIdAndProviderId(githubDatabaseId, provider.getId())
                 .orElseGet(Repository::new);
 
             repository.setNativeId(githubDatabaseId);
@@ -215,48 +215,33 @@ public class GitHubRepositorySyncService {
             repository.setHtmlUrl(repoData.getUrl() != null ? repoData.getUrl().toString() : null);
             repository.setOrganization(organization);
 
-            // Set private status
             repository.setPrivate(repoData.getIsPrivate());
-
-            // Set archived status
             repository.setArchived(repoData.getIsArchived());
-
-            // Set disabled status
             repository.setDisabled(repoData.getIsDisabled());
-
-            // Set discussions enabled status
             repository.setHasDiscussionsEnabled(repoData.getHasDiscussionsEnabled());
 
-            // Set created at timestamp
             if (repoData.getCreatedAt() != null) {
                 repository.setCreatedAt(repoData.getCreatedAt().toInstant());
             }
-
-            // Set updated at timestamp
             if (repoData.getUpdatedAt() != null) {
                 repository.setUpdatedAt(repoData.getUpdatedAt().toInstant());
             }
-
-            // Set pushed at timestamp
             if (repoData.getPushedAt() != null) {
                 repository.setPushedAt(repoData.getPushedAt().toInstant());
             }
 
-            // Set default branch
             if (repoData.getDefaultBranchRef() != null) {
                 repository.setDefaultBranch(repoData.getDefaultBranchRef().getName());
             } else {
                 repository.setDefaultBranch("main");
             }
 
-            // Set visibility
             if (repoData.getVisibility() != null) {
                 repository.setVisibility(Repository.Visibility.valueOf(repoData.getVisibility().name()));
             } else {
                 repository.setVisibility(Repository.Visibility.PRIVATE);
             }
 
-            // Mark sync timestamp
             repository.setLastSyncAt(Instant.now());
 
             repository = repositoryRepository.save(repository);

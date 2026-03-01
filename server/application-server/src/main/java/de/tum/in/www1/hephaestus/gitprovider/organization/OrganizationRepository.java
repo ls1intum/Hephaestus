@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 public interface OrganizationRepository extends JpaRepository<Organization, Long> {
     Optional<Organization> findByNativeIdAndProviderId(Long nativeId, Long providerId);
     Optional<Organization> findByLoginIgnoreCase(String login);
+    Optional<Organization> findByLoginIgnoreCaseAndProviderId(String login, Long providerId);
 
     /**
      * Upsert an organization using PostgreSQL ON CONFLICT.

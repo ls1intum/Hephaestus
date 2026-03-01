@@ -110,7 +110,7 @@ public class GitLabPushMessageHandler extends GitLabMessageHandler<GitLabPushEve
                 safeProjectPath,
                 repository.getId()
             );
-            ensureOrganizationLinked(repository, projectPath);
+            ensureOrganizationLinked(repository, projectPath, provider);
         } else {
             log.warn("Failed to upsert project from push event: projectPath={}", safeProjectPath);
         }
@@ -123,7 +123,7 @@ public class GitLabPushMessageHandler extends GitLabMessageHandler<GitLabPushEve
      * If the org doesn't exist yet (push arrived before first full sync), the repository
      * will be linked during the next scheduled sync run.
      */
-    private void ensureOrganizationLinked(Repository repository, String projectPath) {
+    private void ensureOrganizationLinked(Repository repository, String projectPath, GitProvider provider) {
         if (repository.getOrganization() != null) {
             return;
         }
@@ -133,7 +133,9 @@ public class GitLabPushMessageHandler extends GitLabMessageHandler<GitLabPushEve
             return; // user-owned project, no group
         }
 
-        Organization org = organizationRepository.findByLoginIgnoreCase(groupPath).orElse(null);
+        Organization org = organizationRepository
+            .findByLoginIgnoreCaseAndProviderId(groupPath, provider.getId())
+            .orElse(null);
 
         if (org != null) {
             repository.setOrganization(org);

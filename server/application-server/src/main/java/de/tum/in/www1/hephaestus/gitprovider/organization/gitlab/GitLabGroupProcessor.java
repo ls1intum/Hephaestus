@@ -21,9 +21,9 @@ import org.springframework.transaction.annotation.Transactional;
  * <b>Key mapping decisions:</b>
  * <ul>
  *   <li>{@code fullPath} → {@code login} (unique identifier, supports nested groups)</li>
- *   <li>Numeric ID extracted from GID, negated via {@link GitLabSyncConstants#toEntityId} → {@code id}</li>
+ *   <li>Numeric ID extracted from GID via {@link GitLabSyncConstants#extractNumericId} → {@code nativeId} (provider-scoped)</li>
  *   <li>{@code webUrl} → {@code htmlUrl}</li>
- *   <li>{@code provider} = {@link GitProviderType#GITLAB}</li>
+ *   <li>{@code provider} = {@code GITLAB}</li>
  * </ul>
  */
 @Service
@@ -42,8 +42,8 @@ public class GitLabGroupProcessor {
      * Processes a GitLab group GraphQL response into an Organization entity.
      * <p>
      * Uses upsert for thread-safe concurrent inserts. If the group already exists,
-     * its mutable fields (name, avatar, URL) are updated. IDs are negated to avoid
-     * collision with GitHub organization IDs.
+     * its mutable fields (name, avatar, URL) are updated. IDs are provider-scoped
+     * native IDs, avoiding collision with other providers via the (provider_id, native_id) unique constraint.
      *
      * @param group the GitLab group GraphQL response
      * @return the persisted Organization entity, or null if the response is invalid

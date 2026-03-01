@@ -133,7 +133,7 @@ public class GitLabIssueSyncService {
 
                 for (Map<String, Object> issueNode : nodes) {
                     try {
-                        if (processIssueNode(issueNode, repository) != null) {
+                        if (processIssueNode(issueNode, repository, scopeId) != null) {
                             totalSynced++;
                         }
                     } catch (Exception e) {
@@ -153,6 +153,14 @@ public class GitLabIssueSyncService {
                     break;
                 }
                 cursor = pageInfo.endCursor();
+                if (cursor == null) {
+                    log.warn(
+                        "Pagination cursor is null despite hasNextPage=true: projectPath={}, page={}",
+                        safeProjectPath,
+                        page
+                    );
+                    break;
+                }
                 page++;
 
                 // Throttle between pages
@@ -200,9 +208,10 @@ public class GitLabIssueSyncService {
      */
     @SuppressWarnings("unchecked")
     @Nullable
-    private Issue processIssueNode(Map<String, Object> node, Repository repository) {
+    private Issue processIssueNode(Map<String, Object> node, Repository repository, Long scopeId) {
         String globalId = (String) node.get("id");
         String iid = String.valueOf(node.get("iid"));
+        String issueContext = sanitizeForLog(repository.getNameWithOwner()) + "#" + iid;
         String title = (String) node.get("title");
         String description = (String) node.get("description");
         String state = (String) node.get("state");
@@ -228,7 +237,7 @@ public class GitLabIssueSyncService {
             authorWebUrl = (String) authorMap.get("webUrl");
         }
 
-        // Extract labels
+        // Extract labels (with overflow detection)
         List<GitLabIssueProcessor.SyncLabelData> syncLabels = null;
         Map<String, Object> labelsMap = (Map<String, Object>) node.get("labels");
         if (labelsMap != null) {
@@ -244,10 +253,12 @@ public class GitLabIssueSyncService {
                         )
                     );
                 }
+                // Detect nested pagination overflow for labels
+                checkNestedOverflow(labelsMap, "labels", labelNodes.size(), issueContext);
             }
         }
 
-        // Extract assignees
+        // Extract assignees (with overflow detection)
         List<GitLabIssueProcessor.SyncAssigneeData> syncAssignees = null;
         Map<String, Object> assigneesMap = (Map<String, Object>) node.get("assignees");
         if (assigneesMap != null) {
@@ -265,6 +276,8 @@ public class GitLabIssueSyncService {
                         )
                     );
                 }
+                // Detect nested pagination overflow for assignees
+                checkNestedOverflow(assigneesMap, "assignees", assigneeNodes.size(), issueContext);
             }
         }
 
@@ -288,6 +301,29 @@ public class GitLabIssueSyncService {
             syncLabels,
             syncAssignees
         );
-        return issueProcessor.processFromSync(syncData, repository);
+        return issueProcessor.processFromSync(syncData, repository, scopeId);
+    }
+
+    /**
+     * Checks if a nested GraphQL connection has more pages than were fetched.
+     * Logs a warning when overflow is detected (matching GitHub's overflow detection pattern).
+     */
+    @SuppressWarnings("unchecked")
+    private static void checkNestedOverflow(
+        Map<String, Object> connectionMap,
+        String connectionName,
+        int fetchedCount,
+        String context
+    ) {
+        Map<String, Object> pageInfo = (Map<String, Object>) connectionMap.get("pageInfo");
+        if (pageInfo != null && Boolean.TRUE.equals(pageInfo.get("hasNextPage"))) {
+            log.warn(
+                "GraphQL connection overflow: connection={}, fetchedCount={}, hasNextPage=true, context={}. " +
+                    "Data may be incomplete — consider adding follow-up pagination.",
+                connectionName,
+                fetchedCount,
+                context
+            );
+        }
     }
 }
