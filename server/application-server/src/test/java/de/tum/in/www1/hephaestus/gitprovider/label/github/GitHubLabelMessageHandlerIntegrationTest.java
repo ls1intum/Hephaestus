@@ -416,15 +416,17 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
             // When
             handler.handleEvent(event);
 
-            // Then
-            assertThat(labelRepository.findById(event.label().id()))
-                .isPresent()
-                .get()
-                .satisfies(label -> {
-                    assertThat(label.getRepository()).isNotNull();
-                    assertThat(label.getRepository().getId()).isEqualTo(testRepository.getId());
-                    assertThat(label.getRepository().getNameWithOwner()).isEqualTo(FIXTURE_REPO_FULL_NAME);
-                });
+            // Then — use TransactionTemplate for lazy-loaded repository access
+            transactionTemplate.executeWithoutResult(status -> {
+                assertThat(labelRepository.findById(event.label().id()))
+                    .isPresent()
+                    .get()
+                    .satisfies(label -> {
+                        assertThat(label.getRepository()).isNotNull();
+                        assertThat(label.getRepository().getId()).isEqualTo(testRepository.getId());
+                        assertThat(label.getRepository().getNameWithOwner()).isEqualTo(FIXTURE_REPO_FULL_NAME);
+                    });
+            });
         }
 
         @Test
