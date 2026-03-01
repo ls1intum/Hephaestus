@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -15,6 +16,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 /**
  * Unit tests for {@link GitLabSyncConstants}.
  */
+@Tag("unit")
 @DisplayName("GitLabSyncConstants")
 class GitLabSyncConstantsTest extends BaseUnitTest {
 

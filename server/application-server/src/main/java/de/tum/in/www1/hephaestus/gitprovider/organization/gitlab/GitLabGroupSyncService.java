@@ -125,6 +125,16 @@ public class GitLabGroupSyncService {
                 return Optional.empty();
             }
 
+            // Check for partial errors (GraphQL can return data + errors simultaneously)
+            if (response.getErrors() != null && !response.getErrors().isEmpty()) {
+                log.warn(
+                    "Partial GraphQL errors in group response: scopeId={}, groupPath={}, errors={}",
+                    scopeId,
+                    safeGroupPath,
+                    response.getErrors()
+                );
+            }
+
             graphQlClientProvider.recordSuccess();
 
             GitLabGroupResponse group = response.field("group").toEntity(GitLabGroupResponse.class);
@@ -188,6 +198,7 @@ public class GitLabGroupSyncService {
         int pageCount = 0;
         int projectsSkipped = 0;
         boolean hadApiFailure = false;
+        int reportedTotalCount = -1;
 
         try {
             GitProvider provider = resolveProvider();
@@ -237,10 +248,36 @@ public class GitLabGroupSyncService {
                     break;
                 }
 
+                // Check for partial errors (GraphQL can return data + errors simultaneously)
+                if (response.getErrors() != null && !response.getErrors().isEmpty()) {
+                    log.warn(
+                        "Partial GraphQL errors in group projects response: scopeId={}, groupPath={}, page={}, errors={}",
+                        scopeId,
+                        safeGroupPath,
+                        pageCount,
+                        response.getErrors()
+                    );
+                }
+
                 graphQlClientProvider.recordSuccess();
 
                 // On the first page, extract and persist the top-level group from inlined fields
                 if (pageCount == 0) {
+                    // Extract reported total count for post-sync verification
+                    try {
+                        Object countField = response.field("group.projects.count").getValue();
+                        if (countField instanceof Number number) {
+                            reportedTotalCount = number.intValue();
+                            log.info(
+                                "Project connection reports count={}, groupPath={}",
+                                reportedTotalCount,
+                                safeGroupPath
+                            );
+                        }
+                    } catch (Exception e) {
+                        log.debug("Could not extract project count: groupPath={}", safeGroupPath);
+                    }
+
                     GitLabGroupResponse groupData = response.field("group").toEntity(GitLabGroupResponse.class);
                     if (groupData != null) {
                         topLevelOrganization = groupProcessor.process(groupData, providerId);
@@ -310,6 +347,17 @@ public class GitLabGroupSyncService {
             } while (pageCount < MAX_PAGINATION_PAGES);
 
             int totalPages = pageCount + 1;
+
+            // Post-sync overflow detection using reported totalCount
+            if (reportedTotalCount >= 0 && syncedRepositories.size() + projectsSkipped < reportedTotalCount) {
+                log.warn(
+                    "Project connection overflow detected: groupPath={}, synced={}, reportedCount={}. " +
+                        "Some projects may not have been fetched.",
+                    safeGroupPath,
+                    syncedRepositories.size(),
+                    reportedTotalCount
+                );
+            }
 
             // Warn if pagination was truncated (more pages exist but we hit the safety limit)
             if (pageCount >= MAX_PAGINATION_PAGES) {

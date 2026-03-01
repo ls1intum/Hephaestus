@@ -29,6 +29,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.springframework.graphql.client.ClientGraphQlResponse;
@@ -36,6 +37,7 @@ import org.springframework.graphql.client.ClientResponseField;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import reactor.core.publisher.Mono;
 
+@Tag("unit")
 @DisplayName("GitLabGroupSyncService")
 class GitLabGroupSyncServiceTest extends BaseUnitTest {
 

@@ -8,6 +8,7 @@ query GetGroupProjects($fullPath: ID!, $first: Int!, $after: String, $includeSub
         description
         visibility
         projects(first: $first, after: $after, includeSubgroups: $includeSubgroups) {
+            count
             pageInfo {
                 hasNextPage
                 endCursor

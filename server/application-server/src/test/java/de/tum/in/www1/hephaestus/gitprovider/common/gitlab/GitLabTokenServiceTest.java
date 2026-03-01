@@ -16,6 +16,7 @@ import java.util.function.Function;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -27,6 +28,7 @@ import reactor.core.publisher.Mono;
 /**
  * Unit tests for {@link GitLabTokenService}.
  */
+@Tag("unit")
 @DisplayName("GitLabTokenService")
 class GitLabTokenServiceTest extends BaseUnitTest {
 

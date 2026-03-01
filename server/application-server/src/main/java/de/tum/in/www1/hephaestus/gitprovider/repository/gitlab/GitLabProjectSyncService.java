@@ -112,6 +112,16 @@ public class GitLabProjectSyncService {
                 return Optional.empty();
             }
 
+            // Check for partial errors (GraphQL can return data + errors simultaneously)
+            if (response.getErrors() != null && !response.getErrors().isEmpty()) {
+                log.warn(
+                    "Partial GraphQL errors in project response: scopeId={}, projectPath={}, errors={}",
+                    scopeId,
+                    safeProjectPath,
+                    response.getErrors()
+                );
+            }
+
             graphQlClientProvider.recordSuccess();
 
             GitLabProjectResponse project = response.field("project").toEntity(GitLabProjectResponse.class);

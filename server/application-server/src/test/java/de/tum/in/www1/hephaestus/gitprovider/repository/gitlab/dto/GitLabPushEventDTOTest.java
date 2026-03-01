@@ -7,9 +7,11 @@ import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import java.io.IOException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
 
+@Tag("unit")
 @DisplayName("GitLabPushEventDTO")
 class GitLabPushEventDTOTest extends BaseUnitTest {
 

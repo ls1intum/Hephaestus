@@ -29,11 +29,13 @@ import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionTemplate;
 
+@Tag("unit")
 @DisplayName("GitLabPushMessageHandler")
 class GitLabPushMessageHandlerTest extends BaseUnitTest {
 

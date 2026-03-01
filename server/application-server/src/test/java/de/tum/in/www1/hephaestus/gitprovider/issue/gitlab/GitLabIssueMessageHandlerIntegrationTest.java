@@ -32,6 +32,7 @@ import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
@@ -58,6 +59,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p>
  * Note: Does NOT use @Transactional (see GitHubIssueMessageHandlerIntegrationTest for rationale).
  */
+@Tag("integration")
 @DisplayName("GitLab Issue Message Handler")
 @TestPropertySource(
     properties = {

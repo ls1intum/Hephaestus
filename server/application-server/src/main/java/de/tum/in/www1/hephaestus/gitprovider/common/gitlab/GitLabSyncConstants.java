@@ -94,10 +94,12 @@ public final class GitLabSyncConstants {
     /**
      * Page size for issue sync GraphQL queries.
      * <p>
-     * Reduced from default because GitLab issue queries embed notes,
-     * labels, assignees, and milestone data per issue.
+     * Set to 30 as a conservative balance between throughput and query complexity.
+     * GitLab issue queries embed labels(first:100), assignees(first:20), count fields,
+     * and author data per issue — higher values risk exceeding GitLab's query complexity limit.
+     * With only 100 points/minute budget, keeping complexity per query low is critical.
      */
-    public static final int ISSUE_SYNC_PAGE_SIZE = 20;
+    public static final int ISSUE_SYNC_PAGE_SIZE = 30;
 
     /**
      * Page size for merge request sync GraphQL queries.

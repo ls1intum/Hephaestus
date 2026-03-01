@@ -1,6 +1,7 @@
 query GetProjectIssues($fullPath: ID!, $first: Int!, $after: String, $updatedAfter: Time) {
     project(fullPath: $fullPath) {
         issues(first: $first, after: $after, updatedAfter: $updatedAfter, sort: UPDATED_DESC) {
+            count
             pageInfo {
                 hasNextPage
                 endCursor
@@ -20,8 +21,10 @@ query GetProjectIssues($fullPath: ID!, $first: Int!, $after: String, $updatedAft
                     ...GitLabUserFields
                 }
                 labels(first: 100) {
+                    count
                     pageInfo {
                         hasNextPage
+                        endCursor
                     }
                     nodes {
                         id
@@ -30,8 +33,10 @@ query GetProjectIssues($fullPath: ID!, $first: Int!, $after: String, $updatedAft
                     }
                 }
                 assignees(first: 20) {
+                    count
                     pageInfo {
                         hasNextPage
+                        endCursor
                     }
                     nodes {
                         ...GitLabUserFields

@@ -28,6 +28,9 @@ import org.springframework.stereotype.Service;
  * Implements cursor-based pagination with {@code updatedAfter} for incremental sync.
  * Confidential issues are skipped. Per-issue error handling ensures one bad issue
  * doesn't abort the entire sync.
+ * <p>
+ * Nested collections (labels, assignees) are fetched with overflow detection via
+ * {@code count} fields and follow-up pagination when the initial page is insufficient.
  */
 @Service
 @ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
@@ -36,6 +39,8 @@ public class GitLabIssueSyncService {
     private static final Logger log = LoggerFactory.getLogger(GitLabIssueSyncService.class);
 
     private static final String GET_PROJECT_ISSUES_DOCUMENT = "GetProjectIssues";
+    private static final String GET_ISSUE_LABELS_DOCUMENT = "GetIssueLabels";
+    private static final String GET_ISSUE_ASSIGNEES_DOCUMENT = "GetIssueAssignees";
 
     private final GitLabGraphQlClientProvider graphQlClientProvider;
     private final GitLabIssueProcessor issueProcessor;
@@ -71,10 +76,12 @@ public class GitLabIssueSyncService {
         );
 
         int totalSynced = 0;
+        int totalSkipped = 0;
         String cursor = null;
         int page = 0;
         boolean rateLimitAborted = false;
         boolean errorAborted = false;
+        int reportedTotalCount = -1;
 
         try {
             do {
@@ -121,7 +128,34 @@ public class GitLabIssueSyncService {
                     break;
                 }
 
+                // Check for partial errors (GraphQL can return data + errors simultaneously)
+                if (response.getErrors() != null && !response.getErrors().isEmpty()) {
+                    log.warn(
+                        "Partial GraphQL errors in issue response: scopeId={}, projectPath={}, errors={}",
+                        scopeId,
+                        safeProjectPath,
+                        response.getErrors()
+                    );
+                }
+
                 graphQlClientProvider.recordSuccess();
+
+                // Extract reported total count on first page for post-sync verification
+                if (page == 0) {
+                    try {
+                        Object countField = response.field("project.issues.count").getValue();
+                        if (countField instanceof Number number) {
+                            reportedTotalCount = number.intValue();
+                            log.info(
+                                "Issue connection reports count={}, projectPath={}",
+                                reportedTotalCount,
+                                safeProjectPath
+                            );
+                        }
+                    } catch (Exception e) {
+                        log.debug("Could not extract issue count: projectPath={}", safeProjectPath);
+                    }
+                }
 
                 // Extract issues from response using dot-notation paths
                 @SuppressWarnings({ "unchecked", "rawtypes" })
@@ -135,6 +169,8 @@ public class GitLabIssueSyncService {
                     try {
                         if (processIssueNode(issueNode, repository, scopeId) != null) {
                             totalSynced++;
+                        } else {
+                            totalSkipped++;
                         }
                     } catch (Exception e) {
                         log.warn(
@@ -178,6 +214,18 @@ public class GitLabIssueSyncService {
             errorAborted = true;
         }
 
+        // Post-sync overflow detection using reported totalCount
+        // totalSkipped accounts for confidential issues that are fetched but not persisted
+        if (reportedTotalCount >= 0 && totalSynced + totalSkipped < reportedTotalCount) {
+            log.warn(
+                "Issue connection overflow detected: projectPath={}, synced={}, reportedCount={}. " +
+                    "Some issues may not have been fetched.",
+                safeProjectPath,
+                totalSynced,
+                reportedTotalCount
+            );
+        }
+
         SyncResult result;
         if (errorAborted) {
             result = SyncResult.abortedError(totalSynced);
@@ -188,11 +236,12 @@ public class GitLabIssueSyncService {
         }
 
         log.info(
-            "Completed issue sync: scopeId={}, projectPath={}, status={}, totalSynced={}",
+            "Completed issue sync: scopeId={}, projectPath={}, status={}, totalSynced={}, reportedCount={}",
             scopeId,
             safeProjectPath,
             result.status(),
-            totalSynced
+            totalSynced,
+            reportedTotalCount
         );
 
         return result;
@@ -203,6 +252,9 @@ public class GitLabIssueSyncService {
      * <p>
      * Label and assignee data is extracted here and passed to the processor, which
      * handles persistence within its {@code @Transactional} boundary.
+     * <p>
+     * When nested collections (labels, assignees) overflow their initial page,
+     * follow-up queries are issued to fetch the remaining items.
      *
      * @return the persisted Issue, or {@code null} if the issue was skipped (e.g. confidential)
      */
@@ -237,7 +289,7 @@ public class GitLabIssueSyncService {
             authorWebUrl = (String) authorMap.get("webUrl");
         }
 
-        // Extract labels (with overflow detection)
+        // Extract labels (with overflow detection and follow-up pagination)
         List<GitLabIssueProcessor.SyncLabelData> syncLabels = null;
         Map<String, Object> labelsMap = (Map<String, Object>) node.get("labels");
         if (labelsMap != null) {
@@ -253,12 +305,24 @@ public class GitLabIssueSyncService {
                         )
                     );
                 }
-                // Detect nested pagination overflow for labels
-                checkNestedOverflow(labelsMap, "labels", labelNodes.size(), issueContext);
+                // Detect nested pagination overflow for labels and fetch remaining if needed
+                NestedOverflow overflow = detectNestedOverflow(labelsMap, "labels", labelNodes.size(), issueContext);
+                if (overflow.hasOverflow()) {
+                    List<GitLabIssueProcessor.SyncLabelData> remaining = fetchRemainingLabels(
+                        scopeId,
+                        repository.getNameWithOwner(),
+                        iid,
+                        overflow.endCursor(),
+                        issueContext
+                    );
+                    if (remaining != null) {
+                        syncLabels.addAll(remaining);
+                    }
+                }
             }
         }
 
-        // Extract assignees (with overflow detection)
+        // Extract assignees (with overflow detection and follow-up pagination)
         List<GitLabIssueProcessor.SyncAssigneeData> syncAssignees = null;
         Map<String, Object> assigneesMap = (Map<String, Object>) node.get("assignees");
         if (assigneesMap != null) {
@@ -276,8 +340,25 @@ public class GitLabIssueSyncService {
                         )
                     );
                 }
-                // Detect nested pagination overflow for assignees
-                checkNestedOverflow(assigneesMap, "assignees", assigneeNodes.size(), issueContext);
+                // Detect nested pagination overflow for assignees and fetch remaining if needed
+                NestedOverflow overflow = detectNestedOverflow(
+                    assigneesMap,
+                    "assignees",
+                    assigneeNodes.size(),
+                    issueContext
+                );
+                if (overflow.hasOverflow()) {
+                    List<GitLabIssueProcessor.SyncAssigneeData> remaining = fetchRemainingAssignees(
+                        scopeId,
+                        repository.getNameWithOwner(),
+                        iid,
+                        overflow.endCursor(),
+                        issueContext
+                    );
+                    if (remaining != null) {
+                        syncAssignees.addAll(remaining);
+                    }
+                }
             }
         }
 
@@ -304,26 +385,292 @@ public class GitLabIssueSyncService {
         return issueProcessor.processFromSync(syncData, repository, scopeId);
     }
 
+    // ========================================================================
+    // Nested overflow detection and follow-up pagination
+    // ========================================================================
+
+    /**
+     * Result of checking a nested GraphQL connection for overflow.
+     *
+     * @param hasOverflow whether more items exist beyond what was fetched
+     * @param endCursor   the cursor for fetching the next page (null if no overflow)
+     * @param count       the total count reported by the connection (-1 if unavailable)
+     */
+    private record NestedOverflow(boolean hasOverflow, @Nullable String endCursor, int count) {}
+
     /**
      * Checks if a nested GraphQL connection has more pages than were fetched.
-     * Logs a warning when overflow is detected (matching GitHub's overflow detection pattern).
+     * Uses both {@code count} and {@code pageInfo.hasNextPage} for detection.
      */
     @SuppressWarnings("unchecked")
-    private static void checkNestedOverflow(
+    private static NestedOverflow detectNestedOverflow(
         Map<String, Object> connectionMap,
         String connectionName,
         int fetchedCount,
         String context
     ) {
+        int count = -1;
+        Object countField = connectionMap.get("count");
+        if (countField instanceof Number number) {
+            count = number.intValue();
+        }
+
         Map<String, Object> pageInfo = (Map<String, Object>) connectionMap.get("pageInfo");
-        if (pageInfo != null && Boolean.TRUE.equals(pageInfo.get("hasNextPage"))) {
+        boolean hasNextPage = pageInfo != null && Boolean.TRUE.equals(pageInfo.get("hasNextPage"));
+        String endCursor = pageInfo != null ? (String) pageInfo.get("endCursor") : null;
+
+        boolean overflow = hasNextPage || (count >= 0 && count > fetchedCount);
+
+        if (overflow) {
             log.warn(
-                "GraphQL connection overflow: connection={}, fetchedCount={}, hasNextPage=true, context={}. " +
-                    "Data may be incomplete — consider adding follow-up pagination.",
+                "GraphQL nested connection overflow: connection={}, fetchedCount={}, count={}, " +
+                    "hasNextPage={}, context={}. Will attempt follow-up pagination.",
                 connectionName,
                 fetchedCount,
+                count,
+                hasNextPage,
                 context
             );
         }
+
+        return new NestedOverflow(overflow, endCursor, count);
+    }
+
+    /**
+     * Fetches remaining labels for an issue via follow-up paginated queries.
+     *
+     * @param scopeId     the workspace/scope ID for authentication
+     * @param projectPath the full project path
+     * @param iid         the issue IID
+     * @param afterCursor the cursor from the initial page's endCursor
+     * @param context     logging context string
+     * @return additional labels fetched, or null on failure
+     */
+    @SuppressWarnings("unchecked")
+    @Nullable
+    private List<GitLabIssueProcessor.SyncLabelData> fetchRemainingLabels(
+        Long scopeId,
+        String projectPath,
+        String iid,
+        @Nullable String afterCursor,
+        String context
+    ) {
+        if (afterCursor == null) {
+            log.warn("Cannot fetch remaining labels: endCursor is null, context={}", context);
+            return null;
+        }
+
+        List<GitLabIssueProcessor.SyncLabelData> allRemaining = new ArrayList<>();
+        String cursor = afterCursor;
+        int followUpPages = 0;
+
+        try {
+            while (cursor != null && followUpPages < GitLabSyncConstants.MAX_PAGINATION_PAGES) {
+                graphQlClientProvider.acquirePermission();
+                graphQlClientProvider.waitIfRateLimitLow(scopeId);
+
+                HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
+
+                ClientGraphQlResponse response = client
+                    .documentName(GET_ISSUE_LABELS_DOCUMENT)
+                    .variable("fullPath", projectPath)
+                    .variable("iid", iid)
+                    .variable("first", GitLabSyncConstants.LARGE_PAGE_SIZE)
+                    .variable("after", cursor)
+                    .execute()
+                    .block(gitLabProperties.graphqlTimeout());
+
+                if (response == null || !response.isValid()) {
+                    log.warn(
+                        "Failed to fetch remaining labels: context={}, errors={}",
+                        context,
+                        response != null ? response.getErrors() : "null"
+                    );
+                    graphQlClientProvider.recordFailure(new GitLabSyncException("Invalid GraphQL response"));
+                    break;
+                }
+
+                if (response.getErrors() != null && !response.getErrors().isEmpty()) {
+                    log.warn(
+                        "Partial errors fetching remaining labels: context={}, errors={}",
+                        context,
+                        response.getErrors()
+                    );
+                }
+
+                graphQlClientProvider.recordSuccess();
+
+                // Navigate: project.issues.nodes[0].labels
+                @SuppressWarnings("rawtypes")
+                List issueNodesRaw = response.field("project.issues.nodes").toEntityList(Map.class);
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> issueNodes = (List<Map<String, Object>>) issueNodesRaw;
+
+                if (issueNodes == null || issueNodes.isEmpty()) {
+                    break;
+                }
+
+                Map<String, Object> labelsMap = (Map<String, Object>) issueNodes.get(0).get("labels");
+                if (labelsMap == null) {
+                    break;
+                }
+
+                List<Map<String, Object>> labelNodes = (List<Map<String, Object>>) labelsMap.get("nodes");
+                if (labelNodes == null || labelNodes.isEmpty()) {
+                    break;
+                }
+
+                for (Map<String, Object> lbl : labelNodes) {
+                    allRemaining.add(
+                        new GitLabIssueProcessor.SyncLabelData(
+                            (String) lbl.get("id"),
+                            (String) lbl.get("title"),
+                            (String) lbl.get("color")
+                        )
+                    );
+                }
+
+                // Check for more pages
+                Map<String, Object> pageInfo = (Map<String, Object>) labelsMap.get("pageInfo");
+                if (pageInfo == null || !Boolean.TRUE.equals(pageInfo.get("hasNextPage"))) {
+                    break;
+                }
+                cursor = (String) pageInfo.get("endCursor");
+                followUpPages++;
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.warn("Interrupted during label follow-up pagination: context={}", context);
+        } catch (Exception e) {
+            log.warn("Error during label follow-up pagination: context={}", context, e);
+        }
+
+        if (!allRemaining.isEmpty()) {
+            log.info("Fetched {} additional labels via follow-up pagination: context={}", allRemaining.size(), context);
+        }
+
+        return allRemaining;
+    }
+
+    /**
+     * Fetches remaining assignees for an issue via follow-up paginated queries.
+     *
+     * @param scopeId     the workspace/scope ID for authentication
+     * @param projectPath the full project path
+     * @param iid         the issue IID
+     * @param afterCursor the cursor from the initial page's endCursor
+     * @param context     logging context string
+     * @return additional assignees fetched, or null on failure
+     */
+    @SuppressWarnings("unchecked")
+    @Nullable
+    private List<GitLabIssueProcessor.SyncAssigneeData> fetchRemainingAssignees(
+        Long scopeId,
+        String projectPath,
+        String iid,
+        @Nullable String afterCursor,
+        String context
+    ) {
+        if (afterCursor == null) {
+            log.warn("Cannot fetch remaining assignees: endCursor is null, context={}", context);
+            return null;
+        }
+
+        List<GitLabIssueProcessor.SyncAssigneeData> allRemaining = new ArrayList<>();
+        String cursor = afterCursor;
+        int followUpPages = 0;
+
+        try {
+            while (cursor != null && followUpPages < GitLabSyncConstants.MAX_PAGINATION_PAGES) {
+                graphQlClientProvider.acquirePermission();
+                graphQlClientProvider.waitIfRateLimitLow(scopeId);
+
+                HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
+
+                ClientGraphQlResponse response = client
+                    .documentName(GET_ISSUE_ASSIGNEES_DOCUMENT)
+                    .variable("fullPath", projectPath)
+                    .variable("iid", iid)
+                    .variable("first", GitLabSyncConstants.LARGE_PAGE_SIZE)
+                    .variable("after", cursor)
+                    .execute()
+                    .block(gitLabProperties.graphqlTimeout());
+
+                if (response == null || !response.isValid()) {
+                    log.warn(
+                        "Failed to fetch remaining assignees: context={}, errors={}",
+                        context,
+                        response != null ? response.getErrors() : "null"
+                    );
+                    graphQlClientProvider.recordFailure(new GitLabSyncException("Invalid GraphQL response"));
+                    break;
+                }
+
+                if (response.getErrors() != null && !response.getErrors().isEmpty()) {
+                    log.warn(
+                        "Partial errors fetching remaining assignees: context={}, errors={}",
+                        context,
+                        response.getErrors()
+                    );
+                }
+
+                graphQlClientProvider.recordSuccess();
+
+                // Navigate: project.issues.nodes[0].assignees
+                @SuppressWarnings("rawtypes")
+                List assigneeIssueNodesRaw = response.field("project.issues.nodes").toEntityList(Map.class);
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> issueNodes = (List<Map<String, Object>>) assigneeIssueNodesRaw;
+
+                if (issueNodes == null || issueNodes.isEmpty()) {
+                    break;
+                }
+
+                Map<String, Object> assigneesMap = (Map<String, Object>) issueNodes.get(0).get("assignees");
+                if (assigneesMap == null) {
+                    break;
+                }
+
+                List<Map<String, Object>> assigneeNodes = (List<Map<String, Object>>) assigneesMap.get("nodes");
+                if (assigneeNodes == null || assigneeNodes.isEmpty()) {
+                    break;
+                }
+
+                for (Map<String, Object> a : assigneeNodes) {
+                    allRemaining.add(
+                        new GitLabIssueProcessor.SyncAssigneeData(
+                            (String) a.get("id"),
+                            (String) a.get("username"),
+                            (String) a.get("name"),
+                            (String) a.get("avatarUrl"),
+                            (String) a.get("webUrl")
+                        )
+                    );
+                }
+
+                // Check for more pages
+                Map<String, Object> pageInfo = (Map<String, Object>) assigneesMap.get("pageInfo");
+                if (pageInfo == null || !Boolean.TRUE.equals(pageInfo.get("hasNextPage"))) {
+                    break;
+                }
+                cursor = (String) pageInfo.get("endCursor");
+                followUpPages++;
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.warn("Interrupted during assignee follow-up pagination: context={}", context);
+        } catch (Exception e) {
+            log.warn("Error during assignee follow-up pagination: context={}", context, e);
+        }
+
+        if (!allRemaining.isEmpty()) {
+            log.info(
+                "Fetched {} additional assignees via follow-up pagination: context={}",
+                allRemaining.size(),
+                context
+            );
+        }
+
+        return allRemaining;
     }
 }
