@@ -32,14 +32,8 @@
     <!-- 1. Project table -->
     <changeSet id="1770489781375-1" author="FelixTJDietrich">
         <createTable tableName="project">
-            <column name="id" type="BIGINT" autoIncrement="true">
+            <column name="id" type="BIGINT">
                 <constraints nullable="false" primaryKey="true" primaryKeyName="project_pkey"/>
-            </column>
-            <column name="native_id" type="BIGINT">
-                <constraints nullable="false"/>
-            </column>
-            <column name="provider_id" type="BIGINT">
-                <constraints nullable="false"/>
             </column>
             <column name="node_id" type="VARCHAR(64)"/>
             <column name="owner_type" type="VARCHAR(32)">
@@ -76,13 +70,6 @@
             <column name="created_at" type="TIMESTAMP WITH TIME ZONE"/>
             <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"/>
         </createTable>
-
-        <addForeignKeyConstraint baseTableName="project" baseColumnNames="provider_id"
-                                 referencedTableName="git_provider" referencedColumnNames="id"
-                                 constraintName="fk_project_provider"/>
-
-        <addUniqueConstraint tableName="project" columnNames="provider_id, native_id"
-                             constraintName="uq_project_provider_native_id"/>
 
         <addUniqueConstraint tableName="project" columnNames="owner_type, owner_id, number"
                              constraintName="uk_project_owner_number"/>
@@ -139,14 +126,8 @@
     <!-- 3. Project item table (issue, PR, or draft issue rows) -->
     <changeSet id="1770489781375-3" author="FelixTJDietrich">
         <createTable tableName="project_item">
-            <column name="id" type="BIGINT" autoIncrement="true">
+            <column name="id" type="BIGINT">
                 <constraints nullable="false" primaryKey="true" primaryKeyName="project_item_pkey"/>
-            </column>
-            <column name="native_id" type="BIGINT">
-                <constraints nullable="false"/>
-            </column>
-            <column name="provider_id" type="BIGINT">
-                <constraints nullable="false"/>
             </column>
             <column name="node_id" type="VARCHAR(64)"/>
             <column name="project_id" type="BIGINT">
@@ -166,13 +147,6 @@
             <column name="created_at" type="TIMESTAMP WITH TIME ZONE"/>
             <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"/>
         </createTable>
-
-        <addForeignKeyConstraint baseTableName="project_item" baseColumnNames="provider_id"
-                                 referencedTableName="git_provider" referencedColumnNames="id"
-                                 constraintName="fk_project_item_provider"/>
-
-        <addUniqueConstraint tableName="project_item" columnNames="provider_id, native_id"
-                             constraintName="uq_project_item_provider_native_id"/>
 
         <addUniqueConstraint tableName="project_item" columnNames="project_id, node_id"
                              constraintName="uk_project_item_project_nodeid"/>
@@ -246,14 +220,8 @@
     <!-- 5. Project status update table -->
     <changeSet id="1770489781375-5" author="FelixTJDietrich">
         <createTable tableName="project_status_update">
-            <column name="id" type="BIGINT" autoIncrement="true">
+            <column name="id" type="BIGINT">
                 <constraints nullable="false" primaryKey="true" primaryKeyName="project_status_update_pkey"/>
-            </column>
-            <column name="native_id" type="BIGINT">
-                <constraints nullable="false"/>
-            </column>
-            <column name="provider_id" type="BIGINT">
-                <constraints nullable="false"/>
             </column>
             <column name="node_id" type="VARCHAR(64)"/>
             <column name="project_id" type="BIGINT">
@@ -268,13 +236,6 @@
             <column name="created_at" type="TIMESTAMP WITH TIME ZONE"/>
             <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"/>
         </createTable>
-
-        <addForeignKeyConstraint baseTableName="project_status_update" baseColumnNames="provider_id"
-                                 referencedTableName="git_provider" referencedColumnNames="id"
-                                 constraintName="fk_project_status_update_provider"/>
-
-        <addUniqueConstraint tableName="project_status_update" columnNames="provider_id, native_id"
-                             constraintName="uq_project_status_update_provider_native_id"/>
 
         <addUniqueConstraint tableName="project_status_update" columnNames="node_id"
                              constraintName="uk_project_status_update_node_id"/>
@@ -382,10 +343,6 @@
     -->
 
     <changeSet id="1771100000000-1" author="Hephaestus">
-        <preConditions onFail="MARK_RAN">
-            <indexExists indexName="uk_user_login"/>
-        </preConditions>
-
         <comment>
             Drop case-sensitive uk_user_login constraint and replace with
             a case-insensitive unique index on LOWER(login). This aligns
@@ -394,13 +351,14 @@
             conditions under concurrent webhook processing.
         </comment>
 
+        <!-- Drop the old case-sensitive unique constraint -->
         <dropUniqueConstraint
             tableName="user"
             constraintName="uk_user_login"/>
 
         <!-- Create a case-insensitive unique index -->
         <sql>
-            CREATE UNIQUE INDEX IF NOT EXISTS uk_user_login_lower ON "user" (LOWER(login));
+            CREATE UNIQUE INDEX uk_user_login_lower ON "user" (LOWER(login));
         </sql>
         <rollback>
             <sql>DROP INDEX IF EXISTS uk_user_login_lower;</sql>
