@@ -40,6 +40,8 @@ public class GitLabMergeRequestSyncService {
     private static final String GET_PROJECT_MRS_DOCUMENT = "GetProjectMergeRequests";
     private static final String GET_MR_APPROVALS_DOCUMENT = "GetMergeRequestApprovals";
     private static final String GET_MR_REVIEWERS_DOCUMENT = "GetMergeRequestReviewers";
+    private static final String GET_MR_LABELS_DOCUMENT = "GetMergeRequestLabels";
+    private static final String GET_MR_ASSIGNEES_DOCUMENT = "GetMergeRequestAssignees";
 
     private final GitLabGraphQlClientProvider graphQlClientProvider;
     private final GitLabMergeRequestProcessor mergeRequestProcessor;
@@ -665,32 +667,154 @@ public class GitLabMergeRequestSyncService {
         return new NestedOverflow(overflow, endCursor, count);
     }
 
-    // Follow-up pagination for labels — not implemented (MRs with >100 labels are extremely rare)
+    @SuppressWarnings("unchecked")
     @Nullable
     private List<GitLabMergeRequestProcessor.SyncLabelData> fetchRemainingLabels(
-        @SuppressWarnings("unused") Long scopeId,
-        @SuppressWarnings("unused") String projectPath,
-        @SuppressWarnings("unused") String iid,
+        Long scopeId,
+        String projectPath,
+        String iid,
         @Nullable String afterCursor,
         String context
     ) {
         if (afterCursor == null) return null;
-        log.warn("MR label overflow detected but follow-up not implemented: context={}", context);
-        return null;
+
+        List<GitLabMergeRequestProcessor.SyncLabelData> allRemaining = new ArrayList<>();
+        String cursor = afterCursor;
+        int followUpPages = 0;
+
+        try {
+            while (cursor != null && followUpPages < GitLabSyncConstants.MAX_PAGINATION_PAGES) {
+                graphQlClientProvider.acquirePermission();
+                graphQlClientProvider.waitIfRateLimitLow(scopeId);
+
+                HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
+
+                ClientGraphQlResponse response = client
+                    .documentName(GET_MR_LABELS_DOCUMENT)
+                    .variable("fullPath", projectPath)
+                    .variable("iid", iid)
+                    .variable("first", GitLabSyncConstants.LARGE_PAGE_SIZE)
+                    .variable("after", cursor)
+                    .execute()
+                    .block(gitLabProperties.graphqlTimeout());
+
+                if (response == null || !response.isValid()) {
+                    graphQlClientProvider.recordFailure(new GitLabSyncException("Invalid GraphQL response"));
+                    break;
+                }
+
+                graphQlClientProvider.recordSuccess();
+
+                @SuppressWarnings("rawtypes")
+                List mrNodesRaw = response.field("project.mergeRequests.nodes").toEntityList(Map.class);
+                List<Map<String, Object>> mrNodes = (List<Map<String, Object>>) mrNodesRaw;
+
+                if (mrNodes == null || mrNodes.isEmpty()) break;
+
+                Map<String, Object> labelsMap = (Map<String, Object>) mrNodes.get(0).get("labels");
+                if (labelsMap == null) break;
+
+                List<Map<String, Object>> labelNodes = (List<Map<String, Object>>) labelsMap.get("nodes");
+                if (labelNodes == null || labelNodes.isEmpty()) break;
+
+                for (Map<String, Object> lbl : labelNodes) {
+                    allRemaining.add(
+                        new GitLabMergeRequestProcessor.SyncLabelData(
+                            (String) lbl.get("id"),
+                            (String) lbl.get("title"),
+                            (String) lbl.get("color")
+                        )
+                    );
+                }
+
+                Map<String, Object> pageInfo = (Map<String, Object>) labelsMap.get("pageInfo");
+                if (pageInfo == null || !Boolean.TRUE.equals(pageInfo.get("hasNextPage"))) break;
+                cursor = (String) pageInfo.get("endCursor");
+                followUpPages++;
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } catch (Exception e) {
+            log.warn("Error during label follow-up pagination: context={}", context, e);
+        }
+
+        return allRemaining.isEmpty() ? null : allRemaining;
     }
 
-    // Follow-up pagination for assignees — not implemented (MRs with >20 assignees are extremely rare)
+    @SuppressWarnings("unchecked")
     @Nullable
     private List<GitLabMergeRequestProcessor.SyncUserData> fetchRemainingAssignees(
-        @SuppressWarnings("unused") Long scopeId,
-        @SuppressWarnings("unused") String projectPath,
-        @SuppressWarnings("unused") String iid,
+        Long scopeId,
+        String projectPath,
+        String iid,
         @Nullable String afterCursor,
         String context
     ) {
         if (afterCursor == null) return null;
-        log.warn("MR assignee overflow detected but follow-up not implemented: context={}", context);
-        return null;
+
+        List<GitLabMergeRequestProcessor.SyncUserData> allRemaining = new ArrayList<>();
+        String cursor = afterCursor;
+        int followUpPages = 0;
+
+        try {
+            while (cursor != null && followUpPages < GitLabSyncConstants.MAX_PAGINATION_PAGES) {
+                graphQlClientProvider.acquirePermission();
+                graphQlClientProvider.waitIfRateLimitLow(scopeId);
+
+                HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
+
+                ClientGraphQlResponse response = client
+                    .documentName(GET_MR_ASSIGNEES_DOCUMENT)
+                    .variable("fullPath", projectPath)
+                    .variable("iid", iid)
+                    .variable("first", GitLabSyncConstants.LARGE_PAGE_SIZE)
+                    .variable("after", cursor)
+                    .execute()
+                    .block(gitLabProperties.graphqlTimeout());
+
+                if (response == null || !response.isValid()) {
+                    graphQlClientProvider.recordFailure(new GitLabSyncException("Invalid GraphQL response"));
+                    break;
+                }
+
+                graphQlClientProvider.recordSuccess();
+
+                @SuppressWarnings("rawtypes")
+                List mrNodesRaw = response.field("project.mergeRequests.nodes").toEntityList(Map.class);
+                List<Map<String, Object>> mrNodes = (List<Map<String, Object>>) mrNodesRaw;
+
+                if (mrNodes == null || mrNodes.isEmpty()) break;
+
+                Map<String, Object> assigneesMap = (Map<String, Object>) mrNodes.get(0).get("assignees");
+                if (assigneesMap == null) break;
+
+                List<Map<String, Object>> assigneeNodes = (List<Map<String, Object>>) assigneesMap.get("nodes");
+                if (assigneeNodes == null || assigneeNodes.isEmpty()) break;
+
+                for (Map<String, Object> a : assigneeNodes) {
+                    allRemaining.add(
+                        new GitLabMergeRequestProcessor.SyncUserData(
+                            (String) a.get("id"),
+                            (String) a.get("username"),
+                            (String) a.get("name"),
+                            (String) a.get("avatarUrl"),
+                            (String) a.get("webUrl")
+                        )
+                    );
+                }
+
+                Map<String, Object> pageInfo = (Map<String, Object>) assigneesMap.get("pageInfo");
+                if (pageInfo == null || !Boolean.TRUE.equals(pageInfo.get("hasNextPage"))) break;
+                cursor = (String) pageInfo.get("endCursor");
+                followUpPages++;
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } catch (Exception e) {
+            log.warn("Error during assignee follow-up pagination: context={}", context, e);
+        }
+
+        return allRemaining.isEmpty() ? null : allRemaining;
     }
 
     @SuppressWarnings("unchecked")

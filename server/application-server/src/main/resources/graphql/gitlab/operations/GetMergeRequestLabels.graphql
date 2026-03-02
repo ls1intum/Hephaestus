@@ -1,0 +1,20 @@
+query GetMergeRequestLabels($fullPath: ID!, $iid: String!, $first: Int!, $after: String) {
+    project(fullPath: $fullPath) {
+        mergeRequests(iids: [$iid]) {
+            nodes {
+                labels(first: $first, after: $after) {
+                    count
+                    pageInfo {
+                        hasNextPage
+                        endCursor
+                    }
+                    nodes {
+                        id
+                        title
+                        color
+                    }
+                }
+            }
+        }
+    }
+}

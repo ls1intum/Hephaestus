@@ -16,7 +16,7 @@
     never has overlapping numbers across issues and PRs).
     -->
 
-    <changeSet author="issue-714" id="1772600000000-1">
+    <changeSet author="issue-714" id="1772482036301-1">
         <comment>Replace (repository_id, number) unique constraint with
             (repository_id, issue_type, number) to support GitLab's separate
             IID namespaces for issues and merge requests.</comment>
@@ -39,7 +39,7 @@
     from the old @UniqueConstraint annotation after changeset -1 dropped it.
     This changeset idempotently drops it again. Safe for all environments.
     -->
-    <changeSet author="issue-714" id="1772600000000-2">
+    <changeSet author="issue-714" id="1772482036301-2">
         <comment>Cleanup: drop old (repository_id, number) constraint if Hibernate
             ddl-auto recreated it from the stale JPA annotation.</comment>
         <sql>

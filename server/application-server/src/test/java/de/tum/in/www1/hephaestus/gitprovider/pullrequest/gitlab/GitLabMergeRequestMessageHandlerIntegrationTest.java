@@ -47,17 +47,12 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p>
  * Tests the full webhook handling flow: JSON fixtures -> DTO -> handler -> processor -> DB.
  * <p>
- * <b>Fixture values (merge_request.open.json — MR IID #5):</b>
+ * <b>Fixture data comes from real GitLab exports (gitlab.lrz.de).</b>
+ * The fixtures represent 3 distinct merge requests:
  * <ul>
- *   <li>Native ID: 999555 (stored as nativeId; synthetic auto-generated PK for id)</li>
- *   <li>IID: 5</li>
- *   <li>Title: "Add awesome feature"</li>
- *   <li>State: opened -> OPEN</li>
- *   <li>Source branch: feature/awesome-feature</li>
- *   <li>Target branch: main</li>
- *   <li>Author: testuser (native ID 12345)</li>
- *   <li>Approver: reviewer1 (native ID 11111)</li>
- *   <li>Provider: GITLAB</li>
+ *   <li>MR !3 (open/close/reopen): "Test MR for close/reopen" — author ga84xah (18024)</li>
+ *   <li>MR !2 (merge/update): "Implement OAuth authentication" — author ga84xah (18024)</li>
+ *   <li>MR !4 (approved/unapproved): "Draft: Work in progress feature" — approver bot (83343)</li>
  * </ul>
  * <p>
  * Note: Does NOT use @Transactional (see GitLabIssueMessageHandlerIntegrationTest for rationale).
@@ -67,7 +62,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 @TestPropertySource(
     properties = {
         "hephaestus.gitlab.enabled=true",
-        "hephaestus.gitlab.default-server-url=https://gitlab.com",
+        "hephaestus.gitlab.default-server-url=https://gitlab.lrz.de",
         "hephaestus.gitlab.connect-timeout=30s",
         "hephaestus.gitlab.read-timeout=60s",
         "hephaestus.gitlab.rate-limit-delay=200ms",
@@ -76,24 +71,34 @@ import org.springframework.transaction.support.TransactionTemplate;
 )
 class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
-    // Native IDs from GitLab fixtures (positive, raw values)
-    private static final long NATIVE_MR_ID = 999555L;
-    private static final int MR_IID = 5;
-    private static final long NATIVE_AUTHOR_ID = 12345L;
-    private static final long NATIVE_APPROVER_ID = 11111L;
+    // ==================== Common Constants ====================
 
-    // Fixture values
-    private static final String FIXTURE_MR_TITLE = "Add awesome feature";
-    private static final String FIXTURE_MR_BODY = "This MR adds an awesome feature";
-    private static final String FIXTURE_MR_HTML_URL = "https://gitlab.com/gitlab-org/gitlab/-/merge_requests/5";
-    private static final String FIXTURE_AUTHOR_LOGIN = "testuser";
-    private static final String FIXTURE_APPROVER_LOGIN = "reviewer1";
-    private static final String FIXTURE_SOURCE_BRANCH = "feature/awesome-feature";
-    private static final String FIXTURE_TARGET_BRANCH = "main";
+    private static final long NATIVE_AUTHOR_ID = 18024L;
+    private static final String FIXTURE_AUTHOR_LOGIN = "ga84xah";
+    private static final String FIXTURE_ORG_LOGIN = "hephaestustest";
+    private static final String FIXTURE_REPO_FULL_NAME = "hephaestustest/demo-repository";
 
-    // Repository/org setup
-    private static final String FIXTURE_ORG_LOGIN = "gitlab-org";
-    private static final String FIXTURE_REPO_FULL_NAME = "gitlab-org/gitlab";
+    // ==================== MR !3 (open/close/reopen) ====================
+
+    private static final long NATIVE_MR3_ID = 334053L;
+    private static final int MR3_IID = 3;
+    private static final String MR3_TITLE = "Test MR for close/reopen";
+    private static final String MR3_HTML_URL =
+        "https://gitlab.lrz.de/hephaestustest/demo-repository/-/merge_requests/3";
+    private static final String MR3_SOURCE_BRANCH = "feature/test-close-reopen";
+    private static final String MR3_TARGET_BRANCH = "main";
+
+    // ==================== MR !2 (merge/update) ====================
+
+    private static final long NATIVE_MR2_ID = 334047L;
+    private static final int MR2_IID = 2;
+    private static final String MR2_TITLE = "Implement OAuth authentication";
+
+    // ==================== MR !4 (approved/unapproved) ====================
+
+    private static final long NATIVE_MR4_ID = 334054L;
+    private static final int MR4_IID = 4;
+    private static final long NATIVE_APPROVER_ID = 83343L;
 
     @Autowired
     private GitLabMergeRequestMessageHandler handler;
@@ -169,20 +174,20 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
 
             transactionTemplate.executeWithoutResult(status -> {
                 PullRequest pr = pullRequestRepository
-                    .findByRepositoryIdAndNumber(savedRepo.getId(), MR_IID)
+                    .findByRepositoryIdAndNumber(savedRepo.getId(), MR3_IID)
                     .orElseThrow();
 
                 // Core fields
-                assertThat(pr.getNativeId()).isEqualTo(NATIVE_MR_ID);
-                assertThat(pr.getNumber()).isEqualTo(MR_IID);
-                assertThat(pr.getTitle()).isEqualTo(FIXTURE_MR_TITLE);
-                assertThat(pr.getBody()).isEqualTo(FIXTURE_MR_BODY);
+                assertThat(pr.getNativeId()).isEqualTo(NATIVE_MR3_ID);
+                assertThat(pr.getNumber()).isEqualTo(MR3_IID);
+                assertThat(pr.getTitle()).isEqualTo(MR3_TITLE);
+                assertThat(pr.getBody()).isNull();
                 assertThat(pr.getState()).isEqualTo(Issue.State.OPEN);
-                assertThat(pr.getHtmlUrl()).isEqualTo(FIXTURE_MR_HTML_URL);
+                assertThat(pr.getHtmlUrl()).isEqualTo(MR3_HTML_URL);
 
                 // Branch info
-                assertThat(pr.getHeadRefName()).isEqualTo(FIXTURE_SOURCE_BRANCH);
-                assertThat(pr.getBaseRefName()).isEqualTo(FIXTURE_TARGET_BRANCH);
+                assertThat(pr.getHeadRefName()).isEqualTo(MR3_SOURCE_BRANCH);
+                assertThat(pr.getBaseRefName()).isEqualTo(MR3_TARGET_BRANCH);
 
                 // Provider
                 assertThat(pr.getProvider().getType()).isEqualTo(GitProviderType.GITLAB);
@@ -211,16 +216,16 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         @Test
         @DisplayName("closes merge request on 'close' event")
         void closeMergeRequest_setsStateToClosed() throws Exception {
-            // Create first
+            // Create MR !3 first
             handler.handleEvent(loadPayload("merge_request.open"));
             eventListener.clear();
 
-            // Close
+            // Close MR !3
             handler.handleEvent(loadPayload("merge_request.close"));
 
             transactionTemplate.executeWithoutResult(status -> {
                 PullRequest pr = pullRequestRepository
-                    .findByRepositoryIdAndNumber(savedRepo.getId(), MR_IID)
+                    .findByRepositoryIdAndNumber(savedRepo.getId(), MR3_IID)
                     .orElseThrow();
                 assertThat(pr.getState()).isEqualTo(Issue.State.CLOSED);
                 assertThat(pr.getClosedAt()).isNotNull();
@@ -233,16 +238,16 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         @Test
         @DisplayName("merges merge request on 'merge' event")
         void mergeMergeRequest_setsStateToMerged() throws Exception {
-            // Create first
-            handler.handleEvent(loadPayload("merge_request.open"));
+            // Create MR !2 via update event first
+            handler.handleEvent(loadPayload("merge_request.update"));
             eventListener.clear();
 
-            // Merge
+            // Merge MR !2
             handler.handleEvent(loadPayload("merge_request.merge"));
 
             transactionTemplate.executeWithoutResult(status -> {
                 PullRequest pr = pullRequestRepository
-                    .findByRepositoryIdAndNumber(savedRepo.getId(), MR_IID)
+                    .findByRepositoryIdAndNumber(savedRepo.getId(), MR2_IID)
                     .orElseThrow();
                 assertThat(pr.getState()).isEqualTo(Issue.State.MERGED);
                 assertThat(pr.isMerged()).isTrue();
@@ -257,17 +262,17 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         @Test
         @DisplayName("reopens merge request on 'reopen' event")
         void reopenMergeRequest_setsStateToOpen() throws Exception {
-            // Create and close
+            // Create MR !3 and close it
             handler.handleEvent(loadPayload("merge_request.open"));
             handler.handleEvent(loadPayload("merge_request.close"));
             eventListener.clear();
 
-            // Reopen
+            // Reopen MR !3
             handler.handleEvent(loadPayload("merge_request.reopen"));
 
             transactionTemplate.executeWithoutResult(status -> {
                 PullRequest pr = pullRequestRepository
-                    .findByRepositoryIdAndNumber(savedRepo.getId(), MR_IID)
+                    .findByRepositoryIdAndNumber(savedRepo.getId(), MR3_IID)
                     .orElseThrow();
                 assertThat(pr.getState()).isEqualTo(Issue.State.OPEN);
             });
@@ -285,16 +290,12 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         @Test
         @DisplayName("creates review on 'approved' event")
         void approveMergeRequest_createsReview() throws Exception {
-            // Create first
-            handler.handleEvent(loadPayload("merge_request.open"));
-            eventListener.clear();
-
-            // Approve
+            // Approved event creates MR !4 via internal process() call
             handler.handleEvent(loadPayload("merge_request.approved"));
 
             transactionTemplate.executeWithoutResult(status -> {
                 PullRequest pr = pullRequestRepository
-                    .findByRepositoryIdAndNumber(savedRepo.getId(), MR_IID)
+                    .findByRepositoryIdAndNumber(savedRepo.getId(), MR4_IID)
                     .orElseThrow();
 
                 List<PullRequestReview> reviews = reviewRepository
@@ -306,11 +307,10 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
                 assertThat(reviews).hasSize(1);
                 PullRequestReview review = reviews.get(0);
                 assertThat(review.getState()).isEqualTo(PullRequestReview.State.APPROVED);
-                // Deterministic negative ID: -(mrNativeId << 32 | userNativeId & 0xFFFFFFFFL)
                 assertThat(review.getId()).isNegative();
 
                 long expectedId = GitLabMergeRequestProcessor.generateApprovalReviewId(
-                    NATIVE_MR_ID,
+                    NATIVE_MR4_ID,
                     NATIVE_APPROVER_ID
                 );
                 assertThat(review.getId()).isEqualTo(expectedId);
@@ -322,20 +322,17 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         @Test
         @DisplayName("deletes review on 'unapproved' event")
         void unapproveMergeRequest_deletesReview() throws Exception {
-            // Create and approve
-            handler.handleEvent(loadPayload("merge_request.open"));
+            // Create MR !4 and approve it
             handler.handleEvent(loadPayload("merge_request.approved"));
             eventListener.clear();
 
-            // Unapprove
+            // Unapprove MR !4
             handler.handleEvent(loadPayload("merge_request.unapproved"));
 
             transactionTemplate.executeWithoutResult(status -> {
-                PullRequest pr = pullRequestRepository
-                    .findByRepositoryIdAndNumber(savedRepo.getId(), MR_IID)
-                    .orElseThrow();
-
-                long reviewId = GitLabMergeRequestProcessor.generateApprovalReviewId(NATIVE_MR_ID, NATIVE_APPROVER_ID);
+                long reviewId = GitLabMergeRequestProcessor.generateApprovalReviewId(
+                    NATIVE_MR4_ID, NATIVE_APPROVER_ID
+                );
                 assertThat(reviewRepository.findById(reviewId)).isEmpty();
             });
 
@@ -374,65 +371,104 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         }
 
         @Test
-        @DisplayName("full lifecycle: open -> approved -> merge")
-        void fullLifecycle_openApproveAndMerge() throws Exception {
-            // Open
+        @DisplayName("full lifecycle: open -> close -> reopen (MR !3)")
+        void fullLifecycle_openCloseReopen() throws Exception {
+            // Open MR !3
             handler.handleEvent(loadPayload("merge_request.open"));
             assertThat(eventListener.getCreatedEvents()).hasSize(1);
 
             transactionTemplate.executeWithoutResult(status -> {
                 PullRequest pr = pullRequestRepository
-                    .findByRepositoryIdAndNumber(savedRepo.getId(), MR_IID)
+                    .findByRepositoryIdAndNumber(savedRepo.getId(), MR3_IID)
                     .orElseThrow();
                 assertThat(pr.getState()).isEqualTo(Issue.State.OPEN);
             });
 
-            // Approve
+            // Close MR !3
+            handler.handleEvent(loadPayload("merge_request.close"));
+            assertThat(eventListener.getClosedEvents()).hasSize(1);
+            assertThat(eventListener.getClosedEvents().get(0).wasMerged()).isFalse();
+
+            transactionTemplate.executeWithoutResult(status -> {
+                PullRequest pr = pullRequestRepository
+                    .findByRepositoryIdAndNumber(savedRepo.getId(), MR3_IID)
+                    .orElseThrow();
+                assertThat(pr.getState()).isEqualTo(Issue.State.CLOSED);
+            });
+
+            // Reopen MR !3
+            handler.handleEvent(loadPayload("merge_request.reopen"));
+            assertThat(eventListener.getReopenedEvents()).hasSize(1);
+
+            transactionTemplate.executeWithoutResult(status -> {
+                PullRequest pr = pullRequestRepository
+                    .findByRepositoryIdAndNumber(savedRepo.getId(), MR3_IID)
+                    .orElseThrow();
+                assertThat(pr.getState()).isEqualTo(Issue.State.OPEN);
+            });
+        }
+
+        @Test
+        @DisplayName("full lifecycle: approve -> unapprove (MR !4)")
+        void fullLifecycle_approveUnapprove() throws Exception {
+            // Approve MR !4 (also creates it)
             handler.handleEvent(loadPayload("merge_request.approved"));
             assertThat(eventListener.getReviewSubmittedEvents()).hasSize(1);
 
             transactionTemplate.executeWithoutResult(status -> {
-                long reviewId = GitLabMergeRequestProcessor.generateApprovalReviewId(NATIVE_MR_ID, NATIVE_APPROVER_ID);
+                long reviewId = GitLabMergeRequestProcessor.generateApprovalReviewId(
+                    NATIVE_MR4_ID, NATIVE_APPROVER_ID
+                );
                 assertThat(reviewRepository.findById(reviewId)).isPresent();
             });
 
-            // Merge
-            handler.handleEvent(loadPayload("merge_request.merge"));
+            // Unapprove MR !4
+            handler.handleEvent(loadPayload("merge_request.unapproved"));
+            assertThat(eventListener.getReviewDismissedEvents()).hasSize(1);
 
             transactionTemplate.executeWithoutResult(status -> {
-                PullRequest pr = pullRequestRepository
-                    .findByRepositoryIdAndNumber(savedRepo.getId(), MR_IID)
-                    .orElseThrow();
-                assertThat(pr.getState()).isEqualTo(Issue.State.MERGED);
-                assertThat(pr.isMerged()).isTrue();
-
-                // Review should still exist after merge
-                long reviewId = GitLabMergeRequestProcessor.generateApprovalReviewId(NATIVE_MR_ID, NATIVE_APPROVER_ID);
-                assertThat(reviewRepository.findById(reviewId)).isPresent();
+                long reviewId = GitLabMergeRequestProcessor.generateApprovalReviewId(
+                    NATIVE_MR4_ID, NATIVE_APPROVER_ID
+                );
+                assertThat(reviewRepository.findById(reviewId)).isEmpty();
             });
-
-            // Verify domain events
-            assertThat(eventListener.getCreatedEvents()).hasSize(1);
-            assertThat(eventListener.getClosedEvents()).hasSize(1);
-            assertThat(eventListener.getClosedEvents().get(0).wasMerged()).isTrue();
-            assertThat(eventListener.getMergedEvents()).hasSize(1);
-            assertThat(eventListener.getReviewSubmittedEvents()).hasSize(1);
         }
 
         @Test
-        @DisplayName("IID namespace isolation — Issue #5 and MR #5 coexist in same repository")
+        @DisplayName("full lifecycle: update -> merge (MR !2)")
+        void fullLifecycle_updateMerge() throws Exception {
+            // Create MR !2 via update
+            handler.handleEvent(loadPayload("merge_request.update"));
+            assertThat(eventListener.getCreatedEvents()).hasSize(1);
+
+            // Merge MR !2
+            handler.handleEvent(loadPayload("merge_request.merge"));
+            assertThat(eventListener.getMergedEvents()).hasSize(1);
+
+            transactionTemplate.executeWithoutResult(status -> {
+                PullRequest pr = pullRequestRepository
+                    .findByRepositoryIdAndNumber(savedRepo.getId(), MR2_IID)
+                    .orElseThrow();
+                assertThat(pr.getState()).isEqualTo(Issue.State.MERGED);
+                assertThat(pr.isMerged()).isTrue();
+                assertThat(pr.getTitle()).isEqualTo(MR2_TITLE);
+            });
+        }
+
+        @Test
+        @DisplayName("IID namespace isolation — Issue #3 and MR !3 coexist in same repository")
         void iidNamespaceIsolation_issueAndMrCoexist() throws Exception {
-            // Create an Issue with number=5 in the same repository
+            // Create an Issue with number=3 in the same repository
             transactionTemplate.executeWithoutResult(status -> {
                 issueRepository.upsertCore(
                     /* nativeId */ 888888L,
                     /* providerId */ savedProvider.getId(),
-                    /* number */ MR_IID, // Same number as the MR
+                    /* number */ MR3_IID, // Same number as MR !3
                     /* title */ "Issue with same IID",
                     /* body */ "This is an issue with the same IID as the MR",
                     /* state */ "OPEN",
                     /* stateReason */ null,
-                    /* htmlUrl */ "https://gitlab.com/gitlab-org/gitlab/-/issues/5",
+                    /* htmlUrl */ "https://gitlab.lrz.de/hephaestustest/demo-repository/-/issues/3",
                     /* isLocked */ false,
                     /* closedAt */ null,
                     /* commentsCount */ 0,
@@ -450,23 +486,23 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
                 );
             });
 
-            // Now create MR with iid=5
+            // Now create MR !3
             handler.handleEvent(loadPayload("merge_request.open"));
 
             // Both should exist independently
             transactionTemplate.executeWithoutResult(status -> {
-                // Issue #5 exists as Issue type
-                Issue issue = issueRepository.findByRepositoryIdAndNumber(savedRepo.getId(), MR_IID).orElse(null);
+                // Issue #3 exists as Issue type
+                Issue issue = issueRepository.findByRepositoryIdAndNumber(savedRepo.getId(), MR3_IID).orElse(null);
                 assertThat(issue).isNotNull();
                 assertThat(issue.getTitle()).isEqualTo("Issue with same IID");
                 assertThat(issue.isPullRequest()).isFalse();
 
-                // MR #5 exists as PullRequest type
+                // MR !3 exists as PullRequest type
                 PullRequest pr = pullRequestRepository
-                    .findByRepositoryIdAndNumber(savedRepo.getId(), MR_IID)
+                    .findByRepositoryIdAndNumber(savedRepo.getId(), MR3_IID)
                     .orElse(null);
                 assertThat(pr).isNotNull();
-                assertThat(pr.getTitle()).isEqualTo(FIXTURE_MR_TITLE);
+                assertThat(pr.getTitle()).isEqualTo(MR3_TITLE);
                 assertThat(pr.isPullRequest()).isTrue();
             });
         }
@@ -479,8 +515,8 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
     class DomainEvents {
 
         @Test
-        @DisplayName("publishes correct domain events for each action")
-        void domainEvents_publishedCorrectly() throws Exception {
+        @DisplayName("publishes correct domain events for MR !3 lifecycle")
+        void domainEvents_mr3Lifecycle() throws Exception {
             // Open -> PullRequestCreated
             handler.handleEvent(loadPayload("merge_request.open"));
             assertThat(eventListener.getCreatedEvents()).hasSize(1);
@@ -495,13 +531,13 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
             // Reopen -> PullRequestReopened
             handler.handleEvent(loadPayload("merge_request.reopen"));
             assertThat(eventListener.getReopenedEvents()).hasSize(1);
+        }
 
-            eventListener.clear();
-
-            // Approve -> ReviewSubmitted
-            handler.handleEvent(loadPayload("merge_request.approved"));
-            assertThat(eventListener.getReviewSubmittedEvents()).hasSize(1);
-
+        @Test
+        @DisplayName("publishes correct domain events for MR !2 merge")
+        void domainEvents_mr2Merge() throws Exception {
+            // Create via update
+            handler.handleEvent(loadPayload("merge_request.update"));
             eventListener.clear();
 
             // Merge -> PullRequestClosed(wasMerged=true) + PullRequestMerged
@@ -509,6 +545,20 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
             assertThat(eventListener.getClosedEvents()).hasSize(1);
             assertThat(eventListener.getClosedEvents().get(0).wasMerged()).isTrue();
             assertThat(eventListener.getMergedEvents()).hasSize(1);
+        }
+
+        @Test
+        @DisplayName("publishes correct domain events for MR !4 approval")
+        void domainEvents_mr4Approval() throws Exception {
+            // Approve -> ReviewSubmitted
+            handler.handleEvent(loadPayload("merge_request.approved"));
+            assertThat(eventListener.getReviewSubmittedEvents()).hasSize(1);
+
+            eventListener.clear();
+
+            // Unapprove -> ReviewDismissed
+            handler.handleEvent(loadPayload("merge_request.unapproved"));
+            assertThat(eventListener.getReviewDismissedEvents()).hasSize(1);
         }
     }
 
@@ -545,26 +595,28 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
 
     private void setupTestData() {
         savedProvider = gitProviderRepository
-            .findByTypeAndServerUrl(GitProviderType.GITLAB, "https://gitlab.com")
-            .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITLAB, "https://gitlab.com")));
+            .findByTypeAndServerUrl(GitProviderType.GITLAB, "https://gitlab.lrz.de")
+            .orElseGet(() ->
+                gitProviderRepository.save(new GitProvider(GitProviderType.GITLAB, "https://gitlab.lrz.de"))
+            );
 
         Organization org = new Organization();
         org.setNativeId(1L);
         org.setLogin(FIXTURE_ORG_LOGIN);
         org.setCreatedAt(Instant.now());
         org.setUpdatedAt(Instant.now());
-        org.setName("GitLab Org");
+        org.setName("HephaestusTest");
         org.setAvatarUrl("");
-        org.setHtmlUrl("https://gitlab.com/gitlab-org");
+        org.setHtmlUrl("https://gitlab.lrz.de/hephaestustest");
         org.setProvider(savedProvider);
         org = organizationRepository.save(org);
 
         Repository repo = new Repository();
-        repo.setNativeId(278964L);
-        repo.setName("gitlab");
+        repo.setNativeId(246765L);
+        repo.setName("demo-repository");
         repo.setNameWithOwner(FIXTURE_REPO_FULL_NAME);
-        repo.setHtmlUrl("https://gitlab.com/gitlab-org/gitlab");
-        repo.setVisibility(Repository.Visibility.PUBLIC);
+        repo.setHtmlUrl("https://gitlab.lrz.de/hephaestustest/demo-repository");
+        repo.setVisibility(Repository.Visibility.PRIVATE);
         repo.setDefaultBranch("main");
         repo.setCreatedAt(Instant.now());
         repo.setUpdatedAt(Instant.now());
@@ -574,8 +626,8 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         savedRepo = repositoryRepository.save(repo);
 
         Workspace workspace = new Workspace();
-        workspace.setWorkspaceSlug("gitlab-org-test");
-        workspace.setDisplayName("GitLab Org Test");
+        workspace.setWorkspaceSlug("hephaestus-test-gitlab");
+        workspace.setDisplayName("HephaestusTest GitLab");
         workspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
         workspace.setIsPubliclyViewable(true);
         workspace.setOrganization(org);
