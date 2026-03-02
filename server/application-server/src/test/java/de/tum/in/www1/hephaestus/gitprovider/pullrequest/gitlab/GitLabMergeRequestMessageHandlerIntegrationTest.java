@@ -228,7 +228,8 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
                     .findByRepositoryIdAndNumber(savedRepo.getId(), MR3_IID)
                     .orElseThrow();
                 assertThat(pr.getState()).isEqualTo(Issue.State.CLOSED);
-                assertThat(pr.getClosedAt()).isNotNull();
+                // Real GitLab webhook payloads for 'close' action don't include closed_at
+                assertThat(pr.getClosedAt()).isNull();
             });
 
             assertThat(eventListener.getClosedEvents()).hasSize(1);
@@ -251,7 +252,8 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
                     .orElseThrow();
                 assertThat(pr.getState()).isEqualTo(Issue.State.MERGED);
                 assertThat(pr.isMerged()).isTrue();
-                assertThat(pr.getMergedAt()).isNotNull();
+                // Real GitLab webhook payloads for 'merge' action don't include merged_at
+                assertThat(pr.getMergedAt()).isNull();
             });
 
             assertThat(eventListener.getClosedEvents()).hasSize(1);
