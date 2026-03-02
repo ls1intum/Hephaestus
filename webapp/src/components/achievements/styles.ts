@@ -37,12 +37,12 @@ export const defaultCategoryIcons = {
 // ===== Achievement Rarity Styling ===== //
 
 export const raritySizes = {
-	common: "w-10 h-10",
-	uncommon: "w-11 h-11",
-	rare: "w-12 h-12",
-	epic: "w-14 h-14",
-	legendary: "w-16 h-16",
-	mythic: "w-20 h-20",
+	common: "size-10", // 40px
+	uncommon: "size-12", // 48px
+	rare: "size-14", // 56px
+	epic: "size-16", // 64px
+	legendary: "size-20", // 80px
+	mythic: "size-24", // 96px
 } as const satisfies Record<AchievementRarity, string>;
 
 export const rarityLabels = {

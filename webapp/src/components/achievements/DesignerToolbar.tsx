@@ -1,10 +1,10 @@
-import { Grid3x3, Magnet, Move, Save, MessageSquareOff } from "lucide-react";
+import { Grid3x3, Magnet, MessageSquareOff, Move, Save } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Separator } from "@/components/ui/separator.tsx";
 import { Switch } from "@/components/ui/switch.tsx";
 
-const SNAP_GRID_OPTIONS = [10, 25, 50] as const;
+const SNAP_GRID_OPTIONS = [24, 48, 96] as const;
 export type SnapGridSize = (typeof SNAP_GRID_OPTIONS)[number];
 
 export interface DesignerToolbarProps {
@@ -40,11 +40,7 @@ export function DesignerToolbar({
 			{/* Drag mode toggle */}
 			<div className="flex items-center gap-2">
 				<Move className="w-4 h-4 text-muted-foreground" />
-				<Switch
-					id="designer-drag-mode"
-					checked={isDraggable}
-					onCheckedChange={onDraggableChange}
-				/>
+				<Switch id="designer-drag-mode" checked={isDraggable} onCheckedChange={onDraggableChange} />
 				<Label htmlFor="designer-drag-mode" className="cursor-pointer text-sm">
 					Drag
 				</Label>
@@ -70,11 +66,7 @@ export function DesignerToolbar({
 			{/* Snap toggle */}
 			<div className="flex items-center gap-2">
 				<Magnet className="w-4 h-4 text-muted-foreground" />
-				<Switch
-					id="designer-snap-mode"
-					checked={isSnapping}
-					onCheckedChange={onSnappingChange}
-				/>
+				<Switch id="designer-snap-mode" checked={isSnapping} onCheckedChange={onSnappingChange} />
 				<Label htmlFor="designer-snap-mode" className="cursor-pointer text-sm">
 					Snap
 				</Label>

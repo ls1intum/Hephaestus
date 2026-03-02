@@ -10,7 +10,7 @@ import {
 	useNodesState,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import type { Achievement } from "@/api/types.gen";
 import { ACHIEVEMENT_REGISTRY } from "@/components/achievements/definitions.ts";
 import type { UIAchievement } from "@/components/achievements/types";
@@ -59,19 +59,39 @@ export interface SkillTreeDesignerProps {
 }
 
 export function SkillTreeDesigner({ user, allDefinitions }: SkillTreeDesignerProps) {
-	const [nodes, setNodes, onNodesChange] = useNodesState<(AchievementNode | AvatarNode)>([]);
+	const [nodes, setNodes, onNodesChangeRef] = useNodesState<AchievementNode | AvatarNode>([]);
 	const [edges, setEdges, onEdgesChange] = useEdgesState<AchievementEdge>([]);
 	const [isDraggable, setIsDraggable] = useState(true);
 	const [isSnapping, setIsSnapping] = useState(true);
 	const [showTooltips, setShowTooltips] = useState(true);
 
-	// Node origin: [0.5, 0.5] means position refers to the center of each node,
-	// so the visual circle aligns perfectly with grid intersections.
-	const nodeOrigin = useRef<[number, number]>([0.5, 0.5]).current;
-	const [snapSize, setSnapSize] = useState<SnapGridSize>(25);
+	const [snapSize, setSnapSize] = useState<SnapGridSize>(24);
 
-	// Memoize snap grid tuple to avoid unnecessary re-renders
-	const snapGrid = useMemo((): [number, number] => [snapSize, snapSize], [snapSize]);
+	const handleNodesChange = useCallback(
+		(changes: any[]) => {
+			if (isSnapping) {
+				const snappedChanges = changes.map((change) => {
+					if (change.type === "position" && change.position) {
+						// Custom Snapping: Since nodeOrigin=[0.5, 0.5], the position reflects the center of the node!
+						// By snapping this center directly here, we guarantee absolute perfect alignment
+						// regardless of node width/height.
+						return {
+							...change,
+							position: {
+								x: Math.round(change.position.x / snapSize) * snapSize,
+								y: Math.round(change.position.y / snapSize) * snapSize,
+							},
+						};
+					}
+					return change;
+				});
+				onNodesChangeRef(snappedChanges);
+			} else {
+				onNodesChangeRef(changes);
+			}
+		},
+		[isSnapping, snapSize, onNodesChangeRef],
+	);
 
 	const saveLayout = useCallback(async () => {
 		const layoutMap = nodes.reduce(
@@ -151,7 +171,7 @@ export function SkillTreeDesigner({ user, allDefinitions }: SkillTreeDesignerPro
 						}) as AchievementNode | AvatarNode,
 				)}
 				edges={edges}
-				onNodesChange={onNodesChange}
+				onNodesChange={handleNodesChange}
 				onEdgesChange={onEdgesChange}
 				nodeTypes={nodeTypes}
 				edgeTypes={edgeTypes}
@@ -160,14 +180,14 @@ export function SkillTreeDesigner({ user, allDefinitions }: SkillTreeDesignerPro
 				fitViewOptions={{ padding: 0.15 }}
 				minZoom={0.15}
 				maxZoom={2.5}
-				nodeOrigin={nodeOrigin}
+				nodeOrigin={[0.5, 0.5]}
 				proOptions={{ hideAttribution: true }}
 				className="bg-background"
 				elementsSelectable={true}
 				nodesDraggable={isDraggable}
 				nodesConnectable={false}
-				snapToGrid={isSnapping}
-				snapGrid={snapGrid}
+				// Disable native snap to prevent it snapping the exact top-left corner
+				snapToGrid={false}
 				deleteKeyCode={null}
 				selectionKeyCode={null}
 				multiSelectionKeyCode={null}
@@ -181,19 +201,18 @@ export function SkillTreeDesigner({ user, allDefinitions }: SkillTreeDesignerPro
 				{/* Fine subdivided dot grid */}
 				<Background
 					id="designer-grid-fine"
-					gap={isSnapping ? snapSize : 25}
+					gap={isSnapping ? snapSize : 24}
 					size={1}
-					color="var(--border)"
-					className="opacity-15"
+					className="opacity-60"
 					variant={BackgroundVariant.Dots}
 				/>
-				{/* Major grid lines – 4× the fine grid gap for clear subdivisions */}
+				{/* Major grid lines – lock to 96px for visual consistency */}
 				<Background
 					id="designer-grid-major"
-					gap={isSnapping ? snapSize * 4 : 100}
+					gap={isSnapping && snapSize > 96 ? snapSize : 96}
 					lineWidth={1}
 					color="var(--border)"
-					className="opacity-30"
+					className="opacity-80"
 					variant={BackgroundVariant.Lines}
 				/>
 

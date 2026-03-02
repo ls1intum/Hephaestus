@@ -4,51 +4,51 @@
     "y": 0
   },
   "first_pull": {
-    "x": 160,
+    "x": 144,
     "y": 0
   },
   "pr_beginner": {
-    "x": 280,
+    "x": 240,
     "y": 0
   },
   "pr_apprentice": {
-    "x": 402,
-    "y": 2
+    "x": 336,
+    "y": 0
   },
   "integration_regular": {
-    "x": 522,
-    "y": 2
+    "x": 480,
+    "y": 0
   },
   "pr_specialist": {
-    "x": 644,
-    "y": 4
+    "x": 624,
+    "y": 0
   },
   "integration_expert": {
-    "x": 778,
-    "y": -2
+    "x": 768,
+    "y": 0
   },
   "master_integrator": {
-    "x": 962,
-    "y": 2
+    "x": 912,
+    "y": 0
   },
   "first_review": {
     "x": 0,
-    "y": 140
+    "y": 144
   },
   "review_rookie": {
     "x": 0,
-    "y": 220
+    "y": 240
   },
   "review_master": {
-    "x": -82,
-    "y": 318
+    "x": -96,
+    "y": 384
   },
   "code_commenter": {
-    "x": 78,
-    "y": 318
+    "x": 96,
+    "y": 384
   },
   "helpful_reviewer": {
-    "x": 400,
-    "y": 275
+    "x": 336,
+    "y": 240
   }
 }

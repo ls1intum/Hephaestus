@@ -3,7 +3,7 @@ import { categoryMeta, defaultCategoryIcons } from "./styles.ts";
 
 export function CategoryLabels() {
 	// Position labels around the outer edge of the skill tree
-	const labelRadius = 850;
+	const labelRadius = 1100;
 
 	const mainCategories = Object.entries(categoryMeta);
 
