@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.20.0](https://github.com/ls1intum/Hephaestus/compare/v0.19.0...v0.20.0) (2026-03-02)
+
+### 🚀 Features
+
+* **config:** add Jean worktree setup script ([#764](https://github.com/ls1intum/Hephaestus/issues/764)) ([06003c1](https://github.com/ls1intum/Hephaestus/commit/06003c1b10b5410ecda947bdca526ac6b5c8dea9))
+* **gitprovider:** GitLab sync — Issue entity ([#777](https://github.com/ls1intum/Hephaestus/issues/777)) ([ee51df1](https://github.com/ls1intum/Hephaestus/commit/ee51df1fd9e32f4e80a68225cd02835e1725395a))
+
 ## [0.19.0](https://github.com/ls1intum/Hephaestus/compare/v0.18.0...v0.19.0) (2026-02-25)
 
 ### 🚀 Features
