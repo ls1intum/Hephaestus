@@ -5,7 +5,7 @@
 
 services:
   postgres:
-    image: 'postgres:16'
+    image: 'postgres:16@sha256:78df81b1442dcc764c1104154da7162635e40cfffe67579c42a1c1b96dfc209c'
     environment:
       POSTGRES_DB: hephaestus
       POSTGRES_PASSWORD: root
