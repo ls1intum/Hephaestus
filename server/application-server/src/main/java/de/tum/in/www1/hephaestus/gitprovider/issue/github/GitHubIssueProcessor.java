@@ -164,7 +164,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
         }
 
         // Use atomic upsert to handle concurrent inserts
-        // This uses ON CONFLICT (repository_id, number) DO UPDATE
+        // This uses ON CONFLICT (repository_id, issue_type, number) DO UPDATE
         Instant now = Instant.now();
         issueRepository.upsertCore(
             dbId,

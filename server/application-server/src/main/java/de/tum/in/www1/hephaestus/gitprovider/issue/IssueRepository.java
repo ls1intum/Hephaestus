@@ -19,10 +19,10 @@ import org.springframework.transaction.annotation.Transactional;
  */
 public interface IssueRepository extends JpaRepository<Issue, Long> {
     /**
-     * Finds an issue by repository ID and number.
-     * This is the canonical lookup for sync operations as it uses the natural key
-     * (repository_id, number) which is consistent across both GraphQL sync and
-     * webhook events, regardless of which ID format they use.
+     * Finds an issue (not a pull request) by repository ID and number.
+     * Uses {@code TYPE(i) = Issue} to exclude PullRequest subclass rows, which is
+     * necessary for GitLab where issues and merge requests have separate IID
+     * namespaces (Issue #5 and MR !5 can coexist in the same project).
      *
      * @param repositoryId the repository ID
      * @param number the issue number within the repository
@@ -37,7 +37,7 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
         LEFT JOIN FETCH i.assignees
         LEFT JOIN FETCH i.repository
         LEFT JOIN FETCH i.milestone
-        WHERE i.repository.id = :repositoryId AND i.number = :number
+        WHERE TYPE(i) = Issue AND i.repository.id = :repositoryId AND i.number = :number
         """
     )
     Optional<Issue> findByRepositoryIdAndNumber(@Param("repositoryId") long repositoryId, @Param("number") int number);
@@ -78,18 +78,6 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
     int clearMilestoneReferences(@Param("milestoneId") Long milestoneId);
 
     /**
-     * Atomically inserts or updates an issue's core fields (race-condition safe).
-     * <p>
-     * Uses PostgreSQL's ON CONFLICT to handle concurrent inserts on the unique constraint
-     * (repository_id, number). This eliminates the race condition where two threads both
-     * pass the findById check and try to insert the same issue.
-     * <p>
-     * <b>Note:</b> This only handles scalar fields and FK references. ManyToMany relationships
-     * (labels, assignees) must be handled separately after calling this method.
-     *
-     * @return 1 if inserted, 1 if updated (always 1 on success due to DO UPDATE)
-     */
-    /**
      * Finds an issue by ID with its blockedBy collection eagerly loaded.
      * <p>
      * This is needed by dependency sync because the persistence context may have been
@@ -109,6 +97,49 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
     )
     Optional<Issue> findByIdWithBlockedBy(@Param("id") Long id);
 
+    /**
+     * Corrects the discriminator column for a mistyped stub entity.
+     * <p>
+     * When a GitHub {@code issue_comment} webhook arrives before the {@code pull_request}
+     * webhook, a stub may be created with {@code issue_type='ISSUE'} instead of
+     * {@code 'PULL_REQUEST'}. This method fixes the discriminator so the subsequent
+     * upsert correctly matches on {@code ON CONFLICT (repository_id, issue_type, number)}.
+     * <p>
+     * <b>Safety:</b> Only corrects rows where {@code issue_type = :currentType} to avoid
+     * accidentally modifying the wrong entity in providers where issues and PRs share the
+     * same number namespace (e.g., GitLab IID).
+     *
+     * @param repositoryId the repository ID
+     * @param number the entity number within the repository
+     * @param currentType the current (incorrect) discriminator value (e.g., 'ISSUE')
+     * @param newType the correct discriminator value (e.g., 'PULL_REQUEST')
+     * @return 1 if updated, 0 if no matching row exists
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Transactional
+    @Query(
+        value = "UPDATE issue SET issue_type = :newType WHERE repository_id = :repositoryId AND number = :number AND issue_type = :currentType",
+        nativeQuery = true
+    )
+    int correctDiscriminator(
+        @Param("repositoryId") long repositoryId,
+        @Param("number") int number,
+        @Param("currentType") String currentType,
+        @Param("newType") String newType
+    );
+
+    /**
+     * Atomically inserts or updates an issue's core fields (race-condition safe).
+     * <p>
+     * Uses PostgreSQL's ON CONFLICT to handle concurrent inserts on the unique constraint
+     * (repository_id, issue_type, number). This eliminates the race condition where two threads
+     * both pass the findById check and try to insert the same issue.
+     * <p>
+     * <b>Note:</b> This only handles scalar fields and FK references. ManyToMany relationships
+     * (labels, assignees) must be handled separately after calling this method.
+     *
+     * @return 1 if inserted, 1 if updated (always 1 on success due to DO UPDATE)
+     */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Transactional
     @Query(
@@ -127,7 +158,7 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
             :parentIssueId, :subIssuesTotal, :subIssuesCompleted, :subIssuesPercentCompleted,
             'ISSUE'
         )
-        ON CONFLICT (repository_id, number) DO UPDATE SET
+        ON CONFLICT (repository_id, issue_type, number) DO UPDATE SET
             title = EXCLUDED.title,
             body = EXCLUDED.body,
             state = EXCLUDED.state,

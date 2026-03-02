@@ -87,8 +87,8 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
      * Uses atomic upsert to prevent race conditions when concurrent threads
      * (e.g., multiple NATS consumers or webhook handlers) process the same PR.
      * <p>
-     * Uses (repository_id, number) as the canonical lookup key to ensure idempotency
-     * across both GraphQL sync and webhook events, which use different ID formats.
+     * Uses (repository_id, issue_type, number) as the canonical uniqueness constraint.
+     * Lookup is by (repository_id, number) via the PullRequest typed query.
      *
      * @return the processed PullRequest, or null if the repository context is missing
      */
@@ -115,15 +115,23 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         boolean isNew = existingOpt.isEmpty();
 
         // Detect issue_type mismatch: entity exists as ISSUE but we're processing it as a PR.
-        // The upsertCore native SQL will correct the discriminator, so we just log here.
+        // This happens when a comment webhook creates a stub ISSUE before the PR webhook arrives.
+        // Must correct the discriminator BEFORE the upsert, because ON CONFLICT matches on
+        // (repository_id, issue_type, number) — a mismatched issue_type would cause an INSERT
+        // instead of an UPDATE, violating the (provider_id, native_id) constraint.
         if (isNew) {
             Optional<Issue> existingIssue = issueRepository.findByRepositoryIdAndNumber(
                 repository.getId(),
                 dto.number()
             );
             if (existingIssue.isPresent()) {
+                issueRepository.correctDiscriminator(repository.getId(), dto.number(), "ISSUE", "PULL_REQUEST");
+                // Re-fetch as PullRequest after discriminator correction
+                // (clearAutomatically=true evicted the old entity)
+                existingOpt = pullRequestRepository.findByRepositoryIdAndNumber(repository.getId(), dto.number());
+                isNew = false;
                 log.info(
-                    "Updating issue_type from ISSUE to PULL_REQUEST: repositoryId={}, number={}",
+                    "Corrected issue_type from ISSUE to PULL_REQUEST: repositoryId={}, number={}",
                     repository.getId(),
                     dto.number()
                 );

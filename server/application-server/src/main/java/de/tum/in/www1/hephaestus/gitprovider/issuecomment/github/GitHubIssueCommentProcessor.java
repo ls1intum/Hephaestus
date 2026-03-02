@@ -101,9 +101,16 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
             return null;
         }
 
+        // Look up parent: try Issue first, then PullRequest (needed because
+        // IssueRepository filters by TYPE = Issue, excluding PullRequest rows)
         Issue issue = issueRepository
             .findByRepositoryIdAndNumber(context.repository().getId(), issueNumber)
             .orElse(null);
+        if (issue == null) {
+            issue = pullRequestRepository
+                .findByRepositoryIdAndNumber(context.repository().getId(), issueNumber)
+                .orElse(null);
+        }
         if (issue == null) {
             log.warn(
                 "Skipped comment processing: reason=parentNotFound, repoId={}, issueNumber={}, commentId={}",
@@ -164,11 +171,15 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
             return null;
         }
 
-        // Try to find existing parent entity using natural key (repository + number)
-        // This is consistent across both GraphQL sync and webhook events
+        // Try to find existing parent entity: Issue first, then PullRequest
         Issue issue = issueRepository
             .findByRepositoryIdAndNumber(context.repository().getId(), issueDto.number())
             .orElse(null);
+        if (issue == null) {
+            issue = pullRequestRepository
+                .findByRepositoryIdAndNumber(context.repository().getId(), issueDto.number())
+                .orElse(null);
+        }
 
         // If parent doesn't exist, create a minimal entity from webhook data
         if (issue == null) {
@@ -317,7 +328,7 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
      * <p>
      * This method handles the race condition where multiple threads might try to create
      * the same parent entity concurrently. The database has a unique constraint on
-     * (repository_id, number), so if another thread wins the race, our insert will fail
+     * (repository_id, issue_type, number), so if another thread wins the race, our insert will fail
      * with a constraint violation. In that case, we simply look up the entity that was
      * created by the other thread.
      *
@@ -337,7 +348,12 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
                 context.repository().getId(),
                 issueDto.number()
             );
-            return issueRepository
+            // Try Issue first, then PullRequest (IssueRepository filters by TYPE = Issue)
+            Issue found = issueRepository
+                .findByRepositoryIdAndNumber(context.repository().getId(), issueDto.number())
+                .orElse(null);
+            if (found != null) return found;
+            return pullRequestRepository
                 .findByRepositoryIdAndNumber(context.repository().getId(), issueDto.number())
                 .orElse(null);
         }
