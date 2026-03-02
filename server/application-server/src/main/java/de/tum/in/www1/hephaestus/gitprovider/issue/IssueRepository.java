@@ -114,14 +114,14 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
     @Query(
         value = """
         INSERT INTO issue (
-            id, number, title, body, state, state_reason, html_url, is_locked,
+            native_id, provider_id, number, title, body, state, state_reason, html_url, is_locked,
             closed_at, comments_count, last_sync_at, created_at, updated_at,
             author_id, repository_id, milestone_id, issue_type_id,
             parent_issue_id, sub_issues_total, sub_issues_completed, sub_issues_percent_completed,
             issue_type
         )
         VALUES (
-            :id, :number, :title, :body, :state, :stateReason, :htmlUrl, :isLocked,
+            :nativeId, :providerId, :number, :title, :body, :state, :stateReason, :htmlUrl, :isLocked,
             :closedAt, :commentsCount, :lastSyncAt, :createdAt, :updatedAt,
             :authorId, :repositoryId, :milestoneId, :issueTypeId,
             :parentIssueId, :subIssuesTotal, :subIssuesCompleted, :subIssuesPercentCompleted,
@@ -149,7 +149,8 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
         nativeQuery = true
     )
     int upsertCore(
-        @Param("id") Long id,
+        @Param("nativeId") Long nativeId,
+        @Param("providerId") Long providerId,
         @Param("number") int number,
         @Param("title") String title,
         @Param("body") String body,

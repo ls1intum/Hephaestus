@@ -135,7 +135,7 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
     @Query(
         value = """
         INSERT INTO issue (
-            id, number, title, body, state, state_reason, html_url, is_locked,
+            native_id, provider_id, number, title, body, state, state_reason, html_url, is_locked,
             closed_at, comments_count, last_sync_at, created_at, updated_at,
             author_id, repository_id, milestone_id,
             merged_at, is_draft, is_merged, commits, additions, deletions, changed_files,
@@ -144,7 +144,7 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
             issue_type
         )
         VALUES (
-            :id, :number, :title, :body, :state, :stateReason, :htmlUrl, :isLocked,
+            :nativeId, :providerId, :number, :title, :body, :state, :stateReason, :htmlUrl, :isLocked,
             :closedAt, :commentsCount, :lastSyncAt, :createdAt, :updatedAt,
             :authorId, :repositoryId, :milestoneId,
             :mergedAt, :isDraft, :isMerged, :commits, :additions, :deletions, :changedFiles,
@@ -185,7 +185,8 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
         nativeQuery = true
     )
     int upsertCore(
-        @Param("id") Long id,
+        @Param("nativeId") Long nativeId,
+        @Param("providerId") Long providerId,
         @Param("number") int number,
         @Param("title") String title,
         @Param("body") String body,

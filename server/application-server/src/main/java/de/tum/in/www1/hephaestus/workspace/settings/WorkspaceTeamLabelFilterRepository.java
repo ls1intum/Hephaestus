@@ -54,6 +54,7 @@ public interface WorkspaceTeamLabelFilterRepository
         """
         SELECT wtlf.label
         FROM WorkspaceTeamLabelFilter wtlf
+        JOIN FETCH wtlf.label.repository
         WHERE wtlf.workspace.id = :workspaceId
           AND wtlf.team.id = :teamId
         """
@@ -89,7 +90,8 @@ public interface WorkspaceTeamLabelFilterRepository
         """
         SELECT wtlf
         FROM WorkspaceTeamLabelFilter wtlf
-        JOIN FETCH wtlf.label
+        JOIN FETCH wtlf.label l
+        JOIN FETCH l.repository
         WHERE wtlf.workspace.id = :workspaceId
           AND wtlf.team.id IN :teamIds
         """

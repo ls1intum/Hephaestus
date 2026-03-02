@@ -107,7 +107,7 @@ public class GitHubUserProcessor {
      *     or null if dto is null or has no ID
      */
     @Nullable
-    public User findOrCreate(GitHubUserDTO dto) {
+    public User findOrCreate(GitHubUserDTO dto, Long providerId) {
         if (dto == null) {
             return null;
         }
@@ -131,25 +131,19 @@ public class GitHubUserProcessor {
         // This isolates the upsert from the caller's transaction so that if
         // PostgreSQL detects a deadlock and rolls back, only the inner transaction
         // is affected and we can retry without corrupting the caller's state.
-        executeUpsertWithDeadlockRetry(userId, login, name, avatarUrl, htmlUrl, userType, dto);
+        executeUpsertWithDeadlockRetry(userId, providerId, login, name, avatarUrl, htmlUrl, userType, dto);
 
-        // Evict from L1 cache so the next find() returns fresh data from DB
-        // instead of a stale cached version.
-        User cached = entityManager.find(User.class, userId);
-        if (cached != null) {
-            entityManager.refresh(cached);
-        }
-
-        // Load the entity into the persistence context. We use find() instead of
-        // returning a detached entity because callers set JPA associations
-        // (e.g., comment.setAuthor(user)) which require managed entities.
-        //
-        // The find() call uses the L1 cache — since we just refreshed above,
-        // it returns the up-to-date instance without an extra DB round-trip.
-        User result = entityManager.find(User.class, userId);
-        if (result == null) {
+        // Load the entity by nativeId + providerId. Since the upsert ran in a
+        // REQUIRES_NEW transaction that has already committed, the JPQL query
+        // goes to DB and returns a managed entity in the caller's persistence context.
+        User result = userRepository.findByNativeIdAndProviderId(userId, providerId).orElse(null);
+        if (result != null) {
+            // Refresh to ensure we have the latest data (handles L1 cache staleness
+            // if the entity was previously loaded in this transaction).
+            entityManager.refresh(result);
+        } else {
             // Should not happen after a successful upsert, but handle gracefully
-            log.warn("User not found after upsert: userId={}, login={}", userId, login);
+            log.warn("User not found after upsert: nativeId={}, providerId={}, login={}", userId, providerId, login);
         }
         return result;
     }
@@ -163,6 +157,7 @@ public class GitHubUserProcessor {
      */
     private void executeUpsertWithDeadlockRetry(
         Long userId,
+        Long providerId,
         String login,
         String name,
         String avatarUrl,
@@ -174,11 +169,11 @@ public class GitHubUserProcessor {
             try {
                 requiresNewTransaction.executeWithoutResult(status -> {
                     // Step 1: Try to acquire advisory lock (non-blocking to prevent deadlocks).
-                    boolean lockAcquired = tryAcquireWithRetry(login);
+                    boolean lockAcquired = tryAcquireWithRetry(login, providerId);
 
                     if (lockAcquired) {
-                        // Step 2: Rename any other user that holds this login (different id).
-                        userRepository.freeLoginConflicts(login, userId);
+                        // Step 2: Rename any other user that holds this login (different nativeId).
+                        userRepository.freeLoginConflicts(login, userId, providerId);
                     } else {
                         log.debug(
                             "Could not acquire advisory lock after {} attempts, proceeding with upsert: login={}",
@@ -190,6 +185,7 @@ public class GitHubUserProcessor {
                     // Step 3: Insert or update the user.
                     userRepository.upsertUser(
                         userId,
+                        providerId,
                         login,
                         name,
                         avatarUrl,
@@ -244,9 +240,9 @@ public class GitHubUserProcessor {
      * @param login the login to lock on
      * @return true if the lock was acquired, false after all attempts exhausted
      */
-    private boolean tryAcquireWithRetry(String login) {
+    private boolean tryAcquireWithRetry(String login, Long providerId) {
         for (int attempt = 0; attempt < MAX_LOCK_ATTEMPTS; attempt++) {
-            if (userRepository.tryAcquireLoginLock(login)) {
+            if (userRepository.tryAcquireLoginLock(login, providerId)) {
                 return true;
             }
             if (attempt < MAX_LOCK_ATTEMPTS - 1) {
@@ -272,7 +268,7 @@ public class GitHubUserProcessor {
      * @return the User entity, or null if dto is null or has no ID
      */
     @Nullable
-    public User ensureExists(GitHubUserDTO dto) {
-        return findOrCreate(dto);
+    public User ensureExists(GitHubUserDTO dto, Long providerId) {
+        return findOrCreate(dto, providerId);
     }
 }

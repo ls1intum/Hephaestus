@@ -70,16 +70,20 @@ public class GitHubDiscussionCommentProcessor extends BaseGitHubProcessor {
         }
 
         // Check if this is an update
-        Optional<DiscussionComment> existingOpt = commentRepository.findById(dbId);
+        Optional<DiscussionComment> existingOpt = commentRepository.findByNativeIdAndProviderId(
+            dbId,
+            context.providerId()
+        );
         boolean isNew = existingOpt.isEmpty();
 
         // Resolve related entities
-        User author = dto.author() != null ? findOrCreateUser(dto.author()) : null;
+        User author = dto.author() != null ? findOrCreateUser(dto.author(), context.providerId()) : null;
 
         // Get or create the comment
         DiscussionComment comment = existingOpt.orElseGet(() -> {
             DiscussionComment c = new DiscussionComment();
-            c.setId(dbId);
+            c.setNativeId(dbId);
+            c.setProvider(context.provider());
             return c;
         });
 
@@ -161,7 +165,7 @@ public class GitHubDiscussionCommentProcessor extends BaseGitHubProcessor {
         }
 
         commentRepository
-            .findById(dbId)
+            .findByNativeIdAndProviderId(dbId, context.providerId())
             .ifPresent(comment -> {
                 Long discussionId = comment.getDiscussion() != null ? comment.getDiscussion().getId() : null;
 

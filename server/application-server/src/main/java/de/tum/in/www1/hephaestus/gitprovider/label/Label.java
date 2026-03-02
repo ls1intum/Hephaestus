@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.label;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToMany;
@@ -57,7 +58,7 @@ public class Label {
     @ToString.Exclude
     private Set<Issue> issues = new HashSet<>();
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "repository_id")
     @ToString.Exclude
     private Repository repository;

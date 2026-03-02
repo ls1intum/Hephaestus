@@ -8,6 +8,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.DataSource;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
@@ -25,6 +28,7 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -70,6 +74,7 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
     private static final Long PROJECT_ID = 42L;
     private static final String NODE_ID = "PVTI_abc123";
     private static final Long ITEM_DB_ID = 9001L;
+    private static final Long PROVIDER_ID = 1L;
 
     private Project project;
     private ProcessingContext context;
@@ -94,7 +99,17 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
         project.setNumber(1);
         project.setUrl("https://github.com/orgs/test/projects/1");
 
-        context = ProcessingContext.forSync(SCOPE_ID, null);
+        GitProvider provider = new GitProvider(GitProviderType.GITHUB, "https://github.com");
+        provider.setId(PROVIDER_ID);
+        context = new ProcessingContext(
+            SCOPE_ID,
+            null,
+            provider,
+            Instant.now(),
+            UUID.randomUUID().toString(),
+            null,
+            DataSource.GRAPHQL_SYNC
+        );
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -207,6 +222,7 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
             // Assert
             assertThat(result).isNull();
             verify(projectItemRepository, never()).upsertCore(
+                any(),
                 any(),
                 any(),
                 any(),
@@ -353,6 +369,7 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
                 any(),
                 any(),
                 any(),
+                any(),
                 any(boolean.class),
                 any(),
                 any(),
@@ -381,6 +398,7 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
             // Verify upsert was called with correct params
             verify(projectItemRepository).upsertCore(
                 eq(ITEM_DB_ID),
+                eq(PROVIDER_ID),
                 eq(NODE_ID),
                 eq(PROJECT_ID),
                 eq("DRAFT_ISSUE"),
@@ -424,6 +442,7 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
             // Verify upsert was called with ISSUE content type and resolved issueId
             verify(projectItemRepository).upsertCore(
                 eq(ITEM_DB_ID),
+                eq(PROVIDER_ID),
                 eq(NODE_ID),
                 eq(PROJECT_ID),
                 eq("ISSUE"),
@@ -455,6 +474,7 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
             assertThat(result).isNotNull();
             verify(projectItemRepository).upsertCore(
                 eq(ITEM_DB_ID),
+                eq(PROVIDER_ID),
                 eq(NODE_ID),
                 eq(PROJECT_ID),
                 eq("PULL_REQUEST"),
@@ -488,6 +508,7 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
             // contentDatabaseId should still be set for orphan relinking
             verify(projectItemRepository).upsertCore(
                 eq(ITEM_DB_ID),
+                eq(PROVIDER_ID),
                 eq(NODE_ID),
                 eq(PROJECT_ID),
                 eq("ISSUE"),
@@ -517,6 +538,7 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
             assertThat(result).isNotNull();
             verify(projectItemRepository).upsertCore(
                 eq(ITEM_DB_ID),
+                eq(PROVIDER_ID),
                 eq(NODE_ID),
                 eq(PROJECT_ID),
                 eq("ISSUE"),
@@ -569,6 +591,7 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
             assertThat(result).isNotNull();
             verify(projectItemRepository).upsertCore(
                 eq(ITEM_DB_ID),
+                eq(PROVIDER_ID),
                 eq(NODE_ID),
                 eq(PROJECT_ID),
                 eq("DRAFT_ISSUE"),
@@ -625,6 +648,7 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
                 any(),
                 any(),
                 any(),
+                any(),
                 any(boolean.class),
                 isNull(), // creatorId null because user doesn't exist locally
                 any(),
@@ -645,6 +669,7 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
 
             // Assert
             verify(projectItemRepository).upsertCore(
+                any(),
                 any(),
                 any(),
                 any(),
@@ -693,6 +718,7 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
             // Assert — verify archived=true is passed to upsert
             verify(projectItemRepository).upsertCore(
                 eq(ITEM_DB_ID),
+                eq(PROVIDER_ID),
                 eq(NODE_ID),
                 eq(PROJECT_ID),
                 eq("DRAFT_ISSUE"),
@@ -801,6 +827,7 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
             assertThat(result).isNotNull();
             verify(projectItemRepository).upsertCore(
                 eq(fallbackId), // getDatabaseId() falls back to id
+                eq(PROVIDER_ID),
                 eq(NODE_ID),
                 eq(PROJECT_ID),
                 eq("DRAFT_ISSUE"),
@@ -1109,6 +1136,7 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
             // Verify that archived=true was forced via withArchived(true)
             verify(projectItemRepository).upsertCore(
                 eq(ITEM_DB_ID),
+                eq(PROVIDER_ID),
                 eq(NODE_ID),
                 eq(PROJECT_ID),
                 eq("DRAFT_ISSUE"),
@@ -1217,6 +1245,7 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
             // Verify that archived=false was forced via withArchived(false)
             verify(projectItemRepository).upsertCore(
                 eq(ITEM_DB_ID),
+                eq(PROVIDER_ID),
                 eq(NODE_ID),
                 eq(PROJECT_ID),
                 eq("DRAFT_ISSUE"),
@@ -1293,6 +1322,7 @@ class GitHubProjectItemProcessorTest extends BaseUnitTest {
             assertThat(result).isNotNull();
             // Verify archived=false is passed
             verify(projectItemRepository).upsertCore(
+                any(),
                 any(),
                 any(),
                 any(),

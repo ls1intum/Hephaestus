@@ -14,6 +14,8 @@ import org.springframework.stereotype.Repository;
  */
 @Repository
 public interface TeamRepository extends JpaRepository<Team, Long> {
+    Optional<Team> findByNativeIdAndProviderId(Long nativeId, Long providerId);
+
     List<Team> findAllByName(String name);
 
     List<Team> findAllByOrganizationIgnoreCase(String organization);

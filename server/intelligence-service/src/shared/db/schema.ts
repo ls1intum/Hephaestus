@@ -367,7 +367,12 @@ export const discussion = pgTable(
 	"discussion",
 	{
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		id: bigint({ mode: "number" }).primaryKey().notNull(),
+		id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({
+			name: "discussion_id_seq",
+			startWith: 1,
+			increment: 1,
+			cache: 1,
+		}),
 		createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }),
 		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }),
 		number: integer().notNull(),
@@ -392,6 +397,10 @@ export const discussion = pgTable(
 		answerChosenById: bigint("answer_chosen_by_id", { mode: "number" }),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		answerCommentId: bigint("answer_comment_id", { mode: "number" }),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		nativeId: bigint("native_id", { mode: "number" }).notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		providerId: bigint("provider_id", { mode: "number" }).notNull(),
 	},
 	(table) => [
 		index("idx_discussion_author").using("btree", table.authorId.asc().nullsLast()),
@@ -424,8 +433,14 @@ export const discussion = pgTable(
 			foreignColumns: [discussionComment.id],
 			name: "fk_discussion_answer_comment",
 		}).onDelete("set null"),
+		foreignKey({
+			columns: [table.providerId],
+			foreignColumns: [gitProvider.id],
+			name: "fk_discussion_provider",
+		}),
 		unique("uq_discussion_repo_number").on(table.number, table.repositoryId),
 		unique("uk_discussion_answer_comment_id").on(table.answerCommentId),
+		unique("uq_discussion_provider_native_id").on(table.nativeId, table.providerId),
 	],
 );
 
@@ -461,7 +476,12 @@ export const discussionComment = pgTable(
 	"discussion_comment",
 	{
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		id: bigint({ mode: "number" }).primaryKey().notNull(),
+		id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({
+			name: "discussion_comment_id_seq",
+			startWith: 1,
+			increment: 1,
+			cache: 1,
+		}),
 		createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }),
 		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }),
 		body: text(),
@@ -477,6 +497,10 @@ export const discussionComment = pgTable(
 		authorId: bigint("author_id", { mode: "number" }),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		parentCommentId: bigint("parent_comment_id", { mode: "number" }),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		nativeId: bigint("native_id", { mode: "number" }).notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		providerId: bigint("provider_id", { mode: "number" }).notNull(),
 	},
 	(table) => [
 		index("idx_discussion_comment_author").using("btree", table.authorId.asc().nullsLast()),
@@ -503,6 +527,12 @@ export const discussionComment = pgTable(
 			foreignColumns: [table.id],
 			name: "fk_discussion_comment_parent",
 		}).onDelete("set null"),
+		foreignKey({
+			columns: [table.providerId],
+			foreignColumns: [gitProvider.id],
+			name: "fk_discussion_comment_provider",
+		}),
+		unique("uq_discussion_comment_provider_native_id").on(table.nativeId, table.providerId),
 	],
 );
 
@@ -637,12 +667,33 @@ export const gitCommit = pgTable(
 	],
 );
 
+export const gitProvider = pgTable(
+	"git_provider",
+	{
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({
+			name: "git_provider_id_seq",
+			startWith: 1,
+			increment: 1,
+			cache: 1,
+		}),
+		type: varchar({ length: 10 }).notNull(),
+		serverUrl: varchar("server_url", { length: 512 }).notNull(),
+		createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+			.defaultNow()
+			.notNull(),
+	},
+	(table) => [unique("uq_git_provider_type_server_url").on(table.type, table.serverUrl)],
+);
+
 export const issue = pgTable(
 	"issue",
 	{
 		issueType: varchar("issue_type", { length: 31 }).notNull(),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		id: bigint({ mode: "number" }).primaryKey().notNull(),
+		id: bigint({ mode: "number" })
+			.primaryKey()
+			.generatedByDefaultAsIdentity({ name: "issue_id_seq", startWith: 1, increment: 1, cache: 1 }),
 		createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }),
 		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }),
 		closedAt: timestamp("closed_at", { withTimezone: true, mode: "string" }),
@@ -683,6 +734,10 @@ export const issue = pgTable(
 		headRefOid: varchar("head_ref_oid", { length: 40 }),
 		baseRefName: varchar("base_ref_name", { length: 255 }),
 		baseRefOid: varchar("base_ref_oid", { length: 40 }),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		nativeId: bigint("native_id", { mode: "number" }).notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		providerId: bigint("provider_id", { mode: "number" }).notNull(),
 	},
 	(table) => [
 		index("idx_issue_author_id").using("btree", table.authorId.asc().nullsLast()),
@@ -720,7 +775,13 @@ export const issue = pgTable(
 			foreignColumns: [issueType.id],
 			name: "fk_issue_issue_type",
 		}).onDelete("set null"),
+		foreignKey({
+			columns: [table.providerId],
+			foreignColumns: [gitProvider.id],
+			name: "fk_issue_provider",
+		}),
 		unique("uk_issue_repository_number").on(table.number, table.repositoryId),
+		unique("uq_issue_provider_native_id").on(table.nativeId, table.providerId),
 		check(
 			"issue_merge_state_status_check",
 			sql`(merge_state_status)::text = ANY (ARRAY['BEHIND'::text, 'BLOCKED'::text, 'CLEAN'::text, 'DIRTY'::text, 'HAS_HOOKS'::text, 'UNKNOWN'::text, 'UNSTABLE'::text])`,
@@ -787,7 +848,12 @@ export const issueComment = pgTable(
 	"issue_comment",
 	{
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		id: bigint({ mode: "number" }).primaryKey().notNull(),
+		id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({
+			name: "issue_comment_id_seq",
+			startWith: 1,
+			increment: 1,
+			cache: 1,
+		}),
 		createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }),
 		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }),
 		authorAssociation: varchar("author_association", { length: 255 }),
@@ -797,6 +863,10 @@ export const issueComment = pgTable(
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		issueId: bigint("issue_id", { mode: "number" }),
 		body: text(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		nativeId: bigint("native_id", { mode: "number" }).notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		providerId: bigint("provider_id", { mode: "number" }).notNull(),
 	},
 	(table) => [
 		index("idx_issue_comment_author_id").using("btree", table.authorId.asc().nullsLast()),
@@ -811,6 +881,12 @@ export const issueComment = pgTable(
 			foreignColumns: [user.id],
 			name: "fkdy6oeojymud1wna20olqgyt31",
 		}),
+		foreignKey({
+			columns: [table.providerId],
+			foreignColumns: [gitProvider.id],
+			name: "fk_issue_comment_provider",
+		}),
+		unique("uq_issue_comment_provider_native_id").on(table.nativeId, table.providerId),
 	],
 );
 
@@ -887,7 +963,12 @@ export const milestone = pgTable(
 	"milestone",
 	{
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		id: bigint({ mode: "number" }).primaryKey().notNull(),
+		id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({
+			name: "milestone_id_seq",
+			startWith: 1,
+			increment: 1,
+			cache: 1,
+		}),
 		createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }),
 		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }),
 		closedAt: timestamp("closed_at", { withTimezone: true, mode: "string" }),
@@ -904,6 +985,10 @@ export const milestone = pgTable(
 		closedIssuesCount: integer("closed_issues_count").default(0).notNull(),
 		openIssuesCount: integer("open_issues_count").default(0).notNull(),
 		lastSyncAt: timestamp("last_sync_at", { withTimezone: true, mode: "string" }),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		nativeId: bigint("native_id", { mode: "number" }).notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		providerId: bigint("provider_id", { mode: "number" }).notNull(),
 	},
 	(table) => [
 		foreignKey({
@@ -916,7 +1001,13 @@ export const milestone = pgTable(
 			foreignColumns: [user.id],
 			name: "fkg6ieho7gomiumy85puy6l13f1",
 		}),
+		foreignKey({
+			columns: [table.providerId],
+			foreignColumns: [gitProvider.id],
+			name: "fk_milestone_provider",
+		}),
 		unique("uk_milestone_number_repository").on(table.number, table.repositoryId),
+		unique("uq_milestone_provider_native_id").on(table.nativeId, table.providerId),
 	],
 );
 
@@ -924,20 +1015,32 @@ export const organization = pgTable(
 	"organization",
 	{
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		id: bigint({ mode: "number" }).primaryKey().notNull(),
+		id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({
+			name: "organization_id_seq",
+			startWith: 1,
+			increment: 1,
+			cache: 1,
+		}),
 		createdAt: timestamp("created_at", { precision: 6, withTimezone: true, mode: "string" }),
 		updatedAt: timestamp("updated_at", { precision: 6, withTimezone: true, mode: "string" }),
 		avatarUrl: varchar("avatar_url", { length: 255 }),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		githubId: bigint("github_id", { mode: "number" }).notNull(),
+		nativeId: bigint("native_id", { mode: "number" }).notNull(),
 		htmlUrl: varchar("html_url", { length: 255 }),
 		login: varchar({ length: 255 }).notNull(),
 		name: varchar({ length: 255 }),
 		lastSyncAt: timestamp("last_sync_at", { withTimezone: true, mode: "string" }),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		providerId: bigint("provider_id", { mode: "number" }).notNull(),
 	},
 	(table) => [
-		unique("uq_organization_github_id").on(table.githubId),
-		unique("uq_organization_login").on(table.login),
+		foreignKey({
+			columns: [table.providerId],
+			foreignColumns: [gitProvider.id],
+			name: "fk_organization_provider",
+		}),
+		unique("uq_organization_provider_native_id").on(table.nativeId, table.providerId),
+		unique("uq_organization_provider_login").on(table.login, table.providerId),
 	],
 );
 
@@ -962,7 +1065,12 @@ export const project = pgTable(
 	"project",
 	{
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		id: bigint({ mode: "number" }).primaryKey().notNull(),
+		id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({
+			name: "project_id_seq",
+			startWith: 1,
+			increment: 1,
+			cache: 1,
+		}),
 		nodeId: varchar("node_id", { length: 64 }),
 		ownerType: varchar("owner_type", { length: 32 }).notNull(),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
@@ -990,6 +1098,10 @@ export const project = pgTable(
 		}),
 		createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }),
 		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		nativeId: bigint("native_id", { mode: "number" }).notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		providerId: bigint("provider_id", { mode: "number" }).notNull(),
 	},
 	(table) => [
 		index("idx_project_creator_id").using("btree", table.creatorId.asc().nullsLast()),
@@ -1003,8 +1115,14 @@ export const project = pgTable(
 			foreignColumns: [user.id],
 			name: "fk_project_creator",
 		}).onDelete("set null"),
+		foreignKey({
+			columns: [table.providerId],
+			foreignColumns: [gitProvider.id],
+			name: "fk_project_provider",
+		}),
 		unique("uk_project_node_id").on(table.nodeId),
 		unique("uk_project_owner_number").on(table.ownerType, table.ownerId, table.number),
+		unique("uq_project_provider_native_id").on(table.nativeId, table.providerId),
 	],
 );
 
@@ -1072,7 +1190,12 @@ export const projectItem = pgTable(
 	"project_item",
 	{
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		id: bigint({ mode: "number" }).primaryKey().notNull(),
+		id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({
+			name: "project_item_id_seq",
+			startWith: 1,
+			increment: 1,
+			cache: 1,
+		}),
 		nodeId: varchar("node_id", { length: 64 }),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		projectId: bigint("project_id", { mode: "number" }).notNull(),
@@ -1088,6 +1211,10 @@ export const projectItem = pgTable(
 		creatorId: bigint("creator_id", { mode: "number" }),
 		createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }),
 		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		nativeId: bigint("native_id", { mode: "number" }).notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		providerId: bigint("provider_id", { mode: "number" }).notNull(),
 	},
 	(table) => [
 		index("idx_project_item_content_type_archived").using(
@@ -1123,7 +1250,13 @@ export const projectItem = pgTable(
 			foreignColumns: [user.id],
 			name: "fk_project_item_creator",
 		}).onDelete("set null"),
+		foreignKey({
+			columns: [table.providerId],
+			foreignColumns: [gitProvider.id],
+			name: "fk_project_item_provider",
+		}),
 		unique("uk_project_item_project_nodeid").on(table.nodeId, table.projectId),
+		unique("uq_project_item_provider_native_id").on(table.nativeId, table.providerId),
 	],
 );
 
@@ -1131,7 +1264,12 @@ export const projectStatusUpdate = pgTable(
 	"project_status_update",
 	{
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		id: bigint({ mode: "number" }).primaryKey().notNull(),
+		id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({
+			name: "project_status_update_id_seq",
+			startWith: 1,
+			increment: 1,
+			cache: 1,
+		}),
 		nodeId: varchar("node_id", { length: 64 }),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		projectId: bigint("project_id", { mode: "number" }).notNull(),
@@ -1144,6 +1282,10 @@ export const projectStatusUpdate = pgTable(
 		creatorId: bigint("creator_id", { mode: "number" }),
 		createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }),
 		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		nativeId: bigint("native_id", { mode: "number" }).notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		providerId: bigint("provider_id", { mode: "number" }).notNull(),
 	},
 	(table) => [
 		index("idx_project_status_update_created_at").using(
@@ -1162,7 +1304,13 @@ export const projectStatusUpdate = pgTable(
 			foreignColumns: [user.id],
 			name: "fk_project_status_update_creator",
 		}).onDelete("set null"),
+		foreignKey({
+			columns: [table.providerId],
+			foreignColumns: [gitProvider.id],
+			name: "fk_project_status_update_provider",
+		}),
 		unique("uk_project_status_update_node_id").on(table.nodeId),
+		unique("uq_project_status_update_provider_native_id").on(table.nativeId, table.providerId),
 	],
 );
 
@@ -1271,7 +1419,12 @@ export const pullRequestReviewComment = pgTable(
 	"pull_request_review_comment",
 	{
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		id: bigint({ mode: "number" }).primaryKey().notNull(),
+		id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({
+			name: "pull_request_review_comment_id_seq",
+			startWith: 1,
+			increment: 1,
+			cache: 1,
+		}),
 		createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }),
 		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }),
 		authorAssociation: varchar("author_association", { length: 255 }),
@@ -1296,6 +1449,10 @@ export const pullRequestReviewComment = pgTable(
 		body: text(),
 		diffHunk: text("diff_hunk"),
 		outdated: boolean(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		nativeId: bigint("native_id", { mode: "number" }).notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		providerId: bigint("provider_id", { mode: "number" }).notNull(),
 	},
 	(table) => [
 		index("idx_pull_request_review_comment_thread").using(
@@ -1327,6 +1484,12 @@ export const pullRequestReviewComment = pgTable(
 			foreignColumns: [table.id],
 			name: "fk_pr_review_comment_reply",
 		}).onDelete("set null"),
+		foreignKey({
+			columns: [table.providerId],
+			foreignColumns: [gitProvider.id],
+			name: "fk_pr_review_comment_provider",
+		}),
+		unique("uq_pr_review_comment_provider_native_id").on(table.nativeId, table.providerId),
 	],
 );
 
@@ -1334,7 +1497,12 @@ export const pullRequestReviewThread = pgTable(
 	"pull_request_review_thread",
 	{
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		id: bigint({ mode: "number" }).primaryKey().notNull(),
+		id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({
+			name: "pull_request_review_thread_id_seq",
+			startWith: 1,
+			increment: 1,
+			cache: 1,
+		}),
 		createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }),
 		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }),
 		state: varchar({ length: 20 }).default("UNRESOLVED").notNull(),
@@ -1352,6 +1520,10 @@ export const pullRequestReviewThread = pgTable(
 		collapsed: boolean(),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		resolvedById: bigint("resolved_by_id", { mode: "number" }),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		nativeId: bigint("native_id", { mode: "number" }).notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		providerId: bigint("provider_id", { mode: "number" }).notNull(),
 	},
 	(table) => [
 		index("idx_pull_request_review_thread_pull_request").using(
@@ -1377,7 +1549,13 @@ export const pullRequestReviewThread = pgTable(
 			foreignColumns: [user.id],
 			name: "fk_pull_request_review_thread_resolved_by",
 		}).onDelete("set null"),
+		foreignKey({
+			columns: [table.providerId],
+			foreignColumns: [gitProvider.id],
+			name: "fk_pr_review_thread_provider",
+		}),
 		unique("uq_pr_review_thread_root_comment").on(table.rootCommentId),
+		unique("uq_pr_review_thread_provider_native_id").on(table.nativeId, table.providerId),
 	],
 );
 
@@ -1385,7 +1563,12 @@ export const repository = pgTable(
 	"repository",
 	{
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		id: bigint({ mode: "number" }).primaryKey().notNull(),
+		id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({
+			name: "repository_id_seq",
+			startWith: 1,
+			increment: 1,
+			cache: 1,
+		}),
 		createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }),
 		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }),
 		defaultBranch: varchar("default_branch", { length: 255 }),
@@ -1402,6 +1585,10 @@ export const repository = pgTable(
 		organizationId: bigint("organization_id", { mode: "number" }),
 		lastSyncAt: timestamp("last_sync_at", { withTimezone: true, mode: "string" }),
 		hasDiscussionsEnabled: boolean("has_discussions_enabled").default(false).notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		nativeId: bigint("native_id", { mode: "number" }).notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		providerId: bigint("provider_id", { mode: "number" }).notNull(),
 	},
 	(table) => [
 		index("idx_repository_name_with_owner").using("btree", table.nameWithOwner.asc().nullsLast()),
@@ -1411,7 +1598,13 @@ export const repository = pgTable(
 			foreignColumns: [organization.id],
 			name: "fk_repository_organization",
 		}),
-		unique("uq_repository_name_with_owner").on(table.nameWithOwner),
+		foreignKey({
+			columns: [table.providerId],
+			foreignColumns: [gitProvider.id],
+			name: "fk_repository_provider",
+		}),
+		unique("uq_repository_provider_name_with_owner").on(table.nameWithOwner, table.providerId),
+		unique("uq_repository_provider_native_id").on(table.nativeId, table.providerId),
 	],
 );
 
@@ -1505,8 +1698,24 @@ export const team = pgTable(
 		parentId: bigint("parent_id", { mode: "number" }),
 		privacy: varchar({ length: 32 }),
 		updatedAt: timestamp("updated_at", { precision: 6, withTimezone: true, mode: "string" }),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		nativeId: bigint("native_id", { mode: "number" }).notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		providerId: bigint("provider_id", { mode: "number" }).notNull(),
 	},
-	(table) => [unique("uk_team_organization_name").on(table.name, table.organization)],
+	(table) => [
+		foreignKey({
+			columns: [table.providerId],
+			foreignColumns: [gitProvider.id],
+			name: "fk_team_provider",
+		}),
+		unique("uk_team_provider_organization_name").on(
+			table.name,
+			table.organization,
+			table.providerId,
+		),
+		unique("uq_team_provider_native_id").on(table.nativeId, table.providerId),
+	],
 );
 
 export const teamMembership = pgTable(
@@ -1564,7 +1773,9 @@ export const user = pgTable(
 	"user",
 	{
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		id: bigint({ mode: "number" }).primaryKey().notNull(),
+		id: bigint({ mode: "number" })
+			.primaryKey()
+			.generatedByDefaultAsIdentity({ name: "user_id_seq", startWith: 1, increment: 1, cache: 1 }),
 		createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }),
 		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }),
 		avatarUrl: varchar("avatar_url", { length: 255 }),
@@ -1573,8 +1784,24 @@ export const user = pgTable(
 		login: varchar({ length: 255 }),
 		name: varchar({ length: 255 }),
 		type: varchar({ length: 255 }),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		nativeId: bigint("native_id", { mode: "number" }).notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		providerId: bigint("provider_id", { mode: "number" }).notNull(),
 	},
-	(table) => [uniqueIndex("uk_user_login_lower").using("btree", sql`lower((login)::text)`)],
+	(table) => [
+		uniqueIndex("uk_user_provider_login").using(
+			"btree",
+			sql`provider_id`,
+			sql`lower((login)::text)`,
+		),
+		foreignKey({
+			columns: [table.providerId],
+			foreignColumns: [gitProvider.id],
+			name: "fk_user_provider",
+		}),
+		unique("uq_user_provider_native_id").on(table.nativeId, table.providerId),
+	],
 );
 
 export const userPreferences = pgTable(

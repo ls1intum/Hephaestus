@@ -20,14 +20,11 @@ import org.springframework.lang.NonNull;
 @Table(
     name = "organization",
     uniqueConstraints = {
-        @UniqueConstraint(name = "uq_organization_github_id", columnNames = "github_id"),
-        @UniqueConstraint(name = "uq_organization_login", columnNames = "login"),
+        @UniqueConstraint(name = "uq_organization_provider_native_id", columnNames = { "provider_id", "native_id" }),
+        @UniqueConstraint(name = "uq_organization_provider_login", columnNames = { "provider_id", "login" }),
     }
 )
 public class Organization extends BaseGitServiceEntity {
-
-    @Column(name = "github_id", nullable = false)
-    private Long githubId;
 
     @Column(name = "login", nullable = false)
     private String login;
@@ -43,10 +40,6 @@ public class Organization extends BaseGitServiceEntity {
 
     /**
      * Timestamp of the last successful sync for this organization from the Git provider.
-     * <p>
-     * This is ETL infrastructure used by the sync engine to track when this organization
-     * was last synchronized via GraphQL. Used to implement sync cooldown logic
-     * and detect stale data.
      */
     private Instant lastSyncAt;
 }

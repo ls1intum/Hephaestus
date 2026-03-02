@@ -13,7 +13,6 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDate;
-import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -27,14 +26,19 @@ import org.springframework.lang.NonNull;
 @Entity
 @Table(
     name = "project_status_update",
-    uniqueConstraints = { @UniqueConstraint(name = "uk_project_status_update_node_id", columnNames = { "node_id" }) },
+    uniqueConstraints = {
+        @UniqueConstraint(name = "uk_project_status_update_node_id", columnNames = { "node_id" }),
+        @UniqueConstraint(
+            name = "uq_project_status_update_provider_native_id",
+            columnNames = { "provider_id", "native_id" }
+        ),
+    },
     indexes = { @Index(name = "idx_project_status_update_created_at", columnList = "project_id, created_at DESC") }
 )
 @Getter
 @Setter
 @NoArgsConstructor
 @ToString(callSuper = true)
-@EqualsAndHashCode(callSuper = true)
 public class ProjectStatusUpdate extends BaseGitServiceEntity {
 
     public enum Status {

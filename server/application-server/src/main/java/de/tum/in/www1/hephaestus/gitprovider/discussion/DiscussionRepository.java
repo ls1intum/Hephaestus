@@ -60,12 +60,12 @@ public interface DiscussionRepository extends JpaRepository<Discussion, Long> {
     @Query(
         value = """
         INSERT INTO discussion (
-            id, repository_id, number, title, body, html_url, state, state_reason,
+            native_id, provider_id, repository_id, number, title, body, html_url, state, state_reason,
             is_locked, active_lock_reason, closed_at, answer_chosen_at, comment_count,
             upvote_count, last_sync_at, created_at, updated_at, author_id, category_id, answer_chosen_by_id
         )
         VALUES (
-            :id, :repositoryId, :number, :title, :body, :htmlUrl, :state, :stateReason,
+            :nativeId, :providerId, :repositoryId, :number, :title, :body, :htmlUrl, :state, :stateReason,
             :isLocked, :activeLockReason, :closedAt, :answerChosenAt, :commentCount,
             :upvoteCount, :lastSyncAt, :createdAt, :updatedAt, :authorId, :categoryId, :answerChosenById
         )
@@ -90,7 +90,8 @@ public interface DiscussionRepository extends JpaRepository<Discussion, Long> {
         nativeQuery = true
     )
     int upsertCore(
-        @Param("id") Long id,
+        @Param("nativeId") Long nativeId,
+        @Param("providerId") Long providerId,
         @Param("repositoryId") Long repositoryId,
         @Param("number") int number,
         @Param("title") String title,

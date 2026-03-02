@@ -8,4 +8,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
  * <p>Threads are scoped through their pull request which has scope through
  * the PullRequest -> Repository -> Organization chain.
  */
-public interface PullRequestReviewThreadRepository extends JpaRepository<PullRequestReviewThread, Long> {}
+public interface PullRequestReviewThreadRepository extends JpaRepository<PullRequestReviewThread, Long> {
+    java.util.Optional<PullRequestReviewThread> findByNativeIdAndProviderId(Long nativeId, Long providerId);
+}

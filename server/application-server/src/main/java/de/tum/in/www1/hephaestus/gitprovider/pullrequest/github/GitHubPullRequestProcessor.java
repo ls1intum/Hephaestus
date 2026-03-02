@@ -100,7 +100,7 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
             return null;
         }
 
-        // Check for valid database ID - required for assigned ID strategy
+        // Check for valid native ID - required for provider-scoped upsert
         Long dbId = dto.getDatabaseId();
         if (dbId == null) {
             log.warn("Skipped pull request processing: reason=missingDatabaseId, prNumber={}", dto.number());
@@ -149,8 +149,8 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         }
 
         // Resolve related entities BEFORE the upsert
-        User author = dto.author() != null ? findOrCreateUser(dto.author()) : null;
-        User mergedBy = dto.mergedBy() != null ? findOrCreateUser(dto.mergedBy()) : null;
+        User author = dto.author() != null ? findOrCreateUser(dto.author(), context.providerId()) : null;
+        User mergedBy = dto.mergedBy() != null ? findOrCreateUser(dto.mergedBy(), context.providerId()) : null;
         Milestone milestone = dto.milestone() != null ? findOrCreateMilestone(dto.milestone(), repository) : null;
 
         // Extract branch info
@@ -163,6 +163,7 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         Instant now = Instant.now();
         pullRequestRepository.upsertCore(
             dbId,
+            context.providerId(),
             dto.number(),
             sanitize(dto.title()),
             sanitize(dto.body()),
@@ -208,7 +209,7 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
             );
 
         // Handle ManyToMany relationships (labels, assignees, requestedReviewers)
-        boolean relationshipsChanged = updateRelationships(dto, pr, repository);
+        boolean relationshipsChanged = updateRelationships(dto, pr, repository, context.providerId());
 
         // Save relationship changes
         if (relationshipsChanged) {
@@ -249,15 +250,25 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
      *
      * @return true if any relationships were changed
      */
-    private boolean updateRelationships(GitHubPullRequestDTO dto, PullRequest pr, Repository repository) {
-        boolean assigneesChanged = updateAssignees(dto.assignees(), pr.getAssignees());
+    private boolean updateRelationships(
+        GitHubPullRequestDTO dto,
+        PullRequest pr,
+        Repository repository,
+        Long providerId
+    ) {
+        boolean assigneesChanged = updateAssignees(dto.assignees(), pr.getAssignees(), providerId);
         boolean labelsChanged = updateLabels(dto.labels(), pr.getLabels(), repository);
-        boolean reviewersChanged = updateRequestedReviewers(dto.requestedReviewers(), pr.getRequestedReviewers());
+        boolean reviewersChanged = updateRequestedReviewers(
+            dto.requestedReviewers(),
+            pr.getRequestedReviewers(),
+            providerId
+        );
         return assigneesChanged || labelsChanged || reviewersChanged;
     }
 
     /**
-     * Computes which fields changed between the old and new PR state.
+     * Computes which scalar fields changed between the old and new PR state.
+     * Relationship changes (labels, assignees, reviewers) are tracked separately.
      */
     private Set<String> computeChangedFields(PullRequest oldPr, PullRequest newPr) {
         Set<String> changedFields = new HashSet<>();
@@ -442,8 +453,9 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
             return;
         }
 
-        Long authorId = commitAuthorResolver.resolveByLogin(info.authorLogin());
-        Long committerId = commitAuthorResolver.resolveByLogin(info.committerLogin());
+        Long providerId = repository.getProvider().getId();
+        Long authorId = commitAuthorResolver.resolveByLogin(info.authorLogin(), providerId);
+        Long committerId = commitAuthorResolver.resolveByLogin(info.committerLogin(), providerId);
 
         String htmlUrl = "https://github.com/" + repository.getNameWithOwner() + "/commit/" + info.sha();
 

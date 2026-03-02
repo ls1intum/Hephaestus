@@ -9,11 +9,13 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.util.HashSet;
 import java.util.Set;
 import lombok.Getter;
@@ -22,7 +24,15 @@ import lombok.Setter;
 import lombok.ToString;
 
 @Entity
-@Table(name = "pull_request_review_thread")
+@Table(
+    name = "pull_request_review_thread",
+    uniqueConstraints = {
+        @UniqueConstraint(
+            name = "uq_pr_review_thread_provider_native_id",
+            columnNames = { "provider_id", "native_id" }
+        ),
+    }
+)
 @Getter
 @Setter
 @NoArgsConstructor
@@ -61,17 +71,17 @@ public class PullRequestReviewThread extends BaseGitServiceEntity {
 
     private Boolean collapsed;
 
-    @OneToOne
+    @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "root_comment_id")
     @ToString.Exclude
     private PullRequestReviewComment rootComment;
 
-    @ManyToOne(optional = false)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "pull_request_id")
     @ToString.Exclude
     private PullRequest pullRequest;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "resolved_by_id")
     @ToString.Exclude
     private User resolvedBy;

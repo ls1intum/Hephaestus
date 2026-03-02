@@ -228,7 +228,7 @@ public class GitHubCollaboratorSyncService {
 
                     // Convert GraphQL User to DTO and upsert
                     GitHubUserDTO userDTO = GitHubUserDTO.fromUser(graphQlUser);
-                    User user = userProcessor.findOrCreate(userDTO);
+                    User user = userProcessor.findOrCreate(userDTO, repository.getProvider().getId());
                     if (user == null) {
                         continue;
                     }

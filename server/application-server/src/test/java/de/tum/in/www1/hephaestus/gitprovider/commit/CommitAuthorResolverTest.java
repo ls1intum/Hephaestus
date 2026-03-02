@@ -104,7 +104,7 @@ class CommitAuthorResolverTest extends BaseUnitTest {
         @Test
         @DisplayName("should return null for null email")
         void shouldReturnNullForNullEmail() {
-            Long result = resolver.resolveByEmail(null);
+            Long result = resolver.resolveByEmail(null, null);
             assertThat(result).isNull();
             verifyNoInteractions(userRepository);
         }
@@ -112,7 +112,7 @@ class CommitAuthorResolverTest extends BaseUnitTest {
         @Test
         @DisplayName("should return null for blank email")
         void shouldReturnNullForBlankEmail() {
-            Long result = resolver.resolveByEmail("   ");
+            Long result = resolver.resolveByEmail("   ", null);
             assertThat(result).isNull();
             verifyNoInteractions(userRepository);
         }
@@ -123,7 +123,7 @@ class CommitAuthorResolverTest extends BaseUnitTest {
             User user = createUser(42L);
             when(userRepository.findByEmail("author@example.com")).thenReturn(Optional.of(user));
 
-            Long result = resolver.resolveByEmail("author@example.com");
+            Long result = resolver.resolveByEmail("author@example.com", null);
 
             assertThat(result).isEqualTo(42L);
             verify(userRepository).findByEmail("author@example.com");
@@ -138,7 +138,7 @@ class CommitAuthorResolverTest extends BaseUnitTest {
             User user = createUser(99L);
             when(userRepository.findByLogin("username")).thenReturn(Optional.of(user));
 
-            Long result = resolver.resolveByEmail("username@users.noreply.github.com");
+            Long result = resolver.resolveByEmail("username@users.noreply.github.com", null);
 
             assertThat(result).isEqualTo(99L);
             verify(userRepository).findByEmail("username@users.noreply.github.com");
@@ -153,7 +153,7 @@ class CommitAuthorResolverTest extends BaseUnitTest {
             User user = createUser(77L);
             when(userRepository.findByLogin("dev")).thenReturn(Optional.of(user));
 
-            Long result = resolver.resolveByEmail("12345+dev@users.noreply.github.com");
+            Long result = resolver.resolveByEmail("12345+dev@users.noreply.github.com", null);
 
             assertThat(result).isEqualTo(77L);
         }
@@ -164,7 +164,7 @@ class CommitAuthorResolverTest extends BaseUnitTest {
             when(userRepository.findByEmail("unknown@users.noreply.github.com")).thenReturn(Optional.empty());
             when(userRepository.findByLogin("unknown")).thenReturn(Optional.empty());
 
-            Long result = resolver.resolveByEmail("unknown@users.noreply.github.com");
+            Long result = resolver.resolveByEmail("unknown@users.noreply.github.com", null);
 
             assertThat(result).isNull();
         }
@@ -174,7 +174,7 @@ class CommitAuthorResolverTest extends BaseUnitTest {
         void shouldReturnNullForNonNoreplyEmailWhenNotFound() {
             when(userRepository.findByEmail("personal@gmail.com")).thenReturn(Optional.empty());
 
-            Long result = resolver.resolveByEmail("personal@gmail.com");
+            Long result = resolver.resolveByEmail("personal@gmail.com", null);
 
             assertThat(result).isNull();
             // Should NOT try findByLogin since it's not a noreply email
@@ -188,7 +188,7 @@ class CommitAuthorResolverTest extends BaseUnitTest {
             User user = createUser(55L);
             when(userRepository.findByEmail("dev@users.noreply.github.com")).thenReturn(Optional.of(user));
 
-            Long result = resolver.resolveByEmail("dev@users.noreply.github.com");
+            Long result = resolver.resolveByEmail("dev@users.noreply.github.com", null);
 
             assertThat(result).isEqualTo(55L);
             // Should not proceed to login lookup since email matched
@@ -205,7 +205,7 @@ class CommitAuthorResolverTest extends BaseUnitTest {
         @Test
         @DisplayName("should return null for null login")
         void shouldReturnNullForNullLogin() {
-            Long result = resolver.resolveByLogin(null);
+            Long result = resolver.resolveByLogin(null, null);
             assertThat(result).isNull();
             verifyNoInteractions(userRepository);
         }
@@ -213,7 +213,7 @@ class CommitAuthorResolverTest extends BaseUnitTest {
         @Test
         @DisplayName("should return null for blank login")
         void shouldReturnNullForBlankLogin() {
-            Long result = resolver.resolveByLogin("  ");
+            Long result = resolver.resolveByLogin("  ", null);
             assertThat(result).isNull();
             verifyNoInteractions(userRepository);
         }
@@ -224,7 +224,7 @@ class CommitAuthorResolverTest extends BaseUnitTest {
             User user = createUser(33L);
             when(userRepository.findByLogin("testuser")).thenReturn(Optional.of(user));
 
-            Long result = resolver.resolveByLogin("testuser");
+            Long result = resolver.resolveByLogin("testuser", null);
 
             assertThat(result).isEqualTo(33L);
         }
@@ -234,7 +234,7 @@ class CommitAuthorResolverTest extends BaseUnitTest {
         void shouldReturnNullWhenLoginNotFound() {
             when(userRepository.findByLogin("unknown")).thenReturn(Optional.empty());
 
-            Long result = resolver.resolveByLogin("unknown");
+            Long result = resolver.resolveByLogin("unknown", null);
 
             assertThat(result).isNull();
         }

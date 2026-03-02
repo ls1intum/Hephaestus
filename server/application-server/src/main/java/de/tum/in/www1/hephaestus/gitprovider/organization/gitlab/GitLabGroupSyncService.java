@@ -5,6 +5,9 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncCons
 import static de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants.MAX_PAGINATION_PAGES;
 import static de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants.adaptPageSize;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncException;
@@ -52,17 +55,36 @@ public class GitLabGroupSyncService {
     private final GitLabGroupProcessor groupProcessor;
     private final GitLabProjectProcessor projectProcessor;
     private final GitLabProperties gitLabProperties;
+    private final GitProviderRepository gitProviderRepository;
 
     public GitLabGroupSyncService(
         GitLabGraphQlClientProvider graphQlClientProvider,
         GitLabGroupProcessor groupProcessor,
         GitLabProjectProcessor projectProcessor,
-        GitLabProperties gitLabProperties
+        GitLabProperties gitLabProperties,
+        GitProviderRepository gitProviderRepository
     ) {
         this.graphQlClientProvider = graphQlClientProvider;
         this.groupProcessor = groupProcessor;
         this.projectProcessor = projectProcessor;
         this.gitLabProperties = gitLabProperties;
+        this.gitProviderRepository = gitProviderRepository;
+    }
+
+    /**
+     * Resolves the GitLab provider entity from the database.
+     *
+     * @return the GitLab provider
+     * @throws IllegalStateException if no GitLab provider is found
+     */
+    private GitProvider resolveProvider() {
+        return gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITLAB, gitLabProperties.defaultServerUrl())
+            .orElseThrow(() ->
+                new IllegalStateException(
+                    "GitProvider not found for type=GITLAB, serverUrl=" + gitLabProperties.defaultServerUrl()
+                )
+            );
     }
 
     /**
@@ -81,6 +103,8 @@ public class GitLabGroupSyncService {
         String safeGroupPath = sanitizeForLog(groupFullPath);
 
         try {
+            GitProvider provider = resolveProvider();
+            Long providerId = provider.getId();
             graphQlClientProvider.acquirePermission();
             HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
 
@@ -101,6 +125,16 @@ public class GitLabGroupSyncService {
                 return Optional.empty();
             }
 
+            // Check for partial errors (GraphQL can return data + errors simultaneously)
+            if (response.getErrors() != null && !response.getErrors().isEmpty()) {
+                log.warn(
+                    "Partial GraphQL errors in group response: scopeId={}, groupPath={}, errors={}",
+                    scopeId,
+                    safeGroupPath,
+                    response.getErrors()
+                );
+            }
+
             graphQlClientProvider.recordSuccess();
 
             GitLabGroupResponse group = response.field("group").toEntity(GitLabGroupResponse.class);
@@ -113,7 +147,7 @@ public class GitLabGroupSyncService {
                 return Optional.empty();
             }
 
-            Organization organization = groupProcessor.process(group);
+            Organization organization = groupProcessor.process(group, providerId);
             if (organization != null) {
                 log.info(
                     "Synced group: scopeId={}, orgId={}, groupPath={}",
@@ -164,8 +198,11 @@ public class GitLabGroupSyncService {
         int pageCount = 0;
         int projectsSkipped = 0;
         boolean hadApiFailure = false;
+        int reportedTotalCount = -1;
 
         try {
+            GitProvider provider = resolveProvider();
+            Long providerId = provider.getId();
             graphQlClientProvider.acquirePermission();
 
             do {
@@ -211,13 +248,39 @@ public class GitLabGroupSyncService {
                     break;
                 }
 
+                // Check for partial errors (GraphQL can return data + errors simultaneously)
+                if (response.getErrors() != null && !response.getErrors().isEmpty()) {
+                    log.warn(
+                        "Partial GraphQL errors in group projects response: scopeId={}, groupPath={}, page={}, errors={}",
+                        scopeId,
+                        safeGroupPath,
+                        pageCount,
+                        response.getErrors()
+                    );
+                }
+
                 graphQlClientProvider.recordSuccess();
 
                 // On the first page, extract and persist the top-level group from inlined fields
                 if (pageCount == 0) {
+                    // Extract reported total count for post-sync verification
+                    try {
+                        Object countField = response.field("group.projects.count").getValue();
+                        if (countField instanceof Number number) {
+                            reportedTotalCount = number.intValue();
+                            log.info(
+                                "Project connection reports count={}, groupPath={}",
+                                reportedTotalCount,
+                                safeGroupPath
+                            );
+                        }
+                    } catch (Exception e) {
+                        log.debug("Could not extract project count: groupPath={}", safeGroupPath);
+                    }
+
                     GitLabGroupResponse groupData = response.field("group").toEntity(GitLabGroupResponse.class);
                     if (groupData != null) {
-                        topLevelOrganization = groupProcessor.process(groupData);
+                        topLevelOrganization = groupProcessor.process(groupData, providerId);
                     }
                     if (topLevelOrganization == null) {
                         log.warn(
@@ -244,8 +307,8 @@ public class GitLabGroupSyncService {
                 for (GitLabProjectResponse project : projects) {
                     try {
                         // Resolve the project's immediate parent group (may differ from top-level)
-                        Organization projectOrg = resolveProjectOrganization(project, topLevelOrganization);
-                        Repository repo = projectProcessor.processGraphQlResponse(project, projectOrg);
+                        Organization projectOrg = resolveProjectOrganization(project, topLevelOrganization, providerId);
+                        Repository repo = projectProcessor.processGraphQlResponse(project, projectOrg, provider);
                         if (repo != null) {
                             syncedRepositories.add(repo);
                         } else {
@@ -284,6 +347,17 @@ public class GitLabGroupSyncService {
             } while (pageCount < MAX_PAGINATION_PAGES);
 
             int totalPages = pageCount + 1;
+
+            // Post-sync overflow detection using reported totalCount
+            if (reportedTotalCount >= 0 && syncedRepositories.size() + projectsSkipped < reportedTotalCount) {
+                log.warn(
+                    "Project connection overflow detected: groupPath={}, synced={}, reportedCount={}. " +
+                        "Some projects may not have been fetched.",
+                    safeGroupPath,
+                    syncedRepositories.size(),
+                    reportedTotalCount
+                );
+            }
 
             // Warn if pagination was truncated (more pages exist but we hit the safety limit)
             if (pageCount >= MAX_PAGINATION_PAGES) {
@@ -359,9 +433,13 @@ public class GitLabGroupSyncService {
      * is used as fallback. This correctly handles nested group hierarchies like
      * {@code org/team/subteam/project}.
      */
-    private Organization resolveProjectOrganization(GitLabProjectResponse project, Organization topLevelOrganization) {
+    private Organization resolveProjectOrganization(
+        GitLabProjectResponse project,
+        Organization topLevelOrganization,
+        Long providerId
+    ) {
         if (project.group() != null) {
-            Organization subOrg = groupProcessor.process(project.group());
+            Organization subOrg = groupProcessor.process(project.group(), providerId);
             if (subOrg != null) {
                 return subOrg;
             }

@@ -3,6 +3,9 @@ package de.tum.in.www1.hephaestus.workspace;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
 import de.tum.in.www1.hephaestus.gitprovider.installation.github.GitHubInstallationRepositoryEnumerationService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
@@ -38,9 +41,16 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private GitHubAppTokenService gitHubAppTokenService;
 
+    @Autowired
+    private GitProviderRepository gitProviderRepository;
+
     @BeforeEach
     void setup() {
         databaseTestUtils.cleanDatabase();
+        // Ensure GitHub GitProvider exists - required by WorkspaceRepositoryMonitorService.ensureRepositoryFromSnapshot
+        gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
+            .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com")));
         // Clear any suspended installation state from previous tests
         // This prevents test pollution when async syncs mark installations as suspended
         gitHubAppTokenService.markInstallationActive(INSTALLATION_ID);

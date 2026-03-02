@@ -501,7 +501,8 @@
                         </goals>
                         <configuration>
                             <sources>
-                                <source>${project.build.directory}/generated-sources/graphql</source>
+                                <source>${project.build.directory}/generated-sources/graphql-github</source>
+                                <source>${project.build.directory}/generated-sources/graphql-gitlab</source>
                             </sources>
                         </configuration>
                     </execution>
@@ -533,7 +534,7 @@
                             </graphqlSchemas>
 
                             <!-- Output configuration -->
-                            <outputDir>${project.build.directory}/generated-sources/graphql</outputDir>
+                            <outputDir>${project.build.directory}/generated-sources/graphql-github</outputDir>
                             <packageName>de.tum.in.www1.hephaestus.gitprovider.graphql.github</packageName>
                             <apiPackageName>de.tum.in.www1.hephaestus.gitprovider.graphql.github.api</apiPackageName>
                             <modelPackageName>de.tum.in.www1.hephaestus.gitprovider.graphql.github.model
@@ -600,6 +601,104 @@
                             </customTemplates>
                         </configuration>
                     </execution>
+                    <!-- GitLab GraphQL Code Generator -->
+                    <!-- Generates type-safe Java classes from GitLab GraphQL schema -->
+                    <execution>
+                        <id>generate-gitlab-graphql-client</id>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                        <configuration>
+                            <skip>${graphql.codegen.skip}</skip>
+                            <!-- GitLab schema is large, skip size limit check -->
+                            <skipSchemaSizeLimit>true</skipSchemaSizeLimit>
+
+                            <!-- Schema location -->
+                            <graphqlSchemas>
+                                <rootDir>${project.basedir}/src/main/resources/graphql/gitlab</rootDir>
+                            </graphqlSchemas>
+
+                            <!-- Output configuration (separate dir to avoid codegen cleanup conflicts) -->
+                            <outputDir>${project.build.directory}/generated-sources/graphql-gitlab</outputDir>
+                            <packageName>de.tum.in.www1.hephaestus.gitprovider.graphql.gitlab</packageName>
+                            <apiPackageName>de.tum.in.www1.hephaestus.gitprovider.graphql.gitlab.api</apiPackageName>
+                            <modelPackageName>de.tum.in.www1.hephaestus.gitprovider.graphql.gitlab.model
+                            </modelPackageName>
+                            <modelNamePrefix>GL</modelNamePrefix>
+
+                            <!-- Client-side code generation (for consuming GitLab API) -->
+                            <generateClient>true</generateClient>
+                            <generateApis>false</generateApis>
+                            <generateDataFetchingEnvironmentArgumentInApis>false
+                            </generateDataFetchingEnvironmentArgumentInApis>
+
+                            <!-- Model generation options -->
+                            <generateBuilder>true</generateBuilder>
+                            <generateEqualsAndHashCode>true</generateEqualsAndHashCode>
+                            <generateToString>true</generateToString>
+                            <generateParameterizedFieldsResolvers>false</generateParameterizedFieldsResolvers>
+                            <generateModelsForRootTypes>false</generateModelsForRootTypes>
+                            <generateAllMethodInProjection>true</generateAllMethodInProjection>
+                            <!-- GitLab schema has types with 300+ fields (e.g., Project).
+                                 All-args constructors for these exceed the JVM 255-parameter limit. -->
+                            <generateNoArgsConstructorOnly>true</generateNoArgsConstructorOnly>
+
+                            <!-- Java config -->
+                            <generatedLanguage>JAVA</generatedLanguage>
+                            <addGeneratedAnnotation>true</addGeneratedAnnotation>
+                            <generatedAnnotation>jakarta.annotation.Generated</generatedAnnotation>
+                            <modelValidationAnnotation>@jakarta.annotation.Generated("graphql-codegen")
+                            </modelValidationAnnotation>
+
+                            <!-- GitLab-specific scalar mappings -->
+                            <customTypesMapping>
+                                <Time>java.time.OffsetDateTime</Time>
+                                <ISO8601DateTime>java.time.OffsetDateTime</ISO8601DateTime>
+                                <ISO8601Date>java.time.LocalDate</ISO8601Date>
+                                <GlobalID>java.lang.String</GlobalID>
+                                <JSON>java.lang.Object</JSON>
+                                <UntrustedRegexp>java.lang.String</UntrustedRegexp>
+                                <Duration>java.lang.String</Duration>
+                                <BigInt>java.math.BigInteger</BigInt>
+                                <TodoableID>java.lang.String</TodoableID>
+                                <UserID>java.lang.String</UserID>
+                                <IterationID>java.lang.String</IterationID>
+                                <MilestoneID>java.lang.String</MilestoneID>
+                                <WorkItemID>java.lang.String</WorkItemID>
+                                <IssueID>java.lang.String</IssueID>
+                                <ProjectID>java.lang.String</ProjectID>
+                                <GroupID>java.lang.String</GroupID>
+                                <LabelsFilterType>java.lang.String</LabelsFilterType>
+                                <NegatedIterationWildcardId>java.lang.String</NegatedIterationWildcardId>
+                                <Upload>java.lang.String</Upload>
+                                <Color>java.lang.String</Color>
+                                <PaymentMethodID>java.lang.String</PaymentMethodID>
+                                <NamespaceID>java.lang.String</NamespaceID>
+                                <AuditEventsStreamingHeadersID>java.lang.String</AuditEventsStreamingHeadersID>
+                                <AuditEventsExternalAuditEventDestinationID>java.lang.String</AuditEventsExternalAuditEventDestinationID>
+                                <GoogleCloudLoggingConfigurationID>java.lang.String</GoogleCloudLoggingConfigurationID>
+                                <AmazonS3ConfigurationID>java.lang.String</AmazonS3ConfigurationID>
+                                <InstanceAuditEventsStreamingHeadersID>java.lang.String</InstanceAuditEventsStreamingHeadersID>
+                                <InstanceExternalAuditEventDestinationID>java.lang.String</InstanceExternalAuditEventDestinationID>
+                                <InstanceGoogleCloudLoggingConfigurationID>java.lang.String</InstanceGoogleCloudLoggingConfigurationID>
+                                <InstanceAmazonS3ConfigurationID>java.lang.String</InstanceAmazonS3ConfigurationID>
+                                <JsonString>java.lang.String</JsonString>
+                            </customTypesMapping>
+
+                            <!-- Naming conventions -->
+                            <modelNameSuffix></modelNameSuffix>
+                            <requestSuffix>Request</requestSuffix>
+                            <responseSuffix>Response</responseSuffix>
+                            <responseProjectionSuffix>ResponseProjection</responseProjectionSuffix>
+
+                            <!-- Use same custom template as GitHub for @SuppressWarnings -->
+                            <customTemplatesRoot>${project.basedir}/src/main/resources/graphql/templates
+                            </customTemplatesRoot>
+                            <customTemplates>
+                                <RESPONSE_PROJECTION>response_projection.ftl</RESPONSE_PROJECTION>
+                            </customTemplates>
+                        </configuration>
+                    </execution>
                 </executions>
             </plugin>
             <!-- Post-processing for GraphQL generated code (cross-platform) -->
@@ -622,7 +721,7 @@
                                 <!-- Delete Relay files that depend on missing Query root type -->
                                 <delete failonerror="false">
                                     <fileset
-                                            dir="${project.build.directory}/generated-sources/graphql/de/tum/in/www1/hephaestus/gitprovider/graphql/github/model">
+                                            dir="${project.build.directory}/generated-sources/graphql-github/de/tum/in/www1/hephaestus/gitprovider/graphql/github/model">
                                         <include name="RelayQueryRequest.java"/>
                                         <include name="RelayQueryResponse.java"/>
                                     </fileset>
@@ -634,7 +733,7 @@
                                     <substitution
                                             expression="@SuppressWarnings(&quot;deprecation&quot;)${line.separator}\1"/>
                                     <fileset
-                                            dir="${project.build.directory}/generated-sources/graphql/de/tum/in/www1/hephaestus/gitprovider/graphql/github/model">
+                                            dir="${project.build.directory}/generated-sources/graphql-github/de/tum/in/www1/hephaestus/gitprovider/graphql/github/model">
                                         <include name="ProjectPendingCardsParametrizedInput.java"/>
                                         <include name="IssueProjectCardsParametrizedInput.java"/>
                                         <include name="PullRequestProjectCardsParametrizedInput.java"/>
@@ -825,7 +924,8 @@
                     <failOnViolation>false</failOnViolation>
                     <!-- Exclude generated code -->
                     <excludeRoots>
-                        <excludeRoot>${project.build.directory}/generated-sources/graphql</excludeRoot>
+                        <excludeRoot>${project.build.directory}/generated-sources/graphql-github</excludeRoot>
+                        <excludeRoot>${project.build.directory}/generated-sources/graphql-gitlab</excludeRoot>
                     </excludeRoots>
                 </configuration>
             </plugin>

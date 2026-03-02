@@ -191,7 +191,11 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
         @DisplayName("should return 0 when embeddedItems is null")
         void shouldReturnZeroWhenEmbeddedItemsIsNull() {
             // Act
-            int result = service.processEmbeddedItems(null, ProcessingContext.forSync(SCOPE_ID, null), PARENT_ISSUE_ID);
+            int result = service.processEmbeddedItems(
+                null,
+                ProcessingContext.forSync(SCOPE_ID, (Repository) null),
+                PARENT_ISSUE_ID
+            );
 
             // Assert
             assertThat(result).isZero();
@@ -207,7 +211,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
             // Act
             int result = service.processEmbeddedItems(
                 emptyItems,
-                ProcessingContext.forSync(SCOPE_ID, null),
+                ProcessingContext.forSync(SCOPE_ID, (Repository) null),
                 PARENT_ISSUE_ID
             );
 
@@ -238,7 +242,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
             // Act
             int result = service.processEmbeddedItems(
                 embeddedItems,
-                ProcessingContext.forSync(SCOPE_ID, null),
+                ProcessingContext.forSync(SCOPE_ID, (Repository) null),
                 PARENT_ISSUE_ID
             );
 
@@ -285,7 +289,11 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
             );
 
             // Act
-            service.processEmbeddedItems(embeddedItems, ProcessingContext.forSync(SCOPE_ID, null), PARENT_ISSUE_ID);
+            service.processEmbeddedItems(
+                embeddedItems,
+                ProcessingContext.forSync(SCOPE_ID, (Repository) null),
+                PARENT_ISSUE_ID
+            );
 
             // Assert — truncation flag and cursor are forwarded
             verify(fieldValueSyncService).processFieldValues(eq(88L), any(), eq(true), eq("cursor-abc"));
@@ -304,7 +312,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
             // Act
             int result = service.processEmbeddedItems(
                 embeddedItems,
-                ProcessingContext.forSync(SCOPE_ID, null),
+                ProcessingContext.forSync(SCOPE_ID, (Repository) null),
                 PARENT_ISSUE_ID
             );
 
@@ -341,7 +349,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
             // Act
             int result = service.processEmbeddedItems(
                 embeddedItems,
-                ProcessingContext.forSync(SCOPE_ID, null),
+                ProcessingContext.forSync(SCOPE_ID, (Repository) null),
                 PARENT_ISSUE_ID
             );
 
@@ -366,7 +374,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
             // Act
             int result = service.processEmbeddedItems(
                 embeddedItems,
-                ProcessingContext.forSync(SCOPE_ID, null),
+                ProcessingContext.forSync(SCOPE_ID, (Repository) null),
                 PARENT_ISSUE_ID
             );
 
@@ -393,7 +401,11 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
             );
 
             // Act
-            service.processEmbeddedItems(embeddedItems, ProcessingContext.forSync(SCOPE_ID, null), PARENT_ISSUE_ID);
+            service.processEmbeddedItems(
+                embeddedItems,
+                ProcessingContext.forSync(SCOPE_ID, (Repository) null),
+                PARENT_ISSUE_ID
+            );
 
             // Assert — verify that the DTO passed to processor has the parentIssueId injected
             ArgumentCaptor<GitHubProjectItemDTO> dtoCaptor = ArgumentCaptor.forClass(GitHubProjectItemDTO.class);
@@ -435,7 +447,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
             // Act
             int result = service.processEmbeddedItems(
                 embeddedItems,
-                ProcessingContext.forSync(SCOPE_ID, null),
+                ProcessingContext.forSync(SCOPE_ID, (Repository) null),
                 PARENT_ISSUE_ID
             );
 
@@ -454,7 +466,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
             // Act
             int result = service.processEmbeddedItems(
                 embeddedItems,
-                ProcessingContext.forSync(SCOPE_ID, null),
+                ProcessingContext.forSync(SCOPE_ID, (Repository) null),
                 PARENT_ISSUE_ID
             );
 
@@ -474,7 +486,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
             // Act
             int result = service.processEmbeddedItems(
                 embeddedItems,
-                ProcessingContext.forSync(SCOPE_ID, null),
+                ProcessingContext.forSync(SCOPE_ID, (Repository) null),
                 PARENT_ISSUE_ID
             );
 
@@ -545,7 +557,7 @@ class GitHubProjectItemSyncServiceTest extends BaseUnitTest {
             // Act
             int result = service.processEmbeddedItems(
                 embeddedItems,
-                ProcessingContext.forSync(SCOPE_ID, null),
+                ProcessingContext.forSync(SCOPE_ID, (Repository) null),
                 PARENT_ISSUE_ID
             );
 

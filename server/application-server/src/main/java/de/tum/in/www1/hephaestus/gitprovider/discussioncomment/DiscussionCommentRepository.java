@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
  */
 @Repository
 public interface DiscussionCommentRepository extends JpaRepository<DiscussionComment, Long> {
+    Optional<DiscussionComment> findByNativeIdAndProviderId(Long nativeId, Long providerId);
     /**
      * Find the answer comment for a discussion.
      *

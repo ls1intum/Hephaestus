@@ -255,7 +255,7 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
         review.setAuthorCanPushToRepository(dto.authorCanPushToRepository());
 
         if (dto.author() != null) {
-            User author = findOrCreateUser(dto.author());
+            User author = findOrCreateUser(dto.author(), context.providerId());
             if (author != null) {
                 review.setAuthor(author);
             }
@@ -339,7 +339,8 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
         }
 
         PullRequest pr = new PullRequest();
-        pr.setId(prId);
+        pr.setNativeId(prId);
+        pr.setProvider(context.provider());
         pr.setNumber(dto.number());
         pr.setTitle(sanitize(dto.title()));
         pr.setBody(sanitize(dto.body()));
@@ -372,7 +373,7 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
 
         // Link author
         if (dto.author() != null) {
-            User author = findOrCreateUser(dto.author());
+            User author = findOrCreateUser(dto.author(), context.providerId());
             pr.setAuthor(author);
         }
 

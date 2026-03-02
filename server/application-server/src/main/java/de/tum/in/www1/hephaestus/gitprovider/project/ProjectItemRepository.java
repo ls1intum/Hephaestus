@@ -141,11 +141,11 @@ public interface ProjectItemRepository extends JpaRepository<ProjectItem, Long> 
     @Query(
         value = """
         INSERT INTO project_item (
-            id, node_id, project_id, content_type, issue_id, content_database_id,
+            native_id, provider_id, node_id, project_id, content_type, issue_id, content_database_id,
             draft_title, draft_body, archived, creator_id, created_at, updated_at
         )
         VALUES (
-            :id, :nodeId, :projectId, :contentType, :issueId, :contentDatabaseId,
+            :nativeId, :providerId, :nodeId, :projectId, :contentType, :issueId, :contentDatabaseId,
             :draftTitle, :draftBody, :archived, :creatorId, :createdAt, :updatedAt
         )
         ON CONFLICT (project_id, node_id) DO UPDATE SET
@@ -162,7 +162,8 @@ public interface ProjectItemRepository extends JpaRepository<ProjectItem, Long> 
         nativeQuery = true
     )
     int upsertCore(
-        @Param("id") Long id,
+        @Param("nativeId") Long nativeId,
+        @Param("providerId") Long providerId,
         @Param("nodeId") String nodeId,
         @Param("projectId") Long projectId,
         @Param("contentType") String contentType,

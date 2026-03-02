@@ -38,7 +38,13 @@ import org.springframework.lang.NonNull;
  * where comments can be marked as accepted answers.
  */
 @Entity
-@Table(name = "discussion", uniqueConstraints = @UniqueConstraint(columnNames = { "repository_id", "number" }))
+@Table(
+    name = "discussion",
+    uniqueConstraints = {
+        @UniqueConstraint(columnNames = { "repository_id", "number" }),
+        @UniqueConstraint(name = "uq_discussion_provider_native_id", columnNames = { "provider_id", "native_id" }),
+    }
+)
 @Getter
 @Setter
 @NoArgsConstructor

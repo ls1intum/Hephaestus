@@ -68,6 +68,7 @@ public class GitHubProjectStatusUpdateProcessor {
         // Atomic upsert
         statusUpdateRepository.upsertCore(
             dbId,
+            context.providerId(),
             dto.nodeId(),
             project.getId(),
             sanitize(dto.body()),

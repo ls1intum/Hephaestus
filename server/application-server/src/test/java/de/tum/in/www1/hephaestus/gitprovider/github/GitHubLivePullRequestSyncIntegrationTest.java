@@ -69,7 +69,7 @@ class GitHubLivePullRequestSyncIntegrationTest extends AbstractGitHubLiveSyncInt
         );
 
         // 4. Sync repository first
-        repositorySyncService.syncRepository(workspace.getId(), repository.fullName()).orElseThrow();
+        repositorySyncService.syncRepository(workspace.getId(), repository.fullName(), githubProvider).orElseThrow();
         var localRepo = repositoryRepository.findByNameWithOwner(repository.fullName()).orElseThrow();
 
         // 5. Sync pull requests
@@ -97,7 +97,7 @@ class GitHubLivePullRequestSyncIntegrationTest extends AbstractGitHubLiveSyncInt
         var prArtifacts = createPullRequestWithReview(repository);
 
         // 2. Sync repository first
-        repositorySyncService.syncRepository(workspace.getId(), repository.fullName()).orElseThrow();
+        repositorySyncService.syncRepository(workspace.getId(), repository.fullName(), githubProvider).orElseThrow();
         var localRepo = repositoryRepository.findByNameWithOwner(repository.fullName()).orElseThrow();
 
         // 3. Sync pull requests
@@ -169,7 +169,7 @@ class GitHubLivePullRequestSyncIntegrationTest extends AbstractGitHubLiveSyncInt
         );
 
         // 4. Sync repository first
-        repositorySyncService.syncRepository(workspace.getId(), repository.fullName()).orElseThrow();
+        repositorySyncService.syncRepository(workspace.getId(), repository.fullName(), githubProvider).orElseThrow();
         var localRepo = repositoryRepository.findByNameWithOwner(repository.fullName()).orElseThrow();
 
         // 5. Sync pull requests

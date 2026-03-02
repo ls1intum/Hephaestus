@@ -1,6 +1,6 @@
 package de.tum.in.www1.hephaestus.workspace.dto;
 
-import de.tum.in.www1.hephaestus.workspace.GitProviderType;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;

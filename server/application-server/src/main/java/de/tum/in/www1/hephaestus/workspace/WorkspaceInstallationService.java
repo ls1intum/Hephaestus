@@ -1,6 +1,9 @@
 package de.tum.in.www1.hephaestus.workspace;
 
 import de.tum.in.www1.hephaestus.core.LoggingUtils;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.ProvisioningListener;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
@@ -34,6 +37,7 @@ public class WorkspaceInstallationService {
     private final RepositoryToMonitorRepository repositoryToMonitorRepository;
     private final RepositoryRepository repositoryRepository;
     private final UserRepository userRepository;
+    private final GitProviderRepository gitProviderRepository;
 
     private final WorkspaceSlugService workspaceSlugService;
     private final WorkspaceMembershipService workspaceMembershipService;
@@ -47,6 +51,7 @@ public class WorkspaceInstallationService {
         RepositoryToMonitorRepository repositoryToMonitorRepository,
         RepositoryRepository repositoryRepository,
         UserRepository userRepository,
+        GitProviderRepository gitProviderRepository,
         WorkspaceSlugService workspaceSlugService,
         WorkspaceMembershipService workspaceMembershipService,
         NatsConsumerService natsConsumerService,
@@ -58,6 +63,7 @@ public class WorkspaceInstallationService {
         this.repositoryToMonitorRepository = repositoryToMonitorRepository;
         this.repositoryRepository = repositoryRepository;
         this.userRepository = userRepository;
+        this.gitProviderRepository = gitProviderRepository;
         this.workspaceSlugService = workspaceSlugService;
         this.workspaceMembershipService = workspaceMembershipService;
         this.natsConsumerService = natsConsumerService;
@@ -258,7 +264,11 @@ public class WorkspaceInstallationService {
         // Create Organization entity BEFORE repositories are created
         // This ensures repositories created during provisioning have organization_id set
         if (accountType == ProvisioningListener.AccountType.ORGANIZATION && accountId != null) {
-            Organization org = organizationService.upsertIdentity(accountId, accountLogin);
+            Long providerId = gitProviderRepository
+                .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
+                .orElseThrow(() -> new IllegalStateException("GitProvider for GitHub not found"))
+                .getId();
+            Organization org = organizationService.upsertIdentity(accountId, accountLogin, providerId);
             workspace.setOrganization(org);
             log.debug(
                 "Linked organization to workspace: orgId={}, orgLogin={}, workspaceId={}",
@@ -537,10 +547,16 @@ public class WorkspaceInstallationService {
                     ? User.Type.ORGANIZATION.name()
                     : User.Type.USER.name();
 
-            userRepository.acquireLoginLock(accountLogin);
-            userRepository.freeLoginConflicts(accountLogin, accountId);
+            GitProvider provider = gitProviderRepository
+                .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
+                .orElseThrow(() -> new IllegalStateException("GitProvider for GitHub not found"));
+            Long providerId = provider.getId();
+
+            userRepository.acquireLoginLock(accountLogin, providerId);
+            userRepository.freeLoginConflicts(accountLogin, accountId, providerId);
             userRepository.upsertUser(
                 accountId,
+                providerId,
                 accountLogin,
                 accountLogin, // Use login as fallback name
                 avatarUrl != null ? avatarUrl : "",
@@ -557,7 +573,12 @@ public class WorkspaceInstallationService {
                 typeStr,
                 installationId
             );
-            return accountId;
+            // Retrieve the JPA-managed entity to get the auto-generated PK
+            // (upsertUser is a native SQL INSERT that doesn't return the generated id)
+            return userRepository
+                .findByLogin(accountLogin)
+                .map(User::getId)
+                .orElseThrow(() -> new IllegalStateException("User not found after upsert: login=" + accountLogin));
         }
 
         log.warn(

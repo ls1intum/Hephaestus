@@ -12,6 +12,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
+import org.hibernate.Hibernate;
 import org.springframework.stereotype.Component;
 
 /**
@@ -342,10 +343,16 @@ public class ExperiencePointCalculator implements ExperiencePointStrategy {
             return 0;
         }
 
+        // Unwrap Hibernate proxy to get the actual entity subclass.
+        // When IssueComment.issue is lazy-loaded, Hibernate creates an Issue$HibernateProxy
+        // that cannot be cast to PullRequest even when the underlying row is a PullRequest
+        // (SINGLE_TABLE inheritance). Unproxying resolves the real entity type.
+        issue = (Issue) Hibernate.unproxy(issue);
+
         PullRequest pullRequest;
 
-        if (issue.isPullRequest()) {
-            pullRequest = (PullRequest) issue;
+        if (issue instanceof PullRequest pr) {
+            pullRequest = pr;
         } else {
             if (issue.getRepository() == null) {
                 log.warn("Skipped XP calculation, issue has no repository: issueId={}", issue.getId());

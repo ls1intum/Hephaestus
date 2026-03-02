@@ -16,7 +16,6 @@ import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
-import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -62,13 +61,13 @@ import org.springframework.lang.NonNull;
     uniqueConstraints = {
         @UniqueConstraint(name = "uk_project_owner_number", columnNames = { "owner_type", "owner_id", "number" }),
         @UniqueConstraint(name = "uk_project_node_id", columnNames = { "node_id" }),
+        @UniqueConstraint(name = "uq_project_provider_native_id", columnNames = { "provider_id", "native_id" }),
     }
 )
 @Getter
 @Setter
 @NoArgsConstructor
 @ToString(callSuper = true)
-@EqualsAndHashCode(callSuper = true)
 public class Project extends BaseGitServiceEntity {
 
     /**

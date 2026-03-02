@@ -124,6 +124,7 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
         // Perform atomic upsert
         projectItemRepository.upsertCore(
             dbId,
+            context.providerId(),
             dto.nodeId(),
             project.getId(),
             contentType.name(),

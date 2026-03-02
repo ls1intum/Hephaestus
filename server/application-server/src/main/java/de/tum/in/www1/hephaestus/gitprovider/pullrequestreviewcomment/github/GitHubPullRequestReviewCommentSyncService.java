@@ -650,11 +650,13 @@ public class GitHubPullRequestReviewCommentSyncService {
         PullRequest pullRequest,
         GHPullRequestReviewComment firstComment
     ) {
+        Long providerId = pullRequest.getRepository().getProvider().getId();
         return threadRepository
-            .findById(threadId)
+            .findByNativeIdAndProviderId(threadId, providerId)
             .orElseGet(() -> {
                 PullRequestReviewThread thread = new PullRequestReviewThread();
-                thread.setId(threadId);
+                thread.setNativeId(threadId);
+                thread.setProvider(pullRequest.getRepository().getProvider());
                 thread.setNodeId(threadDto.nodeId());
                 thread.setPullRequest(pullRequest);
                 thread.setPath(threadDto.path());
@@ -684,7 +686,8 @@ public class GitHubPullRequestReviewCommentSyncService {
                     GitHubUserDTO resolvedByDto = threadDto.resolvedBy();
                     if (resolvedByDto != null) {
                         de.tum.in.www1.hephaestus.gitprovider.user.User resolvedBy = userProcessor.ensureExists(
-                            resolvedByDto
+                            resolvedByDto,
+                            pullRequest.getRepository().getProvider().getId()
                         );
                         thread.setResolvedBy(resolvedBy);
                     }
@@ -820,11 +823,13 @@ public class GitHubPullRequestReviewCommentSyncService {
         PullRequest pullRequest,
         GHPullRequestReviewComment firstComment
     ) {
+        Long providerId = pullRequest.getRepository().getProvider().getId();
         return threadRepository
-            .findById(threadId)
+            .findByNativeIdAndProviderId(threadId, providerId)
             .orElseGet(() -> {
                 PullRequestReviewThread thread = new PullRequestReviewThread();
-                thread.setId(threadId);
+                thread.setNativeId(threadId);
+                thread.setProvider(pullRequest.getRepository().getProvider());
                 thread.setNodeId(graphQlThread.getId());
                 thread.setPullRequest(pullRequest);
                 thread.setPath(graphQlThread.getPath());
@@ -852,7 +857,8 @@ public class GitHubPullRequestReviewCommentSyncService {
                     if (graphQlResolvedBy != null) {
                         GitHubUserDTO resolvedByDto = GitHubUserDTO.fromUser(graphQlResolvedBy);
                         de.tum.in.www1.hephaestus.gitprovider.user.User resolvedBy = userProcessor.ensureExists(
-                            resolvedByDto
+                            resolvedByDto,
+                            pullRequest.getRepository().getProvider().getId()
                         );
                         thread.setResolvedBy(resolvedBy);
                     }

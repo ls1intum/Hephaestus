@@ -13,6 +13,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -29,7 +30,15 @@ import org.springframework.lang.NonNull;
  * In Q&amp;A category discussions, a comment can be marked as the accepted answer.
  */
 @Entity
-@Table(name = "discussion_comment")
+@Table(
+    name = "discussion_comment",
+    uniqueConstraints = {
+        @UniqueConstraint(
+            name = "uq_discussion_comment_provider_native_id",
+            columnNames = { "provider_id", "native_id" }
+        ),
+    }
+)
 @Getter
 @Setter
 @NoArgsConstructor

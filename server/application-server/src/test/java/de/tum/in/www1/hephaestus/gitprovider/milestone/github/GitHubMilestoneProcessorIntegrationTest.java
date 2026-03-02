@@ -2,6 +2,9 @@ package de.tum.in.www1.hephaestus.gitprovider.milestone.github;
 
 import static org.assertj.core.api.Assertions.*;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.Milestone;
@@ -62,6 +65,9 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
     private OrganizationRepository organizationRepository;
 
     @Autowired
+    private GitProviderRepository gitProviderRepository;
+
+    @Autowired
     private WorkspaceRepository workspaceRepository;
 
     @Autowired
@@ -72,6 +78,7 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
 
     private Repository testRepository;
     private Workspace testWorkspace;
+    private GitProvider githubProvider;
 
     @BeforeEach
     void setUp() {
@@ -81,20 +88,26 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
     }
 
     private void setupTestData() {
+        // Create GitHub provider
+        githubProvider = gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
+            .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com")));
+
         // Create organization matching fixture data
         Organization org = new Organization();
-        org.setId(FIXTURE_ORG_ID);
-        org.setGithubId(FIXTURE_ORG_ID);
+        org.setNativeId(FIXTURE_ORG_ID);
         org.setLogin(FIXTURE_ORG_LOGIN);
         org.setCreatedAt(Instant.now());
         org.setUpdatedAt(Instant.now());
         org.setName("Hephaestus Test");
         org.setAvatarUrl("https://avatars.githubusercontent.com/u/" + FIXTURE_ORG_ID);
+        org.setHtmlUrl("https://github.com/" + FIXTURE_ORG_LOGIN);
+        org.setProvider(githubProvider);
         org = organizationRepository.save(org);
 
         // Create repository matching fixture data
         testRepository = new Repository();
-        testRepository.setId(FIXTURE_REPO_ID);
+        testRepository.setNativeId(FIXTURE_REPO_ID);
         testRepository.setName("TestRepository");
         testRepository.setNameWithOwner(FIXTURE_REPO_FULL_NAME);
         testRepository.setHtmlUrl("https://github.com/" + FIXTURE_REPO_FULL_NAME);
@@ -104,6 +117,7 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         testRepository.setUpdatedAt(Instant.now());
         testRepository.setPushedAt(Instant.now());
         testRepository.setOrganization(org);
+        testRepository.setProvider(githubProvider);
         testRepository = repositoryRepository.save(testRepository);
 
         // Create workspace
@@ -165,25 +179,27 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
 
             // Then - verify milestone created
             assertThat(result).isNotNull();
-            assertThat(result.getId()).isEqualTo(milestoneId);
+            assertThat(result.getNativeId()).isEqualTo(milestoneId);
             assertThat(result.getNumber()).isEqualTo(3);
             assertThat(result.getTitle()).isEqualTo("New Milestone");
             assertThat(result.getDescription()).isEqualTo("A new milestone for testing");
             assertThat(result.getState()).isEqualTo(Milestone.State.OPEN);
             assertThat(result.getDueOn()).isNotNull();
-            assertThat(result.getRepository().getId()).isEqualTo(FIXTURE_REPO_ID);
+            assertThat(result.getRepository().getNativeId()).isEqualTo(FIXTURE_REPO_ID);
 
             // Verify persisted
-            assertThat(milestoneRepository.findById(milestoneId)).isPresent();
+            assertThat(
+                milestoneRepository.findByNativeIdAndProviderId(milestoneId, githubProvider.getId())
+            ).isPresent();
 
             // Verify MilestoneCreated event published
             assertThat(eventListener.getCreatedEvents())
                 .hasSize(1)
                 .first()
                 .satisfies(event -> {
-                    assertThat(event.milestone().id()).isEqualTo(milestoneId);
+                    assertThat(event.milestone().id()).isEqualTo(result.getId());
                     assertThat(event.context().scopeId()).isEqualTo(testWorkspace.getId());
-                    assertThat(event.context().repository().id()).isEqualTo(FIXTURE_REPO_ID);
+                    assertThat(event.context().repository().id()).isEqualTo(testRepository.getId());
                 });
             assertThat(eventListener.getUpdatedEvents()).isEmpty();
         }
@@ -194,7 +210,8 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
             // Given - create existing milestone
             Long milestoneId = 14028854L;
             Milestone existing = new Milestone();
-            existing.setId(milestoneId);
+            existing.setNativeId(milestoneId);
+            existing.setProvider(githubProvider);
             existing.setNumber(3);
             existing.setTitle("Old Title");
             existing.setDescription("Old description");
@@ -274,8 +291,8 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
 
             // Then - milestone should be created with a generated negative ID
             assertThat(result).isNotNull();
-            assertThat(result.getId()).isNotNull();
-            assertThat(result.getId()).isNegative(); // Generated IDs are negative to avoid collision
+            assertThat(result.getNativeId()).isNotNull();
+            assertThat(result.getNativeId()).isNegative(); // Generated IDs are negative to avoid collision
             assertThat(result.getNumber()).isEqualTo(1);
             assertThat(result.getTitle()).isEqualTo("GraphQL Synced Milestone");
             assertThat(eventListener.getCreatedEvents()).hasSize(1);
@@ -287,7 +304,8 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
             // Given - existing milestone
             Long existingId = 999888777L;
             Milestone existingMilestone = new Milestone();
-            existingMilestone.setId(existingId);
+            existingMilestone.setNativeId(existingId);
+            existingMilestone.setProvider(githubProvider);
             existingMilestone.setNumber(42);
             existingMilestone.setTitle("Existing Milestone");
             existingMilestone.setState(Milestone.State.OPEN);
@@ -316,7 +334,7 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
 
             // Then - should update existing milestone, not create new one
             assertThat(result).isNotNull();
-            assertThat(result.getId()).isEqualTo(existingId); // keeps original ID
+            assertThat(result.getNativeId()).isEqualTo(existingId); // keeps original nativeId
             assertThat(result.getTitle()).isEqualTo("Updated Title");
             assertThat(result.getDescription()).isEqualTo("new description");
             assertThat(milestoneRepository.count()).isEqualTo(1);
@@ -347,7 +365,12 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
 
             // Then
             assertThat(result.getDescription()).isNull();
-            assertThat(milestoneRepository.findById(milestoneId).get().getDescription()).isNull();
+            assertThat(
+                milestoneRepository
+                    .findByNativeIdAndProviderId(milestoneId, githubProvider.getId())
+                    .get()
+                    .getDescription()
+            ).isNull();
         }
 
         @Test
@@ -375,7 +398,9 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
 
             // Then
             assertThat(result.getDueOn()).isNull();
-            assertThat(milestoneRepository.findById(milestoneId).get().getDueOn()).isNull();
+            assertThat(
+                milestoneRepository.findByNativeIdAndProviderId(milestoneId, githubProvider.getId()).get().getDueOn()
+            ).isNull();
         }
 
         @Test
@@ -434,7 +459,7 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
 
             // Then
             assertThat(result.getCreator()).isNotNull();
-            assertThat(result.getCreator().getId()).isEqualTo(FIXTURE_CREATOR_ID);
+            assertThat(result.getCreator().getNativeId()).isEqualTo(FIXTURE_CREATOR_ID);
             assertThat(result.getCreator().getLogin()).isEqualTo(FIXTURE_CREATOR_LOGIN);
         }
 
@@ -469,14 +494,14 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
             );
 
             // Verify user doesn't exist
-            assertThat(userRepository.findById(newUserId)).isEmpty();
+            assertThat(userRepository.findByNativeIdAndProviderId(newUserId, githubProvider.getId())).isEmpty();
 
             // When
             Milestone result = processor.process(dto, testRepository, newCreator, createContext());
 
             // Then
             assertThat(result.getCreator()).isNotNull();
-            assertThat(userRepository.findById(newUserId)).isPresent();
+            assertThat(userRepository.findByNativeIdAndProviderId(newUserId, githubProvider.getId())).isPresent();
         }
 
         @Test
@@ -574,31 +599,34 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
             // Given - create milestone
             Long milestoneId = 14028854L;
             Milestone milestone = new Milestone();
-            milestone.setId(milestoneId);
+            milestone.setNativeId(milestoneId);
+            milestone.setProvider(githubProvider);
             milestone.setNumber(3);
             milestone.setTitle("To Delete Milestone");
             milestone.setState(Milestone.State.OPEN);
             milestone.setHtmlUrl("https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/3");
             milestone.setRepository(testRepository);
-            milestoneRepository.save(milestone);
+            Milestone savedMilestone = milestoneRepository.save(milestone);
 
-            assertThat(milestoneRepository.findById(milestoneId)).isPresent();
+            assertThat(
+                milestoneRepository.findByNativeIdAndProviderId(milestoneId, githubProvider.getId())
+            ).isPresent();
 
             // When
             processor.delete(milestoneId, createContext());
 
             // Then - milestone deleted
-            assertThat(milestoneRepository.findById(milestoneId)).isEmpty();
+            assertThat(milestoneRepository.findByNativeIdAndProviderId(milestoneId, githubProvider.getId())).isEmpty();
 
             // Verify event published
             assertThat(eventListener.getDeletedEvents())
                 .hasSize(1)
                 .first()
                 .satisfies(event -> {
-                    assertThat(event.milestoneId()).isEqualTo(milestoneId);
+                    assertThat(event.milestoneId()).isEqualTo(savedMilestone.getId());
                     assertThat(event.title()).isEqualTo("To Delete Milestone");
                     assertThat(event.context().scopeId()).isEqualTo(testWorkspace.getId());
-                    assertThat(event.context().repository().id()).isEqualTo(FIXTURE_REPO_ID);
+                    assertThat(event.context().repository().id()).isEqualTo(testRepository.getId());
                 });
         }
 
@@ -607,7 +635,9 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         void shouldHandleDeletionOfNonExistentMilestone() {
             // Given - milestone doesn't exist
             Long nonExistentId = 999999999L;
-            assertThat(milestoneRepository.findById(nonExistentId)).isEmpty();
+            assertThat(
+                milestoneRepository.findByNativeIdAndProviderId(nonExistentId, githubProvider.getId())
+            ).isEmpty();
 
             // When/Then - should not throw
             assertThatCode(() -> processor.delete(nonExistentId, createContext())).doesNotThrowAnyException();

@@ -6,7 +6,7 @@ import java.util.UUID;
 import org.springframework.lang.Nullable;
 
 /**
- * Unified context for processing GitHub data from any source (sync or webhook).
+ * Unified context for processing git provider data from any source (sync or webhook).
  * <p>
  * This context carries all the information needed to process data consistently,
  * regardless of whether it came from a scheduled GraphQL sync or a webhook
@@ -34,6 +34,7 @@ import org.springframework.lang.Nullable;
  *
  * @param scopeId        The scope this data belongs to
  * @param repository     The repository being processed (JPA entity - transaction required)
+ * @param provider       The git provider instance (e.g., github.com, gitlab.lrz.de)
  * @param startedAt      When processing started
  * @param correlationId  Unique ID for distributed tracing - correlates all log
  *                       entries and events from a single webhook or sync operation
@@ -43,11 +44,19 @@ import org.springframework.lang.Nullable;
 public record ProcessingContext(
     Long scopeId,
     Repository repository,
+    GitProvider provider,
     Instant startedAt,
     String correlationId,
     @Nullable String webhookAction,
     DataSource source
 ) {
+    /**
+     * Returns the provider's database ID for use in upsert queries.
+     */
+    public Long providerId() {
+        return provider != null ? provider.getId() : null;
+    }
+
     /**
      * Creates a context for scheduled sync operations.
      */
@@ -55,6 +64,23 @@ public record ProcessingContext(
         return new ProcessingContext(
             scopeId,
             repository,
+            repository != null ? repository.getProvider() : null,
+            Instant.now(),
+            UUID.randomUUID().toString(),
+            null,
+            DataSource.GRAPHQL_SYNC
+        );
+    }
+
+    /**
+     * Creates a context for sync operations that are not repository-scoped
+     * (e.g., organization-level project sync, team sync).
+     */
+    public static ProcessingContext forSync(Long scopeId, GitProvider provider) {
+        return new ProcessingContext(
+            scopeId,
+            null,
+            provider,
             Instant.now(),
             UUID.randomUUID().toString(),
             null,
@@ -69,6 +95,23 @@ public record ProcessingContext(
         return new ProcessingContext(
             scopeId,
             repository,
+            repository != null ? repository.getProvider() : null,
+            Instant.now(),
+            UUID.randomUUID().toString(),
+            action,
+            DataSource.WEBHOOK
+        );
+    }
+
+    /**
+     * Creates a context for webhook events that are not repository-scoped
+     * (e.g., organization-level project events).
+     */
+    public static ProcessingContext forWebhook(Long scopeId, GitProvider provider, String action) {
+        return new ProcessingContext(
+            scopeId,
+            null,
+            provider,
             Instant.now(),
             UUID.randomUUID().toString(),
             action,

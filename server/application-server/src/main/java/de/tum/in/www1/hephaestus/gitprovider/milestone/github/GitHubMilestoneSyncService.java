@@ -297,7 +297,7 @@ public class GitHubMilestoneSyncService {
         int removed = 0;
         for (Milestone milestone : existing) {
             if (!syncedNumbers.contains(milestone.getNumber())) {
-                milestoneProcessor.delete(milestone.getId(), context);
+                milestoneProcessor.delete(milestone.getNativeId(), context);
                 removed++;
             }
         }

@@ -2,6 +2,9 @@ package de.tum.in.www1.hephaestus.gitprovider.project.github;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
@@ -9,6 +12,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.ScopeIdResolver;
 import de.tum.in.www1.hephaestus.gitprovider.project.Project;
+import de.tum.in.www1.hephaestus.gitprovider.project.ProjectRepository;
 import de.tum.in.www1.hephaestus.gitprovider.project.github.dto.GitHubProjectEventDTO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -35,17 +39,23 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class GitHubProjectMessageHandler extends GitHubMessageHandler<GitHubProjectEventDTO> {
 
     private final GitHubProjectProcessor projectProcessor;
+    private final ProjectRepository projectRepository;
     private final ScopeIdResolver scopeIdResolver;
+    private final GitProviderRepository gitProviderRepository;
 
     GitHubProjectMessageHandler(
         GitHubProjectProcessor projectProcessor,
+        ProjectRepository projectRepository,
         ScopeIdResolver scopeIdResolver,
+        GitProviderRepository gitProviderRepository,
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate
     ) {
         super(GitHubProjectEventDTO.class, deserializer, transactionTemplate);
         this.projectProcessor = projectProcessor;
+        this.projectRepository = projectRepository;
         this.scopeIdResolver = scopeIdResolver;
+        this.gitProviderRepository = gitProviderRepository;
     }
 
     @Override
@@ -101,7 +111,10 @@ public class GitHubProjectMessageHandler extends GitHubMessageHandler<GitHubProj
             return;
         }
 
-        ProcessingContext context = ProcessingContext.forWebhook(scopeId, null, event.action());
+        GitProvider gitHubProvider = gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
+            .orElseThrow(() -> new IllegalStateException("GitHub provider not configured"));
+        ProcessingContext context = ProcessingContext.forWebhook(scopeId, gitHubProvider, event.action());
 
         // Extract the actor (sender) ID from the webhook event
         Long actorId = event.sender() != null ? event.sender().getDatabaseId() : null;
@@ -109,9 +122,12 @@ public class GitHubProjectMessageHandler extends GitHubMessageHandler<GitHubProj
         GitHubEventAction.ProjectV2 actionType = GitHubEventAction.ProjectV2.fromString(event.action());
         switch (actionType) {
             case DELETED -> {
-                Long projectId = projectDto.getDatabaseId();
-                if (projectId != null) {
-                    projectProcessor.delete(projectId, context);
+                // Resolve the synthetic PK via nodeId since getDatabaseId() returns the native ID
+                String nodeId = projectDto.nodeId();
+                if (nodeId != null) {
+                    projectRepository
+                        .findByNodeId(nodeId)
+                        .ifPresent(project -> projectProcessor.delete(project.getId(), context));
                 }
             }
             case CLOSED -> projectProcessor.processClosed(projectDto, ownerType, ownerId, context, actorId);

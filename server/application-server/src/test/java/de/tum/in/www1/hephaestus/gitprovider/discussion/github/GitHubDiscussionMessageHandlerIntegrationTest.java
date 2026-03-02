@@ -3,6 +3,9 @@ package de.tum.in.www1.hephaestus.gitprovider.discussion.github;
 import static org.assertj.core.api.Assertions.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.discussion.Discussion;
@@ -142,6 +145,9 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
     private WorkspaceRepository workspaceRepository;
 
     @Autowired
+    private GitProviderRepository gitProviderRepository;
+
+    @Autowired
     private ObjectMapper objectMapper;
 
     @Autowired
@@ -188,10 +194,12 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
             // Then - verify ALL persisted fields against hardcoded fixture values
             // Use TransactionTemplate for lazy-loading assertions
             transactionTemplate.executeWithoutResult(status -> {
-                Discussion discussion = discussionRepository.findById(DISCUSSION_27_ID).orElseThrow();
+                Discussion discussion = discussionRepository
+                    .findByRepositoryIdAndNumber(testRepository.getId(), 27)
+                    .orElseThrow();
 
                 // Core identification fields
-                assertThat(discussion.getId()).isEqualTo(DISCUSSION_27_ID);
+                assertThat(discussion.getNativeId()).isEqualTo(DISCUSSION_27_ID);
                 assertThat(discussion.getNumber()).isEqualTo(FIXTURE_DISCUSSION_NUMBER);
 
                 // Content fields
@@ -218,11 +226,11 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
 
                 // Repository association (foreign key)
                 assertThat(discussion.getRepository()).isNotNull();
-                assertThat(discussion.getRepository().getId()).isEqualTo(FIXTURE_REPO_ID);
+                assertThat(discussion.getRepository().getNativeId()).isEqualTo(FIXTURE_REPO_ID);
 
                 // Author association (foreign key) - verify exact fixture values
                 assertThat(discussion.getAuthor()).isNotNull();
-                assertThat(discussion.getAuthor().getId()).isEqualTo(FIXTURE_AUTHOR_ID);
+                assertThat(discussion.getAuthor().getNativeId()).isEqualTo(FIXTURE_AUTHOR_ID);
                 assertThat(discussion.getAuthor().getLogin()).isEqualTo(FIXTURE_AUTHOR_LOGIN);
                 assertThat(discussion.getAuthor().getAvatarUrl()).isEqualTo(FIXTURE_AUTHOR_AVATAR_URL);
                 assertThat(discussion.getAuthor().getHtmlUrl()).isEqualTo(FIXTURE_AUTHOR_HTML_URL);
@@ -257,7 +265,9 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
 
             // Then
             transactionTemplate.executeWithoutResult(status -> {
-                Discussion discussion = discussionRepository.findById(DISCUSSION_27_ID).orElseThrow();
+                Discussion discussion = discussionRepository
+                    .findByRepositoryIdAndNumber(testRepository.getId(), 27)
+                    .orElseThrow();
                 assertThat(discussion.getBody()).isEqualTo("Updated body for webhook tests");
             });
 
@@ -278,7 +288,9 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
             handler.handleEvent(closedEvent);
 
             // Then
-            Discussion discussion = discussionRepository.findById(DISCUSSION_27_ID).orElse(null);
+            Discussion discussion = discussionRepository
+                .findByRepositoryIdAndNumber(testRepository.getId(), 27)
+                .orElse(null);
             assertThat(discussion).isNotNull();
             assertThat(discussion.getState()).isEqualTo(Discussion.State.CLOSED);
             assertThat(discussion.getStateReason()).isEqualTo(Discussion.StateReason.RESOLVED);
@@ -301,7 +313,9 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
             handler.handleEvent(reopenedEvent);
 
             // Then
-            Discussion discussion = discussionRepository.findById(DISCUSSION_27_ID).orElse(null);
+            Discussion discussion = discussionRepository
+                .findByRepositoryIdAndNumber(testRepository.getId(), 27)
+                .orElse(null);
             assertThat(discussion).isNotNull();
             assertThat(discussion.getState()).isEqualTo(Discussion.State.OPEN);
 
@@ -315,15 +329,16 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
             // Given - the deleted fixture uses discussion #28 (ID 9096674)
             // First, we create it by simulating it exists
             Discussion discussionToDelete = new Discussion();
-            discussionToDelete.setId(DISCUSSION_28_ID);
+            discussionToDelete.setNativeId(DISCUSSION_28_ID);
             discussionToDelete.setNumber(28);
             discussionToDelete.setTitle("Disposable discussion");
             discussionToDelete.setState(Discussion.State.OPEN);
             discussionToDelete.setHtmlUrl("https://github.com/" + FIXTURE_REPO_FULL_NAME + "/discussions/28");
-            discussionToDelete.setRepository(repositoryRepository.findById(FIXTURE_REPO_ID).orElseThrow());
+            discussionToDelete.setRepository(testRepository);
+            discussionToDelete.setProvider(gitProvider);
             discussionRepository.save(discussionToDelete);
 
-            assertThat(discussionRepository.existsById(DISCUSSION_28_ID)).isTrue();
+            assertThat(discussionRepository.existsByRepositoryIdAndNumber(testRepository.getId(), 28)).isTrue();
 
             GitHubDiscussionEventDTO deletedEvent = loadPayload("discussion.deleted");
 
@@ -331,7 +346,7 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
             handler.handleEvent(deletedEvent);
 
             // Then
-            assertThat(discussionRepository.existsById(DISCUSSION_28_ID)).isFalse();
+            assertThat(discussionRepository.existsByRepositoryIdAndNumber(testRepository.getId(), 28)).isFalse();
 
             // Verify Deleted event was published
             assertThat(eventListener.getDeletedEvents()).hasSize(1);
@@ -358,7 +373,9 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
 
             // Then
             transactionTemplate.executeWithoutResult(status -> {
-                Discussion discussion = discussionRepository.findById(DISCUSSION_27_ID).orElseThrow();
+                Discussion discussion = discussionRepository
+                    .findByRepositoryIdAndNumber(testRepository.getId(), 27)
+                    .orElseThrow();
                 assertThat(discussion.getAnswerChosenAt()).isNotNull();
                 assertThat(discussion.getAnswerChosenBy()).isNotNull();
                 assertThat(discussion.getAnswerChosenBy().getLogin()).isEqualTo(FIXTURE_AUTHOR_LOGIN);
@@ -382,7 +399,7 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
             handler.handleEvent(unansweredEvent);
 
             // Then - discussion should still exist and be processed
-            assertThat(discussionRepository.existsById(DISCUSSION_27_ID)).isTrue();
+            assertThat(discussionRepository.existsByRepositoryIdAndNumber(testRepository.getId(), 27)).isTrue();
         }
     }
 
@@ -406,7 +423,9 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
 
             // Then - use TransactionTemplate for lazy-loading assertions
             transactionTemplate.executeWithoutResult(status -> {
-                Discussion discussion = discussionRepository.findById(DISCUSSION_27_ID).orElse(null);
+                Discussion discussion = discussionRepository
+                    .findByRepositoryIdAndNumber(testRepository.getId(), 27)
+                    .orElse(null);
                 assertThat(discussion).isNotNull();
                 assertThat(labelNames(discussion)).contains(FIXTURE_LABEL_NAME);
             });
@@ -429,7 +448,7 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
             handler.handleEvent(unlabeledEvent);
 
             // Then - discussion should still exist
-            assertThat(discussionRepository.existsById(DISCUSSION_27_ID)).isTrue();
+            assertThat(discussionRepository.existsByRepositoryIdAndNumber(testRepository.getId(), 27)).isTrue();
         }
     }
 
@@ -452,7 +471,9 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
             handler.handleEvent(lockedEvent);
 
             // Then - verify lock state
-            Discussion discussion = discussionRepository.findById(DISCUSSION_27_ID).orElse(null);
+            Discussion discussion = discussionRepository
+                .findByRepositoryIdAndNumber(testRepository.getId(), 27)
+                .orElse(null);
             assertThat(discussion).isNotNull();
             assertThat(discussion.isLocked()).isTrue();
             assertThat(discussion.getActiveLockReason()).isEqualTo(Discussion.LockReason.RESOLVED);
@@ -475,7 +496,9 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
             handler.handleEvent(unlockedEvent);
 
             // Then
-            Discussion discussion = discussionRepository.findById(DISCUSSION_27_ID).orElse(null);
+            Discussion discussion = discussionRepository
+                .findByRepositoryIdAndNumber(testRepository.getId(), 27)
+                .orElse(null);
             assertThat(discussion).isNotNull();
             assertThat(discussion.isLocked()).isFalse();
         }
@@ -500,7 +523,7 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
             handler.handleEvent(pinnedEvent);
 
             // Then - discussion should still exist
-            assertThat(discussionRepository.existsById(DISCUSSION_27_ID)).isTrue();
+            assertThat(discussionRepository.existsByRepositoryIdAndNumber(testRepository.getId(), 27)).isTrue();
         }
 
         @Test
@@ -517,7 +540,7 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
             handler.handleEvent(unpinnedEvent);
 
             // Then
-            assertThat(discussionRepository.existsById(DISCUSSION_27_ID)).isTrue();
+            assertThat(discussionRepository.existsByRepositoryIdAndNumber(testRepository.getId(), 27)).isTrue();
         }
     }
 
@@ -541,7 +564,9 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
 
             // Then - category should be updated to Q&A
             transactionTemplate.executeWithoutResult(status -> {
-                Discussion discussion = discussionRepository.findById(DISCUSSION_27_ID).orElseThrow();
+                Discussion discussion = discussionRepository
+                    .findByRepositoryIdAndNumber(testRepository.getId(), 27)
+                    .orElseThrow();
                 assertThat(discussion.getCategory()).isNotNull();
                 assertThat(discussion.getCategory().getId()).isEqualTo(FIXTURE_QA_CATEGORY_ID);
                 assertThat(discussion.getCategory().getName()).isEqualTo(FIXTURE_QA_CATEGORY_NAME);
@@ -609,7 +634,7 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
             handler.handleEvent(event);
 
             // Then - discussion should be persisted with the correct ID
-            assertThat(discussionRepository.findById(DISCUSSION_27_ID)).isPresent();
+            assertThat(discussionRepository.findByRepositoryIdAndNumber(testRepository.getId(), 27)).isPresent();
         }
 
         @Test
@@ -622,7 +647,9 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
             handler.handleEvent(loadPayload("discussion.created"));
 
             // Then - author created with exact fixture values
-            var author = userRepository.findById(FIXTURE_AUTHOR_ID).orElseThrow();
+            var author = userRepository
+                .findByNativeIdAndProviderId(FIXTURE_AUTHOR_ID, gitProvider.getId())
+                .orElseThrow();
             assertThat(author.getLogin()).isEqualTo(FIXTURE_AUTHOR_LOGIN);
             assertThat(author.getAvatarUrl()).isEqualTo(FIXTURE_AUTHOR_AVATAR_URL);
             assertThat(author.getHtmlUrl()).isEqualTo(FIXTURE_AUTHOR_HTML_URL);
@@ -642,21 +669,30 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
         return objectMapper.readValue(json, GitHubDiscussionEventDTO.class);
     }
 
+    private GitProvider gitProvider;
+    private Repository testRepository;
+
     private void setupTestData() {
+        // Create GitHub provider
+        gitProvider = gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
+            .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com")));
+
         // Create organization matching fixture data
         Organization org = new Organization();
-        org.setId(FIXTURE_ORG_ID);
-        org.setGithubId(FIXTURE_ORG_ID);
+        org.setNativeId(FIXTURE_ORG_ID);
         org.setLogin(FIXTURE_ORG_LOGIN);
         org.setCreatedAt(Instant.now());
         org.setUpdatedAt(Instant.now());
         org.setName("Hephaestus Test");
         org.setAvatarUrl("https://avatars.githubusercontent.com/u/" + FIXTURE_ORG_ID);
+        org.setHtmlUrl("https://github.com/" + FIXTURE_ORG_LOGIN);
+        org.setProvider(gitProvider);
         org = organizationRepository.save(org);
 
         // Create repository matching fixture data
         Repository repo = new Repository();
-        repo.setId(FIXTURE_REPO_ID);
+        repo.setNativeId(FIXTURE_REPO_ID);
         repo.setName("TestRepository");
         repo.setNameWithOwner(FIXTURE_REPO_FULL_NAME);
         repo.setHtmlUrl("https://github.com/" + FIXTURE_REPO_FULL_NAME);
@@ -666,7 +702,8 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
         repo.setUpdatedAt(Instant.now());
         repo.setPushedAt(Instant.now());
         repo.setOrganization(org);
-        repo = repositoryRepository.save(repo);
+        repo.setProvider(gitProvider);
+        testRepository = repositoryRepository.save(repo);
 
         // Create workspace
         Workspace workspace = new Workspace();

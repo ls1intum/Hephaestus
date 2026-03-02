@@ -6,6 +6,7 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncCons
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.ExponentialBackoff;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
@@ -79,17 +80,23 @@ public class GitHubRepositorySyncService {
      *
      * @param scopeId the scope ID for authentication
      * @param nameWithOwner the full repository name (owner/repo)
+     * @param provider the GitProvider entity representing the GitHub provider instance
      * @return the synced Repository entity, or empty if not found
      */
     @Transactional
-    public Optional<Repository> syncRepository(Long scopeId, String nameWithOwner) {
-        return syncRepositoryWithRetry(scopeId, nameWithOwner, 0);
+    public Optional<Repository> syncRepository(Long scopeId, String nameWithOwner, GitProvider provider) {
+        return syncRepositoryWithRetry(scopeId, nameWithOwner, provider, 0);
     }
 
     /**
      * Internal implementation with retry counter to prevent infinite recursion.
      */
-    private Optional<Repository> syncRepositoryWithRetry(Long scopeId, String nameWithOwner, int retryAttempt) {
+    private Optional<Repository> syncRepositoryWithRetry(
+        Long scopeId,
+        String nameWithOwner,
+        GitProvider provider,
+        int retryAttempt
+    ) {
         String safeNameWithOwner = sanitizeForLog(nameWithOwner);
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(nameWithOwner);
         if (parsedName.isEmpty()) {
@@ -140,7 +147,7 @@ public class GitHubRepositorySyncService {
                             )
                         )
                     ) {
-                        return syncRepositoryWithRetry(scopeId, nameWithOwner, retryAttempt + 1);
+                        return syncRepositoryWithRetry(scopeId, nameWithOwner, provider, retryAttempt + 1);
                     }
                     return Optional.empty();
                 }
@@ -183,7 +190,7 @@ public class GitHubRepositorySyncService {
 
             // Ensure organization exists
             GHRepositoryOwner owner = repoData.getOwner();
-            Organization organization = ensureOrganization(owner);
+            Organization organization = ensureOrganization(owner, provider);
 
             // Create or update repository using typed accessors
             Long githubDatabaseId = repoData.getDatabaseId() != null ? repoData.getDatabaseId().longValue() : null;
@@ -196,57 +203,45 @@ public class GitHubRepositorySyncService {
                 return Optional.empty();
             }
 
-            Repository repository = repositoryRepository.findById(githubDatabaseId).orElseGet(Repository::new);
+            Repository repository = repositoryRepository
+                .findByNativeIdAndProviderId(githubDatabaseId, provider.getId())
+                .orElseGet(Repository::new);
 
-            repository.setId(githubDatabaseId);
+            repository.setNativeId(githubDatabaseId);
+            repository.setProvider(provider);
             repository.setName(repoData.getName());
             repository.setNameWithOwner(repoData.getNameWithOwner());
             repository.setDescription(repoData.getDescription());
             repository.setHtmlUrl(repoData.getUrl() != null ? repoData.getUrl().toString() : null);
             repository.setOrganization(organization);
 
-            // Set private status
             repository.setPrivate(repoData.getIsPrivate());
-
-            // Set archived status
             repository.setArchived(repoData.getIsArchived());
-
-            // Set disabled status
             repository.setDisabled(repoData.getIsDisabled());
-
-            // Set discussions enabled status
             repository.setHasDiscussionsEnabled(repoData.getHasDiscussionsEnabled());
 
-            // Set created at timestamp
             if (repoData.getCreatedAt() != null) {
                 repository.setCreatedAt(repoData.getCreatedAt().toInstant());
             }
-
-            // Set updated at timestamp
             if (repoData.getUpdatedAt() != null) {
                 repository.setUpdatedAt(repoData.getUpdatedAt().toInstant());
             }
-
-            // Set pushed at timestamp
             if (repoData.getPushedAt() != null) {
                 repository.setPushedAt(repoData.getPushedAt().toInstant());
             }
 
-            // Set default branch
             if (repoData.getDefaultBranchRef() != null) {
                 repository.setDefaultBranch(repoData.getDefaultBranchRef().getName());
             } else {
                 repository.setDefaultBranch("main");
             }
 
-            // Set visibility
             if (repoData.getVisibility() != null) {
                 repository.setVisibility(Repository.Visibility.valueOf(repoData.getVisibility().name()));
             } else {
                 repository.setVisibility(Repository.Visibility.PRIVATE);
             }
 
-            // Mark sync timestamp
             repository.setLastSyncAt(Instant.now());
 
             repository = repositoryRepository.save(repository);
@@ -283,7 +278,7 @@ public class GitHubRepositorySyncService {
      * Uses PostgreSQL upsert for thread-safe concurrent access.
      */
     @Nullable
-    private Organization ensureOrganization(GHRepositoryOwner owner) {
+    private Organization ensureOrganization(GHRepositoryOwner owner, GitProvider provider) {
         if (owner == null) {
             return null;
         }
@@ -303,8 +298,8 @@ public class GitHubRepositorySyncService {
             String avatarUrl = graphQlOrg.getAvatarUrl() != null ? graphQlOrg.getAvatarUrl().toString() : null;
 
             // Use upsert for thread-safe concurrent inserts
-            organizationRepository.upsert(databaseId, databaseId, login, name, avatarUrl, url);
-            return organizationRepository.findById(databaseId).orElse(null);
+            organizationRepository.upsert(databaseId, provider.getId(), login, name, avatarUrl, url);
+            return organizationRepository.findByNativeIdAndProviderId(databaseId, provider.getId()).orElse(null);
         } else if (owner instanceof GHUser graphQlUser) {
             // User repositories - create a "virtual" organization from the user
             Integer dbId = graphQlUser.getDatabaseId();
@@ -319,8 +314,8 @@ public class GitHubRepositorySyncService {
             String avatarUrl = graphQlUser.getAvatarUrl() != null ? graphQlUser.getAvatarUrl().toString() : null;
 
             // Use upsert for thread-safe concurrent inserts
-            organizationRepository.upsert(databaseId, databaseId, login, name, avatarUrl, url);
-            return organizationRepository.findById(databaseId).orElse(null);
+            organizationRepository.upsert(databaseId, provider.getId(), login, name, avatarUrl, url);
+            return organizationRepository.findByNativeIdAndProviderId(databaseId, provider.getId()).orElse(null);
         }
 
         return null;

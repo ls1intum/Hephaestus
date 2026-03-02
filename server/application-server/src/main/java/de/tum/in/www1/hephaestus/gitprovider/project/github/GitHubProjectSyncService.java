@@ -12,6 +12,7 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncCons
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.adaptPageSize;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.ExponentialBackoff;
@@ -192,9 +193,14 @@ public class GitHubProjectSyncService {
         String safeOrgLogin = sanitizeForLog(organizationLogin);
 
         // Resolve organization outside transaction to avoid holding locks
-        Organization organization = transactionTemplate.execute(status ->
-            organizationRepository.findByLoginIgnoreCase(organizationLogin).orElse(null)
-        );
+        Organization organization = transactionTemplate.execute(status -> {
+            Organization org = organizationRepository.findByLoginIgnoreCase(organizationLogin).orElse(null);
+            if (org != null) {
+                // Eagerly initialize the lazy-loaded provider for use outside the transaction
+                org.getProvider().getId();
+            }
+            return org;
+        });
 
         if (organization == null) {
             log.warn("Skipped project sync: reason=organizationNotFound, orgLogin={}", safeOrgLogin);
@@ -202,6 +208,7 @@ public class GitHubProjectSyncService {
         }
 
         Long organizationId = organization.getId();
+        GitProvider provider = organization.getProvider();
         HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
         Duration timeout = syncProperties.graphqlTimeout();
 
@@ -316,7 +323,7 @@ public class GitHubProjectSyncService {
                 );
                 final var filters = syncSchedulerProperties.filters();
                 PageResult pageResult = transactionTemplate.execute(status -> {
-                    ProcessingContext context = ProcessingContext.forSync(scopeId, null);
+                    ProcessingContext context = ProcessingContext.forSync(scopeId, provider);
                     int projectsProcessed = 0;
                     int projectsSkipped = 0;
                     int projectsFiltered = 0;
@@ -520,7 +527,7 @@ public class GitHubProjectSyncService {
         // Only remove stale projects if sync completed without abort
         boolean syncCompletedNormally = !hasMore && abortReason == null;
         if (syncCompletedNormally && !syncedProjectIds.isEmpty()) {
-            removeDeletedProjects(organizationId, syncedProjectIds);
+            removeDeletedProjects(organizationId, syncedProjectIds, scopeId, provider);
         } else if (!syncCompletedNormally && abortReason != null) {
             log.warn(
                 "Skipped stale project removal: reason=incompleteSync, orgLogin={}, pagesProcessed={}",
@@ -585,6 +592,18 @@ public class GitHubProjectSyncService {
 
         String projectNodeId = project.getNodeId();
         Long projectId = project.getId();
+
+        // Eagerly resolve the provider for ProcessingContext (lazy-loaded, needs transaction)
+        GitProvider provider = transactionTemplate.execute(status -> {
+            Project p = projectRepository.findById(projectId).orElse(null);
+            if (p != null) {
+                GitProvider prov = p.getProvider();
+                prov.getId(); // force proxy initialization
+                return prov;
+            }
+            return null;
+        });
+
         HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
         Duration timeout = syncProperties.graphqlTimeout();
 
@@ -616,7 +635,7 @@ public class GitHubProjectSyncService {
                 projectNodeId
             );
             transactionTemplate.executeWithoutResult(status -> {
-                ProcessingContext context = ProcessingContext.forSync(scopeId, null);
+                ProcessingContext context = ProcessingContext.forSync(scopeId, provider);
                 projectProcessor.delete(projectId, context);
             });
             return SyncResult.completed(0);
@@ -635,7 +654,7 @@ public class GitHubProjectSyncService {
             );
             statusUpdatesSynced = true;
         } else {
-            statusUpdatesSynced = syncProjectStatusUpdates(client, project, scopeId);
+            statusUpdatesSynced = syncProjectStatusUpdates(client, project, scopeId, provider);
         }
 
         // Resume from cursor if present (via SPI for consistency)
@@ -803,7 +822,7 @@ public class GitHubProjectSyncService {
                             projectNodeId
                         );
                         transactionTemplate.executeWithoutResult(status -> {
-                            ProcessingContext ctx = ProcessingContext.forSync(scopeId, null);
+                            ProcessingContext ctx = ProcessingContext.forSync(scopeId, provider);
                             projectProcessor.delete(projectId, ctx);
                         });
                         return SyncResult.completed(0);
@@ -826,7 +845,7 @@ public class GitHubProjectSyncService {
                         return new ItemPageResult(0, 0);
                     }
 
-                    ProcessingContext context = ProcessingContext.forSync(scopeId, null);
+                    ProcessingContext context = ProcessingContext.forSync(scopeId, provider);
                     int itemsProcessed = 0;
                     int itemsSkipped = 0;
 
@@ -1052,7 +1071,7 @@ public class GitHubProjectSyncService {
             // Resumed syncs and server-side filtered syncs only cover a subset of items,
             // so removal would incorrectly delete items that simply weren't re-fetched.
             if (!resuming && !serverSideFiltered) {
-                ProcessingContext context = ProcessingContext.forSync(scopeId, null);
+                ProcessingContext context = ProcessingContext.forSync(scopeId, provider);
                 int removedDrafts = itemProcessor.removeStaleDraftIssues(projectId, syncedItemNodeIds, context);
                 if (removedDrafts > 0) {
                     log.debug("Removed stale Draft Issues: projectId={}, count={}", projectId, removedDrafts);
@@ -1342,12 +1361,18 @@ public class GitHubProjectSyncService {
      * Status updates track project health with ON_TRACK, AT_RISK, OFF_TRACK statuses.
      * Uses Mono.defer() with retry for transport error resilience.
      *
-     * @param client  the GraphQL client
-     * @param project the project to sync status updates for
-     * @param scopeId the scope ID for rate limit tracking
+     * @param client   the GraphQL client
+     * @param project  the project to sync status updates for
+     * @param scopeId  the scope ID for rate limit tracking
+     * @param provider the git provider instance for processing context
      * @return true if status update sync completed successfully, false if aborted or failed
      */
-    private boolean syncProjectStatusUpdates(HttpGraphQlClient client, Project project, Long scopeId) {
+    private boolean syncProjectStatusUpdates(
+        HttpGraphQlClient client,
+        Project project,
+        Long scopeId,
+        GitProvider provider
+    ) {
         String projectNodeId = project.getNodeId();
         if (projectNodeId == null) {
             return true; // Nothing to sync, consider it success
@@ -1458,7 +1483,7 @@ public class GitHubProjectSyncService {
                         return;
                     }
 
-                    ProcessingContext context = ProcessingContext.forSync(scopeId, null);
+                    ProcessingContext context = ProcessingContext.forSync(scopeId, provider);
 
                     for (GHProjectV2StatusUpdate graphQlStatusUpdate : statusUpdatesConnection.getNodes()) {
                         GitHubProjectStatusUpdateDTO dto = GitHubProjectStatusUpdateDTO.fromStatusUpdate(
@@ -1508,7 +1533,7 @@ public class GitHubProjectSyncService {
                 // Remove stale status updates only if we have synced IDs to compare against
                 if (!syncedStatusUpdateNodeIds.isEmpty()) {
                     transactionTemplate.executeWithoutResult(status -> {
-                        ProcessingContext context = ProcessingContext.forSync(scopeId, null);
+                        ProcessingContext context = ProcessingContext.forSync(scopeId, provider);
                         int removed = statusUpdateProcessor.removeStaleStatusUpdates(
                             projectId,
                             syncedStatusUpdateNodeIds,
@@ -1554,14 +1579,19 @@ public class GitHubProjectSyncService {
     /**
      * Removes projects that no longer exist in the organization.
      */
-    private void removeDeletedProjects(Long organizationId, Set<Long> syncedProjectIds) {
+    private void removeDeletedProjects(
+        Long organizationId,
+        Set<Long> syncedProjectIds,
+        Long scopeId,
+        GitProvider provider
+    ) {
         transactionTemplate.executeWithoutResult(status -> {
             List<Project> existingProjects = projectRepository.findAllByOwnerTypeAndOwnerId(
                 Project.OwnerType.ORGANIZATION,
                 organizationId
             );
 
-            ProcessingContext context = ProcessingContext.forSync(null, null);
+            ProcessingContext context = ProcessingContext.forSync(scopeId, provider);
             int removed = 0;
 
             for (Project project : existingProjects) {

@@ -28,10 +28,10 @@ public interface ProjectStatusUpdateRepository extends JpaRepository<ProjectStat
     @Query(
         value = """
         INSERT INTO project_status_update (
-            id, node_id, project_id, body, body_html, start_date, target_date, status, creator_id, created_at, updated_at
+            native_id, provider_id, node_id, project_id, body, body_html, start_date, target_date, status, creator_id, created_at, updated_at
         )
         VALUES (
-            :id, :nodeId, :projectId, :body, :bodyHtml, :startDate, :targetDate, :status, :creatorId, :createdAt, :updatedAt
+            :nativeId, :providerId, :nodeId, :projectId, :body, :bodyHtml, :startDate, :targetDate, :status, :creatorId, :createdAt, :updatedAt
         )
         ON CONFLICT (node_id) DO UPDATE SET
             body = EXCLUDED.body,
@@ -44,7 +44,8 @@ public interface ProjectStatusUpdateRepository extends JpaRepository<ProjectStat
         nativeQuery = true
     )
     int upsertCore(
-        @Param("id") Long id,
+        @Param("nativeId") Long nativeId,
+        @Param("providerId") Long providerId,
         @Param("nodeId") String nodeId,
         @Param("projectId") Long projectId,
         @Param("body") String body,

@@ -1,5 +1,8 @@
 package de.tum.in.www1.hephaestus.workspace;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
@@ -16,6 +19,9 @@ public abstract class AbstractWorkspaceIntegrationTest extends BaseIntegrationTe
 
     @Autowired
     protected UserRepository userRepository;
+
+    @Autowired
+    protected GitProviderRepository gitProviderRepository;
 
     @Autowired
     protected WorkspaceService workspaceService;
@@ -36,9 +42,18 @@ public abstract class AbstractWorkspaceIntegrationTest extends BaseIntegrationTe
         databaseTestUtils.cleanDatabase();
     }
 
+    protected GitProvider ensureGitHubProvider() {
+        return gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
+            .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com")));
+    }
+
     protected User persistUser(String login) {
+        GitProvider provider = ensureGitHubProvider();
         User user = new User();
-        user.setId(userIdGenerator.incrementAndGet());
+        long nativeId = userIdGenerator.incrementAndGet();
+        user.setNativeId(nativeId);
+        user.setProvider(provider);
         user.setLogin(login);
         user.setName("User " + login);
         user.setAvatarUrl("https://example.com/" + login + ".png");
@@ -73,12 +88,12 @@ public abstract class AbstractWorkspaceIntegrationTest extends BaseIntegrationTe
     }
 
     protected WorkspaceMembership ensureAdminMembership(Workspace workspace) {
-        User adminUser = TestUserFactory.ensureUser(userRepository, "admin", 3L);
+        User adminUser = TestUserFactory.ensureUser(userRepository, "admin", 3L, ensureGitHubProvider());
         return ensureWorkspaceMembership(workspace, adminUser, WorkspaceMembership.WorkspaceRole.ADMIN);
     }
 
     protected WorkspaceMembership ensureOwnerMembership(Workspace workspace) {
-        User adminUser = TestUserFactory.ensureUser(userRepository, "admin", 3L);
+        User adminUser = TestUserFactory.ensureUser(userRepository, "admin", 3L, ensureGitHubProvider());
         return ensureWorkspaceMembership(workspace, adminUser, WorkspaceMembership.WorkspaceRole.OWNER);
     }
 }

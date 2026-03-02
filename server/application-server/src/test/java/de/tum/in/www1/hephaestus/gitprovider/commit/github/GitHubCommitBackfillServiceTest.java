@@ -112,6 +112,9 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
         lenient().when(repo.getId()).thenReturn(id);
         lenient().when(repo.getNameWithOwner()).thenReturn(nameWithOwner);
         lenient().when(repo.getDefaultBranch()).thenReturn(defaultBranch);
+        var provider = mock(de.tum.in.www1.hephaestus.gitprovider.common.GitProvider.class);
+        lenient().when(provider.getId()).thenReturn(1L);
+        lenient().when(repo.getProvider()).thenReturn(provider);
         return repo;
     }
 
@@ -537,8 +540,8 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
             when(gitRepositoryManager.walkCommits(1L, null, "head123")).thenReturn(List.of(commitInfo));
             when(commitRepository.existsByShaAndRepositoryId("commit1", 1L)).thenReturn(false);
 
-            when(authorResolver.resolveByEmail("author@test.com")).thenReturn(10L);
-            when(authorResolver.resolveByEmail("committer@test.com")).thenReturn(20L);
+            when(authorResolver.resolveByEmail(eq("author@test.com"), any())).thenReturn(10L);
+            when(authorResolver.resolveByEmail(eq("committer@test.com"), any())).thenReturn(20L);
 
             Commit mockCommit = createMockCommit("commit1", 1L);
             when(commitRepository.findByShaAndRepositoryId("commit1", 1L)).thenReturn(Optional.of(mockCommit));
@@ -578,8 +581,8 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
             when(gitRepositoryManager.walkCommits(1L, null, "head123")).thenReturn(List.of(commitInfo));
             when(commitRepository.existsByShaAndRepositoryId("commit1", 1L)).thenReturn(false);
 
-            when(authorResolver.resolveByEmail("author@test.com")).thenReturn(null);
-            when(authorResolver.resolveByEmail("committer@test.com")).thenReturn(null);
+            when(authorResolver.resolveByEmail(eq("author@test.com"), any())).thenReturn(null);
+            when(authorResolver.resolveByEmail(eq("committer@test.com"), any())).thenReturn(null);
 
             Commit mockCommit = createMockCommit("commit1", 1L);
             when(commitRepository.findByShaAndRepositoryId("commit1", 1L)).thenReturn(Optional.of(mockCommit));
