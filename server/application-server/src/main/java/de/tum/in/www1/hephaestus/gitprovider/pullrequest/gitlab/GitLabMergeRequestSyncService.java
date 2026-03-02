@@ -704,8 +704,11 @@ public class GitLabMergeRequestSyncService {
                 }
 
                 if (response.getErrors() != null && !response.getErrors().isEmpty()) {
-                    log.warn("Partial errors fetching remaining MR labels: context={}, errors={}",
-                        context, response.getErrors());
+                    log.warn(
+                        "Partial errors fetching remaining MR labels: context={}, errors={}",
+                        context,
+                        response.getErrors()
+                    );
                 }
 
                 graphQlClientProvider.recordSuccess();
@@ -744,8 +747,11 @@ public class GitLabMergeRequestSyncService {
         }
 
         if (!allRemaining.isEmpty()) {
-            log.info("Fetched {} additional MR labels via follow-up pagination: context={}",
-                allRemaining.size(), context);
+            log.info(
+                "Fetched {} additional MR labels via follow-up pagination: context={}",
+                allRemaining.size(),
+                context
+            );
         }
 
         return allRemaining.isEmpty() ? null : allRemaining;
@@ -788,8 +794,11 @@ public class GitLabMergeRequestSyncService {
                 }
 
                 if (response.getErrors() != null && !response.getErrors().isEmpty()) {
-                    log.warn("Partial errors fetching remaining MR assignees: context={}, errors={}",
-                        context, response.getErrors());
+                    log.warn(
+                        "Partial errors fetching remaining MR assignees: context={}, errors={}",
+                        context,
+                        response.getErrors()
+                    );
                 }
 
                 graphQlClientProvider.recordSuccess();
@@ -830,8 +839,11 @@ public class GitLabMergeRequestSyncService {
         }
 
         if (!allRemaining.isEmpty()) {
-            log.info("Fetched {} additional MR assignees via follow-up pagination: context={}",
-                allRemaining.size(), context);
+            log.info(
+                "Fetched {} additional MR assignees via follow-up pagination: context={}",
+                allRemaining.size(),
+                context
+            );
         }
 
         return allRemaining.isEmpty() ? null : allRemaining;
@@ -873,8 +885,11 @@ public class GitLabMergeRequestSyncService {
                 }
 
                 if (response.getErrors() != null && !response.getErrors().isEmpty()) {
-                    log.warn("Partial errors fetching remaining MR reviewers: context={}, errors={}",
-                        context, response.getErrors());
+                    log.warn(
+                        "Partial errors fetching remaining MR reviewers: context={}, errors={}",
+                        context,
+                        response.getErrors()
+                    );
                 }
 
                 graphQlClientProvider.recordSuccess();
@@ -915,8 +930,11 @@ public class GitLabMergeRequestSyncService {
         }
 
         if (!allRemaining.isEmpty()) {
-            log.info("Fetched {} additional MR reviewers via follow-up pagination: context={}",
-                allRemaining.size(), context);
+            log.info(
+                "Fetched {} additional MR reviewers via follow-up pagination: context={}",
+                allRemaining.size(),
+                context
+            );
         }
 
         return allRemaining;
@@ -958,8 +976,11 @@ public class GitLabMergeRequestSyncService {
                 }
 
                 if (response.getErrors() != null && !response.getErrors().isEmpty()) {
-                    log.warn("Partial errors fetching remaining MR approvers: context={}, errors={}",
-                        context, response.getErrors());
+                    log.warn(
+                        "Partial errors fetching remaining MR approvers: context={}, errors={}",
+                        context,
+                        response.getErrors()
+                    );
                 }
 
                 graphQlClientProvider.recordSuccess();
@@ -1000,8 +1021,11 @@ public class GitLabMergeRequestSyncService {
         }
 
         if (!allRemaining.isEmpty()) {
-            log.info("Fetched {} additional MR approvers via follow-up pagination: context={}",
-                allRemaining.size(), context);
+            log.info(
+                "Fetched {} additional MR approvers via follow-up pagination: context={}",
+                allRemaining.size(),
+                context
+            );
         }
 
         return allRemaining;

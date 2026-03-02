@@ -330,9 +330,7 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
             handler.handleEvent(loadPayload("merge_request.unapproved"));
 
             transactionTemplate.executeWithoutResult(status -> {
-                long reviewId = GitLabMergeRequestProcessor.generateApprovalReviewId(
-                    NATIVE_MR4_ID, NATIVE_APPROVER_ID
-                );
+                long reviewId = GitLabMergeRequestProcessor.generateApprovalReviewId(NATIVE_MR4_ID, NATIVE_APPROVER_ID);
                 assertThat(reviewRepository.findById(reviewId)).isEmpty();
             });
 
@@ -416,9 +414,7 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
             assertThat(eventListener.getReviewSubmittedEvents()).hasSize(1);
 
             transactionTemplate.executeWithoutResult(status -> {
-                long reviewId = GitLabMergeRequestProcessor.generateApprovalReviewId(
-                    NATIVE_MR4_ID, NATIVE_APPROVER_ID
-                );
+                long reviewId = GitLabMergeRequestProcessor.generateApprovalReviewId(NATIVE_MR4_ID, NATIVE_APPROVER_ID);
                 assertThat(reviewRepository.findById(reviewId)).isPresent();
             });
 
@@ -427,9 +423,7 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
             assertThat(eventListener.getReviewDismissedEvents()).hasSize(1);
 
             transactionTemplate.executeWithoutResult(status -> {
-                long reviewId = GitLabMergeRequestProcessor.generateApprovalReviewId(
-                    NATIVE_MR4_ID, NATIVE_APPROVER_ID
-                );
+                long reviewId = GitLabMergeRequestProcessor.generateApprovalReviewId(NATIVE_MR4_ID, NATIVE_APPROVER_ID);
                 assertThat(reviewRepository.findById(reviewId)).isEmpty();
             });
         }
