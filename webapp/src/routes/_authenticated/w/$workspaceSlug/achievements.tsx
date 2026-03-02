@@ -5,7 +5,6 @@ import { useState } from "react";
 import { getUserProfileOptions } from "@/api/@tanstack/react-query.gen";
 import { AchievementHeader } from "@/components/achievements/AchievementHeader.tsx";
 import { AchievementsListView } from "@/components/achievements/AchievementsListView.tsx";
-import { CategoryLabels } from "@/components/achievements/CategoryLabels.tsx";
 import { SkillTree } from "@/components/achievements/SkillTree.tsx";
 import { StatsPanel } from "@/components/achievements/stats-panel";
 import type { ViewMode } from "@/components/achievements/types";
@@ -67,18 +66,7 @@ function AchievementsPage() {
 								{/* Radial gradient background */}
 								<div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,var(--tw-gradient-stops))] from-primary/5 via-background to-background" />
 
-								{/* Decorative rings */}
-								<div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-									<div className="w-100 h-100 rounded-full border border-primary/10" />
-									<div className="absolute w-150 h-150 rounded-full border border-primary/10" />
-									<div className="absolute w-200 h-200 rounded-full border border-primary/10" />
-									<div className="absolute w-250 h-250 rounded-full border border-primary/5" />
-									<div className="absolute w-300 h-300 rounded-full border border-primary/5" />
-									<div className="absolute w-375 h-375 rounded-full border border-primary/5" />
-								</div>
 
-								{/* Category labels */}
-								<CategoryLabels />
 
 
 

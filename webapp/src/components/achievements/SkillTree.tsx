@@ -15,6 +15,7 @@ import { generateSkillTreeData } from "@/components/achievements/utils";
 import { AchievementEdge } from "./AchievementEdge.tsx";
 import { AchievementNode } from "./AchievementNode.tsx";
 import { AvatarNode } from "./AvatarNode.tsx";
+import { SkillTreeGraphBackground } from "./SkillTreeGraphBackground.tsx";
 
 const nodeTypes: NodeTypes = {
 	achievement: AchievementNode,
@@ -100,6 +101,7 @@ export function SkillTree({ user, achievements }: SkillTreeProps) {
 				panActivationKeyCode={null}
 				disableKeyboardA11y={true}
 			>
+				<SkillTreeGraphBackground />
 				{/* Subtle dot grid background */}
 				<Background gap={40} size={1} color="var(--border)" className="opacity-20" />
 

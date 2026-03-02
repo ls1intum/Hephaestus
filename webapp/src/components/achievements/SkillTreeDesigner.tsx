@@ -19,6 +19,7 @@ import { Switch } from "@/components/ui/switch.tsx";
 import { AchievementEdge } from "./AchievementEdge.tsx";
 import { AchievementNode } from "./AchievementNode.tsx";
 import { AvatarNode } from "./AvatarNode.tsx";
+import { SkillTreeGraphBackground } from "./SkillTreeGraphBackground.tsx";
 
 const nodeTypes: NodeTypes = {
 	achievement: AchievementNode,
@@ -163,6 +164,8 @@ export function SkillTreeDesigner({ user, allDefinitions }: SkillTreeDesignerPro
 				panActivationKeyCode={null}
 				disableKeyboardA11y={true}
 			>
+				{/* Custom zooming synchronized background */}
+				<SkillTreeGraphBackground />
 				<Background gap={40} size={1} color="var(--border)" className="opacity-20" />
 				<Controls
 					className="bg-card! border-border! rounded-lg! overflow-hidden [&>button]:bg-card! [&>button]:border-border! [&>button]:text-foreground! [&>button:hover]:bg-secondary!"

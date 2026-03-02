@@ -8,28 +8,28 @@
     "y": 30
   },
   "pr_beginner": {
-    "x": 300,
-    "y": 25
+    "x": 299,
+    "y": 28
   },
   "pr_apprentice": {
     "x": 423,
-    "y": 20
+    "y": 21
   },
   "integration_regular": {
-    "x": 536,
-    "y": 16
+    "x": 538,
+    "y": 18
   },
   "pr_specialist": {
     "x": 669,
-    "y": 10
+    "y": 13
   },
   "integration_expert": {
-    "x": 785,
-    "y": 2
+    "x": 788,
+    "y": 7
   },
   "master_integrator": {
-    "x": 918,
-    "y": -6
+    "x": 921,
+    "y": 1
   },
   "first_review": {
     "x": 36,
@@ -48,7 +48,7 @@
     "y": 389
   },
   "helpful_reviewer": {
-    "x": 659,
-    "y": -203
+    "x": 474,
+    "y": 353
   }
 }

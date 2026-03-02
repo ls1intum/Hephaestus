@@ -97,11 +97,10 @@ export const statusIcons = {
 
 /** Skill tree radial angles with clock direction annotations */
 const skillTreeAngles = {
-	TOP: 270, // Top (12 o'clock)
-	TOP_RIGHT: 342, // Top-right (2 o'clock)
-	RIGHT: 54, // Right (4 o'clock)
-	BOTTOM_RIGHT: 126, // Bottom-right (7 o'clock)
-	BOTTOM_LEFT: 198, // Bottom-left (9 o'clock)
+	NORTH: 270, // Top (Commits)
+	EAST: 0, // Right (Pull Requests)
+	SOUTH: 90, // Bottom (Communication)
+	WEST: 180, // Left (Issues)
 } as const satisfies Record<string, number>;
 
 /**
@@ -111,27 +110,27 @@ const skillTreeAngles = {
 export const categoryMeta = {
 	commits: {
 		name: "Commits",
-		angle: skillTreeAngles.TOP,
+		angle: skillTreeAngles.NORTH,
 		description: "Track your code contributions",
 	},
 	pull_requests: {
 		name: "Pull Requests",
-		angle: skillTreeAngles.TOP_RIGHT,
+		angle: skillTreeAngles.EAST,
 		description: "Submit and merge code changes",
 	},
 	communication: {
 		name: "Communication",
-		angle: skillTreeAngles.RIGHT,
+		angle: skillTreeAngles.SOUTH,
 		description: "Reviews, comments, and discussions",
 	},
 	issues: {
 		name: "Issues",
-		angle: skillTreeAngles.BOTTOM_RIGHT,
+		angle: skillTreeAngles.WEST,
 		description: "Report and track work items",
 	},
 	milestones: {
 		name: "Milestones",
-		angle: skillTreeAngles.BOTTOM_LEFT,
+		angle: 0, // Milestones don't have a specific direction, they are placed in between components or have a special border later.
 		description: "Combined achievements",
 	},
 } as const satisfies Record<
