@@ -54,6 +54,7 @@
     "time_estimate": 0,
     "title": "Test MR for close/reopen",
     "updated_at": "2026-01-31 19:26:48 +0100",
+    "closed_at": "2026-01-31 19:26:48 +0100",
     "updated_by_id": null,
     "prepared_at": "2026-01-31 19:26:46 +0100",
     "assignee_ids": [],
