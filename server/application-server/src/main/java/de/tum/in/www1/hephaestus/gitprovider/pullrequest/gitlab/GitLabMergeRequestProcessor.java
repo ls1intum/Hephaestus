@@ -546,9 +546,9 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             mrState.name(),
             null,
             htmlUrl,
-            null, // isLocked: not in webhook, COALESCE preserves sync value
+            false, // isLocked: not in webhook, default false (NOT NULL column)
             parseGitLabTimestamp(closedAt),
-            0, // commentsCount: not in webhook, default to 0 (NOT NULL column)
+            0, // commentsCount: not in webhook, default 0 (NOT NULL column)
             now, // lastSyncAt
             parseGitLabTimestamp(createdAt),
             parseGitLabTimestamp(updatedAt),
@@ -558,10 +558,10 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             parseGitLabTimestamp(mergedAt),
             draft,
             isMerged,
-            null,
-            null,
-            null,
-            null, // commits, additions, deletions, changedFiles — not in webhook
+            0,
+            0,
+            0,
+            0, // commits, additions, deletions, changedFiles — not in webhook, default 0 (NOT NULL)
             null,
             null,
             null, // reviewDecision, mergeStateStatus, mergeable — not in webhook

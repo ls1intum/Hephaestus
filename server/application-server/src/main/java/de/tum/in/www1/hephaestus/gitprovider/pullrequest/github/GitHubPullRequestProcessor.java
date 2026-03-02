@@ -231,7 +231,9 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         upsertMergeCommit(dto, repository);
 
         // Publish events
-        if (isNew) {
+        // Promotions (ISSUE→PR) are treated as new for event purposes: existingOpt is empty
+        // because the entity was an Issue, not a PullRequest, so computeChangedFields would crash.
+        if (isNew || promotedFromIssue) {
             eventPublisher.publishEvent(
                 new DomainEvent.PullRequestCreated(EventPayload.PullRequestData.from(pr), EventContext.from(context))
             );
