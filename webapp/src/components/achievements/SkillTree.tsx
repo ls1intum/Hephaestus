@@ -9,7 +9,7 @@ import {
 	useNodesState,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { useEffect, useSyncExternalStore } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 import type { UIAchievement } from "@/components/achievements/types";
 import { generateSkillTreeData } from "@/components/achievements/utils";
 import { AchievementEdge } from "./AchievementEdge.tsx";
@@ -62,6 +62,9 @@ export function SkillTree({ user, achievements }: SkillTreeProps) {
 	const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
 	const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
+	// Node origin: [0.5, 0.5] treats position as node center, matching the designer.
+	const nodeOrigin = useRef<[number, number]>([0.5, 0.5]).current;
+
 	// Update nodes when user or achievements props change
 	useEffect(() => {
 		const { nodes: newNodes, edges: newEdges } = generateSkillTreeData(user, achievements);
@@ -87,6 +90,7 @@ export function SkillTree({ user, achievements }: SkillTreeProps) {
 				fitViewOptions={{ padding: 0.15 }}
 				minZoom={0.15}
 				maxZoom={2.5}
+				nodeOrigin={nodeOrigin}
 				proOptions={{ hideAttribution: true }}
 				className="bg-background"
 				// Nodes should be not accessible besides selection for tooltip

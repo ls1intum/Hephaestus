@@ -4,48 +4,48 @@
     "y": 0
   },
   "first_pull": {
-    "x": 186,
-    "y": 30
+    "x": 160,
+    "y": 0
   },
   "pr_beginner": {
-    "x": 299,
-    "y": 28
+    "x": 280,
+    "y": 0
   },
   "pr_apprentice": {
-    "x": 425,
-    "y": 25
+    "x": 402,
+    "y": 2
   },
   "integration_regular": {
-    "x": 525,
-    "y": 25
+    "x": 522,
+    "y": 2
   },
   "pr_specialist": {
-    "x": 625,
-    "y": 25
+    "x": 644,
+    "y": 4
   },
   "integration_expert": {
-    "x": 725,
-    "y": 25
+    "x": 778,
+    "y": -2
   },
   "master_integrator": {
-    "x": 850,
-    "y": 25
+    "x": 962,
+    "y": 2
   },
   "first_review": {
-    "x": 25,
-    "y": 175
+    "x": 0,
+    "y": 140
   },
   "review_rookie": {
-    "x": 25,
-    "y": 275
+    "x": 0,
+    "y": 220
   },
   "review_master": {
-    "x": -75,
-    "y": 375
+    "x": -82,
+    "y": 318
   },
   "code_commenter": {
-    "x": 125,
-    "y": 375
+    "x": 78,
+    "y": 318
   },
   "helpful_reviewer": {
     "x": 400,

@@ -10,7 +10,7 @@ import {
 	useNodesState,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { Achievement } from "@/api/types.gen";
 import { ACHIEVEMENT_REGISTRY } from "@/components/achievements/definitions.ts";
 import type { UIAchievement } from "@/components/achievements/types";
@@ -63,6 +63,11 @@ export function SkillTreeDesigner({ user, allDefinitions }: SkillTreeDesignerPro
 	const [edges, setEdges, onEdgesChange] = useEdgesState<AchievementEdge>([]);
 	const [isDraggable, setIsDraggable] = useState(true);
 	const [isSnapping, setIsSnapping] = useState(true);
+	const [showTooltips, setShowTooltips] = useState(true);
+
+	// Node origin: [0.5, 0.5] means position refers to the center of each node,
+	// so the visual circle aligns perfectly with grid intersections.
+	const nodeOrigin = useRef<[number, number]>([0.5, 0.5]).current;
 	const [snapSize, setSnapSize] = useState<SnapGridSize>(25);
 
 	// Memoize snap grid tuple to avoid unnecessary re-renders
@@ -132,11 +137,19 @@ export function SkillTreeDesigner({ user, allDefinitions }: SkillTreeDesignerPro
 				onSnappingChange={setIsSnapping}
 				snapSize={snapSize}
 				onSnapSizeChange={setSnapSize}
+				showTooltips={showTooltips}
+				onShowTooltipsChange={setShowTooltips}
 				onSave={saveLayout}
 			/>
 
 			<ReactFlow
-				nodes={nodes}
+				nodes={nodes.map(
+					(n) =>
+						({
+							...n,
+							data: { ...n.data, showTooltips },
+						}) as AchievementNode | AvatarNode,
+				)}
 				edges={edges}
 				onNodesChange={onNodesChange}
 				onEdgesChange={onEdgesChange}
@@ -147,6 +160,7 @@ export function SkillTreeDesigner({ user, allDefinitions }: SkillTreeDesignerPro
 				fitViewOptions={{ padding: 0.15 }}
 				minZoom={0.15}
 				maxZoom={2.5}
+				nodeOrigin={nodeOrigin}
 				proOptions={{ hideAttribution: true }}
 				className="bg-background"
 				elementsSelectable={true}

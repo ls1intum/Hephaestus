@@ -7,7 +7,7 @@ import { AchievementTooltip } from "./AchievementTooltip.tsx";
 import { rarityIconSizes, raritySizes, rarityStylingClasses } from "./styles.ts";
 
 export type AchievementNode = Node<
-	{ achievement: UIAchievement; className?: string },
+	{ achievement: UIAchievement; showTooltips?: boolean; className?: string },
 	"achievement"
 >;
 
@@ -28,14 +28,14 @@ export function AchievementNode({ data }: NodeProps<AchievementNode>) {
 	};
 
 	return (
-		<>
+		<div className="border border-red-500">
 			<Handle
 				type="target"
 				position={Position.Top}
 				className="bg-transparent! border-0! w-0! h-0!"
 				style={{ top: "50%", left: "50%", transform: "translate(-50%, -50%)" }}
 			/>
-			<AchievementTooltip achievement={achievement} open={isHovered}>
+			<AchievementTooltip achievement={achievement} open={isHovered && data.showTooltips !== false}>
 				<button
 					type="button"
 					className={cn(
@@ -114,6 +114,6 @@ export function AchievementNode({ data }: NodeProps<AchievementNode>) {
 				className="bg-transparent! border-0! w-0! h-0!"
 				style={{ top: "50%", left: "50%", transform: "translate(-50%, -50%)" }}
 			/>
-		</>
+		</div>
 	);
 }

@@ -1,4 +1,4 @@
-import { Grid3x3, Magnet, Move, Save } from "lucide-react";
+import { Grid3x3, Magnet, Move, Save, MessageSquareOff } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Separator } from "@/components/ui/separator.tsx";
@@ -17,6 +17,9 @@ export interface DesignerToolbarProps {
 	/** The current snap grid size */
 	snapSize: SnapGridSize;
 	onSnapSizeChange: (size: SnapGridSize) => void;
+	/** Whether tooltips should be shown */
+	showTooltips: boolean;
+	onShowTooltipsChange: (value: boolean) => void;
 	/** Save callback */
 	onSave: () => void;
 }
@@ -28,6 +31,8 @@ export function DesignerToolbar({
 	onSnappingChange,
 	snapSize,
 	onSnapSizeChange,
+	showTooltips,
+	onShowTooltipsChange,
 	onSave,
 }: DesignerToolbarProps) {
 	return (
@@ -42,6 +47,21 @@ export function DesignerToolbar({
 				/>
 				<Label htmlFor="designer-drag-mode" className="cursor-pointer text-sm">
 					Drag
+				</Label>
+			</div>
+
+			<Separator orientation="vertical" className="h-6" />
+
+			{/* Tooltip toggle */}
+			<div className="flex items-center gap-2">
+				<MessageSquareOff className="w-4 h-4 text-muted-foreground" />
+				<Switch
+					id="designer-tooltip-mode"
+					checked={!showTooltips}
+					onCheckedChange={(checked) => onShowTooltipsChange(!checked)}
+				/>
+				<Label htmlFor="designer-tooltip-mode" className="cursor-pointer text-sm">
+					Hide Tooltips
 				</Label>
 			</div>
 

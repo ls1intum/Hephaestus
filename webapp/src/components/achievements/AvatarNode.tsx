@@ -5,7 +5,14 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { cn } from "@/lib/utils";
 
 export type AvatarNode = Node<
-	{ level: number; leaguePoints: number; avatarUrl: string; name: string; className?: string },
+	{
+		level: number;
+		leaguePoints: number;
+		avatarUrl: string;
+		name: string;
+		showTooltips?: boolean;
+		className?: string;
+	},
 	"avatar"
 >;
 

@@ -112,8 +112,6 @@ export function generateSkillTreeData(
 		// The API doesn't provide a numeric 'level' field directly in Achievement type
 		// but 'rarity' maps to it. Or we use the 'parentId' chain depth.
 		// For now, let's assume we can derive a visual 'level' from rarity or use a default.
-		// data.ts used `achievement.level`. If that property is missing from the generated type,
-		// we need to compute it.
 		// Generated Achievement type does NOT have 'level'. It has 'rarity'.
 		// We can map Rarity -> Level (Common=1, Mythic=6).
 

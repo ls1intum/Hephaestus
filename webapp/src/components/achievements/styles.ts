@@ -64,16 +64,16 @@ export const rarityColors = {
 } as const satisfies Record<AchievementRarity, string>;
 
 export const rarityIconSizes = {
-	common: 14,
-	uncommon: 16,
-	rare: 18,
-	epic: 22,
-	legendary: 26,
-	mythic: 32,
+	common: 15,
+	uncommon: 15,
+	rare: 25,
+	epic: 25,
+	legendary: 35,
+	mythic: 50,
 } as const satisfies Record<AchievementRarity, number>;
 
 export const rarityStylingClasses = {
-	common: "bg-node-locked border-node-locked/50 opacity-40",
+	common: "bg-node-locked border-node-locked/50",
 	uncommon:
 		"bg-node-available/80 border-node-available/70 shadow-[0_0_12px_rgba(var(--shadow-rgb),0.15)]",
 	rare: "bg-node-unlocked border-node-unlocked shadow-[0_0_15px_rgba(var(--shadow-rgb),0.3),0_0_30px_rgba(var(--shadow-rgb),0.15)]",
