@@ -119,6 +119,7 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         // Must correct the discriminator BEFORE the upsert, because ON CONFLICT matches on
         // (repository_id, issue_type, number) — a mismatched issue_type would cause an INSERT
         // instead of an UPDATE, violating the (provider_id, native_id) constraint.
+        boolean promotedFromIssue = false;
         if (isNew) {
             Optional<Issue> existingIssue = issueRepository.findByRepositoryIdAndNumber(
                 repository.getId(),
@@ -126,9 +127,10 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
             );
             if (existingIssue.isPresent()) {
                 issueRepository.correctDiscriminator(repository.getId(), dto.number(), "ISSUE", "PULL_REQUEST");
-                // Re-fetch as PullRequest after discriminator correction
-                // (clearAutomatically=true evicted the old entity)
-                existingOpt = pullRequestRepository.findByRepositoryIdAndNumber(repository.getId(), dto.number());
+                // Don't re-fetch: the promoted row has NULL PR-specific columns (additions, etc.)
+                // which would crash Hibernate on primitive int fields. The upsert below will
+                // populate all fields correctly.
+                promotedFromIssue = true;
                 isNew = false;
                 log.info(
                     "Corrected issue_type from ISSUE to PULL_REQUEST: repositoryId={}, number={}",
@@ -138,8 +140,9 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
             }
         }
 
-        // Skip update if existing data is newer (prevents stale webhooks from overwriting)
-        if (!isNew) {
+        // Skip update if existing data is newer (prevents stale webhooks from overwriting).
+        // Skip stale check for promotions — the entity needs all PR fields populated by the upsert.
+        if (!isNew && !promotedFromIssue) {
             PullRequest existing = existingOpt.get();
             if (
                 existing.getUpdatedAt() != null &&
