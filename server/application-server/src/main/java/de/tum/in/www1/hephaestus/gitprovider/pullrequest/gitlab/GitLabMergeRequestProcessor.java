@@ -548,8 +548,8 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             htmlUrl,
             null, // isLocked: not in webhook, COALESCE preserves sync value
             parseGitLabTimestamp(closedAt),
-            null,
-            now, // commentsCount: not in webhook
+            0, // commentsCount: not in webhook, default to 0 (NOT NULL column)
+            now, // lastSyncAt
             parseGitLabTimestamp(createdAt),
             parseGitLabTimestamp(updatedAt),
             author != null ? author.getId() : null,
