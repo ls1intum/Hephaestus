@@ -12,43 +12,43 @@
     "y": 28
   },
   "pr_apprentice": {
-    "x": 423,
-    "y": 21
+    "x": 425,
+    "y": 25
   },
   "integration_regular": {
-    "x": 538,
-    "y": 18
+    "x": 525,
+    "y": 25
   },
   "pr_specialist": {
-    "x": 669,
-    "y": 13
+    "x": 625,
+    "y": 25
   },
   "integration_expert": {
-    "x": 788,
-    "y": 7
+    "x": 725,
+    "y": 25
   },
   "master_integrator": {
-    "x": 921,
-    "y": 1
+    "x": 850,
+    "y": 25
   },
   "first_review": {
-    "x": 36,
-    "y": 181
+    "x": 25,
+    "y": 175
   },
   "review_rookie": {
-    "x": 41,
-    "y": 284
+    "x": 25,
+    "y": 275
   },
   "review_master": {
-    "x": -25,
-    "y": 390
+    "x": -75,
+    "y": 375
   },
   "code_commenter": {
-    "x": 94,
-    "y": 389
+    "x": 125,
+    "y": 375
   },
   "helpful_reviewer": {
-    "x": 474,
-    "y": 353
+    "x": 400,
+    "y": 275
   }
 }

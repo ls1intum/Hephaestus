@@ -1,5 +1,6 @@
 import {
 	Background,
+	BackgroundVariant,
 	Controls,
 	type EdgeTypes,
 	MiniMap,
@@ -9,16 +10,15 @@ import {
 	useNodesState,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import type { Achievement } from "@/api/types.gen";
 import { ACHIEVEMENT_REGISTRY } from "@/components/achievements/definitions.ts";
 import type { UIAchievement } from "@/components/achievements/types";
 import { generateSkillTreeData } from "@/components/achievements/utils";
-import { Label } from "@/components/ui/label.tsx";
-import { Switch } from "@/components/ui/switch.tsx";
 import { AchievementEdge } from "./AchievementEdge.tsx";
 import { AchievementNode } from "./AchievementNode.tsx";
 import { AvatarNode } from "./AvatarNode.tsx";
+import { DesignerToolbar, type SnapGridSize } from "./DesignerToolbar.tsx";
 import { SkillTreeGraphBackground } from "./SkillTreeGraphBackground.tsx";
 
 const nodeTypes: NodeTypes = {
@@ -61,9 +61,14 @@ export interface SkillTreeDesignerProps {
 export function SkillTreeDesigner({ user, allDefinitions }: SkillTreeDesignerProps) {
 	const [nodes, setNodes, onNodesChange] = useNodesState<(AchievementNode | AvatarNode)>([]);
 	const [edges, setEdges, onEdgesChange] = useEdgesState<AchievementEdge>([]);
-	const [isDesignerMode, setIsDesignerMode] = useState(true);
+	const [isDraggable, setIsDraggable] = useState(true);
+	const [isSnapping, setIsSnapping] = useState(true);
+	const [snapSize, setSnapSize] = useState<SnapGridSize>(25);
 
-	const saveLayout = async () => {
+	// Memoize snap grid tuple to avoid unnecessary re-renders
+	const snapGrid = useMemo((): [number, number] => [snapSize, snapSize], [snapSize]);
+
+	const saveLayout = useCallback(async () => {
 		const layoutMap = nodes.reduce(
 			(coords, node) => {
 				if (node.type === "avatar") coords.avatar = { x: 0, y: 0 };
@@ -84,7 +89,7 @@ export function SkillTreeDesigner({ user, allDefinitions }: SkillTreeDesignerPro
 			body: JSON.stringify(layoutMap, null, 2),
 		});
 		alert("Layout saved to coordinates.json!");
-	};
+	}, [nodes]);
 
 	useEffect(() => {
 		let displayAchievements: UIAchievement[] = [];
@@ -119,26 +124,16 @@ export function SkillTreeDesigner({ user, allDefinitions }: SkillTreeDesignerPro
 
 	return (
 		<div className="w-full h-full relative">
-			<div className="absolute top-4 right-4 z-50 flex items-center gap-4 bg-background p-3 rounded-lg shadow-lg border border-border">
-				<div className="flex items-center space-x-2">
-					<Switch
-						id="designer-mode"
-						checked={isDesignerMode}
-						onCheckedChange={setIsDesignerMode}
-					/>
-					<Label htmlFor="designer-mode" className="cursor-pointer">
-						Drag Nodes Enabled
-					</Label>
-				</div>
-
-				<button
-					type="button"
-					onClick={saveLayout}
-					className="px-3 py-1.5 bg-green-600 text-white text-sm font-semibold rounded shadow hover:bg-green-700 transition-colors"
-				>
-					Save Layout
-				</button>
-			</div>
+			{/* Designer Toolbar */}
+			<DesignerToolbar
+				isDraggable={isDraggable}
+				onDraggableChange={setIsDraggable}
+				isSnapping={isSnapping}
+				onSnappingChange={setIsSnapping}
+				snapSize={snapSize}
+				onSnapSizeChange={setSnapSize}
+				onSave={saveLayout}
+			/>
 
 			<ReactFlow
 				nodes={nodes}
@@ -155,8 +150,10 @@ export function SkillTreeDesigner({ user, allDefinitions }: SkillTreeDesignerPro
 				proOptions={{ hideAttribution: true }}
 				className="bg-background"
 				elementsSelectable={true}
-				nodesDraggable={isDesignerMode}
+				nodesDraggable={isDraggable}
 				nodesConnectable={false}
+				snapToGrid={isSnapping}
+				snapGrid={snapGrid}
 				deleteKeyCode={null}
 				selectionKeyCode={null}
 				multiSelectionKeyCode={null}
@@ -164,9 +161,28 @@ export function SkillTreeDesigner({ user, allDefinitions }: SkillTreeDesignerPro
 				panActivationKeyCode={null}
 				disableKeyboardA11y={true}
 			>
-				{/* Custom zooming synchronized background */}
-				<SkillTreeGraphBackground />
-				<Background gap={40} size={1} color="var(--border)" className="opacity-20" />
+				{/* Custom origin-synchronized background (axes + category labels) */}
+				<SkillTreeGraphBackground showAxes={true} />
+
+				{/* Fine subdivided dot grid */}
+				<Background
+					id="designer-grid-fine"
+					gap={isSnapping ? snapSize : 25}
+					size={1}
+					color="var(--border)"
+					className="opacity-15"
+					variant={BackgroundVariant.Dots}
+				/>
+				{/* Major grid lines – 4× the fine grid gap for clear subdivisions */}
+				<Background
+					id="designer-grid-major"
+					gap={isSnapping ? snapSize * 4 : 100}
+					lineWidth={1}
+					color="var(--border)"
+					className="opacity-30"
+					variant={BackgroundVariant.Lines}
+				/>
+
 				<Controls
 					className="bg-card! border-border! rounded-lg! overflow-hidden [&>button]:bg-card! [&>button]:border-border! [&>button]:text-foreground! [&>button:hover]:bg-secondary!"
 					showInteractive={false}
