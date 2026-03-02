@@ -329,7 +329,7 @@ public class WorkspaceActivationService {
                                         }
                                     }
 
-                                    // Update lastSyncAt once after all phases complete for this repo
+                                    // Update lastSyncAt when at least one sync phase completes for this repo
                                     if (issuesDone || mrsDone) {
                                         repositoryRepository.updateLastSyncAt(repo.getId(), Instant.now());
                                     }
