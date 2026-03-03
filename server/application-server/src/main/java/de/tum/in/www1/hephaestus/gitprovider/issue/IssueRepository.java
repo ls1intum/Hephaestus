@@ -107,7 +107,7 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
      * <p>
      * <b>Safety:</b> Only corrects rows where {@code issue_type = :currentType} to avoid
      * accidentally modifying the wrong entity in providers where issues and PRs share the
-     * same number namespace (e.g., GitLab IID).
+     * same number namespace (e.g., GitHub).
      *
      * @param repositoryId the repository ID
      * @param number the entity number within the repository
@@ -152,8 +152,9 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
             issue_type
         )
         VALUES (
-            :nativeId, :providerId, :number, :title, :body, :state, :stateReason, :htmlUrl, :isLocked,
-            :closedAt, :commentsCount, :lastSyncAt, :createdAt, :updatedAt,
+            :nativeId, :providerId, :number, :title, :body, :state, :stateReason, :htmlUrl,
+            COALESCE(:isLocked, false),
+            :closedAt, COALESCE(:commentsCount, 0), :lastSyncAt, :createdAt, :updatedAt,
             :authorId, :repositoryId, :milestoneId, :issueTypeId,
             :parentIssueId, :subIssuesTotal, :subIssuesCompleted, :subIssuesPercentCompleted,
             'ISSUE'
@@ -164,9 +165,9 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
             state = EXCLUDED.state,
             state_reason = EXCLUDED.state_reason,
             html_url = EXCLUDED.html_url,
-            is_locked = EXCLUDED.is_locked,
+            is_locked = COALESCE(EXCLUDED.is_locked, issue.is_locked),
             closed_at = EXCLUDED.closed_at,
-            comments_count = EXCLUDED.comments_count,
+            comments_count = COALESCE(EXCLUDED.comments_count, issue.comments_count),
             last_sync_at = EXCLUDED.last_sync_at,
             updated_at = EXCLUDED.updated_at,
             author_id = COALESCE(EXCLUDED.author_id, issue.author_id),
@@ -188,9 +189,9 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
         @Param("state") String state,
         @Param("stateReason") String stateReason,
         @Param("htmlUrl") String htmlUrl,
-        @Param("isLocked") boolean isLocked,
+        @Param("isLocked") Boolean isLocked,
         @Param("closedAt") Instant closedAt,
-        @Param("commentsCount") int commentsCount,
+        @Param("commentsCount") Integer commentsCount,
         @Param("lastSyncAt") Instant lastSyncAt,
         @Param("createdAt") Instant createdAt,
         @Param("updatedAt") Instant updatedAt,

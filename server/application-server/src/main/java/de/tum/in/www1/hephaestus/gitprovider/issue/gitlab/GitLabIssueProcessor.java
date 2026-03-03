@@ -210,7 +210,7 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
             issueState.name(),
             null, // stateReason — not available in GitLab
             data.webUrl(),
-            false, // locked — not in query
+            null, // locked — not available in GitLab API, null lets COALESCE preserve existing or default
             parseGitLabTimestamp(data.closedAt()),
             data.commentsCount(),
             now,
@@ -360,9 +360,9 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
             issueState.name(),
             null, // stateReason
             htmlUrl,
-            false, // locked
+            null, // locked — not in webhook, null lets COALESCE preserve existing or default
             parseGitLabTimestamp(closedAt),
-            0, // commentsCount — not available in webhook
+            null, // commentsCount — not in webhook, null lets COALESCE preserve existing or default
             now,
             parseGitLabTimestamp(createdAt),
             parseGitLabTimestamp(updatedAt),

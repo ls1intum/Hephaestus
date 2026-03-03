@@ -323,7 +323,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 .thenReturn(Optional.empty())
                 .thenReturn(Optional.of(pr));
 
-            GitLabMergeRequestEventDTO event = createEventWithState("open", null, false);
+            GitLabMergeRequestEventDTO event = createEventWithState("open", null);
             processor.process(event, createContext());
 
             verify(pullRequestRepository).upsertCore(
@@ -370,7 +370,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 .thenReturn(Optional.empty())
                 .thenReturn(Optional.of(pr));
 
-            GitLabMergeRequestEventDTO event = createEventWithState("open", "some_unknown_state", false);
+            GitLabMergeRequestEventDTO event = createEventWithState("open", "some_unknown_state");
             processor.process(event, createContext());
 
             verify(pullRequestRepository).upsertCore(
@@ -417,7 +417,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 .thenReturn(Optional.empty())
                 .thenReturn(Optional.of(pr));
 
-            GitLabMergeRequestEventDTO event = createEventWithState("open", "locked", false);
+            GitLabMergeRequestEventDTO event = createEventWithState("open", "locked");
             processor.process(event, createContext());
 
             verify(pullRequestRepository).upsertCore(
@@ -570,6 +570,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         @DisplayName("processReopened() sets state to OPEN and publishes PullRequestReopened")
         void processReopenedPublishesEvent() {
             PullRequest pr = createPullRequestEntity();
+            pr.setState(Issue.State.CLOSED);
             // 2 calls: stale+isNew check (process), post-upsert fetch (upsertMergeRequest)
             when(pullRequestRepository.findByRepositoryIdAndNumber(REPO_ID, MR_IID))
                 .thenReturn(Optional.of(pr))
@@ -1642,7 +1643,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         );
     }
 
-    private GitLabMergeRequestEventDTO createEventWithState(String action, String state, boolean confidential) {
+    private GitLabMergeRequestEventDTO createEventWithState(String action, String state) {
         var attrs = new GitLabMergeRequestEventDTO.ObjectAttributes(
             RAW_MR_ID,
             MR_IID,

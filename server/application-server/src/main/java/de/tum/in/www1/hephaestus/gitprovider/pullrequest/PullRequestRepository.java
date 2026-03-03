@@ -142,10 +142,12 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
             issue_type
         )
         VALUES (
-            :nativeId, :providerId, :number, :title, :body, :state, :stateReason, :htmlUrl, :isLocked,
-            :closedAt, :commentsCount, :lastSyncAt, :createdAt, :updatedAt,
+            :nativeId, :providerId, :number, :title, :body, :state, :stateReason, :htmlUrl,
+            COALESCE(:isLocked, false),
+            :closedAt, COALESCE(:commentsCount, 0), :lastSyncAt, :createdAt, :updatedAt,
             :authorId, :repositoryId, :milestoneId,
-            :mergedAt, :isDraft, :isMerged, :commits, :additions, :deletions, :changedFiles,
+            :mergedAt, :isDraft, :isMerged,
+            COALESCE(:commits, 0), COALESCE(:additions, 0), COALESCE(:deletions, 0), COALESCE(:changedFiles, 0),
             :reviewDecision, :mergeStateStatus, :mergeable,
             :headRefName, :baseRefName, :headRefOid, :baseRefOid, :mergedById,
             'PULL_REQUEST'

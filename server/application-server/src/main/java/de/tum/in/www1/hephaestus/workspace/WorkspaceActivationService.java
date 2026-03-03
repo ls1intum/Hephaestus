@@ -329,8 +329,10 @@ public class WorkspaceActivationService {
                                         }
                                     }
 
-                                    // Update lastSyncAt when at least one sync phase completes for this repo
-                                    if (issuesDone || mrsDone) {
+                                    // Update lastSyncAt only when every enabled sync phase completed for this repo
+                                    boolean allEnabledPhasesCompleted =
+                                        (issueSyncService == null || issuesDone) && (mrSyncService == null || mrsDone);
+                                    if (allEnabledPhasesCompleted) {
                                         repositoryRepository.updateLastSyncAt(repo.getId(), Instant.now());
                                     }
                                 }

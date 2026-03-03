@@ -229,8 +229,9 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
     @Transactional
     @Nullable
     public PullRequest processClosed(GitLabMergeRequestEventDTO event, ProcessingContext context) {
+        Issue.State before = getExistingState(event, context);
         PullRequest pr = process(event, context);
-        if (pr != null) {
+        if (pr != null && before != Issue.State.CLOSED && before != Issue.State.MERGED) {
             eventPublisher.publishEvent(
                 new DomainEvent.PullRequestClosed(
                     EventPayload.PullRequestData.from(pr),
@@ -249,8 +250,9 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
     @Transactional
     @Nullable
     public PullRequest processReopened(GitLabMergeRequestEventDTO event, ProcessingContext context) {
+        Issue.State before = getExistingState(event, context);
         PullRequest pr = process(event, context);
-        if (pr != null) {
+        if (pr != null && before != Issue.State.OPEN) {
             eventPublisher.publishEvent(
                 new DomainEvent.PullRequestReopened(EventPayload.PullRequestData.from(pr), EventContext.from(context))
             );
@@ -265,10 +267,15 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
     @Transactional
     @Nullable
     public PullRequest processMerged(GitLabMergeRequestEventDTO event, ProcessingContext context) {
+        Issue.State before = getExistingState(event, context);
         PullRequest pr = process(event, context);
-        if (pr != null) {
+        if (pr != null && before != Issue.State.MERGED) {
             var prData = EventPayload.PullRequestData.from(pr);
-            eventPublisher.publishEvent(new DomainEvent.PullRequestClosed(prData, true, EventContext.from(context)));
+            if (before != Issue.State.CLOSED) {
+                eventPublisher.publishEvent(
+                    new DomainEvent.PullRequestClosed(prData, true, EventContext.from(context))
+                );
+            }
             eventPublisher.publishEvent(new DomainEvent.PullRequestMerged(prData, EventContext.from(context)));
             log.debug("Merged merge request: prId={}", pr.getId());
         }
@@ -334,6 +341,21 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
     // ========================================================================
     // Sync Processing
     // ========================================================================
+
+    /**
+     * Looks up the current state of an existing PR before processing a webhook event.
+     * Returns null if the PR does not exist yet.
+     */
+    @Nullable
+    private Issue.State getExistingState(GitLabMergeRequestEventDTO event, ProcessingContext context) {
+        if (event.objectAttributes() == null || event.objectAttributes().iid() == null) {
+            return null;
+        }
+        return pullRequestRepository
+            .findByRepositoryIdAndNumber(context.repository().getId(), event.objectAttributes().iid())
+            .map(PullRequest::getState)
+            .orElse(null);
+    }
 
     /**
      * Process a GitLab merge request from GraphQL sync.
@@ -546,9 +568,9 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             mrState.name(),
             null,
             htmlUrl,
-            false, // isLocked: not in webhook, default false (NOT NULL column)
+            null, // isLocked: not in webhook — null lets COALESCE preserve existing or default
             parseGitLabTimestamp(closedAt),
-            0, // commentsCount: not in webhook, default 0 (NOT NULL column)
+            null, // commentsCount: not in webhook — null lets COALESCE preserve existing or default
             now, // lastSyncAt
             parseGitLabTimestamp(createdAt),
             parseGitLabTimestamp(updatedAt),
@@ -558,10 +580,10 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             parseGitLabTimestamp(mergedAt),
             draft,
             isMerged,
-            0,
-            0,
-            0,
-            0, // commits, additions, deletions, changedFiles — not in webhook, default 0 (NOT NULL)
+            null,
+            null,
+            null,
+            null, // commits, additions, deletions, changedFiles — not in webhook, null preserves existing
             null,
             null,
             null, // reviewDecision, mergeStateStatus, mergeable — not in webhook
