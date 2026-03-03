@@ -8,8 +8,9 @@ import {
 	Trophy,
 } from "lucide-react";
 import type React from "react";
+import { categoryMeta } from "@/components/achievements/styles";
 import type { AchievementCategory, UIAchievement } from "@/components/achievements/types";
-import { calculateStats, categoryMeta } from "@/components/achievements/utils";
+import { calculateStats } from "@/components/achievements/utils";
 import { Progress, ProgressIndicator, ProgressTrack } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 

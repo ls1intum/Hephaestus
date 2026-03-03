@@ -81,7 +81,7 @@ export function generateSkillTreeData(
 	const achievementMap = new Map(achievements.map((a) => [a.id, a]));
 
 	const avatarNode = {
-		id: "root-avatar",
+		id: "avatar-node",
 		position: {
 			x: 0,
 			y: 0,
@@ -108,15 +108,6 @@ export function generateSkillTreeData(
 			.filter((a) => a.category === category)
 			.sort(compareByRarity);
 
-		// Calculate basic level if not present, or use rarity
-		// The API doesn't provide a numeric 'level' field directly in Achievement type
-		// but 'rarity' maps to it. Or we use the 'parentId' chain depth.
-		// For now, let's assume we can derive a visual 'level' from rarity or use a default.
-		// Generated Achievement type does NOT have 'level'. It has 'rarity'.
-		// We can map Rarity -> Level (Common=1, Mythic=6).
-
-		// const baseAngle = categoryMeta[category].angle; // Deprecated! We use the coordinates dev tool serialization now
-
 		for (const achievement of categoryAchievements) {
 			const savedCoords = (coordinatesData as Record<string, { x: number; y: number }>)[
 				achievement.id
@@ -138,55 +129,31 @@ export function generateSkillTreeData(
 				zIndex: 10,
 			} satisfies AchievementNode);
 
-			// nodes.push({
-			// 	id: achievementId,
-			// 	type: "achievement",
-			// 	position: { x, y },
-			// 	data: {
-			// 		id: achievementId,
-			// 		name: achievement.name ?? "Unknown",
-			// 		description: achievement.description ?? "",
-			// 		category: achievement.category ?? "milestones",
-			// 		tier: rarity,
-			// 		status: achievement.status ?? "locked",
-			// 		icon: achievement.icon ?? "GitCommit",
-			// 		progress: achievement.progress,
-			// 		maxProgress: achievement.maxProgress,
-			// 		unlockedAt: achievement.unlockedAt ? new Date(achievement.unlockedAt) : null,
-			// 		level,
-			// 		angle: baseAngle,
-			// 		ring: level,
-			// 	},
-			// } satisfies AchievementNode);
-
-			// Create edge based on parentId
+			// Create edge based on parent relationship
 			if (achievement.parent !== undefined) {
 				const parent = achievementMap.get(achievement.parent);
 				if (parent) {
+					// Active only when both parent and child are unlocked
+					const isActive = parent.status === "unlocked" && achievement.status === "unlocked";
 					processedEdges.push({
 						id: `${achievement.parent}-${achievement.id}-edge`,
-						source: achievement.parent,
-						target: achievement.id,
+						source: `${achievement.parent}-node`,
+						target: `${achievement.id}-node`,
+						type: "achievement",
 						data: {
-							isEnabled: achievement.status !== "locked",
+							isEnabled: isActive,
 						},
 					} satisfies AchievementEdge);
 				}
-				// id: `${achievement.parentId}-${achievementId}`,
-				// source: achievement.parentId,
-				// target: achievementId,
-				// type: "skill",
-				// data: {
-				// 	active: parent.status === "unlocked" && achievement.status !== "locked",
-				// },
 			} else {
-				// Level 1 achievements with no parent connect to root avatar
+				// Root-level achievements connect to the central avatar
 				processedEdges.push({
-					id: `root-${achievement.id}-edge`,
+					id: `avatar-${achievement.id}-edge`,
 					source: avatarNode.id,
-					target: achievement.id,
+					target: `${achievement.id}-node`,
+					type: "achievement",
 					data: {
-						isEnabled: achievement.status !== "locked",
+						isEnabled: achievement.status === "unlocked",
 					},
 				} satisfies AchievementEdge);
 			}
@@ -227,5 +194,3 @@ export function calculateStats(achievementList: Achievement[]) {
 		byCategory,
 	};
 }
-
-export class categoryMeta {}

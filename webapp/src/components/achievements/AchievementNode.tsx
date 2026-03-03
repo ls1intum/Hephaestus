@@ -28,12 +28,12 @@ export function AchievementNode({ data }: NodeProps<AchievementNode>) {
 	};
 
 	return (
-		<div className="border border-red-500">
+		<div>
 			<Handle
 				type="target"
-				position={Position.Top}
-				className="bg-transparent! border-0! w-0! h-0!"
-				style={{ top: "50%", left: "50%", transform: "translate(-50%, -50%)" }}
+				position={Position.Bottom}
+				className="bg-transparent! border-0! w-0! h-0! min-w-0! min-h-0!"
+				style={{ top: "50%", bottom: "auto", left: "50%", transform: "translate(-50%, -50%)" }}
 			/>
 			<AchievementTooltip achievement={achievement} open={isHovered && data.showTooltips !== false}>
 				<button
@@ -112,7 +112,7 @@ export function AchievementNode({ data }: NodeProps<AchievementNode>) {
 				type="source"
 				position={Position.Bottom}
 				className="bg-transparent! border-0! w-0! h-0!"
-				style={{ top: "50%", left: "50%", transform: "translate(-50%, -50%)" }}
+				style={{ top: "50%", bottom: "auto", left: "50%", transform: "translate(-50%, -50%)" }}
 			/>
 		</div>
 	);
