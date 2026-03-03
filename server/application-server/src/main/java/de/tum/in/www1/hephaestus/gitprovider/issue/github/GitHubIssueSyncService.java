@@ -568,7 +568,9 @@ public class GitHubIssueSyncService {
         }
 
         // Check for overflow: did we fetch fewer items than GitHub reported?
-        if (reportedTotalCount >= 0) {
+        // Only meaningful during full sync — during incremental sync we intentionally fetch
+        // only recently-updated items, so fetchedCount < totalCount is expected by design.
+        if (reportedTotalCount >= 0 && !incrementalSync) {
             GraphQlConnectionOverflowDetector.check("issues", totalIssuesSynced, reportedTotalCount, safeNameWithOwner);
         }
 

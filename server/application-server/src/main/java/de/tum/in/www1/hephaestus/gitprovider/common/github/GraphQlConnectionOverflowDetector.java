@@ -13,6 +13,19 @@ import lombok.extern.slf4j.Slf4j;
  * This utility provides a single place to log a warning whenever such overflow is detected,
  * making it easy to spot data loss in production logs and add follow-up pagination where needed.
  *
+ * <h2>When to use</h2>
+ * Use this detector for connections where overflow means <b>actual data loss</b> — i.e., the caller
+ * has no follow-up pagination and the truncated items will never be fetched.
+ *
+ * <h2>When NOT to use</h2>
+ * <ul>
+ *   <li><b>Embedded DTOs with pagination</b>: If the DTO already tracks {@code hasNextPage}/{@code endCursor}
+ *       and the caller follows up with additional API calls (e.g., {@code EmbeddedReviewsDTO},
+ *       {@code EmbeddedCommentsDTO}), the overflow is handled — don't warn about it.</li>
+ *   <li><b>Incremental sync</b>: When syncing only recently-updated items, {@code fetchedCount < totalCount}
+ *       is expected by design — the caller intentionally skips unchanged items.</li>
+ * </ul>
+ *
  * <h2>Usage</h2>
  * <pre>{@code
  * // For connections where totalCount is available:
