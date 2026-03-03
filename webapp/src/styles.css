@@ -74,7 +74,9 @@ code {
   --node-locked: oklch(0.9 0 0);
   --node-available: oklch(0.6 0 0);
   --node-unlocked: oklch(0.2 0 0);
+  --node-epic: oklch(0.45 0.15 300);
   --node-legendary: oklch(0.55 0.2 70);
+  --node-mythic: oklch(0.5 0.2 290);
   --glow-primary: oklch(0.2 0 0);
   --glow-secondary: oklch(0.4 0 0);
   --glow-tertiary: oklch(0.6 0 0);
@@ -83,6 +85,15 @@ code {
   --edge-active: oklch(0.4 0 0);
   --edge-glow: oklch(0 0 0 / 0.1);
   --shadow-rgb: 0 0 0;
+
+  /* Rarity border colors (Light Mode) — monochromatic low tiers, chromatic high tiers */
+  --rarity-common: oklch(0.75 0 0);
+  --rarity-uncommon: oklch(0.55 0.12 145);
+  --rarity-rare: oklch(0.55 0.1 250);
+  --rarity-epic: oklch(0.5 0.18 300);
+  --rarity-legendary: oklch(0.65 0.2 80);
+  --rarity-mythic-from: oklch(0.55 0.22 290);
+  --rarity-mythic-to: oklch(0.55 0.18 250);
 }
 
 .dark {
@@ -133,7 +144,9 @@ code {
   --node-locked: oklch(0.18 0 0);
   --node-available: oklch(0.35 0 0);
   --node-unlocked: oklch(0.95 0 0);
+  --node-epic: oklch(0.7 0.15 300);
   --node-legendary: oklch(1 0 0);
+  --node-mythic: oklch(0.75 0.2 290);
   --glow-primary: oklch(0.95 0 0);
   --glow-secondary: oklch(0.7 0 0);
   --glow-tertiary: oklch(0.5 0 0);
@@ -142,6 +155,15 @@ code {
   --edge-active: oklch(0.85 0 0);
   --edge-glow: oklch(1 0 0 / 0.3);
   --shadow-rgb: 255 255 255;
+
+  /* Rarity border colors (Dark Mode) — brighter to pop on dark backgrounds */
+  --rarity-common: oklch(0.4 0 0);
+  --rarity-uncommon: oklch(0.65 0.14 145);
+  --rarity-rare: oklch(0.7 0.12 250);
+  --rarity-epic: oklch(0.72 0.18 300);
+  --rarity-legendary: oklch(0.82 0.18 80);
+  --rarity-mythic-from: oklch(0.75 0.22 290);
+  --rarity-mythic-to: oklch(0.7 0.18 250);
 }
 
 @theme inline {
@@ -236,13 +258,24 @@ code {
   --color-node-locked: var(--node-locked);
   --color-node-available: var(--node-available);
   --color-node-unlocked: var(--node-unlocked);
+  --color-node-epic: var(--node-epic);
   --color-node-legendary: var(--node-legendary);
+  --color-node-mythic: var(--node-mythic);
   --color-glow-primary: var(--glow-primary);
   --color-glow-secondary: var(--glow-secondary);
   --color-glow-tertiary: var(--glow-tertiary);
   --color-glow-accent: var(--glow-accent);
   --color-edge-inactive: var(--edge-inactive);
   --color-edge-active: var(--edge-active);
+
+  /* Rarity border colors */
+  --color-rarity-common: var(--rarity-common);
+  --color-rarity-uncommon: var(--rarity-uncommon);
+  --color-rarity-rare: var(--rarity-rare);
+  --color-rarity-epic: var(--rarity-epic);
+  --color-rarity-legendary: var(--rarity-legendary);
+  --color-rarity-mythic-from: var(--rarity-mythic-from);
+  --color-rarity-mythic-to: var(--rarity-mythic-to);
 }
 
 @layer base {
@@ -385,6 +418,70 @@ code {
 
 @media (prefers-reduced-motion: reduce) {
   .shimmer-overlay::after {
+    animation: none !important;
+  }
+}
+
+/* ===== Achievement Rarity Animations ===== */
+
+/* Legendary: subtle pulsing glow */
+@keyframes legendary-pulse {
+  0%, 100% {
+    box-shadow:
+      0 0 10px var(--rarity-legendary),
+      0 0 24px color-mix(in oklch, var(--rarity-legendary) 40%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 18px var(--rarity-legendary),
+      0 0 40px color-mix(in oklch, var(--rarity-legendary) 50%, transparent);
+  }
+}
+
+/* Mythic: rotating conic-gradient border via pseudo-element */
+@property --mythic-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes mythic-rotate {
+  to {
+    --mythic-angle: 360deg;
+  }
+}
+
+.achievement-mythic-border {
+  position: relative;
+}
+
+.achievement-mythic-border::before {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 9999px;
+  background: conic-gradient(
+    from var(--mythic-angle),
+    var(--rarity-mythic-from),
+    var(--rarity-mythic-to),
+    var(--rarity-mythic-from)
+  );
+  animation: mythic-rotate 3s linear infinite;
+  z-index: -1;
+}
+
+/* Mask the inner area so only the border ring is visible */
+.achievement-mythic-border::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: var(--background);
+  z-index: -1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .achievement-mythic-border::before {
     animation: none !important;
   }
 }

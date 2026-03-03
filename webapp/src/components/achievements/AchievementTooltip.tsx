@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { AchievementProgressDisplay } from "@/components/achievements/AchievementProgressDisplay.tsx";
-import { rarityColors, rarityLabels, statusIcons } from "@/components/achievements/styles";
+import { rarityBorderColors, rarityLabels, statusIcons } from "@/components/achievements/styles";
 import type { UIAchievement } from "@/components/achievements/types.ts";
 import { cn } from "@/lib/utils";
 
@@ -22,14 +22,14 @@ export function AchievementTooltip(props: AchievementTooltipProps) {
 					className={cn(
 						"absolute z-50 w-64 p-4 rounded-lg bg-popover border-2 shadow-2xl",
 						"transform -translate-x-1/2 left-1/2 bottom-full mb-3",
-						rarityColors[achievement.rarity],
+						rarityBorderColors[achievement.rarity],
 					)}
 				>
 					{/* Arrow */}
 					<div
 						className={cn(
 							"absolute left-1/2 -translate-x-1/2 -bottom-2 w-4 h-4 rotate-45 bg-popover border-r-2 border-b-2",
-							rarityColors[achievement.rarity],
+							rarityBorderColors[achievement.rarity],
 						)}
 					/>
 

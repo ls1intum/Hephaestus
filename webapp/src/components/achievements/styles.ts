@@ -54,13 +54,17 @@ export const rarityLabels = {
 	mythic: "Mythic",
 } as const satisfies Record<AchievementRarity, string>;
 
-export const rarityColors = {
-	common: "border-muted-foreground/40",
-	uncommon: "border-foreground/30",
-	rare: "border-foreground/50",
-	epic: "border-foreground/70",
-	legendary: "border-foreground/90",
-	mythic: "border-purple-500/90",
+/**
+ * Rarity border colors using the `--rarity-*` CSS custom properties.
+ * Used for tooltip borders and other rarity-colored accents.
+ */
+export const rarityBorderColors = {
+	common: "border-rarity-common",
+	uncommon: "border-rarity-uncommon",
+	rare: "border-rarity-rare",
+	epic: "border-rarity-epic",
+	legendary: "border-rarity-legendary",
+	mythic: "border-rarity-mythic-from",
 } as const satisfies Record<AchievementRarity, string>;
 
 export const rarityIconSizes = {
@@ -72,17 +76,42 @@ export const rarityIconSizes = {
 	mythic: 50,
 } as const satisfies Record<AchievementRarity, number>;
 
+/**
+ * Rarity styling classes for the achievement node *frame* (border, shadow, animation).
+ *
+ * These intentionally do NOT include background colors — backgrounds are
+ * controlled by {@link statusBackgrounds} so that locked/available/unlocked
+ * status is always clearly communicated regardless of rarity tier.
+ *
+ * Design philosophy (game dev + web dev hybrid):
+ * - **Same core shape** (circle + centered icon) — only the "frame" changes.
+ * - **Progressive enhancement**: each tier adds ONE new visual element.
+ * - **Border differentiation**: width, color, shadow — the primary recognition signal.
+ * - **Color strategy**: common→rare = monochromatic (shadcn feel), epic+ = chromatic accents.
+ */
 export const rarityStylingClasses = {
-	common: "bg-node-locked border-node-locked/50",
-	uncommon:
-		"bg-node-available/80 border-node-available/70 shadow-[0_0_12px_rgba(var(--shadow-rgb),0.15)]",
-	rare: "bg-node-unlocked border-node-unlocked shadow-[0_0_15px_rgba(var(--shadow-rgb),0.3),0_0_30px_rgba(var(--shadow-rgb),0.15)]",
-	epic: "bg-node-epic border-node-epic shadow-[0_0_25px_rgba(var(--shadow-rgb),0.4),0_0_50px_rgba(var(--shadow-rgb),0.2),inset_0_0_15px_rgba(var(--shadow-rgb),0.15)]",
-	legendary:
-		"bg-node-legendary border-node-legendary shadow-[0_0_30px_rgba(var(--shadow-rgb),0.6),0_0_60px_rgba(var(--shadow-rgb),0.3),inset_0_0_20px_rgba(var(--shadow-rgb),0.2)]",
-	mythic:
-		"bg-node-mythic border-node-mythic shadow-[0_0_30px_rgba(var(--shadow-rgb),0.6),0_0_60px_rgba(var(--shadow-rgb),0.3),inset_0_0_20px_rgba(var(--shadow-rgb),0.2)]",
+	common: "border-2 border-rarity-common",
+	uncommon: "border-3 border-rarity-uncommon",
+	rare: "border-3 border-rarity-rare shadow-[0_0_12px_var(--rarity-rare)]",
+	epic: "border-3 border-rarity-epic shadow-[0_0_16px_var(--rarity-epic),0_0_32px_color-mix(in_oklch,var(--rarity-epic)_30%,transparent)]",
+	legendary: "border-4 border-rarity-legendary animate-[legendary-pulse_6s_ease-in-out_infinite]",
+	mythic: "border-4 border-rarity-mythic-from achievement-mythic-border",
 } as const satisfies Record<AchievementRarity, string>;
+
+/**
+ * Fully-opaque background classes based on achievement status.
+ *
+ * - **locked**: muted gray — visible but clearly "not yet achieved".
+ * - **available**: mid-tone — progress is possible, draws subtle attention.
+ * - **unlocked**: high contrast fill — the achievement "lights up".
+ * - **hidden**: same as locked (shown only in designer/admin views).
+ */
+export const statusBackgrounds = {
+	locked: "bg-node-locked",
+	available: "bg-node-available",
+	unlocked: "bg-node-unlocked",
+	hidden: "bg-node-locked",
+} as const satisfies Record<AchievementStatus, string>;
 
 // ===== Achievement Status Styling ===== //
 
