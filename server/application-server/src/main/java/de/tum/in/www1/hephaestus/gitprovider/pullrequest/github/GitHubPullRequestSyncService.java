@@ -469,6 +469,21 @@ public class GitHubPullRequestSyncService {
                 hasMore = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
                 cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
 
+                // GitHub has a known bug where hasNextPage returns false prematurely
+                // around ~500 nodes (community discussion #30687). When totalCount
+                // indicates more data exists and we have a valid cursor, force-continue.
+                // Safety: if GitHub truly has no more data, the next page returns empty
+                // nodes and the existing isEmpty() check at line ~434 breaks out cleanly.
+                if (!hasMore && cursor != null && reportedTotalCount > 0 && totalPRsSynced < reportedTotalCount) {
+                    log.info(
+                        "Forcing pagination past hasNextPage=false (GitHub GraphQL ~500-node bug): fetched={}, totalCount={}, repo={}",
+                        totalPRsSynced,
+                        reportedTotalCount,
+                        safeNameWithOwner
+                    );
+                    hasMore = true;
+                }
+
                 // For incremental sync: check if the oldest PR in this page is older than effectiveSyncTimestamp
                 // PRs are ordered by updatedAt DESC, so the last item is the oldest
                 if (incrementalSync && hasMore) {
@@ -625,9 +640,8 @@ public class GitHubPullRequestSyncService {
         // Check for overflow: did we fetch fewer items than GitHub reported?
         // Only meaningful during full sync — during incremental sync we intentionally fetch
         // only recently-updated items, so fetchedCount < totalCount is expected by design.
-        // If overflow detected and no state filter was applied, retry with per-state splitting.
-        // GitHub's GraphQL API has a known bug where hasNextPage returns false prematurely
-        // around ~500 nodes. Splitting by state gives each state its own connection limit.
+        // The force-pagination above should have handled most cases, but if GitHub
+        // returned empty pages (truly can't serve more data), we fall back to state splitting.
         if (reportedTotalCount >= 0 && !incrementalSync) {
             boolean overflowDetected = GraphQlConnectionOverflowDetector.check(
                 "pullRequests",
@@ -637,11 +651,16 @@ public class GitHubPullRequestSyncService {
             );
             if (overflowDetected && states == null && !stoppedByIncrementalSync) {
                 log.info(
-                    "PR connection overflow detected (fetched={}, total={}), retrying with state splitting: repo={}",
+                    "PR connection overflow persists after force-pagination (fetched={}, total={}), " +
+                        "falling back to state splitting: repo={}",
                     totalPRsSynced,
                     reportedTotalCount,
                     safeNameWithOwner
                 );
+                // Clear stale cursor from the truncated run before retrying
+                if (syncTargetId != null) {
+                    clearCursorCheckpoint(syncTargetId);
+                }
                 SyncResult[] stateResults = Stream.of("OPEN", "CLOSED", "MERGED")
                     .map(state -> {
                         log.info("State-split sync: repo={}, state={}", safeNameWithOwner, state);
@@ -656,6 +675,16 @@ public class GitHubPullRequestSyncService {
                     })
                     .toArray(SyncResult[]::new);
                 return SyncResult.merge(stateResults);
+            }
+            if (overflowDetected && states != null) {
+                log.error(
+                    "PR sync data loss: state={} still has more PRs than GitHub GraphQL can return. " +
+                        "fetched={}, totalCount={}, repo={}. No further recovery possible.",
+                    states,
+                    totalPRsSynced,
+                    reportedTotalCount,
+                    safeNameWithOwner
+                );
             }
         }
 
