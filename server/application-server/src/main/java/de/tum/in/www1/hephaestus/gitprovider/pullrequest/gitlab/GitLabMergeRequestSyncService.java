@@ -590,8 +590,13 @@ public class GitLabMergeRequestSyncService {
 
         NestedOverflow overflow = detectNestedOverflow(reviewersMap, "reviewers", reviewerNodes.size(), context);
         if (overflow.hasOverflow()) {
-            List<GitLabMergeRequestProcessor.SyncUserData> remaining =
-                fetchRemainingReviewers(scopeId, projectPath, iid, overflow.endCursor(), context);
+            List<GitLabMergeRequestProcessor.SyncUserData> remaining = fetchRemainingReviewers(
+                scopeId,
+                projectPath,
+                iid,
+                overflow.endCursor(),
+                context
+            );
             if (remaining == null) {
                 return null; // Do not reconcile with incomplete data
             }
@@ -635,8 +640,13 @@ public class GitLabMergeRequestSyncService {
 
         NestedOverflow overflow = detectNestedOverflow(approvedByMap, "approvedBy", approverNodes.size(), context);
         if (overflow.hasOverflow()) {
-            List<GitLabMergeRequestProcessor.SyncUserData> remaining =
-                fetchRemainingApprovers(scopeId, projectPath, iid, overflow.endCursor(), context);
+            List<GitLabMergeRequestProcessor.SyncUserData> remaining = fetchRemainingApprovers(
+                scopeId,
+                projectPath,
+                iid,
+                overflow.endCursor(),
+                context
+            );
             if (remaining == null) {
                 return null; // Do not reconcile with incomplete data
             }
@@ -901,7 +911,10 @@ public class GitLabMergeRequestSyncService {
 
                 if (response == null || !response.isValid()) {
                     graphQlClientProvider.recordFailure(new GitLabSyncException("Invalid GraphQL response"));
-                    log.warn("Invalid response fetching remaining MR reviewers, aborting to prevent data loss: context={}", context);
+                    log.warn(
+                        "Invalid response fetching remaining MR reviewers, aborting to prevent data loss: context={}",
+                        context
+                    );
                     return null;
                 }
 
@@ -948,7 +961,11 @@ public class GitLabMergeRequestSyncService {
             Thread.currentThread().interrupt();
             return null;
         } catch (Exception e) {
-            log.warn("Error during reviewer follow-up pagination, aborting to prevent data loss: context={}", context, e);
+            log.warn(
+                "Error during reviewer follow-up pagination, aborting to prevent data loss: context={}",
+                context,
+                e
+            );
             return null;
         }
 
@@ -996,7 +1013,10 @@ public class GitLabMergeRequestSyncService {
 
                 if (response == null || !response.isValid()) {
                     graphQlClientProvider.recordFailure(new GitLabSyncException("Invalid GraphQL response"));
-                    log.warn("Invalid response fetching remaining MR approvers, aborting to prevent data loss: context={}", context);
+                    log.warn(
+                        "Invalid response fetching remaining MR approvers, aborting to prevent data loss: context={}",
+                        context
+                    );
                     return null;
                 }
 
@@ -1043,7 +1063,11 @@ public class GitLabMergeRequestSyncService {
             Thread.currentThread().interrupt();
             return null;
         } catch (Exception e) {
-            log.warn("Error during approver follow-up pagination, aborting to prevent data loss: context={}", context, e);
+            log.warn(
+                "Error during approver follow-up pagination, aborting to prevent data loss: context={}",
+                context,
+                e
+            );
             return null;
         }
 
