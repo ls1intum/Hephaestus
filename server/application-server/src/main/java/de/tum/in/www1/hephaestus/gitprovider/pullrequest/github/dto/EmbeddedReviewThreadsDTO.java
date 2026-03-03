@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.dto;
 
-import de.tum.in.www1.hephaestus.gitprovider.common.github.GraphQlConnectionOverflowDetector;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHPullRequestReviewThreadConnection;
 import java.util.Collections;
 import java.util.List;
@@ -50,8 +49,6 @@ public record EmbeddedReviewThreadsDTO(
             connection.getPageInfo() != null && Boolean.TRUE.equals(connection.getPageInfo().getHasNextPage());
 
         String endCursor = connection.getPageInfo() != null ? connection.getPageInfo().getEndCursor() : null;
-
-        GraphQlConnectionOverflowDetector.check("reviewThreads", threads.size(), connection.getTotalCount(), context);
 
         return new EmbeddedReviewThreadsDTO(threads, connection.getTotalCount(), hasNextPage, endCursor);
     }

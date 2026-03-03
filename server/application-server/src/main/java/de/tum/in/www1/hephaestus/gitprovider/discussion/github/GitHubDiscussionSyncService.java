@@ -534,7 +534,9 @@ public class GitHubDiscussionSyncService {
         }
 
         // Detect if pagination was incomplete (reported total vs actually synced)
-        if (reportedTotalCount >= 0) {
+        // Only meaningful during full sync — during incremental sync we intentionally fetch
+        // only recently-updated items, so fetchedCount < totalCount is expected by design.
+        if (reportedTotalCount >= 0 && !incrementalSync) {
             GraphQlConnectionOverflowDetector.check(
                 "discussions",
                 totalDiscussionsSynced,
