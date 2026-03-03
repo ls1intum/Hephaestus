@@ -15,6 +15,24 @@ expand(
 	}),
 );
 
+/**
+ * Optional string env var that treats empty strings as unset.
+ *
+ * Docker Compose and Kubernetes set env vars to "" when declared but not assigned.
+ * Zod treats "" as present (not undefined), so `.min(1).optional()` rejects it.
+ * This helper normalizes "" → undefined before validation so the field behaves
+ * as truly optional regardless of how the orchestrator represents "unset."
+ */
+const optionalString = z.preprocess(
+	(v) => (v === "" ? undefined : v),
+	z.string().min(1).optional(),
+);
+
+const optionalUrl = z.preprocess(
+	(v) => (v === "" ? undefined : v),
+	z.string().min(1).url().optional(),
+);
+
 const EnvSchema = z
 	.object({
 		NODE_ENV: z.string().default("development"),
@@ -36,18 +54,18 @@ const EnvSchema = z
 		VERBOSE_LOG_FILE: z.string().default("logs/verbose.log"),
 
 		// LLM Providers
-		OPENAI_API_KEY: z.string().min(1).optional(),
-		AZURE_RESOURCE_NAME: z.string().min(1).optional(), // Just the resource name (e.g., "myresource")
-		AZURE_API_KEY: z.string().min(1).optional(),
+		OPENAI_API_KEY: optionalString,
+		AZURE_RESOURCE_NAME: optionalString, // Just the resource name (e.g., "myresource")
+		AZURE_API_KEY: optionalString,
 
 		// Models
 		MODEL_NAME: z.string().min(1).default("openai:gpt-4o-mini"),
 		DETECTION_MODEL_NAME: z.string().min(1).default("openai:gpt-4o-mini"),
 
 		// LangFuse (optional)
-		LANGFUSE_SECRET_KEY: z.string().min(1).optional(),
-		LANGFUSE_PUBLIC_KEY: z.string().min(1).optional(),
-		LANGFUSE_BASE_URL: z.string().min(1).url().optional(),
+		LANGFUSE_SECRET_KEY: optionalString,
+		LANGFUSE_PUBLIC_KEY: optionalString,
+		LANGFUSE_BASE_URL: optionalUrl,
 	})
 	.superRefine((val, ctx) => {
 		const parseProvider = (modelName: string) => {
