@@ -111,7 +111,7 @@ export function AchievementNode({ data }: NodeProps<AchievementNode>) {
 			<Handle
 				type="source"
 				position={Position.Bottom}
-				className="bg-transparent! border-0! w-0! h-0!"
+				className="bg-transparent! border-0! w-0! h-0! min-w-0! min-h-0!"
 				style={{ top: "50%", bottom: "auto", left: "50%", transform: "translate(-50%, -50%)" }}
 			/>
 		</div>
