@@ -171,6 +171,7 @@ public class GitLabMergeRequestSyncService {
                             mrNode.get("iid"),
                             e
                         );
+                        totalSkipped++;
                     }
                 }
 
@@ -494,7 +495,11 @@ public class GitLabMergeRequestSyncService {
                 overflow.endCursor(),
                 context
             );
-            if (remaining != null) syncLabels.addAll(remaining);
+            if (remaining == null) {
+                // Do not reconcile with incomplete source-of-truth data.
+                return null;
+            }
+            syncLabels.addAll(remaining);
         }
 
         return syncLabels;
@@ -541,7 +546,11 @@ public class GitLabMergeRequestSyncService {
                 overflow.endCursor(),
                 context
             );
-            if (remaining != null) syncAssignees.addAll(remaining);
+            if (remaining == null) {
+                // Do not reconcile with incomplete source-of-truth data.
+                return null;
+            }
+            syncAssignees.addAll(remaining);
         }
 
         return syncAssignees;
@@ -581,7 +590,12 @@ public class GitLabMergeRequestSyncService {
 
         NestedOverflow overflow = detectNestedOverflow(reviewersMap, "reviewers", reviewerNodes.size(), context);
         if (overflow.hasOverflow()) {
-            syncReviewers.addAll(fetchRemainingReviewers(scopeId, projectPath, iid, overflow.endCursor(), context));
+            List<GitLabMergeRequestProcessor.SyncUserData> remaining =
+                fetchRemainingReviewers(scopeId, projectPath, iid, overflow.endCursor(), context);
+            if (remaining == null) {
+                return null; // Do not reconcile with incomplete data
+            }
+            syncReviewers.addAll(remaining);
         }
 
         return syncReviewers;
@@ -621,7 +635,12 @@ public class GitLabMergeRequestSyncService {
 
         NestedOverflow overflow = detectNestedOverflow(approvedByMap, "approvedBy", approverNodes.size(), context);
         if (overflow.hasOverflow()) {
-            syncApprovers.addAll(fetchRemainingApprovers(scopeId, projectPath, iid, overflow.endCursor(), context));
+            List<GitLabMergeRequestProcessor.SyncUserData> remaining =
+                fetchRemainingApprovers(scopeId, projectPath, iid, overflow.endCursor(), context);
+            if (remaining == null) {
+                return null; // Do not reconcile with incomplete data
+            }
+            syncApprovers.addAll(remaining);
         }
 
         return syncApprovers;
@@ -850,6 +869,7 @@ public class GitLabMergeRequestSyncService {
     }
 
     @SuppressWarnings("unchecked")
+    @Nullable
     private List<GitLabMergeRequestProcessor.SyncUserData> fetchRemainingReviewers(
         Long scopeId,
         String projectPath,
@@ -881,7 +901,8 @@ public class GitLabMergeRequestSyncService {
 
                 if (response == null || !response.isValid()) {
                     graphQlClientProvider.recordFailure(new GitLabSyncException("Invalid GraphQL response"));
-                    break;
+                    log.warn("Invalid response fetching remaining MR reviewers, aborting to prevent data loss: context={}", context);
+                    return null;
                 }
 
                 if (response.getErrors() != null && !response.getErrors().isEmpty()) {
@@ -925,8 +946,10 @@ public class GitLabMergeRequestSyncService {
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            return null;
         } catch (Exception e) {
-            log.warn("Error during reviewer follow-up pagination: context={}", context, e);
+            log.warn("Error during reviewer follow-up pagination, aborting to prevent data loss: context={}", context, e);
+            return null;
         }
 
         if (!allRemaining.isEmpty()) {
@@ -941,6 +964,7 @@ public class GitLabMergeRequestSyncService {
     }
 
     @SuppressWarnings("unchecked")
+    @Nullable
     private List<GitLabMergeRequestProcessor.SyncUserData> fetchRemainingApprovers(
         Long scopeId,
         String projectPath,
@@ -972,7 +996,8 @@ public class GitLabMergeRequestSyncService {
 
                 if (response == null || !response.isValid()) {
                     graphQlClientProvider.recordFailure(new GitLabSyncException("Invalid GraphQL response"));
-                    break;
+                    log.warn("Invalid response fetching remaining MR approvers, aborting to prevent data loss: context={}", context);
+                    return null;
                 }
 
                 if (response.getErrors() != null && !response.getErrors().isEmpty()) {
@@ -1016,8 +1041,10 @@ public class GitLabMergeRequestSyncService {
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            return null;
         } catch (Exception e) {
-            log.warn("Error during approver follow-up pagination: context={}", context, e);
+            log.warn("Error during approver follow-up pagination, aborting to prevent data loss: context={}", context, e);
+            return null;
         }
 
         if (!allRemaining.isEmpty()) {
