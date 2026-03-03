@@ -185,6 +185,26 @@ public record SyncResult(
     }
 
     /**
+     * Merges multiple sync results into one by summing counts and picking the worst status.
+     * <p>
+     * Used when a single logical sync is split into multiple passes (e.g., by PR state).
+     *
+     * @param results the results to merge
+     * @return a merged SyncResult with aggregated count and worst status
+     */
+    public static SyncResult merge(SyncResult... results) {
+        int totalCount = 0;
+        Status worstStatus = Status.COMPLETED;
+        for (SyncResult r : results) {
+            totalCount += r.count();
+            if (r.status().ordinal() > worstStatus.ordinal()) {
+                worstStatus = r.status();
+            }
+        }
+        return new SyncResult(worstStatus, totalCount);
+    }
+
+    /**
      * Checks if the sync completed successfully (fully or with warnings).
      *
      * @return true if status is COMPLETED or COMPLETED_WITH_WARNINGS

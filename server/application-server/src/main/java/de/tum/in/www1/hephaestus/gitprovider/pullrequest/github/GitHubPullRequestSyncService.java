@@ -48,6 +48,7 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.graphql.client.ClientGraphQlResponse;
@@ -208,19 +209,10 @@ public class GitHubPullRequestSyncService {
      * Since GitHub's GraphQL API doesn't support filterBy for PRs, we implement
      * client-side filtering by stopping pagination early.
      * <p>
-     * Reviews are fetched inline with PRs (first 10 per PR) to eliminate N+1 queries.
-     * Only PRs with more than 10 reviews require additional API calls for pagination.
-     * <p>
-     * When {@code syncTargetId} is provided, the pagination cursor is persisted after
-     * each successfully processed page. This allows sync to resume from where it left
-     * off if the process is interrupted (e.g., crash, timeout, deployment).
-     * <p>
-     * On successful completion, the cursor is cleared to indicate sync finished.
-     * <p>
-     * Note: This method intentionally does NOT use @Transactional to avoid long-running
-     * transactions. Each page of PRs is processed in its own transaction to keep
-     * individual transactions short (seconds, not minutes) while maintaining data
-     * consistency within each page.
+     * If the GitHub GraphQL API silently truncates results (totalCount &gt; fetched),
+     * this method automatically retries with state-based splitting (OPEN, CLOSED, MERGED).
+     * Each state gets its own independent pagination connection, effectively tripling
+     * the cap imposed by GitHub's connection limit.
      *
      * @param scopeId           the scope ID for authentication
      * @param repositoryId      the repository ID to sync pull requests for
@@ -235,6 +227,25 @@ public class GitHubPullRequestSyncService {
         @Nullable Long syncTargetId,
         @Nullable String initialCursor,
         @Nullable Instant lastSyncTimestamp
+    ) {
+        return syncForRepositoryWithStates(scopeId, repositoryId, syncTargetId, initialCursor, lastSyncTimestamp, null);
+    }
+
+    /**
+     * Core sync implementation that accepts an optional PR state filter.
+     * <p>
+     * When {@code states} is null, all PR states are fetched. If the GitHub GraphQL API
+     * silently truncates the connection (a known bug where hasNextPage returns false
+     * prematurely), this method detects the overflow and — for the unfiltered case —
+     * retries automatically by splitting into per-state queries (OPEN, CLOSED, MERGED).
+     */
+    private SyncResult syncForRepositoryWithStates(
+        Long scopeId,
+        Long repositoryId,
+        @Nullable Long syncTargetId,
+        @Nullable String initialCursor,
+        @Nullable Instant lastSyncTimestamp,
+        @Nullable List<String> states
     ) {
         // Fetch repository outside of transaction to avoid holding locks during API calls
         Repository repository = transactionTemplate.execute(status ->
@@ -343,6 +354,7 @@ public class GitHubPullRequestSyncService {
                             adaptPageSize(PR_SYNC_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
                         )
                         .variable("after", currentCursor)
+                        .variable("states", states)
                         .execute()
                 )
                     .retryWhen(
@@ -613,13 +625,38 @@ public class GitHubPullRequestSyncService {
         // Check for overflow: did we fetch fewer items than GitHub reported?
         // Only meaningful during full sync — during incremental sync we intentionally fetch
         // only recently-updated items, so fetchedCount < totalCount is expected by design.
+        // If overflow detected and no state filter was applied, retry with per-state splitting.
+        // GitHub's GraphQL API has a known bug where hasNextPage returns false prematurely
+        // around ~500 nodes. Splitting by state gives each state its own connection limit.
         if (reportedTotalCount >= 0 && !incrementalSync) {
-            GraphQlConnectionOverflowDetector.check(
+            boolean overflowDetected = GraphQlConnectionOverflowDetector.check(
                 "pullRequests",
                 totalPRsSynced,
                 reportedTotalCount,
                 safeNameWithOwner
             );
+            if (overflowDetected && states == null && !stoppedByIncrementalSync) {
+                log.info(
+                    "PR connection overflow detected (fetched={}, total={}), retrying with state splitting: repo={}",
+                    totalPRsSynced,
+                    reportedTotalCount,
+                    safeNameWithOwner
+                );
+                SyncResult[] stateResults = Stream.of("OPEN", "CLOSED", "MERGED")
+                    .map(state -> {
+                        log.info("State-split sync: repo={}, state={}", safeNameWithOwner, state);
+                        return syncForRepositoryWithStates(
+                            scopeId,
+                            repositoryId,
+                            null, // no cursor persistence for state-split retries
+                            null, // start fresh
+                            lastSyncTimestamp,
+                            List.of(state)
+                        );
+                    })
+                    .toArray(SyncResult[]::new);
+                return SyncResult.merge(stateResults);
+            }
         }
 
         // Fetch remaining reviews for PRs with >10 reviews (using cursor for efficient continuation)
