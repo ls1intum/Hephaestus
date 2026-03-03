@@ -7,11 +7,8 @@ import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabEventAction;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabEventType;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabMessageHandler;
-import de.tum.in.www1.hephaestus.gitprovider.common.spi.RepositoryScopeFilter;
-import de.tum.in.www1.hephaestus.gitprovider.common.spi.ScopeIdResolver;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabWebhookContextResolver;
 import de.tum.in.www1.hephaestus.gitprovider.issue.gitlab.dto.GitLabIssueEventDTO;
-import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
-import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -40,23 +37,17 @@ public class GitLabIssueMessageHandler extends GitLabMessageHandler<GitLabIssueE
     private static final Logger log = LoggerFactory.getLogger(GitLabIssueMessageHandler.class);
 
     private final GitLabIssueProcessor issueProcessor;
-    private final RepositoryRepository repositoryRepository;
-    private final RepositoryScopeFilter repositoryScopeFilter;
-    private final ScopeIdResolver scopeIdResolver;
+    private final GitLabWebhookContextResolver contextResolver;
 
     GitLabIssueMessageHandler(
         GitLabIssueProcessor issueProcessor,
-        RepositoryRepository repositoryRepository,
-        RepositoryScopeFilter repositoryScopeFilter,
-        ScopeIdResolver scopeIdResolver,
+        GitLabWebhookContextResolver contextResolver,
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate
     ) {
         super(GitLabIssueEventDTO.class, deserializer, transactionTemplate);
         this.issueProcessor = issueProcessor;
-        this.repositoryRepository = repositoryRepository;
-        this.repositoryScopeFilter = repositoryScopeFilter;
-        this.scopeIdResolver = scopeIdResolver;
+        this.contextResolver = contextResolver;
     }
 
     @Override
@@ -83,6 +74,10 @@ public class GitLabIssueMessageHandler extends GitLabMessageHandler<GitLabIssueE
         }
 
         String projectPath = event.project().pathWithNamespace();
+        if (projectPath == null || projectPath.isBlank()) {
+            log.warn("Received issue event with missing project path");
+            return;
+        }
         String safeProjectPath = sanitizeForLog(projectPath);
         GitLabEventAction action = event.actionType();
 
@@ -93,7 +88,7 @@ public class GitLabIssueMessageHandler extends GitLabMessageHandler<GitLabIssueE
             action
         );
 
-        ProcessingContext context = resolveContext(projectPath, action.getValue());
+        ProcessingContext context = contextResolver.resolve(projectPath, action.getValue(), "issue");
         if (context == null) {
             return;
         }
@@ -104,37 +99,5 @@ public class GitLabIssueMessageHandler extends GitLabMessageHandler<GitLabIssueE
             case REOPEN -> issueProcessor.processReopened(event, context);
             default -> log.debug("Unhandled issue action: projectPath={}, action={}", safeProjectPath, action);
         }
-    }
-
-    private ProcessingContext resolveContext(String pathWithNamespace, String action) {
-        String safePath = sanitizeForLog(pathWithNamespace);
-
-        if (!repositoryScopeFilter.isRepositoryAllowed(pathWithNamespace)) {
-            log.debug("Skipped issue event: reason=repositoryFiltered, repoName={}", safePath);
-            return null;
-        }
-
-        Repository repository = repositoryRepository
-            .findByNameWithOwnerWithOrganization(pathWithNamespace)
-            .orElse(null);
-
-        if (repository == null) {
-            log.debug("Skipped issue event: reason=repositoryNotFound, repoName={}", safePath);
-            return null;
-        }
-
-        Long scopeId = resolveScopeId(repository);
-        return ProcessingContext.forWebhook(scopeId, repository, action);
-    }
-
-    private Long resolveScopeId(Repository repository) {
-        if (repository.getOrganization() != null) {
-            String orgLogin = repository.getOrganization().getLogin();
-            Long scopeId = scopeIdResolver.findScopeIdByOrgLogin(orgLogin).orElse(null);
-            if (scopeId != null) {
-                return scopeId;
-            }
-        }
-        return scopeIdResolver.findScopeIdByRepositoryName(repository.getNameWithOwner()).orElse(null);
     }
 }
