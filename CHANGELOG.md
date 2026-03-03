@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.20.2](https://github.com/ls1intum/Hephaestus/compare/v0.20.1...v0.20.2) (2026-03-03)
+
+### 🐛 Bug Fixes
+
+* **gitprovider:** remove false-positive overflow warnings from sync pipeline ([#786](https://github.com/ls1intum/Hephaestus/issues/786)) ([7247502](https://github.com/ls1intum/Hephaestus/commit/7247502267f89629ef46ad4cb082ec1421d6edb4))
+* **ai:** treat empty env strings as unset for optional fields ([#785](https://github.com/ls1intum/Hephaestus/issues/785)) ([0cc8b53](https://github.com/ls1intum/Hephaestus/commit/0cc8b5338559c9b87616cafb3b514a9f605311ee))
+
 ## [0.20.1](https://github.com/ls1intum/Hephaestus/compare/v0.20.0...v0.20.1) (2026-03-03)
 
 ### 🐛 Bug Fixes
