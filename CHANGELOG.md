@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.20.1](https://github.com/ls1intum/Hephaestus/compare/v0.20.0...v0.20.1) (2026-03-03)
+
+### 🐛 Bug Fixes
+
+* **db:** accept old Liquibase checksum for wipe-gitprovider changeset ([#783](https://github.com/ls1intum/Hephaestus/issues/783)) ([458779f](https://github.com/ls1intum/Hephaestus/commit/458779fc885681aac495d90d6d5293fd3657f278))
+
 ## [0.20.0](https://github.com/ls1intum/Hephaestus/compare/v0.19.0...v0.20.0) (2026-03-02)
 
 ### 🚀 Features
