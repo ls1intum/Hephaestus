@@ -67,6 +67,38 @@ export const rarityBorderColors = {
 	mythic: "border-rarity-mythic-from",
 } as const satisfies Record<AchievementRarity, string>;
 
+/**
+ * Rarity title text colors for tooltips and headings.
+ *
+ * Low tiers use the standard foreground to stay clean.
+ * Epic+ tiers use their chromatic `--rarity-*` tokens,
+ * giving the achievement name itself a colored "aura".
+ */
+export const rarityTitleColors = {
+	common: "text-foreground",
+	uncommon: "text-foreground",
+	rare: "text-foreground",
+	epic: "text-rarity-epic",
+	legendary: "text-rarity-legendary",
+	mythic: "text-rarity-mythic-from",
+} as const satisfies Record<AchievementRarity, string>;
+
+/**
+ * Small accent-colored backgrounds keyed by rarity.
+ *
+ * Used in the stats panel "Recent Unlocks" list and similar
+ * contexts where a tiny colored dot or circle represents the
+ * tier. Colors are the `--rarity-*` tokens at a toned-down opacity.
+ */
+export const rarityAccentBackgrounds = {
+	common: "bg-rarity-common/40",
+	uncommon: "bg-rarity-uncommon/60",
+	rare: "bg-rarity-rare/60",
+	epic: "bg-rarity-epic/70",
+	legendary: "bg-rarity-legendary/80",
+	mythic: "bg-rarity-mythic-from/80",
+} as const satisfies Record<AchievementRarity, string>;
+
 export const rarityIconSizes = {
 	common: 15,
 	uncommon: 15,
@@ -94,8 +126,8 @@ export const rarityStylingClasses = {
 	uncommon: "border-3 border-rarity-uncommon",
 	rare: "border-3 border-rarity-rare shadow-[0_0_12px_var(--rarity-rare)]",
 	epic: "border-3 border-rarity-epic shadow-[0_0_16px_var(--rarity-epic),0_0_32px_color-mix(in_oklch,var(--rarity-epic)_30%,transparent)]",
-	legendary: "border-4 border-rarity-legendary animate-[legendary-pulse_6s_ease-in-out_infinite]",
-	mythic: "border-4 border-rarity-mythic-from achievement-mythic-border",
+	legendary: "border-4 border-rarity-legendary animate-[legendary-pulse_30s_ease-in-out_infinite]",
+	mythic: "border-4 border-transparent bg-clip-padding achievement-mythic-border",
 } as const satisfies Record<AchievementRarity, string>;
 
 /**

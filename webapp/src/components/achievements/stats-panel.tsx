@@ -8,7 +8,7 @@ import {
 	Trophy,
 } from "lucide-react";
 import type React from "react";
-import { categoryMeta } from "@/components/achievements/styles";
+import { categoryMeta, rarityAccentBackgrounds, rarityBorderColors, rarityLabels } from "@/components/achievements/styles";
 import type { AchievementCategory, UIAchievement } from "@/components/achievements/types";
 import { calculateStats } from "@/components/achievements/utils";
 import { Progress, ProgressIndicator, ProgressTrack } from "@/components/ui/progress";
@@ -123,11 +123,8 @@ export function StatsPanel({ achievements }: StatsPanelProps) {
 									<div
 										className={cn(
 											"w-6 h-6 rounded-full flex items-center justify-center",
-											rarity === "legendary" && "bg-foreground text-background",
-											rarity === "epic" && "bg-foreground/80 text-background",
-											rarity === "rare" && "bg-foreground/60 text-background",
-											rarity === "uncommon" && "bg-foreground/40 text-background",
-											rarity === "common" && "bg-foreground/20 text-background",
+											rarityAccentBackgrounds[rarity],
+											"text-background",
 										)}
 									>
 										<Flame className="w-3 h-3" />
@@ -147,27 +144,36 @@ export function StatsPanel({ achievements }: StatsPanelProps) {
 			</div>
 
 			{/* Legend */}
-			{/*TODO: Rethink legend definitions here*/}
 			<div className="mt-8 pt-6 border-t border-border">
 				<h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-3">
 					Legend
 				</h3>
-				<div className="space-y-2 text-xs">
-					<div className="flex items-center gap-2">
-						<div className="w-3 h-3 rounded-full bg-foreground shadow-[0_0_6px_rgba(var(--shadow-rgb),0.3)]" />
-						<span className="text-muted-foreground">Unlocked</span>
+				<div className="space-y-3 text-xs">
+					{/* Status indicators */}
+					<div className="space-y-2">
+						<span className="text-muted-foreground font-medium">Status</span>
+						<div className="flex items-center gap-2">
+							<div className="w-3 h-3 rounded-full bg-node-unlocked" />
+							<span className="text-muted-foreground">Unlocked</span>
+						</div>
+						<div className="flex items-center gap-2">
+							<div className="w-3 h-3 rounded-full bg-node-available" />
+							<span className="text-muted-foreground">Available</span>
+						</div>
+						<div className="flex items-center gap-2">
+							<div className="w-3 h-3 rounded-full bg-node-locked" />
+							<span className="text-muted-foreground">Locked</span>
+						</div>
 					</div>
-					<div className="flex items-center gap-2">
-						<div className="w-3 h-3 rounded-full bg-foreground/40 animate-pulse" />
-						<span className="text-muted-foreground">Available</span>
-					</div>
-					<div className="flex items-center gap-2">
-						<div className="w-3 h-3 rounded-full bg-muted opacity-50" />
-						<span className="text-muted-foreground">Locked</span>
-					</div>
-					<div className="flex items-center gap-2">
-						<div className="w-3 h-3 rounded-full bg-foreground shadow-[0_0_8px_rgba(var(--shadow-rgb),0.5)]" />
-						<span className="text-muted-foreground">Legendary</span>
+					{/* Rarity tiers */}
+					<div className="space-y-2">
+						<span className="text-muted-foreground font-medium">Rarity</span>
+						{(["common", "uncommon", "rare", "epic", "legendary", "mythic"] as const).map((rarity) => (
+							<div key={rarity} className="flex items-center gap-2">
+								<div className={cn("w-3 h-3 rounded-full border-2", rarityBorderColors[rarity], "bg-transparent")} />
+								<span className="text-muted-foreground">{rarityLabels[rarity]}</span>
+							</div>
+						))}
 					</div>
 				</div>
 			</div>

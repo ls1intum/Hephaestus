@@ -74,13 +74,6 @@ code {
   --node-locked: oklch(0.9 0 0);
   --node-available: oklch(0.6 0 0);
   --node-unlocked: oklch(0.2 0 0);
-  --node-epic: oklch(0.45 0.15 300);
-  --node-legendary: oklch(0.55 0.2 70);
-  --node-mythic: oklch(0.5 0.2 290);
-  --glow-primary: oklch(0.2 0 0);
-  --glow-secondary: oklch(0.4 0 0);
-  --glow-tertiary: oklch(0.6 0 0);
-  --glow-accent: oklch(0.3 0 0);
   --edge-inactive: oklch(0.75 0 0);
   --edge-active: oklch(0.4 0 0);
   --edge-glow: oklch(0 0 0 / 0.1);
@@ -144,13 +137,6 @@ code {
   --node-locked: oklch(0.18 0 0);
   --node-available: oklch(0.35 0 0);
   --node-unlocked: oklch(0.95 0 0);
-  --node-epic: oklch(0.7 0.15 300);
-  --node-legendary: oklch(1 0 0);
-  --node-mythic: oklch(0.75 0.2 290);
-  --glow-primary: oklch(0.95 0 0);
-  --glow-secondary: oklch(0.7 0 0);
-  --glow-tertiary: oklch(0.5 0 0);
-  --glow-accent: oklch(0.85 0 0);
   --edge-inactive: oklch(0.25 0 0);
   --edge-active: oklch(0.85 0 0);
   --edge-glow: oklch(1 0 0 / 0.3);
@@ -258,13 +244,6 @@ code {
   --color-node-locked: var(--node-locked);
   --color-node-available: var(--node-available);
   --color-node-unlocked: var(--node-unlocked);
-  --color-node-epic: var(--node-epic);
-  --color-node-legendary: var(--node-legendary);
-  --color-node-mythic: var(--node-mythic);
-  --color-glow-primary: var(--glow-primary);
-  --color-glow-secondary: var(--glow-secondary);
-  --color-glow-tertiary: var(--glow-tertiary);
-  --color-glow-accent: var(--glow-accent);
   --color-edge-inactive: var(--edge-inactive);
   --color-edge-active: var(--edge-active);
 
@@ -426,7 +405,8 @@ code {
 
 /* Legendary: subtle pulsing glow */
 @keyframes legendary-pulse {
-  0%, 100% {
+  0%,
+  100% {
     box-shadow:
       0 0 10px var(--rarity-legendary),
       0 0 24px color-mix(in oklch, var(--rarity-legendary) 40%, transparent);
@@ -467,16 +447,6 @@ code {
     var(--rarity-mythic-from)
   );
   animation: mythic-rotate 3s linear infinite;
-  z-index: -1;
-}
-
-/* Mask the inner area so only the border ring is visible */
-.achievement-mythic-border::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: 9999px;
-  background: var(--background);
   z-index: -1;
 }
 

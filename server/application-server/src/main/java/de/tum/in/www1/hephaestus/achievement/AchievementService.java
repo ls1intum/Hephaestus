@@ -248,6 +248,8 @@ public class AchievementService {
         List<AchievementDTO> result = new ArrayList<>();
         for (AchievementDefinition achievement : AchievementDefinition.values()) {
             UserAchievement progress = progressMap.get(achievement.getId());
+            if (progress == null)
+                continue;
             AchievementStatus status = computeStatus(achievement, progressMap);
             AchievementProgress progressData = progress.getProgressData();
             Optional<Instant> unlockedAt = Optional.ofNullable(progress.getUnlockedAt());

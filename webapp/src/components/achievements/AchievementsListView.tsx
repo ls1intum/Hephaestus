@@ -1,6 +1,6 @@
 import { Check, Lock } from "lucide-react";
 import { AchievementProgressDisplay } from "@/components/achievements/AchievementProgressDisplay.tsx";
-import { categoryLabels } from "@/components/achievements/styles.ts";
+import { categoryLabels, statusBackgrounds } from "@/components/achievements/styles.ts";
 import type {
 	AchievementCategory,
 	AchievementStatus,
@@ -49,7 +49,7 @@ export function AchievementsListView({ achievements }: AchievementListViewProps)
 		switch (status) {
 			case "unlocked":
 				return (
-					<Badge variant="default" className="bg-green-600 hover:bg-green-700">
+					<Badge variant="default" className="bg-github-success-foreground hover:bg-github-success-foreground/80">
 						<Check className="w-3 h-3 mr-1" />
 						Unlocked
 					</Badge>
@@ -107,9 +107,9 @@ export function AchievementsListView({ achievements }: AchievementListViewProps)
 												<div
 													className={cn(
 														"w-8 h-8 rounded-full flex items-center justify-center",
-														status === "unlocked" && "bg-green-600 text-white",
-														status === "available" && "bg-secondary",
-														status === "locked" && "bg-muted",
+														statusBackgrounds[status],
+														status === "unlocked" && "text-background",
+														status !== "unlocked" && "text-muted-foreground",
 													)}
 												>
 													<Icon className="w-4 h-4" />

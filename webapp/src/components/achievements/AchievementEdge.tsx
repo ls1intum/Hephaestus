@@ -8,13 +8,6 @@ export function AchievementEdge(props: EdgeProps<AchievementEdge>) {
 
 	// Create a straight line path (cleaner for radial layout)
 	const edgePath = `M ${sourceX} ${sourceY} L ${targetX} ${targetY}`;
-	console.debug({
-		id: props.id,
-		component: "AchievementEdge",
-		edgePath,
-		coords: { sourceX, sourceY, targetX, targetY },
-		data,
-	});
 
 	return (
 		<>

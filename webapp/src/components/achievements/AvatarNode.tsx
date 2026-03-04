@@ -24,7 +24,7 @@ export function AvatarNode({ data }: NodeProps<AvatarNode>) {
 	return (
 		<div className={cn(className, "relative group")}>
 			{/* Pulse effect */}
-			<div className="absolute inset-0 rounded-full bg-primary/20 animate-ping opacity-75 duration-3000 pointer-events-none" />
+		<div className="absolute inset-0 rounded-full bg-primary/20 animate-ping opacity-75 duration-3000 pointer-events-none" />
 
 			{/* Avatar with Level Badge - Matching ProfileHeader.tsx styling */}
 			<div className="relative shrink-0 transition-transform duration-300 hover:scale-105">

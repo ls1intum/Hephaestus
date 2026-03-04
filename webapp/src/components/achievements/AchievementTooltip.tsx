@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { AchievementProgressDisplay } from "@/components/achievements/AchievementProgressDisplay.tsx";
-import { rarityBorderColors, rarityLabels, statusIcons } from "@/components/achievements/styles";
+import { rarityBorderColors, rarityLabels, rarityTitleColors, statusIcons } from "@/components/achievements/styles";
 import type { UIAchievement } from "@/components/achievements/types.ts";
 import { cn } from "@/lib/utils";
 
@@ -39,9 +39,7 @@ export function AchievementTooltip(props: AchievementTooltipProps) {
 							<h3
 								className={cn(
 									"font-bold text-sm",
-									achievement.rarity === "mythic" && "text-purple-500",
-									achievement.rarity === "legendary" && "text-foreground",
-									achievement.rarity === "epic" && "text-foreground/90",
+									rarityTitleColors[achievement.rarity],
 									achievement.status === "locked" && "text-muted-foreground",
 								)}
 							>
