@@ -8,6 +8,25 @@ export type EqualizerEdge = Edge<
 	"equalizer"
 >;
 
+/** Maximum pixel displacement for any wave outburst to prevent overlapping other nodes */
+const MAX_DISPLACEMENT = 18;
+
+/** Global speed factor for wave animations and traveling pulses. Higher = faster. */
+const ANIMATION_SPEED_FACTOR = 0.5;
+
+/**
+ * Normalizes and "squeezes" displacement so it approaches MAX_DISPLACEMENT
+ * without hard-clamping (avoiding flat plateaus).
+ */
+function softLimit(value: number, limit: number): number {
+	// A simple saturation curve: limit * tanh(value / limit)
+	// Since JS doesn't have Math.tanh (available in most envs but just in case),
+	// we use: (exp(2x)-1)/(exp(2x)+1) or a simple rational approximation:
+	const x = value / limit;
+	const squeezed = x / (1 + Math.abs(x));
+	return squeezed * limit;
+}
+
 /**
  * Compute an SVG path for a straight line with a localized, traveling audio-wave burst.
  *
@@ -67,7 +86,9 @@ function getTravelingWavePath(
 
 			const waveForm = primary + secondary + noise;
 			const maxAmp = 12 * amplitudeMult; // Max pixel peak displacement
-			waveDisp = envelope * waveForm * maxAmp;
+			const rawDisp = envelope * waveForm * maxAmp;
+			// Final displacement: soft limit to avoid flat plateaus
+			waveDisp = softLimit(rawDisp, MAX_DISPLACEMENT);
 		}
 
 		const x = px + nx * waveDisp;
@@ -144,7 +165,9 @@ function getStaticWavePath(
 
 			const maxAmp = 15 * amplitudeMult;
 			const waveForm = lowWave * low + midWave * mid + highWave * high;
-			waveDisp = envSq * waveForm * maxAmp;
+			const rawDisp = envSq * waveForm * maxAmp;
+			// Final displacement: soft limit to avoid flat plateaus
+			waveDisp = softLimit(rawDisp, MAX_DISPLACEMENT);
 		}
 
 		const x = px + nx * waveDisp;
@@ -157,10 +180,23 @@ function getStaticWavePath(
 }
 
 export function EqualizerEdge(props: EdgeProps<EqualizerEdge>) {
-	const { sourceX, sourceY, targetX, targetY, data } = props;
+	const { sourceX, sourceY, targetX, targetY, data, id } = props;
 	const isEnabled = data?.isEnabled ?? false;
 	const variant: EqualizerVariant = data?.variant ?? "traveling";
 	const monochrome = data?.monochrome ?? false;
+
+	// Use the edge ID as a stable seed for randomization so different edges
+	// have different outburst patterns and traveling offsets.
+	const seedRef = useRef<number>(0);
+	if (seedRef.current === 0) {
+		// Simple hash of the ID string to get a stable number
+		let hash = 0;
+		for (let i = 0; i < id.length; i++) {
+			hash = (hash << 5) - hash + id.charCodeAt(i);
+			hash |= 0;
+		}
+		seedRef.current = Math.abs(hash) % 1000;
+	}
 
 	const [time, setTime] = useState(0);
 	const rafRef = useRef<number>(0);
@@ -174,7 +210,7 @@ export function EqualizerEdge(props: EdgeProps<EqualizerEdge>) {
 			const delta = (now - prevTimeRef.current) * 0.001; // in seconds
 			prevTimeRef.current = now;
 
-			setTime((t) => t + delta);
+			setTime((t) => t + delta * ANIMATION_SPEED_FACTOR);
 			rafRef.current = requestAnimationFrame(animate);
 		};
 
@@ -227,8 +263,17 @@ export function EqualizerEdge(props: EdgeProps<EqualizerEdge>) {
 			<path
 				d={
 					variant === "traveling"
-						? getTravelingWavePath(sourceX, sourceY, targetX, targetY, pulsePosition, time, 1, 1.0)
-						: getStaticWavePath(sourceX, sourceY, targetX, targetY, time, 1, 1.0)
+						? getTravelingWavePath(
+								sourceX,
+								sourceY,
+								targetX,
+								targetY,
+								pulsePosition,
+								time,
+								seedRef.current + 1,
+								1.0,
+							)
+						: getStaticWavePath(sourceX, sourceY, targetX, targetY, time, seedRef.current + 1, 1.0)
 				}
 				stroke={layer1Stroke}
 				strokeWidth={layer1Width}
@@ -241,8 +286,17 @@ export function EqualizerEdge(props: EdgeProps<EqualizerEdge>) {
 			<path
 				d={
 					variant === "traveling"
-						? getTravelingWavePath(sourceX, sourceY, targetX, targetY, pulsePosition, time, 2, 0.65)
-						: getStaticWavePath(sourceX, sourceY, targetX, targetY, time, 2, 0.65)
+						? getTravelingWavePath(
+								sourceX,
+								sourceY,
+								targetX,
+								targetY,
+								pulsePosition,
+								time,
+								seedRef.current + 2,
+								0.65,
+							)
+						: getStaticWavePath(sourceX, sourceY, targetX, targetY, time, seedRef.current + 2, 0.65)
 				}
 				stroke={layer2Stroke}
 				strokeWidth={layer2Width}

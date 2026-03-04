@@ -14,7 +14,7 @@ import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import type { Achievement } from "@/api/types.gen";
 import { ACHIEVEMENT_REGISTRY } from "@/components/achievements/definitions.ts";
 import type { UIAchievement } from "@/components/achievements/types";
-import { generateSkillTreeData } from "@/components/achievements/utils";
+import { generateSkillTreeData, type EdgeDisplayMode, type AnyAchievementEdge } from "@/components/achievements/utils";
 import { AchievementEdge } from "./AchievementEdge.tsx";
 import { AchievementNode } from "./AchievementNode.tsx";
 import { AvatarNode } from "./AvatarNode.tsx";
@@ -64,10 +64,11 @@ export interface SkillTreeDesignerProps {
 
 export function SkillTreeDesigner({ user, allDefinitions }: SkillTreeDesignerProps) {
 	const [nodes, setNodes, onNodesChangeRef] = useNodesState<AchievementNode | AvatarNode>([]);
-	const [edges, setEdges, onEdgesChange] = useEdgesState<AchievementEdge>([]);
+	const [edges, setEdges, onEdgesChange] = useEdgesState<AnyAchievementEdge>([]);
 	const [isDraggable, setIsDraggable] = useState(true);
 	const [isSnapping, setIsSnapping] = useState(true);
 	const [showTooltips, setShowTooltips] = useState(true);
+	const [edgeDisplayMode, setEdgeDisplayMode] = useState<EdgeDisplayMode>("achievement");
 
 	const [snapSize, setSnapSize] = useState<SnapGridSize>(24);
 
@@ -143,11 +144,11 @@ export function SkillTreeDesigner({ user, allDefinitions }: SkillTreeDesignerPro
 			);
 		}
 
-		const { nodes: newNodes, edges: newEdges } = generateSkillTreeData(user, displayAchievements);
+		const { nodes: newNodes, edges: newEdges } = generateSkillTreeData(user, displayAchievements, edgeDisplayMode);
 
 		setNodes(newNodes);
 		setEdges(newEdges);
-	}, [user, allDefinitions, setNodes, setEdges]);
+	}, [user, allDefinitions, setNodes, setEdges, edgeDisplayMode]);
 
 	const isDark = useSyncExternalStore(subscribeToTheme, getIsDarkMode, () => true);
 
@@ -164,6 +165,8 @@ export function SkillTreeDesigner({ user, allDefinitions }: SkillTreeDesignerPro
 				showTooltips={showTooltips}
 				onShowTooltipsChange={setShowTooltips}
 				onSave={saveLayout}
+				edgeDisplayMode={edgeDisplayMode}
+				onEdgeDisplayModeChange={setEdgeDisplayMode}
 			/>
 
 			<ReactFlow

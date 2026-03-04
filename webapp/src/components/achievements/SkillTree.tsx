@@ -11,7 +11,7 @@ import {
 import "@xyflow/react/dist/style.css";
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import type { UIAchievement } from "@/components/achievements/types";
-import { generateSkillTreeData } from "@/components/achievements/utils";
+import { generateSkillTreeData, type AnyAchievementEdge } from "@/components/achievements/utils";
 import { AchievementEdge } from "./AchievementEdge.tsx";
 import { AchievementNode } from "./AchievementNode.tsx";
 import { AvatarNode } from "./AvatarNode.tsx";
@@ -64,7 +64,7 @@ export function SkillTree({ user, achievements }: SkillTreeProps) {
 	const { nodes: initialNodes, edges: initialEdges } = generateSkillTreeData(user, achievements);
 
 	const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-	const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+	const [edges, setEdges, onEdgesChange] = useEdgesState<AnyAchievementEdge>(initialEdges);
 
 	// Node origin: [0.5, 0.5] treats position as node center, matching the designer.
 	const nodeOrigin = useRef<[number, number]>([0.5, 0.5]).current;

@@ -2,6 +2,8 @@ import type { Achievement } from "@/api";
 import type { AchievementEdge } from "@/components/achievements/AchievementEdge.tsx";
 import type { AchievementNode } from "@/components/achievements/AchievementNode.tsx";
 import type { AvatarNode } from "@/components/achievements/AvatarNode.tsx";
+import type { EqualizerEdge } from "@/components/achievements/EqualizerEdge.tsx";
+import type { SynthwaveEdge } from "@/components/achievements/SynthwaveEdge.tsx";
 import { ACHIEVEMENT_REGISTRY } from "@/components/achievements/definitions.ts";
 import {
 	type AchievementCategory,
@@ -56,11 +58,23 @@ export function enhanceAchievements(achievements: Achievement[]): UIAchievement[
 	);
 }
 
+export type EdgeDisplayMode =
+	| "achievement"
+	| "synthwave-neon"
+	| "synthwave-rarity"
+	| "equalizer-traveling"
+	| "equalizer-static"
+	| "equalizer-traveling-mono"
+	| "equalizer-static-mono";
+
+export type AnyAchievementEdge = AchievementEdge | SynthwaveEdge | EqualizerEdge;
+
 /**
  * Generates React Flow nodes and edges for the skill tree visualization.
  *
  * @param user - User information for the central avatar node
  * @param achievements - Array of UIAchievements from the API
+ * @param edgeDisplayMode - The selected edge style to preview
  * @returns Nodes and edges for React Flow
  */
 export function generateSkillTreeData(
@@ -71,9 +85,10 @@ export function generateSkillTreeData(
 		leaguePoints: number;
 	},
 	achievements: UIAchievement[] = [],
+	edgeDisplayMode: EdgeDisplayMode = "achievement",
 ): {
 	nodes: (AchievementNode | AvatarNode)[];
-	edges: AchievementEdge[];
+	edges: AnyAchievementEdge[];
 } {
 	const nodes: (AchievementNode | AvatarNode)[] = [];
 
@@ -101,7 +116,41 @@ export function generateSkillTreeData(
 	nodes.push(avatarNode);
 
 	// Process all categories
-	const processedEdges: AchievementEdge[] = [];
+	const processedEdges: AnyAchievementEdge[] = [];
+
+	// Helper to generate edge props with explicit type verification
+	const getEdgeConfig = (isEnabled: boolean, mode: EdgeDisplayMode): Pick<AnyAchievementEdge, "type" | "data"> => {
+		if (mode.startsWith("synthwave")) {
+			const variant = mode.replace("synthwave-", "") as "neon" | "rarity";
+			return {
+				type: "synthwave",
+				data: {
+					isEnabled,
+					variant,
+				},
+			};
+		}
+
+		if (mode.startsWith("equalizer")) {
+			const parts = mode.replace("equalizer-", "").split("-");
+			const variant = parts[0] as "traveling" | "static";
+			const monochrome = parts.includes("mono");
+			return {
+				type: "equalizer",
+				data: {
+					isEnabled,
+					variant,
+					monochrome,
+				},
+			};
+		}
+
+		// Default to standard achievement
+		return {
+			type: "achievement",
+			data: { isEnabled },
+		};
+	};
 
 	for (const category of ACHIEVEMENT_CATEGORIES) {
 		const categoryAchievements = achievements
@@ -135,27 +184,23 @@ export function generateSkillTreeData(
 				if (parent) {
 					// Active only when both parent and child are unlocked
 					const isActive = parent.status === "unlocked" && achievement.status === "unlocked";
+					const config = getEdgeConfig(isActive, edgeDisplayMode);
 					processedEdges.push({
 						id: `${achievement.parent}-${achievement.id}-edge`,
 						source: `${achievement.parent}-node`,
 						target: `${achievement.id}-node`,
-						type: "achievement",
-						data: {
-							isEnabled: isActive,
-						},
-					} satisfies AchievementEdge);
+						...config,
+					} as AnyAchievementEdge);
 				}
 			} else {
 				// Root-level achievements connect to the central avatar
+				const config = getEdgeConfig(achievement.status === "unlocked", edgeDisplayMode);
 				processedEdges.push({
 					id: `avatar-${achievement.id}-edge`,
 					source: avatarNode.id,
 					target: `${achievement.id}-node`,
-					type: "achievement",
-					data: {
-						isEnabled: achievement.status === "unlocked",
-					},
-				} satisfies AchievementEdge);
+					...config,
+				} as AnyAchievementEdge);
 			}
 		}
 	}

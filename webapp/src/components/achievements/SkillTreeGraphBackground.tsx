@@ -24,6 +24,7 @@ export function SkillTreeGraphBackground({ showAxes = false }: SkillTreeGraphBac
 				{showAxes && (
 					<svg
 						className="absolute"
+						aria-hidden="true"
 						style={{
 							width: "20000px",
 							height: "20000px",
