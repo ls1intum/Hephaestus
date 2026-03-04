@@ -702,6 +702,23 @@ public class HistoricalBackfillService {
                 hasMore = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
                 String nextCursor = pageInfo != null ? pageInfo.getEndCursor() : null;
 
+                // GitHub has a known bug where hasNextPage returns false prematurely
+                // around ~500 nodes (community discussion #30687). When totalCount
+                // indicates more data exists and we have a valid cursor, force-continue.
+                // Safety: if GitHub truly has no more data, the next page returns empty
+                // nodes and the existing isEmpty() check above breaks out cleanly.
+                if (
+                    !hasMore && nextCursor != null && reportedTotalCount > 0 && totalIssuesSynced < reportedTotalCount
+                ) {
+                    log.info(
+                        "Forcing pagination past hasNextPage=false (GitHub GraphQL ~500-node bug): fetched={}, totalCount={}, repo={}, entity=issues",
+                        totalIssuesSynced,
+                        reportedTotalCount,
+                        sanitizeForLog(repoNameForLog)
+                    );
+                    hasMore = true;
+                }
+
                 // Process issues AND their embedded comments, persist cursor in the SAME transaction for atomicity.
                 // This ensures that if processing succeeds but cursor save fails (or vice versa),
                 // both are rolled back together, preventing duplicate processing on restart.
@@ -889,6 +906,21 @@ public class HistoricalBackfillService {
                 GHPageInfo pageInfo = connection.getPageInfo();
                 hasMore = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
                 String nextCursor = pageInfo != null ? pageInfo.getEndCursor() : null;
+
+                // GitHub has a known bug where hasNextPage returns false prematurely
+                // around ~500 nodes (community discussion #30687). When totalCount
+                // indicates more data exists and we have a valid cursor, force-continue.
+                // Safety: if GitHub truly has no more data, the next page returns empty
+                // nodes and the existing isEmpty() check above breaks out cleanly.
+                if (!hasMore && nextCursor != null && reportedTotalCount > 0 && totalPRsSynced < reportedTotalCount) {
+                    log.info(
+                        "Forcing pagination past hasNextPage=false (GitHub GraphQL ~500-node bug): fetched={}, totalCount={}, repo={}, entity=pullRequests",
+                        totalPRsSynced,
+                        reportedTotalCount,
+                        sanitizeForLog(repoNameForLog)
+                    );
+                    hasMore = true;
+                }
 
                 // Process PRs AND their embedded reviews/comments, persist cursor in the SAME transaction for atomicity.
                 // This ensures that if processing succeeds but cursor save fails (or vice versa),

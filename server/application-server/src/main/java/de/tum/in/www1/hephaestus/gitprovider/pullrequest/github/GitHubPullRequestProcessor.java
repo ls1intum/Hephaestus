@@ -87,8 +87,8 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
      * Uses atomic upsert to prevent race conditions when concurrent threads
      * (e.g., multiple NATS consumers or webhook handlers) process the same PR.
      * <p>
-     * Uses (repository_id, number) as the canonical lookup key to ensure idempotency
-     * across both GraphQL sync and webhook events, which use different ID formats.
+     * Uses (repository_id, issue_type, number) as the canonical uniqueness constraint.
+     * Lookup is by (repository_id, number) via the PullRequest typed query.
      *
      * @return the processed PullRequest, or null if the repository context is missing
      */
@@ -115,23 +115,34 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         boolean isNew = existingOpt.isEmpty();
 
         // Detect issue_type mismatch: entity exists as ISSUE but we're processing it as a PR.
-        // The upsertCore native SQL will correct the discriminator, so we just log here.
+        // This happens when a comment webhook creates a stub ISSUE before the PR webhook arrives.
+        // Must correct the discriminator BEFORE the upsert, because ON CONFLICT matches on
+        // (repository_id, issue_type, number) — a mismatched issue_type would cause an INSERT
+        // instead of an UPDATE, violating the (provider_id, native_id) constraint.
+        boolean promotedFromIssue = false;
         if (isNew) {
             Optional<Issue> existingIssue = issueRepository.findByRepositoryIdAndNumber(
                 repository.getId(),
                 dto.number()
             );
             if (existingIssue.isPresent()) {
+                issueRepository.correctDiscriminator(repository.getId(), dto.number(), "ISSUE", "PULL_REQUEST");
+                // Don't re-fetch: the promoted row has NULL PR-specific columns (additions, etc.)
+                // which would crash Hibernate on primitive int fields. The upsert below will
+                // populate all fields correctly.
+                promotedFromIssue = true;
+                isNew = false;
                 log.info(
-                    "Updating issue_type from ISSUE to PULL_REQUEST: repositoryId={}, number={}",
+                    "Corrected issue_type from ISSUE to PULL_REQUEST: repositoryId={}, number={}",
                     repository.getId(),
                     dto.number()
                 );
             }
         }
 
-        // Skip update if existing data is newer (prevents stale webhooks from overwriting)
-        if (!isNew) {
+        // Skip update if existing data is newer (prevents stale webhooks from overwriting).
+        // Skip stale check for promotions — the entity needs all PR fields populated by the upsert.
+        if (!isNew && !promotedFromIssue) {
             PullRequest existing = existingOpt.get();
             if (
                 existing.getUpdatedAt() != null &&
@@ -220,7 +231,9 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         upsertMergeCommit(dto, repository);
 
         // Publish events
-        if (isNew) {
+        // Promotions (ISSUE→PR) are treated as new for event purposes: existingOpt is empty
+        // because the entity was an Issue, not a PullRequest, so computeChangedFields would crash.
+        if (isNew || promotedFromIssue) {
             eventPublisher.publishEvent(
                 new DomainEvent.PullRequestCreated(EventPayload.PullRequestData.from(pr), EventContext.from(context))
             );

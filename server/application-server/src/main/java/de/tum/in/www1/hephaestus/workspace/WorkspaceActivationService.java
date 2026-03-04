@@ -5,6 +5,7 @@ import de.tum.in.www1.hephaestus.gitprovider.issue.gitlab.GitLabIssueSyncService
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
 import de.tum.in.www1.hephaestus.gitprovider.organization.gitlab.GitLabGroupSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.organization.gitlab.GitLabSyncResult;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.gitlab.GitLabMergeRequestSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.sync.GitHubDataSyncService;
@@ -59,6 +60,7 @@ public class WorkspaceActivationService {
     private final ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider;
     private final ObjectProvider<GitLabGroupSyncService> gitLabGroupSyncServiceProvider;
     private final ObjectProvider<GitLabIssueSyncService> gitLabIssueSyncServiceProvider;
+    private final ObjectProvider<GitLabMergeRequestSyncService> gitLabMergeRequestSyncServiceProvider;
 
     // Infrastructure
     private final AsyncTaskExecutor monitoringExecutor;
@@ -74,6 +76,7 @@ public class WorkspaceActivationService {
         ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider,
         ObjectProvider<GitLabGroupSyncService> gitLabGroupSyncServiceProvider,
         ObjectProvider<GitLabIssueSyncService> gitLabIssueSyncServiceProvider,
+        ObjectProvider<GitLabMergeRequestSyncService> gitLabMergeRequestSyncServiceProvider,
         @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor
     ) {
         this.natsProperties = natsProperties;
@@ -86,6 +89,7 @@ public class WorkspaceActivationService {
         this.gitHubDataSyncServiceProvider = gitHubDataSyncServiceProvider;
         this.gitLabGroupSyncServiceProvider = gitLabGroupSyncServiceProvider;
         this.gitLabIssueSyncServiceProvider = gitLabIssueSyncServiceProvider;
+        this.gitLabMergeRequestSyncServiceProvider = gitLabMergeRequestSyncServiceProvider;
         this.monitoringExecutor = monitoringExecutor;
     }
 
@@ -258,51 +262,99 @@ public class WorkspaceActivationService {
                             // Link workspace to organization after sync (org was created during sync)
                             linkWorkspaceToOrganization(workspace);
 
-                            // Sync issues for each project
+                            // Sync issues and merge requests for each project.
+                            // lastSyncAt is updated ONCE per repo after ALL sync phases complete,
+                            // using the timestamp captured BEFORE sync starts. This ensures:
+                            // 1. MR sync doesn't overwrite issue sync's timestamp
+                            // 2. updatedAfter is consistent across both phases
                             var issueSyncService = gitLabIssueSyncServiceProvider.getIfAvailable();
-                            if (issueSyncService != null && !result.synced().isEmpty()) {
+                            var mrSyncService = gitLabMergeRequestSyncServiceProvider.getIfAvailable();
+
+                            if (!result.synced().isEmpty()) {
                                 int totalIssues = 0;
-                                int completedRepos = 0;
+                                int issueCompletedRepos = 0;
+                                int totalMRs = 0;
+                                int mrCompletedRepos = 0;
+
                                 for (Repository repo : result.synced()) {
-                                    try {
-                                        // Compute updatedAfter from the repository's last sync timestamp.
-                                        // Subtract a safety buffer to catch issues updated during the
-                                        // previous sync window (mirrors GitHub's incrementalSyncBuffer).
-                                        OffsetDateTime updatedAfter = null;
-                                        if (repo.getLastSyncAt() != null) {
-                                            Instant buffered = repo.getLastSyncAt().minus(Duration.ofMinutes(5));
-                                            updatedAfter = buffered.atOffset(ZoneOffset.UTC);
-                                        }
+                                    // Capture updatedAfter ONCE per repo before any sync phase.
+                                    OffsetDateTime updatedAfter = null;
+                                    if (repo.getLastSyncAt() != null) {
+                                        Instant buffered = repo.getLastSyncAt().minus(Duration.ofMinutes(5));
+                                        updatedAfter = buffered.atOffset(ZoneOffset.UTC);
+                                    }
 
-                                        SyncResult issueResult = issueSyncService.syncIssues(
-                                            workspace.getId(),
-                                            repo,
-                                            updatedAfter
-                                        );
-                                        totalIssues += issueResult.count();
+                                    boolean issuesDone = false;
+                                    boolean mrsDone = false;
 
-                                        // Update lastSyncAt only on successful completion so that
-                                        // aborted syncs retry from the same point next run.
-                                        if (issueResult.isCompleted()) {
-                                            repositoryRepository.updateLastSyncAt(repo.getId(), Instant.now());
-                                            completedRepos++;
+                                    // Phase 1: Sync issues
+                                    if (issueSyncService != null) {
+                                        try {
+                                            SyncResult issueResult = issueSyncService.syncIssues(
+                                                workspace.getId(),
+                                                repo,
+                                                updatedAfter
+                                            );
+                                            totalIssues += issueResult.count();
+                                            issuesDone = issueResult.isCompleted();
+                                            if (issuesDone) issueCompletedRepos++;
+                                        } catch (Exception e) {
+                                            log.warn(
+                                                "Failed to sync issues for project: workspaceId={}, repoName={}",
+                                                workspace.getId(),
+                                                repo.getNameWithOwner(),
+                                                e
+                                            );
                                         }
-                                    } catch (Exception e) {
-                                        log.warn(
-                                            "Failed to sync issues for project: workspaceId={}, repoName={}",
-                                            workspace.getId(),
-                                            repo.getNameWithOwner(),
-                                            e
-                                        );
+                                    }
+
+                                    // Phase 2: Sync merge requests
+                                    if (mrSyncService != null) {
+                                        try {
+                                            SyncResult mrResult = mrSyncService.syncMergeRequests(
+                                                workspace.getId(),
+                                                repo,
+                                                updatedAfter
+                                            );
+                                            totalMRs += mrResult.count();
+                                            mrsDone = mrResult.isCompleted();
+                                            if (mrsDone) mrCompletedRepos++;
+                                        } catch (Exception e) {
+                                            log.warn(
+                                                "Failed to sync merge requests for project: workspaceId={}, repoName={}",
+                                                workspace.getId(),
+                                                repo.getNameWithOwner(),
+                                                e
+                                            );
+                                        }
+                                    }
+
+                                    // Update lastSyncAt only when every enabled sync phase completed for this repo
+                                    boolean allEnabledPhasesCompleted =
+                                        (issueSyncService == null || issuesDone) && (mrSyncService == null || mrsDone);
+                                    if (allEnabledPhasesCompleted) {
+                                        repositoryRepository.updateLastSyncAt(repo.getId(), Instant.now());
                                     }
                                 }
-                                log.info(
-                                    "GitLab issue sync complete: workspaceId={}, projects={}, completedRepos={}, totalIssues={}",
-                                    workspace.getId(),
-                                    result.synced().size(),
-                                    completedRepos,
-                                    totalIssues
-                                );
+
+                                if (issueSyncService != null) {
+                                    log.info(
+                                        "GitLab issue sync complete: workspaceId={}, projects={}, completedRepos={}, totalIssues={}",
+                                        workspace.getId(),
+                                        result.synced().size(),
+                                        issueCompletedRepos,
+                                        totalIssues
+                                    );
+                                }
+                                if (mrSyncService != null) {
+                                    log.info(
+                                        "GitLab MR sync complete: workspaceId={}, projects={}, completedRepos={}, totalMRs={}",
+                                        workspace.getId(),
+                                        result.synced().size(),
+                                        mrCompletedRepos,
+                                        totalMRs
+                                    );
+                                }
                             }
                         }
                     } else {
