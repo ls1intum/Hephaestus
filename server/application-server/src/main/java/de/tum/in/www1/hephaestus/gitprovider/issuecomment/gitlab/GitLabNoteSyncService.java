@@ -132,7 +132,9 @@ public class GitLabNoteSyncService {
                     );
                     String errorDetail = response != null ? String.valueOf(response.getErrors()) : "null response";
                     graphQlClientProvider.recordFailure(
-                        new GitLabSyncException("Invalid GraphQL response: context=" + safeContext + ", errors=" + errorDetail)
+                        new GitLabSyncException(
+                            "Invalid GraphQL response: context=" + safeContext + ", errors=" + errorDetail
+                        )
                     );
                     break;
                 }

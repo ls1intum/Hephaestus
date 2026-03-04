@@ -416,8 +416,10 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
     @Component
     static class GitLabNoteTestEventListener {
 
-        private final List<DomainEvent.CommentCreated> createdEvents = new java.util.concurrent.CopyOnWriteArrayList<>();
-        private final List<DomainEvent.CommentUpdated> updatedEvents = new java.util.concurrent.CopyOnWriteArrayList<>();
+        private final List<DomainEvent.CommentCreated> createdEvents =
+            new java.util.concurrent.CopyOnWriteArrayList<>();
+        private final List<DomainEvent.CommentUpdated> updatedEvents =
+            new java.util.concurrent.CopyOnWriteArrayList<>();
 
         @EventListener
         public void onCreated(DomainEvent.CommentCreated event) {
