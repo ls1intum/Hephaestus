@@ -1,11 +1,9 @@
 package de.tum.in.www1.hephaestus.workspace;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
-import de.tum.in.www1.hephaestus.gitprovider.issue.gitlab.GitLabIssueSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncServiceHolder;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
-import de.tum.in.www1.hephaestus.gitprovider.organization.gitlab.GitLabGroupSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.organization.gitlab.GitLabSyncResult;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequest.gitlab.GitLabMergeRequestSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.sync.GitHubDataSyncService;
@@ -58,9 +56,7 @@ public class WorkspaceActivationService {
 
     // Lazy-loaded to break circular reference with sync services
     private final ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider;
-    private final ObjectProvider<GitLabGroupSyncService> gitLabGroupSyncServiceProvider;
-    private final ObjectProvider<GitLabIssueSyncService> gitLabIssueSyncServiceProvider;
-    private final ObjectProvider<GitLabMergeRequestSyncService> gitLabMergeRequestSyncServiceProvider;
+    private final ObjectProvider<GitLabSyncServiceHolder> gitLabSyncServiceHolderProvider;
 
     // Infrastructure
     private final AsyncTaskExecutor monitoringExecutor;
@@ -74,9 +70,7 @@ public class WorkspaceActivationService {
         NatsConsumerService natsConsumerService,
         WorkspaceScopeFilter workspaceScopeFilter,
         ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider,
-        ObjectProvider<GitLabGroupSyncService> gitLabGroupSyncServiceProvider,
-        ObjectProvider<GitLabIssueSyncService> gitLabIssueSyncServiceProvider,
-        ObjectProvider<GitLabMergeRequestSyncService> gitLabMergeRequestSyncServiceProvider,
+        ObjectProvider<GitLabSyncServiceHolder> gitLabSyncServiceHolderProvider,
         @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor
     ) {
         this.natsProperties = natsProperties;
@@ -87,9 +81,7 @@ public class WorkspaceActivationService {
         this.natsConsumerService = natsConsumerService;
         this.workspaceScopeFilter = workspaceScopeFilter;
         this.gitHubDataSyncServiceProvider = gitHubDataSyncServiceProvider;
-        this.gitLabGroupSyncServiceProvider = gitLabGroupSyncServiceProvider;
-        this.gitLabIssueSyncServiceProvider = gitLabIssueSyncServiceProvider;
-        this.gitLabMergeRequestSyncServiceProvider = gitLabMergeRequestSyncServiceProvider;
+        this.gitLabSyncServiceHolderProvider = gitLabSyncServiceHolderProvider;
         this.monitoringExecutor = monitoringExecutor;
     }
 
@@ -239,7 +231,8 @@ public class WorkspaceActivationService {
                 if (workspace.getProviderType() == GitProviderType.GITLAB) {
                     // GitLab: sync group and its projects via GraphQL
                     // Group metadata is extracted from the first page response (no extra API call)
-                    var syncService = gitLabGroupSyncServiceProvider.getIfAvailable();
+                    var gitLabServices = gitLabSyncServiceHolderProvider.getIfAvailable();
+                    var syncService = gitLabServices != null ? gitLabServices.getGroupSyncService() : null;
                     if (syncService != null) {
                         if (isBlank(workspace.getAccountLogin())) {
                             log.warn(
@@ -267,10 +260,14 @@ public class WorkspaceActivationService {
                             // using the timestamp captured BEFORE sync starts. This ensures:
                             // 1. MR sync doesn't overwrite issue sync's timestamp
                             // 2. updatedAfter is consistent across both phases
-                            var issueSyncService = gitLabIssueSyncServiceProvider.getIfAvailable();
-                            var mrSyncService = gitLabMergeRequestSyncServiceProvider.getIfAvailable();
+                            var labelSyncService = gitLabServices.getLabelSyncService();
+                            var milestoneSyncService = gitLabServices.getMilestoneSyncService();
+                            var issueSyncService = gitLabServices.getIssueSyncService();
+                            var mrSyncService = gitLabServices.getMergeRequestSyncService();
 
                             if (!result.synced().isEmpty()) {
+                                int totalLabels = 0;
+                                int totalMilestones = 0;
                                 int totalIssues = 0;
                                 int issueCompletedRepos = 0;
                                 int totalMRs = 0;
@@ -286,6 +283,41 @@ public class WorkspaceActivationService {
 
                                     boolean issuesDone = false;
                                     boolean mrsDone = false;
+
+                                    // Phase 0: Sync labels and milestones (lightweight, run first)
+                                    if (labelSyncService != null) {
+                                        try {
+                                            SyncResult labelResult = labelSyncService.syncLabelsForRepository(
+                                                workspace.getId(),
+                                                repo
+                                            );
+                                            totalLabels += labelResult.count();
+                                        } catch (Exception e) {
+                                            log.warn(
+                                                "Failed to sync labels for project: workspaceId={}, repoName={}",
+                                                workspace.getId(),
+                                                repo.getNameWithOwner(),
+                                                e
+                                            );
+                                        }
+                                    }
+                                    if (milestoneSyncService != null) {
+                                        try {
+                                            SyncResult milestoneResult =
+                                                milestoneSyncService.syncMilestonesForRepository(
+                                                    workspace.getId(),
+                                                    repo
+                                                );
+                                            totalMilestones += milestoneResult.count();
+                                        } catch (Exception e) {
+                                            log.warn(
+                                                "Failed to sync milestones for project: workspaceId={}, repoName={}",
+                                                workspace.getId(),
+                                                repo.getNameWithOwner(),
+                                                e
+                                            );
+                                        }
+                                    }
 
                                     // Phase 1: Sync issues
                                     if (issueSyncService != null) {
@@ -337,6 +369,15 @@ public class WorkspaceActivationService {
                                     }
                                 }
 
+                                if (labelSyncService != null || milestoneSyncService != null) {
+                                    log.info(
+                                        "GitLab label/milestone sync complete: workspaceId={}, projects={}, totalLabels={}, totalMilestones={}",
+                                        workspace.getId(),
+                                        result.synced().size(),
+                                        totalLabels,
+                                        totalMilestones
+                                    );
+                                }
                                 if (issueSyncService != null) {
                                     log.info(
                                         "GitLab issue sync complete: workspaceId={}, projects={}, completedRepos={}, totalIssues={}",

@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.common.gitlab;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.LabelIdUtils;
 import de.tum.in.www1.hephaestus.gitprovider.common.PostgresStringUtils;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.dto.GitLabWebhookLabel;
@@ -228,8 +229,7 @@ public abstract class BaseGitLabProcessor {
 
     /** Produces a negative deterministic ID from (repositoryId, labelName) to avoid collisions with real label IDs. */
     private Long generateDeterministicLabelId(Long repositoryId, String labelName) {
-        long combined = (repositoryId << 32) | (labelName.hashCode() & 0xFFFFFFFFL);
-        return -combined;
+        return LabelIdUtils.generateDeterministicId(repositoryId, labelName);
     }
 
     // ========================================================================
