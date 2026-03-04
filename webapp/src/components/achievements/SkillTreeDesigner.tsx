@@ -19,7 +19,9 @@ import { AchievementEdge } from "./AchievementEdge.tsx";
 import { AchievementNode } from "./AchievementNode.tsx";
 import { AvatarNode } from "./AvatarNode.tsx";
 import { DesignerToolbar, type SnapGridSize } from "./DesignerToolbar.tsx";
+import { EqualizerEdge } from "./EqualizerEdge.tsx";
 import { SkillTreeGraphBackground } from "./SkillTreeGraphBackground.tsx";
+import { SynthwaveEdge } from "./SynthwaveEdge.tsx";
 
 const nodeTypes: NodeTypes = {
 	achievement: AchievementNode,
@@ -28,6 +30,8 @@ const nodeTypes: NodeTypes = {
 
 const edgeTypes: EdgeTypes = {
 	achievement: AchievementEdge,
+	synthwave: SynthwaveEdge,
+	equalizer: EqualizerEdge,
 };
 
 function subscribeToTheme(callback: () => void) {

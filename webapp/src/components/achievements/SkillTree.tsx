@@ -15,7 +15,9 @@ import { generateSkillTreeData } from "@/components/achievements/utils";
 import { AchievementEdge } from "./AchievementEdge.tsx";
 import { AchievementNode } from "./AchievementNode.tsx";
 import { AvatarNode } from "./AvatarNode.tsx";
+import { EqualizerEdge } from "./EqualizerEdge.tsx";
 import { SkillTreeGraphBackground } from "./SkillTreeGraphBackground.tsx";
+import { SynthwaveEdge } from "./SynthwaveEdge.tsx";
 
 const nodeTypes: NodeTypes = {
 	achievement: AchievementNode,
@@ -24,6 +26,8 @@ const nodeTypes: NodeTypes = {
 
 const edgeTypes: EdgeTypes = {
 	achievement: AchievementEdge,
+	synthwave: SynthwaveEdge,
+	equalizer: EqualizerEdge,
 };
 
 // Theme detection for MiniMap colors (React Flow requires computed color strings)
@@ -77,7 +81,6 @@ export function SkillTree({ user, achievements }: SkillTreeProps) {
 
 	return (
 		<div className="w-full h-full relative">
-
 			<ReactFlow
 				nodes={nodes}
 				edges={edges}
