@@ -116,21 +116,25 @@ export function generateSkillTreeData(
 	// Process all categories
 	const processedEdges: AnyAchievementEdge[] = [];
 
-	// Track the absolute max depth found in the tree
-	let maxTreeDepth = 0;
+	// 1. First, pre-calculate all node depths and the tree's absolute maximum depth.
+	// This ensures that all edges, even those created early in the loop, use the correct global maxDepth!
 	const nodeDepths = new Map<string, number>();
-	const getNodeDepth = (id: any): number => {
-		if (nodeDepths.has(id as string)) return nodeDepths.get(id as string)!;
-		const ach = achievementMap.get(id);
+	let maxTreeDepth = 0;
+
+	const getNodeDepth = (id: string): number => {
+		if (nodeDepths.has(id)) return nodeDepths.get(id)!;
+		const ach = achievementMap.get(id as any);
 		if (!ach || ach.parent === undefined) {
-			nodeDepths.set(id as string, 0);
+			nodeDepths.set(id, 0);
 			return 0;
 		}
 		const depth = getNodeDepth(ach.parent) + 1;
-		nodeDepths.set(id as string, depth);
+		nodeDepths.set(id, depth);
 		if (depth > maxTreeDepth) maxTreeDepth = depth;
 		return depth;
 	};
+
+	achievements.forEach((a) => getNodeDepth(a.id));
 
 	// Helper to generate edge props with explicit type verification
 	const getEdgeConfig = (

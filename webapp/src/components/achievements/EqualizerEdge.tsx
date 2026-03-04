@@ -182,17 +182,14 @@ export function EqualizerEdge(props: EdgeProps<EqualizerEdge>) {
 
 	const [time, setTime] = useState(0);
 	const rafRef = useRef<number>(0);
-	const prevTimeRef = useRef<number>(0);
 
 	useEffect(() => {
 		if (!isEnabled) return;
 
 		const animate = (now: number) => {
-			if (prevTimeRef.current === 0) prevTimeRef.current = now;
-			const delta = (now - prevTimeRef.current) * 0.001;
-			prevTimeRef.current = now;
-
-			setTime((t) => t + delta * ANIMATION_SPEED_FACTOR);
+			// Using absolute time (now * 0.001) ensures all edges share the same global clock cycle!
+			// This prevents them from drifting out of sync even if they mount at different times.
+			setTime(now * 0.001 * ANIMATION_SPEED_FACTOR);
 			rafRef.current = requestAnimationFrame(animate);
 		};
 
@@ -200,7 +197,6 @@ export function EqualizerEdge(props: EdgeProps<EqualizerEdge>) {
 
 		return () => {
 			cancelAnimationFrame(rafRef.current);
-			prevTimeRef.current = 0;
 		};
 	}, [isEnabled]);
 
@@ -231,22 +227,23 @@ export function EqualizerEdge(props: EdgeProps<EqualizerEdge>) {
 	let chainEnvelope = 1.0; // Global multiplier for any outburst
 
 	if (data?.depth !== undefined) {
-		// Chain variant: Every level takes 1.0 seconds.
-		// Cycle restarts as soon as the last level is done.
-		// maxDepth of 3 means depth 0, 1, 2, 3.
-		// Start times: 0, 1, 2, 3. End time of 3 is 4.2.
-		const maxD = data.maxDepth ?? 8;
-		const cycleDuration = maxD + 1.2;
+		// Chain variant: Propagation burst that spreads from root to leaves.
+		const BURST_OFFSET = 0.3; // Small offset between levels
+		const BURST_DURATION = 2.0; // Duration of each edge's active burst
+		const GLOBAL_COOLDOWN = 1.0; // Cooldown after the last node finishes its burst
+
+		const maxD = data.maxDepth ?? 0;
+		// Cycle resets after the last possible node would have finished its burst + cooldown.
+		const cycleDuration = maxD * BURST_OFFSET + BURST_DURATION + GLOBAL_COOLDOWN;
+
 		const globalPulseTime = time % cycleDuration;
-		const startTime = data.depth;
-		const duration = 1.2;
-		const endTime = startTime + duration;
+		const startTime = data.depth * BURST_OFFSET;
+		const endTime = startTime + BURST_DURATION;
 
 		if (globalPulseTime >= startTime && globalPulseTime <= endTime) {
-			const progress = (globalPulseTime - startTime) / duration;
+			const progress = (globalPulseTime - startTime) / BURST_DURATION;
 			pulsePosition = progress * 1.4 - 0.2;
-			// Bell curve for static outbursts so they fade in/out during their "turn"
-			// Use a steeper curve so it looks punchy
+			// Bell curve for static outbursts so they fade in/out during their propagation step
 			chainEnvelope = Math.sin(progress * Math.PI);
 		} else {
 			chainEnvelope = 0;
