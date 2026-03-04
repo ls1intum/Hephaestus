@@ -68,6 +68,12 @@ public record GitLabSyncResult(
         int pagesCompleted,
         int projectsSkipped
     ) {
-        return new GitLabSyncResult(status, Collections.unmodifiableList(syncedSoFar), pagesCompleted, projectsSkipped, 0);
+        return new GitLabSyncResult(
+            status,
+            Collections.unmodifiableList(syncedSoFar),
+            pagesCompleted,
+            projectsSkipped,
+            0
+        );
     }
 }
