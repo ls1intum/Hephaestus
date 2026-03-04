@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.22.0](https://github.com/ls1intum/Hephaestus/compare/v0.21.2...v0.22.0) (2026-03-04)
+
+### 🚀 Features
+
+* **gitprovider:** GitLab sync — Notes & Comments ([#793](https://github.com/ls1intum/Hephaestus/issues/793)) ([3071f80](https://github.com/ls1intum/Hephaestus/commit/3071f80ad3246ae240c6950672b0644c784242d3))
+
 ## [0.21.2](https://github.com/ls1intum/Hephaestus/compare/v0.21.1...v0.21.2) (2026-03-04)
 
 ### 🐛 Bug Fixes
