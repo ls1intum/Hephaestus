@@ -157,6 +157,9 @@ export const assignRole = <ThrowOnError extends boolean = false>(options: Option
  * Get the current user's membership in this workspace.
  *
  * Get the current user's membership in this workspace.
+ * Super admins (Keycloak admin realm role) have their effective role elevated to ADMIN
+ * if their database role is lower, matching the runtime authorization behaviour in
+ * {@link WorkspaceAccessService WorkspaceAccessService}.
  */
 export const getCurrentUserMembership = <ThrowOnError extends boolean = false>(options: Options<GetCurrentUserMembershipData, ThrowOnError>) => (options.client ?? client).get<GetCurrentUserMembershipResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/members/me', ...options });
 

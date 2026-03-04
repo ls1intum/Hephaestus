@@ -378,6 +378,9 @@ export const getCurrentUserMembershipQueryKey = (options: Options<GetCurrentUser
  * Get the current user's membership in this workspace.
  *
  * Get the current user's membership in this workspace.
+ * Super admins (Keycloak admin realm role) have their effective role elevated to ADMIN
+ * if their database role is lower, matching the runtime authorization behaviour in
+ * {@link WorkspaceAccessService WorkspaceAccessService}.
  */
 export const getCurrentUserMembershipOptions = (options: Options<GetCurrentUserMembershipData>) => queryOptions<GetCurrentUserMembershipResponse, DefaultError, GetCurrentUserMembershipResponse, ReturnType<typeof getCurrentUserMembershipQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {

@@ -1375,7 +1375,7 @@ export type GetCurrentUserMembershipData = {
 
 export type GetCurrentUserMembershipResponses = {
     /**
-     * the current user's membership details
+     * the current user's membership details with effective role
      */
     200: WorkspaceMembership;
 };
