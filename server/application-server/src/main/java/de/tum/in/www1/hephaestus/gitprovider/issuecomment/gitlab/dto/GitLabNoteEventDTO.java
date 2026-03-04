@@ -5,16 +5,17 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabEventAction;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.dto.GitLabWebhookProject;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.dto.GitLabWebhookUser;
+import org.springframework.lang.NonNull;
 import org.springframework.lang.Nullable;
 
 /** DTO for GitLab note webhook events ({@code object_kind: "note"}). */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitLabNoteEventDTO(
-    @JsonProperty("object_kind") String objectKind,
-    @JsonProperty("event_type") String eventType,
-    GitLabWebhookUser user,
-    GitLabWebhookProject project,
-    @JsonProperty("object_attributes") NoteAttributes objectAttributes,
+    @NonNull @JsonProperty("object_kind") String objectKind,
+    @NonNull @JsonProperty("event_type") String eventType,
+    @NonNull GitLabWebhookUser user,
+    @NonNull GitLabWebhookProject project,
+    @NonNull @JsonProperty("object_attributes") NoteAttributes objectAttributes,
     @Nullable EmbeddedIssue issue,
     @Nullable @JsonProperty("merge_request") EmbeddedMergeRequest mergeRequest
 ) {

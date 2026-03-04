@@ -370,7 +370,7 @@ public class GitLabMergeRequestSyncService {
             try {
                 noteSyncService.syncNotesForMergeRequest(scopeId, repository, Integer.parseInt(fields.iid()), pr);
             } catch (Exception e) {
-                log.warn("Note sync failed for MR: context={}", mrContext, e);
+                log.error("Note sync failed for MR: context={}", mrContext, e);
             }
         }
 

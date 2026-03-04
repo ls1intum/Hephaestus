@@ -130,7 +130,10 @@ public class GitLabNoteSyncService {
                         safeContext,
                         response != null ? response.getErrors() : "null response"
                     );
-                    graphQlClientProvider.recordFailure(new GitLabSyncException("Invalid GraphQL response"));
+                    String errorDetail = response != null ? String.valueOf(response.getErrors()) : "null response";
+                    graphQlClientProvider.recordFailure(
+                        new GitLabSyncException("Invalid GraphQL response: context=" + safeContext + ", errors=" + errorDetail)
+                    );
                     break;
                 }
 
@@ -172,6 +175,7 @@ public class GitLabNoteSyncService {
                         }
                     } catch (Exception e) {
                         log.warn("Error processing note: context={}, noteId={}", safeContext, noteNode.get("id"), e);
+                        totalSkipped++;
                     }
                 }
 

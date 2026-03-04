@@ -360,10 +360,11 @@ public class GitLabIssueCommentProcessor extends BaseGitLabProcessor {
         pr.setNumber(dto.iid());
         pr.setTitle(sanitize(dto.title()));
         pr.setBody(sanitize(dto.description()));
-        pr.setState(convertMrState(dto.state()));
+        Issue.State mappedState = convertMrState(dto.state());
+        pr.setState(mappedState);
         pr.setHtmlUrl(dto.url());
         pr.setDraft(dto.draft());
-        pr.setMerged(false);
+        pr.setMerged(mappedState == Issue.State.MERGED);
         pr.setAdditions(0);
         pr.setDeletions(0);
         pr.setChangedFiles(0);

@@ -393,7 +393,7 @@ public class GitLabIssueSyncService {
             try {
                 noteSyncService.syncNotesForIssue(scopeId, repository, Integer.parseInt(iid), issue);
             } catch (Exception e) {
-                log.warn("Note sync failed for issue: context={}", issueContext, e);
+                log.error("Note sync failed for issue: context={}", issueContext, e);
             }
         }
 

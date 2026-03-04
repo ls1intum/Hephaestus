@@ -80,6 +80,15 @@ public class GitLabNoteMessageHandler extends GitLabMessageHandler<GitLabNoteEve
         GitLabEventAction action = event.actionType();
         String noteableType = event.noteableType();
 
+        if (action == GitLabEventAction.UNKNOWN) {
+            log.debug(
+                "Skipped note with unknown action: projectPath={}, noteId={}",
+                safeProjectPath,
+                event.objectAttributes().id()
+            );
+            return;
+        }
+
         log.info(
             "Processing note event: projectPath={}, noteableType={}, noteId={}, action={}",
             safeProjectPath,
