@@ -8,6 +8,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncException;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabPageInfo;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
+import de.tum.in.www1.hephaestus.gitprovider.issuecomment.gitlab.GitLabNoteSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.sync.SyncResult;
 import java.time.OffsetDateTime;
@@ -44,15 +45,18 @@ public class GitLabIssueSyncService {
 
     private final GitLabGraphQlClientProvider graphQlClientProvider;
     private final GitLabIssueProcessor issueProcessor;
+    private final GitLabNoteSyncService noteSyncService;
     private final GitLabProperties gitLabProperties;
 
     public GitLabIssueSyncService(
         GitLabGraphQlClientProvider graphQlClientProvider,
         GitLabIssueProcessor issueProcessor,
+        GitLabNoteSyncService noteSyncService,
         GitLabProperties gitLabProperties
     ) {
         this.graphQlClientProvider = graphQlClientProvider;
         this.issueProcessor = issueProcessor;
+        this.noteSyncService = noteSyncService;
         this.gitLabProperties = gitLabProperties;
     }
 
@@ -382,7 +386,18 @@ public class GitLabIssueSyncService {
             syncLabels,
             syncAssignees
         );
-        return issueProcessor.processFromSync(syncData, repository, scopeId);
+        Issue issue = issueProcessor.processFromSync(syncData, repository, scopeId);
+
+        // Sync notes for this issue if it has comments and wasn't skipped
+        if (issue != null && userNotesCount > 0) {
+            try {
+                noteSyncService.syncNotesForIssue(scopeId, repository, Integer.parseInt(iid), issue);
+            } catch (Exception e) {
+                log.warn("Note sync failed for issue: context={}", issueContext, e);
+            }
+        }
+
+        return issue;
     }
 
     // ========================================================================

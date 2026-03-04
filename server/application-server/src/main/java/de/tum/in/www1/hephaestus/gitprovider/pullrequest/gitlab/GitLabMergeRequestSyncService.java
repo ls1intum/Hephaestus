@@ -7,6 +7,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncException;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabPageInfo;
+import de.tum.in.www1.hephaestus.gitprovider.issuecomment.gitlab.GitLabNoteSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.sync.SyncResult;
@@ -45,15 +46,18 @@ public class GitLabMergeRequestSyncService {
 
     private final GitLabGraphQlClientProvider graphQlClientProvider;
     private final GitLabMergeRequestProcessor mergeRequestProcessor;
+    private final GitLabNoteSyncService noteSyncService;
     private final GitLabProperties gitLabProperties;
 
     public GitLabMergeRequestSyncService(
         GitLabGraphQlClientProvider graphQlClientProvider,
         GitLabMergeRequestProcessor mergeRequestProcessor,
+        GitLabNoteSyncService noteSyncService,
         GitLabProperties gitLabProperties
     ) {
         this.graphQlClientProvider = graphQlClientProvider;
         this.mergeRequestProcessor = mergeRequestProcessor;
+        this.noteSyncService = noteSyncService;
         this.gitLabProperties = gitLabProperties;
     }
 
@@ -359,7 +363,20 @@ public class GitLabMergeRequestSyncService {
             syncReviewers,
             syncApprovers
         );
-        return mergeRequestProcessor.processFromSync(syncData, repository, scopeId);
+        PullRequest pr = mergeRequestProcessor.processFromSync(syncData, repository, scopeId);
+
+        // Sync notes for this MR if it has comments and wasn't skipped
+        if (pr != null && fields.userNotesCount() > 0) {
+            try {
+                noteSyncService.syncNotesForMergeRequest(
+                    scopeId, repository, Integer.parseInt(fields.iid()), pr
+                );
+            } catch (Exception e) {
+                log.warn("Note sync failed for MR: context={}", mrContext, e);
+            }
+        }
+
+        return pr;
     }
 
     // ========================================================================
