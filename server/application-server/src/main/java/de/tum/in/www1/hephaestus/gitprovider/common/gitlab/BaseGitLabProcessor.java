@@ -7,6 +7,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.dto.GitLabWebhookUser
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.RepositoryScopeFilter;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.ScopeIdResolver;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
+import de.tum.in.www1.hephaestus.gitprovider.label.LabelIdUtils;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
@@ -228,8 +229,7 @@ public abstract class BaseGitLabProcessor {
 
     /** Produces a negative deterministic ID from (repositoryId, labelName) to avoid collisions with real label IDs. */
     private Long generateDeterministicLabelId(Long repositoryId, String labelName) {
-        long combined = (repositoryId << 32) | (labelName.hashCode() & 0xFFFFFFFFL);
-        return -combined;
+        return LabelIdUtils.generateDeterministicId(repositoryId, labelName);
     }
 
     // ========================================================================

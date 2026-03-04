@@ -21,6 +21,7 @@ public enum GitLabEventType {
     MERGE_REQUEST("merge_request"),
     ISSUE("issue"),
     NOTE("note"),
+    MILESTONE("milestone"),
 
     // Git events
     PUSH("push"),

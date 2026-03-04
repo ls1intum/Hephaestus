@@ -5,6 +5,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.EventContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.EventPayload;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
+import de.tum.in.www1.hephaestus.gitprovider.label.LabelIdUtils;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.label.github.dto.GitHubLabelDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
@@ -131,24 +132,8 @@ public class GitHubLabelProcessor {
         return saved;
     }
 
-    /**
-     * Generates a deterministic ID for labels synced via GraphQL.
-     * GitHub's GraphQL API doesn't expose databaseId for labels, so we generate
-     * a consistent ID based on the repository ID and label name.
-     * <p>
-     * The generated ID is negative to avoid collision with actual GitHub databaseIds.
-     *
-     * @param repositoryId the repository's database ID
-     * @param labelName the label's name
-     * @return a deterministic negative Long ID
-     */
     private Long generateDeterministicId(Long repositoryId, String labelName) {
-        // Use bit shifting to combine repo ID and label name hash without collision.
-        // The formula repositoryId * 31 + labelName.hashCode() can produce collisions.
-        // Bit shifting separates components: repo ID in upper 32 bits, label name hash in lower 32 bits.
-        // Negative IDs won't collide with GitHub's positive databaseIds.
-        long combined = (repositoryId << 32) | (labelName.hashCode() & 0xFFFFFFFFL);
-        return -combined;
+        return LabelIdUtils.generateDeterministicId(repositoryId, labelName);
     }
 
     /**
