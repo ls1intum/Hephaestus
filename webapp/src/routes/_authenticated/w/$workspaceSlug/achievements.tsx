@@ -6,7 +6,7 @@ import { getUserProfileOptions } from "@/api/@tanstack/react-query.gen";
 import { AchievementHeader } from "@/components/achievements/AchievementHeader.tsx";
 import { AchievementsListView } from "@/components/achievements/AchievementsListView.tsx";
 import { SkillTree } from "@/components/achievements/SkillTree.tsx";
-import { StatsPanel } from "@/components/achievements/stats-panel";
+import { StatsPanel } from "@/components/achievements/StatsPanel.tsx";
 import type { ViewMode } from "@/components/achievements/types";
 import { enhanceAchievements } from "@/components/achievements/utils.ts";
 import { useAchievementNotifications } from "@/hooks/use-achievement-notifications";
@@ -66,15 +66,8 @@ function AchievementsPage() {
 								{/* Radial gradient background */}
 								<div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,var(--tw-gradient-stops))] from-primary/5 via-background to-background" />
 
-
-
-
-
 								{/* Skill tree */}
-								<SkillTree
-									user={user}
-									achievements={uiAchievements}
-								/>
+								<SkillTree user={user} achievements={uiAchievements} />
 							</>
 						) : (
 							<>

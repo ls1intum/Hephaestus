@@ -8,7 +8,12 @@ import {
 	Trophy,
 } from "lucide-react";
 import type React from "react";
-import { categoryMeta, rarityAccentBackgrounds, rarityBorderColors, rarityLabels } from "@/components/achievements/styles";
+import {
+	categoryMeta,
+	rarityAccentBackgrounds,
+	rarityBorderColors,
+	rarityLabels,
+} from "@/components/achievements/styles";
 import type { AchievementCategory, UIAchievement } from "@/components/achievements/types";
 import { calculateStats } from "@/components/achievements/utils";
 import { Progress, ProgressIndicator, ProgressTrack } from "@/components/ui/progress";
@@ -109,7 +114,7 @@ export function StatsPanel({ achievements }: StatsPanelProps) {
 				<div className="space-y-2">
 					{achievements
 						.filter((a) => a.status === "unlocked" && a.unlockedAt)
-						.sort((a, b) => b.unlockedAt.getTime() - a.unlockedAt.getTime())
+						.sort((a, b) => new Date(b.unlockedAt).getTime() - new Date(a.unlockedAt).getTime())
 						.slice(0, 5)
 						.map((achievement) => {
 							const rarity = achievement.rarity ?? "common";
@@ -134,7 +139,9 @@ export function StatsPanel({ achievements }: StatsPanelProps) {
 											{achievement.name}
 										</p>
 										<p className="text-xs text-muted-foreground">
-											{unlockedDate.toLocaleDateString()}
+											{unlockedDate
+												? new Date(unlockedDate).toLocaleDateString()
+												: "Recently unlocked"}
 										</p>
 									</div>
 								</div>
@@ -168,12 +175,20 @@ export function StatsPanel({ achievements }: StatsPanelProps) {
 					{/* Rarity tiers */}
 					<div className="space-y-2">
 						<span className="text-muted-foreground font-medium">Rarity</span>
-						{(["common", "uncommon", "rare", "epic", "legendary", "mythic"] as const).map((rarity) => (
-							<div key={rarity} className="flex items-center gap-2">
-								<div className={cn("w-3 h-3 rounded-full border-2", rarityBorderColors[rarity], "bg-transparent")} />
-								<span className="text-muted-foreground">{rarityLabels[rarity]}</span>
-							</div>
-						))}
+						{(["common", "uncommon", "rare", "epic", "legendary", "mythic"] as const).map(
+							(rarity) => (
+								<div key={rarity} className="flex items-center gap-2">
+									<div
+										className={cn(
+											"w-3 h-3 rounded-full border-2",
+											rarityBorderColors[rarity],
+											"bg-transparent",
+										)}
+									/>
+									<span className="text-muted-foreground">{rarityLabels[rarity]}</span>
+								</div>
+							),
+						)}
 					</div>
 				</div>
 			</div>

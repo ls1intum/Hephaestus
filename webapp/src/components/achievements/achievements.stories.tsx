@@ -6,7 +6,7 @@ import { AchievementNode } from "./AchievementNode.tsx";
 
 import { SkillTree } from "./SkillTree.tsx";
 
-import { StatsPanel } from "./stats-panel";
+import { StatsPanel } from "./StatsPanel.tsx";
 import type { UIAchievement } from "./types.ts";
 import { enhanceAchievements } from "./utils.ts";
 
