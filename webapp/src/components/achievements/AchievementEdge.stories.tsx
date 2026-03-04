@@ -48,16 +48,6 @@ const meta: Meta<typeof AchievementEdge> = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-// Mock edges using the project's digital-Greek-mythology naming
-// These are deliberately non-trivial positions to show the straight-line path
-const zeusEdgeEnabled = {
-	sourceX: 40,
-	sourceY: 90,
-	targetX: 400,
-	targetY: 90,
-	data: { isEnabled: true },
-};
-
 const zeusEdgeDisabled = {
 	sourceX: 40,
 	sourceY: 40,
@@ -72,25 +62,6 @@ const hermesEdgeAnimated = {
 	targetX: 400,
 	targetY: 140,
 	data: { isEnabled: true },
-};
-
-// In-between example: two segments that together form a full connection
-// left segment is enabled, right segment is disabled — visually represents
-// an "in-between" progress state along the connection.
-const inBetweenLeft = {
-	sourceX: 40,
-	sourceY: 115,
-	targetX: 220,
-	targetY: 115,
-	data: { isEnabled: true },
-};
-
-const inBetweenRight = {
-	sourceX: 220,
-	sourceY: 115,
-	targetX: 400,
-	targetY: 115,
-	data: { isEnabled: false },
 };
 
 /** Active - animated edge to demonstrate particle motion */
