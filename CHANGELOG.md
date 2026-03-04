@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.23.1](https://github.com/ls1intum/Hephaestus/compare/v0.23.0...v0.23.1) (2026-03-04)
+
+### 🐛 Bug Fixes
+
+* **profile:** use static Tailwind classes for league badge background ([#798](https://github.com/ls1intum/Hephaestus/issues/798)) ([87ce571](https://github.com/ls1intum/Hephaestus/commit/87ce571b69fd7772751fbcef85c13e0160c3dda0))
+
 ## [0.23.0](https://github.com/ls1intum/Hephaestus/compare/v0.22.0...v0.23.0) (2026-03-04)
 
 ### 🚀 Features
