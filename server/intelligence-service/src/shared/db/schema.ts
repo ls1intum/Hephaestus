@@ -780,7 +780,7 @@ export const issue = pgTable(
 			foreignColumns: [gitProvider.id],
 			name: "fk_issue_provider",
 		}),
-		unique("uk_issue_repository_number").on(table.number, table.repositoryId),
+		unique("uk_issue_repository_type_number").on(table.issueType, table.number, table.repositoryId),
 		unique("uq_issue_provider_native_id").on(table.nativeId, table.providerId),
 		check(
 			"issue_merge_state_status_check",

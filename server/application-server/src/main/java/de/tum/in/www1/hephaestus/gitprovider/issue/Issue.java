@@ -38,7 +38,10 @@ import org.springframework.lang.NonNull;
 @Table(
     name = "issue",
     uniqueConstraints = {
-        @UniqueConstraint(name = "uk_issue_repository_number", columnNames = { "repository_id", "number" }),
+        @UniqueConstraint(
+            name = "uk_issue_repository_type_number",
+            columnNames = { "repository_id", "issue_type", "number" }
+        ),
         @UniqueConstraint(name = "uq_issue_provider_native_id", columnNames = { "provider_id", "native_id" }),
     }
 )

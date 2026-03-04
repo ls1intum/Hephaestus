@@ -12,27 +12,22 @@ import static org.mockito.Mockito.when;
 import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabEventType;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabWebhookContextResolver;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.dto.GitLabWebhookLabel;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.dto.GitLabWebhookProject;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.dto.GitLabWebhookUser;
-import de.tum.in.www1.hephaestus.gitprovider.common.spi.RepositoryScopeFilter;
-import de.tum.in.www1.hephaestus.gitprovider.common.spi.ScopeIdResolver;
 import de.tum.in.www1.hephaestus.gitprovider.issue.gitlab.dto.GitLabIssueEventDTO;
-import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
-import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import io.nats.client.Message;
 import java.io.IOException;
 import java.util.List;
-import java.util.Optional;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -48,13 +43,7 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
     private GitLabIssueProcessor issueProcessor;
 
     @Mock
-    private RepositoryRepository repositoryRepository;
-
-    @Mock
-    private RepositoryScopeFilter repositoryScopeFilter;
-
-    @Mock
-    private ScopeIdResolver scopeIdResolver;
+    private GitLabWebhookContextResolver contextResolver;
 
     @Mock
     private NatsMessageDeserializer deserializer;
@@ -75,17 +64,12 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
             .when(transactionTemplate)
             .executeWithoutResult(any());
 
-        handler = new GitLabIssueMessageHandler(
-            issueProcessor,
-            repositoryRepository,
-            repositoryScopeFilter,
-            scopeIdResolver,
-            deserializer,
-            transactionTemplate
-        );
+        handler = new GitLabIssueMessageHandler(issueProcessor, contextResolver, deserializer, transactionTemplate);
 
-        // Default: allow all repositories
-        lenient().when(repositoryScopeFilter.isRepositoryAllowed(any())).thenReturn(true);
+        // Default: context resolver returns a valid context
+        lenient()
+            .when(contextResolver.resolve(eq(PROJECT_PATH), any(), any()))
+            .thenReturn(ProcessingContext.forWebhook(1L, setupRepository(), "open"));
     }
 
     @Test
@@ -186,7 +170,7 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
             handler.onMessage(msg);
 
             verify(issueProcessor, never()).process(any(), any());
-            verify(repositoryRepository, never()).findByNameWithOwnerWithOrganization(any());
+            verify(contextResolver, never()).resolve(any(), any(), any());
         }
 
         @Test
@@ -307,77 +291,15 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
     class ContextResolution {
 
         @Test
-        @DisplayName("skips when repository is filtered")
-        void repositoryFiltered_skipsProcessing() throws IOException {
-            when(repositoryScopeFilter.isRepositoryAllowed(PROJECT_PATH)).thenReturn(false);
+        @DisplayName("skips when context resolver returns null (filtered or not found)")
+        void contextResolverReturnsNull_skipsProcessing() throws IOException {
+            when(contextResolver.resolve(eq(PROJECT_PATH), any(), any())).thenReturn(null);
             GitLabIssueEventDTO event = createEvent("open", "opened", false);
 
             Message msg = mockMessage(event);
             handler.onMessage(msg);
 
             verify(issueProcessor, never()).process(any(), any());
-            verify(repositoryRepository, never()).findByNameWithOwnerWithOrganization(any());
-        }
-
-        @Test
-        @DisplayName("skips when repository not found in DB")
-        void repositoryNotFound_skipsProcessing() throws IOException {
-            when(repositoryRepository.findByNameWithOwnerWithOrganization(PROJECT_PATH)).thenReturn(Optional.empty());
-            GitLabIssueEventDTO event = createEvent("open", "opened", false);
-
-            Message msg = mockMessage(event);
-            handler.onMessage(msg);
-
-            verify(issueProcessor, never()).process(any(), any());
-        }
-
-        @Test
-        @DisplayName("resolves scope from organization")
-        void resolvesScopeFromOrganization() throws IOException {
-            Organization org = new Organization();
-            org.setLogin("hephaestustest");
-
-            Repository repo = new Repository();
-            repo.setId(-246765L);
-            repo.setNameWithOwner(PROJECT_PATH);
-            repo.setOrganization(org);
-
-            when(repositoryRepository.findByNameWithOwnerWithOrganization(PROJECT_PATH)).thenReturn(Optional.of(repo));
-            when(scopeIdResolver.findScopeIdByOrgLogin("hephaestustest")).thenReturn(Optional.of(42L));
-
-            GitLabIssueEventDTO event = createEvent("open", "opened", false);
-
-            Message msg = mockMessage(event);
-            handler.onMessage(msg);
-
-            ArgumentCaptor<ProcessingContext> ctxCaptor = ArgumentCaptor.forClass(ProcessingContext.class);
-            verify(issueProcessor).process(eq(event), ctxCaptor.capture());
-
-            ProcessingContext ctx = ctxCaptor.getValue();
-            assertThat(ctx.scopeId()).isEqualTo(42L);
-            assertThat(ctx.repository()).isSameAs(repo);
-        }
-
-        @Test
-        @DisplayName("falls back to repo name for scope when org not found")
-        void fallsBackToRepoNameForScope() throws IOException {
-            Repository repo = new Repository();
-            repo.setId(-246765L);
-            repo.setNameWithOwner(PROJECT_PATH);
-            // No organization
-
-            when(repositoryRepository.findByNameWithOwnerWithOrganization(PROJECT_PATH)).thenReturn(Optional.of(repo));
-            when(scopeIdResolver.findScopeIdByRepositoryName(PROJECT_PATH)).thenReturn(Optional.of(99L));
-
-            GitLabIssueEventDTO event = createEvent("open", "opened", false);
-
-            Message msg = mockMessage(event);
-            handler.onMessage(msg);
-
-            ArgumentCaptor<ProcessingContext> ctxCaptor = ArgumentCaptor.forClass(ProcessingContext.class);
-            verify(issueProcessor).process(eq(event), ctxCaptor.capture());
-
-            assertThat(ctxCaptor.getValue().scopeId()).isEqualTo(99L);
         }
     }
 
@@ -389,10 +311,6 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
         Repository repo = new Repository();
         repo.setId(-246765L);
         repo.setNameWithOwner(PROJECT_PATH);
-
-        when(repositoryRepository.findByNameWithOwnerWithOrganization(PROJECT_PATH)).thenReturn(Optional.of(repo));
-        when(scopeIdResolver.findScopeIdByRepositoryName(PROJECT_PATH)).thenReturn(Optional.of(1L));
-
         return repo;
     }
 

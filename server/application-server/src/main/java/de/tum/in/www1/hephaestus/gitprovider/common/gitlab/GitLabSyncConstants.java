@@ -149,7 +149,7 @@ public final class GitLabSyncConstants {
      *
      * @see <a href="https://docs.gitlab.com/ee/api/graphql/index.html#gitlab-custom-scalars">GitLab Custom Scalars</a>
      */
-    private static final Pattern GID_PATTERN = Pattern.compile("^gid://gitlab/[A-Za-z]+/(\\d+)$");
+    private static final Pattern GID_PATTERN = Pattern.compile("^gid://gitlab/[A-Za-z:]+/(\\d+)$");
 
     /**
      * Returns the raw GitLab numeric ID as the native entity ID.

@@ -24,6 +24,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.hibernate.annotations.BatchSize;
 import org.springframework.lang.Nullable;
 
 /**
@@ -130,10 +131,12 @@ public class PullRequest extends Issue {
         joinColumns = @JoinColumn(name = "pull_request_id"),
         inverseJoinColumns = @JoinColumn(name = "user_id")
     )
+    @BatchSize(size = 50)
     @ToString.Exclude
     private Set<User> requestedReviewers = new HashSet<>();
 
     @OneToMany(mappedBy = "pullRequest", cascade = CascadeType.REMOVE, orphanRemoval = true)
+    @BatchSize(size = 50)
     @ToString.Exclude
     private Set<PullRequestReview> reviews = new HashSet<>();
 
