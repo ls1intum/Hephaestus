@@ -18,12 +18,16 @@ public record WorkspaceMembershipDTO(
     @Schema(description = "Timestamp when the membership was created") Instant createdAt
 ) {
     public static WorkspaceMembershipDTO from(WorkspaceMembership membership) {
+        return from(membership, membership.getRole());
+    }
+
+    public static WorkspaceMembershipDTO from(WorkspaceMembership membership, WorkspaceRole effectiveRole) {
         var user = membership.getUser();
         return new WorkspaceMembershipDTO(
             user.getId(),
             user.getLogin(),
             user.getName(),
-            membership.getRole(),
+            effectiveRole,
             membership.getLeaguePoints(),
             membership.getCreatedAt()
         );
