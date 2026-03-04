@@ -1,6 +1,6 @@
 import { Check, Lock } from "lucide-react";
 import { AchievementProgressDisplay } from "@/components/achievements/AchievementProgressDisplay.tsx";
-import { categoryLabels, statusBackgrounds } from "@/components/achievements/styles.ts";
+import { categoryLabels, rarityLabels, rarityTitleColors, statusBackgrounds } from "@/components/achievements/styles.ts";
 import type {
 	AchievementCategory,
 	AchievementStatus,
@@ -88,7 +88,7 @@ export function AchievementsListView({ achievements }: AchievementListViewProps)
 								<TableRow>
 									<TableHead className="w-12">Icon</TableHead>
 									<TableHead>Achievement</TableHead>
-									<TableHead className="w-24">Tier</TableHead>
+									<TableHead className="w-24">Rarity</TableHead>
 									<TableHead className="w-32">Progress</TableHead>
 									<TableHead className="w-28">Status</TableHead>
 								</TableRow>
@@ -108,8 +108,7 @@ export function AchievementsListView({ achievements }: AchievementListViewProps)
 													className={cn(
 														"w-8 h-8 rounded-full flex items-center justify-center",
 														statusBackgrounds[status],
-														status === "unlocked" && "text-background",
-														status !== "unlocked" && "text-muted-foreground",
+														status === "unlocked" ? "text-background" : "text-foreground",
 													)}
 												>
 													<Icon className="w-4 h-4" />
@@ -124,7 +123,9 @@ export function AchievementsListView({ achievements }: AchievementListViewProps)
 												</div>
 											</TableCell>
 											<TableCell>
-												<span className="text-sm capitalize">{achievement.rarity}</span>
+												<span className={cn("text-sm font-semibold", rarityTitleColors[achievement.rarity])}>
+													{rarityLabels[achievement.rarity]}
+												</span>
 											</TableCell>
 											<TableCell>
 												<AchievementProgressDisplay achievement={achievement} />

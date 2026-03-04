@@ -124,11 +124,12 @@ export function generateSkillTreeData(
 	const getNodeDepth = (id: string): number => {
 		if (nodeDepths.has(id)) return nodeDepths.get(id)!;
 		const ach = achievementMap.get(id as any);
-		if (!ach || ach.parent === undefined) {
+		const parentId = (ach as any)?.parentId ?? ach?.parent;
+		if (!ach || parentId === undefined || parentId === id) {
 			nodeDepths.set(id, 0);
 			return 0;
 		}
-		const depth = getNodeDepth(ach.parent) + 1;
+		const depth = getNodeDepth(parentId) + 1;
 		nodeDepths.set(id, depth);
 		if (depth > maxTreeDepth) maxTreeDepth = depth;
 		return depth;
@@ -186,8 +187,13 @@ export function generateSkillTreeData(
 			const savedCoords = (coordinatesData as Record<string, { x: number; y: number }>)[
 				achievement.id
 			];
-			const x = savedCoords?.x ?? 0;
-			const y = savedCoords?.y ?? 0;
+
+			// Support for mocked positions in Storybook (MockUIAchievement)
+			const mockX = (achievement as { x?: number }).x;
+			const mockY = (achievement as { y?: number }).y;
+
+			const x = mockX ?? savedCoords?.x ?? 0;
+			const y = mockY ?? savedCoords?.y ?? 0;
 
 			nodes.push({
 				id: `${achievement.id}-node`,
@@ -204,16 +210,20 @@ export function generateSkillTreeData(
 			} satisfies AchievementNode);
 
 			// Create edge based on parent relationship
-			if (achievement.parent !== undefined) {
-				const parent = achievementMap.get(achievement.parent);
+			const parentId = (achievement as any).parentId ?? achievement.parent;
+
+			if (parentId === achievement.id) {
+				// Standalone achievement: No edges at all (not even to avatar)
+			} else if (parentId !== undefined) {
+				const parent = achievementMap.get(parentId);
 				if (parent) {
 					// Active only when both parent and child are unlocked
 					const isActive = parent.status === "unlocked" && achievement.status === "unlocked";
-					const edgeDepth = getNodeDepth(achievement.parent) + 1;
+					const edgeDepth = getNodeDepth(parentId) + 1;
 					const config = getEdgeConfig(isActive, edgeDisplayMode, edgeDepth, maxTreeDepth);
 					processedEdges.push({
-						id: `${achievement.parent}-${achievement.id}-edge`,
-						source: `${achievement.parent}-node`,
+						id: `${parentId}-${achievement.id}-edge`,
+						source: `${parentId}-node`,
 						target: `${achievement.id}-node`,
 						...config,
 					} as AnyAchievementEdge);

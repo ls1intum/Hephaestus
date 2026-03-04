@@ -1,15 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { ReactFlowProvider } from "@xyflow/react";
-import { useState } from "react";
-import { getUserProfileOptions } from "@/api/@tanstack/react-query.gen";
-import { AchievementSidebar } from "@/components/achievements/AchievementSidebar";
-import { AchievementsListView } from "@/components/achievements/AchievementsListView";
-import { SkillTree } from "@/components/achievements/SkillTree";
-import type { ViewMode } from "@/components/achievements/types";
-import { enhanceAchievements } from "@/components/achievements/utils";
-import { useAchievementNotifications } from "@/hooks/use-achievement-notifications";
-import { useAchievements } from "@/hooks/use-achievements";
+import { AchievementsView } from "@/components/achievements/AchievementsView";
 import { useAuth } from "@/integrations/auth/AuthContext";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
@@ -17,62 +7,21 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/achieveme
 	component: AchievementsPage,
 });
 
+/**
+ * Shortcut route for viewing the current user's own achievements.
+ * Delegates to the shared AchievementsView component.
+ */
 function AchievementsPage() {
 	const { userProfile, getUserGithubProfilePictureUrl, username } = useAuth();
 	const selectedSlug = useWorkspaceStore((state) => state.selectedSlug);
-	const [viewMode, setViewMode] = useState<ViewMode>("tree");
-
-	// Attempt to fetch real profile data if we have a workspace context
-	const profileQuery = useQuery({
-		...getUserProfileOptions({
-			path: { workspaceSlug: selectedSlug || "", login: username || "" },
-		}),
-		enabled: Boolean(selectedSlug) && Boolean(username),
-	});
-
-	// Fetch achievements from the API
-	const achievementsQuery = useAchievements(selectedSlug || "", username || "");
-
-	const uiAchievements = enhanceAchievements(achievementsQuery.data ?? []);
-
-	// Show toast notifications when achievements are unlocked
-	useAchievementNotifications(uiAchievements);
-
-	// Derived user data for the skill tree (React Compiler handles memoization)
-	const user = {
-		name: profileQuery.data?.userInfo?.name || userProfile?.name || userProfile?.username || "",
-		avatarUrl: profileQuery.data?.userInfo?.avatarUrl || getUserGithubProfilePictureUrl(),
-		level: profileQuery.data?.xpRecord?.currentLevel ?? 1,
-		leaguePoints: profileQuery.data?.userInfo?.leaguePoints ?? 0,
-	};
 
 	return (
-		<ReactFlowProvider>
-			<div className="h-[calc(100dvh-4rem)] flex bg-background overflow-hidden">
-				{/* Main content area — fills remaining space */}
-				<div className="flex-1 relative">
-					{viewMode === "tree" ? (
-						<>
-							{/* Radial gradient background */}
-							<div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,var(--tw-gradient-stops))] from-primary/5 via-background to-background" />
-
-							{/* Skill tree */}
-							<SkillTree user={user} achievements={uiAchievements} />
-						</>
-					) : (
-						<AchievementsListView achievements={uiAchievements} />
-					)}
-				</div>
-
-				{/* Right sidebar — non-foldable, achievement controls + stats */}
-				<AchievementSidebar
-					viewMode={viewMode}
-					onViewModeChange={setViewMode}
-					isLoading={achievementsQuery.isLoading}
-					isError={achievementsQuery.isError}
-					achievements={uiAchievements}
-				/>
-			</div>
-		</ReactFlowProvider>
+		<AchievementsView
+			workspaceSlug={selectedSlug || ""}
+			targetUsername={username || ""}
+			isOwnProfile={true}
+			fallbackName={userProfile?.name || userProfile?.username}
+			fallbackAvatarUrl={getUserGithubProfilePictureUrl()}
+		/>
 	);
 }

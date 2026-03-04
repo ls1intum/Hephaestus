@@ -76,11 +76,11 @@ export const rarityBorderColors = {
  */
 export const rarityTitleColors = {
 	common: "text-foreground",
-	uncommon: "text-foreground",
-	rare: "text-foreground",
+	uncommon: "text-rarity-uncommon",
+	rare: "text-rarity-rare",
 	epic: "text-rarity-epic",
 	legendary: "text-rarity-legendary",
-	mythic: "text-rarity-mythic-from",
+	mythic: "text-rarity-mythic",
 } as const satisfies Record<AchievementRarity, string>;
 
 /**
@@ -124,9 +124,10 @@ export const rarityIconSizes = {
 export const rarityStylingClasses = {
 	common: "border-2 border-rarity-common",
 	uncommon: "border-3 border-rarity-uncommon",
-	rare: "border-2 border-rarity-rare ring-1 ring-rarity-rare ring-offset-1 ring-offset-background",
-	epic: "border-2 border-rarity-epic ring-2 ring-rarity-epic ring-offset-2 ring-offset-background",
-	legendary: "border-4 legendary-pulse-anim ring-2 ring-rarity-legendary",
+	rare: "border-2 border-rarity-rare outline-2 outline-rarity-rare outline-offset-2",
+	epic: "border-2 border-rarity-epic outline-2 outline-rarity-epic outline-offset-3",
+	legendary:
+		"border-4 border-rarity-legendary outline-4 outline-rarity-legendary legendary-pulse-anim outline-offset-3",
 	mythic: "achievement-mythic-hexagon",
 } as const satisfies Record<AchievementRarity, string>;
 

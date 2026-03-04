@@ -1,10 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import type { Achievement } from "@/api/types.gen";
 import { AchievementProgressDisplay } from "./AchievementProgressDisplay";
+import { apolloClarity, athenaReview, dionysusDeploy, hermesSprint } from "./storyMockData";
 
 /**
- * Component for displaying achievement progress with different progress types.
- * Supports linear progress bars and binary status indicators.
+ * Component for showcasing achievement progress indicators.
+ * Supports both linear progress bars (for quantitative goals) and
+ * binary status icons (for boolean milestones) within digital mythological contexts.
  */
 const meta = {
 	component: AchievementProgressDisplay,
@@ -12,131 +13,56 @@ const meta = {
 		layout: "centered",
 		docs: {
 			description: {
-				component: "Displays progress for achievements in digital mythological themes.",
+				component:
+					"Displays progress for divine achievements using the standardized forged artifacts design system.",
 			},
 		},
 	},
 	tags: ["autodocs"],
+	decorators: [
+		(Story) => (
+			<div className="bg-background p-12 min-w-[300px] border rounded-lg flex justify-center items-center">
+				<Story />
+			</div>
+		),
+	],
 } satisfies Meta<typeof AchievementProgressDisplay>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-// Mock achievements with digital mythology theme
-const linearEmptyAchievement: Achievement = {
-	id: "first_review",
-	name: "Athena's Wisdom Reviews",
-	description: "Gain strategic insights through comprehensive code reviews",
-	category: "pull_requests",
-	rarity: "epic",
-	status: "available",
-	unlockedAt: null,
-	progressData: {
-		type: "LinearAchievementProgress",
-		current: 0,
-		target: 20,
-	},
-} as unknown as Achievement;
-
-const linearPartialAchievement: Achievement = {
-	id: "pr_beginner",
-	name: "Zeus's Thunder Commits",
-	description: "Channel the power of lightning to commit code with godly precision",
-	category: "commits",
-	rarity: "common",
-	status: "available",
-	unlockedAt: null,
-	progressData: {
-		type: "LinearAchievementProgress",
-		current: 75,
-		target: 100,
-	},
-} as unknown as Achievement;
-
-const linearCompleteAchievement: Achievement = {
-	id: "integration_regular",
-	name: "Poseidon's Code Streams",
-	description: "Master the tides of continuous integration and deployment",
-	category: "issues",
-	rarity: "rare",
-	status: "available",
-	unlockedAt: new Date("2026-02-14T12:00:00Z"),
-	progressData: {
-		type: "LinearAchievementProgress",
-		current: 50,
-		target: 50,
-	},
-} as unknown as Achievement;
-
-const binaryUnlockedAchievement: Achievement = {
-	id: "review_master",
-	name: "Hermes' Swift Deploys",
-	description: "Achieve messenger-like speed in deployment cycles",
-	category: "milestones",
-	rarity: "legendary",
-	status: "unlocked",
-	unlockedAt: new Date("2026-02-14T13:00:00Z"),
-	progressData: {
-		type: "BinaryAchievementProgress",
-		unlocked: true,
-	},
-} as unknown as Achievement;
-
-const binaryLockedAchievement: Achievement = {
-	id: "code_commenter",
-	name: "Apollo's Bug Fixes",
-	description: "Harness the sun god's clarity to eliminate all software defects",
-	category: "communication",
-	rarity: "mythic",
-	status: "available",
-	unlockedAt: null,
-	progressData: {
-		type: "BinaryAchievementProgress",
-		unlocked: false,
-	},
-} as unknown as Achievement;
-
 /**
- * Linear achievement with no progress (0% complete).
+ * Linear achievement showing partial progress toward a divine goal.
  */
-export const LinearEmpty: Story = {
+export const LinearPartialProgress: Story = {
 	args: {
-		achievement: linearEmptyAchievement,
+		achievement: apolloClarity,
 	},
 };
 
 /**
- * Linear achievement with partial progress (75% complete).
+ * Linear achievement that has reached its full potential.
  */
-export const LinearPartial: Story = {
+export const LinearCompleted: Story = {
 	args: {
-		achievement: linearPartialAchievement,
+		achievement: athenaReview,
 	},
 };
 
 /**
- * Linear achievement with complete progress (100% complete).
+ * Binary achievement that remains locked behind the vault of the gods.
  */
-export const LinearComplete: Story = {
+export const BinaryLockedMilestone: Story = {
 	args: {
-		achievement: linearCompleteAchievement,
+		achievement: dionysusDeploy,
 	},
 };
 
 /**
- * Binary achievement that is unlocked.
+ * Binary achievement that has been unlocked through divine intervention.
  */
-export const BinaryUnlocked: Story = {
+export const BinaryUnlockedmilestone: Story = {
 	args: {
-		achievement: binaryUnlockedAchievement,
-	},
-};
-
-/**
- * Binary achievement that is locked.
- */
-export const BinaryLocked: Story = {
-	args: {
-		achievement: binaryLockedAchievement,
+		achievement: hermesSprint,
 	},
 };

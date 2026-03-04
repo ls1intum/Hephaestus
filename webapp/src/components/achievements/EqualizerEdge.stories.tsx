@@ -26,7 +26,7 @@ const meta: Meta<typeof EqualizerEdge> = {
 		(Story) => (
 			<ReactFlowProvider>
 				<div
-					className="dark bg-background"
+					className="bg-background"
 					style={{ width: 520, padding: 48, display: "flex", justifyContent: "center" }}
 				>
 					<svg
@@ -48,112 +48,50 @@ const meta: Meta<typeof EqualizerEdge> = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-// Mock data setups
-const horizontalEnabled = {
-	id: "eq-demo-h",
-	sourceX: 30,
-	sourceY: 100,
-	targetX: 410,
-	targetY: 100,
-	data: { isEnabled: true },
-};
-
-const horizontalDisabled = {
-	id: "eq-demo-h-off",
-	sourceX: 30,
-	sourceY: 40,
-	targetX: 410,
-	targetY: 40,
-	data: { isEnabled: false },
-};
-
-const diagonalEnabled = {
-	id: "eq-demo-diag",
-	sourceX: 30,
-	sourceY: 30,
-	targetX: 410,
-	targetY: 170,
-	data: { isEnabled: true },
-};
-
-const staticHorizontalEnabled = {
-	id: "eq-demo-static-h",
-	sourceX: 30,
-	sourceY: 100,
-	targetX: 410,
-	targetY: 100,
-	data: { isEnabled: true, variant: "static" as const },
-};
-
-const staticDiagonalEnabled = {
-	id: "eq-demo-static-diag",
-	sourceX: 30,
-	sourceY: 30,
-	targetX: 410,
-	targetY: 170,
-	data: { isEnabled: true, variant: "static" as const },
-};
-
-const monochromeEnabled = {
-	id: "eq-demo-mono-h",
-	sourceX: 30,
-	sourceY: 100,
-	targetX: 410,
-	targetY: 100,
-	data: { isEnabled: true, monochrome: true },
-};
-
-const monochromeStaticEnabled = {
-	id: "eq-demo-mono-static-h",
-	sourceX: 30,
-	sourceY: 100,
-	targetX: 410,
-	targetY: 100,
-	data: { isEnabled: true, variant: "static" as const, monochrome: true },
-};
+// Mock edge props generator
+const createEdgeProps = (id: string, y: number, data: any = {}) => ({
+	id,
+	sourceX: 40,
+	sourceY: y,
+	targetX: 400,
+	targetY: y,
+	data,
+	sourcePosition: "right" as const,
+	targetPosition: "left" as const,
+});
 
 export const Default: Story = {
-	render: () => <EqualizerEdge {...(horizontalEnabled as any)} />,
-	name: "Default",
+	args: createEdgeProps("default", 100, { isEnabled: true }) as any,
 };
 
-export const Disabled: Story = {
-	render: () => <EqualizerEdge {...(horizontalDisabled as any)} />,
-	name: "Disabled",
-};
-
-export const Diagonal: Story = {
-	render: () => <EqualizerEdge {...(diagonalEnabled as any)} />,
-	name: "Diagonal",
-};
-
-export const Combined: Story = {
+/**
+ * Comparison of Enabled (Traveling Neon) vs Disabled (Muted Wire) states.
+ */
+export const States: Story = {
 	render: () => (
 		<>
-			<EqualizerEdge {...(horizontalDisabled as any)} />
-			<EqualizerEdge {...(horizontalEnabled as any)} />
-			<EqualizerEdge {...(diagonalEnabled as any)} />
+			{/* Disabled State */}
+			<EqualizerEdge {...(createEdgeProps("disabled", 20, { isEnabled: false }) as any)} />
+			<text x="40" y="10" className="fill-muted-foreground text-[10px] uppercase font-mono">
+				Disabled
+			</text>
+
+			{/* Enabled State (Traveling) */}
+			<EqualizerEdge {...(createEdgeProps("enabled", 100, { isEnabled: true }) as any)} />
+			<text x="40" y="90" className="fill-muted-foreground text-[10px] uppercase font-mono">
+				Enabled (Traveling)
+			</text>
+
+			{/* Static Variant */}
+			<EqualizerEdge
+				{...(createEdgeProps("static", 180, {
+					isEnabled: true,
+					variant: "static",
+				}) as any)}
+			/>
+			<text x="40" y="170" className="fill-muted-foreground text-[10px] uppercase font-mono">
+				Static Variant
+			</text>
 		</>
 	),
-	name: "Combined",
-};
-
-export const StaticDefault: Story = {
-	render: () => <EqualizerEdge {...(staticHorizontalEnabled as any)} />,
-	name: "Static Default",
-};
-
-export const StaticDiagonal: Story = {
-	render: () => <EqualizerEdge {...(staticDiagonalEnabled as any)} />,
-	name: "Static Diagonal",
-};
-
-export const TravelingMonochrome: Story = {
-	render: () => <EqualizerEdge {...(monochromeEnabled as any)} />,
-	name: "Traveling Monochrome",
-};
-
-export const StaticMonochrome: Story = {
-	render: () => <EqualizerEdge {...(monochromeStaticEnabled as any)} />,
-	name: "Static Monochrome",
 };

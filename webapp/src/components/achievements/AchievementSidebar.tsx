@@ -65,6 +65,10 @@ export interface AchievementSidebarProps {
 	isLoading: boolean;
 	isError: boolean;
 	achievements: UIAchievement[];
+	/** Whether the viewer is looking at their own achievements. */
+	isOwnProfile: boolean;
+	/** Username of the user whose achievements are being displayed. */
+	targetUsername: string;
 }
 
 /**
@@ -77,6 +81,8 @@ function SidebarBody({
 	isLoading,
 	isError,
 	achievements,
+	isOwnProfile,
+	targetUsername,
 	onZoomIn,
 	onZoomOut,
 	onFitView,
@@ -97,9 +103,11 @@ function SidebarBody({
 					</div>
 					<div>
 						<h2 className="text-base font-bold text-sidebar-foreground leading-tight">
-							Contributor Journey
+							{isOwnProfile ? "My Contributor Journey" : `${targetUsername}'s Journey`}
 						</h2>
-						<p className="text-xs text-muted-foreground">Track your contributions</p>
+						<p className="text-xs text-muted-foreground">
+							{isOwnProfile ? "Track your contributions" : "View their contributions"}
+						</p>
 					</div>
 				</div>
 
@@ -174,7 +182,7 @@ function SidebarBody({
 				<SidebarGroup>
 					<SidebarGroupLabel>
 						<Trophy className="w-4 h-4 mr-1.5" />
-						Your Progress
+						{isOwnProfile ? "Your Progress" : `${targetUsername}'s Progress`}
 					</SidebarGroupLabel>
 					<SidebarGroupContent>
 						<div className="p-3 rounded-lg bg-secondary/50 border border-border">
@@ -247,10 +255,7 @@ function SidebarBody({
 					<SidebarGroupContent className="space-y-1.5">
 						{achievements
 							.filter((a) => a.status === "unlocked" && a.unlockedAt)
-							.sort(
-								(a, b) =>
-									new Date(b.unlockedAt).getTime() - new Date(a.unlockedAt).getTime(),
-							)
+							.sort((a, b) => new Date(b.unlockedAt).getTime() - new Date(a.unlockedAt).getTime())
 							.slice(0, 5)
 							.map((achievement) => {
 								const rarity = achievement.rarity ?? "common";
@@ -284,7 +289,6 @@ function SidebarBody({
 							})}
 					</SidebarGroupContent>
 				</SidebarGroup>
-
 			</SidebarContent>
 
 			{/* ── Legend (pinned to bottom) ── */}

@@ -46,7 +46,9 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 		const allowSurveys =
 			isPosthogEnabled && !userSettingsError && (userSettings?.participateInResearch ?? true);
 		const isMentorRoute = pathname === "/mentor" || /^\/w\/[^/]+\/mentor/.test(pathname);
-		const isAchievementsRoute = /^\/w\/[^/]+\/achievements/.test(pathname);
+		const isAchievementsRoute =
+			/^\/w\/[^/]+\/achievements/.test(pathname) ||
+			/^\/w\/[^/]+\/user\/[^/]+\/achievements/.test(pathname);
 		// Routes that use full-height layouts without padding or footer
 		const isFullscreenRoute = isMentorRoute || isAchievementsRoute;
 

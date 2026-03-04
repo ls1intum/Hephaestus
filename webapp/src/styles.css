@@ -263,6 +263,13 @@ code {
   --color-rarity-mythic-to: var(--rarity-mythic-to);
 }
 
+@utility text-rarity-mythic {
+  background: linear-gradient(to right, var(--rarity-mythic-from), var(--rarity-mythic-to));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -413,10 +420,10 @@ code {
 @keyframes legendary-color-pulse {
   0%,
   100% {
-     border-color: var(--rarity-legendary-to);
+     outline-color: var(--rarity-legendary-to);
   }
   50% {
-    border-color: var(--rarity-legendary-from);
+    outline-color: var(--rarity-legendary-from);
   }
 }
 

@@ -26,6 +26,7 @@ import { Route as AuthenticatedWWorkspaceSlugAdminAchievementDesignerRouteImport
 import { Route as AuthenticatedWWorkspaceSlugAdminAdminRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/_admin'
 import { Route as AuthenticatedWWorkspaceSlugUserUsernameIndexRouteImport } from './routes/_authenticated/w/$workspaceSlug/user/$username/index'
 import { Route as AuthenticatedWWorkspaceSlugUserUsernameBestPracticesRouteImport } from './routes/_authenticated/w/$workspaceSlug/user/$username/best-practices'
+import { Route as AuthenticatedWWorkspaceSlugUserUsernameAchievementsRouteImport } from './routes/_authenticated/w/$workspaceSlug/user/$username/achievements'
 import { Route as AuthenticatedWWorkspaceSlugAdminAdminTeamsRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/_admin/teams'
 import { Route as AuthenticatedWWorkspaceSlugAdminAdminSettingsRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/_admin/settings'
 import { Route as AuthenticatedWWorkspaceSlugAdminAdminMembersRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/_admin/members'
@@ -124,6 +125,12 @@ const AuthenticatedWWorkspaceSlugUserUsernameBestPracticesRoute =
     path: '/w/$workspaceSlug/user/$username/best-practices',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedWWorkspaceSlugUserUsernameAchievementsRoute =
+  AuthenticatedWWorkspaceSlugUserUsernameAchievementsRouteImport.update({
+    id: '/w/$workspaceSlug/user/$username/achievements',
+    path: '/w/$workspaceSlug/user/$username/achievements',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedWWorkspaceSlugAdminAdminTeamsRoute =
   AuthenticatedWWorkspaceSlugAdminAdminTeamsRouteImport.update({
     id: '/teams',
@@ -161,6 +168,7 @@ export interface FileRoutesByFullPath {
   '/w/$workspaceSlug/admin/members': typeof AuthenticatedWWorkspaceSlugAdminAdminMembersRoute
   '/w/$workspaceSlug/admin/settings': typeof AuthenticatedWWorkspaceSlugAdminAdminSettingsRoute
   '/w/$workspaceSlug/admin/teams': typeof AuthenticatedWWorkspaceSlugAdminAdminTeamsRoute
+  '/w/$workspaceSlug/user/$username/achievements': typeof AuthenticatedWWorkspaceSlugUserUsernameAchievementsRoute
   '/w/$workspaceSlug/user/$username/best-practices': typeof AuthenticatedWWorkspaceSlugUserUsernameBestPracticesRoute
   '/w/$workspaceSlug/user/$username/': typeof AuthenticatedWWorkspaceSlugUserUsernameIndexRoute
 }
@@ -182,6 +190,7 @@ export interface FileRoutesByTo {
   '/w/$workspaceSlug/admin/members': typeof AuthenticatedWWorkspaceSlugAdminAdminMembersRoute
   '/w/$workspaceSlug/admin/settings': typeof AuthenticatedWWorkspaceSlugAdminAdminSettingsRoute
   '/w/$workspaceSlug/admin/teams': typeof AuthenticatedWWorkspaceSlugAdminAdminTeamsRoute
+  '/w/$workspaceSlug/user/$username/achievements': typeof AuthenticatedWWorkspaceSlugUserUsernameAchievementsRoute
   '/w/$workspaceSlug/user/$username/best-practices': typeof AuthenticatedWWorkspaceSlugUserUsernameBestPracticesRoute
   '/w/$workspaceSlug/user/$username': typeof AuthenticatedWWorkspaceSlugUserUsernameIndexRoute
 }
@@ -205,6 +214,7 @@ export interface FileRoutesById {
   '/_authenticated/w/$workspaceSlug/admin/_admin/members': typeof AuthenticatedWWorkspaceSlugAdminAdminMembersRoute
   '/_authenticated/w/$workspaceSlug/admin/_admin/settings': typeof AuthenticatedWWorkspaceSlugAdminAdminSettingsRoute
   '/_authenticated/w/$workspaceSlug/admin/_admin/teams': typeof AuthenticatedWWorkspaceSlugAdminAdminTeamsRoute
+  '/_authenticated/w/$workspaceSlug/user/$username/achievements': typeof AuthenticatedWWorkspaceSlugUserUsernameAchievementsRoute
   '/_authenticated/w/$workspaceSlug/user/$username/best-practices': typeof AuthenticatedWWorkspaceSlugUserUsernameBestPracticesRoute
   '/_authenticated/w/$workspaceSlug/user/$username/': typeof AuthenticatedWWorkspaceSlugUserUsernameIndexRoute
 }
@@ -228,6 +238,7 @@ export interface FileRouteTypes {
     | '/w/$workspaceSlug/admin/members'
     | '/w/$workspaceSlug/admin/settings'
     | '/w/$workspaceSlug/admin/teams'
+    | '/w/$workspaceSlug/user/$username/achievements'
     | '/w/$workspaceSlug/user/$username/best-practices'
     | '/w/$workspaceSlug/user/$username/'
   fileRoutesByTo: FileRoutesByTo
@@ -249,6 +260,7 @@ export interface FileRouteTypes {
     | '/w/$workspaceSlug/admin/members'
     | '/w/$workspaceSlug/admin/settings'
     | '/w/$workspaceSlug/admin/teams'
+    | '/w/$workspaceSlug/user/$username/achievements'
     | '/w/$workspaceSlug/user/$username/best-practices'
     | '/w/$workspaceSlug/user/$username'
   id:
@@ -271,6 +283,7 @@ export interface FileRouteTypes {
     | '/_authenticated/w/$workspaceSlug/admin/_admin/members'
     | '/_authenticated/w/$workspaceSlug/admin/_admin/settings'
     | '/_authenticated/w/$workspaceSlug/admin/_admin/teams'
+    | '/_authenticated/w/$workspaceSlug/user/$username/achievements'
     | '/_authenticated/w/$workspaceSlug/user/$username/best-practices'
     | '/_authenticated/w/$workspaceSlug/user/$username/'
   fileRoutesById: FileRoutesById
@@ -404,6 +417,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedWWorkspaceSlugUserUsernameBestPracticesRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/w/$workspaceSlug/user/$username/achievements': {
+      id: '/_authenticated/w/$workspaceSlug/user/$username/achievements'
+      path: '/w/$workspaceSlug/user/$username/achievements'
+      fullPath: '/w/$workspaceSlug/user/$username/achievements'
+      preLoaderRoute: typeof AuthenticatedWWorkspaceSlugUserUsernameAchievementsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/w/$workspaceSlug/admin/_admin/teams': {
       id: '/_authenticated/w/$workspaceSlug/admin/_admin/teams'
       path: '/teams'
@@ -460,6 +480,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedWWorkspaceSlugMentorThreadIdRoute: typeof AuthenticatedWWorkspaceSlugMentorThreadIdRoute
   AuthenticatedWWorkspaceSlugMentorIndexRoute: typeof AuthenticatedWWorkspaceSlugMentorIndexRoute
   AuthenticatedWWorkspaceSlugTeamsIndexRoute: typeof AuthenticatedWWorkspaceSlugTeamsIndexRoute
+  AuthenticatedWWorkspaceSlugUserUsernameAchievementsRoute: typeof AuthenticatedWWorkspaceSlugUserUsernameAchievementsRoute
   AuthenticatedWWorkspaceSlugUserUsernameBestPracticesRoute: typeof AuthenticatedWWorkspaceSlugUserUsernameBestPracticesRoute
   AuthenticatedWWorkspaceSlugUserUsernameIndexRoute: typeof AuthenticatedWWorkspaceSlugUserUsernameIndexRoute
 }
@@ -481,6 +502,8 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
     AuthenticatedWWorkspaceSlugMentorIndexRoute,
   AuthenticatedWWorkspaceSlugTeamsIndexRoute:
     AuthenticatedWWorkspaceSlugTeamsIndexRoute,
+  AuthenticatedWWorkspaceSlugUserUsernameAchievementsRoute:
+    AuthenticatedWWorkspaceSlugUserUsernameAchievementsRoute,
   AuthenticatedWWorkspaceSlugUserUsernameBestPracticesRoute:
     AuthenticatedWWorkspaceSlugUserUsernameBestPracticesRoute,
   AuthenticatedWWorkspaceSlugUserUsernameIndexRoute:

@@ -1,17 +1,26 @@
-import { CheckCircleIcon, XCircleIcon } from "@primer/octicons-react";
 import type { Meta, StoryObj } from "@storybook/react";
-import type { UIAchievement } from "@/components/achievements/types";
 import { Button } from "@/components/ui/button";
 import { AchievementTooltip } from "./AchievementTooltip";
+import {
+    hephaestusInit,
+    aresConflict,
+    apolloClarity,
+    poseidonTrident,
+    zeusThunderbolt
+} from "./storyMockData";
+import { ReactFlowProvider } from "@xyflow/react";
 
 /**
  * Component for displaying achievement tooltips with detailed information.
  * Shows achievement name, tier, description, progress, and unlock date when available.
+ *
+ * Tooltips use Portals to always render above the skill tree canvas.
  */
 const meta = {
 	component: AchievementTooltip,
+	title: "Achievements/AchievementTooltip",
 	parameters: {
-		layout: "padded",
+		layout: "centered",
 		docs: {
 			description: {
 				component: "Displays tooltips for achievements in digital mythological themes.",
@@ -24,15 +33,19 @@ const meta = {
 	tags: ["autodocs"],
 	decorators: [
 		(Story) => (
-			<div
-				style={{
-					paddingTop: "200px",
-					display: "flex",
-					justifyContent: "center",
-				}}
-			>
-				<Story />
-			</div>
+            <ReactFlowProvider>
+                <div
+                    className="bg-background p-32"
+                    style={{
+                        paddingTop: "160px",
+                        paddingBottom: "160px",
+                        display: "flex",
+                        justifyContent: "center",
+                    }}
+                >
+                    <Story />
+                </div>
+            </ReactFlowProvider>
 		),
 	],
 } satisfies Meta<typeof AchievementTooltip>;
@@ -40,136 +53,60 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-// Mock achievements with digital mythology theme
-const zeusThunderCommits: UIAchievement = {
-	id: "pr_beginner",
-	name: "Zeus's Thunder Commits",
-	description: "Channel the power of lightning to commit code with godly precision",
-	icon: CheckCircleIcon,
-	category: "commits",
-	rarity: "common",
-	status: "available",
-	unlockedAt: null,
-	progressData: {
-		type: "LinearAchievementProgress",
-		current: 75,
-		target: 100,
-	},
-} as unknown as UIAchievement;
-
-const poseidonCodeStreams: UIAchievement = {
-	id: "integration_regular",
-	name: "Poseidon's Code Streams",
-	description: "Master the tides of continuous integration and deployment",
-	icon: CheckCircleIcon,
-	category: "issues",
-	rarity: "rare",
-	status: "unlocked",
-	unlockedAt: new Date("2026-02-14T12:00:00Z"),
-	progressData: {
-		type: "LinearAchievementProgress",
-		current: 50,
-		target: 50,
-	},
-} as unknown as UIAchievement;
-
-const athenaWisdomReviews: UIAchievement = {
-	id: "first_review",
-	name: "Athena's Wisdom Reviews",
-	description: "Gain strategic insights through comprehensive code reviews",
-	icon: XCircleIcon,
-	category: "pull_requests",
-	rarity: "epic",
-	status: "available",
-	unlockedAt: null,
-	progressData: {
-		type: "LinearAchievementProgress",
-		current: 0,
-		target: 20,
-	},
-} as unknown as UIAchievement;
-
-const hermesSwiftDeploys: UIAchievement = {
-	id: "review_master",
-	name: "Hermes' Swift Deploys",
-	description: "Achieve messenger-like speed in deployment cycles",
-	icon: CheckCircleIcon,
-	category: "milestones",
-	rarity: "legendary",
-	status: "unlocked",
-	unlockedAt: new Date("2026-02-14T13:00:00Z"),
-	progressData: {
-		type: "BinaryAchievementProgress",
-		unlocked: true,
-	},
-} as unknown as UIAchievement;
-
-const apolloBugFixes: UIAchievement = {
-	id: "code_commenter",
-	name: "Apollo's Bug Fixes",
-	description: "Harness the sun god's clarity to eliminate all software defects",
-	icon: XCircleIcon,
-	category: "communication",
-	rarity: "mythic",
-	status: "locked",
-	unlockedAt: null,
-	progressData: {
-		type: "BinaryAchievementProgress",
-		unlocked: false,
-	},
-} as unknown as UIAchievement;
+const Trigger = <Button variant="outline" className="w-32">Hover Me</Button>;
 
 /**
- * Tooltip for an available achievement with zero progress.
+ * Tooltip for a common unlocked achievement.
  */
-export const AvailableEmptyProgress: Story = {
+export const CommonUnlocked: Story = {
 	args: {
-		achievement: athenaWisdomReviews,
+		achievement: hephaestusInit,
 		open: true,
-		children: <Button>Achievement</Button>,
+		children: Trigger,
 	},
 };
 
 /**
- * Tooltip for an available achievement with partial progress.
+ * Tooltip for a rare locked achievement.
+ * Notice the monochromatic border to signify its locked state.
  */
-export const AvailableWithProgress: Story = {
+export const RareLocked: Story = {
 	args: {
-		achievement: zeusThunderCommits,
+		achievement: { ...aresConflict, status: "locked" },
 		open: true,
-		children: <Button>Achievement</Button>,
+		children: Trigger,
 	},
 };
 
 /**
- * Tooltip for an unlocked achievement with complete progress.
+ * Tooltip for an epic available achievement with partial progress.
  */
-export const UnlockedWithProgress: Story = {
+export const EpicAvailable: Story = {
 	args: {
-		achievement: poseidonCodeStreams,
+		achievement: apolloClarity,
 		open: true,
-		children: <Button>Achievement</Button>,
+		children: Trigger,
 	},
 };
 
 /**
- * Tooltip for an unlocked achievement without progress (binary achievement).
+ * Tooltip for a legendary unlocked achievement.
  */
-export const UnlockedBinary: Story = {
+export const LegendaryUnlocked: Story = {
 	args: {
-		achievement: hermesSwiftDeploys,
+		achievement: poseidonTrident,
 		open: true,
-		children: <Button>Achievement</Button>,
+		children: Trigger,
 	},
 };
 
 /**
- * Tooltip for a locked achievement.
+ * Tooltip for a mythic available achievement.
  */
-export const Locked: Story = {
+export const MythicAvailable: Story = {
 	args: {
-		achievement: apolloBugFixes,
+		achievement: zeusThunderbolt,
 		open: true,
-		children: <Button>Achievement</Button>,
+		children: Trigger,
 	},
 };

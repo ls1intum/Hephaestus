@@ -25,7 +25,7 @@ const meta: Meta<typeof AchievementEdge> = {
 		(Story) => (
 			<ReactFlowProvider>
 				<div
-					className="dark bg-background"
+					className="bg-background"
 					style={{ width: 520, padding: 48, display: "flex", justifyContent: "center" }}
 				>
 					{/* Provide an SVG viewport so <path>, <circle> and <animateMotion> render correctly */}
@@ -93,31 +93,14 @@ const inBetweenRight = {
 	data: { isEnabled: false },
 };
 
-/** Default - enabled edge (represents the default/active state) */
-export const Default: Story = {
-	render: () => <AchievementEdge {...(zeusEdgeEnabled as any)} />,
-	name: "Default",
-};
-
 /** Active - animated edge to demonstrate particle motion */
 export const Active: Story = {
 	render: () => <AchievementEdge {...(hermesEdgeAnimated as any)} />,
 	name: "Active",
 };
 
-/** Disabled - inactive edge (no glow or particle) */
+/** Disabled (Default state) - inactive edge (no glow or particle) */
 export const Disabled: Story = {
 	render: () => <AchievementEdge {...(zeusEdgeDisabled as any)} />,
 	name: "Disabled",
-};
-
-/** Partial - segmented edge demonstrating an in-between state (partial activation) */
-export const Partial: Story = {
-	render: () => (
-		<>
-			<AchievementEdge {...(inBetweenLeft as any)} />
-			<AchievementEdge {...(inBetweenRight as any)} />
-		</>
-	),
-	name: "Partial",
 };

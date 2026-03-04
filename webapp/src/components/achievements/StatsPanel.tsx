@@ -1,6 +1,5 @@
 import {
 	CircleDot,
-	Flame,
 	GitCommit,
 	GitPullRequest,
 	Layers,
@@ -119,12 +118,12 @@ export function StatsPanel({ achievements }: StatsPanelProps) {
 						.map((achievement) => {
 							const rarity = achievement.rarity ?? "common";
 							const unlockedDate = achievement.unlockedAt;
+							const Icon = achievement.icon;
 							return (
 								<div
 									key={achievement.id}
 									className="flex items-center gap-3 p-2 rounded-lg bg-secondary/20 hover:bg-secondary/40 transition-colors"
 								>
-									{/* TODO: Rethink rarity styling here*/}
 									<div
 										className={cn(
 											"w-6 h-6 rounded-full flex items-center justify-center",
@@ -132,7 +131,7 @@ export function StatsPanel({ achievements }: StatsPanelProps) {
 											"text-background",
 										)}
 									>
-										<Flame className="w-3 h-3" />
+										<Icon className="w-3.5 h-3.5" />
 									</div>
 									<div className="flex-1 min-w-0">
 										<p className="text-sm font-medium text-foreground truncate">

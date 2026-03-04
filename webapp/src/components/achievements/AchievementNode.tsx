@@ -25,10 +25,8 @@ function getIconColor(status: UIAchievement["status"]): string {
 	switch (status) {
 		case "unlocked":
 			return "text-background";
-		case "available":
-			return "text-muted-foreground";
-		default:
-			return "text-muted-foreground";
+		default: // available, locked, or hidden
+			return "text-foreground";
 	}
 }
 
@@ -55,6 +53,10 @@ export function AchievementNode({ data }: NodeProps<AchievementNode>) {
 						raritySizes[achievement.rarity],
 						!isMythic && statusBackgrounds[achievement.status],
 						rarityStylingClasses[achievement.rarity],
+						(achievement.rarity === "rare" ||
+							achievement.rarity === "epic" ||
+							achievement.rarity === "legendary") &&
+							(achievement.status === "unlocked" ? "outline-solid" : "outline-dashed"),
 						isHovered && achievement.status !== "locked" && "scale-110",
 						achievement.status !== "unlocked" && "grayscale",
 					)}
@@ -76,30 +78,57 @@ export function AchievementNode({ data }: NodeProps<AchievementNode>) {
 					{achievement.status === "available" &&
 						achievement.progressData?.type === "LinearAchievementProgress" && (
 							<svg
-								className="absolute inset-0 w-full h-full -rotate-90"
+								className={cn("absolute inset-0 w-full h-full", !isMythic && "-rotate-90")}
 								viewBox="0 0 100 100"
 								aria-hidden="true"
 							>
-								<circle
-									cx="50"
-									cy="50"
-									r="46"
-									fill="none"
-									stroke="currentColor"
-									strokeWidth="4"
-									className="text-muted/30"
-								/>
-								<circle
-									cx="50"
-									cy="50"
-									r="46"
-									fill="none"
-									stroke="currentColor"
-									strokeWidth="4"
-									strokeDasharray={`${(achievement.progressData.current / achievement.progressData.target) * 289} 289`}
-									className="text-foreground/70"
-									strokeLinecap="round"
-								/>
+								{isMythic ? (
+									<>
+										{/* Hexagon Track */}
+										<path
+											d="M 50 9.5 L 84.64 29.5 L 84.64 69.5 L 50 89.5 L 15.36 69.5 L 15.36 29.5 Z"
+											fill="none"
+											stroke="currentColor"
+											strokeWidth="4"
+											className="text-muted/30"
+										/>
+										{/* Hexagon Progress */}
+										<path
+											d="M 50 9.5 L 84.64 29.5 L 84.64 69.5 L 50 89.5 L 15.36 69.5 L 15.36 29.5 Z"
+											fill="none"
+											stroke="currentColor"
+											strokeWidth="4"
+											strokeDasharray={`${(achievement.progressData.current / achievement.progressData.target) * 240} 240`}
+											className="text-foreground/70"
+											strokeLinecap="round"
+										/>
+									</>
+								) : (
+									<>
+										{/* Circle Track */}
+										<circle
+											cx="50"
+											cy="50"
+											r="46"
+											fill="none"
+											stroke="currentColor"
+											strokeWidth="4"
+											className="text-muted/30"
+										/>
+										{/* Circle Progress */}
+										<circle
+											cx="50"
+											cy="50"
+											r="46"
+											fill="none"
+											stroke="currentColor"
+											strokeWidth="4"
+											strokeDasharray={`${(achievement.progressData.current / achievement.progressData.target) * 289} 289`}
+											className="text-foreground/70"
+											strokeLinecap="round"
+										/>
+									</>
+								)}
 							</svg>
 						)}
 				</button>

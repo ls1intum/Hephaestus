@@ -1,8 +1,11 @@
 import { format } from "date-fns";
+import { Link } from "@tanstack/react-router";
+import { Sparkles } from "lucide-react";
 import type { ProfileXpRecord, RepositoryInfo, UserInfo } from "@/api/types.gen";
 import { LeagueIcon } from "@/components/leaderboard/LeagueIcon";
 import { getLeagueColor, getLeagueTier } from "@/components/leaderboard/utils.ts";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils.ts";
@@ -15,6 +18,8 @@ export interface ProfileHeaderProps {
 	leaguePoints?: number;
 	userXpRecord?: ProfileXpRecord;
 	isLoading: boolean;
+	/** Workspace slug for routing to achievement page. */
+	workspaceSlug: string;
 }
 
 export function ProfileHeader({
@@ -23,6 +28,7 @@ export function ProfileHeader({
 	leaguePoints = 0,
 	userXpRecord = { currentLevel: 1, currentLevelXP: 0, totalXP: 0, xpNeeded: 150 },
 	isLoading,
+	workspaceSlug,
 }: ProfileHeaderProps) {
 	// Unpack XP data
 	const { currentLevel: level, currentLevelXP: currentXp, xpNeeded, totalXP } = userXpRecord;
@@ -87,14 +93,30 @@ export function ProfileHeader({
 					) : user ? (
 						<div className="flex flex-col gap-0.5">
 							<h1 className="text-xl md:text-2xl font-bold leading-tight">{user.name}</h1>
-							<a
-								className="text-sm md:text-base text-muted-foreground hover:text-primary transition-colors"
-								href={user.htmlUrl}
-								target="_blank"
-								rel="noopener noreferrer"
-							>
-								github.com/{user.login}
-							</a>
+							<div className="flex items-center gap-3">
+								<a
+									className="text-sm md:text-base text-muted-foreground hover:text-primary transition-colors"
+									href={user.htmlUrl}
+									target="_blank"
+									rel="noopener noreferrer"
+								>
+									github.com/{user.login}
+								</a>
+								<Button
+									variant="ghost"
+									size="sm"
+									className="h-7 gap-1.5 text-muted-foreground hover:text-foreground"
+									render={
+										<Link
+											to="/w/$workspaceSlug/user/$username/achievements"
+											params={{ workspaceSlug, username: user.login ?? "" }}
+										/>
+									}
+								>
+									<Sparkles className="w-3.5 h-3.5" />
+									<span className="text-xs">Achievements</span>
+								</Button>
+							</div>
 						</div>
 					) : null}
 				</div>

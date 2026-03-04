@@ -51,137 +51,47 @@ const meta: Meta<typeof SynthwaveEdge> = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-// ---- Mock edge props ---- //
+// Mock edge props generator
+const createEdgeProps = (id: string, y: number, data: any = {}) => ({
+	id,
+	sourceX: 40,
+	sourceY: y,
+	targetX: 400,
+	targetY: y,
+	data,
+	sourcePosition: "right" as const,
+	targetPosition: "left" as const,
+});
 
-const horizontalEnabled = {
-	id: "synthwave-demo-h",
-	sourceX: 30,
-	sourceY: 100,
-	targetX: 410,
-	targetY: 100,
-	data: { isEnabled: true },
-};
-
-const horizontalDisabled = {
-	id: "synthwave-demo-h-off",
-	sourceX: 30,
-	sourceY: 40,
-	targetX: 410,
-	targetY: 40,
-	data: { isEnabled: false },
-};
-
-const diagonalEnabled = {
-	id: "synthwave-demo-diag",
-	sourceX: 30,
-	sourceY: 30,
-	targetX: 410,
-	targetY: 170,
-	data: { isEnabled: true },
-};
-
-const shortEnabled = {
-	id: "synthwave-demo-short",
-	sourceX: 140,
-	sourceY: 100,
-	targetX: 300,
-	targetY: 100,
-	data: { isEnabled: true },
-};
-
-// ---- Rarity variant mock data ---- //
-
-const rarityHorizontal = {
-	id: "synthwave-rarity-h",
-	sourceX: 30,
-	sourceY: 100,
-	targetX: 410,
-	targetY: 100,
-	data: { isEnabled: true, variant: "rarity" as const },
-};
-
-const rarityDiagonal = {
-	id: "synthwave-rarity-diag",
-	sourceX: 30,
-	sourceY: 30,
-	targetX: 410,
-	targetY: 170,
-	data: { isEnabled: true, variant: "rarity" as const },
-};
-
-/** Default — enabled horizontal edge with flowing neon waves */
 export const Default: Story = {
-	render: () => <SynthwaveEdge {...(horizontalEnabled as any)} />,
-	name: "Default",
+	args: createEdgeProps("default", 100, { isEnabled: true }) as any,
 };
 
-/** Disabled — falls back to a subtle straight line */
-export const Disabled: Story = {
-	render: () => <SynthwaveEdge {...(horizontalDisabled as any)} />,
-	name: "Disabled",
-};
-
-/** Diagonal — demonstrates the wave effect on an angled edge */
-export const Diagonal: Story = {
-	render: () => <SynthwaveEdge {...(diagonalEnabled as any)} />,
-	name: "Diagonal",
-};
-
-/** Short — shorter edge to show scaled wave behavior */
-export const Short: Story = {
-	render: () => <SynthwaveEdge {...(shortEnabled as any)} />,
-	name: "Short",
-};
-
-/** RarityDefault — rarity variant using uncommon (green), rare (blue), epic (purple) */
-export const RarityDefault: Story = {
-	render: () => <SynthwaveEdge {...(rarityHorizontal as any)} />,
-	name: "Rarity Default",
-};
-
-/** RarityDiagonal — rarity variant on an angled edge */
-export const RarityDiagonal: Story = {
-	render: () => <SynthwaveEdge {...(rarityDiagonal as any)} />,
-	name: "Rarity Diagonal",
-};
-
-/** VariantComparison — neon (top) vs rarity (bottom) side by side */
-export const VariantComparison: Story = {
+/**
+ * Comparison of Disabled (Muted Wire) vs Default (Neon Waves) vs Rarity themed states.
+ */
+export const States: Story = {
 	render: () => (
 		<>
-			<SynthwaveEdge
-				{...({
-					id: "cmp-neon",
-					sourceX: 30,
-					sourceY: 70,
-					targetX: 410,
-					targetY: 70,
-					data: { isEnabled: true, variant: "neon" },
-				} as any)}
-			/>
-			<SynthwaveEdge
-				{...({
-					id: "cmp-rarity",
-					sourceX: 30,
-					sourceY: 140,
-					targetX: 410,
-					targetY: 140,
-					data: { isEnabled: true, variant: "rarity" },
-				} as any)}
-			/>
-		</>
-	),
-	name: "Variant Comparison",
-};
+			{/* Disabled State */}
+			<SynthwaveEdge {...(createEdgeProps("disabled", 20, { isEnabled: false }) as any)} />
+			<text x="40" y="10" className="fill-muted-foreground text-[10px] uppercase font-mono tracking-widest">
+				Disabled
+			</text>
 
-/** Combined — all neon variants together for comparison */
-export const Combined: Story = {
-	render: () => (
-		<>
-			<SynthwaveEdge {...(horizontalDisabled as any)} />
-			<SynthwaveEdge {...(horizontalEnabled as any)} />
-			<SynthwaveEdge {...(diagonalEnabled as any)} />
+			{/* Default Flowing State */}
+			<SynthwaveEdge {...(createEdgeProps("default", 100, { isEnabled: true }) as any)} />
+			<text x="40" y="90" className="fill-muted-foreground text-[10px] uppercase font-mono tracking-widest">
+				Neon (Classic Flow)
+			</text>
+
+			{/* Rarity Variant */}
+			<SynthwaveEdge
+				{...(createEdgeProps("rarity", 180, { isEnabled: true, variant: "rarity" }) as any)}
+			/>
+			<text x="40" y="170" className="fill-muted-foreground text-[10px] uppercase font-mono tracking-widest">
+				Rarity (Themed Waves)
+			</text>
 		</>
 	),
-	name: "Combined",
 };
