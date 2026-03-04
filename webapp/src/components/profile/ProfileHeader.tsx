@@ -35,6 +35,14 @@ export function ProfileHeader({
 	const rawTier = getLeagueTier(leaguePoints);
 	const leagueTier = rawTier === "none" ? "bronze" : rawTier;
 
+	const leagueBgColor = {
+		bronze: "bg-league-bronze",
+		silver: "bg-league-silver",
+		gold: "bg-league-gold",
+		diamond: "bg-league-diamond",
+		master: "bg-league-master",
+	}[leagueTier];
+
 	return (
 		<div className="flex items-start justify-between gap-6 mx-8">
 			{/* Left section: Avatar + User Info + XP */}
@@ -64,7 +72,7 @@ export function ProfileHeader({
 										<div
 											className={cn(
 												"absolute -bottom-1 -right-1 flex size-7 items-center justify-center rounded-full border-2 border-background text-primary-foreground font-bold text-xs",
-												`bg-league-${leagueTier}`,
+												leagueBgColor,
 											)}
 										/>
 									}
