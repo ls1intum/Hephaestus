@@ -266,6 +266,7 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
             assertThat(result.synced()).hasSize(2);
             assertThat(result.synced()).extracting(Repository::getId).containsExactly(10L, 20L);
             assertThat(result.projectsSkipped()).isZero();
+            assertThat(result.projectsRedacted()).isZero();
         }
 
         @Test
@@ -350,6 +351,37 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
             assertThat(result.synced()).hasSize(1);
             assertThat(result.synced().get(0).getId()).isEqualTo(20L);
             assertThat(result.projectsSkipped()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("null nodes from GitLab access restrictions are counted as redacted, not errors")
+        void nullNodes_countedAsRedacted_notErrors() {
+            var proj1 = createMinimalProject("gid://gitlab/Project/10", "my-org/proj-a", "proj-a");
+
+            // Simulate GitLab returning [proj1, null, null] — 2 null nodes due to access restrictions
+            List<GitLabProjectResponse> nodesWithNulls = new java.util.ArrayList<>();
+            nodesWithNulls.add(proj1);
+            nodesWithNulls.add(null);
+            nodesWithNulls.add(null);
+
+            ClientGraphQlResponse projectsResp = mockProjectsPageWithGroup(nodesWithNulls, null);
+
+            HttpGraphQlClient client = mockClient();
+            mockSequentialExecute(client, projectsResp);
+            when(groupProcessor.process(any(), anyLong())).thenReturn(org);
+            when(graphQlClientProvider.getRateLimitRemaining(1L)).thenReturn(100);
+
+            Repository repo1 = new Repository();
+            repo1.setId(10L);
+            when(projectProcessor.processGraphQlResponse(eq(proj1), any(), any())).thenReturn(repo1);
+
+            GitLabSyncResult result = service.syncGroupProjects(1L, "my-org");
+
+            // Redacted nodes should NOT cause COMPLETED_WITH_ERRORS
+            assertThat(result.status()).isEqualTo(GitLabSyncResult.Status.COMPLETED);
+            assertThat(result.synced()).hasSize(1);
+            assertThat(result.projectsSkipped()).isZero();
+            assertThat(result.projectsRedacted()).isEqualTo(2);
         }
 
         @Test

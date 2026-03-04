@@ -135,6 +135,46 @@ paths:
       summary: Create a new workspace
       tags:
       - workspace-registry
+  /workspaces/gitlab/groups:
+    post:
+      operationId: listGitLabGroups
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GitLabPreflightRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GitLabGroup"
+          description: Accessible groups
+      summary: List GitLab groups accessible to a PAT
+      tags:
+      - workspace-registry
+  /workspaces/gitlab/preflight:
+    post:
+      operationId: gitLabPreflight
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GitLabPreflightRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GitLabPreflightResponse"
+          description: Validation result
+      summary: Validate a GitLab PAT before workspace creation
+      tags:
+      - workspace-registry
   /workspaces/{workspaceSlug}:
     delete:
       operationId: purgeWorkspace
@@ -2272,11 +2312,12 @@ components:
       properties:
         accountLogin:
           type: string
-          description: GitHub account login to associate with this workspace
+          description: Git provider account login (GitHub org/user or GitLab group
+            path)
           example: my-org
         accountType:
           type: string
-          description: Type of GitHub account (USER or ORGANIZATION)
+          description: Type of account (USER or ORG)
           enum:
           - ORG
           - USER
@@ -2284,10 +2325,29 @@ components:
           type: string
           description: Human-readable name of the workspace
           example: My Workspace
+        gitProviderMode:
+          type: string
+          description: Git provider authentication mode. Defaults to PAT_ORG (GitHub
+            PAT) if not specified.
+          enum:
+          - PAT_ORG
+          - GITHUB_APP_INSTALLATION
+          - GITLAB_PAT
+          example: GITLAB_PAT
         ownerUserId:
           type: integer
           format: int64
           description: User ID of the workspace owner
+        personalAccessToken:
+          type: string
+          description: Personal Access Token for GitLab API access. Required when
+            gitProviderMode is GITLAB_PAT. Stored encrypted at rest.
+          example: your-gitlab-token
+        serverUrl:
+          type: string
+          description: Custom server URL for self-hosted GitLab instances. Must use
+            HTTPS. Defaults to https://gitlab.com if not specified.
+          example: https://gitlab.example.com
         workspaceSlug:
           type: string
           description: URL-friendly identifier for the workspace
@@ -2377,6 +2437,74 @@ components:
       - error
       x-hephaestus:
         export: true
+    GitLabGroup:
+      type: object
+      description: GitLab group accessible to the provided PAT
+      properties:
+        avatarUrl:
+          type: string
+          description: Group avatar URL
+        fullPath:
+          type: string
+          description: Full group path including parent groups
+          example: my-org/my-team
+        id:
+          type: integer
+          format: int64
+          description: GitLab group numeric ID
+        name:
+          type: string
+          description: Group display name
+        visibility:
+          type: string
+          description: "Group visibility: public, internal, or private"
+        webUrl:
+          type: string
+          description: Group web URL
+      required:
+      - fullPath
+      - id
+      - name
+    GitLabPreflightRequest:
+      type: object
+      description: Request to validate a GitLab PAT or list accessible groups before
+        workspace creation
+      properties:
+        groupFullPath:
+          type: string
+          description: "GitLab group full path, used as fallback for group/project\
+            \ tokens that cannot access /api/v4/user"
+          example: my-org/my-team
+        personalAccessToken:
+          type: string
+          description: GitLab Personal Access Token to validate
+          example: your-gitlab-token
+        serverUrl:
+          type: string
+          description: GitLab server URL. Defaults to https://gitlab.com if not specified.
+          example: https://gitlab.example.com
+      required:
+      - personalAccessToken
+    GitLabPreflightResponse:
+      type: object
+      description: Result of GitLab PAT validation
+      properties:
+        error:
+          type: string
+          description: Error message if validation failed
+        userId:
+          type: integer
+          format: int64
+          description: GitLab user ID or group ID
+        username:
+          type: string
+          description: Username of the token owner (personal tokens) or group name
+            (group tokens)
+        valid:
+          type: boolean
+          description: Whether the token is valid
+      required:
+      - valid
     LabelInfo:
       type: object
       description: Information about a label from a repository
@@ -3313,6 +3441,9 @@ components:
         gitProviderMode:
           type: string
           description: "Git provider mode (PAT_ORG, GITHUB_APP_INSTALLATION, GITLAB_PAT)"
+        hasPersonalAccessToken:
+          type: boolean
+          description: Whether a Personal Access Token is configured
         hasSlackSigningSecret:
           type: boolean
           description: Whether Slack signing secret is configured
@@ -3379,6 +3510,7 @@ components:
       - accountLogin
       - createdAt
       - displayName
+      - hasPersonalAccessToken
       - hasSlackSigningSecret
       - hasSlackToken
       - id

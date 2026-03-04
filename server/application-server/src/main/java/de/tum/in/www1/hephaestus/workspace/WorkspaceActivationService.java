@@ -245,11 +245,12 @@ public class WorkspaceActivationService {
                                 workspace.getAccountLogin()
                             );
                             log.info(
-                                "GitLab sync result: workspaceId={}, status={}, synced={}, skipped={}, pages={}",
+                                "GitLab sync result: workspaceId={}, status={}, synced={}, failed={}, redacted={}, pages={}",
                                 workspace.getId(),
                                 result.status(),
                                 result.synced().size(),
                                 result.projectsSkipped(),
+                                result.projectsRedacted(),
                                 result.pagesCompleted()
                             );
                             // Link workspace to organization after sync (org was created during sync)

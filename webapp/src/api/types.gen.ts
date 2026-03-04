@@ -129,6 +129,10 @@ export type Workspace = {
      */
     gitProviderMode?: string;
     /**
+     * Whether a Personal Access Token is configured
+     */
+    hasPersonalAccessToken: boolean;
+    /**
      * Whether Slack signing secret is configured
      */
     hasSlackSigningSecret: boolean;
@@ -940,6 +944,76 @@ export type LeaderboardEntry = {
     user?: UserInfo;
 };
 
+/**
+ * Result of GitLab PAT validation
+ */
+export type GitLabPreflightResponse = {
+    /**
+     * Error message if validation failed
+     */
+    error?: string;
+    /**
+     * GitLab user ID or group ID
+     */
+    userId?: number;
+    /**
+     * Username of the token owner (personal tokens) or group name (group tokens)
+     */
+    username?: string;
+    /**
+     * Whether the token is valid
+     */
+    valid: boolean;
+};
+
+/**
+ * Request to validate a GitLab PAT or list accessible groups before workspace creation
+ */
+export type GitLabPreflightRequest = {
+    /**
+     * GitLab group full path, used as fallback for group/project tokens that cannot access /api/v4/user
+     */
+    groupFullPath?: string;
+    /**
+     * GitLab Personal Access Token to validate
+     */
+    personalAccessToken: string;
+    /**
+     * GitLab server URL. Defaults to https://gitlab.com if not specified.
+     */
+    serverUrl?: string;
+};
+
+/**
+ * GitLab group accessible to the provided PAT
+ */
+export type GitLabGroup = {
+    /**
+     * Group avatar URL
+     */
+    avatarUrl?: string;
+    /**
+     * Full group path including parent groups
+     */
+    fullPath: string;
+    /**
+     * GitLab group numeric ID
+     */
+    id: number;
+    /**
+     * Group display name
+     */
+    name: string;
+    /**
+     * Group visibility: public, internal, or private
+     */
+    visibility?: string;
+    /**
+     * Group web URL
+     */
+    webUrl?: string;
+};
+
 export type ErrorResponse = {
     /**
      * Human-readable error message
@@ -979,11 +1053,11 @@ export type DetectionResult = {
  */
 export type CreateWorkspaceRequest = {
     /**
-     * GitHub account login to associate with this workspace
+     * Git provider account login (GitHub org/user or GitLab group path)
      */
     accountLogin: string;
     /**
-     * Type of GitHub account (USER or ORGANIZATION)
+     * Type of account (USER or ORG)
      */
     accountType: 'ORG' | 'USER';
     /**
@@ -991,9 +1065,21 @@ export type CreateWorkspaceRequest = {
      */
     displayName: string;
     /**
+     * Git provider authentication mode. Defaults to PAT_ORG (GitHub PAT) if not specified.
+     */
+    gitProviderMode?: 'PAT_ORG' | 'GITHUB_APP_INSTALLATION' | 'GITLAB_PAT';
+    /**
      * User ID of the workspace owner
      */
     ownerUserId: number;
+    /**
+     * Personal Access Token for GitLab API access. Required when gitProviderMode is GITLAB_PAT. Stored encrypted at rest.
+     */
+    personalAccessToken?: string;
+    /**
+     * Custom server URL for self-hosted GitLab instances. Must use HTTPS. Defaults to https://gitlab.com if not specified.
+     */
+    serverUrl?: string;
     /**
      * URL-friendly identifier for the workspace
      */
@@ -1175,6 +1261,38 @@ export type CreateWorkspaceResponses = {
 };
 
 export type CreateWorkspaceResponse = CreateWorkspaceResponses[keyof CreateWorkspaceResponses];
+
+export type ListGitLabGroupsData = {
+    body: GitLabPreflightRequest;
+    path?: never;
+    query?: never;
+    url: '/workspaces/gitlab/groups';
+};
+
+export type ListGitLabGroupsResponses = {
+    /**
+     * Accessible groups
+     */
+    200: Array<GitLabGroup>;
+};
+
+export type ListGitLabGroupsResponse = ListGitLabGroupsResponses[keyof ListGitLabGroupsResponses];
+
+export type GitLabPreflightData = {
+    body: GitLabPreflightRequest;
+    path?: never;
+    query?: never;
+    url: '/workspaces/gitlab/preflight';
+};
+
+export type GitLabPreflightResponses = {
+    /**
+     * Validation result
+     */
+    200: GitLabPreflightResponse;
+};
+
+export type GitLabPreflightResponse2 = GitLabPreflightResponses[keyof GitLabPreflightResponses];
 
 export type PurgeWorkspaceData = {
     body?: never;

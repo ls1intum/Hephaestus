@@ -36,6 +36,7 @@ public record WorkspaceDTO(
     @Schema(description = "Whether leaderboard notifications are enabled") Boolean leaderboardNotificationEnabled,
     @Schema(description = "Team name for leaderboard notifications") String leaderboardNotificationTeam,
     @Schema(description = "Slack channel ID for leaderboard notifications") String leaderboardNotificationChannelId,
+    @NonNull @Schema(description = "Whether a Personal Access Token is configured") Boolean hasPersonalAccessToken,
     @NonNull @Schema(description = "Whether Slack token is configured") Boolean hasSlackToken,
     @NonNull @Schema(description = "Whether Slack signing secret is configured") Boolean hasSlackSigningSecret
 ) {
@@ -59,6 +60,7 @@ public record WorkspaceDTO(
             workspace.getLeaderboardNotificationEnabled(),
             workspace.getLeaderboardNotificationTeam(),
             workspace.getLeaderboardNotificationChannelId(),
+            workspace.getPersonalAccessToken() != null && !workspace.getPersonalAccessToken().isEmpty(),
             workspace.getSlackToken() != null && !workspace.getSlackToken().isEmpty(),
             workspace.getSlackSigningSecret() != null && !workspace.getSlackSigningSecret().isEmpty()
         );
