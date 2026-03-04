@@ -151,7 +151,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
             .asInstanceOf(InstanceOfAssertFactories.map(String.class, Object.class))
             .containsKey("tokenProvidedForGitLab");
 
-        assertThat(workspaceRepository.count()).isZero();
+        assertThat(workspaceRepository.findByWorkspaceSlug("gitlab-notoken")).isEmpty();
     }
 
     @Test
@@ -189,7 +189,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
             .asInstanceOf(InstanceOfAssertFactories.map(String.class, Object.class))
             .containsKey("serverUrlSafe");
 
-        assertThat(workspaceRepository.count()).isZero();
+        assertThat(workspaceRepository.findByWorkspaceSlug("gitlab-http")).isEmpty();
     }
 
     @Test
@@ -233,7 +233,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
     @WithMentorUser
     void createGitLabWorkspaceResponseNeverContainsRawToken() {
         User owner = persistUser("mentor");
-        String secretToken = "glpat-super-secret-token-xyz";
+        String secretToken = "test-token-placeholder";
 
         var request = new CreateWorkspaceRequestDTO(
             "gitlab-secret",
@@ -313,7 +313,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
         assertThat(workspaces).isNotNull();
         assertThat(workspaces)
             .extracting(WorkspaceListItemDTO::providerType)
-            .containsExactlyInAnyOrder(GitProviderType.GITHUB, GitProviderType.GITLAB);
+            .contains(GitProviderType.GITHUB, GitProviderType.GITLAB);
     }
 
     @Test

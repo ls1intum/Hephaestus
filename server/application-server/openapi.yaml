@@ -2342,7 +2342,7 @@ components:
           type: string
           description: Personal Access Token for GitLab API access. Required when
             gitProviderMode is GITLAB_PAT. Stored encrypted at rest.
-          example: glpat-xxxxxxxxxxxxxxxxxxxx
+          example: your-gitlab-token
         serverUrl:
           type: string
           description: Custom server URL for self-hosted GitLab instances. Must use
@@ -2478,7 +2478,7 @@ components:
         personalAccessToken:
           type: string
           description: GitLab Personal Access Token to validate
-          example: glpat-xxxxxxxxxxxxxxxxxxxx
+          example: your-gitlab-token
         serverUrl:
           type: string
           description: GitLab server URL. Defaults to https://gitlab.com if not specified.

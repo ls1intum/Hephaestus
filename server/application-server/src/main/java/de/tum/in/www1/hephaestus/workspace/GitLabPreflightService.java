@@ -81,7 +81,7 @@ public class GitLabPreflightService {
             }
         } catch (Exception e) {
             log.warn("GitLab /api/v4/user failed: serverUrl={}, error={}", resolvedUrl, e.getMessage());
-            return GitLabPreflightResponseDTO.failure("Failed to connect to GitLab server: " + e.getMessage());
+            return GitLabPreflightResponseDTO.failure("Failed to connect to GitLab server");
         }
 
         // Fallback: try group endpoint for group/project access tokens
@@ -118,7 +118,13 @@ public class GitLabPreflightService {
             }
             return GitLabPreflightResponseDTO.failure("GitLab API returned status " + status);
         } catch (Exception e) {
-            return GitLabPreflightResponseDTO.failure("Failed to validate group token: " + e.getMessage());
+            log.warn(
+                "GitLab group token validation failed: serverUrl={}, group={}, error={}",
+                serverUrl,
+                groupFullPath,
+                e.getMessage()
+            );
+            return GitLabPreflightResponseDTO.failure("Failed to validate group token");
         }
 
         return GitLabPreflightResponseDTO.failure("Failed to validate group token");
@@ -134,23 +140,28 @@ public class GitLabPreflightService {
     public List<GitLabGroupDTO> listAccessibleGroups(String token, String serverUrl) {
         String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
 
-        List<GitLabGroupListItem> groups = webClient
-            .get()
-            .uri(resolvedUrl + "/api/v4/groups?min_access_level=10&per_page=100&order_by=name&sort=asc")
-            .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-            .retrieve()
-            .bodyToFlux(GitLabGroupListItem.class)
-            .collectList()
-            .block(REQUEST_TIMEOUT);
+        try {
+            List<GitLabGroupListItem> groups = webClient
+                .get()
+                .uri(resolvedUrl + "/api/v4/groups?min_access_level=10&per_page=100&order_by=name&sort=asc")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .retrieve()
+                .bodyToFlux(GitLabGroupListItem.class)
+                .collectList()
+                .block(REQUEST_TIMEOUT);
 
-        if (groups == null) {
+            if (groups == null) {
+                return List.of();
+            }
+
+            return groups
+                .stream()
+                .map(g -> new GitLabGroupDTO(g.id(), g.name(), g.fullPath(), g.avatarUrl(), g.webUrl(), g.visibility()))
+                .toList();
+        } catch (Exception e) {
+            log.warn("Failed to list accessible GitLab groups: serverUrl={}, error={}", resolvedUrl, e.getMessage());
             return List.of();
         }
-
-        return groups
-            .stream()
-            .map(g -> new GitLabGroupDTO(g.id(), g.name(), g.fullPath(), g.avatarUrl(), g.webUrl(), g.visibility()))
-            .toList();
     }
 
     /**

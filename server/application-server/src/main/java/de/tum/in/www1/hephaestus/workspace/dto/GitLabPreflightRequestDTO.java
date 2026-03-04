@@ -14,7 +14,7 @@ public record GitLabPreflightRequestDTO(
     @NotBlank(message = "Personal access token is required")
     @Schema(
         description = "GitLab Personal Access Token to validate",
-        example = "glpat-xxxxxxxxxxxxxxxxxxxx",
+        example = "your-gitlab-token",
         requiredMode = Schema.RequiredMode.REQUIRED
     )
     String personalAccessToken,

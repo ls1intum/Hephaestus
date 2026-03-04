@@ -62,7 +62,7 @@ public record CreateWorkspaceRequestDTO(
 
     @Schema(
         description = "Personal Access Token for GitLab API access. Required when gitProviderMode is GITLAB_PAT. Stored encrypted at rest.",
-        example = "glpat-xxxxxxxxxxxxxxxxxxxx"
+        example = "your-gitlab-token"
     )
     String personalAccessToken,
 

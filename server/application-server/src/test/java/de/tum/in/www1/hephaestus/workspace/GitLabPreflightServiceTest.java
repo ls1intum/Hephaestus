@@ -125,11 +125,15 @@ class GitLabPreflightServiceTest extends BaseUnitTest {
         @Test
         @DisplayName("validates against custom server URL when provided")
         void validatesWithCustomServerUrl() {
-            // Uses default gitlab.com — the mock intercepts regardless
+            // Uses custom server URL — the mock intercepts regardless
             mockGetRequest(new GitLabPreflightService.GitLabUserResponse(99L, "custom-user", "Custom", null, null));
 
             // Note: actual server URL validation (SSRF) is tested in ServerUrlValidatorTest
-            GitLabPreflightResponseDTO result = preflightService.validateToken("glpat-test", null, null);
+            GitLabPreflightResponseDTO result = preflightService.validateToken(
+                "glpat-test",
+                "https://gitlab.example.com",
+                null
+            );
 
             assertThat(result.valid()).isTrue();
             assertThat(result.username()).isEqualTo("custom-user");
