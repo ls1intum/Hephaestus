@@ -771,8 +771,10 @@ public class GitLabMergeRequestSyncService {
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            return null;
         } catch (Exception e) {
-            log.warn("Error during label follow-up pagination: context={}", context, e);
+            log.warn("Error during label follow-up pagination, aborting to prevent data loss: context={}", context, e);
+            return null;
         }
 
         if (!allRemaining.isEmpty()) {
@@ -783,7 +785,7 @@ public class GitLabMergeRequestSyncService {
             );
         }
 
-        return allRemaining.isEmpty() ? null : allRemaining;
+        return allRemaining;
     }
 
     @SuppressWarnings("unchecked")
@@ -863,8 +865,14 @@ public class GitLabMergeRequestSyncService {
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            return null;
         } catch (Exception e) {
-            log.warn("Error during assignee follow-up pagination: context={}", context, e);
+            log.warn(
+                "Error during assignee follow-up pagination, aborting to prevent data loss: context={}",
+                context,
+                e
+            );
+            return null;
         }
 
         if (!allRemaining.isEmpty()) {
@@ -875,7 +883,7 @@ public class GitLabMergeRequestSyncService {
             );
         }
 
-        return allRemaining.isEmpty() ? null : allRemaining;
+        return allRemaining;
     }
 
     @SuppressWarnings("unchecked")
@@ -887,7 +895,7 @@ public class GitLabMergeRequestSyncService {
         @Nullable String afterCursor,
         String context
     ) {
-        if (afterCursor == null) return List.of();
+        if (afterCursor == null) return null;
 
         List<GitLabMergeRequestProcessor.SyncUserData> allRemaining = new ArrayList<>();
         String cursor = afterCursor;
@@ -989,7 +997,7 @@ public class GitLabMergeRequestSyncService {
         @Nullable String afterCursor,
         String context
     ) {
-        if (afterCursor == null) return List.of();
+        if (afterCursor == null) return null;
 
         List<GitLabMergeRequestProcessor.SyncUserData> allRemaining = new ArrayList<>();
         String cursor = afterCursor;

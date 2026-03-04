@@ -188,6 +188,7 @@ public record SyncResult(
      * Merges multiple sync results into one by summing counts and picking the worst status.
      * <p>
      * Used when a single logical sync is split into multiple passes (e.g., by PR state).
+     * Note: phase-level detail (fieldsSynced, statusUpdatesSynced, itemsSynced) is not preserved.
      *
      * @param results the results to merge
      * @return a merged SyncResult with aggregated count and worst status
