@@ -45,6 +45,7 @@ import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -146,6 +147,10 @@ public class GitHubTeamSyncService {
 
         try {
             Set<Long> syncedTeamIds = new HashSet<>();
+            // Maps GitHub native ID → persisted Team for parent resolution after all teams are saved
+            Map<Long, Team> syncedTeamsByNativeId = new HashMap<>();
+            // Maps child team's native ID → parent team's native ID (from GraphQL)
+            Map<Long, Long> parentNativeIdByChildNativeId = new HashMap<>();
             int totalSynced = 0;
             int totalPermissions = 0;
             String cursor = null;
@@ -254,6 +259,18 @@ public class GitHubTeamSyncService {
                     Team team = processTeam(graphQlTeam, organizationLogin, context);
                     if (team != null) {
                         syncedTeamIds.add(team.getNativeId());
+                        syncedTeamsByNativeId.put(team.getNativeId(), team);
+
+                        // Collect parent mapping for deferred resolution
+                        if (
+                            graphQlTeam.getParentTeam() != null && graphQlTeam.getParentTeam().getDatabaseId() != null
+                        ) {
+                            parentNativeIdByChildNativeId.put(
+                                team.getNativeId(),
+                                graphQlTeam.getParentTeam().getDatabaseId().longValue()
+                            );
+                        }
+
                         syncTeamMemberships(client, team, graphQlTeam, organizationLogin, scopeId);
                         totalPermissions += syncTeamRepoPermissions(
                             client,
@@ -284,6 +301,11 @@ public class GitHubTeamSyncService {
 
             // Mark sync as completed normally if we exhausted all pages
             syncCompletedNormally = !hasNextPage;
+
+            // Resolve parent references now that all teams are persisted.
+            // This two-pass approach ensures correct parentId even when a child
+            // team appears before its parent in the GraphQL response.
+            resolveParentReferences(syncedTeamsByNativeId, parentNativeIdByChildNativeId, safeOrgLogin);
 
             // CRITICAL: Only remove stale teams if sync completed fully.
             // If sync was aborted (rate limit, error, pagination limit), we don't have
@@ -344,16 +366,68 @@ public class GitHubTeamSyncService {
         Team team = teamProcessor.process(dto, organizationLogin, context);
 
         if (team != null) {
-            // Update parent team reference if available
-            if (graphQlTeam.getParentTeam() != null && graphQlTeam.getParentTeam().getDatabaseId() != null) {
-                team.setParentId(graphQlTeam.getParentTeam().getDatabaseId().longValue());
-            }
+            // NOTE: parentId resolution is deferred to resolveParentReferences()
+            // which runs after all teams have been persisted. This ensures parent
+            // teams are available for lookup regardless of processing order.
+
             // Update last synced timestamp
             team.setLastSyncAt(Instant.now());
             team = teamRepository.save(team);
         }
 
         return team;
+    }
+
+    /**
+     * Resolves parent team references after all teams have been persisted.
+     * <p>
+     * The GitHub GraphQL API returns {@code parentTeam.databaseId} (the GitHub native ID),
+     * but our {@code team.parent_id} column references the internal auto-increment PK.
+     * This method translates native IDs to internal IDs using the in-memory map built
+     * during this sync, and clears stale parent references for teams whose parent was
+     * removed in GitHub.
+     *
+     * @param syncedTeamsByNativeId         map of GitHub native ID → persisted Team
+     * @param parentNativeIdByChildNativeId map of child native ID → parent native ID from GraphQL
+     * @param safeOrgLogin                  sanitized org login for logging
+     */
+    private void resolveParentReferences(
+        Map<Long, Team> syncedTeamsByNativeId,
+        Map<Long, Long> parentNativeIdByChildNativeId,
+        String safeOrgLogin
+    ) {
+        List<Team> changed = new ArrayList<>();
+
+        for (Map.Entry<Long, Team> entry : syncedTeamsByNativeId.entrySet()) {
+            Team child = entry.getValue();
+            Long parentNativeId = parentNativeIdByChildNativeId.get(entry.getKey());
+
+            // Determine the correct internal parent ID (null if no parent in GraphQL)
+            Long correctParentId = null;
+            if (parentNativeId != null) {
+                Team parent = syncedTeamsByNativeId.get(parentNativeId);
+                if (parent != null) {
+                    correctParentId = parent.getId();
+                } else {
+                    log.warn(
+                        "Parent team not found in current sync: child={}, parentNativeId={}, orgLogin={}",
+                        child.getName(),
+                        parentNativeId,
+                        safeOrgLogin
+                    );
+                }
+            }
+
+            if (!Objects.equals(correctParentId, child.getParentId())) {
+                child.setParentId(correctParentId);
+                changed.add(child);
+            }
+        }
+
+        if (!changed.isEmpty()) {
+            teamRepository.saveAll(changed);
+            log.info("Resolved parent team references: orgLogin={}, updated={}", safeOrgLogin, changed.size());
+        }
     }
 
     /**
