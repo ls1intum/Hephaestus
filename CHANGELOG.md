@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.21.2](https://github.com/ls1intum/Hephaestus/compare/v0.21.1...v0.21.2) (2026-03-04)
+
+### 🐛 Bug Fixes
+
+* **workspace:** return effective role with super admin elevation in /members/me ([#790](https://github.com/ls1intum/Hephaestus/issues/790)) ([bccff72](https://github.com/ls1intum/Hephaestus/commit/bccff72c271995fc21d0b4457fb82c57c4015e5e))
+
 ## [0.21.1](https://github.com/ls1intum/Hephaestus/compare/v0.21.0...v0.21.1) (2026-03-04)
 
 ### 🐛 Bug Fixes
