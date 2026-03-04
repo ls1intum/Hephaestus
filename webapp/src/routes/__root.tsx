@@ -46,6 +46,9 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 		const allowSurveys =
 			isPosthogEnabled && !userSettingsError && (userSettings?.participateInResearch ?? true);
 		const isMentorRoute = pathname === "/mentor" || /^\/w\/[^/]+\/mentor/.test(pathname);
+		const isAchievementsRoute = /^\/w\/[^/]+\/achievements/.test(pathname);
+		// Routes that use full-height layouts without padding or footer
+		const isFullscreenRoute = isMentorRoute || isAchievementsRoute;
 
 		// Exclude routes where Copilot should not appear
 		const isExcludedRoute =
@@ -63,13 +66,13 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 			<>
 				<SidebarProvider>
 					<AppSidebarContainer />
-					<SidebarInset>
+					<SidebarInset style={{ marginRight: "var(--right-sidebar-width, 0)" }}>
 						<HeaderContainer />
 						<div className="min-h-[calc(100dvh-4rem)] flex flex-col">
-							<main className={`${isMentorRoute ? "" : "p-4"}`}>
+							<main className={`${isFullscreenRoute ? "" : "p-4"}`}>
 								<Outlet />
 							</main>
-							{!isMentorRoute && (
+							{!isFullscreenRoute && (
 								<div className="flex justify-end flex-col h-full">
 									<Footer buildInfo={environment.buildInfo} />
 								</div>

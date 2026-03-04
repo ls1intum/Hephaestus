@@ -3,12 +3,11 @@ import { createFileRoute } from "@tanstack/react-router";
 import { ReactFlowProvider } from "@xyflow/react";
 import { useState } from "react";
 import { getUserProfileOptions } from "@/api/@tanstack/react-query.gen";
-import { AchievementHeader } from "@/components/achievements/AchievementHeader.tsx";
-import { AchievementsListView } from "@/components/achievements/AchievementsListView.tsx";
-import { SkillTree } from "@/components/achievements/SkillTree.tsx";
-import { StatsPanel } from "@/components/achievements/StatsPanel.tsx";
+import { AchievementSidebar } from "@/components/achievements/AchievementSidebar";
+import { AchievementsListView } from "@/components/achievements/AchievementsListView";
+import { SkillTree } from "@/components/achievements/SkillTree";
 import type { ViewMode } from "@/components/achievements/types";
-import { enhanceAchievements } from "@/components/achievements/utils.ts";
+import { enhanceAchievements } from "@/components/achievements/utils";
 import { useAchievementNotifications } from "@/hooks/use-achievement-notifications";
 import { useAchievements } from "@/hooks/use-achievements";
 import { useAuth } from "@/integrations/auth/AuthContext";
@@ -49,37 +48,30 @@ function AchievementsPage() {
 
 	return (
 		<ReactFlowProvider>
-			<div className="h-screen flex flex-col bg-background overflow-hidden">
-				<AchievementHeader
+			<div className="h-[calc(100dvh-4rem)] flex bg-background overflow-hidden">
+				{/* Main content area — fills remaining space */}
+				<div className="flex-1 relative">
+					{viewMode === "tree" ? (
+						<>
+							{/* Radial gradient background */}
+							<div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,var(--tw-gradient-stops))] from-primary/5 via-background to-background" />
+
+							{/* Skill tree */}
+							<SkillTree user={user} achievements={uiAchievements} />
+						</>
+					) : (
+						<AchievementsListView achievements={uiAchievements} />
+					)}
+				</div>
+
+				{/* Right sidebar — non-foldable, achievement controls + stats */}
+				<AchievementSidebar
 					viewMode={viewMode}
 					onViewModeChange={setViewMode}
-					showZoomControls={viewMode === "tree"}
-					isError={achievementsQuery.isError}
 					isLoading={achievementsQuery.isLoading}
+					isError={achievementsQuery.isError}
+					achievements={uiAchievements}
 				/>
-
-				<div className="flex-1 flex overflow-hidden">
-					{/* Main content area */}
-					<div className="flex-1 relative">
-						{viewMode === "tree" ? (
-							<>
-								{/* Radial gradient background */}
-								<div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,var(--tw-gradient-stops))] from-primary/5 via-background to-background" />
-
-								{/* Skill tree */}
-								<SkillTree user={user} achievements={uiAchievements} />
-							</>
-						) : (
-							<>
-								{/* List view */}
-								<AchievementsListView achievements={uiAchievements} />
-							</>
-						)}
-					</div>
-
-					{/* Stats panel - visible in both views */}
-					<StatsPanel achievements={uiAchievements} />
-				</div>
 			</div>
 		</ReactFlowProvider>
 	);
