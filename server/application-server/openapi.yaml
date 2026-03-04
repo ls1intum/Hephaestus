@@ -367,7 +367,11 @@ paths:
       - workspace-membership
   /workspaces/{workspaceSlug}/members/me:
     get:
-      description: Get the current user's membership in this workspace.
+      description: |-
+        Get the current user's membership in this workspace.
+         Super admins (Keycloak admin realm role) have their effective role elevated to ADMIN
+         if their database role is lower, matching the runtime authorization behaviour in
+         {@link WorkspaceAccessService WorkspaceAccessService}.
       operationId: getCurrentUserMembership
       parameters:
       - description: Workspace slug
@@ -383,7 +387,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/WorkspaceMembership"
-          description: the current user's membership details
+          description: the current user's membership details with effective role
       security: []
       summary: Get the current user's membership in this workspace.
       tags:
