@@ -97,15 +97,25 @@ public class GitLabNoteMessageHandler extends GitLabMessageHandler<GitLabNoteEve
             case "Issue" -> issueCommentProcessor.processIssueNote(event, context);
             case "MergeRequest" -> {
                 if (event.isDiffNote()) {
-                    log.debug("Skipped diff note: projectPath={}, noteId={}", safeProjectPath, event.objectAttributes().id());
+                    log.debug(
+                        "Skipped diff note: projectPath={}, noteId={}",
+                        safeProjectPath,
+                        event.objectAttributes().id()
+                    );
                 } else {
                     issueCommentProcessor.processMergeRequestNote(event, context);
                 }
             }
-            case "Commit" -> log.debug("Skipped commit note: projectPath={}, noteId={}", safeProjectPath, event.objectAttributes().id());
+            case "Commit" -> log.debug(
+                "Skipped commit note: projectPath={}, noteId={}",
+                safeProjectPath,
+                event.objectAttributes().id()
+            );
             case null, default -> log.debug(
                 "Skipped note with unsupported noteable type: projectPath={}, noteableType={}, noteId={}",
-                safeProjectPath, noteableType, event.objectAttributes().id()
+                safeProjectPath,
+                noteableType,
+                event.objectAttributes().id()
             );
         }
     }

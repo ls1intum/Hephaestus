@@ -62,7 +62,14 @@ public class GitLabIssueCommentProcessor extends BaseGitLabProcessor {
         GitLabProperties gitLabProperties,
         ApplicationEventPublisher eventPublisher
     ) {
-        super(userRepository, labelRepository, repositoryRepository, scopeIdResolver, repositoryScopeFilter, gitLabProperties);
+        super(
+            userRepository,
+            labelRepository,
+            repositoryRepository,
+            scopeIdResolver,
+            repositoryScopeFilter,
+            gitLabProperties
+        );
         this.commentRepository = commentRepository;
         this.issueRepository = issueRepository;
         this.pullRequestRepository = pullRequestRepository;
@@ -88,7 +95,8 @@ public class GitLabIssueCommentProcessor extends BaseGitLabProcessor {
             if (parent == null) {
                 log.warn(
                     "Skipped issue note: reason=failedToCreateParent, issueIid={}, noteId={}",
-                    embeddedIssue.iid(), attrs.id()
+                    embeddedIssue.iid(),
+                    attrs.id()
                 );
                 return null;
             }
@@ -118,7 +126,8 @@ public class GitLabIssueCommentProcessor extends BaseGitLabProcessor {
             if (parent == null) {
                 log.warn(
                     "Skipped MR note: reason=failedToCreateParent, mrIid={}, noteId={}",
-                    embeddedMr.iid(), attrs.id()
+                    embeddedMr.iid(),
+                    attrs.id()
                 );
                 return null;
             }
@@ -150,8 +159,12 @@ public class GitLabIssueCommentProcessor extends BaseGitLabProcessor {
         }
 
         User author = findOrCreateUser(
-            data.authorGlobalId(), data.authorUsername(), data.authorName(),
-            data.authorAvatarUrl(), data.authorWebUrl(), providerId
+            data.authorGlobalId(),
+            data.authorUsername(),
+            data.authorName(),
+            data.authorAvatarUrl(),
+            data.authorWebUrl(),
+            providerId
         );
 
         Optional<IssueComment> existingOpt = commentRepository.findByNativeIdAndProviderId(data.id(), providerId);
@@ -196,30 +209,15 @@ public class GitLabIssueCommentProcessor extends BaseGitLabProcessor {
         Long issueId = parent.getId();
 
         if (isNew) {
-            EventContext eventCtx = EventContext.forSync(
-                scopeId,
-                RepositoryRef.from(parent.getRepository())
-            );
+            EventContext eventCtx = EventContext.forSync(scopeId, RepositoryRef.from(parent.getRepository()));
             eventPublisher.publishEvent(
-                new DomainEvent.CommentCreated(
-                    EventPayload.CommentData.from(saved),
-                    issueId,
-                    eventCtx
-                )
+                new DomainEvent.CommentCreated(EventPayload.CommentData.from(saved), issueId, eventCtx)
             );
             log.debug("Created comment from sync: commentId={}, parentId={}", saved.getId(), issueId);
         } else if (!changedFields.isEmpty()) {
-            EventContext eventCtx = EventContext.forSync(
-                scopeId,
-                RepositoryRef.from(parent.getRepository())
-            );
+            EventContext eventCtx = EventContext.forSync(scopeId, RepositoryRef.from(parent.getRepository()));
             eventPublisher.publishEvent(
-                new DomainEvent.CommentUpdated(
-                    EventPayload.CommentData.from(saved),
-                    issueId,
-                    changedFields,
-                    eventCtx
-                )
+                new DomainEvent.CommentUpdated(EventPayload.CommentData.from(saved), issueId, changedFields, eventCtx)
             );
             log.debug("Updated comment from sync: commentId={}, changed={}", saved.getId(), changedFields);
         }
@@ -235,7 +233,8 @@ public class GitLabIssueCommentProcessor extends BaseGitLabProcessor {
     ) {
         Long issueId = parent.getId();
         Optional<IssueComment> existingOpt = commentRepository.findByNativeIdAndProviderId(
-            attrs.id(), context.providerId()
+            attrs.id(),
+            context.providerId()
         );
         boolean isNew = existingOpt.isEmpty();
         IssueComment comment = existingOpt.orElseGet(IssueComment::new);
@@ -306,9 +305,7 @@ public class GitLabIssueCommentProcessor extends BaseGitLabProcessor {
             return createMinimalIssue(dto, context);
         } catch (DataIntegrityViolationException e) {
             log.debug("Concurrent issue creation, looking up: iid={}", dto.iid());
-            return issueRepository
-                .findByRepositoryIdAndNumber(context.repository().getId(), dto.iid())
-                .orElse(null);
+            return issueRepository.findByRepositoryIdAndNumber(context.repository().getId(), dto.iid()).orElse(null);
         }
     }
 
@@ -333,7 +330,9 @@ public class GitLabIssueCommentProcessor extends BaseGitLabProcessor {
         Issue saved = issueRepository.save(issue);
         log.info(
             "Created stub Issue from note webhook: issueId={}, iid={}, repo={}",
-            saved.getId(), saved.getNumber(), repository.getNameWithOwner()
+            saved.getId(),
+            saved.getNumber(),
+            repository.getNameWithOwner()
         );
         return saved;
     }
@@ -379,7 +378,9 @@ public class GitLabIssueCommentProcessor extends BaseGitLabProcessor {
         PullRequest saved = pullRequestRepository.save(pr);
         log.info(
             "Created stub PullRequest from note webhook: prId={}, iid={}, repo={}",
-            saved.getId(), saved.getNumber(), repository.getNameWithOwner()
+            saved.getId(),
+            saved.getNumber(),
+            repository.getNameWithOwner()
         );
         return saved;
     }

@@ -135,7 +135,11 @@ public class GitLabNoteSyncService {
                 }
 
                 if (response.getErrors() != null && !response.getErrors().isEmpty()) {
-                    log.warn("Partial errors in note response: context={}, errors={}", safeContext, response.getErrors());
+                    log.warn(
+                        "Partial errors in note response: context={}, errors={}",
+                        safeContext,
+                        response.getErrors()
+                    );
                 }
 
                 graphQlClientProvider.recordSuccess();
@@ -167,18 +171,12 @@ public class GitLabNoteSyncService {
                             totalSkipped++;
                         }
                     } catch (Exception e) {
-                        log.warn(
-                            "Error processing note: context={}, noteId={}",
-                            safeContext,
-                            noteNode.get("id"),
-                            e
-                        );
+                        log.warn("Error processing note: context={}, noteId={}", safeContext, noteNode.get("id"), e);
                     }
                 }
 
                 // Pagination
-                GitLabPageInfo pageInfo = response.field(notesFieldPath + ".pageInfo")
-                    .toEntity(GitLabPageInfo.class);
+                GitLabPageInfo pageInfo = response.field(notesFieldPath + ".pageInfo").toEntity(GitLabPageInfo.class);
 
                 if (pageInfo == null || !pageInfo.hasNextPage()) {
                     break;
@@ -205,7 +203,10 @@ public class GitLabNoteSyncService {
         if (reportedTotalCount >= 0 && totalSynced + totalSkipped < reportedTotalCount) {
             log.warn(
                 "Note connection overflow detected: context={}, synced={}, skipped={}, reportedCount={}",
-                safeContext, totalSynced, totalSkipped, reportedTotalCount
+                safeContext,
+                totalSynced,
+                totalSkipped,
+                reportedTotalCount
             );
         }
 
@@ -246,8 +247,11 @@ public class GitLabNoteSyncService {
         String updatedAt = node.get("updatedAt") != null ? node.get("updatedAt").toString() : null;
 
         // Author
-        String authorGlobalId = null, authorUsername = null, authorName = null,
-            authorAvatarUrl = null, authorWebUrl = null;
+        String authorGlobalId = null,
+            authorUsername = null,
+            authorName = null,
+            authorAvatarUrl = null,
+            authorWebUrl = null;
         Map<String, Object> authorMap = (Map<String, Object>) node.get("author");
         if (authorMap != null) {
             authorGlobalId = (String) authorMap.get("id");

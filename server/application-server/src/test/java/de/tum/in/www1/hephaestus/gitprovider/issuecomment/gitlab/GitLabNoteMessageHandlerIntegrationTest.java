@@ -36,8 +36,8 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.event.EventListener;
 import org.springframework.context.annotation.Import;
+import org.springframework.context.event.EventListener;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 import org.springframework.test.context.TestPropertySource;
@@ -307,7 +307,8 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
                 assertThat(issueRepository.count()).isEqualTo(1);
                 assertThat(commentRepository.count()).isEqualTo(1);
 
-                Issue stubIssue = issueRepository.findByRepositoryIdAndNumber(savedRepo.getId(), ISSUE_IID)
+                Issue stubIssue = issueRepository
+                    .findByRepositoryIdAndNumber(savedRepo.getId(), ISSUE_IID)
                     .orElse(null);
                 assertThat(stubIssue).isNotNull();
                 assertThat(stubIssue.getNativeId()).isEqualTo(NATIVE_ISSUE_ID);

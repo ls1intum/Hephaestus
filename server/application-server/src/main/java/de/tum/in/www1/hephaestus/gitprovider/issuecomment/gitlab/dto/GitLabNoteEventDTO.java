@@ -18,7 +18,6 @@ public record GitLabNoteEventDTO(
     @Nullable EmbeddedIssue issue,
     @Nullable @JsonProperty("merge_request") EmbeddedMergeRequest mergeRequest
 ) {
-
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record NoteAttributes(
         Long id,

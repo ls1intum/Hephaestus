@@ -66,7 +66,10 @@ class GitLabNoteMessageHandlerTest extends BaseUnitTest {
             .executeWithoutResult(any());
 
         handler = new GitLabNoteMessageHandler(
-            issueCommentProcessor, contextResolver, deserializer, transactionTemplate
+            issueCommentProcessor,
+            contextResolver,
+            deserializer,
+            transactionTemplate
         );
 
         lenient()
@@ -183,7 +186,13 @@ class GitLabNoteMessageHandlerTest extends BaseUnitTest {
         @DisplayName("missing object_attributes skips processing")
         void missingObjectAttributes_skipsProcessing() throws IOException {
             GitLabNoteEventDTO event = new GitLabNoteEventDTO(
-                "note", "note", createUser(), createProject(), null, null, null
+                "note",
+                "note",
+                createUser(),
+                createProject(),
+                null,
+                null,
+                null
             );
 
             Message msg = mockMessage(event);
@@ -197,7 +206,13 @@ class GitLabNoteMessageHandlerTest extends BaseUnitTest {
         void missingProject_skipsProcessing() throws IOException {
             NoteAttributes attrs = createNoteAttributes("Issue", "create", false, false, null);
             GitLabNoteEventDTO event = new GitLabNoteEventDTO(
-                "note", "note", createUser(), null, attrs, createEmbeddedIssue(false), null
+                "note",
+                "note",
+                createUser(),
+                null,
+                attrs,
+                createEmbeddedIssue(false),
+                null
             );
 
             Message msg = mockMessage(event);
@@ -244,7 +259,10 @@ class GitLabNoteMessageHandlerTest extends BaseUnitTest {
     }
 
     private GitLabNoteEventDTO createIssueNoteEvent(
-        String action, boolean system, boolean internal, boolean confidentialIssue
+        String action,
+        boolean system,
+        boolean internal,
+        boolean confidentialIssue
     ) {
         NoteAttributes attrs = createNoteAttributes("Issue", action, system, internal, null);
         return new GitLabNoteEventDTO(
@@ -259,7 +277,10 @@ class GitLabNoteMessageHandlerTest extends BaseUnitTest {
     }
 
     private GitLabNoteEventDTO createMergeRequestNoteEvent(
-        String action, boolean system, boolean internal, Object position
+        String action,
+        boolean system,
+        boolean internal,
+        Object position
     ) {
         NoteAttributes attrs = createNoteAttributes("MergeRequest", action, system, internal, position);
         return new GitLabNoteEventDTO(
@@ -275,13 +296,15 @@ class GitLabNoteMessageHandlerTest extends BaseUnitTest {
 
     private GitLabNoteEventDTO createCommitNoteEvent() {
         NoteAttributes attrs = createNoteAttributes("Commit", "create", false, false, null);
-        return new GitLabNoteEventDTO(
-            "note", "note", createUser(), createProject(), attrs, null, null
-        );
+        return new GitLabNoteEventDTO("note", "note", createUser(), createProject(), attrs, null, null);
     }
 
     private NoteAttributes createNoteAttributes(
-        String noteableType, String action, boolean system, boolean internal, Object position
+        String noteableType,
+        String action,
+        boolean system,
+        boolean internal,
+        Object position
     ) {
         return new NoteAttributes(
             4406174L,
@@ -299,34 +322,50 @@ class GitLabNoteMessageHandlerTest extends BaseUnitTest {
 
     private EmbeddedIssue createEmbeddedIssue(boolean confidential) {
         return new EmbeddedIssue(
-            422296L, 5, "Feature: Add user authentication",
-            "Implement OAuth2 authentication flow", "opened", confidential,
+            422296L,
+            5,
+            "Feature: Add user authentication",
+            "Implement OAuth2 authentication flow",
+            "opened",
+            confidential,
             "https://gitlab.lrz.de/hephaestustest/demo-repository/-/issues/5",
-            "2026-01-31 19:03:35 +0100", "2026-01-31 19:03:35 +0100"
+            "2026-01-31 19:03:35 +0100",
+            "2026-01-31 19:03:35 +0100"
         );
     }
 
     private EmbeddedMergeRequest createEmbeddedMergeRequest() {
         return new EmbeddedMergeRequest(
-            334047L, 2, "Implement OAuth authentication",
-            "This MR implements OAuth2 authentication.\n\nCloses #5", "opened", false,
-            "feature/oauth", "main",
+            334047L,
+            2,
+            "Implement OAuth authentication",
+            "This MR implements OAuth2 authentication.\n\nCloses #5",
+            "opened",
+            false,
+            "feature/oauth",
+            "main",
             "https://gitlab.lrz.de/hephaestustest/demo-repository/-/merge_requests/2",
-            "2026-01-31 19:03:54 +0100", "2026-01-31 19:03:56 +0100"
+            "2026-01-31 19:03:54 +0100",
+            "2026-01-31 19:03:56 +0100"
         );
     }
 
     private GitLabWebhookUser createUser() {
         return new GitLabWebhookUser(
-            18024L, "ga84xah", "Felix Dietrich",
-            "https://gitlab.lrz.de/uploads/-/system/user/avatar/18024/avatar.png", null
+            18024L,
+            "ga84xah",
+            "Felix Dietrich",
+            "https://gitlab.lrz.de/uploads/-/system/user/avatar/18024/avatar.png",
+            null
         );
     }
 
     private GitLabWebhookProject createProject() {
         return new GitLabWebhookProject(
-            246765L, "demo-repository",
-            "https://gitlab.lrz.de/hephaestustest/demo-repository", PROJECT_PATH
+            246765L,
+            "demo-repository",
+            "https://gitlab.lrz.de/hephaestustest/demo-repository",
+            PROJECT_PATH
         );
     }
 

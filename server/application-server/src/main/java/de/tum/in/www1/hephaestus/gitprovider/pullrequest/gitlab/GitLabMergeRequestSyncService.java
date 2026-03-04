@@ -368,9 +368,7 @@ public class GitLabMergeRequestSyncService {
         // Sync notes for this MR if it has comments and wasn't skipped
         if (pr != null && fields.userNotesCount() > 0) {
             try {
-                noteSyncService.syncNotesForMergeRequest(
-                    scopeId, repository, Integer.parseInt(fields.iid()), pr
-                );
+                noteSyncService.syncNotesForMergeRequest(scopeId, repository, Integer.parseInt(fields.iid()), pr);
             } catch (Exception e) {
                 log.warn("Note sync failed for MR: context={}", mrContext, e);
             }
