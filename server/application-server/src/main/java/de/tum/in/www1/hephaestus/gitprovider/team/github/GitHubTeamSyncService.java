@@ -305,7 +305,7 @@ public class GitHubTeamSyncService {
             // Resolve parent references now that all teams are persisted.
             // This two-pass approach ensures correct parentId even when a child
             // team appears before its parent in the GraphQL response.
-            resolveParentReferences(syncedTeamsByNativeId, parentNativeIdByChildNativeId, safeOrgLogin, provider);
+            resolveParentReferences(syncedTeamsByNativeId, parentNativeIdByChildNativeId, safeOrgLogin);
 
             // CRITICAL: Only remove stale teams if sync completed fully.
             // If sync was aborted (rate limit, error, pagination limit), we don't have
@@ -381,80 +381,52 @@ public class GitHubTeamSyncService {
     /**
      * Resolves parent team references after all teams have been persisted.
      * <p>
-     * The GitHub GraphQL API returns parentTeam.databaseId (the GitHub native ID),
-     * but our {@code team.parent_id} column must reference the internal auto-increment PK.
-     * This method translates native IDs to internal IDs using the in-memory map of
-     * synced teams, falling back to a database lookup for parents that were synced in
-     * a previous run.
-     * <p>
-     * Teams whose parent was removed in GitHub have their parentId cleared to null.
+     * The GitHub GraphQL API returns {@code parentTeam.databaseId} (the GitHub native ID),
+     * but our {@code team.parent_id} column references the internal auto-increment PK.
+     * This method translates native IDs to internal IDs using the in-memory map built
+     * during this sync, and clears stale parent references for teams whose parent was
+     * removed in GitHub.
      *
-     * @param syncedTeamsByNativeId      map of GitHub native ID → persisted Team
+     * @param syncedTeamsByNativeId         map of GitHub native ID → persisted Team
      * @param parentNativeIdByChildNativeId map of child native ID → parent native ID from GraphQL
-     * @param safeOrgLogin               sanitized org login for logging
-     * @param provider                   the Git provider entity for fallback lookups
+     * @param safeOrgLogin                  sanitized org login for logging
      */
     private void resolveParentReferences(
         Map<Long, Team> syncedTeamsByNativeId,
         Map<Long, Long> parentNativeIdByChildNativeId,
-        String safeOrgLogin,
-        GitProvider provider
+        String safeOrgLogin
     ) {
-        int resolved = 0;
-        int cleared = 0;
-        int failed = 0;
+        List<Team> changed = new ArrayList<>();
 
         for (Map.Entry<Long, Team> entry : syncedTeamsByNativeId.entrySet()) {
-            Long childNativeId = entry.getKey();
             Team child = entry.getValue();
-            Long parentNativeId = parentNativeIdByChildNativeId.get(childNativeId);
+            Long parentNativeId = parentNativeIdByChildNativeId.get(entry.getKey());
 
-            if (parentNativeId == null) {
-                // No parent in GraphQL response — clear any stale parent reference
-                if (child.getParentId() != null) {
-                    child.setParentId(null);
-                    teamRepository.save(child);
-                    cleared++;
+            // Determine the correct internal parent ID (null if no parent in GraphQL)
+            Long correctParentId = null;
+            if (parentNativeId != null) {
+                Team parent = syncedTeamsByNativeId.get(parentNativeId);
+                if (parent != null) {
+                    correctParentId = parent.getId();
+                } else {
+                    log.warn(
+                        "Parent team not found in current sync: child={}, parentNativeId={}, orgLogin={}",
+                        child.getName(),
+                        parentNativeId,
+                        safeOrgLogin
+                    );
                 }
-                continue;
             }
 
-            // Look up parent team: first from this sync's in-memory map, then from DB
-            Team parent = syncedTeamsByNativeId.get(parentNativeId);
-            if (parent == null) {
-                parent = teamRepository.findByNativeIdAndProviderId(parentNativeId, provider.getId()).orElse(null);
-            }
-
-            if (parent != null && parent.getId() != null) {
-                if (!parent.getId().equals(child.getParentId())) {
-                    child.setParentId(parent.getId());
-                    teamRepository.save(child);
-                    resolved++;
-                }
-            } else {
-                log.warn(
-                    "Could not resolve parent team: childTeam={}, parentNativeId={}, orgLogin={}",
-                    child.getName(),
-                    parentNativeId,
-                    safeOrgLogin
-                );
-                // Clear invalid parent reference rather than leaving stale data
-                if (child.getParentId() != null) {
-                    child.setParentId(null);
-                    teamRepository.save(child);
-                }
-                failed++;
+            if (!Objects.equals(correctParentId, child.getParentId())) {
+                child.setParentId(correctParentId);
+                changed.add(child);
             }
         }
 
-        if (resolved > 0 || cleared > 0 || failed > 0) {
-            log.info(
-                "Resolved parent team references: orgLogin={}, resolved={}, cleared={}, failed={}",
-                safeOrgLogin,
-                resolved,
-                cleared,
-                failed
-            );
+        if (!changed.isEmpty()) {
+            teamRepository.saveAll(changed);
+            log.info("Resolved parent team references: orgLogin={}, updated={}", safeOrgLogin, changed.size());
         }
     }
 
