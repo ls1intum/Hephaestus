@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.23.0](https://github.com/ls1intum/Hephaestus/compare/v0.22.0...v0.23.0) (2026-03-04)
+
+### 🚀 Features
+
+* **gitprovider:** GitLab sync — Labels & Milestones ([#795](https://github.com/ls1intum/Hephaestus/issues/795)) ([86839e3](https://github.com/ls1intum/Hephaestus/commit/86839e38d97d51b387eef6a554080e3302f69549))
+
 ## [0.22.0](https://github.com/ls1intum/Hephaestus/compare/v0.21.2...v0.22.0) (2026-03-04)
 
 ### 🚀 Features
