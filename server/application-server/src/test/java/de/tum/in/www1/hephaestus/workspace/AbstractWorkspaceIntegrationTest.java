@@ -48,6 +48,12 @@ public abstract class AbstractWorkspaceIntegrationTest extends BaseIntegrationTe
             .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com")));
     }
 
+    protected GitProvider ensureGitLabProvider() {
+        return gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITLAB, "https://gitlab.com")
+            .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITLAB, "https://gitlab.com")));
+    }
+
     protected User persistUser(String login) {
         GitProvider provider = ensureGitHubProvider();
         User user = new User();

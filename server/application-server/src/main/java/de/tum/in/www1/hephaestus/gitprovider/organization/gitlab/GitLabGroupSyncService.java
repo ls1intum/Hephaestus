@@ -305,6 +305,11 @@ public class GitLabGroupSyncService {
                     .toEntityList(GitLabProjectResponse.class);
 
                 for (GitLabProjectResponse project : projects) {
+                    if (project == null) {
+                        projectsSkipped++;
+                        log.debug("Skipped null project node in GraphQL response: groupPath={}", safeGroupPath);
+                        continue;
+                    }
                     try {
                         // Resolve the project's immediate parent group (may differ from top-level)
                         Organization projectOrg = resolveProjectOrganization(project, topLevelOrganization, providerId);

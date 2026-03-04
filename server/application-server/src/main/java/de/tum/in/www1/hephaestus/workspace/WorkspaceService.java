@@ -123,6 +123,27 @@ public class WorkspaceService {
         AccountType accountType,
         Long ownerUserId
     ) {
+        return createWorkspace(rawSlug, displayName, accountLogin, accountType, ownerUserId, null, null, null);
+    }
+
+    /**
+     * Creates a workspace with optional git provider configuration.
+     *
+     * <p>For GitLab workspaces, provide {@code gitProviderMode = GITLAB_PAT} along with the
+     * personal access token and optional server URL. The PAT is automatically encrypted
+     * at rest via {@link de.tum.in.www1.hephaestus.core.security.EncryptedStringConverter}.
+     */
+    @Transactional
+    public Workspace createWorkspace(
+        String rawSlug,
+        String displayName,
+        String accountLogin,
+        AccountType accountType,
+        Long ownerUserId,
+        Workspace.GitProviderMode gitProviderMode,
+        String personalAccessToken,
+        String serverUrl
+    ) {
         String slug = workspaceSlugService.normalize(rawSlug);
         workspaceSlugService.validate(slug);
 
@@ -137,6 +158,16 @@ public class WorkspaceService {
         workspace.setAccountLogin(accountLogin);
         workspace.setAccountType(accountType);
         workspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
+
+        if (gitProviderMode != null) {
+            workspace.setGitProviderMode(gitProviderMode);
+        }
+        if (personalAccessToken != null && !personalAccessToken.isBlank()) {
+            workspace.setPersonalAccessToken(personalAccessToken);
+        }
+        if (serverUrl != null && !serverUrl.isBlank()) {
+            workspace.setServerUrl(serverUrl.trim());
+        }
 
         try {
             Workspace saved = workspaceRepository.save(workspace);

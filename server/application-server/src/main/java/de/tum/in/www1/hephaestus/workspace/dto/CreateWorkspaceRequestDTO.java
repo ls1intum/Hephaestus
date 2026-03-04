@@ -1,13 +1,20 @@
 package de.tum.in.www1.hephaestus.workspace.dto;
 
+import de.tum.in.www1.hephaestus.core.security.ServerUrlValidator;
 import de.tum.in.www1.hephaestus.workspace.AccountType;
+import de.tum.in.www1.hephaestus.workspace.Workspace;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 
 /**
  * DTO for creating a new workspace.
+ *
+ * <p>Supports both GitHub and GitLab workspaces via the optional {@code gitProviderMode} field.
+ * When creating a GitLab workspace, {@code personalAccessToken} is required and
+ * {@code serverUrl} may be provided for self-hosted instances.
  */
 @Schema(description = "Request to create a new workspace")
 public record CreateWorkspaceRequestDTO(
@@ -33,17 +40,58 @@ public record CreateWorkspaceRequestDTO(
 
     @NotBlank(message = "Account login is required")
     @Schema(
-        description = "GitHub account login to associate with this workspace",
+        description = "Git provider account login (GitHub org/user or GitLab group path)",
         example = "my-org",
         requiredMode = Schema.RequiredMode.REQUIRED
     )
     String accountLogin,
 
     @NotNull(message = "Account type is required")
-    @Schema(description = "Type of GitHub account (USER or ORGANIZATION)", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(description = "Type of account (USER or ORG)", requiredMode = Schema.RequiredMode.REQUIRED)
     AccountType accountType,
 
     @NotNull(message = "Owner user ID is required")
     @Schema(description = "User ID of the workspace owner", requiredMode = Schema.RequiredMode.REQUIRED)
-    Long ownerUserId
-) {}
+    Long ownerUserId,
+
+    @Schema(
+        description = "Git provider authentication mode. Defaults to PAT_ORG (GitHub PAT) if not specified.",
+        example = "GITLAB_PAT"
+    )
+    Workspace.GitProviderMode gitProviderMode,
+
+    @Schema(
+        description = "Personal Access Token for GitLab API access. Required when gitProviderMode is GITLAB_PAT. Stored encrypted at rest.",
+        example = "glpat-xxxxxxxxxxxxxxxxxxxx"
+    )
+    String personalAccessToken,
+
+    @Schema(
+        description = "Custom server URL for self-hosted GitLab instances. Must use HTTPS. Defaults to https://gitlab.com if not specified.",
+        example = "https://gitlab.example.com"
+    )
+    String serverUrl
+) {
+    @AssertTrue(message = "Personal access token is required for GitLab PAT workspaces")
+    @Schema(hidden = true)
+    private boolean isTokenProvidedForGitLab() {
+        if (gitProviderMode == Workspace.GitProviderMode.GITLAB_PAT) {
+            return personalAccessToken != null && !personalAccessToken.isBlank();
+        }
+        return true;
+    }
+
+    @AssertTrue(message = "Server URL must use HTTPS and must not point to private/reserved addresses")
+    @Schema(hidden = true)
+    private boolean isServerUrlSafe() {
+        if (serverUrl == null || serverUrl.isBlank()) {
+            return true;
+        }
+        try {
+            ServerUrlValidator.validate(serverUrl);
+            return true;
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+    }
+}

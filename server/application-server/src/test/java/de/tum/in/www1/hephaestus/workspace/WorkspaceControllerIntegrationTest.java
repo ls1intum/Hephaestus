@@ -52,7 +52,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
     @Test
     @WithAdminUser
     void createWorkspaceWithInvalidPayloadReturnsValidationProblemDetail() {
-        var request = new CreateWorkspaceRequestDTO("INVALID SLUG", "", "", null, null);
+        var request = new CreateWorkspaceRequestDTO("INVALID SLUG", "", "", null, null, null, null, null);
 
         ProblemDetail problem = webTestClient
             .post()
@@ -83,7 +83,10 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             "Unauthenticated",
             "unauthenticated",
             AccountType.ORG,
-            owner.getId()
+            owner.getId(),
+            null,
+            null,
+            null
         );
 
         webTestClient
@@ -108,7 +111,10 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             "Mentor Space",
             "mentor-org",
             AccountType.ORG,
-            owner.getId()
+            owner.getId(),
+            null,
+            null,
+            null
         );
 
         webTestClient
@@ -134,7 +140,10 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             "Controller Space",
             "controller",
             AccountType.ORG,
-            owner.getId()
+            owner.getId(),
+            null,
+            null,
+            null
         );
 
         WorkspaceDTO created = webTestClient
@@ -435,7 +444,10 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             "Duplicate",
             "duplicate",
             AccountType.ORG,
-            owner.getId()
+            owner.getId(),
+            null,
+            null,
+            null
         );
 
         ProblemDetail problem = webTestClient

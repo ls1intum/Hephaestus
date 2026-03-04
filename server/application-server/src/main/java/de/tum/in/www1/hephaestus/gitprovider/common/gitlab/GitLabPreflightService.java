@@ -1,0 +1,201 @@
+package de.tum.in.www1.hephaestus.gitprovider.common.gitlab;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import de.tum.in.www1.hephaestus.core.security.ServerUrlValidator;
+import de.tum.in.www1.hephaestus.workspace.dto.GitLabGroupDTO;
+import de.tum.in.www1.hephaestus.workspace.dto.GitLabPreflightResponseDTO;
+import java.time.Duration;
+import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpHeaders;
+import org.springframework.stereotype.Service;
+import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
+
+/**
+ * Pre-creation validation service for GitLab workspace setup.
+ *
+ * <p>Validates PATs and lists accessible groups <b>before</b> a workspace entity exists.
+ * This service is always available (not gated by {@code hephaestus.gitlab.enabled})
+ * because it serves the workspace creation wizard, not sync operations.
+ *
+ * <h2>Token Validation Flow</h2>
+ * <ol>
+ *   <li>Try {@code GET /api/v4/user} — works for personal access tokens</li>
+ *   <li>If 401 and {@code groupFullPath} provided, try {@code GET /api/v4/groups/{path}}
+ *       — works for group/project access tokens</li>
+ *   <li>Return structured success/failure result</li>
+ * </ol>
+ *
+ * @see ServerUrlValidator for SSRF protection on user-provided server URLs
+ */
+@Service
+public class GitLabPreflightService {
+
+    private static final Logger log = LoggerFactory.getLogger(GitLabPreflightService.class);
+    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(10);
+
+    private final GitLabProperties gitLabProperties;
+    private final WebClient webClient;
+
+    public GitLabPreflightService(GitLabProperties gitLabProperties) {
+        this.gitLabProperties = gitLabProperties;
+        this.webClient = WebClient.builder().build();
+    }
+
+    /**
+     * Validates a GitLab PAT by attempting to authenticate against the GitLab API.
+     *
+     * @param token         the personal access token
+     * @param serverUrl     custom server URL (nullable, defaults to gitlab.com)
+     * @param groupFullPath optional group path for group/project token fallback
+     * @return validation result with user/group info on success, or error message on failure
+     */
+    public GitLabPreflightResponseDTO validateToken(String token, String serverUrl, String groupFullPath) {
+        String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
+
+        // Try personal token endpoint first
+        try {
+            GitLabUserResponse user = webClient
+                .get()
+                .uri(resolvedUrl + "/api/v4/user")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .retrieve()
+                .bodyToMono(GitLabUserResponse.class)
+                .block(REQUEST_TIMEOUT);
+
+            if (user != null && user.id() != null) {
+                log.info("GitLab preflight: token valid for user={}, serverUrl={}", user.username(), resolvedUrl);
+                return GitLabPreflightResponseDTO.success(user.username(), user.id());
+            }
+        } catch (WebClientResponseException e) {
+            int status = e.getStatusCode().value();
+            if (status == 401 || status == 403) {
+                log.debug("GitLab /api/v4/user returned {}: trying group fallback", status);
+            } else {
+                log.warn("GitLab /api/v4/user failed: status={}, serverUrl={}", status, resolvedUrl);
+                return GitLabPreflightResponseDTO.failure("GitLab API returned status " + status);
+            }
+        } catch (Exception e) {
+            log.warn("GitLab /api/v4/user failed: serverUrl={}, error={}", resolvedUrl, e.getMessage());
+            return GitLabPreflightResponseDTO.failure("Failed to connect to GitLab server: " + e.getMessage());
+        }
+
+        // Fallback: try group endpoint for group/project access tokens
+        if (groupFullPath != null && !groupFullPath.isBlank()) {
+            return validateGroupToken(token, resolvedUrl, groupFullPath.trim());
+        }
+
+        return GitLabPreflightResponseDTO.failure(
+            "Token is invalid or is a group/project token. Provide groupFullPath for group token validation."
+        );
+    }
+
+    private GitLabPreflightResponseDTO validateGroupToken(String token, String serverUrl, String groupFullPath) {
+        try {
+            GitLabGroupResponse group = webClient
+                .get()
+                .uri(serverUrl + "/api/v4/groups/{groupPath}", groupFullPath)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .retrieve()
+                .bodyToMono(GitLabGroupResponse.class)
+                .block(REQUEST_TIMEOUT);
+
+            if (group != null && group.id() != null) {
+                log.info("GitLab preflight: group token valid for group={}, serverUrl={}", group.fullPath(), serverUrl);
+                return GitLabPreflightResponseDTO.success(group.name(), group.id());
+            }
+        } catch (WebClientResponseException e) {
+            int status = e.getStatusCode().value();
+            if (status == 401 || status == 403) {
+                return GitLabPreflightResponseDTO.failure("Token does not have access to group: " + groupFullPath);
+            }
+            if (status == 404) {
+                return GitLabPreflightResponseDTO.failure("Group not found: " + groupFullPath);
+            }
+            return GitLabPreflightResponseDTO.failure("GitLab API returned status " + status);
+        } catch (Exception e) {
+            return GitLabPreflightResponseDTO.failure("Failed to validate group token: " + e.getMessage());
+        }
+
+        return GitLabPreflightResponseDTO.failure("Failed to validate group token");
+    }
+
+    /**
+     * Lists GitLab groups accessible to the provided PAT.
+     *
+     * @param token     the personal access token
+     * @param serverUrl custom server URL (nullable, defaults to gitlab.com)
+     * @return list of accessible groups
+     */
+    public List<GitLabGroupDTO> listAccessibleGroups(String token, String serverUrl) {
+        String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
+
+        List<GitLabGroupListItem> groups = webClient
+            .get()
+            .uri(resolvedUrl + "/api/v4/groups?min_access_level=10&per_page=100&order_by=name&sort=asc")
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+            .retrieve()
+            .bodyToFlux(GitLabGroupListItem.class)
+            .collectList()
+            .block(REQUEST_TIMEOUT);
+
+        if (groups == null) {
+            return List.of();
+        }
+
+        return groups
+            .stream()
+            .map(g -> new GitLabGroupDTO(g.id(), g.name(), g.fullPath(), g.avatarUrl(), g.webUrl(), g.visibility()))
+            .toList();
+    }
+
+    /**
+     * Resolves and validates the server URL, applying SSRF protections.
+     */
+    private String resolveAndValidateServerUrl(String serverUrl) {
+        if (serverUrl == null || serverUrl.isBlank()) {
+            return gitLabProperties.defaultServerUrl();
+        }
+
+        String trimmed = serverUrl.trim();
+        String normalized = trimmed.endsWith("/") ? trimmed.substring(0, trimmed.length() - 1) : trimmed;
+
+        // SSRF validation — throws IllegalArgumentException if unsafe
+        ServerUrlValidator.validate(normalized);
+
+        return normalized;
+    }
+
+    // ============ GitLab REST API Response Records ============
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record GitLabUserResponse(
+        Long id,
+        String username,
+        String name,
+        @JsonProperty("avatar_url") String avatarUrl,
+        @JsonProperty("web_url") String webUrl
+    ) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record GitLabGroupResponse(
+        Long id,
+        String name,
+        @JsonProperty("full_path") String fullPath,
+        @JsonProperty("avatar_url") String avatarUrl,
+        @JsonProperty("web_url") String webUrl
+    ) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record GitLabGroupListItem(
+        Long id,
+        String name,
+        @JsonProperty("full_path") String fullPath,
+        @JsonProperty("avatar_url") String avatarUrl,
+        @JsonProperty("web_url") String webUrl,
+        String visibility
+    ) {}
+}
