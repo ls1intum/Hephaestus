@@ -1,7 +1,8 @@
 query GetMergeRequestNotes($fullPath: ID!, $iid: String!, $first: Int!, $after: String) {
     project(fullPath: $fullPath) {
         mergeRequest(iid: $iid) {
-            notes(first: $first, after: $after) {
+            notes(first: $first, after: $after, filter: ONLY_COMMENTS) {
+                count
                 pageInfo {
                     hasNextPage
                     endCursor

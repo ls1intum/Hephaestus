@@ -308,11 +308,11 @@ class GitLabNoteMessageHandlerTest extends BaseUnitTest {
 
     private EmbeddedMergeRequest createEmbeddedMergeRequest() {
         return new EmbeddedMergeRequest(
-            422300L, 2, "Fix: login bug",
-            "Fixes the login bug", "opened", false,
-            "feature-branch", "main",
+            334047L, 2, "Implement OAuth authentication",
+            "This MR implements OAuth2 authentication.\n\nCloses #5", "opened", false,
+            "feature/oauth", "main",
             "https://gitlab.lrz.de/hephaestustest/demo-repository/-/merge_requests/2",
-            "2026-01-31 19:03:35 +0100", "2026-01-31 19:03:35 +0100"
+            "2026-01-31 19:03:54 +0100", "2026-01-31 19:03:56 +0100"
         );
     }
 

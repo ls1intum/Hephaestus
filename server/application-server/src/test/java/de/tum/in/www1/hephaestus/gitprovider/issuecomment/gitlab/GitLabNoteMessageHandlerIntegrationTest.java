@@ -65,10 +65,17 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
     private static final int ISSUE_IID = 5;
     private static final long NATIVE_USER_ID = 18024L;
     private static final long NATIVE_MR_NOTE_ID = 4406178L;
+    private static final long NATIVE_MR_ID = 334047L;
     private static final int MR_IID = 2;
 
     // Fixture values
     private static final String FIXTURE_NOTE_BODY = "I'll start working on this feature";
+    private static final String FIXTURE_NOTE_UPDATED_BODY =
+        "Updated: I'll start working on this feature - high priority\\!";
+    private static final String FIXTURE_MR_NOTE_BODY =
+        "LGTM\\! Just a minor suggestion: consider adding error handling.";
+    private static final String FIXTURE_MR_NOTE_UPDATED_BODY =
+        "Updated: Consider adding error handling here. Also add input validation.";
     private static final String FIXTURE_NOTE_URL =
         "https://gitlab.lrz.de/hephaestustest/demo-repository/-/issues/5#note_4406174";
     private static final String FIXTURE_AUTHOR_LOGIN = "ga84xah";
@@ -175,8 +182,7 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
                 IssueComment comment = comments.get(0);
                 assertThat(comment.getNativeId()).isEqualTo(NATIVE_NOTE_ID);
-                // Body should be updated to the fixture update value
-                assertThat(comment.getBody()).contains("Updated:");
+                assertThat(comment.getBody()).isEqualTo(FIXTURE_NOTE_UPDATED_BODY);
             });
 
             assertThat(eventListener.getUpdatedEvents()).hasSize(1);
@@ -200,10 +206,31 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
                 IssueComment comment = comments.get(0);
                 assertThat(comment.getNativeId()).isEqualTo(NATIVE_MR_NOTE_ID);
+                assertThat(comment.getBody()).isEqualTo(FIXTURE_MR_NOTE_BODY);
                 assertThat(comment.getIssue().getId()).isEqualTo(savedPr.getId());
             });
 
             assertThat(eventListener.getCreatedEvents()).hasSize(1);
+        }
+
+        @Test
+        @DisplayName("updates comment body on MR note update event")
+        void shouldUpdateCommentFromMrNoteUpdate() throws Exception {
+            handler.handleEvent(loadPayload("note.mergerequest.create"));
+            eventListener.clear();
+
+            handler.handleEvent(loadPayload("note.mergerequest.update"));
+
+            transactionTemplate.executeWithoutResult(status -> {
+                List<IssueComment> comments = commentRepository.findAll();
+                assertThat(comments).hasSize(1);
+
+                IssueComment comment = comments.get(0);
+                assertThat(comment.getNativeId()).isEqualTo(NATIVE_MR_NOTE_ID);
+                assertThat(comment.getBody()).isEqualTo(FIXTURE_MR_NOTE_UPDATED_BODY);
+            });
+
+            assertThat(eventListener.getUpdatedEvents()).hasSize(1);
         }
     }
 
@@ -353,11 +380,11 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
         // Pre-create PullRequest (IID 2) — parent for MR notes
         PullRequest pr = new PullRequest();
-        pr.setNativeId(422300L);
+        pr.setNativeId(NATIVE_MR_ID);
         pr.setProvider(savedProvider);
         pr.setNumber(MR_IID);
-        pr.setTitle("Fix: login bug");
-        pr.setBody("Fixes the login bug");
+        pr.setTitle("Implement OAuth authentication");
+        pr.setBody("This MR implements OAuth2 authentication.\n\nCloses #5");
         pr.setState(Issue.State.OPEN);
         pr.setHtmlUrl("https://gitlab.lrz.de/hephaestustest/demo-repository/-/merge_requests/2");
         pr.setMerged(false);
@@ -365,7 +392,7 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
         pr.setDeletions(0);
         pr.setChangedFiles(0);
         pr.setCommits(0);
-        pr.setHeadRefName("feature-branch");
+        pr.setHeadRefName("feature/oauth");
         pr.setBaseRefName("main");
         pr.setCreatedAt(Instant.now());
         pr.setUpdatedAt(Instant.now());

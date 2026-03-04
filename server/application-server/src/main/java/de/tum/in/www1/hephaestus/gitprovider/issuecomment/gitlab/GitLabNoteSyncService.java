@@ -88,8 +88,10 @@ public class GitLabNoteSyncService {
         }
 
         int totalSynced = 0;
+        int totalSkipped = 0;
         String cursor = null;
         int page = 0;
+        int reportedTotalCount = -1;
 
         try {
             do {
@@ -138,6 +140,17 @@ public class GitLabNoteSyncService {
 
                 graphQlClientProvider.recordSuccess();
 
+                if (page == 0) {
+                    try {
+                        Object countField = response.field(notesFieldPath + ".count").getValue();
+                        if (countField instanceof Number number) {
+                            reportedTotalCount = number.intValue();
+                        }
+                    } catch (Exception e) {
+                        log.debug("Could not extract note count: context={}", safeContext);
+                    }
+                }
+
                 @SuppressWarnings("rawtypes")
                 List nodesRaw = response.field(notesFieldPath + ".nodes").toEntityList(Map.class);
                 List<Map<String, Object>> nodes = (List<Map<String, Object>>) nodesRaw;
@@ -150,6 +163,8 @@ public class GitLabNoteSyncService {
                     try {
                         if (processNoteNode(noteNode, parent, providerId, scopeId)) {
                             totalSynced++;
+                        } else {
+                            totalSkipped++;
                         }
                     } catch (Exception e) {
                         log.warn(
@@ -187,8 +202,15 @@ public class GitLabNoteSyncService {
             log.error("Note sync failed: context={}", safeContext, e);
         }
 
+        if (reportedTotalCount >= 0 && totalSynced + totalSkipped < reportedTotalCount) {
+            log.warn(
+                "Note connection overflow detected: context={}, synced={}, skipped={}, reportedCount={}",
+                safeContext, totalSynced, totalSkipped, reportedTotalCount
+            );
+        }
+
         if (totalSynced > 0) {
-            log.debug("Synced {} notes: context={}", totalSynced, safeContext);
+            log.debug("Synced {} notes (skipped {}): context={}", totalSynced, totalSkipped, safeContext);
         }
 
         return totalSynced;
