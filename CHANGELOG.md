@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.21.0](https://github.com/ls1intum/Hephaestus/compare/v0.20.2...v0.21.0) (2026-03-04)
+
+### 🚀 Features
+
+* **gitprovider:** GitLab sync — Merge Request entity ([#782](https://github.com/ls1intum/Hephaestus/issues/782)) ([ea9a441](https://github.com/ls1intum/Hephaestus/commit/ea9a441a87a01d126e389b11e6430af652534945))
+
 ## [0.20.2](https://github.com/ls1intum/Hephaestus/compare/v0.20.1...v0.20.2) (2026-03-03)
 
 ### 🐛 Bug Fixes
