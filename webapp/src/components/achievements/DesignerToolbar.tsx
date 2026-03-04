@@ -120,12 +120,10 @@ export function DesignerToolbar({
 					</SelectTrigger>
 					<SelectContent>
 						<SelectItem value="achievement">Standard Achievement</SelectItem>
-						<SelectItem value="synthwave-neon">Synthwave (Neon)</SelectItem>
-						<SelectItem value="synthwave-rarity">Synthwave (Rarity)</SelectItem>
+						<SelectItem value="synthwave">Synthwave (Mono)</SelectItem>
 						<SelectItem value="equalizer-traveling">Equalizer (Traveling)</SelectItem>
 						<SelectItem value="equalizer-static">Equalizer (Static)</SelectItem>
-						<SelectItem value="equalizer-traveling-mono">Equalizer (Traveling Mono)</SelectItem>
-						<SelectItem value="equalizer-static-mono">Equalizer (Static Mono)</SelectItem>
+						<SelectItem value="equalizer-chain">Equalizer (Chain)</SelectItem>
 					</SelectContent>
 				</Select>
 			</div>

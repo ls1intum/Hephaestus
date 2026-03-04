@@ -68,7 +68,7 @@ export function SkillTreeDesigner({ user, allDefinitions }: SkillTreeDesignerPro
 	const [isDraggable, setIsDraggable] = useState(true);
 	const [isSnapping, setIsSnapping] = useState(true);
 	const [showTooltips, setShowTooltips] = useState(true);
-	const [edgeDisplayMode, setEdgeDisplayMode] = useState<EdgeDisplayMode>("achievement");
+	const [edgeDisplayMode, setEdgeDisplayMode] = useState<EdgeDisplayMode>("equalizer-static");
 
 	const [snapSize, setSnapSize] = useState<SnapGridSize>(24);
 

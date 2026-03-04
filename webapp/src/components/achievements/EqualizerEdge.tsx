@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 export type EqualizerVariant = "traveling" | "static";
 
 export type EqualizerEdge = Edge<
-	{ isEnabled: boolean; variant?: EqualizerVariant; monochrome?: boolean },
+	{ isEnabled: boolean; variant?: EqualizerVariant; depth?: number; maxDepth?: number },
 	"equalizer"
 >;
 
@@ -14,14 +14,17 @@ const MAX_DISPLACEMENT = 18;
 /** Global speed factor for wave animations and traveling pulses. Higher = faster. */
 const ANIMATION_SPEED_FACTOR = 0.5;
 
+/** Duration of an active outburst cycle for static equalizer (in seconds) */
+const STATIC_BURST_DURATION = 2.0;
+
+/** Cooldown between static equalizer outbursts (in seconds) */
+const STATIC_BURST_COOLDOWN = 0.8;
+
 /**
  * Normalizes and "squeezes" displacement so it approaches MAX_DISPLACEMENT
  * without hard-clamping (avoiding flat plateaus).
  */
 function softLimit(value: number, limit: number): number {
-	// A simple saturation curve: limit * tanh(value / limit)
-	// Since JS doesn't have Math.tanh (available in most envs but just in case),
-	// we use: (exp(2x)-1)/(exp(2x)+1) or a simple rational approximation:
 	const x = value / limit;
 	const squeezed = x / (1 + Math.abs(x));
 	return squeezed * limit;
@@ -29,16 +32,6 @@ function softLimit(value: number, limit: number): number {
 
 /**
  * Compute an SVG path for a straight line with a localized, traveling audio-wave burst.
- *
- * @param sx            source X
- * @param sy            source Y
- * @param tx            target X
- * @param ty            target Y
- * @param pulsePosition relative position of the burst center (0 = start, 1 = end)
- * @param timePhase     continuously increasing time for inner wave animation
- * @param seedOffset    phase shift to allow multiple layered waves to look distinct
- * @param amplitudeMult scales the height of the burst
- * @param steps         polyline resolution
  */
 function getTravelingWavePath(
 	sx: number,
@@ -55,10 +48,8 @@ function getTravelingWavePath(
 	const dy = ty - sy;
 	const len = Math.sqrt(dx * dx + dy * dy);
 
-	// Fallback to straight line if too short
 	if (len < 5) return `M ${sx} ${sy} L ${tx} ${ty}`;
 
-	// Unit normal vector perpendicular to the edge
 	const nx = -dy / len;
 	const ny = dx / len;
 
@@ -69,25 +60,21 @@ function getTravelingWavePath(
 		const px = sx + dx * t;
 		const py = sy + dy * t;
 
-		// Convert relative progress to absolute pixel distance
 		const absPos = t * len;
 		const absCenter = pulsePosition * len;
 		const distFromCenter = Math.abs(absPos - absCenter);
 
-		// Envelope: Gaussian bell curve, ~40px wide regardless of edge length
 		const envelope = Math.exp(-((distFromCenter / 20) ** 2));
 
 		let waveDisp = 0;
 		if (envelope > 0.01) {
-			// Rapid audio-like frequencies creating chaotic interference
 			const primary = Math.sin(absPos * 0.3 - timePhase * 15 + seedOffset * 10);
 			const secondary = Math.sin(absPos * 0.7 + timePhase * 25 + seedOffset * 20) * 0.5;
 			const noise = Math.sin(absPos * 1.5 - timePhase * 40 + seedOffset * 30) * 0.25;
 
 			const waveForm = primary + secondary + noise;
-			const maxAmp = 12 * amplitudeMult; // Max pixel peak displacement
+			const maxAmp = 12 * amplitudeMult;
 			const rawDisp = envelope * waveForm * maxAmp;
-			// Final displacement: soft limit to avoid flat plateaus
 			waveDisp = softLimit(rawDisp, MAX_DISPLACEMENT);
 		}
 
@@ -101,7 +88,7 @@ function getTravelingWavePath(
 }
 
 /**
- * Compute an SVG path for a straight line with a static equalizer wave that pulses
+ * Compute an SVG path for a static equalizer wave that pulses
  * randomly across the whole line based on a chaotic noise generator.
  */
 function getStaticWavePath(
@@ -113,6 +100,7 @@ function getStaticWavePath(
 	seedOffset: number,
 	amplitudeMult = 1.0,
 	steps = 100,
+	minEnergy = 0,
 ): string {
 	const dx = tx - sx;
 	const dy = ty - sy;
@@ -124,28 +112,28 @@ function getStaticWavePath(
 	const ny = dx / len;
 
 	const parts: string[] = [];
-
-	// Pseudo-random outbursts using multiplied uneven sine waves.
-	// By mixing sine waves with prime-number frequencies, the pattern takes a very long time to repeat.
 	const tScale = timePhase * 0.4 + seedOffset;
 
-	// Helper to generate isolated chaotic bursts. Returns 0 most of the time, and a curve up to ~1 during bursts.
 	const getBurst = (t: number, s1: number, s2: number, s3: number, sharpness: number) => {
 		const noise = Math.sin(t * s1) * Math.sin(t * s2) * Math.sin(t * s3);
 		return Math.abs(noise) ** sharpness;
 	};
 
-	// Low freq band outbursts (wider peaks, slightly more frequent)
 	const lowBurst = getBurst(tScale, 1.1, 1.7, 2.3, 3);
-	// Mid freq band outbursts (punchier, medium occurrence)
 	const midBurst = getBurst(tScale, 1.3, 1.9, 2.9, 5);
-	// High freq band outbursts (razor sharp peaks, more sporadic)
 	const highBurst = getBurst(tScale, 1.5, 2.1, 3.1, 8);
 
-	// Apply some chaotic cross-talk so when one band peaks heavily, the others react slightly
-	const low = lowBurst + midBurst * 0.1 + highBurst * 0.05;
+	let low = lowBurst + midBurst * 0.1 + highBurst * 0.05;
 	const mid = midBurst + lowBurst * 0.2 + highBurst * 0.1;
 	const high = highBurst + midBurst * 0.2 + lowBurst * 0.05;
+
+	// Ensure at least some movement if minEnergy floor is provided
+	if (minEnergy > 0) {
+		const total = low + mid + high;
+		if (total < minEnergy) {
+			low += minEnergy - total;
+		}
+	}
 
 	for (let i = 0; i <= steps; i++) {
 		const t = i / steps;
@@ -153,7 +141,6 @@ function getStaticWavePath(
 		const py = sy + dy * t;
 
 		const absPos = t * len;
-		// envelope so it ends cleanly at the nodes
 		const envelope = Math.sin(t * Math.PI);
 		const envSq = envelope * envelope;
 
@@ -166,7 +153,6 @@ function getStaticWavePath(
 			const maxAmp = 15 * amplitudeMult;
 			const waveForm = lowWave * low + midWave * mid + highWave * high;
 			const rawDisp = envSq * waveForm * maxAmp;
-			// Final displacement: soft limit to avoid flat plateaus
 			waveDisp = softLimit(rawDisp, MAX_DISPLACEMENT);
 		}
 
@@ -183,13 +169,9 @@ export function EqualizerEdge(props: EdgeProps<EqualizerEdge>) {
 	const { sourceX, sourceY, targetX, targetY, data, id } = props;
 	const isEnabled = data?.isEnabled ?? false;
 	const variant: EqualizerVariant = data?.variant ?? "traveling";
-	const monochrome = data?.monochrome ?? false;
 
-	// Use the edge ID as a stable seed for randomization so different edges
-	// have different outburst patterns and traveling offsets.
 	const seedRef = useRef<number>(0);
 	if (seedRef.current === 0) {
-		// Simple hash of the ID string to get a stable number
 		let hash = 0;
 		for (let i = 0; i < id.length; i++) {
 			hash = (hash << 5) - hash + id.charCodeAt(i);
@@ -207,7 +189,7 @@ export function EqualizerEdge(props: EdgeProps<EqualizerEdge>) {
 
 		const animate = (now: number) => {
 			if (prevTimeRef.current === 0) prevTimeRef.current = now;
-			const delta = (now - prevTimeRef.current) * 0.001; // in seconds
+			const delta = (now - prevTimeRef.current) * 0.001;
 			prevTimeRef.current = now;
 
 			setTime((t) => t + delta * ANIMATION_SPEED_FACTOR);
@@ -222,7 +204,6 @@ export function EqualizerEdge(props: EdgeProps<EqualizerEdge>) {
 		};
 	}, [isEnabled]);
 
-	// Inactive: render a simple straight dotted or muted line
 	if (!isEnabled) {
 		return (
 			<path
@@ -234,20 +215,61 @@ export function EqualizerEdge(props: EdgeProps<EqualizerEdge>) {
 		);
 	}
 
-	// Pulse travels from -0.2 (before start) to 1.2 (past end) over 3 seconds.
-	const cycleTime = time % 3;
-	const pulsePosition = (cycleTime / 3) * 1.4 - 0.2;
+	// Always use monochromatic styling
+	const baseStroke = "var(--edge-active)";
+	const baseWidth = 3;
 
-	// Theme / monochrome styling applied based on props
-	const baseStroke = monochrome ? "var(--edge-active)" : "var(--edge-active)";
-	const baseWidth = monochrome ? 3 : 1.5; // Bigger static connection line
+	const layer1Stroke = "var(--foreground)";
+	const layer1Width = 1.0;
 
-	const layer1Stroke = monochrome ? "var(--foreground)" : "oklch(0.82 0.18 195)";
-	const layer1Width = monochrome ? 1.0 : 1.8; // Thinner dark/white lines
+	const layer2Stroke = "var(--foreground)";
+	const layer2Width = 0.6;
+	const layer2Opacity = 0.7;
 
-	const layer2Stroke = monochrome ? "var(--foreground)" : "oklch(0.72 0.25 340)";
-	const layer2Width = monochrome ? 0.6 : 1.4; // Even thinner offset layer
-	const layer2Opacity = monochrome ? 0.7 : 1.0;
+	// Pulse and Static timing logic
+	let pulsePosition = -1; // Specific to traveling wave
+	let chainEnvelope = 1.0; // Global multiplier for any outburst
+
+	if (data?.depth !== undefined) {
+		// Chain variant: Every level takes 1.0 seconds.
+		// Cycle restarts as soon as the last level is done.
+		// maxDepth of 3 means depth 0, 1, 2, 3.
+		// Start times: 0, 1, 2, 3. End time of 3 is 4.2.
+		const maxD = data.maxDepth ?? 8;
+		const cycleDuration = maxD + 1.2;
+		const globalPulseTime = time % cycleDuration;
+		const startTime = data.depth;
+		const duration = 1.2;
+		const endTime = startTime + duration;
+
+		if (globalPulseTime >= startTime && globalPulseTime <= endTime) {
+			const progress = (globalPulseTime - startTime) / duration;
+			pulsePosition = progress * 1.4 - 0.2;
+			// Bell curve for static outbursts so they fade in/out during their "turn"
+			// Use a steeper curve so it looks punchy
+			chainEnvelope = Math.sin(progress * Math.PI);
+		} else {
+			chainEnvelope = 0;
+		}
+	} else if (variant === "static") {
+		// Static variant: Burst for duration, then wait for cooldown.
+		// Shift by seed so everything isn't pulsating at once.
+		const cycle = STATIC_BURST_DURATION + STATIC_BURST_COOLDOWN;
+		const localTime = (time + seedRef.current * 0.77) % cycle;
+
+		if (localTime < STATIC_BURST_DURATION) {
+			const progress = localTime / STATIC_BURST_DURATION;
+			// Smooth pulse curve
+			chainEnvelope = Math.sin(progress * Math.PI);
+		} else {
+			chainEnvelope = 0;
+		}
+	} else {
+		// Normal traveling variant: Traveling pulse runs every 3 seconds, Static is always active.
+		const cycleTime = time % 3;
+		pulsePosition = (cycleTime / 3) * 1.4 - 0.2;
+		chainEnvelope = 1.0;
+	}
 
 	return (
 		<>
@@ -271,9 +293,19 @@ export function EqualizerEdge(props: EdgeProps<EqualizerEdge>) {
 								pulsePosition,
 								time,
 								seedRef.current + 1,
-								1.0,
+								chainEnvelope,
 							)
-						: getStaticWavePath(sourceX, sourceY, targetX, targetY, time, seedRef.current + 1, 1.0)
+						: getStaticWavePath(
+								sourceX,
+								sourceY,
+								targetX,
+								targetY,
+								time,
+								seedRef.current + 1,
+								chainEnvelope,
+								100,
+								data?.depth !== undefined ? 0.4 : 0,
+							)
 				}
 				stroke={layer1Stroke}
 				strokeWidth={layer1Width}
@@ -281,7 +313,6 @@ export function EqualizerEdge(props: EdgeProps<EqualizerEdge>) {
 				strokeLinecap="round"
 				strokeLinejoin="round"
 			/>
-
 			{/* 3. Equalizer burst - Layer 2 */}
 			<path
 				d={
@@ -294,9 +325,19 @@ export function EqualizerEdge(props: EdgeProps<EqualizerEdge>) {
 								pulsePosition,
 								time,
 								seedRef.current + 2,
-								0.65,
+								chainEnvelope * 0.65,
 							)
-						: getStaticWavePath(sourceX, sourceY, targetX, targetY, time, seedRef.current + 2, 0.65)
+						: getStaticWavePath(
+								sourceX,
+								sourceY,
+								targetX,
+								targetY,
+								time,
+								seedRef.current + 2,
+								chainEnvelope * 0.65,
+								100,
+								data?.depth !== undefined ? 0.4 : 0,
+							)
 				}
 				stroke={layer2Stroke}
 				strokeWidth={layer2Width}

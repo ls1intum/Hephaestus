@@ -60,12 +60,10 @@ export function enhanceAchievements(achievements: Achievement[]): UIAchievement[
 
 export type EdgeDisplayMode =
 	| "achievement"
-	| "synthwave-neon"
-	| "synthwave-rarity"
+	| "synthwave"
 	| "equalizer-traveling"
 	| "equalizer-static"
-	| "equalizer-traveling-mono"
-	| "equalizer-static-mono";
+	| "equalizer-chain";
 
 export type AnyAchievementEdge = AchievementEdge | SynthwaveEdge | EqualizerEdge;
 
@@ -85,7 +83,7 @@ export function generateSkillTreeData(
 		leaguePoints: number;
 	},
 	achievements: UIAchievement[] = [],
-	edgeDisplayMode: EdgeDisplayMode = "achievement",
+	edgeDisplayMode: EdgeDisplayMode = "equalizer-static",
 ): {
 	nodes: (AchievementNode | AvatarNode)[];
 	edges: AnyAchievementEdge[];
@@ -118,29 +116,52 @@ export function generateSkillTreeData(
 	// Process all categories
 	const processedEdges: AnyAchievementEdge[] = [];
 
+	// Track the absolute max depth found in the tree
+	let maxTreeDepth = 0;
+	const nodeDepths = new Map<string, number>();
+	const getNodeDepth = (id: any): number => {
+		if (nodeDepths.has(id as string)) return nodeDepths.get(id as string)!;
+		const ach = achievementMap.get(id);
+		if (!ach || ach.parent === undefined) {
+			nodeDepths.set(id as string, 0);
+			return 0;
+		}
+		const depth = getNodeDepth(ach.parent) + 1;
+		nodeDepths.set(id as string, depth);
+		if (depth > maxTreeDepth) maxTreeDepth = depth;
+		return depth;
+	};
+
 	// Helper to generate edge props with explicit type verification
-	const getEdgeConfig = (isEnabled: boolean, mode: EdgeDisplayMode): Pick<AnyAchievementEdge, "type" | "data"> => {
-		if (mode.startsWith("synthwave")) {
-			const variant = mode.replace("synthwave-", "") as "neon" | "rarity";
+	const getEdgeConfig = (
+		isEnabled: boolean,
+		mode: EdgeDisplayMode,
+		depth: number,
+		maxDepth: number,
+	): Pick<AnyAchievementEdge, "type" | "data"> => {
+		if (mode === "synthwave") {
 			return {
 				type: "synthwave",
-				data: {
-					isEnabled,
-					variant,
-				},
+				data: { isEnabled },
 			};
 		}
 
 		if (mode.startsWith("equalizer")) {
-			const parts = mode.replace("equalizer-", "").split("-");
-			const variant = parts[0] as "traveling" | "static";
-			const monochrome = parts.includes("mono");
+			// Extract variant from mode
+			let variant: "traveling" | "static" = "traveling";
+			if (mode === "equalizer-static") {
+				variant = "static";
+			} else if (mode === "equalizer-chain") {
+				variant = "static"; // Chain now uses the static outbursts but with depth-based timing
+			}
+
 			return {
 				type: "equalizer",
 				data: {
 					isEnabled,
 					variant,
-					monochrome,
+					depth: mode === "equalizer-chain" ? depth : undefined,
+					maxDepth: mode === "equalizer-chain" ? maxDepth : undefined,
 				},
 			};
 		}
@@ -184,7 +205,8 @@ export function generateSkillTreeData(
 				if (parent) {
 					// Active only when both parent and child are unlocked
 					const isActive = parent.status === "unlocked" && achievement.status === "unlocked";
-					const config = getEdgeConfig(isActive, edgeDisplayMode);
+					const edgeDepth = getNodeDepth(achievement.parent) + 1;
+					const config = getEdgeConfig(isActive, edgeDisplayMode, edgeDepth, maxTreeDepth);
 					processedEdges.push({
 						id: `${achievement.parent}-${achievement.id}-edge`,
 						source: `${achievement.parent}-node`,
@@ -194,7 +216,7 @@ export function generateSkillTreeData(
 				}
 			} else {
 				// Root-level achievements connect to the central avatar
-				const config = getEdgeConfig(achievement.status === "unlocked", edgeDisplayMode);
+				const config = getEdgeConfig(achievement.status === "unlocked", edgeDisplayMode, 0, maxTreeDepth);
 				processedEdges.push({
 					id: `avatar-${achievement.id}-edge`,
 					source: avatarNode.id,
