@@ -4,7 +4,13 @@ import { useState } from "react";
 import type { UIAchievement } from "@/components/achievements/types.ts";
 import { cn } from "@/lib/utils";
 import { AchievementTooltip } from "./AchievementTooltip.tsx";
-import { rarityIconSizes, raritySizes, rarityStylingClasses, statusBackgrounds } from "./styles.ts";
+import {
+	mythicBackgroundVars,
+	rarityIconSizes,
+	raritySizes,
+	rarityStylingClasses,
+	statusBackgrounds,
+} from "./styles.ts";
 
 export type AchievementNode = Node<
 	{ achievement: UIAchievement; showTooltips?: boolean; className?: string },
@@ -30,6 +36,7 @@ export function AchievementNode({ data }: NodeProps<AchievementNode>) {
 	const { achievement } = data;
 	const [isHovered, setIsHovered] = useState(false);
 	const Icon = achievement.icon;
+	const isMythic = achievement.rarity === "mythic";
 
 	return (
 		<div>
@@ -43,12 +50,18 @@ export function AchievementNode({ data }: NodeProps<AchievementNode>) {
 				<button
 					type="button"
 					className={cn(
-						"relative flex items-center justify-center rounded-full transition-all duration-300 cursor-pointer",
+						"relative flex items-center justify-center transition-all duration-300 cursor-pointer",
+						!isMythic && "rounded-full",
 						raritySizes[achievement.rarity],
-						statusBackgrounds[achievement.status],
+						!isMythic && statusBackgrounds[achievement.status],
 						rarityStylingClasses[achievement.rarity],
 						isHovered && achievement.status !== "locked" && "scale-110",
 					)}
+					style={
+						isMythic
+							? ({ "--mythic-bg": mythicBackgroundVars[achievement.status] } as React.CSSProperties)
+							: undefined
+					}
 					onMouseEnter={() => setIsHovered(true)}
 					onMouseLeave={() => setIsHovered(false)}
 					aria-label={`Achievement: ${achievement.name}`}

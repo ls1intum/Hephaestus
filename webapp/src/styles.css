@@ -255,6 +255,7 @@ code {
   --color-rarity-legendary: var(--rarity-legendary);
   --color-rarity-mythic-from: var(--rarity-mythic-from);
   --color-rarity-mythic-to: var(--rarity-mythic-to);
+  --color-rarity-mythic-to: var(--rarity-mythic-to);
 }
 
 @layer base {
@@ -403,22 +404,22 @@ code {
 
 /* ===== Achievement Rarity Animations ===== */
 
-/* Legendary: subtle pulsing glow */
-@keyframes legendary-pulse {
+/* Legendary: color pulse (glow-free and flat) */
+@keyframes legendary-color-pulse {
   0%,
   100% {
-    box-shadow:
-      0 0 10px var(--rarity-legendary),
-      0 0 24px color-mix(in oklch, var(--rarity-legendary) 40%, transparent);
+    border-color: #fbbf24; /* amber-400 */
   }
   50% {
-    box-shadow:
-      0 0 18px var(--rarity-legendary),
-      0 0 40px color-mix(in oklch, var(--rarity-legendary) 50%, transparent);
+    border-color: var(--rarity-legendary);
   }
 }
 
-/* Mythic: rotating conic-gradient border via pseudo-element */
+.legendary-pulse-anim {
+  animation: legendary-color-pulse 3s ease-in-out infinite;
+}
+
+/* Mythic: shadow-free rotating conic-gradient via clip-path for Hexagon shape */
 @property --mythic-angle {
   syntax: "<angle>";
   initial-value: 0deg;
@@ -431,27 +432,36 @@ code {
   }
 }
 
-.achievement-mythic-border {
+.achievement-mythic-hexagon {
   position: relative;
+  /* Clip the entire outer button into a perfect mathematical hexagon */
+  clip-path: polygon(50% 0%, 93.301% 25%, 93.301% 75%, 50% 100%, 6.699% 75%, 6.699% 25%);
+  background-color: transparent !important; /* handled by inner pseudo-element */
+  border: none !important;
 }
 
-.achievement-mythic-border::before {
+/* The spinning border (full size) */
+.achievement-mythic-hexagon::before {
   content: "";
   position: absolute;
-  inset: -4px;
-  border-radius: 9999px;
-  background: conic-gradient(
+  inset: 0;
+  background-image: conic-gradient(
     from var(--mythic-angle),
     var(--rarity-mythic-from),
     var(--rarity-mythic-to),
     var(--rarity-mythic-from)
   );
   animation: mythic-rotate 3s linear infinite;
-  z-index: -1;
+  z-index: -2;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .achievement-mythic-border::before {
-    animation: none !important;
-  }
+/* The inner solid fill (smaller size, inset 4px creates the border track) */
+.achievement-mythic-hexagon::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  background-color: var(--mythic-bg);
+  /* Clip the inner background to perfectly match the outer geometry */
+  clip-path: polygon(50% 0%, 93.301% 25%, 93.301% 75%, 50% 100%, 6.699% 75%, 6.699% 25%);
+  z-index: -1;
 }

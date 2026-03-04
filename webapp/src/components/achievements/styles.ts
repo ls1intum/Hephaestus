@@ -124,10 +124,10 @@ export const rarityIconSizes = {
 export const rarityStylingClasses = {
 	common: "border-2 border-rarity-common",
 	uncommon: "border-3 border-rarity-uncommon",
-	rare: "border-3 border-rarity-rare shadow-[0_0_12px_var(--rarity-rare)]",
-	epic: "border-3 border-rarity-epic shadow-[0_0_16px_var(--rarity-epic),0_0_32px_color-mix(in_oklch,var(--rarity-epic)_30%,transparent)]",
-	legendary: "border-4 border-rarity-legendary animate-[legendary-pulse_30s_ease-in-out_infinite]",
-	mythic: "border-4 border-transparent bg-clip-padding achievement-mythic-border",
+	rare: "border-2 border-rarity-rare ring-1 ring-rarity-rare ring-offset-1 ring-offset-background",
+	epic: "border-2 border-rarity-epic ring-2 ring-rarity-epic ring-offset-2 ring-offset-background",
+	legendary: "border-4 legendary-pulse-anim ring-2 ring-rarity-legendary",
+	mythic: "achievement-mythic-hexagon",
 } as const satisfies Record<AchievementRarity, string>;
 
 /**
@@ -143,6 +143,17 @@ export const statusBackgrounds = {
 	available: "bg-node-available",
 	unlocked: "bg-node-unlocked",
 	hidden: "bg-node-locked",
+} as const satisfies Record<AchievementStatus, string>;
+
+/**
+ * CSS Custom properties for the Mythic Hexagon's inner solid fill.
+ * Maps status perfectly to the CSS variable used by Tailwind.
+ */
+export const mythicBackgroundVars = {
+	locked: "var(--node-locked)",
+	available: "var(--node-available)",
+	unlocked: "var(--node-unlocked)",
+	hidden: "var(--node-locked)",
 } as const satisfies Record<AchievementStatus, string>;
 
 // ===== Achievement Status Styling ===== //

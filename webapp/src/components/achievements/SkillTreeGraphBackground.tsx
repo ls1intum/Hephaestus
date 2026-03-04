@@ -53,27 +53,21 @@ export function SkillTreeGraphBackground({ showAxes = false }: SkillTreeGraphBac
 							className="text-primary/30"
 						/>
 						{/* Origin dot */}
-						<circle
-							cx="10000"
-							cy="10000"
-							r="4"
-							fill="currentColor"
-							className="text-primary/60"
-						/>
+						<circle cx="10000" cy="10000" r="4" fill="currentColor" className="text-primary/60" />
 					</svg>
 				)}
 
 				{/* Decorative rings scaling outwardly from origin (only in non-designer / regular view) */}
 				{!showAxes && (
 					<>
-						<div className="w-[100px] h-[100px] rounded-full border border-primary/20 absolute -translate-x-1/2 -translate-y-1/2" />
-						<div className="w-[150px] h-[150px] rounded-full border border-primary/20 absolute -translate-x-1/2 -translate-y-1/2" />
-						<div className="w-[200px] h-[200px] rounded-full border border-primary/20 absolute -translate-x-1/2 -translate-y-1/2" />
-						<div className="w-[250px] h-[250px] rounded-full border border-primary/10 absolute -translate-x-1/2 -translate-y-1/2" />
-						<div className="w-[300px] h-[300px] rounded-full border border-primary/10 absolute -translate-x-1/2 -translate-y-1/2" />
-						<div className="w-[375px] h-[375px] rounded-full border border-primary/10 absolute -translate-x-1/2 -translate-y-1/2" />
-						<div className="w-[450px] h-[450px] rounded-full border border-primary/5 absolute -translate-x-1/2 -translate-y-1/2" />
-						<div className="w-[525px] h-[525px] rounded-full border border-primary/5 absolute -translate-x-1/2 -translate-y-1/2" />
+						<div className="w-20 h-20 rounded-full border border-primary/20 absolute" />
+						<div className="w-40 h-40 rounded-full border border-primary/20 absolute" />
+						<div className="w-60 h-60 rounded-full border border-primary/20 absolute" />
+						<div className="w-80 h-80 rounded-full border border-primary/10 absolute" />
+						<div className="w-100 h-100 rounded-full border border-primary/10 absolute" />
+						<div className="w-120 h-120 rounded-full border border-primary/10 absolute" />
+						<div className="w-140 h-140 rounded-full border border-primary/5 absolute" />
+						<div className="w-160 h-160 rounded-full border border-primary/5 absolute" />
 					</>
 				)}
 
