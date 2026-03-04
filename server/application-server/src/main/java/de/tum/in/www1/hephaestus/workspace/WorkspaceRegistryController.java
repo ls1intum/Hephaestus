@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.workspace;
 
-import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabPreflightService;
 import de.tum.in.www1.hephaestus.workspace.dto.CreateWorkspaceRequestDTO;
 import de.tum.in.www1.hephaestus.workspace.dto.GitLabGroupDTO;
 import de.tum.in.www1.hephaestus.workspace.dto.GitLabPreflightRequestDTO;
@@ -52,16 +51,7 @@ public class WorkspaceRegistryController {
     public ResponseEntity<WorkspaceDTO> createWorkspace(
         @Valid @RequestBody CreateWorkspaceRequestDTO createWorkspaceRequest
     ) {
-        Workspace workspace = workspaceService.createWorkspace(
-            createWorkspaceRequest.workspaceSlug(),
-            createWorkspaceRequest.displayName(),
-            createWorkspaceRequest.accountLogin(),
-            createWorkspaceRequest.accountType(),
-            createWorkspaceRequest.ownerUserId(),
-            createWorkspaceRequest.gitProviderMode(),
-            createWorkspaceRequest.personalAccessToken(),
-            createWorkspaceRequest.serverUrl()
-        );
+        Workspace workspace = workspaceService.createWorkspace(createWorkspaceRequest);
 
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()
             .path("/{workspaceSlug}")

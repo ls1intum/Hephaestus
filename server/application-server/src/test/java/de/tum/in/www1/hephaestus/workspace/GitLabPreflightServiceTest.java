@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.gitprovider.common.gitlab;
+package de.tum.in.www1.hephaestus.workspace;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -9,6 +9,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import de.tum.in.www1.hephaestus.workspace.dto.GitLabGroupDTO;
 import de.tum.in.www1.hephaestus.workspace.dto.GitLabPreflightResponseDTO;

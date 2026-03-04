@@ -1,8 +1,9 @@
-package de.tum.in.www1.hephaestus.gitprovider.common.gitlab;
+package de.tum.in.www1.hephaestus.workspace;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import de.tum.in.www1.hephaestus.core.security.ServerUrlValidator;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.workspace.dto.GitLabGroupDTO;
 import de.tum.in.www1.hephaestus.workspace.dto.GitLabPreflightResponseDTO;
 import java.time.Duration;

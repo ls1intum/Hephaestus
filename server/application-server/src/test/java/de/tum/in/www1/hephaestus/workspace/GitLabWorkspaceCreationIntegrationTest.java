@@ -321,14 +321,16 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
     void gitLabWorkspaceLifecycleSuspendAndPurgeWorkCorrectly() {
         User owner = persistUser("lifecycle-owner");
         Workspace workspace = workspaceService.createWorkspace(
-            "gitlab-lifecycle",
-            "Lifecycle Test",
-            "lifecycle-group",
-            AccountType.ORG,
-            owner.getId(),
-            Workspace.GitProviderMode.GITLAB_PAT,
-            "glpat-lifecycle-token",
-            null
+            new CreateWorkspaceRequestDTO(
+                "gitlab-lifecycle",
+                "Lifecycle Test",
+                "lifecycle-group",
+                AccountType.ORG,
+                owner.getId(),
+                Workspace.GitProviderMode.GITLAB_PAT,
+                "glpat-lifecycle-token",
+                null
+            )
         );
         ensureOwnerMembership(workspace);
 
