@@ -56,6 +56,7 @@ export function AchievementNode({ data }: NodeProps<AchievementNode>) {
 						!isMythic && statusBackgrounds[achievement.status],
 						rarityStylingClasses[achievement.rarity],
 						isHovered && achievement.status !== "locked" && "scale-110",
+						achievement.status !== "unlocked" && "grayscale",
 					)}
 					style={
 						isMythic

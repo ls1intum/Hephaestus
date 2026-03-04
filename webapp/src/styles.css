@@ -85,6 +85,8 @@ code {
   --rarity-rare: oklch(0.55 0.1 250);
   --rarity-epic: oklch(0.5 0.18 300);
   --rarity-legendary: oklch(0.65 0.2 80);
+  --rarity-legendary-from: var(--rarity-legendary);
+  --rarity-legendary-to: oklch(0.9 0.1 95);
   --rarity-mythic-from: oklch(0.55 0.22 290);
   --rarity-mythic-to: oklch(0.55 0.18 250);
 }
@@ -148,6 +150,8 @@ code {
   --rarity-rare: oklch(0.7 0.12 250);
   --rarity-epic: oklch(0.72 0.18 300);
   --rarity-legendary: oklch(0.82 0.18 80);
+  --rarity-legendary-from: var(--rarity-legendary);
+  --rarity-legendary-to: oklch(0.95 0.08 95);
   --rarity-mythic-from: oklch(0.75 0.22 290);
   --rarity-mythic-to: oklch(0.7 0.18 250);
 }
@@ -253,8 +257,9 @@ code {
   --color-rarity-rare: var(--rarity-rare);
   --color-rarity-epic: var(--rarity-epic);
   --color-rarity-legendary: var(--rarity-legendary);
+  --color-rarity-legendary-from: var(--rarity-legendary-from);
+  --color-rarity-legendary-to: var(--rarity-legendary-to);
   --color-rarity-mythic-from: var(--rarity-mythic-from);
-  --color-rarity-mythic-to: var(--rarity-mythic-to);
   --color-rarity-mythic-to: var(--rarity-mythic-to);
 }
 
@@ -284,7 +289,7 @@ code {
 }
 
 .shiki code {
-  @apply whitespace-pre-wrap break-words;
+  @apply whitespace-pre-wrap wrap-break-word;
   background: transparent !important;
 }
 
@@ -408,10 +413,10 @@ code {
 @keyframes legendary-color-pulse {
   0%,
   100% {
-    border-color: #fbbf24; /* amber-400 */
+     border-color: var(--rarity-legendary-to);
   }
   50% {
-    border-color: var(--rarity-legendary);
+    border-color: var(--rarity-legendary-from);
   }
 }
 
@@ -455,11 +460,11 @@ code {
   z-index: -2;
 }
 
-/* The inner solid fill (smaller size, inset 4px creates the border track) */
+/* The inner solid fill (smaller size, inset 6px creates the border track) */
 .achievement-mythic-hexagon::after {
   content: "";
   position: absolute;
-  inset: 4px;
+  inset: 6px;
   background-color: var(--mythic-bg);
   /* Clip the inner background to perfectly match the outer geometry */
   clip-path: polygon(50% 0%, 93.301% 25%, 93.301% 75%, 50% 100%, 6.699% 75%, 6.699% 25%);
