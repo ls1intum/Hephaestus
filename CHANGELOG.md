@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.21.1](https://github.com/ls1intum/Hephaestus/compare/v0.21.0...v0.21.1) (2026-03-04)
+
+### 🐛 Bug Fixes
+
+* **teams:** resolve parent team IDs using internal PKs instead of GitHub native IDs ([#788](https://github.com/ls1intum/Hephaestus/issues/788)) ([40758d8](https://github.com/ls1intum/Hephaestus/commit/40758d8c75490c8440686cd62e628f644a1e689c))
+
 ## [0.21.0](https://github.com/ls1intum/Hephaestus/compare/v0.20.2...v0.21.0) (2026-03-04)
 
 ### 🚀 Features
