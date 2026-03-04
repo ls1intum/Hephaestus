@@ -5,7 +5,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.EventContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.EventPayload;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
-import de.tum.in.www1.hephaestus.gitprovider.label.LabelIdUtils;
+import de.tum.in.www1.hephaestus.gitprovider.common.LabelIdUtils;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.label.gitlab.dto.GitLabLabelDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;

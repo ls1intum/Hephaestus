@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.gitprovider.label;
+package de.tum.in.www1.hephaestus.gitprovider.common;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

@@ -7,7 +7,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.dto.GitLabWebhookUser
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.RepositoryScopeFilter;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.ScopeIdResolver;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
-import de.tum.in.www1.hephaestus.gitprovider.label.LabelIdUtils;
+import de.tum.in.www1.hephaestus.gitprovider.common.LabelIdUtils;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;

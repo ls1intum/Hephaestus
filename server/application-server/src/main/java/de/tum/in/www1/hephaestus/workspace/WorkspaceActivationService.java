@@ -1,13 +1,9 @@
 package de.tum.in.www1.hephaestus.workspace;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
-import de.tum.in.www1.hephaestus.gitprovider.issue.gitlab.GitLabIssueSyncService;
-import de.tum.in.www1.hephaestus.gitprovider.label.gitlab.GitLabLabelSyncService;
-import de.tum.in.www1.hephaestus.gitprovider.milestone.gitlab.GitLabMilestoneSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncServiceHolder;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
-import de.tum.in.www1.hephaestus.gitprovider.organization.gitlab.GitLabGroupSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.organization.gitlab.GitLabSyncResult;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequest.gitlab.GitLabMergeRequestSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.sync.GitHubDataSyncService;
@@ -60,11 +56,7 @@ public class WorkspaceActivationService {
 
     // Lazy-loaded to break circular reference with sync services
     private final ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider;
-    private final ObjectProvider<GitLabGroupSyncService> gitLabGroupSyncServiceProvider;
-    private final ObjectProvider<GitLabIssueSyncService> gitLabIssueSyncServiceProvider;
-    private final ObjectProvider<GitLabMergeRequestSyncService> gitLabMergeRequestSyncServiceProvider;
-    private final ObjectProvider<GitLabLabelSyncService> gitLabLabelSyncServiceProvider;
-    private final ObjectProvider<GitLabMilestoneSyncService> gitLabMilestoneSyncServiceProvider;
+    private final ObjectProvider<GitLabSyncServiceHolder> gitLabSyncServiceHolderProvider;
 
     // Infrastructure
     private final AsyncTaskExecutor monitoringExecutor;
@@ -78,11 +70,7 @@ public class WorkspaceActivationService {
         NatsConsumerService natsConsumerService,
         WorkspaceScopeFilter workspaceScopeFilter,
         ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider,
-        ObjectProvider<GitLabGroupSyncService> gitLabGroupSyncServiceProvider,
-        ObjectProvider<GitLabIssueSyncService> gitLabIssueSyncServiceProvider,
-        ObjectProvider<GitLabMergeRequestSyncService> gitLabMergeRequestSyncServiceProvider,
-        ObjectProvider<GitLabLabelSyncService> gitLabLabelSyncServiceProvider,
-        ObjectProvider<GitLabMilestoneSyncService> gitLabMilestoneSyncServiceProvider,
+        ObjectProvider<GitLabSyncServiceHolder> gitLabSyncServiceHolderProvider,
         @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor
     ) {
         this.natsProperties = natsProperties;
@@ -93,11 +81,7 @@ public class WorkspaceActivationService {
         this.natsConsumerService = natsConsumerService;
         this.workspaceScopeFilter = workspaceScopeFilter;
         this.gitHubDataSyncServiceProvider = gitHubDataSyncServiceProvider;
-        this.gitLabGroupSyncServiceProvider = gitLabGroupSyncServiceProvider;
-        this.gitLabIssueSyncServiceProvider = gitLabIssueSyncServiceProvider;
-        this.gitLabMergeRequestSyncServiceProvider = gitLabMergeRequestSyncServiceProvider;
-        this.gitLabLabelSyncServiceProvider = gitLabLabelSyncServiceProvider;
-        this.gitLabMilestoneSyncServiceProvider = gitLabMilestoneSyncServiceProvider;
+        this.gitLabSyncServiceHolderProvider = gitLabSyncServiceHolderProvider;
         this.monitoringExecutor = monitoringExecutor;
     }
 
@@ -247,7 +231,8 @@ public class WorkspaceActivationService {
                 if (workspace.getProviderType() == GitProviderType.GITLAB) {
                     // GitLab: sync group and its projects via GraphQL
                     // Group metadata is extracted from the first page response (no extra API call)
-                    var syncService = gitLabGroupSyncServiceProvider.getIfAvailable();
+                    var gitLabServices = gitLabSyncServiceHolderProvider.getIfAvailable();
+                    var syncService = gitLabServices != null ? gitLabServices.getGroupSyncService() : null;
                     if (syncService != null) {
                         if (isBlank(workspace.getAccountLogin())) {
                             log.warn(
@@ -275,10 +260,10 @@ public class WorkspaceActivationService {
                             // using the timestamp captured BEFORE sync starts. This ensures:
                             // 1. MR sync doesn't overwrite issue sync's timestamp
                             // 2. updatedAfter is consistent across both phases
-                            var labelSyncService = gitLabLabelSyncServiceProvider.getIfAvailable();
-                            var milestoneSyncService = gitLabMilestoneSyncServiceProvider.getIfAvailable();
-                            var issueSyncService = gitLabIssueSyncServiceProvider.getIfAvailable();
-                            var mrSyncService = gitLabMergeRequestSyncServiceProvider.getIfAvailable();
+                            var labelSyncService = gitLabServices.getLabelSyncService();
+                            var milestoneSyncService = gitLabServices.getMilestoneSyncService();
+                            var issueSyncService = gitLabServices.getIssueSyncService();
+                            var mrSyncService = gitLabServices.getMergeRequestSyncService();
 
                             if (!result.synced().isEmpty()) {
                                 int totalLabels = 0;

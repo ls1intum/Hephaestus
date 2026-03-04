@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.gitprovider.label;
+package de.tum.in.www1.hephaestus.gitprovider.common;
 
 /**
  * Shared utility for generating deterministic label IDs.
