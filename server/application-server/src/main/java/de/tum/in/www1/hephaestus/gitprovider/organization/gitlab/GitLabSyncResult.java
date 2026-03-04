@@ -10,12 +10,19 @@ import java.util.List;
  * Provides structured feedback about the sync outcome, including partial success
  * scenarios where some projects were synced but others failed.
  *
- * @param status          the overall sync outcome
- * @param synced          successfully synced repositories (unmodifiable)
- * @param pagesCompleted  number of pagination pages successfully fetched
- * @param projectsSkipped number of individual projects that failed to process
+ * @param status            the overall sync outcome
+ * @param synced            successfully synced repositories (unmodifiable)
+ * @param pagesCompleted    number of pagination pages successfully fetched
+ * @param projectsSkipped   number of individual projects that failed to process
+ * @param projectsRedacted  number of projects returned as null by GitLab due to access restrictions
  */
-public record GitLabSyncResult(Status status, List<Repository> synced, int pagesCompleted, int projectsSkipped) {
+public record GitLabSyncResult(
+    Status status,
+    List<Repository> synced,
+    int pagesCompleted,
+    int projectsSkipped,
+    int projectsRedacted
+) {
     public enum Status {
         /** All projects synced successfully. */
         COMPLETED,
@@ -28,17 +35,29 @@ public record GitLabSyncResult(Status status, List<Repository> synced, int pages
     }
 
     /** Successful sync with no errors. */
-    public static GitLabSyncResult completed(List<Repository> synced, int pagesCompleted) {
-        return new GitLabSyncResult(Status.COMPLETED, Collections.unmodifiableList(synced), pagesCompleted, 0);
+    public static GitLabSyncResult completed(List<Repository> synced, int pagesCompleted, int projectsRedacted) {
+        return new GitLabSyncResult(
+            Status.COMPLETED,
+            Collections.unmodifiableList(synced),
+            pagesCompleted,
+            0,
+            projectsRedacted
+        );
     }
 
     /** Sync finished but some projects or pages had errors. */
-    public static GitLabSyncResult withErrors(List<Repository> synced, int pagesCompleted, int projectsSkipped) {
+    public static GitLabSyncResult withErrors(
+        List<Repository> synced,
+        int pagesCompleted,
+        int projectsSkipped,
+        int projectsRedacted
+    ) {
         return new GitLabSyncResult(
             Status.COMPLETED_WITH_ERRORS,
             Collections.unmodifiableList(synced),
             pagesCompleted,
-            projectsSkipped
+            projectsSkipped,
+            projectsRedacted
         );
     }
 
@@ -49,6 +68,6 @@ public record GitLabSyncResult(Status status, List<Repository> synced, int pages
         int pagesCompleted,
         int projectsSkipped
     ) {
-        return new GitLabSyncResult(status, Collections.unmodifiableList(syncedSoFar), pagesCompleted, projectsSkipped);
+        return new GitLabSyncResult(status, Collections.unmodifiableList(syncedSoFar), pagesCompleted, projectsSkipped, 0);
     }
 }

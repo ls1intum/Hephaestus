@@ -197,6 +197,7 @@ public class GitLabGroupSyncService {
         String cursor = null;
         int pageCount = 0;
         int projectsSkipped = 0;
+        int projectsRedacted = 0;
         boolean hadApiFailure = false;
         int reportedTotalCount = -1;
 
@@ -306,8 +307,7 @@ public class GitLabGroupSyncService {
 
                 for (GitLabProjectResponse project : projects) {
                     if (project == null) {
-                        projectsSkipped++;
-                        log.debug("Skipped null project node in GraphQL response: groupPath={}", safeGroupPath);
+                        projectsRedacted++;
                         continue;
                     }
                     try {
@@ -353,13 +353,31 @@ public class GitLabGroupSyncService {
 
             int totalPages = pageCount + 1;
 
-            // Post-sync overflow detection using reported totalCount
-            if (reportedTotalCount >= 0 && syncedRepositories.size() + projectsSkipped < reportedTotalCount) {
+            // Null nodes indicate a deserialization issue (codec misconfiguration)
+            // or GitLab access restrictions. Either way, this is unexpected and should be investigated.
+            if (projectsRedacted > 0) {
                 log.warn(
-                    "Project connection overflow detected: groupPath={}, synced={}, reportedCount={}. " +
-                        "Some projects may not have been fetched.",
+                    "Deserialization returned {} null project node(s): groupPath={}, " +
+                        "synced={}, nullNodes={}, reportedCount={}. " +
+                        "This may indicate a WebClient codec misconfiguration.",
+                    projectsRedacted,
                     safeGroupPath,
                     syncedRepositories.size(),
+                    projectsRedacted,
+                    reportedTotalCount
+                );
+            }
+
+            // Post-sync overflow detection using reported totalCount
+            int totalProcessed = syncedRepositories.size() + projectsSkipped + projectsRedacted;
+            if (reportedTotalCount >= 0 && totalProcessed < reportedTotalCount) {
+                log.warn(
+                    "Project connection overflow detected: groupPath={}, synced={}, skipped={}, redacted={}, " +
+                        "reportedCount={}. Some projects may not have been fetched.",
+                    safeGroupPath,
+                    syncedRepositories.size(),
+                    projectsSkipped,
+                    projectsRedacted,
                     reportedTotalCount
                 );
             }
@@ -382,11 +400,12 @@ public class GitLabGroupSyncService {
             }
 
             log.info(
-                "Synced group projects: scopeId={}, groupPath={}, projectCount={}, skipped={}, pages={}",
+                "Synced group projects: scopeId={}, groupPath={}, synced={}, failed={}, redacted={}, pages={}",
                 scopeId,
                 safeGroupPath,
                 syncedRepositories.size(),
                 projectsSkipped,
+                projectsRedacted,
                 totalPages
             );
 
@@ -399,10 +418,11 @@ public class GitLabGroupSyncService {
                     projectsSkipped
                 );
             }
+            // Only actual processing failures count as errors; redacted projects are expected
             if (projectsSkipped > 0) {
-                return GitLabSyncResult.withErrors(syncedRepositories, totalPages, projectsSkipped);
+                return GitLabSyncResult.withErrors(syncedRepositories, totalPages, projectsSkipped, projectsRedacted);
             }
-            return GitLabSyncResult.completed(syncedRepositories, totalPages);
+            return GitLabSyncResult.completed(syncedRepositories, totalPages, projectsRedacted);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             log.warn("Interrupted during group project sync: scopeId={}, groupPath={}", scopeId, safeGroupPath);

@@ -8,6 +8,7 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncCons
 import static de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants.TRANSPORT_MAX_BACKOFF;
 import static de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants.TRANSPORT_MAX_RETRIES;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubTransportErrors;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabRateLimitTracker;
@@ -27,6 +28,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
+import org.springframework.http.codec.json.Jackson2JsonDecoder;
+import org.springframework.http.codec.json.Jackson2JsonEncoder;
 import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
@@ -64,9 +67,13 @@ public class GitLabGraphQlConfig {
 
     @Bean
     @Qualifier("gitLabGraphQlWebClient")
-    public WebClient gitLabGraphQlWebClient() {
+    public WebClient gitLabGraphQlWebClient(ObjectMapper baseObjectMapper) {
         ExchangeStrategies strategies = ExchangeStrategies.builder()
-            .codecs(config -> config.defaultCodecs().maxInMemorySize(MAX_BUFFER_SIZE))
+            .codecs(config -> {
+                config.defaultCodecs().maxInMemorySize(MAX_BUFFER_SIZE);
+                config.defaultCodecs().jackson2JsonEncoder(new Jackson2JsonEncoder(baseObjectMapper));
+                config.defaultCodecs().jackson2JsonDecoder(new Jackson2JsonDecoder(baseObjectMapper));
+            })
             .build();
 
         // GitLab rate limit is 100 points/min — 10 connections is generous
