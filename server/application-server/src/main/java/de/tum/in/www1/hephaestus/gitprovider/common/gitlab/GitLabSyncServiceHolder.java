@@ -6,60 +6,61 @@ import de.tum.in.www1.hephaestus.gitprovider.milestone.gitlab.GitLabMilestoneSyn
 import de.tum.in.www1.hephaestus.gitprovider.organization.gitlab.GitLabGroupSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.gitlab.GitLabMergeRequestSyncService;
 import jakarta.annotation.Nullable;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 /**
- * Holds all GitLab sync service providers to reduce constructor parameter count
+ * Holds all GitLab sync services to reduce constructor parameter count
  * in services that need to orchestrate multiple GitLab sync phases.
+ * <p>
+ * All services are conditionally available (null when not configured).
  */
 @Component
 @ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
 public class GitLabSyncServiceHolder {
 
-    private final ObjectProvider<GitLabGroupSyncService> groupSyncServiceProvider;
-    private final ObjectProvider<GitLabLabelSyncService> labelSyncServiceProvider;
-    private final ObjectProvider<GitLabMilestoneSyncService> milestoneSyncServiceProvider;
-    private final ObjectProvider<GitLabIssueSyncService> issueSyncServiceProvider;
-    private final ObjectProvider<GitLabMergeRequestSyncService> mergeRequestSyncServiceProvider;
+    private final GitLabGroupSyncService groupSyncService;
+    private final GitLabLabelSyncService labelSyncService;
+    private final GitLabMilestoneSyncService milestoneSyncService;
+    private final GitLabIssueSyncService issueSyncService;
+    private final GitLabMergeRequestSyncService mergeRequestSyncService;
 
     public GitLabSyncServiceHolder(
-        ObjectProvider<GitLabGroupSyncService> groupSyncServiceProvider,
-        ObjectProvider<GitLabLabelSyncService> labelSyncServiceProvider,
-        ObjectProvider<GitLabMilestoneSyncService> milestoneSyncServiceProvider,
-        ObjectProvider<GitLabIssueSyncService> issueSyncServiceProvider,
-        ObjectProvider<GitLabMergeRequestSyncService> mergeRequestSyncServiceProvider
+        @Nullable GitLabGroupSyncService groupSyncService,
+        @Nullable GitLabLabelSyncService labelSyncService,
+        @Nullable GitLabMilestoneSyncService milestoneSyncService,
+        @Nullable GitLabIssueSyncService issueSyncService,
+        @Nullable GitLabMergeRequestSyncService mergeRequestSyncService
     ) {
-        this.groupSyncServiceProvider = groupSyncServiceProvider;
-        this.labelSyncServiceProvider = labelSyncServiceProvider;
-        this.milestoneSyncServiceProvider = milestoneSyncServiceProvider;
-        this.issueSyncServiceProvider = issueSyncServiceProvider;
-        this.mergeRequestSyncServiceProvider = mergeRequestSyncServiceProvider;
+        this.groupSyncService = groupSyncService;
+        this.labelSyncService = labelSyncService;
+        this.milestoneSyncService = milestoneSyncService;
+        this.issueSyncService = issueSyncService;
+        this.mergeRequestSyncService = mergeRequestSyncService;
     }
 
     @Nullable
     public GitLabGroupSyncService getGroupSyncService() {
-        return groupSyncServiceProvider.getIfAvailable();
+        return groupSyncService;
     }
 
     @Nullable
     public GitLabLabelSyncService getLabelSyncService() {
-        return labelSyncServiceProvider.getIfAvailable();
+        return labelSyncService;
     }
 
     @Nullable
     public GitLabMilestoneSyncService getMilestoneSyncService() {
-        return milestoneSyncServiceProvider.getIfAvailable();
+        return milestoneSyncService;
     }
 
     @Nullable
     public GitLabIssueSyncService getIssueSyncService() {
-        return issueSyncServiceProvider.getIfAvailable();
+        return issueSyncService;
     }
 
     @Nullable
     public GitLabMergeRequestSyncService getMergeRequestSyncService() {
-        return mergeRequestSyncServiceProvider.getIfAvailable();
+        return mergeRequestSyncService;
     }
 }
