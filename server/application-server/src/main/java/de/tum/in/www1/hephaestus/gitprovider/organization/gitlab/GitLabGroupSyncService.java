@@ -1,7 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.organization.gitlab;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
-import static de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants.DEFAULT_PAGE_SIZE;
+import static de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants.GROUP_PROJECTS_PAGE_SIZE;
 import static de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants.MAX_PAGINATION_PAGES;
 import static de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants.adaptPageSize;
 
@@ -224,7 +224,10 @@ public class GitLabGroupSyncService {
                     }
                 }
 
-                int pageSize = adaptPageSize(DEFAULT_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId));
+                int pageSize = adaptPageSize(
+                    GROUP_PROJECTS_PAGE_SIZE,
+                    graphQlClientProvider.getRateLimitRemaining(scopeId)
+                );
                 HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
 
                 ClientGraphQlResponse response = client
@@ -353,13 +356,14 @@ public class GitLabGroupSyncService {
 
             int totalPages = pageCount + 1;
 
-            // Null nodes indicate a deserialization issue (codec misconfiguration)
-            // or GitLab access restrictions. Either way, this is unexpected and should be investigated.
+            // Null nodes typically indicate GitLab server-side timeouts when resolving
+            // complex nested fields (e.g., group{} sub-objects per project node).
+            // This causes data loss — the affected projects are silently dropped.
             if (projectsRedacted > 0) {
                 log.warn(
-                    "Deserialization returned {} null project node(s): groupPath={}, " +
+                    "GraphQL returned {} null project node(s) (likely server-side timeout): groupPath={}, " +
                         "synced={}, nullNodes={}, reportedCount={}. " +
-                        "This may indicate a WebClient codec misconfiguration.",
+                        "Consider reducing GROUP_PROJECTS_PAGE_SIZE.",
                     projectsRedacted,
                     safeGroupPath,
                     syncedRepositories.size(),
@@ -418,8 +422,8 @@ public class GitLabGroupSyncService {
                     projectsSkipped
                 );
             }
-            // Only actual processing failures count as errors; redacted projects are expected
-            if (projectsSkipped > 0) {
+            // Both processing failures and redacted (null) projects indicate incomplete sync
+            if (projectsSkipped > 0 || projectsRedacted > 0) {
                 return GitLabSyncResult.withErrors(syncedRepositories, totalPages, projectsSkipped, projectsRedacted);
             }
             return GitLabSyncResult.completed(syncedRepositories, totalPages, projectsRedacted);

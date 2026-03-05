@@ -103,6 +103,8 @@ services:
       POSTHOG_API_HOST: ${POSTHOG_API_HOST:-https://app.posthog.com}
       POSTHOG_PROJECT_ID: ${POSTHOG_PROJECT_ID:-}
       POSTHOG_PERSONAL_API_KEY: ${POSTHOG_PERSONAL_API_KEY:-}
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET}
+      WEBHOOK_EXTERNAL_URL: https://${APP_HOSTNAME}/webhooks
     depends_on:
       - postgres
     restart: unless-stopped

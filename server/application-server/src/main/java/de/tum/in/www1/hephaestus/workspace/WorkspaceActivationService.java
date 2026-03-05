@@ -57,6 +57,7 @@ public class WorkspaceActivationService {
     // Lazy-loaded to break circular reference with sync services
     private final ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider;
     private final ObjectProvider<GitLabSyncServiceHolder> gitLabSyncServiceHolderProvider;
+    private final ObjectProvider<GitLabWebhookService> gitLabWebhookServiceProvider;
 
     // Infrastructure
     private final AsyncTaskExecutor monitoringExecutor;
@@ -71,6 +72,7 @@ public class WorkspaceActivationService {
         WorkspaceScopeFilter workspaceScopeFilter,
         ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider,
         ObjectProvider<GitLabSyncServiceHolder> gitLabSyncServiceHolderProvider,
+        ObjectProvider<GitLabWebhookService> gitLabWebhookServiceProvider,
         @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor
     ) {
         this.natsProperties = natsProperties;
@@ -82,6 +84,7 @@ public class WorkspaceActivationService {
         this.workspaceScopeFilter = workspaceScopeFilter;
         this.gitHubDataSyncServiceProvider = gitHubDataSyncServiceProvider;
         this.gitLabSyncServiceHolderProvider = gitLabSyncServiceHolderProvider;
+        this.gitLabWebhookServiceProvider = gitLabWebhookServiceProvider;
         this.monitoringExecutor = monitoringExecutor;
     }
 
@@ -229,6 +232,38 @@ public class WorkspaceActivationService {
             WorkspaceContextHolder.setContext(workspaceContext);
             try {
                 if (workspace.getProviderType() == GitProviderType.GITLAB) {
+                    // Phase 0: Token rotation + webhook registration (before sync)
+                    // Runs before sync so the webhook is ready before any events arrive,
+                    // and token rotation ensures subsequent API calls use a fresh token.
+                    var webhookService = gitLabWebhookServiceProvider.getIfAvailable();
+                    if (webhookService != null) {
+                        try {
+                            webhookService.rotateTokenIfNeeded(workspace);
+                        } catch (Exception e) {
+                            log.warn(
+                                "Token rotation failed: workspaceId={}, error={}",
+                                workspace.getId(),
+                                e.getMessage()
+                            );
+                        }
+
+                        try {
+                            var webhookResult = webhookService.registerWebhook(workspace);
+                            log.info(
+                                "Webhook setup: workspaceId={}, registered={}, reason={}",
+                                workspace.getId(),
+                                webhookResult.registered(),
+                                webhookResult.failureReason()
+                            );
+                        } catch (Exception e) {
+                            log.warn(
+                                "Webhook registration failed: workspaceId={}, error={}",
+                                workspace.getId(),
+                                e.getMessage()
+                            );
+                        }
+                    }
+
                     // GitLab: sync group and its projects via GraphQL
                     // Group metadata is extracted from the first page response (no extra API call)
                     var gitLabServices = gitLabSyncServiceHolderProvider.getIfAvailable();

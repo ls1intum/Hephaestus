@@ -92,6 +92,17 @@ public final class GitLabSyncConstants {
     public static final int DEFAULT_PAGE_SIZE = 100;
 
     /**
+     * Page size for group projects sync GraphQL queries.
+     * <p>
+     * Set to 10 because {@code GetGroupProjects} embeds nested {@code group{}}
+     * and {@code repository{}} sub-objects per project node (~14 fields each).
+     * GitLab's server-side resolver times out when hydrating too many complex nodes,
+     * returning null for nodes it cannot resolve in time. Even page size 20
+     * produces timeouts on some self-hosted instances.
+     */
+    public static final int GROUP_PROJECTS_PAGE_SIZE = 10;
+
+    /**
      * Page size for issue sync GraphQL queries.
      * <p>
      * Set to 30 as a conservative balance between throughput and query complexity.

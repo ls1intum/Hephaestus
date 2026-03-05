@@ -38,7 +38,9 @@ public record WorkspaceDTO(
     @Schema(description = "Slack channel ID for leaderboard notifications") String leaderboardNotificationChannelId,
     @NonNull @Schema(description = "Whether a Personal Access Token is configured") Boolean hasPersonalAccessToken,
     @NonNull @Schema(description = "Whether Slack token is configured") Boolean hasSlackToken,
-    @NonNull @Schema(description = "Whether Slack signing secret is configured") Boolean hasSlackSigningSecret
+    @NonNull @Schema(description = "Whether Slack signing secret is configured") Boolean hasSlackSigningSecret,
+    @Schema(description = "Whether a GitLab webhook has been auto-registered for this workspace")
+    Boolean gitlabWebhookRegistered
 ) {
     public static WorkspaceDTO from(Workspace workspace) {
         return new WorkspaceDTO(
@@ -62,7 +64,8 @@ public record WorkspaceDTO(
             workspace.getLeaderboardNotificationChannelId(),
             workspace.getPersonalAccessToken() != null && !workspace.getPersonalAccessToken().isEmpty(),
             workspace.getSlackToken() != null && !workspace.getSlackToken().isEmpty(),
-            workspace.getSlackSigningSecret() != null && !workspace.getSlackSigningSecret().isEmpty()
+            workspace.getSlackSigningSecret() != null && !workspace.getSlackSigningSecret().isEmpty(),
+            workspace.getGitlabWebhookId() != null
         );
     }
 }

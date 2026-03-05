@@ -217,6 +217,22 @@ public class Workspace {
     @ToString.Exclude
     private String personalAccessToken;
 
+    /**
+     * GitLab group numeric ID (stable across renames).
+     * Used for REST API calls: {@code POST/DELETE /groups/:id/hooks}.
+     * Populated during webhook auto-registration; null for non-GitLab workspaces.
+     */
+    @Column(name = "gitlab_group_id")
+    private Long gitlabGroupId;
+
+    /**
+     * GitLab webhook ID returned on successful registration.
+     * Used for deregistration and idempotency checks.
+     * Null when webhook was not registered (e.g., insufficient permissions).
+     */
+    @Column(name = "gitlab_webhook_id")
+    private Long gitlabWebhookId;
+
     /** GitHub App repository selection mode: ALL repositories or SELECTED subset */
     @Enumerated(EnumType.STRING)
     private RepositorySelection githubRepositorySelection;
