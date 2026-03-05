@@ -1,5 +1,5 @@
-import { format } from "date-fns";
 import { Link } from "@tanstack/react-router";
+import { format } from "date-fns";
 import { Sparkles } from "lucide-react";
 import type { ProfileXpRecord, RepositoryInfo, UserInfo } from "@/api/types.gen";
 import { LeagueIcon } from "@/components/leaderboard/LeagueIcon";

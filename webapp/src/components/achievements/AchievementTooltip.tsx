@@ -1,7 +1,12 @@
-import type { ReactNode, ReactElement } from "react";
 import { Tooltip as TooltipPrimitive } from "@base-ui/react/tooltip";
+import type { ReactElement, ReactNode } from "react";
 import { AchievementProgressDisplay } from "@/components/achievements/AchievementProgressDisplay.tsx";
-import { rarityBorderColors, rarityLabels, rarityTitleColors, statusIcons } from "@/components/achievements/styles";
+import {
+	rarityBorderColors,
+	rarityLabels,
+	rarityTitleColors,
+	statusIcons,
+} from "@/components/achievements/styles";
 import type { UIAchievement } from "@/components/achievements/types.ts";
 import { cn } from "@/lib/utils";
 
@@ -16,7 +21,9 @@ export function AchievementTooltip(props: AchievementTooltipProps) {
 	const StatusIcon = statusIcons[achievement.status];
 
 	const borderClass =
-		achievement.status === "unlocked" ? rarityBorderColors[achievement.rarity] : "border-muted-foreground/30";
+		achievement.status === "unlocked"
+			? rarityBorderColors[achievement.rarity]
+			: "border-muted-foreground/30";
 
 	return (
 		<TooltipPrimitive.Provider delay={0}>
@@ -45,7 +52,9 @@ export function AchievementTooltip(props: AchievementTooltipProps) {
 										>
 											{achievement.name}
 										</h3>
-										<span className={cn("text-xs uppercase tracking-wider", "text-muted-foreground")}>
+										<span
+											className={cn("text-xs uppercase tracking-wider", "text-muted-foreground")}
+										>
 											{rarityLabels[achievement.rarity]}
 										</span>
 									</div>
@@ -77,19 +86,19 @@ export function AchievementTooltip(props: AchievementTooltipProps) {
 								)}
 							</div>
 
-						{/* Custom Arrow to match the border color logic and orientation */}
-						<TooltipPrimitive.Arrow
-							className={cn(
-								"w-4 h-4 rotate-45 bg-popover z-0",
-								// Positioning: Anchor to the opposite edge of the side it's on
-								"data-[side=top]:-bottom-2",
-								"data-[side=bottom]:-top-2",
-								// Borders: Only show the borders that point towards the node
-								"data-[side=top]:border-r-2 data-[side=top]:border-b-2",
-								"data-[side=bottom]:border-l-2 data-[side=bottom]:border-t-2",
-								borderClass,
-							)}
-						/>
+							{/* Custom Arrow to match the border color logic and orientation */}
+							<TooltipPrimitive.Arrow
+								className={cn(
+									"w-4 h-4 rotate-45 bg-popover z-0",
+									// Positioning: Anchor to the opposite edge of the side it's on
+									"data-[side=top]:-bottom-2",
+									"data-[side=bottom]:-top-2",
+									// Borders: Only show the borders that point towards the node
+									"data-[side=top]:border-r-2 data-[side=top]:border-b-2",
+									"data-[side=bottom]:border-l-2 data-[side=bottom]:border-t-2",
+									borderClass,
+								)}
+							/>
 						</TooltipPrimitive.Popup>
 					</TooltipPrimitive.Positioner>
 				</TooltipPrimitive.Portal>

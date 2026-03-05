@@ -1,14 +1,14 @@
 import type { Meta, StoryObj } from "@storybook/react";
+import { ReactFlowProvider } from "@xyflow/react";
 import { Button } from "@/components/ui/button";
 import { AchievementTooltip } from "./AchievementTooltip";
 import {
-    hephaestusInit,
-    aresConflict,
-    apolloClarity,
-    poseidonTrident,
-    zeusThunderbolt
+	apolloClarity,
+	aresConflict,
+	hephaestusInit,
+	poseidonTrident,
+	zeusThunderbolt,
 } from "./storyMockData";
-import { ReactFlowProvider } from "@xyflow/react";
 
 /**
  * Component for displaying achievement tooltips with detailed information.
@@ -33,19 +33,19 @@ const meta = {
 	tags: ["autodocs"],
 	decorators: [
 		(Story) => (
-            <ReactFlowProvider>
-                <div
-                    className="bg-background p-32"
-                    style={{
-                        paddingTop: "160px",
-                        paddingBottom: "160px",
-                        display: "flex",
-                        justifyContent: "center",
-                    }}
-                >
-                    <Story />
-                </div>
-            </ReactFlowProvider>
+			<ReactFlowProvider>
+				<div
+					className="bg-background p-32"
+					style={{
+						paddingTop: "160px",
+						paddingBottom: "160px",
+						display: "flex",
+						justifyContent: "center",
+					}}
+				>
+					<Story />
+				</div>
+			</ReactFlowProvider>
 		),
 	],
 } satisfies Meta<typeof AchievementTooltip>;
@@ -53,7 +53,11 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-const Trigger = <Button variant="outline" className="w-32">Hover Me</Button>;
+const Trigger = (
+	<Button variant="outline" className="w-32">
+		Hover Me
+	</Button>
+);
 
 /**
  * Tooltip for a common unlocked achievement.

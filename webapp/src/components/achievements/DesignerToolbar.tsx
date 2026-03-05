@@ -114,7 +114,10 @@ export function DesignerToolbar({
 			{/* Edge Style Selector */}
 			<div className="flex items-center gap-2">
 				<Label className="text-xs text-muted-foreground mr-1 whitespace-nowrap">Edge Style:</Label>
-				<Select value={edgeDisplayMode} onValueChange={(val) => onEdgeDisplayModeChange(val as EdgeDisplayMode)}>
+				<Select
+					value={edgeDisplayMode}
+					onValueChange={(val) => onEdgeDisplayModeChange(val as EdgeDisplayMode)}
+				>
 					<SelectTrigger className="w-45 h-8 text-xs">
 						<SelectValue placeholder="Select Edge Style" />
 					</SelectTrigger>

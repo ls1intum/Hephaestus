@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { ReactFlowProvider } from "@xyflow/react";
 import { AchievementSidebar } from "./AchievementSidebar";
-import { mythicAchievements, mockUser } from "./storyMockData";
+import { mockUser, mythicAchievements } from "./storyMockData";
 
 /**
  * The consolidated achievements sidebar showing stats, progress, recent unlocks,
@@ -13,22 +13,23 @@ const meta: Meta<typeof AchievementSidebar> = {
 		layout: "fullscreen",
 		docs: {
 			description: {
-				component: "A non-foldable sidebar that displays achievement statistics, overall progress, and recent unlocks with digital mythological themes.",
+				component:
+					"A non-foldable sidebar that displays achievement statistics, overall progress, and recent unlocks with digital mythological themes.",
 			},
 		},
 	},
 	tags: ["autodocs"],
-    decorators: [
-        (Story) => (
-            <ReactFlowProvider>
-                <div className="h-screen w-full flex justify-end bg-background overflow-hidden relative">
-                    {/* Simulated main content area */}
-                    <div className="flex-1 bg-[radial-gradient(ellipse_at_center,var(--tw-gradient-stops))] from-primary/5 via-background to-background" />
-                    <Story />
-                </div>
-            </ReactFlowProvider>
-        ),
-    ],
+	decorators: [
+		(Story) => (
+			<ReactFlowProvider>
+				<div className="h-screen w-full flex justify-end bg-background overflow-hidden relative">
+					{/* Simulated main content area */}
+					<div className="flex-1 bg-[radial-gradient(ellipse_at_center,var(--tw-gradient-stops))] from-primary/5 via-background to-background" />
+					<Story />
+				</div>
+			</ReactFlowProvider>
+		),
+	],
 };
 
 export default meta;
@@ -44,8 +45,8 @@ export const Default: Story = {
 		isLoading: false,
 		isError: false,
 		achievements: mythicAchievements,
-        isOwnProfile: true,
-        targetUsername: mockUser.name,
+		isOwnProfile: true,
+		targetUsername: mockUser.name,
 	},
 };
 
@@ -59,8 +60,8 @@ export const ViewingOthersProfile: Story = {
 		isLoading: false,
 		isError: false,
 		achievements: mythicAchievements,
-        isOwnProfile: false,
-        targetUsername: "Hercules_Coder",
+		isOwnProfile: false,
+		targetUsername: "Hercules_Coder",
 	},
 };
 
@@ -74,8 +75,8 @@ export const ListViewMode: Story = {
 		isLoading: false,
 		isError: false,
 		achievements: mythicAchievements,
-        isOwnProfile: true,
-        targetUsername: mockUser.name,
+		isOwnProfile: true,
+		targetUsername: mockUser.name,
 	},
 };
 
@@ -89,8 +90,8 @@ export const Loading: Story = {
 		isLoading: true,
 		isError: false,
 		achievements: [],
-        isOwnProfile: true,
-        targetUsername: mockUser.name,
+		isOwnProfile: true,
+		targetUsername: mockUser.name,
 	},
 };
 
@@ -104,7 +105,7 @@ export const ErrorState: Story = {
 		isLoading: false,
 		isError: true,
 		achievements: [],
-        isOwnProfile: true,
-        targetUsername: mockUser.name,
+		isOwnProfile: true,
+		targetUsername: mockUser.name,
 	},
 };

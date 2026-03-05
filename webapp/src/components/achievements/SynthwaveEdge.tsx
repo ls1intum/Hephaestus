@@ -1,4 +1,4 @@
-import { type Edge, type EdgeProps } from "@xyflow/react";
+import type { Edge, EdgeProps } from "@xyflow/react";
 import { useEffect, useRef, useState } from "react";
 
 export type SynthwaveEdge = Edge<{ isEnabled: boolean }, "synthwave">;

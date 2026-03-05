@@ -8,9 +8,11 @@ import { useAllAchievementDefinitions } from "@/hooks/use-all-achievement-defini
 import { useAuth } from "@/integrations/auth/AuthContext";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
-export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/achievement-designer")({
-	component: AchievementDesignerPage,
-});
+export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/achievement-designer")(
+	{
+		component: AchievementDesignerPage,
+	},
+);
 
 function AchievementDesignerPage() {
 	const { userProfile, getUserGithubProfilePictureUrl, username } = useAuth();
@@ -38,15 +40,16 @@ function AchievementDesignerPage() {
 	return (
 		<ReactFlowProvider>
 			<div className="h-screen flex flex-col bg-background overflow-hidden">
-				<AchievementHeader showZoomControls={true} isError={allDefinitionsQuery.isError} isLoading={allDefinitionsQuery.isLoading} />
+				<AchievementHeader
+					showZoomControls={true}
+					isError={allDefinitionsQuery.isError}
+					isLoading={allDefinitionsQuery.isLoading}
+				/>
 
 				<div className="flex-1 flex overflow-hidden">
 					<div className="flex-1 relative">
-
 						{/* Radial gradient background */}
 						<div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,var(--tw-gradient-stops))] from-primary/5 via-background to-background" />
-
-
 
 						{/* Skill tree (Designer implementation) */}
 						<SkillTreeDesigner user={user} allDefinitions={allDefinitionsQuery.data} />

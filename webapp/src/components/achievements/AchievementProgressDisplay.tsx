@@ -44,7 +44,9 @@ export function AchievementProgressDisplay({
 			// No progress bar needed, just a status indicator
 			if (progressData.unlocked) {
 				return (
-					<div className={cn("flex items-center gap-1.5 text-github-success-foreground", className)}>
+					<div
+						className={cn("flex items-center gap-1.5 text-github-success-foreground", className)}
+					>
 						<CheckCircleIcon className="h-4 w-4" />
 						<span className="text-xs font-medium">Unlocked</span>
 					</div>

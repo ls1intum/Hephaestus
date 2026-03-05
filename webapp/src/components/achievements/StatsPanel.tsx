@@ -1,11 +1,4 @@
-import {
-	CircleDot,
-	GitCommit,
-	GitPullRequest,
-	Layers,
-	MessageSquare,
-	Trophy,
-} from "lucide-react";
+import { CircleDot, GitCommit, GitPullRequest, Layers, MessageSquare, Trophy } from "lucide-react";
 import type React from "react";
 import {
 	categoryMeta,

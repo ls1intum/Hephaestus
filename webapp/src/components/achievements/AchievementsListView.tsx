@@ -1,6 +1,11 @@
 import { Check, Lock } from "lucide-react";
 import { AchievementProgressDisplay } from "@/components/achievements/AchievementProgressDisplay.tsx";
-import { categoryLabels, rarityLabels, rarityTitleColors, statusBackgrounds } from "@/components/achievements/styles.ts";
+import {
+	categoryLabels,
+	rarityLabels,
+	rarityTitleColors,
+	statusBackgrounds,
+} from "@/components/achievements/styles.ts";
 import type {
 	AchievementCategory,
 	AchievementStatus,
@@ -49,7 +54,10 @@ export function AchievementsListView({ achievements }: AchievementListViewProps)
 		switch (status) {
 			case "unlocked":
 				return (
-					<Badge variant="default" className="bg-github-success-foreground hover:bg-github-success-foreground/80">
+					<Badge
+						variant="default"
+						className="bg-github-success-foreground hover:bg-github-success-foreground/80"
+					>
 						<Check className="w-3 h-3 mr-1" />
 						Unlocked
 					</Badge>
@@ -123,7 +131,12 @@ export function AchievementsListView({ achievements }: AchievementListViewProps)
 												</div>
 											</TableCell>
 											<TableCell>
-												<span className={cn("text-sm font-semibold", rarityTitleColors[achievement.rarity])}>
+												<span
+													className={cn(
+														"text-sm font-semibold",
+														rarityTitleColors[achievement.rarity],
+													)}
+												>
 													{rarityLabels[achievement.rarity]}
 												</span>
 											</TableCell>

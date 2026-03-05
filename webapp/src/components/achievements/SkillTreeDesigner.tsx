@@ -14,7 +14,11 @@ import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import type { Achievement } from "@/api/types.gen";
 import { ACHIEVEMENT_REGISTRY } from "@/components/achievements/definitions.ts";
 import type { UIAchievement } from "@/components/achievements/types";
-import { generateSkillTreeData, type EdgeDisplayMode, type AnyAchievementEdge } from "@/components/achievements/utils";
+import {
+	type AnyAchievementEdge,
+	type EdgeDisplayMode,
+	generateSkillTreeData,
+} from "@/components/achievements/utils";
 import { AchievementEdge } from "./AchievementEdge.tsx";
 import { AchievementNode } from "./AchievementNode.tsx";
 import { AvatarNode } from "./AvatarNode.tsx";
@@ -144,7 +148,11 @@ export function SkillTreeDesigner({ user, allDefinitions }: SkillTreeDesignerPro
 			);
 		}
 
-		const { nodes: newNodes, edges: newEdges } = generateSkillTreeData(user, displayAchievements, edgeDisplayMode);
+		const { nodes: newNodes, edges: newEdges } = generateSkillTreeData(
+			user,
+			displayAchievements,
+			edgeDisplayMode,
+		);
 
 		setNodes(newNodes);
 		setEdges(newEdges);

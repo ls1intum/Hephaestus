@@ -1,54 +1,54 @@
 {
-  "avatar": {
-    "x": 0,
-    "y": 0
-  },
-  "first_pull": {
-    "x": 144,
-    "y": 0
-  },
-  "pr_beginner": {
-    "x": 240,
-    "y": 0
-  },
-  "pr_apprentice": {
-    "x": 336,
-    "y": 0
-  },
-  "integration_regular": {
-    "x": 432,
-    "y": 0
-  },
-  "pr_specialist": {
-    "x": 528,
-    "y": 0
-  },
-  "integration_expert": {
-    "x": 648,
-    "y": 0
-  },
-  "master_integrator": {
-    "x": 792,
-    "y": 0
-  },
-  "first_review": {
-    "x": 0,
-    "y": 144
-  },
-  "review_rookie": {
-    "x": 0,
-    "y": 240
-  },
-  "review_master": {
-    "x": -96,
-    "y": 384
-  },
-  "code_commenter": {
-    "x": 96,
-    "y": 384
-  },
-  "helpful_reviewer": {
-    "x": 336,
-    "y": 240
-  }
+	"avatar": {
+		"x": 0,
+		"y": 0
+	},
+	"first_pull": {
+		"x": 144,
+		"y": 0
+	},
+	"pr_beginner": {
+		"x": 240,
+		"y": 0
+	},
+	"pr_apprentice": {
+		"x": 336,
+		"y": 0
+	},
+	"integration_regular": {
+		"x": 432,
+		"y": 0
+	},
+	"pr_specialist": {
+		"x": 528,
+		"y": 0
+	},
+	"integration_expert": {
+		"x": 648,
+		"y": 0
+	},
+	"master_integrator": {
+		"x": 792,
+		"y": 0
+	},
+	"first_review": {
+		"x": 0,
+		"y": 144
+	},
+	"review_rookie": {
+		"x": 0,
+		"y": 240
+	},
+	"review_master": {
+		"x": -96,
+		"y": 384
+	},
+	"code_commenter": {
+		"x": 96,
+		"y": 384
+	},
+	"helpful_reviewer": {
+		"x": 336,
+		"y": 240
+	}
 }

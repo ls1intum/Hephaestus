@@ -3,10 +3,10 @@ import { ReactFlowProvider } from "@xyflow/react";
 import { AchievementNode } from "@/components/achievements/AchievementNode";
 import type { UIAchievement } from "@/components/achievements/types";
 import {
+	apolloClarity,
+	aresConflict,
 	hephaestusInit,
 	hermesSprint,
-	aresConflict,
-	apolloClarity,
 	poseidonTrident,
 	zeusThunderbolt,
 } from "./storyMockData";

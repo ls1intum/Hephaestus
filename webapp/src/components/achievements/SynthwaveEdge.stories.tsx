@@ -75,13 +75,21 @@ export const States: Story = {
 		<>
 			{/* Disabled State */}
 			<SynthwaveEdge {...(createEdgeProps("disabled", 20, { isEnabled: false }) as any)} />
-			<text x="40" y="10" className="fill-muted-foreground text-[10px] uppercase font-mono tracking-widest">
+			<text
+				x="40"
+				y="10"
+				className="fill-muted-foreground text-[10px] uppercase font-mono tracking-widest"
+			>
 				Disabled
 			</text>
 
 			{/* Default Flowing State */}
 			<SynthwaveEdge {...(createEdgeProps("default", 100, { isEnabled: true }) as any)} />
-			<text x="40" y="90" className="fill-muted-foreground text-[10px] uppercase font-mono tracking-widest">
+			<text
+				x="40"
+				y="90"
+				className="fill-muted-foreground text-[10px] uppercase font-mono tracking-widest"
+			>
 				Neon (Classic Flow)
 			</text>
 
@@ -89,7 +97,11 @@ export const States: Story = {
 			<SynthwaveEdge
 				{...(createEdgeProps("rarity", 180, { isEnabled: true, variant: "rarity" }) as any)}
 			/>
-			<text x="40" y="170" className="fill-muted-foreground text-[10px] uppercase font-mono tracking-widest">
+			<text
+				x="40"
+				y="170"
+				className="fill-muted-foreground text-[10px] uppercase font-mono tracking-widest"
+			>
 				Rarity (Themed Waves)
 			</text>
 		</>

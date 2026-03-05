@@ -2,9 +2,9 @@ import type { Achievement } from "@/api";
 import type { AchievementEdge } from "@/components/achievements/AchievementEdge.tsx";
 import type { AchievementNode } from "@/components/achievements/AchievementNode.tsx";
 import type { AvatarNode } from "@/components/achievements/AvatarNode.tsx";
+import { ACHIEVEMENT_REGISTRY } from "@/components/achievements/definitions.ts";
 import type { EqualizerEdge } from "@/components/achievements/EqualizerEdge.tsx";
 import type { SynthwaveEdge } from "@/components/achievements/SynthwaveEdge.tsx";
-import { ACHIEVEMENT_REGISTRY } from "@/components/achievements/definitions.ts";
 import {
 	type AchievementCategory,
 	type AchievementRarity,
@@ -230,7 +230,12 @@ export function generateSkillTreeData(
 				}
 			} else {
 				// Root-level achievements connect to the central avatar
-				const config = getEdgeConfig(achievement.status === "unlocked", edgeDisplayMode, 0, maxTreeDepth);
+				const config = getEdgeConfig(
+					achievement.status === "unlocked",
+					edgeDisplayMode,
+					0,
+					maxTreeDepth,
+				);
 				processedEdges.push({
 					id: `avatar-${achievement.id}-edge`,
 					source: avatarNode.id,
