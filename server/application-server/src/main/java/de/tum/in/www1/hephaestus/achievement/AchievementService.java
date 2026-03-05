@@ -126,7 +126,7 @@ public class AchievementService {
      * @param occurredAt when the activity actually occurred (source timestamp)
      * @return list of newly unlocked achievement types (empty if none)
      */
-    @CacheEvict(value = ACHIEVEMENT_PROGRESS_CACHE, key = "#user.login", condition = "#user != null")
+    @CacheEvict(value = ACHIEVEMENT_PROGRESS_CACHE, key = "#user.id", condition = "#user != null")
     @Transactional
     public List<AchievementDefinition> checkAndUnlock(User user, ActivityEventType eventType, Instant occurredAt) {
         if (user == null) {
@@ -235,7 +235,7 @@ public class AchievementService {
      * @param user the user to get achievements for
      * @return list of all achievement DTOs with progress, ordered by category and level
      */
-    @Cacheable(value = ACHIEVEMENT_PROGRESS_CACHE, key = "#user.login")
+    @Cacheable(value = ACHIEVEMENT_PROGRESS_CACHE, key = "#user.id", condition = "#user != null")
     @Transactional(readOnly = true)
     public List<AchievementDTO> getAllAchievementsWithProgress(User user) {
         if (user == null) {
