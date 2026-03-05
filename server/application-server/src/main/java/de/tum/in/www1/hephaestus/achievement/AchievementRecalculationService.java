@@ -40,7 +40,7 @@ public class AchievementRecalculationService {
      */
     @Async
     @Transactional
-    @CacheEvict(value = AchievementService.ACHIEVEMENT_PROGRESS_CACHE, key = "#user.login", condition = "#user != null")
+    @CacheEvict(value = AchievementService.ACHIEVEMENT_PROGRESS_CACHE, key = "#user.id", condition = "#user != null")
     public void recalculateUser(User user) {
         log.info("Starting complete achievement recalculation for user: userId={}, login={}", user.getId(), user.getLogin());
 
