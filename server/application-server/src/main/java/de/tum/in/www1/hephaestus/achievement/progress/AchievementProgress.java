@@ -19,8 +19,8 @@ import io.swagger.v3.oas.annotations.media.Schema;
     property = "type"
 )
 @JsonSubTypes({
-    @JsonSubTypes.Type(value = LinearAchievementProgress.class, name = "LINEAR"),
-    @JsonSubTypes.Type(value = BinaryAchievementProgress.class, name = "BINARY"),
+    @JsonSubTypes.Type(value = LinearAchievementProgress.class, name = "LinearAchievementProgress"),
+    @JsonSubTypes.Type(value = BinaryAchievementProgress.class, name = "BinaryAchievementProgress"),
 })
 @Schema(
     name = "AchievementProgress",

@@ -1,10 +1,10 @@
 import { CheckCircleIcon, XCircleIcon } from "@primer/octicons-react";
-import type { Achievement } from "@/api/types.gen";
+import type { UIAchievement } from "@/components/achievements/types.ts";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 
 interface AchievementProgressDisplayProps {
-	achievement: Achievement;
+	achievement: UIAchievement;
 	className?: string;
 }
 
@@ -13,6 +13,8 @@ export function AchievementProgressDisplay({
 	className,
 }: AchievementProgressDisplayProps) {
 	const { progressData } = achievement;
+
+	console.debug(progressData.type);
 
 	switch (progressData.type) {
 		case "LinearAchievementProgress": {
@@ -60,8 +62,5 @@ export function AchievementProgressDisplay({
 				</div>
 			);
 		}
-
-		default:
-			return null;
 	}
 }

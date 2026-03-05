@@ -111,6 +111,7 @@ export const Unlocked: Story = {
 								achievement: {
 									...rarityMocks[rarity],
 									status: "unlocked",
+									unlockedAt: new Date(Date.now()),
 									progressData: unlockedProgressData,
 								},
 								showTooltips: true,
