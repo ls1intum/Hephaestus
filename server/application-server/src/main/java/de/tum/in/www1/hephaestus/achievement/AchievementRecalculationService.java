@@ -6,6 +6,7 @@ import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,6 +38,7 @@ public class AchievementRecalculationService {
      *
      * @param user the user to recalculate achievements for
      */
+    @Async
     @Transactional
     @CacheEvict(value = AchievementService.ACHIEVEMENT_PROGRESS_CACHE, key = "#user.login", condition = "#user != null")
     public void recalculateUser(User user) {

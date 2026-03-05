@@ -7,6 +7,7 @@ import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
@@ -113,14 +114,20 @@ public class AchievementController {
      * timeline of activity events chronologically to accurately determine the actual
      * dates they earned their achievements.
      *
+     * <p>This operation is performed asynchronously.
+     *
      * @param workspaceContext the resolved workspace context (used for access control)
      * @param login the user's GitHub login
-     * @return 204 No Content upon successful recalculation
+     * @return 202 Accepted upon successfully starting the recalculation
      */
     @PostMapping("/recalculate")
     @Operation(
         summary = "Recalculate user achievements",
         description = "Wipes and historically recalculates a user's achievement timeline. Admin only."
+    )
+    @ApiResponse(
+        responseCode = "202",
+        description = "Recalculation task started successfully"
     )
     @RequireAtLeastWorkspaceAdmin
     public ResponseEntity<Void> recalculateUserAchievements(
@@ -130,8 +137,10 @@ public class AchievementController {
         log.info("Admin requested achievement recalculation for user: {} in workspace: {}", login, workspaceContext.slug());
 
         User user = userRepository.findByLogin(login).orElseThrow(() -> new EntityNotFoundException("User", login));
+
+        // Triggered asynchronously via @Async on the service method
         achievementRecalculationService.recalculateUser(user);
 
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.accepted().build();
     }
 }
