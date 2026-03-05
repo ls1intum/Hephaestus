@@ -512,7 +512,7 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
      * @param actorId the user's ID
      * @return stream of activity events ordered by occurred_at ASC
      */
-    @QueryHints(value = @QueryHint(name = org.hibernate.jpa.HibernateHints.HINT_FETCH_SIZE, value = "" + Integer.MIN_VALUE))
+    @QueryHints(value = @QueryHint(name = org.hibernate.jpa.HibernateHints.HINT_FETCH_SIZE, value = "500"))
     @Query(
         """
         SELECT e
