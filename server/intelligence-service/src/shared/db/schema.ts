@@ -1888,6 +1888,10 @@ export const workspace = pgTable(
 			mode: "string",
 		}),
 		serverUrl: varchar("server_url", { length: 512 }),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		gitlabGroupId: bigint("gitlab_group_id", { mode: "number" }),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		gitlabWebhookId: bigint("gitlab_webhook_id", { mode: "number" }),
 	},
 	(table) => [
 		foreignKey({

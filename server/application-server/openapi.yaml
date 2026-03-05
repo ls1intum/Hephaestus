@@ -3441,6 +3441,10 @@ components:
         gitProviderMode:
           type: string
           description: "Git provider mode (PAT_ORG, GITHUB_APP_INSTALLATION, GITLAB_PAT)"
+        gitlabWebhookRegistered:
+          type: boolean
+          description: Whether a GitLab webhook has been auto-registered for this
+            workspace
         hasPersonalAccessToken:
           type: boolean
           description: Whether a Personal Access Token is configured

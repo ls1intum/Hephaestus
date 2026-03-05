@@ -626,6 +626,8 @@ erDiagram
         TIMESTAMPTZ issue_types_synced_at
         TIMESTAMPTZ issue_dependencies_synced_at
         VARCHAR(512) server_url
+        BIGINT gitlab_group_id
+        BIGINT gitlab_webhook_id
     }
 
     WorkspaceMembership {
