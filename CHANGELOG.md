@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.24.0](https://github.com/ls1intum/Hephaestus/compare/v0.23.1...v0.24.0) (2026-03-05)
+
+### 🚀 Features
+
+* **workspace:** GitLab workspace creation API ([#797](https://github.com/ls1intum/Hephaestus/issues/797)) ([c961169](https://github.com/ls1intum/Hephaestus/commit/c9611692381e449b6703ae9cdcee761aa21b7100))
+
 ## [0.23.1](https://github.com/ls1intum/Hephaestus/compare/v0.23.0...v0.23.1) (2026-03-04)
 
 ### 🐛 Bug Fixes
