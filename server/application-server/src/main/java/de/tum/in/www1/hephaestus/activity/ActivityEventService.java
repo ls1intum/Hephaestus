@@ -179,7 +179,7 @@ public class ActivityEventService {
         xpDistribution.record(roundedXp);
 
         // Publish event for downstream listeners (e.g., achievement system)
-        eventPublisher.publishEvent(new ActivitySavedEvent(actor, eventType, workspaceId));
+        eventPublisher.publishEvent(new ActivitySavedEvent(actor, eventType, occurredAt, workspaceId));
 
         // Structured logging with trace context
         log.info(

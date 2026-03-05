@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.achievement;
 
-import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
@@ -9,6 +8,8 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
+
+import java.util.List;
 
 /**
  * Event listener that triggers achievement evaluation on activity events.
@@ -61,7 +62,9 @@ public class AchievementEventListener {
         }
 
         try {
-            List<AchievementDefinition> unlocked = achievementService.checkAndUnlock(event.user(), event.eventType());
+            List<AchievementDefinition> unlocked = achievementService.checkAndUnlock(
+                event.user(), event.eventType(), event.occurredAt()
+            );
 
             if (!unlocked.isEmpty()) {
                 log.info(

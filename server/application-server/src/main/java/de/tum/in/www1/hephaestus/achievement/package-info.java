@@ -26,11 +26,23 @@
  * <pre>
  * ActivityEventService.record()
  *     ↓
- * ActivitySavedEvent published
+ * ActivitySavedEvent(occurredAt) published
  *     ↓
  * AchievementEventListener receives event
  *     ↓
  * AchievementService.checkAndUnlock() increments progress and unlocks if threshold met
+ * </pre>
+ *
+ * <h3>Backfill Flow (Manual/Historical)</h3>
+ * <p>To accurately simulate unlocking achievements with their actual distinct dates
+ * (e.g., when a user first joins or historical data is synced), we provide an
+ * admin endpoint to perform a retroactive recalculation:
+ * <pre>
+ * Admin calls POST /users/{login}/achievements/recalculate
+ *     ↓
+ * AchievementRecalculationService.recalculateUser() wipes progress
+ *     ↓
+ * Replays all user activity chronologically to assign exact unlock dates
  * </pre>
  *
  * @see de.tum.in.www1.hephaestus.activity.ActivityEventService

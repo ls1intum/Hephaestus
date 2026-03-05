@@ -116,13 +116,19 @@ public class AchievementService {
      * <p>This method increments progress on all achievements triggered by the
      * specified event type and unlocks any that have reached their threshold.
      *
-     * @param user      the user to check achievements for
-     * @param eventType the activity event type that was just recorded
+     * <p>The {@code occurredAt} timestamp is used as the unlock time instead of
+     * {@link Instant#now()}. This ensures that achievements unlocked during
+     * historical data syncs or backfills carry the timestamp of the earliest
+     * qualifying activity event, not the moment of processing.
+     *
+     * @param user       the user to check achievements for
+     * @param eventType  the activity event type that was just recorded
+     * @param occurredAt when the activity actually occurred (source timestamp)
      * @return list of newly unlocked achievement types (empty if none)
      */
     @CacheEvict(value = ACHIEVEMENT_PROGRESS_CACHE, key = "#user.login", condition = "#user != null")
     @Transactional
-    public List<AchievementDefinition> checkAndUnlock(User user, ActivityEventType eventType) {
+    public List<AchievementDefinition> checkAndUnlock(User user, ActivityEventType eventType, Instant occurredAt) {
         if (user == null) {
             log.debug("Skipping achievement check: user is null");
             return List.of();
@@ -166,13 +172,14 @@ public class AchievementService {
             boolean wasUnlocked = evaluator.updateProgress(uaProgress);
 
             if (wasUnlocked) {
-                uaProgress.setUnlockedAt(Instant.now());
+                uaProgress.setUnlockedAt(occurredAt);
                 newlyUnlocked.add(achievementDefinition);
                 log.info(
-                    "Achievement unlocked: userId={}, achievement={}, progress={}",
+                    "Achievement unlocked: userId={}, achievement={}, progress={}, occurredAt={}",
                     user.getId(),
                     achievementDefinition.getId(),
-                    uaProgress.getProgressData()
+                    uaProgress.getProgressData(),
+                    occurredAt
                 );
             }
 

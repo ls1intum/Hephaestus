@@ -3,6 +3,8 @@ package de.tum.in.www1.hephaestus.achievement;
 import de.tum.in.www1.hephaestus.activity.ActivityEventType;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 
+import java.time.Instant;
+
 /**
  * Spring application event published when an activity event is successfully recorded.
  *
@@ -12,12 +14,13 @@ import de.tum.in.www1.hephaestus.gitprovider.user.User;
  *
  * @param user the user who performed the activity (may be null for system events)
  * @param eventType the type of activity that was recorded
+ * @param occurredAt when the activity actually occurred (source timestamp, not ingestion time)
  * @param workspaceId the workspace where the activity occurred
  *
  * @see AchievementEventListener
  * @see de.tum.in.www1.hephaestus.activity.ActivityEventService
  */
-public record ActivitySavedEvent(User user, ActivityEventType eventType, Long workspaceId) {
+public record ActivitySavedEvent(User user, ActivityEventType eventType, Instant occurredAt, Long workspaceId) {
     /**
      * Check if this event has a valid user for achievement evaluation.
      *

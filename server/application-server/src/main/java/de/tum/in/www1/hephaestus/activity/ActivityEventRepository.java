@@ -11,6 +11,9 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.jpa.repository.QueryHints;
+import jakarta.persistence.QueryHint;
+import java.util.stream.Stream;
 
 /**
  * Activity event repository with leaderboard aggregation queries.
@@ -498,4 +501,25 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         @Param("actorId") Long actorId,
         @Param("eventTypes") Set<String> eventTypes
     );
+
+    /**
+     * Stream all activity events for a specific actor in chronological order.
+     *
+     * <p>Used for recalculating achievements correctly after historical data syncs.
+     * Uses a specific fetch size to prevent out-of-memory errors for users with
+     * tens of thousands of commits.
+     *
+     * @param actorId the user's ID
+     * @return stream of activity events ordered by occurred_at ASC
+     */
+    @QueryHints(value = @QueryHint(name = org.hibernate.jpa.HibernateHints.HINT_FETCH_SIZE, value = "" + Integer.MIN_VALUE))
+    @Query(
+        """
+        SELECT e
+        FROM ActivityEvent e
+        WHERE e.actor.id = :actorId
+        ORDER BY e.occurredAt ASC
+        """
+    )
+    Stream<ActivityEvent> streamByActorIdOrderByOccurredAtAsc(@Param("actorId") Long actorId);
 }

@@ -5,9 +5,11 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Repository for managing user achievement unlocks.
@@ -138,4 +140,26 @@ public interface UserAchievementRepository extends JpaRepository<UserAchievement
         @Param("userId") Long userId,
         @Param("achievementIds") Set<String> achievementIds
     );
+
+    /**
+     * Delete all achievement progress records for a specific user.
+     *
+     * <p>Used by the recalculation/backfill service to clear state before
+     * replaying historical events chronologically.
+     *
+     * @param userId the user's ID
+     */
+    @Modifying
+    @Transactional
+    @Query("DELETE FROM UserAchievement ua WHERE ua.user.id = :userId")
+    void deleteByUserId(@Param("userId") Long userId);
+
+    /**
+     * Count achievement progress records for a user.
+     *
+     * @param userId the user's ID
+     * @return count of achievement records
+     */
+    @Query("SELECT COUNT(ua) FROM UserAchievement ua WHERE ua.user.id = :userId")
+    long countByUserId(@Param("userId") Long userId);
 }

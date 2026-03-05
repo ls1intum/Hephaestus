@@ -21,7 +21,9 @@ import org.springframework.core.env.Environment;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import de.tum.in.www1.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 
 /**
  * Controller for user achievement endpoints.
@@ -39,6 +41,7 @@ public class AchievementController {
     private static final Logger log = LoggerFactory.getLogger(AchievementController.class);
 
     private final AchievementService achievementService;
+    private final AchievementRecalculationService achievementRecalculationService;
     private final UserRepository userRepository;
     private final Environment env;
 
@@ -101,5 +104,34 @@ public class AchievementController {
 
         List<AchievementDTO> definitions = achievementService.getAllAchievementDefinitions();
         return ResponseEntity.ok(definitions);
+    }
+
+    /**
+     * Recalculate all achievements for a specific user.
+     *
+     * <p>This wipes the current user's achievement progress and streams their complete
+     * timeline of activity events chronologically to accurately determine the actual
+     * dates they earned their achievements.
+     *
+     * @param workspaceContext the resolved workspace context (used for access control)
+     * @param login the user's GitHub login
+     * @return 204 No Content upon successful recalculation
+     */
+    @PostMapping("/recalculate")
+    @Operation(
+        summary = "Recalculate user achievements",
+        description = "Wipes and historically recalculates a user's achievement timeline. Admin only."
+    )
+    @RequireAtLeastWorkspaceAdmin
+    public ResponseEntity<Void> recalculateUserAchievements(
+        WorkspaceContext workspaceContext,
+        @PathVariable String login
+    ) {
+        log.info("Admin requested achievement recalculation for user: {} in workspace: {}", login, workspaceContext.slug());
+
+        User user = userRepository.findByLogin(login).orElseThrow(() -> new EntityNotFoundException("User", login));
+        achievementRecalculationService.recalculateUser(user);
+
+        return ResponseEntity.noContent().build();
     }
 }
