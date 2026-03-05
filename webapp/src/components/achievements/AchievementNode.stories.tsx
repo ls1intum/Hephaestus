@@ -87,23 +87,44 @@ const rarityMocks: Record<(typeof rarities)[number], UIAchievement> = {
 export const Unlocked: Story = {
 	render: () => (
 		<div className="flex items-center justify-center gap-12">
-			{rarities.map((rarity) => (
-				<div key={rarity} className="relative w-24 h-24 flex items-center justify-center">
-					<AchievementNode
-						id={`node-${rarity}`}
-						data={{
-							achievement: { ...rarityMocks[rarity], status: "unlocked" },
-							showTooltips: true,
-						}}
-						{...sharedNodeProps}
-					/>
-					<div className="absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap">
-						<span className="text-[10px] text-muted-foreground uppercase font-mono tracking-tighter">
-							{rarity}
-						</span>
+			{rarities.map((rarity) => {
+				const unlockedProgressData = (() => {
+					const raw = rarityMocks[rarity].progressData;
+					if (!raw) {
+						return { type: "BinaryAchievementProgress", unlocked: true } as const;
+					}
+
+					switch (raw.type) {
+						case "LinearAchievementProgress":
+							return { ...raw, current: raw.target } as const;
+						case "BinaryAchievementProgress":
+							return { ...raw, unlocked: true } as const;
+						default:
+							return { type: "BinaryAchievementProgress", unlocked: true } as const;
+					}
+				})();
+				return (
+					<div key={rarity} className="relative w-24 h-24 flex items-center justify-center">
+						<AchievementNode
+							id={`node-${rarity}`}
+							data={{
+								achievement: {
+									...rarityMocks[rarity],
+									status: "unlocked",
+									progressData: unlockedProgressData,
+								},
+								showTooltips: true,
+							}}
+							{...sharedNodeProps}
+						/>
+						<div className="absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap">
+							<span className="text-[10px] text-muted-foreground uppercase font-mono tracking-tighter">
+								{rarity}
+							</span>
+						</div>
 					</div>
-				</div>
-			))}
+				);
+			})}
 		</div>
 	),
 };
@@ -150,23 +171,44 @@ export const Available: Story = {
 export const Locked: Story = {
 	render: () => (
 		<div className="flex items-center justify-center gap-12">
-			{rarities.map((rarity) => (
-				<div key={rarity} className="relative w-24 h-24 flex items-center justify-center">
-					<AchievementNode
-						id={`node-locked-${rarity}`}
-						data={{
-							achievement: { ...rarityMocks[rarity], status: "locked" },
-							showTooltips: true,
-						}}
-						{...sharedNodeProps}
-					/>
-					<div className="absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap">
-						<span className="text-[10px] text-muted-foreground uppercase font-mono tracking-tighter">
-							{rarity}
-						</span>
+			{rarities.map((rarity) => {
+				const lockedProgressData = (() => {
+					const raw = rarityMocks[rarity].progressData;
+					if (!raw) {
+						return { type: "BinaryAchievementProgress", unlocked: false } as const;
+					}
+
+					switch (raw.type) {
+						case "LinearAchievementProgress":
+							return { ...raw, current: 0 } as const;
+						case "BinaryAchievementProgress":
+							return { ...raw, unlocked: false } as const;
+						default:
+							return { type: "BinaryAchievementProgress", unlocked: false } as const;
+					}
+				})();
+				return (
+					<div key={rarity} className="relative w-24 h-24 flex items-center justify-center">
+						<AchievementNode
+							id={`node-locked-${rarity}`}
+							data={{
+								achievement: {
+									...rarityMocks[rarity],
+									status: "locked",
+									progressData: lockedProgressData,
+								},
+								showTooltips: true,
+							}}
+							{...sharedNodeProps}
+						/>
+						<div className="absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap">
+							<span className="text-[10px] text-muted-foreground uppercase font-mono tracking-tighter">
+								{rarity}
+							</span>
+						</div>
 					</div>
-				</div>
-			))}
+				);
+			})}
 		</div>
 	),
 };
