@@ -2743,3 +2743,26 @@ export type GetAllAchievementDefinitionsResponses = {
 };
 
 export type GetAllAchievementDefinitionsResponse = GetAllAchievementDefinitionsResponses[keyof GetAllAchievementDefinitionsResponses];
+
+export type RecalculateUserAchievementsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        /**
+         * the user's GitHub login
+         */
+        login: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/users/{login}/achievements/recalculate';
+};
+
+export type RecalculateUserAchievementsResponses = {
+    /**
+     * Recalculation task started successfully
+     */
+    202: unknown;
+};
