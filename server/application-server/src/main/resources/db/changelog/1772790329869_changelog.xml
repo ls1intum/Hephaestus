@@ -19,7 +19,7 @@
                              Used for deregistration and idempotency checks.
     -->
 
-    <changeSet id="1772600000000-1" author="hephaestus">
+    <changeSet id="1772790329869-1" author="hephaestus">
         <addColumn tableName="workspace">
             <column name="gitlab_group_id" type="BIGINT">
                 <constraints nullable="true"/>
