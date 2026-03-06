@@ -354,8 +354,8 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("null nodes from GitLab access restrictions are counted as redacted, not errors")
-        void nullNodes_countedAsRedacted_notErrors() {
+        @DisplayName("null nodes from GitLab timeouts produce COMPLETED_WITH_ERRORS")
+        void nullNodes_countedAsRedacted_producesErrors() {
             var proj1 = createMinimalProject("gid://gitlab/Project/10", "my-org/proj-a", "proj-a");
 
             // Simulate GitLab returning [proj1, null, null] — 2 null nodes due to access restrictions
@@ -377,8 +377,8 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
 
             GitLabSyncResult result = service.syncGroupProjects(1L, "my-org");
 
-            // Redacted nodes should NOT cause COMPLETED_WITH_ERRORS
-            assertThat(result.status()).isEqualTo(GitLabSyncResult.Status.COMPLETED);
+            // Redacted nodes indicate data loss and should produce COMPLETED_WITH_ERRORS
+            assertThat(result.status()).isEqualTo(GitLabSyncResult.Status.COMPLETED_WITH_ERRORS);
             assertThat(result.synced()).hasSize(1);
             assertThat(result.projectsSkipped()).isZero();
             assertThat(result.projectsRedacted()).isEqualTo(2);

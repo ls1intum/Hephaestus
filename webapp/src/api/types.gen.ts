@@ -129,6 +129,10 @@ export type Workspace = {
      */
     gitProviderMode?: string;
     /**
+     * Whether a GitLab webhook has been auto-registered for this workspace
+     */
+    gitlabWebhookRegistered: boolean;
+    /**
      * Whether a Personal Access Token is configured
      */
     hasPersonalAccessToken: boolean;
