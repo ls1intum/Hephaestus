@@ -131,7 +131,7 @@ export type Workspace = {
     /**
      * Whether a GitLab webhook has been auto-registered for this workspace
      */
-    gitlabWebhookRegistered?: boolean;
+    gitlabWebhookRegistered: boolean;
     /**
      * Whether a Personal Access Token is configured
      */

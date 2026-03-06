@@ -3514,6 +3514,7 @@ components:
       - accountLogin
       - createdAt
       - displayName
+      - gitlabWebhookRegistered
       - hasPersonalAccessToken
       - hasSlackSigningSecret
       - hasSlackToken
