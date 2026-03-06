@@ -342,6 +342,12 @@ class GitLabWebhookClientTest extends BaseUnitTest {
     class IsPermissionOrNotFoundError {
 
         @Test
+        @DisplayName("should return true for 401")
+        void shouldReturnTrueFor401() {
+            assertThat(GitLabWebhookClient.isPermissionOrNotFoundError(HttpStatus.UNAUTHORIZED)).isTrue();
+        }
+
+        @Test
         @DisplayName("should return true for 403")
         void shouldReturnTrueFor403() {
             assertThat(GitLabWebhookClient.isPermissionOrNotFoundError(HttpStatus.FORBIDDEN)).isTrue();

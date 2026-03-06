@@ -110,6 +110,12 @@ public class GitLabTokenRotationClient {
         }
 
         String newToken = (String) response.get("token");
+        if (newToken == null || newToken.isBlank()) {
+            throw new IllegalStateException(
+                "GitLab rotation response missing 'token' field. Old token is revoked. Manual intervention required: scopeId=" +
+                    scopeId
+            );
+        }
         String newExpiresAtStr = (String) response.get("expires_at");
         LocalDate newExpiresAt = newExpiresAtStr != null ? LocalDate.parse(newExpiresAtStr) : expiresAt;
 

@@ -157,7 +157,8 @@ public class GitLabWebhookService {
         }
 
         Long scopeId = workspace.getId();
-        String webhookUrl = webhookProperties.externalUrl() + "/gitlab";
+        String baseUrl = webhookProperties.externalUrl().replaceAll("/+$", "");
+        String webhookUrl = baseUrl + "/gitlab";
 
         try {
             // Step 1: If we already have a webhook ID, verify it still exists

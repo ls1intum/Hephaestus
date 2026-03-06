@@ -395,6 +395,7 @@ hephaestus:
         external-url: ${WEBHOOK_EXTERNAL_URL:}
         secret: ${WEBHOOK_SECRET:}
         token-rotation-threshold-days: ${WEBHOOK_TOKEN_ROTATION_THRESHOLD_DAYS:7}
+        token-rotation-validity-days: ${WEBHOOK_TOKEN_ROTATION_VALIDITY_DAYS:90}
 
     # ═══════════════════════════════════════════════════════════════════════════
     # GITHUB AUTHENTICATION

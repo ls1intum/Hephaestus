@@ -165,6 +165,32 @@ class GitLabTokenRotationClientTest extends BaseUnitTest {
         }
 
         @Test
+        @DisplayName("should throw when rotation response missing token field")
+        @SuppressWarnings("unchecked")
+        void shouldThrowWhenResponseMissingToken() {
+            stubTokenService();
+            RequestBodyUriSpec bodyUriSpec = mock(RequestBodyUriSpec.class);
+            RequestBodySpec bodySpec = mock(RequestBodySpec.class);
+            ResponseSpec responseSpec = mock(ResponseSpec.class);
+
+            when(mockWebClient.post()).thenReturn(bodyUriSpec);
+            org.mockito.Mockito.doReturn(bodySpec).when(bodyUriSpec).uri(anyString());
+            org.mockito.Mockito.doReturn(bodySpec).when(bodySpec).header(anyString(), anyString());
+            org.mockito.Mockito.doReturn(bodySpec).when(bodySpec).bodyValue(any());
+            when(bodySpec.retrieve()).thenReturn(responseSpec);
+
+            Map<String, Object> responseMap = new java.util.HashMap<>();
+            responseMap.put("token", null);
+            responseMap.put("expires_at", "2026-09-01");
+
+            when(responseSpec.bodyToMono(any(ParameterizedTypeReference.class))).thenReturn(Mono.just(responseMap));
+
+            assertThatThrownBy(() -> rotationClient.rotateToken(SCOPE_ID, LocalDate.of(2026, 9, 1)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("missing 'token' field");
+        }
+
+        @Test
         @DisplayName("should throw on 403 (insufficient scope)")
         @SuppressWarnings("unchecked")
         void shouldThrowOn403() {

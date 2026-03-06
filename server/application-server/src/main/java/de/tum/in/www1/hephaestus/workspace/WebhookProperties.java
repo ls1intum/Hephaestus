@@ -41,7 +41,7 @@ public record WebhookProperties(
         if (externalUrl == null || externalUrl.isBlank()) {
             return false;
         }
-        if (secret == null) {
+        if (secret == null || secret.isBlank()) {
             return false;
         }
         if (secret.length() < MIN_SECRET_LENGTH) {

@@ -114,7 +114,13 @@ public class GitLabWebhookClient {
             );
         }
 
-        long webhookId = ((Number) response.get("id")).longValue();
+        Number idValue = (Number) response.get("id");
+        if (idValue == null) {
+            throw new IllegalStateException(
+                "GitLab webhook response missing 'id' field: scopeId=" + scopeId + ", groupId=" + groupId
+            );
+        }
+        long webhookId = idValue.longValue();
         String url = (String) response.get("url");
         log.info("Registered GitLab group webhook: scopeId={}, groupId={}, webhookId={}", scopeId, groupId, webhookId);
         return new WebhookInfo(webhookId, url);
@@ -179,7 +185,7 @@ public class GitLabWebhookClient {
                 .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
                 .block(REQUEST_TIMEOUT);
 
-            if (response == null) {
+            if (response == null || response.get("id") == null) {
                 return Optional.empty();
             }
 
@@ -218,19 +224,21 @@ public class GitLabWebhookClient {
 
         return response
             .stream()
+            .filter(hook -> hook.get("id") != null)
             .map(hook -> new WebhookInfo(((Number) hook.get("id")).longValue(), (String) hook.get("url")))
             .toList();
     }
 
     /**
-     * Checks whether a 403 (Forbidden) or 404 (Not Found) response indicates
-     * insufficient permissions or a missing resource (as opposed to a transient failure).
+     * Checks whether a 401, 403, or 404 response indicates an authentication/permission
+     * issue or a missing resource (as opposed to a transient failure).
      *
-     * <p>Note: 404 may indicate either a missing resource or that the caller lacks
+     * <p>Includes 401 (Unauthorized) because an expired or invalid token is non-retryable.
+     * Note: 404 may indicate either a missing resource or that the caller lacks
      * permission to view it (GitLab returns 404 for unauthorized access to private resources).
      */
     public static boolean isPermissionOrNotFoundError(HttpStatusCode status) {
-        return status.value() == 403 || status.value() == 404;
+        return status.value() == 401 || status.value() == 403 || status.value() == 404;
     }
 
     public record GroupInfo(long id, String name, String fullPath) {}
