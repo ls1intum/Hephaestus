@@ -49,25 +49,17 @@ public class GitLabWebhookClient {
         this.webClient = webClientBuilder.build();
     }
 
-    // ========================================================================
-    // Internal helpers
-    // ========================================================================
-
     /** Resolved server URL and access token for a given scope. */
-    record ScopeCredentials(String serverUrl, String token) {}
-
-    /**
-     * Resolves the server URL and access token for the given workspace/scope ID.
-     */
-    private ScopeCredentials resolveCredentials(Long scopeId) {
-        String serverUrl = tokenService.resolveServerUrl(scopeId);
-        String token = tokenService.getAccessToken(scopeId);
-        return new ScopeCredentials(serverUrl, token);
+    record ScopeCredentials(String serverUrl, String token) {
+        @Override
+        public String toString() {
+            return "ScopeCredentials[serverUrl=" + serverUrl + "]";
+        }
     }
 
-    // ========================================================================
-    // GraphQL: Group Lookup (reuses existing infra)
-    // ========================================================================
+    private ScopeCredentials resolveCredentials(Long scopeId) {
+        return new ScopeCredentials(tokenService.resolveServerUrl(scopeId), tokenService.getAccessToken(scopeId));
+    }
 
     /**
      * Looks up a GitLab group by its full path and returns the stable numeric ID.
@@ -94,10 +86,6 @@ public class GitLabWebhookClient {
         long numericId = GitLabSyncConstants.extractNumericId(group.id());
         return new GroupInfo(numericId, group.name(), group.fullPath());
     }
-
-    // ========================================================================
-    // REST: Webhook CRUD (no GraphQL mutations available)
-    // ========================================================================
 
     /**
      * Registers a group-level webhook.
@@ -244,10 +232,6 @@ public class GitLabWebhookClient {
     public static boolean isPermissionOrNotFoundError(HttpStatusCode status) {
         return status.value() == 403 || status.value() == 404;
     }
-
-    // ========================================================================
-    // DTOs
-    // ========================================================================
 
     public record GroupInfo(long id, String name, String fullPath) {}
 

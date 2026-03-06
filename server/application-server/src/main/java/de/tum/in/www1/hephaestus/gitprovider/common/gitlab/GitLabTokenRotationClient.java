@@ -43,10 +43,12 @@ public class GitLabTokenRotationClient {
         this.webClient = webClientBuilder.build();
     }
 
-    /**
-     * Resolves server URL and access token for the given scope.
-     */
-    private record ScopeCredentials(String serverUrl, String token) {}
+    private record ScopeCredentials(String serverUrl, String token) {
+        @Override
+        public String toString() {
+            return "ScopeCredentials[serverUrl=" + serverUrl + "]";
+        }
+    }
 
     private ScopeCredentials resolveCredentials(Long scopeId) {
         return new ScopeCredentials(tokenService.resolveServerUrl(scopeId), tokenService.getAccessToken(scopeId));

@@ -251,7 +251,12 @@ public class GitLabWebhookService {
             }
             int status = e.getStatusCode().value();
             String apiReason = String.format("GitLab API error: %d", status);
-            log.warn("Webhook registration failed: workspaceId={}, reason={}", scopeId, apiReason);
+            log.warn(
+                "Webhook registration failed: workspaceId={}, reason={}, body={}",
+                scopeId,
+                apiReason,
+                e.getResponseBodyAsString()
+            );
             workspaceRepository.save(workspace);
             return WebhookSetupResult.failed(apiReason);
         }
