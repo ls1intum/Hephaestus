@@ -28,6 +28,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 /**
@@ -81,14 +82,7 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
         workspace.setAccountLogin("my-org");
         workspace.setPersonalAccessToken("glpat-test-token");
 
-        // Use reflection to set ID since there's no setter on @GeneratedValue fields
-        try {
-            var idField = Workspace.class.getDeclaredField("id");
-            idField.setAccessible(true);
-            idField.set(workspace, 1L);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        ReflectionTestUtils.setField(workspace, "id", 1L);
     }
 
     @Nested

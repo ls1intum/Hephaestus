@@ -29,6 +29,20 @@ public record WebhookProperties(
     @DefaultValue("7") int tokenRotationThresholdDays,
     @DefaultValue("90") int tokenRotationValidityDays
 ) {
+    /** Compact constructor: fail fast on invalid configuration. */
+    public WebhookProperties {
+        if (tokenRotationThresholdDays < 0) {
+            throw new IllegalArgumentException(
+                "tokenRotationThresholdDays must be >= 0, got: " + tokenRotationThresholdDays
+            );
+        }
+        if (tokenRotationValidityDays < 1) {
+            throw new IllegalArgumentException(
+                "tokenRotationValidityDays must be >= 1, got: " + tokenRotationValidityDays
+            );
+        }
+    }
+
     private static final Logger log = LoggerFactory.getLogger(WebhookProperties.class);
 
     static final int MIN_SECRET_LENGTH = 32;

@@ -75,7 +75,13 @@ public class GitLabTokenRotationClient {
             throw new IllegalStateException("Empty response from GitLab token self-introspection");
         }
 
-        long id = ((Number) response.get("id")).longValue();
+        Number idValue = (Number) response.get("id");
+        if (idValue == null) {
+            throw new IllegalStateException(
+                "GitLab token introspection response missing 'id' field: scopeId=" + scopeId
+            );
+        }
+        long id = idValue.longValue();
         String name = (String) response.get("name");
         String expiresAtStr = (String) response.get("expires_at");
         LocalDate expiresAt = expiresAtStr != null ? LocalDate.parse(expiresAtStr) : null;

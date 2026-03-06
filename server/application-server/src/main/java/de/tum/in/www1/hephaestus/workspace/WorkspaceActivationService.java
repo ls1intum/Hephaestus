@@ -237,31 +237,16 @@ public class WorkspaceActivationService {
                     // and token rotation ensures subsequent API calls use a fresh token.
                     var webhookService = gitLabWebhookServiceProvider.getIfAvailable();
                     if (webhookService != null) {
-                        try {
-                            webhookService.rotateTokenIfNeeded(workspace);
-                        } catch (Exception e) {
-                            log.warn(
-                                "Token rotation failed: workspaceId={}, error={}",
-                                workspace.getId(),
-                                e.getMessage()
-                            );
-                        }
+                        // rotateTokenIfNeeded catches exceptions internally (non-fatal)
+                        webhookService.rotateTokenIfNeeded(workspace);
 
-                        try {
-                            var webhookResult = webhookService.registerWebhook(workspace);
-                            log.info(
-                                "Webhook setup: workspaceId={}, registered={}, reason={}",
-                                workspace.getId(),
-                                webhookResult.registered(),
-                                webhookResult.failureReason()
-                            );
-                        } catch (Exception e) {
-                            log.warn(
-                                "Webhook registration failed: workspaceId={}, error={}",
-                                workspace.getId(),
-                                e.getMessage()
-                            );
-                        }
+                        var webhookResult = webhookService.registerWebhook(workspace);
+                        log.info(
+                            "Webhook setup: workspaceId={}, registered={}, reason={}",
+                            workspace.getId(),
+                            webhookResult.registered(),
+                            webhookResult.failureReason()
+                        );
                     }
 
                     // GitLab: sync group and its projects via GraphQL

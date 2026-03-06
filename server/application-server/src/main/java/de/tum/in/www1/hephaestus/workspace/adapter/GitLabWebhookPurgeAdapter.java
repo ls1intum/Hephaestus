@@ -41,7 +41,8 @@ public class GitLabWebhookPurgeAdapter implements WorkspacePurgeContributor {
             log.warn(
                 "GitLab webhook deregistration failed during purge (best-effort): workspaceId={}, error={}",
                 workspaceId,
-                e.getMessage()
+                e.getMessage(),
+                e
             );
         }
     }

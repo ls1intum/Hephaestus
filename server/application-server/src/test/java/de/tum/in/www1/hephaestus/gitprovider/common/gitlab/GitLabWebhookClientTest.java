@@ -24,9 +24,6 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.graphql.client.ClientGraphQlRequest;
-import org.springframework.graphql.client.ClientGraphQlResponse;
-import org.springframework.graphql.client.ClientResponseField;
 import org.springframework.graphql.client.GraphQlClient;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.http.HttpStatus;
@@ -87,7 +84,6 @@ class GitLabWebhookClientTest extends BaseUnitTest {
             HttpGraphQlClient mockGraphQlClient = mock(HttpGraphQlClient.class);
             GraphQlClient.RequestSpec requestSpec = mock(GraphQlClient.RequestSpec.class);
             GraphQlClient.RetrieveSpec retrieveSpec = mock(GraphQlClient.RetrieveSpec.class);
-            ClientResponseField responseField = mock(ClientResponseField.class);
 
             when(graphQlClientProvider.forScope(SCOPE_ID)).thenReturn(mockGraphQlClient);
             when(mockGraphQlClient.documentName("GetGroup")).thenReturn(requestSpec);

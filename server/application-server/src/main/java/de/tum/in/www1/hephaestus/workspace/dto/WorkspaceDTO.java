@@ -39,6 +39,7 @@ public record WorkspaceDTO(
     @NonNull @Schema(description = "Whether a Personal Access Token is configured") Boolean hasPersonalAccessToken,
     @NonNull @Schema(description = "Whether Slack token is configured") Boolean hasSlackToken,
     @NonNull @Schema(description = "Whether Slack signing secret is configured") Boolean hasSlackSigningSecret,
+    @NonNull
     @Schema(description = "Whether a GitLab webhook has been auto-registered for this workspace")
     Boolean gitlabWebhookRegistered
 ) {
