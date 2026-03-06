@@ -6,7 +6,6 @@ import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabTokenService;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabWebhookClient;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabWebhookClient.WebhookConfig;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabWebhookClient.WebhookInfo;
-import de.tum.in.www1.hephaestus.workspace.dto.WebhookSetupResult;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -14,6 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
@@ -57,10 +57,6 @@ public class GitLabWebhookService {
         this.webhookProperties = webhookProperties;
         this.workspaceRepository = workspaceRepository;
     }
-
-    // ========================================================================
-    // Token Rotation
-    // ========================================================================
 
     /**
      * Checks if the workspace's PAT is expiring soon and rotates it if needed.
@@ -106,8 +102,7 @@ public class GitLabWebhookService {
                 return;
             }
 
-            // Rotate with 90-day validity
-            LocalDate newExpiry = LocalDate.now().plusDays(90);
+            LocalDate newExpiry = LocalDate.now().plusDays(webhookProperties.tokenRotationValidityDays());
             var rotatedToken = rotationClient.rotateToken(workspace.getId(), newExpiry);
 
             // Critical: persist new token immediately — old token is already revoked
@@ -126,15 +121,11 @@ public class GitLabWebhookService {
                 tokenInfo.expiresAt(),
                 rotatedToken.expiresAt()
             );
-        } catch (Exception e) {
+        } catch (WebClientResponseException | IllegalStateException e) {
             // Token rotation failure is non-fatal — the token still works until actual expiry
             log.warn("Token rotation failed: workspaceId={}, error={}", workspace.getId(), e.getMessage());
         }
     }
-
-    // ========================================================================
-    // Webhook Registration (Idempotent)
-    // ========================================================================
 
     /**
      * Registers a group-level webhook for the workspace, idempotently.
@@ -247,7 +238,7 @@ public class GitLabWebhookService {
             );
             return WebhookSetupResult.success(registered.id(), groupId);
         } catch (WebClientResponseException e) {
-            if (GitLabWebhookClient.isPermissionError(e.getStatusCode())) {
+            if (GitLabWebhookClient.isPermissionOrNotFoundError(e.getStatusCode())) {
                 String reason = String.format(
                     "Insufficient permissions (HTTP %d). Requires Owner role on GitLab group '%s' with Premium tier.",
                     e.getStatusCode().value(),
@@ -258,13 +249,13 @@ public class GitLabWebhookService {
                 workspaceRepository.save(workspace);
                 return WebhookSetupResult.failed(reason);
             }
-            throw e;
+            int status = e.getStatusCode().value();
+            String apiReason = String.format("GitLab API error: %d", status);
+            log.warn("Webhook registration failed: workspaceId={}, reason={}", scopeId, apiReason);
+            workspaceRepository.save(workspace);
+            return WebhookSetupResult.failed(apiReason);
         }
     }
-
-    // ========================================================================
-    // Webhook Deregistration (Best-Effort)
-    // ========================================================================
 
     /**
      * Deregisters the workspace's webhook from GitLab. Best-effort: never throws.
@@ -306,9 +297,14 @@ public class GitLabWebhookService {
     /**
      * Deregisters webhook by workspace ID. Used by purge contributors.
      *
+     * <p>Uses {@link Propagation#NOT_SUPPORTED} to suspend the outer purge
+     * transaction during the external HTTP call to GitLab. Running HTTP calls
+     * inside a transaction is an anti-pattern (ties up a DB connection for the
+     * duration of the network round-trip).
+     *
      * @param workspaceId the workspace ID
      */
-    @Transactional
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public void deregisterWebhookByWorkspaceId(Long workspaceId) {
         workspaceRepository.findById(workspaceId).ifPresent(this::deregisterWebhook);
     }

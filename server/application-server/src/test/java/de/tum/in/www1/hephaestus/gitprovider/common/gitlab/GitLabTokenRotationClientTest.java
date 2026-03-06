@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -12,7 +11,6 @@ import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabTokenRotationCl
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabTokenRotationClient.TokenInfo;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import java.time.LocalDate;
-import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -20,6 +18,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClient.RequestBodySpec;
 import org.springframework.web.reactive.function.client.WebClient.RequestBodyUriSpec;
@@ -47,7 +46,6 @@ class GitLabTokenRotationClientTest extends BaseUnitTest {
     private static final String TOKEN = "glpat-test-token";
 
     @BeforeEach
-    @SuppressWarnings("unchecked")
     void setUp() {
         mockWebClient = mock(WebClient.class);
         WebClient.Builder builder = mock(WebClient.Builder.class);
@@ -79,21 +77,8 @@ class GitLabTokenRotationClientTest extends BaseUnitTest {
             when(uriSpec.uri(anyString())).thenReturn(headersSpec);
             when(headersSpec.header(anyString(), anyString())).thenReturn(headersSpec);
             when(headersSpec.retrieve()).thenReturn(responseSpec);
-            when(responseSpec.bodyToMono(eq(Map.class))).thenReturn(
-                Mono.just(
-                    Map.of(
-                        "id",
-                        123,
-                        "name",
-                        "my-token",
-                        "expires_at",
-                        "2026-06-01",
-                        "scopes",
-                        List.of("api", "read_user"),
-                        "active",
-                        true
-                    )
-                )
+            when(responseSpec.bodyToMono(any(ParameterizedTypeReference.class))).thenReturn(
+                Mono.just(Map.of("id", 123, "name", "my-token", "expires_at", "2026-06-01"))
             );
 
             TokenInfo result = rotationClient.getTokenInfo(SCOPE_ID);
@@ -101,8 +86,6 @@ class GitLabTokenRotationClientTest extends BaseUnitTest {
             assertThat(result.id()).isEqualTo(123L);
             assertThat(result.name()).isEqualTo("my-token");
             assertThat(result.expiresAt()).isEqualTo(LocalDate.of(2026, 6, 1));
-            assertThat(result.scopes()).containsExactly("api", "read_user");
-            assertThat(result.active()).isTrue();
         }
 
         @Test
@@ -124,10 +107,8 @@ class GitLabTokenRotationClientTest extends BaseUnitTest {
             responseMap.put("id", 123);
             responseMap.put("name", "my-token");
             responseMap.put("expires_at", null);
-            responseMap.put("scopes", List.of("api"));
-            responseMap.put("active", true);
 
-            when(responseSpec.bodyToMono(eq(Map.class))).thenReturn(Mono.just(responseMap));
+            when(responseSpec.bodyToMono(any(ParameterizedTypeReference.class))).thenReturn(Mono.just(responseMap));
 
             TokenInfo result = rotationClient.getTokenInfo(SCOPE_ID);
 
@@ -173,7 +154,7 @@ class GitLabTokenRotationClientTest extends BaseUnitTest {
             org.mockito.Mockito.doReturn(bodySpec).when(bodySpec).header(anyString(), anyString());
             org.mockito.Mockito.doReturn(bodySpec).when(bodySpec).bodyValue(any());
             when(bodySpec.retrieve()).thenReturn(responseSpec);
-            when(responseSpec.bodyToMono(eq(Map.class))).thenReturn(
+            when(responseSpec.bodyToMono(any(ParameterizedTypeReference.class))).thenReturn(
                 Mono.just(Map.of("token", "glpat-new-rotated-token", "expires_at", "2026-09-01"))
             );
 
@@ -210,7 +191,7 @@ class GitLabTokenRotationClientTest extends BaseUnitTest {
         @Test
         @DisplayName("TokenInfo toString should not expose sensitive data")
         void tokenInfoToString() {
-            TokenInfo info = new TokenInfo(1L, "test", LocalDate.of(2026, 1, 1), List.of("api"), true);
+            TokenInfo info = new TokenInfo(1L, "test", LocalDate.of(2026, 1, 1));
             assertThat(info.toString()).doesNotContain("glpat");
         }
 

@@ -150,7 +150,7 @@ class GitLabWebhookClientTest extends BaseUnitTest {
             org.mockito.Mockito.doReturn(bodySpec).when(bodySpec).header(anyString(), anyString());
             org.mockito.Mockito.doReturn(bodySpec).when(bodySpec).bodyValue(any());
             when(bodySpec.retrieve()).thenReturn(responseSpec);
-            when(responseSpec.bodyToMono(eq(Map.class))).thenReturn(
+            when(responseSpec.bodyToMono(any(ParameterizedTypeReference.class))).thenReturn(
                 Mono.just(Map.of("id", 99, "url", "https://example.com/webhooks/gitlab"))
             );
 
@@ -189,7 +189,7 @@ class GitLabWebhookClientTest extends BaseUnitTest {
             when(uriSpec.uri(anyString(), eq(GROUP_ID), eq(99L))).thenReturn(headersSpec);
             when(headersSpec.header(anyString(), anyString())).thenReturn(headersSpec);
             when(headersSpec.retrieve()).thenReturn(responseSpec);
-            when(responseSpec.bodyToMono(eq(Map.class))).thenReturn(
+            when(responseSpec.bodyToMono(any(ParameterizedTypeReference.class))).thenReturn(
                 Mono.just(Map.of("id", 99, "url", "https://example.com/webhooks/gitlab"))
             );
 
@@ -275,25 +275,88 @@ class GitLabWebhookClientTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("isPermissionError")
-    class IsPermissionError {
+    @DisplayName("deregisterGroupWebhook")
+    class DeregisterGroupWebhook {
+
+        @Test
+        @DisplayName("should deregister webhook successfully")
+        @SuppressWarnings("unchecked")
+        void shouldDeregisterWebhook() {
+            stubTokenService();
+            RequestHeadersUriSpec uriSpec = mock(RequestHeadersUriSpec.class);
+            RequestHeadersSpec headersSpec = mock(RequestHeadersSpec.class);
+            ResponseSpec responseSpec = mock(ResponseSpec.class);
+
+            when(mockWebClient.delete()).thenReturn(uriSpec);
+            when(uriSpec.uri(anyString(), eq(GROUP_ID), eq(99L))).thenReturn(headersSpec);
+            when(headersSpec.header(anyString(), anyString())).thenReturn(headersSpec);
+            when(headersSpec.retrieve()).thenReturn(responseSpec);
+            when(responseSpec.toBodilessEntity()).thenReturn(Mono.empty());
+
+            // Should complete without exception
+            webhookClient.deregisterGroupWebhook(SCOPE_ID, GROUP_ID, 99L);
+        }
+
+        @Test
+        @DisplayName("should treat 404 as success (already deleted)")
+        @SuppressWarnings("unchecked")
+        void shouldTreat404AsSuccess() {
+            stubTokenService();
+            RequestHeadersUriSpec uriSpec = mock(RequestHeadersUriSpec.class);
+            RequestHeadersSpec headersSpec = mock(RequestHeadersSpec.class);
+
+            when(mockWebClient.delete()).thenReturn(uriSpec);
+            when(uriSpec.uri(anyString(), eq(GROUP_ID), eq(999L))).thenReturn(headersSpec);
+            when(headersSpec.header(anyString(), anyString())).thenReturn(headersSpec);
+            when(headersSpec.retrieve()).thenThrow(
+                WebClientResponseException.create(404, "Not Found", null, null, null)
+            );
+
+            // Should complete without exception (404 is treated as already deleted)
+            webhookClient.deregisterGroupWebhook(SCOPE_ID, GROUP_ID, 999L);
+        }
+
+        @Test
+        @DisplayName("should rethrow non-404 errors")
+        @SuppressWarnings("unchecked")
+        void shouldRethrowNon404Errors() {
+            stubTokenService();
+            RequestHeadersUriSpec uriSpec = mock(RequestHeadersUriSpec.class);
+            RequestHeadersSpec headersSpec = mock(RequestHeadersSpec.class);
+
+            when(mockWebClient.delete()).thenReturn(uriSpec);
+            when(uriSpec.uri(anyString(), eq(GROUP_ID), eq(99L))).thenReturn(headersSpec);
+            when(headersSpec.header(anyString(), anyString())).thenReturn(headersSpec);
+            when(headersSpec.retrieve()).thenThrow(
+                WebClientResponseException.create(500, "Internal Server Error", null, null, null)
+            );
+
+            assertThatThrownBy(() -> webhookClient.deregisterGroupWebhook(SCOPE_ID, GROUP_ID, 99L)).isInstanceOf(
+                WebClientResponseException.class
+            );
+        }
+    }
+
+    @Nested
+    @DisplayName("isPermissionOrNotFoundError")
+    class IsPermissionOrNotFoundError {
 
         @Test
         @DisplayName("should return true for 403")
         void shouldReturnTrueFor403() {
-            assertThat(GitLabWebhookClient.isPermissionError(HttpStatus.FORBIDDEN)).isTrue();
+            assertThat(GitLabWebhookClient.isPermissionOrNotFoundError(HttpStatus.FORBIDDEN)).isTrue();
         }
 
         @Test
         @DisplayName("should return true for 404")
         void shouldReturnTrueFor404() {
-            assertThat(GitLabWebhookClient.isPermissionError(HttpStatus.NOT_FOUND)).isTrue();
+            assertThat(GitLabWebhookClient.isPermissionOrNotFoundError(HttpStatus.NOT_FOUND)).isTrue();
         }
 
         @Test
         @DisplayName("should return false for 500")
         void shouldReturnFalseFor500() {
-            assertThat(GitLabWebhookClient.isPermissionError(HttpStatus.INTERNAL_SERVER_ERROR)).isFalse();
+            assertThat(GitLabWebhookClient.isPermissionOrNotFoundError(HttpStatus.INTERNAL_SERVER_ERROR)).isFalse();
         }
     }
 }

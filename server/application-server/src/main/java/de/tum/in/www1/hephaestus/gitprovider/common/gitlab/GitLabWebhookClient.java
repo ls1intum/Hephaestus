@@ -5,7 +5,8 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
@@ -28,10 +29,10 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
  * @see <a href="https://docs.gitlab.com/ee/api/group_level_webhooks.html">GitLab Group Webhooks API</a>
  */
 @Service
-@Slf4j
 @ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
 public class GitLabWebhookClient {
 
+    private static final Logger log = LoggerFactory.getLogger(GitLabWebhookClient.class);
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(15);
 
     private final GitLabGraphQlClientProvider graphQlClientProvider;
@@ -46,6 +47,22 @@ public class GitLabWebhookClient {
         this.graphQlClientProvider = graphQlClientProvider;
         this.tokenService = tokenService;
         this.webClient = webClientBuilder.build();
+    }
+
+    // ========================================================================
+    // Internal helpers
+    // ========================================================================
+
+    /** Resolved server URL and access token for a given scope. */
+    record ScopeCredentials(String serverUrl, String token) {}
+
+    /**
+     * Resolves the server URL and access token for the given workspace/scope ID.
+     */
+    private ScopeCredentials resolveCredentials(Long scopeId) {
+        String serverUrl = tokenService.resolveServerUrl(scopeId);
+        String token = tokenService.getAccessToken(scopeId);
+        return new ScopeCredentials(serverUrl, token);
     }
 
     // ========================================================================
@@ -92,21 +109,21 @@ public class GitLabWebhookClient {
      * @throws WebClientResponseException on API errors (e.g., 403 Forbidden)
      */
     public WebhookInfo registerGroupWebhook(Long scopeId, long groupId, WebhookConfig config) {
-        String serverUrl = tokenService.resolveServerUrl(scopeId);
-        String token = tokenService.getAccessToken(scopeId);
+        ScopeCredentials credentials = resolveCredentials(scopeId);
 
-        @SuppressWarnings("unchecked")
         Map<String, Object> response = webClient
             .post()
-            .uri(serverUrl + "/api/v4/groups/{groupId}/hooks", groupId)
-            .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+            .uri(credentials.serverUrl() + "/api/v4/groups/{groupId}/hooks", groupId)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + credentials.token())
             .bodyValue(config.toPayload())
             .retrieve()
-            .bodyToMono(Map.class)
+            .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
             .block(REQUEST_TIMEOUT);
 
         if (response == null) {
-            throw new IllegalStateException("Empty response from GitLab webhook registration");
+            throw new IllegalStateException(
+                "Null response from GitLab when registering webhook: scopeId=" + scopeId + ", groupId=" + groupId
+            );
         }
 
         long webhookId = ((Number) response.get("id")).longValue();
@@ -123,14 +140,13 @@ public class GitLabWebhookClient {
      * @param webhookId the webhook ID to delete
      */
     public void deregisterGroupWebhook(Long scopeId, long groupId, long webhookId) {
-        String serverUrl = tokenService.resolveServerUrl(scopeId);
-        String token = tokenService.getAccessToken(scopeId);
+        ScopeCredentials credentials = resolveCredentials(scopeId);
 
         try {
             webClient
                 .delete()
-                .uri(serverUrl + "/api/v4/groups/{groupId}/hooks/{hookId}", groupId, webhookId)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .uri(credentials.serverUrl() + "/api/v4/groups/{groupId}/hooks/{hookId}", groupId, webhookId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + credentials.token())
                 .retrieve()
                 .toBodilessEntity()
                 .block(REQUEST_TIMEOUT);
@@ -164,17 +180,15 @@ public class GitLabWebhookClient {
      * @return the webhook info, or empty if not found (404)
      */
     public Optional<WebhookInfo> getGroupWebhook(Long scopeId, long groupId, long webhookId) {
-        String serverUrl = tokenService.resolveServerUrl(scopeId);
-        String token = tokenService.getAccessToken(scopeId);
+        ScopeCredentials credentials = resolveCredentials(scopeId);
 
         try {
-            @SuppressWarnings("unchecked")
             Map<String, Object> response = webClient
                 .get()
-                .uri(serverUrl + "/api/v4/groups/{groupId}/hooks/{hookId}", groupId, webhookId)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .uri(credentials.serverUrl() + "/api/v4/groups/{groupId}/hooks/{hookId}", groupId, webhookId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + credentials.token())
                 .retrieve()
-                .bodyToMono(Map.class)
+                .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
                 .block(REQUEST_TIMEOUT);
 
             if (response == null) {
@@ -200,13 +214,12 @@ public class GitLabWebhookClient {
      * @return list of webhook info
      */
     public List<WebhookInfo> listGroupWebhooks(Long scopeId, long groupId) {
-        String serverUrl = tokenService.resolveServerUrl(scopeId);
-        String token = tokenService.getAccessToken(scopeId);
+        ScopeCredentials credentials = resolveCredentials(scopeId);
 
         List<Map<String, Object>> response = webClient
             .get()
-            .uri(serverUrl + "/api/v4/groups/{groupId}/hooks", groupId)
-            .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+            .uri(credentials.serverUrl() + "/api/v4/groups/{groupId}/hooks?per_page=100", groupId)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + credentials.token())
             .retrieve()
             .bodyToMono(new ParameterizedTypeReference<List<Map<String, Object>>>() {})
             .block(REQUEST_TIMEOUT);
@@ -222,10 +235,13 @@ public class GitLabWebhookClient {
     }
 
     /**
-     * Checks whether a 403/404 response indicates insufficient permissions
-     * (as opposed to a transient failure).
+     * Checks whether a 403 (Forbidden) or 404 (Not Found) response indicates
+     * insufficient permissions or a missing resource (as opposed to a transient failure).
+     *
+     * <p>Note: 404 may indicate either a missing resource or that the caller lacks
+     * permission to view it (GitLab returns 404 for unauthorized access to private resources).
      */
-    public static boolean isPermissionError(HttpStatusCode status) {
+    public static boolean isPermissionOrNotFoundError(HttpStatusCode status) {
         return status.value() == 403 || status.value() == 404;
     }
 
@@ -252,7 +268,7 @@ public class GitLabWebhookClient {
         boolean pipelineEvents,
         boolean enableSslVerification
     ) {
-        Map<String, Object> toPayload() {
+        public Map<String, Object> toPayload() {
             return Map.of(
                 "url",
                 url,

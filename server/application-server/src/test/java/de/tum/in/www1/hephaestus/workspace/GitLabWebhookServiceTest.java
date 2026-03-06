@@ -18,7 +18,6 @@ import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabWebhookClient.G
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabWebhookClient.WebhookConfig;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabWebhookClient.WebhookInfo;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
-import de.tum.in.www1.hephaestus.workspace.dto.WebhookSetupResult;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -67,7 +66,7 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        WebhookProperties properties = new WebhookProperties(EXTERNAL_URL, SECRET, 7);
+        WebhookProperties properties = new WebhookProperties(EXTERNAL_URL, SECRET, 7, 90);
 
         webhookService = new GitLabWebhookService(
             webhookClientProvider,
@@ -213,7 +212,7 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
         @Test
         @DisplayName("should skip when properties not configured")
         void shouldSkipWhenNotConfigured() {
-            WebhookProperties unconfigured = new WebhookProperties("", "", 7);
+            WebhookProperties unconfigured = new WebhookProperties("", "", 7, 90);
             var service = new GitLabWebhookService(
                 webhookClientProvider,
                 rotationClientProvider,
@@ -256,7 +255,7 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
         @DisplayName("should skip when token has no expiry")
         void shouldSkipNoExpiry() {
             when(rotationClientProvider.getIfAvailable()).thenReturn(rotationClient);
-            when(rotationClient.getTokenInfo(1L)).thenReturn(new TokenInfo(1L, "test", null, List.of("api"), true));
+            when(rotationClient.getTokenInfo(1L)).thenReturn(new TokenInfo(1L, "test", null));
 
             webhookService.rotateTokenIfNeeded(workspace);
 
@@ -267,9 +266,7 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
         @DisplayName("should skip when token not expiring soon")
         void shouldSkipNotExpiringSoon() {
             when(rotationClientProvider.getIfAvailable()).thenReturn(rotationClient);
-            when(rotationClient.getTokenInfo(1L)).thenReturn(
-                new TokenInfo(1L, "test", LocalDate.now().plusDays(30), List.of("api"), true)
-            );
+            when(rotationClient.getTokenInfo(1L)).thenReturn(new TokenInfo(1L, "test", LocalDate.now().plusDays(30)));
 
             webhookService.rotateTokenIfNeeded(workspace);
 
@@ -281,9 +278,7 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
         void shouldRotateWhenExpiringSoon() {
             when(rotationClientProvider.getIfAvailable()).thenReturn(rotationClient);
             when(tokenServiceProvider.getIfAvailable()).thenReturn(tokenService);
-            when(rotationClient.getTokenInfo(1L)).thenReturn(
-                new TokenInfo(1L, "test", LocalDate.now().plusDays(3), List.of("api"), true)
-            );
+            when(rotationClient.getTokenInfo(1L)).thenReturn(new TokenInfo(1L, "test", LocalDate.now().plusDays(3)));
             when(rotationClient.rotateToken(eq(1L), any(LocalDate.class))).thenReturn(
                 new RotatedToken("glpat-new-token", LocalDate.now().plusDays(90))
             );
@@ -300,7 +295,7 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
         @DisplayName("should continue on rotation error")
         void shouldContinueOnError() {
             when(rotationClientProvider.getIfAvailable()).thenReturn(rotationClient);
-            when(rotationClient.getTokenInfo(1L)).thenThrow(new RuntimeException("Connection refused"));
+            when(rotationClient.getTokenInfo(1L)).thenThrow(new IllegalStateException("Connection refused"));
 
             // Should not throw
             webhookService.rotateTokenIfNeeded(workspace);
@@ -369,6 +364,38 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
 
             assertThat(workspace.getGitlabWebhookId()).isNull();
             assertThat(workspace.getGitlabGroupId()).isNull();
+        }
+    }
+
+    @Nested
+    @DisplayName("deregisterWebhookByWorkspaceId")
+    class DeregisterWebhookByWorkspaceId {
+
+        @Test
+        @DisplayName("should deregister webhook for existing workspace")
+        void shouldDeregisterForExistingWorkspace() {
+            workspace.setGitlabGroupId(42L);
+            workspace.setGitlabWebhookId(99L);
+
+            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
+            when(webhookClientProvider.getIfAvailable()).thenReturn(webhookClient);
+            when(workspaceRepository.save(any(Workspace.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            webhookService.deregisterWebhookByWorkspaceId(1L);
+
+            verify(webhookClient).deregisterGroupWebhook(1L, 42L, 99L);
+            assertThat(workspace.getGitlabWebhookId()).isNull();
+            assertThat(workspace.getGitlabGroupId()).isNull();
+        }
+
+        @Test
+        @DisplayName("should do nothing when workspace not found")
+        void shouldDoNothingWhenWorkspaceNotFound() {
+            when(workspaceRepository.findById(999L)).thenReturn(Optional.empty());
+
+            webhookService.deregisterWebhookByWorkspaceId(999L);
+
+            verify(webhookClientProvider, never()).getIfAvailable();
         }
     }
 }
