@@ -191,6 +191,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
             assertThat(repositoryToMonitorRepository.findByWorkspaceId(workspaceId)).isEmpty();
             assertThat(workspaceSlugHistoryRepository.findByWorkspaceOrderByChangedAtDesc(purged)).isEmpty();
             assertThat(workspaceMembershipRepository.findByWorkspace_Id(workspaceId)).isEmpty();
+            assertThat(activityEventRepository.countByWorkspaceId(workspaceId)).isZero();
         }
     }
 

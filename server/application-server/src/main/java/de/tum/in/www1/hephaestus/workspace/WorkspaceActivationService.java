@@ -586,10 +586,17 @@ public class WorkspaceActivationService {
      */
     @Transactional
     void ensureRepositoryMonitorsForGitLab(Workspace workspace, List<Repository> syncedRepos) {
+        // Bulk-fetch existing monitors to avoid N+1 queries
+        Set<String> existing = repositoryToMonitorRepository
+            .findByWorkspaceId(workspace.getId())
+            .stream()
+            .map(RepositoryToMonitor::getNameWithOwner)
+            .collect(java.util.stream.Collectors.toSet());
+
         int created = 0;
         for (Repository repo : syncedRepos) {
             String nwo = repo.getNameWithOwner();
-            if (repositoryToMonitorRepository.existsByWorkspaceIdAndNameWithOwner(workspace.getId(), nwo)) {
+            if (existing.contains(nwo)) {
                 continue;
             }
             RepositoryToMonitor monitor = new RepositoryToMonitor();

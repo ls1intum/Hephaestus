@@ -25,6 +25,7 @@ import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.issue.gitlab.dto.GitLabIssueEventDTO;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
+import de.tum.in.www1.hephaestus.gitprovider.milestone.Milestone;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.MilestoneRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
@@ -640,6 +641,161 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 DomainEvent.IssueCreated.class
             );
             verify(eventPublisher).publishEvent(eventCaptor.capture());
+        }
+
+        @Test
+        @DisplayName("processFromSync() links milestone when milestoneIid is provided")
+        void processFromSyncLinksMilestone() {
+            Issue issue = createIssueEntity();
+            when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, ISSUE_IID))
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.of(issue));
+
+            Milestone milestone = new Milestone();
+            milestone.setId(42L);
+            milestone.setNumber(3);
+            when(milestoneRepository.findByNumberAndRepositoryId(3, REPO_ID)).thenReturn(Optional.of(milestone));
+
+            var syncData = new GitLabIssueProcessor.SyncIssueData(
+                "gid://gitlab/Issue/422296",
+                "5",
+                "Title",
+                null,
+                "opened",
+                false,
+                "https://example.com",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                0,
+                null,
+                null,
+                3
+            );
+            processor.processFromSync(syncData, testRepo, 1L);
+
+            verify(issueRepository).upsertCore(
+                eq(RAW_ISSUE_ID),
+                eq(PROVIDER_ID),
+                eq(ISSUE_IID),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                eq(REPO_ID),
+                eq(42L),
+                any(),
+                any(),
+                any(),
+                any(),
+                any()
+            );
+        }
+
+        @Test
+        @DisplayName("processFromSync() passes null milestoneId when milestone not found")
+        void processFromSyncMilestoneNotFound() {
+            Issue issue = createIssueEntity();
+            when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, ISSUE_IID))
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.of(issue));
+
+            when(milestoneRepository.findByNumberAndRepositoryId(99, REPO_ID)).thenReturn(Optional.empty());
+
+            var syncData = new GitLabIssueProcessor.SyncIssueData(
+                "gid://gitlab/Issue/422296",
+                "5",
+                "Title",
+                null,
+                "opened",
+                false,
+                "https://example.com",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                0,
+                null,
+                null,
+                99
+            );
+            processor.processFromSync(syncData, testRepo, 1L);
+
+            verify(issueRepository).upsertCore(
+                eq(RAW_ISSUE_ID),
+                eq(PROVIDER_ID),
+                eq(ISSUE_IID),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                eq(REPO_ID),
+                eq((Long) null),
+                any(),
+                any(),
+                any(),
+                any(),
+                any()
+            );
+        }
+
+        @Test
+        @DisplayName("processFromSync() skips milestone lookup when milestoneIid is null")
+        void processFromSyncNullMilestoneIid() {
+            Issue issue = createIssueEntity();
+            when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, ISSUE_IID))
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.of(issue));
+
+            var syncData = new GitLabIssueProcessor.SyncIssueData(
+                "gid://gitlab/Issue/422296",
+                "5",
+                "Title",
+                null,
+                "opened",
+                false,
+                "https://example.com",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                0,
+                null,
+                null,
+                null
+            );
+            processor.processFromSync(syncData, testRepo, 1L);
+
+            verify(milestoneRepository, never()).findByNumberAndRepositoryId(anyInt(), anyLong());
         }
 
         @Test
