@@ -102,6 +102,86 @@ export const Comparison: Story = {
 	},
 };
 
+const COLOR_TOKENS = [
+	{
+		token: "open",
+		label: "Open",
+		bgClass: "bg-provider-open",
+		fgClass: "text-provider-open-foreground",
+	},
+	{
+		token: "done",
+		label: "Merged/Done",
+		bgClass: "bg-provider-done",
+		fgClass: "text-provider-done-foreground",
+	},
+	{
+		token: "closed",
+		label: "Closed",
+		bgClass: "bg-provider-closed",
+		fgClass: "text-provider-closed-foreground",
+	},
+	{
+		token: "danger",
+		label: "Danger",
+		bgClass: "bg-provider-danger",
+		fgClass: "text-provider-danger-foreground",
+	},
+	{
+		token: "success",
+		label: "Success",
+		bgClass: "bg-provider-success",
+		fgClass: "text-provider-success-foreground",
+	},
+	{
+		token: "muted",
+		label: "Muted/Draft",
+		bgClass: "bg-provider-muted",
+		fgClass: "text-provider-muted-foreground",
+	},
+];
+
+function ColorSwatches({ provider }: { provider: "GitHub" | "GitLab" }) {
+	return (
+		<div className="flex flex-col gap-3">
+			<h3 className="text-sm font-semibold">{provider}</h3>
+			<div className="flex gap-4">
+				{COLOR_TOKENS.map(({ token, label, bgClass, fgClass }) => (
+					<div key={token} className="flex flex-col items-center gap-2">
+						<div className={`w-12 h-12 rounded-md ${bgClass}`} />
+						<div className={`text-sm font-semibold ${fgClass}`}>Aa</div>
+						<span className="text-xs text-muted-foreground">{label}</span>
+					</div>
+				))}
+			</div>
+		</div>
+	);
+}
+
+/**
+ * Provider color tokens side by side. Shows the background and foreground colors
+ * for each semantic token (open, merged, closed, danger, success, muted).
+ * GitHub uses Primer colors (e.g. purple for merged), GitLab uses Pajamas colors (e.g. blue for merged).
+ */
+export const ColorTokens: Story = {
+	render: () => (
+		<div className="flex flex-col gap-8">
+			<ColorSwatches provider="GitHub" />
+			<div data-provider="gitlab">
+				<ColorSwatches provider="GitLab" />
+			</div>
+		</div>
+	),
+	parameters: {
+		docs: {
+			description: {
+				story:
+					"Provider-aware CSS custom properties side by side. The most visible difference is merged/done: GitHub purple vs GitLab blue.",
+			},
+		},
+	},
+};
+
 /**
  * Icons rendered at multiple sizes (12, 16, 20, 24, 32) for both providers.
  * Useful for verifying icon clarity at different scales.

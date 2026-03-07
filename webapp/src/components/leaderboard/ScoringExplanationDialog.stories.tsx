@@ -55,17 +55,3 @@ export const Closed: Story = {
 		open: false,
 	},
 };
-
-// --- GitLab variant ---
-import { gitlabDecorator } from "@/stories/decorators";
-
-/**
- * GitLab version — uses "merge request" terminology throughout the scoring explanation.
- */
-export const GitLabOpen: Story = {
-	decorators: [gitlabDecorator],
-	args: {
-		open: true,
-		providerType: "GITLAB",
-	},
-};

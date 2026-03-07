@@ -30,16 +30,3 @@ type Story = StoryObj<typeof BadPracticeLegendCard>;
 export const Default: Story = {
 	args: {},
 };
-
-// --- GitLab variant ---
-import { gitlabDecorator } from "@/stories/decorators";
-
-/**
- * GitLab version — uses "merge request" terminology in descriptions.
- */
-export const GitLab: Story = {
-	decorators: [gitlabDecorator],
-	args: {
-		providerType: "GITLAB",
-	},
-};
