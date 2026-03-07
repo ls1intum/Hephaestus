@@ -152,7 +152,7 @@ public class GitHubPullRequestReviewSyncService {
      * a starting cursor.
      */
     public int syncForPullRequest(Long scopeId, PullRequest pullRequest) {
-        return syncRemainingReviews(scopeId, pullRequest, null);
+        return syncRemainingReviews(scopeId, pullRequest, null, 0);
     }
 
     /**
@@ -166,9 +166,10 @@ public class GitHubPullRequestReviewSyncService {
      * @param scopeId  the scope ID for authentication
      * @param pullRequest  the pull request to sync reviews for
      * @param startCursor  the cursor to start from (null to fetch all reviews)
+     * @param inlineCount  number of reviews already synced inline (for accurate overflow detection)
      * @return number of reviews synced
      */
-    public int syncRemainingReviews(Long scopeId, PullRequest pullRequest, String startCursor) {
+    public int syncRemainingReviews(Long scopeId, PullRequest pullRequest, String startCursor, int inlineCount) {
         if (pullRequest == null || pullRequest.getRepository() == null) {
             log.warn(
                 "Skipped review sync: reason=prOrRepositoryNull, prId={}",
@@ -391,10 +392,11 @@ public class GitHubPullRequestReviewSyncService {
         }
 
         // Check for overflow: did we fetch fewer items than GitHub reported?
+        // Include inline count to avoid false positives (inline reviews were already synced)
         if (reportedTotalCount >= 0) {
             GraphQlConnectionOverflowDetector.check(
                 "reviews",
-                totalSynced,
+                totalSynced + inlineCount,
                 reportedTotalCount,
                 safeNameWithOwner + " PR #" + pullRequest.getNumber()
             );
