@@ -13,6 +13,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { getTeamAvatarUrl, type ProviderType } from "@/lib/provider";
 import { cn } from "@/lib/utils";
 import { LeagueIcon } from "./LeagueIcon";
 
@@ -28,6 +29,7 @@ export interface LeaderboardTableProps {
 	onUserClick?: (username: string) => void;
 	onTeamClick?: (teamId: number) => void;
 	teamLabelsById?: Record<number, string>;
+	providerType?: ProviderType;
 }
 export function LeaderboardTable({
 	leaderboard = [],
@@ -37,6 +39,7 @@ export function LeaderboardTable({
 	onUserClick,
 	onTeamClick,
 	teamLabelsById,
+	providerType = "GITHUB",
 }: LeaderboardTableProps) {
 	if (isLoading) {
 		return <LeaderboardTableSkeleton />;
@@ -45,7 +48,7 @@ export function LeaderboardTable({
 	if (leaderboard.length === 0) {
 		return (
 			<div className="flex flex-col items-center justify-center p-8 text-center">
-				<NoEntryIcon className="h-12 w-12 text-github-danger-foreground mb-2" />
+				<NoEntryIcon className="h-12 w-12 text-provider-danger-foreground mb-2" />
 				<h3 className="text-lg font-medium">No entries found</h3>
 				<p className="text-muted-foreground">There are no leaderboard entries available.</p>
 			</div>
@@ -62,7 +65,7 @@ export function LeaderboardTable({
 					{!isTeam && <TableHead className="text-center w-20">League</TableHead>}
 					<TableHead className="w-56">{isTeam ? "Team" : "Contributor"}</TableHead>
 					<TableHead className="text-center">
-						<div className="flex justify-center items-center gap-1 text-github-done-foreground">
+						<div className="flex justify-center items-center gap-1 text-provider-done-foreground">
 							<span className="flex items-center gap-0.5">
 								<AwardIcon className="size-4" /> Score
 							</span>
@@ -89,7 +92,7 @@ export function LeaderboardTable({
 									<div className="flex items-center gap-2 font-medium">
 										<Avatar className="size-9">
 											<AvatarImage
-												src={`https://avatars.githubusercontent.com/t/${team.id}?s=512&v=4`}
+												src={getTeamAvatarUrl(providerType, team.id) ?? undefined}
 												alt={`${displayName}'s avatar`}
 											/>
 											<AvatarFallback>{displayName.slice(0, 2).toUpperCase()}</AvatarFallback>
@@ -105,6 +108,7 @@ export function LeaderboardTable({
 										approvals={entry.numberOfApprovals}
 										comments={entry.numberOfComments + entry.numberOfUnknowns}
 										codeComments={entry.numberOfCodeComments}
+										providerType={providerType}
 									/>
 								</TableCell>
 							</TableRow>
@@ -154,6 +158,7 @@ export function LeaderboardTable({
 									approvals={entry.numberOfApprovals}
 									comments={entry.numberOfComments + entry.numberOfUnknowns}
 									codeComments={entry.numberOfCodeComments}
+									providerType={providerType}
 									highlightReviews={isCurrentUser}
 								/>
 							</TableCell>

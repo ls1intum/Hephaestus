@@ -24,3 +24,16 @@ type Story = StoryObj<typeof meta>;
  * Includes access to detailed scoring explanation via modal.
  */
 export const Default: Story = {};
+
+// --- GitLab variant ---
+import { gitlabDecorator } from "@/stories/decorators";
+
+/**
+ * GitLab version — shows "merge requests" terminology and GitLab MR icon.
+ */
+export const GitLab: Story = {
+	decorators: [gitlabDecorator],
+	args: {
+		providerType: "GITLAB",
+	},
+};

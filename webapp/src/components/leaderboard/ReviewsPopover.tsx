@@ -1,10 +1,11 @@
-import { CheckIcon, CopyIcon, GitPullRequestIcon } from "@primer/octicons-react";
+import { CheckIcon, CopyIcon } from "@primer/octicons-react";
 import { useEffect, useState } from "react";
 import type { PullRequestBaseInfo, PullRequestInfo } from "@/api/types.gen";
 import { Button } from "@/components/ui/button";
 import { CardTitle } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { getProviderTerms, getPullRequestStateIcon, type ProviderType } from "@/lib/provider";
 import { cn } from "@/lib/utils";
 
 export type ReviewedPullRequest = PullRequestInfo | PullRequestBaseInfo;
@@ -12,12 +13,19 @@ export type ReviewedPullRequest = PullRequestInfo | PullRequestBaseInfo;
 export interface ReviewsPopoverProps {
 	reviewedPRs: readonly ReviewedPullRequest[];
 	highlight?: boolean;
+	providerType?: ProviderType;
 }
 
-export function ReviewsPopover({ reviewedPRs, highlight = false }: ReviewsPopoverProps) {
+export function ReviewsPopover({
+	reviewedPRs,
+	highlight = false,
+	providerType = "GITHUB",
+}: ReviewsPopoverProps) {
 	const [isOpen, setIsOpen] = useState(false);
 	const [showCopySuccess, setShowCopySuccess] = useState(false);
 	const hasReviews = reviewedPRs?.length > 0;
+	const terms = getProviderTerms(providerType);
+	const { icon: PrIcon } = getPullRequestStateIcon(providerType, "OPEN");
 
 	// Sort reviewed PRs by repository name and PR number
 	const sortedReviewedPRs = reviewedPRs
@@ -96,12 +104,12 @@ export function ReviewsPopover({ reviewedPRs, highlight = false }: ReviewsPopove
 						className={cn(
 							"flex items-center gap-1",
 							!highlight
-								? "text-github-muted-foreground"
+								? "text-provider-muted-foreground"
 								: "border-primary bg-accent hover:bg-foreground hover:text-background",
 						)}
 						onClick={(e) => e.stopPropagation()}
 					>
-						<GitPullRequestIcon size={16} />
+						<PrIcon size={16} />
 						{reviewedPRs?.length || 0}
 					</Button>
 				}
@@ -113,8 +121,8 @@ export function ReviewsPopover({ reviewedPRs, highlight = false }: ReviewsPopove
 			>
 				<div className="flex flex-wrap justify-between items-center gap-4">
 					<CardTitle className="flex items-center gap-2">
-						<GitPullRequestIcon size={20} />
-						<h4 className="font-medium leading-none">Reviewed PRs</h4>
+						<PrIcon size={20} />
+						<h4 className="font-medium leading-none">Reviewed {terms.prs}</h4>
 					</CardTitle>
 					<Button variant="outline" size="icon" onClick={copyPullRequests}>
 						{showCopySuccess ? (

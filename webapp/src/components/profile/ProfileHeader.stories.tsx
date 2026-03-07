@@ -3,7 +3,7 @@ import { ProfileHeader } from "./ProfileHeader";
 
 /**
  * Header component for the user profile page displaying key user information.
- * Shows the user's GitHub profile details, league points, contribution history,
+ * Shows the user's profile details, league points, contribution history,
  * and repositories they've contributed to.
  */
 const meta = {
@@ -23,7 +23,7 @@ const meta = {
 			control: "boolean",
 		},
 		user: {
-			description: "User profile data from GitHub",
+			description: "User profile data",
 			control: "object",
 		},
 		userXpRecord: {

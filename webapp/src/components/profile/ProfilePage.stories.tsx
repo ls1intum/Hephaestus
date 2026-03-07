@@ -9,7 +9,7 @@ const defaultBefore = formatISO(endOfISOWeek(now));
 
 /**
  * Complete user profile page that combines header and content sections.
- * Displays a user's GitHub information, contributions, review activity,
+ * Displays a user's profile information, contributions, review activity,
  * and open pull requests in a unified interface.
  */
 const meta = {
@@ -41,7 +41,7 @@ const meta = {
 			},
 		},
 		username: {
-			description: "GitHub username of the profile owner",
+			description: "Username of the profile owner",
 			control: "text",
 			table: {
 				type: { summary: "string" },

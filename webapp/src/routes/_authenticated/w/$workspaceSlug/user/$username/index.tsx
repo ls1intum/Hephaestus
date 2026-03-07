@@ -106,6 +106,7 @@ function UserProfile() {
 
 	return (
 		<ProfilePage
+			providerType={workspaceQuery.data?.providerType ?? "GITHUB"}
 			profileData={profileQuery.data}
 			isLoading={
 				(profileQuery.isPending && !profileQuery.data) ||

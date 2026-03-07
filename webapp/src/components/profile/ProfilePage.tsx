@@ -1,11 +1,13 @@
 import { XCircleIcon } from "lucide-react";
 import type { Profile } from "@/api/types.gen";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import type { ProviderType } from "@/lib/provider";
 import type { LeaderboardSchedule } from "@/lib/timeframe";
 import { ProfileContent } from "./ProfileContent";
 import { ProfileHeader } from "./ProfileHeader";
 
 interface ProfileProps {
+	providerType?: ProviderType;
 	profileData?: Profile;
 	isLoading: boolean;
 	error: boolean;
@@ -20,6 +22,7 @@ interface ProfileProps {
 }
 
 export function ProfilePage({
+	providerType = "GITHUB",
 	profileData,
 	isLoading,
 	error,
@@ -54,6 +57,7 @@ export function ProfilePage({
 				isLoading={isLoading}
 			/>
 			<ProfileContent
+				providerType={providerType}
 				reviewActivity={profileData?.reviewActivity}
 				openPullRequests={profileData?.openPullRequests}
 				isLoading={isLoading}

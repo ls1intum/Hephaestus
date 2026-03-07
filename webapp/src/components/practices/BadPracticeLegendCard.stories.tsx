@@ -26,7 +26,6 @@ type Story = StoryObj<typeof BadPracticeLegendCard>;
 
 /**
  * Default view of the legend card showing all practice and issue types.
- * This component doesn't take any props as it's purely informational.
  */
 export const Default: Story = {
 	args: {},

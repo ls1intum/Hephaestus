@@ -1,15 +1,10 @@
-import {
-	GitMergeIcon,
-	GitPullRequestClosedIcon,
-	GitPullRequestDraftIcon,
-	GitPullRequestIcon,
-} from "@primer/octicons-react";
 import { format } from "date-fns";
 import type { LabelInfo } from "@/api/types.gen";
 import { FormattedTitle } from "@/components/shared/FormattedTitle";
-import { GithubBadge } from "@/components/shared/GithubBadge";
+import { LabelBadge } from "@/components/shared/LabelBadge";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getPullRequestStateIcon, type ProviderType } from "@/lib/provider";
 import { cn } from "@/lib/utils";
 
 export interface IssueCardProps {
@@ -34,6 +29,8 @@ export interface IssueCardProps {
 	onClick?: () => void;
 	/** Optional className to apply to the card */
 	className?: string;
+	/** Provider type for rendering correct icons */
+	providerType?: ProviderType;
 }
 
 export function IssueCard({
@@ -54,28 +51,15 @@ export function IssueCard({
 	rightContent,
 	onClick,
 	className,
+	providerType = "GITHUB",
 }: IssueCardProps) {
-	// Determine the PR state icon and color
-	const getIssueIconAndColor = () => {
-		if (state === "OPEN") {
-			if (isDraft) {
-				return {
-					icon: GitPullRequestDraftIcon,
-					color: "text-github-muted-foreground",
-				};
-			}
-			return { icon: GitPullRequestIcon, color: "text-github-open-foreground" };
-		}
-		if (isMerged) {
-			return { icon: GitMergeIcon, color: "text-github-done-foreground" };
-		}
-		return {
-			icon: GitPullRequestClosedIcon,
-			color: "text-github-closed-foreground",
-		};
-	};
-
-	const { icon: StateIcon, color } = getIssueIconAndColor();
+	// Determine the PR state icon and color based on provider
+	const effectiveState = isMerged ? "MERGED" : (state ?? "OPEN");
+	const { icon: StateIcon, colorClass: color } = getPullRequestStateIcon(
+		providerType,
+		effectiveState,
+		isDraft,
+	);
 
 	// Format the date as MMM D (e.g., "Jan 15")
 	const formattedDate = createdAt ? format(createdAt, "MMM d") : "";
@@ -96,7 +80,7 @@ export function IssueCard({
 					"pb-0": isLoading || pullRequestLabels.length > 0,
 				})}
 			>
-				<div className="flex justify-between gap-2 items-center text-sm text-github-muted-foreground">
+				<div className="flex justify-between gap-2 items-center text-sm text-provider-muted-foreground">
 					<span className="font-medium flex justify-center items-center space-x-1">
 						{isLoading ? (
 							<>
@@ -139,10 +123,10 @@ export function IssueCard({
 						) : (
 							<>
 								{additions !== undefined && (
-									<span className="text-github-success-foreground font-bold">+{additions}</span>
+									<span className="text-provider-success-foreground font-bold">+{additions}</span>
 								)}
 								{deletions !== undefined && (
-									<span className="text-github-danger-foreground font-bold">-{deletions}</span>
+									<span className="text-provider-danger-foreground font-bold">-{deletions}</span>
 								)}
 							</>
 						)}
@@ -162,7 +146,7 @@ export function IssueCard({
 			{!isLoading && pullRequestLabels.length > 0 && (
 				<div className="flex flex-row items-center flex-wrap gap-2 p-4 pt-2">
 					{pullRequestLabels.map((label) => (
-						<GithubBadge key={label.id} label={label.name} color={label.color} />
+						<LabelBadge key={label.id} label={label.name} color={label.color} />
 					))}
 				</div>
 			)}

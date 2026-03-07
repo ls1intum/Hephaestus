@@ -29,7 +29,7 @@ const meta = {
 			control: "text",
 		},
 		number: {
-			description: "Pull request number (as shown in GitHub)",
+			description: "Pull request number",
 			control: "number",
 		},
 		additions: {
