@@ -413,6 +413,9 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
      *
      * @param workspaceId the workspace ID
      */
+    @Query(value = "SELECT COUNT(*) FROM activity_event WHERE workspace_id = :workspaceId", nativeQuery = true)
+    long countByWorkspaceId(@Param("workspaceId") Long workspaceId);
+
     @Modifying
     @Transactional
     @Query(value = "DELETE FROM activity_event WHERE workspace_id = :workspaceId", nativeQuery = true)

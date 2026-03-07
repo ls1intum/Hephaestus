@@ -24,6 +24,8 @@ import de.tum.in.www1.hephaestus.gitprovider.common.spi.RepositoryScopeFilter;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.ScopeIdResolver;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
+import de.tum.in.www1.hephaestus.gitprovider.milestone.Milestone;
+import de.tum.in.www1.hephaestus.gitprovider.milestone.MilestoneRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.gitlab.dto.GitLabMergeRequestEventDTO;
@@ -84,6 +86,9 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
     private RepositoryScopeFilter repositoryScopeFilter;
 
     @Mock
+    private MilestoneRepository milestoneRepository;
+
+    @Mock
     private ApplicationEventPublisher eventPublisher;
 
     private GitLabMergeRequestProcessor processor;
@@ -103,6 +108,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         processor = new GitLabMergeRequestProcessor(
             pullRequestRepository,
             reviewRepository,
+            milestoneRepository,
             userRepository,
             labelRepository,
             repositoryRepository,
@@ -1134,6 +1140,207 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         }
 
         @Test
+        @DisplayName("processFromSync() links milestone when milestoneIid is provided")
+        void processFromSyncLinksMilestone() {
+            PullRequest pr = createPullRequestEntity();
+            when(pullRequestRepository.findByRepositoryIdAndNumber(REPO_ID, MR_IID))
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.of(pr));
+
+            User author = createUserEntity();
+            when(userRepository.findByNativeIdAndProviderId(RAW_USER_ID, PROVIDER_ID)).thenReturn(Optional.of(author));
+
+            Milestone milestone = new Milestone();
+            milestone.setId(42L);
+            milestone.setNumber(3);
+            when(milestoneRepository.findByNumberAndRepositoryId(3, REPO_ID)).thenReturn(Optional.of(milestone));
+
+            var syncData = new GitLabMergeRequestProcessor.SyncMergeRequestData(
+                "gid://gitlab/MergeRequest/999555",
+                "5",
+                "Add awesome feature",
+                null,
+                "opened",
+                false,
+                null,
+                null,
+                false,
+                "https://gitlab.com/gitlab-org/gitlab/-/merge_requests/5",
+                null,
+                null,
+                null,
+                null,
+                0,
+                0,
+                0,
+                0,
+                "feature/awesome-feature",
+                "main",
+                null,
+                null,
+                false,
+                0,
+                "gid://gitlab/User/12345",
+                "testuser",
+                "Test User",
+                "https://gitlab.com/uploads/avatar.png",
+                "https://gitlab.com/testuser",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                3
+            );
+            processor.processFromSync(syncData, testRepo, 1L);
+
+            verify(pullRequestRepository).upsertCore(
+                eq(RAW_MR_ID),
+                eq(PROVIDER_ID),
+                eq(MR_IID),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                eq(REPO_ID),
+                eq(42L),
+                any(),
+                anyBoolean(),
+                anyBoolean(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any()
+            );
+        }
+
+        @Test
+        @DisplayName("processFromSync() passes null milestoneId when milestone not found")
+        void processFromSyncMilestoneNotFound() {
+            PullRequest pr = createPullRequestEntity();
+            when(pullRequestRepository.findByRepositoryIdAndNumber(REPO_ID, MR_IID))
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.of(pr));
+
+            User author = createUserEntity();
+            when(userRepository.findByNativeIdAndProviderId(RAW_USER_ID, PROVIDER_ID)).thenReturn(Optional.of(author));
+
+            when(milestoneRepository.findByNumberAndRepositoryId(99, REPO_ID)).thenReturn(Optional.empty());
+
+            var syncData = new GitLabMergeRequestProcessor.SyncMergeRequestData(
+                "gid://gitlab/MergeRequest/999555",
+                "5",
+                "Add awesome feature",
+                null,
+                "opened",
+                false,
+                null,
+                null,
+                false,
+                "https://gitlab.com/gitlab-org/gitlab/-/merge_requests/5",
+                null,
+                null,
+                null,
+                null,
+                0,
+                0,
+                0,
+                0,
+                "feature/awesome-feature",
+                "main",
+                null,
+                null,
+                false,
+                0,
+                "gid://gitlab/User/12345",
+                "testuser",
+                "Test User",
+                "https://gitlab.com/uploads/avatar.png",
+                "https://gitlab.com/testuser",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                99
+            );
+            processor.processFromSync(syncData, testRepo, 1L);
+
+            verify(pullRequestRepository).upsertCore(
+                eq(RAW_MR_ID),
+                eq(PROVIDER_ID),
+                eq(MR_IID),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                eq(REPO_ID),
+                eq((Long) null),
+                any(),
+                anyBoolean(),
+                anyBoolean(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any()
+            );
+        }
+
+        @Test
+        @DisplayName("processFromSync() skips milestone lookup when milestoneIid is null")
+        void processFromSyncNullMilestoneIid() {
+            PullRequest pr = createPullRequestEntity();
+            when(pullRequestRepository.findByRepositoryIdAndNumber(REPO_ID, MR_IID))
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.of(pr));
+
+            var syncData = createSyncData();
+            processor.processFromSync(syncData, testRepo, 1L);
+
+            verify(milestoneRepository, never()).findByNumberAndRepositoryId(anyInt(), anyLong());
+        }
+
+        @Test
         @DisplayName("processFromSync() with invalid globalId skips processing")
         void processFromSyncInvalidGlobalId() {
             var syncData = new GitLabMergeRequestProcessor.SyncMergeRequestData(
@@ -1161,6 +1368,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 null,
                 false,
                 0,
+                null,
                 null,
                 null,
                 null,
@@ -1209,6 +1417,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 null,
                 false,
                 0,
+                null,
                 null,
                 null,
                 null,
@@ -1313,7 +1522,8 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                         "https://gitlab.com/uploads/avatar.png",
                         "https://gitlab.com/reviewer1"
                     )
-                )
+                ),
+                null
             );
             processor.processFromSync(syncData, testRepo, 1L);
 
@@ -1472,6 +1682,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 "gid://gitlab/User/12345",
                 "testuser",
                 "Test User",
+                null,
                 null,
                 null,
                 null,
@@ -1796,6 +2007,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
             "Test User",
             "https://gitlab.com/uploads/avatar.png",
             "https://gitlab.com/testuser",
+            null,
             null,
             null,
             null,

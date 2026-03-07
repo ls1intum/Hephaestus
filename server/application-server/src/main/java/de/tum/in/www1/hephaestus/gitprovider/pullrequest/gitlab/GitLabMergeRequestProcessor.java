@@ -13,6 +13,8 @@ import de.tum.in.www1.hephaestus.gitprovider.common.spi.ScopeIdResolver;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
+import de.tum.in.www1.hephaestus.gitprovider.milestone.Milestone;
+import de.tum.in.www1.hephaestus.gitprovider.milestone.MilestoneRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.gitlab.dto.GitLabMergeRequestEventDTO;
@@ -54,11 +56,13 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
 
     private final PullRequestRepository pullRequestRepository;
     private final PullRequestReviewRepository reviewRepository;
+    private final MilestoneRepository milestoneRepository;
     private final ApplicationEventPublisher eventPublisher;
 
     public GitLabMergeRequestProcessor(
         PullRequestRepository pullRequestRepository,
         PullRequestReviewRepository reviewRepository,
+        MilestoneRepository milestoneRepository,
         UserRepository userRepository,
         LabelRepository labelRepository,
         RepositoryRepository repositoryRepository,
@@ -77,6 +81,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         );
         this.pullRequestRepository = pullRequestRepository;
         this.reviewRepository = reviewRepository;
+        this.milestoneRepository = milestoneRepository;
         this.eventPublisher = eventPublisher;
     }
 
@@ -133,7 +138,8 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         @Nullable List<SyncLabelData> syncLabels,
         @Nullable List<SyncUserData> syncAssignees,
         @Nullable List<SyncUserData> syncReviewers,
-        @Nullable List<SyncUserData> syncApprovers
+        @Nullable List<SyncUserData> syncApprovers,
+        @Nullable Integer milestoneIid
     ) {}
 
     // ========================================================================
@@ -410,6 +416,15 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         String reviewDecision = data.approved() ? "APPROVED" : "REVIEW_REQUIRED";
         String mergeStateStatus = mapDetailedMergeStatus(data.detailedMergeStatus());
 
+        // Resolve milestone by iid + repository (milestones are synced before MRs)
+        Long milestoneId = null;
+        if (data.milestoneIid() != null) {
+            milestoneId = milestoneRepository
+                .findByNumberAndRepositoryId(data.milestoneIid(), repository.getId())
+                .map(Milestone::getId)
+                .orElse(null);
+        }
+
         Instant now = Instant.now();
         pullRequestRepository.upsertCore(
             nativeId,
@@ -428,7 +443,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             parseGitLabTimestamp(data.updatedAt()),
             author != null ? author.getId() : null,
             repository.getId(),
-            null, // milestoneId
+            milestoneId,
             parseGitLabTimestamp(data.mergedAt()),
             data.draft(),
             isMerged,

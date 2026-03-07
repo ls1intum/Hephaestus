@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.workspace.adapter;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncContextProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider;
 import de.tum.in.www1.hephaestus.gitprovider.project.ProjectRepository;
@@ -63,6 +64,7 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
             .findAll()
             .stream()
             .filter(ws -> ws.getStatus() == Workspace.WorkspaceStatus.ACTIVE)
+            .filter(ws -> ws.getProviderType() == GitProviderType.GITHUB)
             .flatMap(ws ->
                 ws
                     .getRepositoriesToMonitor()
@@ -384,6 +386,7 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
         return allWorkspaces
             .stream()
             .filter(ws -> ws.getStatus() == WorkspaceStatus.ACTIVE)
+            .filter(ws -> ws.getProviderType() == GitProviderType.GITHUB)
             .filter(workspaceScopeFilter::isWorkspaceAllowed)
             .map(this::toSyncSession)
             .toList();
@@ -400,17 +403,18 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
             .filter(ws -> ws.getStatus() != WorkspaceStatus.ACTIVE)
             .count();
 
-        List<Workspace> activeWorkspaces = allWorkspaces
+        List<Workspace> activeGitHubWorkspaces = allWorkspaces
             .stream()
             .filter(ws -> ws.getStatus() == WorkspaceStatus.ACTIVE)
+            .filter(ws -> ws.getProviderType() == GitProviderType.GITHUB)
             .toList();
 
-        int skippedByFilter = (int) activeWorkspaces
+        int skippedByFilter = (int) activeGitHubWorkspaces
             .stream()
             .filter(ws -> !workspaceScopeFilter.isWorkspaceAllowed(ws))
             .count();
 
-        int activeAndAllowed = activeWorkspaces.size() - skippedByFilter;
+        int activeAndAllowed = activeGitHubWorkspaces.size() - skippedByFilter;
 
         return new SyncStatistics(
             total,
