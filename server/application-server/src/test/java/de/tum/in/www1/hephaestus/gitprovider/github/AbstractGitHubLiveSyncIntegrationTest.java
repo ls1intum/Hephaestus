@@ -136,7 +136,7 @@ public abstract class AbstractGitHubLiveSyncIntegrationTest extends BaseGitHubLi
         ws.setDisplayName(githubOrganization());
         ws.setAccountLogin(githubOrganization());
         ws.setAccountType(AccountType.ORG);
-        ws.setGithubRepositorySelection(RepositorySelection.ALL);
+        ws.setRepositorySelection(RepositorySelection.ALL);
         return workspaceRepository.save(ws);
     }
 

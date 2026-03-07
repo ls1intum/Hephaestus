@@ -26,7 +26,6 @@ public class GitLabNoteSyncService {
     private static final Logger log = LoggerFactory.getLogger(GitLabNoteSyncService.class);
 
     private static final String GET_ISSUE_NOTES_DOCUMENT = "GetIssueNotes";
-    private static final String GET_MR_NOTES_DOCUMENT = "GetMergeRequestNotes";
 
     private static final int NOTE_SYNC_PAGE_SIZE = 100;
 
@@ -52,18 +51,6 @@ public class GitLabNoteSyncService {
             "iid",
             String.valueOf(issueIid),
             "project.issue.notes",
-            parent
-        );
-    }
-
-    public int syncNotesForMergeRequest(Long scopeId, Repository repository, int mrIid, Issue parent) {
-        return syncNotes(
-            scopeId,
-            repository,
-            GET_MR_NOTES_DOCUMENT,
-            "iid",
-            String.valueOf(mrIid),
-            "project.mergeRequest.notes",
             parent
         );
     }
@@ -235,9 +222,10 @@ public class GitLabNoteSyncService {
             return false;
         }
 
-        // Skip diff notes (position != null) — deferred to follow-up PR
+        // Note: Diff notes for MRs are now handled by GitLabDiscussionSyncService
+        // which preserves thread structure. This method is only called for issue notes.
         if (node.get("position") != null) {
-            log.debug("Skipping diff note during sync: id={}", node.get("id"));
+            log.debug("Skipping diff note in flat note sync: id={}", node.get("id"));
             return false;
         }
 

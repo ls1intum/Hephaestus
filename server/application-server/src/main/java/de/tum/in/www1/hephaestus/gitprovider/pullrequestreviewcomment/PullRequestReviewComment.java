@@ -41,8 +41,8 @@ import org.springframework.lang.NonNull;
 public class PullRequestReviewComment extends BaseGitServiceEntity {
 
     // The diff of the line that the comment refers to.
+    // Nullable: GitLab does not expose diff hunks for inline comments.
     @Column(columnDefinition = "TEXT")
-    @NonNull
     private String diffHunk;
 
     // The relative path of the file to which the comment applies.
@@ -64,7 +64,7 @@ public class PullRequestReviewComment extends BaseGitServiceEntity {
     @NonNull
     private String htmlUrl;
 
-    @NonNull
+    // Nullable: GitLab does not have the concept of author association.
     @Enumerated(EnumType.STRING)
     private AuthorAssociation authorAssociation;
 

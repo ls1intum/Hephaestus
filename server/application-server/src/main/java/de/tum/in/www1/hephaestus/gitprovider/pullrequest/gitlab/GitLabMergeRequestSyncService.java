@@ -7,8 +7,8 @@ import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncException;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabPageInfo;
-import de.tum.in.www1.hephaestus.gitprovider.issuecomment.gitlab.GitLabNoteSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.gitlab.GitLabDiscussionSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.sync.SyncResult;
 import java.time.OffsetDateTime;
@@ -46,18 +46,18 @@ public class GitLabMergeRequestSyncService {
 
     private final GitLabGraphQlClientProvider graphQlClientProvider;
     private final GitLabMergeRequestProcessor mergeRequestProcessor;
-    private final GitLabNoteSyncService noteSyncService;
+    private final GitLabDiscussionSyncService discussionSyncService;
     private final GitLabProperties gitLabProperties;
 
     public GitLabMergeRequestSyncService(
         GitLabGraphQlClientProvider graphQlClientProvider,
         GitLabMergeRequestProcessor mergeRequestProcessor,
-        GitLabNoteSyncService noteSyncService,
+        GitLabDiscussionSyncService discussionSyncService,
         GitLabProperties gitLabProperties
     ) {
         this.graphQlClientProvider = graphQlClientProvider;
         this.mergeRequestProcessor = mergeRequestProcessor;
-        this.noteSyncService = noteSyncService;
+        this.discussionSyncService = discussionSyncService;
         this.gitLabProperties = gitLabProperties;
     }
 
@@ -368,12 +368,18 @@ public class GitLabMergeRequestSyncService {
         );
         PullRequest pr = mergeRequestProcessor.processFromSync(syncData, repository, scopeId);
 
-        // Sync notes for this MR if it has comments and wasn't skipped
+        // Sync discussions (threads + comments) for this MR if it has comments and wasn't skipped.
+        // Uses discussion-based sync to preserve thread structure, resolution state, and diff positions.
         if (pr != null && fields.userNotesCount() > 0) {
             try {
-                noteSyncService.syncNotesForMergeRequest(scopeId, repository, Integer.parseInt(fields.iid()), pr);
+                discussionSyncService.syncDiscussionsForMergeRequest(
+                    scopeId,
+                    repository,
+                    Integer.parseInt(fields.iid()),
+                    pr
+                );
             } catch (Exception e) {
-                log.error("Note sync failed for MR: context={}", mrContext, e);
+                log.error("Discussion sync failed for MR: context={}", mrContext, e);
             }
         }
 

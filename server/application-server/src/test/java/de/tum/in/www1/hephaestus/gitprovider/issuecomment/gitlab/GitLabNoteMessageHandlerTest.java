@@ -19,6 +19,7 @@ import de.tum.in.www1.hephaestus.gitprovider.issuecomment.gitlab.dto.GitLabNoteE
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.gitlab.dto.GitLabNoteEventDTO.EmbeddedIssue;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.gitlab.dto.GitLabNoteEventDTO.EmbeddedMergeRequest;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.gitlab.dto.GitLabNoteEventDTO.NoteAttributes;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.gitlab.GitLabDiffNoteWebhookProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import io.nats.client.Message;
@@ -44,6 +45,9 @@ class GitLabNoteMessageHandlerTest extends BaseUnitTest {
     private GitLabIssueCommentProcessor issueCommentProcessor;
 
     @Mock
+    private GitLabDiffNoteWebhookProcessor diffNoteProcessor;
+
+    @Mock
     private GitLabWebhookContextResolver contextResolver;
 
     @Mock
@@ -67,6 +71,7 @@ class GitLabNoteMessageHandlerTest extends BaseUnitTest {
 
         handler = new GitLabNoteMessageHandler(
             issueCommentProcessor,
+            diffNoteProcessor,
             contextResolver,
             deserializer,
             transactionTemplate

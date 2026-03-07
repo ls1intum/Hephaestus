@@ -233,9 +233,10 @@ public class Workspace {
     @Column(name = "gitlab_webhook_id")
     private Long gitlabWebhookId;
 
-    /** GitHub App repository selection mode: ALL repositories or SELECTED subset */
+    /** Repository selection mode: ALL repositories or SELECTED subset */
     @Enumerated(EnumType.STRING)
-    private RepositorySelection githubRepositorySelection;
+    @Column(name = "repository_selection")
+    private RepositorySelection repositorySelection;
 
     /** Timestamp when GitHub App installation was linked to this workspace */
     private Instant installationLinkedAt;
