@@ -145,6 +145,7 @@ public class GitHubPullRequestReviewCommentSyncService {
         int retryAttempt = 0;
         try {
             int totalSynced = 0;
+            int totalFetched = 0;
             String cursor = null;
             boolean hasNextPage = true;
             int pageCount = 0;
@@ -263,6 +264,8 @@ public class GitHubPullRequestReviewCommentSyncService {
                     break;
                 }
 
+                totalFetched += response.getNodes().size();
+
                 if (reportedTotalCount < 0) {
                     reportedTotalCount = response.getTotalCount();
                 }
@@ -278,11 +281,13 @@ public class GitHubPullRequestReviewCommentSyncService {
                 retryAttempt = 0;
             }
 
-            // Check for overflow
+            // Check for overflow: compare totalFetched (raw API node count) vs reportedTotalCount.
+            // We use totalFetched instead of totalSynced because some threads are legitimately
+            // filtered out during processing (e.g., threads with no persistable comments).
             if (reportedTotalCount >= 0) {
                 GraphQlConnectionOverflowDetector.check(
                     "reviewThreads",
-                    totalSynced,
+                    totalFetched,
                     reportedTotalCount,
                     "prNumber=" + pullRequest.getNumber()
                 );
@@ -1050,6 +1055,7 @@ public class GitHubPullRequestReviewCommentSyncService {
 
         try {
             int totalSynced = 0;
+            int totalFetched = 0;
             String cursor = startCursor;
             boolean hasNextPage = true;
             int pageCount = 0;
@@ -1143,6 +1149,8 @@ public class GitHubPullRequestReviewCommentSyncService {
                     break;
                 }
 
+                totalFetched += response.getNodes().size();
+
                 if (reportedTotalCount < 0) {
                     reportedTotalCount = response.getTotalCount();
                 }
@@ -1157,11 +1165,13 @@ public class GitHubPullRequestReviewCommentSyncService {
                 cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
             }
 
-            // Check for overflow
+            // Check for overflow: compare totalFetched (raw API node count) vs reportedTotalCount.
+            // We use totalFetched instead of totalSynced because some threads are legitimately
+            // filtered out during processing (e.g., threads with no persistable comments).
             if (reportedTotalCount >= 0) {
                 GraphQlConnectionOverflowDetector.check(
                     "reviewThreads",
-                    totalSynced,
+                    totalFetched,
                     reportedTotalCount,
                     "prNumber=" + pullRequest.getNumber()
                 );

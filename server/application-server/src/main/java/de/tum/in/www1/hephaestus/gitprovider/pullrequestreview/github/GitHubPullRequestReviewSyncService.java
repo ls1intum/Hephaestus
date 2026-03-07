@@ -190,6 +190,7 @@ public class GitHubPullRequestReviewSyncService {
         HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
 
         int totalSynced = 0;
+        int totalFetched = 0;
         int reportedTotalCount = -1;
         String cursor = startCursor;
         boolean hasMore = true;
@@ -319,6 +320,8 @@ public class GitHubPullRequestReviewSyncService {
                     break;
                 }
 
+                totalFetched += connection.getNodes().size();
+
                 if (reportedTotalCount < 0) {
                     reportedTotalCount = connection.getTotalCount();
                 }
@@ -390,11 +393,13 @@ public class GitHubPullRequestReviewSyncService {
             }
         }
 
-        // Check for overflow: did we fetch fewer items than GitHub reported?
+        // Check for overflow: compare totalFetched (raw API node count) vs reportedTotalCount.
+        // We use totalFetched instead of totalSynced because some reviews are legitimately
+        // filtered out during processing (e.g., bot reviews, dismissed reviews returning null DTOs).
         if (reportedTotalCount >= 0) {
             GraphQlConnectionOverflowDetector.check(
                 "reviews",
-                totalSynced,
+                totalFetched,
                 reportedTotalCount,
                 safeNameWithOwner + " PR #" + pullRequest.getNumber()
             );

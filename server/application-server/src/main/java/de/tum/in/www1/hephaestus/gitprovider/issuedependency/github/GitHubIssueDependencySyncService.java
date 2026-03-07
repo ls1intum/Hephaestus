@@ -420,15 +420,10 @@ public class GitHubIssueDependencySyncService {
             totalSynced += self.processIssueDependenciesPage(issueConnection, repo, scopeId);
         }
 
-        // Check for overflow
-        if (reportedTotalCount >= 0) {
-            GraphQlConnectionOverflowDetector.check(
-                "issues",
-                totalSynced,
-                reportedTotalCount,
-                "repoName=" + safeNameWithOwner
-            );
-        }
+        // Note: no overflow check here — totalSynced counts only issues that have
+        // dependency relationships (trackedIssues/closingIssuesReferences), while
+        // reportedTotalCount is the total issue count for the repository.
+        // Comparing them would always produce false-positive overflow warnings.
 
         return totalSynced;
     }
