@@ -1,16 +1,18 @@
-import { GitPullRequest, InfoIcon } from "lucide-react";
+import { InfoIcon } from "lucide-react";
 import type { BadPracticeFeedback, UserPractices } from "@/api/types.gen";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { getProviderTerms, getPullRequestStateIcon, type ProviderType } from "@/lib/provider";
 import { ActivitySummaryCard } from "./ActivitySummaryCard";
 import { BadPracticeLegendCard } from "./BadPracticeLegendCard";
 import { PullRequestBadPracticeCard } from "./PullRequestBadPracticeCard";
 import { filterGoodAndBadPractices } from "./utils";
 
 interface PracticesPageProps {
+	providerType?: ProviderType;
 	activityData?: UserPractices;
 	isLoading: boolean;
 	isDetectingBadPractices: boolean;
-	username: string; // GitHub login name
+	username: string; // Login name
 	displayName?: string; // User's display name
 	currUserIsDashboardUser: boolean;
 	onDetectBadPractices: () => void;
@@ -22,6 +24,7 @@ interface PracticesPageProps {
 }
 
 export function PracticesPage({
+	providerType = "GITHUB",
 	activityData,
 	isLoading,
 	isDetectingBadPractices,
@@ -35,6 +38,9 @@ export function PracticesPage({
 	onResolveBadPracticeAsWrong,
 	onProvideBadPracticeFeedback,
 }: PracticesPageProps) {
+	const terms = getProviderTerms(providerType);
+	const { icon: PrIcon } = getPullRequestStateIcon(providerType, "OPEN");
+
 	// Calculate statistics
 	const pullRequests = activityData?.pullRequests || [];
 	const allBadPractices = pullRequests.flatMap((pr) => pr.badPractices);
@@ -55,6 +61,7 @@ export function PracticesPage({
 					<div className="space-y-4 col-span-1">
 						<div className="xl:sticky xl:top-4 xl:self-start xl:max-h-[calc(100vh-2rem)] xl:overflow-auto">
 							<ActivitySummaryCard
+								providerType={providerType}
 								username={username}
 								displayName={displayName}
 								currUserIsDashboardUser={currUserIsDashboardUser}
@@ -86,6 +93,7 @@ export function PracticesPage({
 								pullRequests.map((pullRequest) => (
 									<PullRequestBadPracticeCard
 										key={pullRequest.id}
+										providerType={providerType}
 										id={pullRequest.id}
 										title={pullRequest.title}
 										number={pullRequest.number}
@@ -111,12 +119,12 @@ export function PracticesPage({
 								))
 							) : (
 								<EmptyState
-									icon={GitPullRequest}
-									title="No pull requests found"
+									icon={PrIcon}
+									title={`No ${terms.pullRequests.toLowerCase()} found`}
 									description={
 										currUserIsDashboardUser
-											? "When you create pull requests, they will be analyzed and appear here."
-											: `${displayName || username} doesn't have any pull requests to analyze.`
+											? `When you create ${terms.pullRequests.toLowerCase()}, they will be analyzed and appear here.`
+											: `${displayName || username} doesn't have any ${terms.pullRequests.toLowerCase()} to analyze.`
 									}
 								/>
 							)}
@@ -125,7 +133,7 @@ export function PracticesPage({
 
 					{/* Right Column - Legend */}
 					<div className="col-span-1 xl:sticky xl:top-4 xl:self-start xl:max-h-[calc(100vh-2rem)] xl:overflow-auto">
-						<BadPracticeLegendCard />
+						<BadPracticeLegendCard providerType={providerType} />
 					</div>
 				</div>
 			</div>

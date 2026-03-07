@@ -142,7 +142,7 @@ export function LandingHeroSection({
 					<div className="flex items-center gap-2 text-muted-foreground">
 						<MentorIcon size={36} className="text-primary" />
 						<span className="text-sm">
-							Powered by <span className="text-github-done-foreground">Heph</span>, your AI mentor
+							Powered by <span className="text-provider-done-foreground">Heph</span>, your AI mentor
 						</span>
 					</div>
 				</div>

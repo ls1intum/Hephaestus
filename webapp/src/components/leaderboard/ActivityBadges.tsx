@@ -7,6 +7,7 @@ import {
 } from "@primer/octicons-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import type { ProviderType } from "@/lib/provider";
 import { cn } from "@/lib/utils";
 import type { ReviewedPullRequest } from "./ReviewsPopover";
 import { ReviewsPopover } from "./ReviewsPopover";
@@ -20,6 +21,7 @@ export interface ActivityBadgesProps {
 	highlightReviews?: boolean;
 	className?: string;
 	isLoading?: boolean;
+	providerType?: ProviderType;
 }
 
 export function ActivityBadges({
@@ -31,6 +33,7 @@ export function ActivityBadges({
 	highlightReviews = false,
 	className,
 	isLoading = false,
+	providerType = "GITHUB",
 }: ActivityBadgesProps) {
 	const hasActivity =
 		reviewedPullRequests.length > 0 ||
@@ -55,8 +58,12 @@ export function ActivityBadges({
 		<div className={cn("flex items-center gap-2", className)}>
 			{reviewedPullRequests.length > 0 && (
 				<>
-					<ReviewsPopover reviewedPRs={reviewedPullRequests} highlight={highlightReviews} />
-					<div className="flex items-center text-github-muted-foreground">
+					<ReviewsPopover
+						reviewedPRs={reviewedPullRequests}
+						highlight={highlightReviews}
+						providerType={providerType}
+					/>
+					<div className="flex items-center text-provider-muted-foreground">
 						<ChevronLeftIcon className="h-4 w-4" />
 					</div>
 				</>
@@ -64,7 +71,7 @@ export function ActivityBadges({
 			{changeRequests > 0 && (
 				<Tooltip>
 					<TooltipTrigger
-						render={<div className="flex items-center gap-1 text-github-danger-foreground" />}
+						render={<div className="flex items-center gap-1 text-provider-danger-foreground" />}
 					>
 						<FileDiffIcon className="h-4 w-4" />
 						<span>{changeRequests}</span>
@@ -75,7 +82,7 @@ export function ActivityBadges({
 			{approvals > 0 && (
 				<Tooltip>
 					<TooltipTrigger
-						render={<div className="flex items-center gap-1 text-github-success-foreground" />}
+						render={<div className="flex items-center gap-1 text-provider-success-foreground" />}
 					>
 						<CheckIcon className="h-4 w-4" />
 						<span>{approvals}</span>
@@ -86,7 +93,7 @@ export function ActivityBadges({
 			{comments > 0 && (
 				<Tooltip>
 					<TooltipTrigger
-						render={<div className="flex items-center gap-1 text-github-muted-foreground" />}
+						render={<div className="flex items-center gap-1 text-provider-muted-foreground" />}
 					>
 						<CommentIcon className="h-4 w-4" />
 						<span>{comments}</span>
@@ -97,7 +104,7 @@ export function ActivityBadges({
 			{codeComments > 0 && (
 				<Tooltip>
 					<TooltipTrigger
-						render={<div className="flex items-center gap-1 text-github-muted-foreground" />}
+						render={<div className="flex items-center gap-1 text-provider-muted-foreground" />}
 					>
 						<CommentDiscussionIcon className="h-4 w-4" />
 						<span>{codeComments}</span>

@@ -105,9 +105,9 @@ export function MessageActions({
 									<Button
 										data-testid="message-upvote"
 										className={cn(
-											"touch:w-10 size-8 text-muted-foreground hover:text-github-success-foreground hover:bg-github-success-foreground/10",
+											"touch:w-10 size-8 text-muted-foreground hover:text-provider-success-foreground hover:bg-provider-success-foreground/10",
 											{
-												"text-github-success-foreground": vote?.isUpvoted === true,
+												"text-provider-success-foreground": vote?.isUpvoted === true,
 												"opacity-50 hover:opacity-100": vote?.isUpvoted === false,
 											},
 										)}
@@ -128,9 +128,9 @@ export function MessageActions({
 									<Button
 										data-testid="message-downvote"
 										className={cn(
-											"touch:w-10 size-8 text-muted-foreground hover:text-github-danger-foreground hover:bg-github-danger-foreground/10",
+											"touch:w-10 size-8 text-muted-foreground hover:text-provider-danger-foreground hover:bg-provider-danger-foreground/10",
 											{
-												"text-github-danger-foreground": vote?.isUpvoted === false,
+												"text-provider-danger-foreground": vote?.isUpvoted === false,
 												"opacity-50 hover:opacity-100": vote?.isUpvoted === true,
 											},
 										)}

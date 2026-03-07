@@ -1,17 +1,20 @@
-import { CheckIcon, CommentIcon, FileDiffIcon, GitPullRequestIcon } from "@primer/octicons-react";
+import { CheckIcon, CommentIcon, FileDiffIcon } from "@primer/octicons-react";
 import { formatDistanceToNow } from "date-fns";
 import { AwardIcon } from "lucide-react";
 import { FormattedTitle } from "@/components/shared/FormattedTitle";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { getPullRequestStateIcon, type IconComponent, type ProviderType } from "@/lib/provider";
 import { cn } from "@/lib/utils";
 
-// Define the styling for different review states
+// Review-action icons: same across providers (check, diff, comment).
+// PR-state icons (UNKNOWN/PENDING/DISMISSED) use a placeholder that gets
+// replaced at render time with the provider-aware PR icon.
 const REVIEW_STATE_STYLES: Record<
 	string,
 	{
-		icon: React.ElementType;
+		icon: IconComponent | null;
 		color: string;
 		skeletonColor: string;
 		tooltip: string;
@@ -19,38 +22,38 @@ const REVIEW_STATE_STYLES: Record<
 > = {
 	APPROVED: {
 		icon: CheckIcon,
-		color: "text-github-success-foreground",
-		skeletonColor: "bg-github-success-foreground/30",
+		color: "text-provider-success-foreground",
+		skeletonColor: "bg-provider-success-foreground/30",
 		tooltip: "Approved",
 	},
 	CHANGES_REQUESTED: {
 		icon: FileDiffIcon,
-		color: "text-github-danger-foreground",
-		skeletonColor: "bg-github-danger-foreground/30",
+		color: "text-provider-danger-foreground",
+		skeletonColor: "bg-provider-danger-foreground/30",
 		tooltip: "Changes Requested",
 	},
 	COMMENTED: {
 		icon: CommentIcon,
-		color: "text-github-muted-foreground",
-		skeletonColor: "bg-github-muted-foreground/30",
+		color: "text-provider-muted-foreground",
+		skeletonColor: "bg-provider-muted-foreground/30",
 		tooltip: "Commented",
 	},
 	UNKNOWN: {
-		icon: GitPullRequestIcon,
-		color: "text-github-muted-foreground",
-		skeletonColor: "bg-github-muted-foreground/30",
+		icon: null,
+		color: "text-provider-muted-foreground",
+		skeletonColor: "bg-provider-muted-foreground/30",
 		tooltip: "Reviewed",
 	},
 	PENDING: {
-		icon: GitPullRequestIcon,
-		color: "text-github-muted-foreground",
-		skeletonColor: "bg-github-muted-foreground/30",
+		icon: null,
+		color: "text-provider-muted-foreground",
+		skeletonColor: "bg-provider-muted-foreground/30",
 		tooltip: "Pending",
 	},
 	DISMISSED: {
-		icon: GitPullRequestIcon,
-		color: "text-github-muted-foreground",
-		skeletonColor: "bg-github-muted-foreground/30",
+		icon: null,
+		color: "text-provider-muted-foreground",
+		skeletonColor: "bg-provider-muted-foreground/30",
 		tooltip: "Dismissed",
 	},
 };
@@ -77,6 +80,7 @@ export interface ReviewActivityCardProps {
 	};
 	repositoryName?: string;
 	score?: number;
+	providerType?: ProviderType;
 }
 
 export function ReviewActivityCard({
@@ -86,9 +90,13 @@ export function ReviewActivityCard({
 	htmlUrl,
 	pullRequest,
 	score,
+	providerType = "GITHUB",
 }: ReviewActivityCardProps) {
 	// Get the style for the current review state
 	const stateStyle = REVIEW_STATE_STYLES[state] || REVIEW_STATE_STYLES.UNKNOWN;
+	// For states without a specific review icon (UNKNOWN/PENDING/DISMISSED),
+	// use the provider-aware PR/MR open icon as fallback
+	const StateIcon = stateStyle.icon ?? getPullRequestStateIcon(providerType, "OPEN").icon;
 
 	// Format relative time from submission date
 	const relativeTime = submittedAt
@@ -101,7 +109,7 @@ export function ReviewActivityCard({
 			<Card className="rounded-lg border border-border bg-card text-card-foreground shadow-sm hover:bg-accent/50 cursor-pointer py-0 gap-0">
 				<div className="flex flex-col gap-1 p-4">
 					{/* Repository, PR number and points */}
-					<div className="flex justify-between gap-2 items-center text-sm text-github-muted-foreground">
+					<div className="flex justify-between gap-2 items-center text-sm text-provider-muted-foreground">
 						<span className="font-medium flex justify-center items-center space-x-1">
 							{isLoading ? (
 								<>
@@ -111,7 +119,7 @@ export function ReviewActivityCard({
 							) : (
 								<>
 									<div className={stateStyle.color}>
-										<stateStyle.icon className="mr-1" size={18} />
+										<StateIcon className="mr-1" size={18} />
 									</div>
 									<span className="whitespace-nowrap">
 										{pullRequest?.repository?.name} #{pullRequest?.number} {relativeTime}
@@ -121,7 +129,7 @@ export function ReviewActivityCard({
 						</span>
 
 						{!isLoading && score !== undefined && score > 0 && (
-							<span className="flex items-center gap-1 text-github-done-foreground font-semibold">
+							<span className="flex items-center gap-1 text-provider-done-foreground font-semibold">
 								<Tooltip>
 									<TooltipTrigger className="flex items-center gap-1">
 										<AwardIcon size={16} />

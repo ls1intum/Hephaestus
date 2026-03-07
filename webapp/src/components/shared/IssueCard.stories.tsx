@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { IssueCard } from "./IssueCard";
 
 /**
- * Card component for displaying GitHub issues or pull requests with metadata.
+ * Card component for displaying pull requests / merge requests with metadata.
  * Shows details such as title, repository, state, labels, and creation date.
  * Used primarily in user profile pages to display contribution activity.
  */
@@ -15,7 +15,7 @@ const meta = {
 		docs: {
 			description: {
 				component:
-					"A card that displays GitHub pull request or issue information with metadata like state, labels, and repository.",
+					"A card that displays pull request / merge request information with metadata like state, labels, and repository.",
 			},
 		},
 	},
@@ -41,7 +41,7 @@ const meta = {
 			control: "number",
 		},
 		htmlUrl: {
-			description: "Link to the GitHub issue or PR",
+			description: "Link to the pull request or merge request",
 			control: "text",
 		},
 		repositoryName: {
@@ -222,5 +222,56 @@ export const WithNoLinkWrapperAndRightContent: Story = {
 				<span className="text-xs">Analyze</span>
 			</Button>
 		),
+	},
+};
+
+// --- GitLab variants ---
+import { gitlabDecorator } from "@/stories/decorators";
+
+/**
+ * GitLab open merge request with GitLab MR icon and green color.
+ */
+export const GitLabOpenMR: Story = {
+	decorators: [gitlabDecorator],
+	args: {
+		...OpenPR.args,
+		providerType: "GITLAB",
+		htmlUrl: "https://gitlab.com/ls1intum/Hephaestus/-/merge_requests/42",
+	},
+};
+
+/**
+ * GitLab draft merge request.
+ */
+export const GitLabDraftMR: Story = {
+	decorators: [gitlabDecorator],
+	args: {
+		...DraftPR.args,
+		providerType: "GITLAB",
+		htmlUrl: "https://gitlab.com/ls1intum/Artemis/-/merge_requests/87",
+	},
+};
+
+/**
+ * GitLab merged MR with blue merged color (vs GitHub purple).
+ */
+export const GitLabMergedMR: Story = {
+	decorators: [gitlabDecorator],
+	args: {
+		...MergedPR.args,
+		providerType: "GITLAB",
+		htmlUrl: "https://gitlab.com/ls1intum/Athena/-/merge_requests/103",
+	},
+};
+
+/**
+ * GitLab closed merge request (not merged).
+ */
+export const GitLabClosedMR: Story = {
+	decorators: [gitlabDecorator],
+	args: {
+		...ClosedPR.args,
+		providerType: "GITLAB",
+		htmlUrl: "https://gitlab.com/ls1intum/ExampleRepo/-/merge_requests/75",
 	},
 };

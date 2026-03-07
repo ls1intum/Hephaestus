@@ -1,7 +1,9 @@
 import { Activity } from "lucide-react";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { getProviderTerms, type ProviderType } from "@/lib/provider";
 
 interface ActivitySummaryCardProps {
+	providerType?: ProviderType;
 	username: string;
 	displayName?: string;
 	currUserIsDashboardUser: boolean;
@@ -13,6 +15,7 @@ interface ActivitySummaryCardProps {
 }
 
 export function ActivitySummaryCard({
+	providerType = "GITHUB",
 	username,
 	displayName,
 	currUserIsDashboardUser,
@@ -20,12 +23,16 @@ export function ActivitySummaryCard({
 	numberOfGoodPractices,
 	numberOfBadPractices,
 }: ActivitySummaryCardProps) {
+	const terms = getProviderTerms(providerType);
 	// Use displayName if available, otherwise fall back to username
 	const userDisplayName = displayName || username;
 	const userLabel = currUserIsDashboardUser ? "You have" : `${userDisplayName} has`;
 
 	// Handle pluralization
-	const prText = numberOfPullRequests === 1 ? "active pull request" : "active pull requests";
+	const prText =
+		numberOfPullRequests === 1
+			? `active ${terms.pullRequest.toLowerCase()}`
+			: `active ${terms.pullRequests.toLowerCase()}`;
 	const goodText = numberOfGoodPractices === 1 ? "good practice" : "good practices";
 	const badText = numberOfBadPractices === 1 ? "area for improvement" : "areas for improvement";
 
@@ -42,11 +49,11 @@ export function ActivitySummaryCard({
 							{numberOfPullRequests} {prText}
 						</span>{" "}
 						with{" "}
-						<span className="font-medium text-github-success-foreground">
+						<span className="font-medium text-provider-success-foreground">
 							{numberOfGoodPractices} {goodText}
 						</span>{" "}
 						and{" "}
-						<span className="font-medium text-github-attention-foreground">
+						<span className="font-medium text-provider-attention-foreground">
 							{numberOfBadPractices} {badText}
 						</span>
 						.

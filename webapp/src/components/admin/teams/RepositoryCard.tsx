@@ -1,7 +1,7 @@
 import { Eye, EyeOff, Settings } from "lucide-react";
 import { useMemo } from "react";
 import type { LabelInfo, RepositoryInfo, TeamInfo } from "@/api/types.gen";
-import { GithubBadge } from "@/components/shared/GithubBadge";
+import { LabelBadge } from "@/components/shared/LabelBadge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -123,7 +123,7 @@ export function RepositoryCard({
 				{filteredRepoLabels.length > 0 && (
 					<div className="flex flex-wrap gap-1 mt-2">
 						{filteredRepoLabels.map((label) => (
-							<GithubBadge
+							<LabelBadge
 								key={`${label.name}-${label.repository?.id ?? ""}`}
 								label={label.name}
 								color={label.color}
