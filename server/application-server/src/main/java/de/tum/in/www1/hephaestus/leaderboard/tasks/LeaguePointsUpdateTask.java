@@ -49,10 +49,10 @@ public class LeaguePointsUpdateTask implements Runnable {
     @Override
     @Transactional
     public void run() {
-        List<Workspace> workspaces = workspaceRepository.findAll();
+        List<Workspace> workspaces = workspaceRepository.findByStatus(Workspace.WorkspaceStatus.ACTIVE);
 
         if (workspaces.isEmpty()) {
-            log.debug("Skipped league points update: reason=noWorkspacesConfigured");
+            log.debug("Skipped league points update: reason=noActiveWorkspaces");
             return;
         }
 
