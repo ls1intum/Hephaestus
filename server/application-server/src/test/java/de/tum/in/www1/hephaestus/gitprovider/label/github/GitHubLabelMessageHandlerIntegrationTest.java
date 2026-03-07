@@ -158,16 +158,16 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
     void shouldProcessCreatedLabelEvents() throws Exception {
         // Given
         GitHubLabelEventDTO event = loadPayload("label.created");
-        assertThat(labelRepository.findById(FIXTURE_LABEL_ID)).isEmpty();
+        assertThat(labelRepository.findByNativeIdAndProviderId(FIXTURE_LABEL_ID, gitProvider.getId())).isEmpty();
 
         // When
         handler.handleEvent(event);
 
         // Then - verify ALL persisted fields against hardcoded fixture values
-        Label label = labelRepository.findById(FIXTURE_LABEL_ID).orElseThrow();
+        Label label = labelRepository.findByNativeIdAndProviderId(FIXTURE_LABEL_ID, gitProvider.getId()).orElseThrow();
 
         // Core schema fields (mapped to DB columns)
-        assertThat(label.getId()).isEqualTo(FIXTURE_LABEL_ID);
+        assertThat(label.getNativeId()).isEqualTo(FIXTURE_LABEL_ID);
         assertThat(label.getName()).isEqualTo(FIXTURE_LABEL_NAME);
         assertThat(label.getColor()).isEqualTo(FIXTURE_LABEL_COLOR);
         assertThat(label.getDescription()).isEqualTo(FIXTURE_LABEL_DESCRIPTION);
@@ -188,7 +188,8 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
         Long labelId = event.label().id();
 
         Label existingLabel = new Label();
-        existingLabel.setId(labelId);
+        existingLabel.setNativeId(labelId);
+        existingLabel.setProvider(gitProvider);
         existingLabel.setName("stale-name");
         existingLabel.setColor("ffffff");
         existingLabel.setDescription("stale description");
@@ -199,7 +200,7 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
         handler.handleEvent(event);
 
         // Then - verify all mutable fields are updated from DTO
-        Label label = labelRepository.findById(labelId).orElseThrow();
+        Label label = labelRepository.findByNativeIdAndProviderId(labelId, gitProvider.getId()).orElseThrow();
         assertThat(label.getName()).isEqualTo(event.label().name());
         assertThat(label.getColor()).isEqualTo(event.label().color());
         assertThat(label.getDescription()).isEqualTo(event.label().description());
@@ -216,20 +217,21 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
         // Create existing label
         Label existingLabel = new Label();
-        existingLabel.setId(event.label().id());
+        existingLabel.setNativeId(event.label().id());
+        existingLabel.setProvider(gitProvider);
         existingLabel.setName(event.label().name());
         existingLabel.setColor(event.label().color());
         existingLabel.setRepository(testRepository);
         labelRepository.save(existingLabel);
 
         // Verify it exists
-        assertThat(labelRepository.findById(event.label().id())).isPresent();
+        assertThat(labelRepository.findByNativeIdAndProviderId(event.label().id(), gitProvider.getId())).isPresent();
 
         // When
         handler.handleEvent(event);
 
         // Then
-        assertThat(labelRepository.findById(event.label().id())).isEmpty();
+        assertThat(labelRepository.findByNativeIdAndProviderId(event.label().id(), gitProvider.getId())).isEmpty();
     }
 
     private GitHubLabelEventDTO loadPayload(String filename) throws IOException {
@@ -311,7 +313,7 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
             handler.handleEvent(event);
 
             // Then
-            assertThat(labelRepository.findById(labelId))
+            assertThat(labelRepository.findByNativeIdAndProviderId(labelId, gitProvider.getId()))
                 .isPresent()
                 .get()
                 .satisfies(label -> {
@@ -326,7 +328,8 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
             // Given - existing label with description
             Long labelId = 987654321L;
             Label existingLabel = new Label();
-            existingLabel.setId(labelId);
+            existingLabel.setNativeId(labelId);
+            existingLabel.setProvider(gitProvider);
             existingLabel.setName("has-description");
             existingLabel.setColor("123456");
             existingLabel.setDescription("original description");
@@ -347,7 +350,11 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
             handler.handleEvent(event);
 
             // Then - description should be null now
-            assertThat(labelRepository.findById(labelId)).isPresent().get().extracting(Label::getDescription).isNull();
+            assertThat(labelRepository.findByNativeIdAndProviderId(labelId, gitProvider.getId()))
+                .isPresent()
+                .get()
+                .extracting(Label::getDescription)
+                .isNull();
         }
 
         @Test
@@ -361,7 +368,9 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
             handler.handleEvent(event);
 
             // Then - only one label should exist
-            assertThat(labelRepository.findById(event.label().id())).isPresent();
+            assertThat(
+                labelRepository.findByNativeIdAndProviderId(event.label().id(), gitProvider.getId())
+            ).isPresent();
             assertThat(labelRepository.count()).isEqualTo(1);
         }
 
@@ -370,7 +379,7 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
         void shouldHandleDeletionOfNonExistentLabel() throws Exception {
             // Given - label doesn't exist
             GitHubLabelEventDTO event = loadPayload("label.deleted");
-            assertThat(labelRepository.findById(event.label().id())).isEmpty();
+            assertThat(labelRepository.findByNativeIdAndProviderId(event.label().id(), gitProvider.getId())).isEmpty();
 
             // When/Then - should not throw
             assertThatCode(() -> handler.handleEvent(event)).doesNotThrowAnyException();
@@ -418,7 +427,7 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
             // Then — use TransactionTemplate for lazy-loaded repository access
             transactionTemplate.executeWithoutResult(status -> {
-                assertThat(labelRepository.findById(event.label().id()))
+                assertThat(labelRepository.findByNativeIdAndProviderId(event.label().id(), gitProvider.getId()))
                     .isPresent()
                     .get()
                     .satisfies(label -> {
@@ -444,7 +453,7 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
                 .isPresent()
                 .get()
                 .satisfies(label -> {
-                    assertThat(label.getId()).isEqualTo(event.label().id());
+                    assertThat(label.getNativeId()).isEqualTo(event.label().id());
                     assertThat(label.getName()).isEqualTo(event.label().name());
                 });
         }
@@ -469,7 +478,9 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
             GitHubLabelEventDTO createEvent = loadPayload("label.created");
             handler.handleEvent(createEvent);
 
-            Label label = labelRepository.findById(createEvent.label().id()).orElseThrow();
+            Label label = labelRepository
+                .findByNativeIdAndProviderId(createEvent.label().id(), gitProvider.getId())
+                .orElseThrow();
 
             Issue issue = new Issue();
             issue.setNativeId(12345L);

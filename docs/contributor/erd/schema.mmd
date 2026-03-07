@@ -685,6 +685,7 @@ erDiagram
     GitProvider ||--|| Issue : references
     Repository ||--|| Issue : has
     GitProvider ||--|| IssueComment : commented_on
+    GitProvider ||--|| Label : labeled
     Repository ||--|| Label : labeled
     GitProvider ||--|| Milestone : references
     Repository ||--|| Milestone : has
@@ -699,7 +700,6 @@ erDiagram
     GitProvider ||--|| PullRequestReview : reviewed
     GitProvider ||--|| PullRequestReviewComment : commented_on
     GitProvider ||--|| PullRequestReviewThread : reviewed
-    GitProvider ||--|| Label : labeled
     PullRequestReviewComment ||--|| PullRequestReviewThread : reviewed
     GitProvider ||--|| Repository : references
     GitProvider ||--|| Team : references

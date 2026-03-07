@@ -221,7 +221,7 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
                 // Label association - verify exact fixture values
                 assertThat(issue.getLabels()).hasSize(1);
                 Label label = issue.getLabels().iterator().next();
-                assertThat(label.getId()).isEqualTo(FIXTURE_LABEL_ID);
+                assertThat(label.getNativeId()).isEqualTo(FIXTURE_LABEL_ID);
                 assertThat(label.getName()).isEqualTo(FIXTURE_LABEL_NAME);
                 assertThat(label.getColor()).isEqualTo(FIXTURE_LABEL_COLOR);
 
@@ -347,7 +347,7 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             });
 
             // Verify label was created in repository
-            assertThat(labelRepository.findById(9567656085L)).isPresent();
+            assertThat(labelRepository.findByNativeIdAndProviderId(9567656085L, gitProvider.getId())).isPresent();
 
             // Verify Labeled event was published
             assertThat(eventListener.getLabeledEvents()).hasSize(1);
@@ -702,7 +702,9 @@ class GitHubIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             assertThat(author.getHtmlUrl()).isEqualTo(FIXTURE_AUTHOR_HTML_URL);
 
             // Then - label created with exact fixture values
-            var label = labelRepository.findById(FIXTURE_LABEL_ID).orElseThrow();
+            var label = labelRepository
+                .findByNativeIdAndProviderId(FIXTURE_LABEL_ID, gitProvider.getId())
+                .orElseThrow();
             assertThat(label.getName()).isEqualTo(FIXTURE_LABEL_NAME);
             assertThat(label.getColor()).isEqualTo(FIXTURE_LABEL_COLOR);
             assertThat(label.getDescription()).isNull(); // fixture has null description

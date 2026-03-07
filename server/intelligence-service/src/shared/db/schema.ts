@@ -939,12 +939,9 @@ export const label = pgTable(
 	"label",
 	{
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({
-			name: "label_id_seq",
-			startWith: 1,
-			increment: 1,
-			cache: 1,
-		}),
+		id: bigint({ mode: "number" })
+			.primaryKey()
+			.generatedByDefaultAsIdentity({ name: "label_id_seq", startWith: 1, increment: 1, cache: 1 }),
 		color: varchar({ length: 255 }),
 		description: varchar({ length: 255 }),
 		name: varchar({ length: 255 }),
@@ -1414,8 +1411,8 @@ export const pullRequestReview = pgTable(
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		pullRequestId: bigint("pull_request_id", { mode: "number" }),
 		body: text(),
-		createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }),
-		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }),
+		createdAt: timestamp("created_at", { mode: "string" }),
+		updatedAt: timestamp("updated_at", { mode: "string" }),
 		authorCanPushToRepository: boolean("author_can_push_to_repository"),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		nativeId: bigint("native_id", { mode: "number" }).notNull(),

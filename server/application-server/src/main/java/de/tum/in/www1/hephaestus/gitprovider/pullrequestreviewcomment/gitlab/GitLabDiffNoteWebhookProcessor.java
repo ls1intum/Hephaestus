@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.gitlab;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.BaseGitLabProcessor;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabFieldUtils;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.RepositoryScopeFilter;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.ScopeIdResolver;

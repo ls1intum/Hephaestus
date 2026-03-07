@@ -1,4 +1,4 @@
-package de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.gitlab;
+package de.tum.in.www1.hephaestus.gitprovider.common.gitlab;
 
 import org.springframework.lang.Nullable;
 
@@ -6,12 +6,12 @@ import org.springframework.lang.Nullable;
  * Shared utilities for extracting typed values from GitLab GraphQL/webhook
  * response maps where values may arrive as String, Number, or null.
  */
-final class GitLabFieldUtils {
+public final class GitLabFieldUtils {
 
     private GitLabFieldUtils() {}
 
     @Nullable
-    static Integer toInteger(@Nullable Object value) {
+    public static Integer toInteger(@Nullable Object value) {
         if (value == null) return null;
         if (value instanceof Number number) return number.intValue();
         try {
@@ -22,7 +22,7 @@ final class GitLabFieldUtils {
     }
 
     @Nullable
-    static String asString(@Nullable Object value) {
+    public static String asString(@Nullable Object value) {
         return value != null ? value.toString() : null;
     }
 }

@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.gitlab;
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabFieldUtils;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants;

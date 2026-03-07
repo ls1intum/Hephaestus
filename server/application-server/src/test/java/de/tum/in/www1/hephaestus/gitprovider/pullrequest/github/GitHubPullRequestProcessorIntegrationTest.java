@@ -554,7 +554,7 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(result.getLabels()).hasSize(1);
             Label label = result.getLabels().iterator().next();
             assertThat(label.getName()).isEqualTo(labelName);
-            assertThat(labelRepository.findById(labelId)).isPresent();
+            assertThat(labelRepository.findByNativeIdAndProviderId(labelId, githubProvider.getId())).isPresent();
         }
 
         @Test
