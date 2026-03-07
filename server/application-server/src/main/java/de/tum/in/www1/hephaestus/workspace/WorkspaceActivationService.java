@@ -599,7 +599,12 @@ public class WorkspaceActivationService {
             created++;
         }
         if (created > 0) {
-            log.info("Created repository monitors for GitLab workspace: workspaceId={}, created={}, total={}", workspace.getId(), created, syncedRepos.size());
+            log.info(
+                "Created repository monitors for GitLab workspace: workspaceId={}, created={}, total={}",
+                workspace.getId(),
+                created,
+                syncedRepos.size()
+            );
         }
     }
 
