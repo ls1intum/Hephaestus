@@ -323,6 +323,8 @@ public class GitLabMergeRequestSyncService {
             mrContext
         );
 
+        Integer milestoneIid = extractMilestoneIid(node);
+
         var syncData = new GitLabMergeRequestProcessor.SyncMergeRequestData(
             fields.globalId(),
             fields.iid(),
@@ -361,7 +363,8 @@ public class GitLabMergeRequestSyncService {
             syncLabels,
             syncAssignees,
             syncReviewers,
-            syncApprovers
+            syncApprovers,
+            milestoneIid
         );
         PullRequest pr = mergeRequestProcessor.processFromSync(syncData, repository, scopeId);
 
@@ -450,6 +453,28 @@ public class GitLabMergeRequestSyncService {
         int deletions = diffStats.get("deletions") != null ? ((Number) diffStats.get("deletions")).intValue() : 0;
         int fileCount = diffStats.get("fileCount") != null ? ((Number) diffStats.get("fileCount")).intValue() : 0;
         return new DiffStats(additions, deletions, fileCount);
+    }
+
+    // ========================================================================
+    // Milestone extraction
+    // ========================================================================
+
+    @SuppressWarnings("unchecked")
+    @Nullable
+    private static Integer extractMilestoneIid(Map<String, Object> node) {
+        Map<String, Object> milestone = (Map<String, Object>) node.get("milestone");
+        if (milestone == null) {
+            return null;
+        }
+        Object iid = milestone.get("iid");
+        if (iid == null) {
+            return null;
+        }
+        try {
+            return Integer.parseInt(iid.toString());
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     // ========================================================================

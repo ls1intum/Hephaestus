@@ -49,6 +49,7 @@ public class WorkspaceActivationService {
     private final WorkspaceRepository workspaceRepository;
     private final OrganizationRepository organizationRepository;
     private final RepositoryRepository repositoryRepository;
+    private final RepositoryToMonitorRepository repositoryToMonitorRepository;
 
     // Services
     private final NatsConsumerService natsConsumerService;
@@ -68,6 +69,7 @@ public class WorkspaceActivationService {
         WorkspaceRepository workspaceRepository,
         OrganizationRepository organizationRepository,
         RepositoryRepository repositoryRepository,
+        RepositoryToMonitorRepository repositoryToMonitorRepository,
         NatsConsumerService natsConsumerService,
         WorkspaceScopeFilter workspaceScopeFilter,
         ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider,
@@ -80,6 +82,7 @@ public class WorkspaceActivationService {
         this.workspaceRepository = workspaceRepository;
         this.organizationRepository = organizationRepository;
         this.repositoryRepository = repositoryRepository;
+        this.repositoryToMonitorRepository = repositoryToMonitorRepository;
         this.natsConsumerService = natsConsumerService;
         this.workspaceScopeFilter = workspaceScopeFilter;
         this.gitHubDataSyncServiceProvider = gitHubDataSyncServiceProvider;
@@ -275,6 +278,10 @@ public class WorkspaceActivationService {
                             );
                             // Link workspace to organization after sync (org was created during sync)
                             linkWorkspaceToOrganization(workspace);
+
+                            // Register synced repositories as monitored for this workspace.
+                            // This is analogous to ensureRepositoryMonitorForInstallation() for GitHub.
+                            ensureRepositoryMonitorsForGitLab(workspace, result.synced());
 
                             // Sync issues and merge requests for each project.
                             // lastSyncAt is updated ONCE per repo after ALL sync phases complete,
@@ -571,6 +578,29 @@ public class WorkspaceActivationService {
                         }
                     });
             });
+    }
+
+    /**
+     * Ensures each synced GitLab repository has a corresponding {@link RepositoryToMonitor} entry.
+     * Analogous to {@code ensureRepositoryMonitorForInstallation()} for GitHub App installations.
+     */
+    @Transactional
+    void ensureRepositoryMonitorsForGitLab(Workspace workspace, List<Repository> syncedRepos) {
+        int created = 0;
+        for (Repository repo : syncedRepos) {
+            String nwo = repo.getNameWithOwner();
+            if (repositoryToMonitorRepository.existsByWorkspaceIdAndNameWithOwner(workspace.getId(), nwo)) {
+                continue;
+            }
+            RepositoryToMonitor monitor = new RepositoryToMonitor();
+            monitor.setNameWithOwner(nwo);
+            monitor.setWorkspace(workspace);
+            repositoryToMonitorRepository.save(monitor);
+            created++;
+        }
+        if (created > 0) {
+            log.info("Created repository monitors for GitLab workspace: workspaceId={}, created={}, total={}", workspace.getId(), created, syncedRepos.size());
+        }
     }
 
     private boolean isBlank(String value) {

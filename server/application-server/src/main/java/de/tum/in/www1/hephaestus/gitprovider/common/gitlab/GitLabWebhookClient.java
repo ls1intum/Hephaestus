@@ -258,26 +258,21 @@ public class GitLabWebhookClient {
         boolean noteEvents,
         boolean pushEvents,
         boolean pipelineEvents,
+        boolean milestoneEvents,
         boolean enableSslVerification
     ) {
         public Map<String, Object> toPayload() {
-            return Map.of(
-                "url",
-                url,
-                "token",
-                token,
-                "merge_requests_events",
-                mergeRequestsEvents,
-                "issues_events",
-                issuesEvents,
-                "note_events",
-                noteEvents,
-                "push_events",
-                pushEvents,
-                "pipeline_events",
-                pipelineEvents,
-                "enable_ssl_verification",
-                enableSslVerification
+            // Map.ofEntries used because Map.of supports at most 10 entries
+            return Map.ofEntries(
+                Map.entry("url", url),
+                Map.entry("token", token),
+                Map.entry("merge_requests_events", mergeRequestsEvents),
+                Map.entry("issues_events", issuesEvents),
+                Map.entry("note_events", noteEvents),
+                Map.entry("push_events", pushEvents),
+                Map.entry("pipeline_events", pipelineEvents),
+                Map.entry("milestone_events", milestoneEvents),
+                Map.entry("enable_ssl_verification", enableSslVerification)
             );
         }
     }

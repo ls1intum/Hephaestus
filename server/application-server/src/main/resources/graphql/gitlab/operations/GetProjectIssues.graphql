@@ -17,6 +17,10 @@ query GetProjectIssues($fullPath: ID!, $first: Int!, $after: String, $updatedAft
                 createdAt
                 updatedAt
                 closedAt
+                milestone {
+                    id
+                    iid
+                }
                 author {
                     ...GitLabUserFields
                 }

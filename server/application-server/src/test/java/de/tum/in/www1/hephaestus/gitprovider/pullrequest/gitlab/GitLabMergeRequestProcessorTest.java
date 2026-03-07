@@ -24,6 +24,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.spi.RepositoryScopeFilter;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.ScopeIdResolver;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
+import de.tum.in.www1.hephaestus.gitprovider.milestone.MilestoneRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.gitlab.dto.GitLabMergeRequestEventDTO;
@@ -84,6 +85,9 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
     private RepositoryScopeFilter repositoryScopeFilter;
 
     @Mock
+    private MilestoneRepository milestoneRepository;
+
+    @Mock
     private ApplicationEventPublisher eventPublisher;
 
     private GitLabMergeRequestProcessor processor;
@@ -103,6 +107,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         processor = new GitLabMergeRequestProcessor(
             pullRequestRepository,
             reviewRepository,
+            milestoneRepository,
             userRepository,
             labelRepository,
             repositoryRepository,
@@ -1174,6 +1179,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 null,
                 null,
                 null,
+                null,
                 null
             );
             PullRequest result = processor.processFromSync(syncData, testRepo, 1L);
@@ -1209,6 +1215,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 null,
                 false,
                 0,
+                null,
                 null,
                 null,
                 null,
@@ -1313,7 +1320,8 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                         "https://gitlab.com/uploads/avatar.png",
                         "https://gitlab.com/reviewer1"
                     )
-                )
+                ),
+                null
             );
             processor.processFromSync(syncData, testRepo, 1L);
 
@@ -1472,6 +1480,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 "gid://gitlab/User/12345",
                 "testuser",
                 "Test User",
+                null,
                 null,
                 null,
                 null,
@@ -1796,6 +1805,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
             "Test User",
             "https://gitlab.com/uploads/avatar.png",
             "https://gitlab.com/testuser",
+            null,
             null,
             null,
             null,

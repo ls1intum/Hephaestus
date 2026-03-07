@@ -158,6 +158,7 @@ class GitLabWebhookClientTest extends BaseUnitTest {
                 true,
                 true,
                 false,
+                true,
                 true
             );
 

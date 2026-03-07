@@ -224,6 +224,7 @@ public class GitLabWebhookService {
                 true, // note_events
                 true, // push_events
                 false, // pipeline_events
+                true, // milestone_events
                 true // enable_ssl_verification
             );
 

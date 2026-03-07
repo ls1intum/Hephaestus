@@ -25,6 +25,7 @@ import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.issue.gitlab.dto.GitLabIssueEventDTO;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
+import de.tum.in.www1.hephaestus.gitprovider.milestone.MilestoneRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
@@ -74,6 +75,9 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
     private RepositoryScopeFilter repositoryScopeFilter;
 
     @Mock
+    private MilestoneRepository milestoneRepository;
+
+    @Mock
     private ApplicationEventPublisher eventPublisher;
 
     private GitLabIssueProcessor processor;
@@ -92,6 +96,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
 
         processor = new GitLabIssueProcessor(
             issueRepository,
+            milestoneRepository,
             userRepository,
             labelRepository,
             repositoryRepository,
@@ -207,6 +212,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 null,
                 null,
                 0,
+                null,
                 null,
                 null
             );
@@ -507,6 +513,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 "https://gitlab.lrz.de/ga84xah",
                 0,
                 null,
+                null,
                 null
             );
             Issue result = processor.processFromSync(syncData, testRepo, 1L);
@@ -561,6 +568,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 null,
                 0,
                 null,
+                null,
                 null
             );
             Issue result = processor.processFromSync(syncData, testRepo, 1L);
@@ -588,6 +596,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 null,
                 null,
                 0,
+                null,
                 null,
                 null
             );
@@ -621,6 +630,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 null,
                 null,
                 0,
+                null,
                 null,
                 null
             );
@@ -658,6 +668,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 null,
                 null,
                 0,
+                null,
                 null,
                 null
             );
