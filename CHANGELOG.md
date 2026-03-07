@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.25.0](https://github.com/ls1intum/Hephaestus/compare/v0.24.0...v0.25.0) (2026-03-07)
+
+### 🚀 Features
+
+* **workspace:** GitLab webhook auto-registration ([#804](https://github.com/ls1intum/Hephaestus/issues/804)) ([460e273](https://github.com/ls1intum/Hephaestus/commit/460e27345ce390443688cb0f867bcc5653a363d0))
+* **workspace:** GitLab workspace deletion and cleanup ([#805](https://github.com/ls1intum/Hephaestus/issues/805)) ([0649c6c](https://github.com/ls1intum/Hephaestus/commit/0649c6c62a0d2a02285fdade7b3ec90f31bb2524))
+
 ## [0.24.0](https://github.com/ls1intum/Hephaestus/compare/v0.23.1...v0.24.0) (2026-03-05)
 
 ### 🚀 Features
