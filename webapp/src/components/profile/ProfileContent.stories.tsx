@@ -275,3 +275,43 @@ export const CompletelyEmpty: Story = {
 		onTimeframeChange: fn(),
 	},
 };
+
+// --- GitLab variant ---
+import { gitlabDecorator } from "@/stories/decorators";
+
+const gitlabReviewActivity = mockReviewActivity.map((r) => ({
+	...r,
+	htmlUrl: r.htmlUrl.replace("github.com", "gitlab.com").replace("/pull/", "/-/merge_requests/"),
+	pullRequest: {
+		...r.pullRequest,
+		htmlUrl: r.pullRequest.htmlUrl
+			.replace("github.com", "gitlab.com")
+			.replace("/pull/", "/-/merge_requests/"),
+		repository: {
+			...r.pullRequest.repository,
+			htmlUrl: r.pullRequest.repository.htmlUrl.replace("github.com", "gitlab.com"),
+		},
+	},
+}));
+
+const gitlabOpenPullRequests = mockOpenPullRequests.map((pr) => ({
+	...pr,
+	htmlUrl: pr.htmlUrl.replace("github.com", "gitlab.com").replace("/pull/", "/-/merge_requests/"),
+	repository: {
+		...pr.repository,
+		htmlUrl: pr.repository.htmlUrl.replace("github.com", "gitlab.com"),
+	},
+}));
+
+/**
+ * GitLab version — shows merge request terminology and GitLab icons throughout.
+ */
+export const GitLabDefault: Story = {
+	decorators: [gitlabDecorator],
+	args: {
+		...Default.args,
+		providerType: "GITLAB",
+		reviewActivity: gitlabReviewActivity,
+		openPullRequests: gitlabOpenPullRequests,
+	},
+};

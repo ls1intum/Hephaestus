@@ -111,3 +111,17 @@ export const Loading: Story = {
 		codeComments: 0,
 	},
 };
+
+// --- GitLab variant ---
+import { gitlabDecorator } from "@/stories/decorators";
+
+/**
+ * GitLab version — uses GitLab MR icons in the reviews popover.
+ */
+export const GitLabDefault: Story = {
+	decorators: [gitlabDecorator],
+	args: {
+		...Default.args,
+		providerType: "GITLAB",
+	},
+};
