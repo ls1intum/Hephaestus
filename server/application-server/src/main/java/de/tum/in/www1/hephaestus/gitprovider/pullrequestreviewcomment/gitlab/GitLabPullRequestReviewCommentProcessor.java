@@ -65,28 +65,27 @@ public class GitLabPullRequestReviewCommentProcessor {
     ) {}
 
     /**
-     * Finds or creates a review comment from a GitLab diff note.
-     *
-     * @param data the diff note data
-     * @param thread the parent thread (discussion)
-     * @param pr the parent pull request
-     * @param author the comment author (may be null)
-     * @param provider the git provider
-     * @param inReplyTo the parent comment (for threaded replies, may be null)
-     * @param scopeId the scope ID for event context
-     * @return the persisted comment entity, or null if noteGlobalId is invalid
+     * Groups the contextual parameters needed to find or create a review comment.
      */
-    @Transactional
-    @Nullable
-    public PullRequestReviewComment findOrCreateComment(
-        DiffNoteData data,
+    public record CommentContext(
         PullRequestReviewThread thread,
         PullRequest pr,
         @Nullable User author,
         GitProvider provider,
         @Nullable PullRequestReviewComment inReplyTo,
         Long scopeId
-    ) {
+    ) {}
+
+    /**
+     * Finds or creates a review comment from a GitLab diff note.
+     *
+     * @param data the diff note data
+     * @param context the contextual parameters (thread, PR, author, provider, inReplyTo, scopeId)
+     * @return the persisted comment entity, or null if noteGlobalId is invalid
+     */
+    @Transactional
+    @Nullable
+    public PullRequestReviewComment findOrCreateComment(DiffNoteData data, CommentContext context) {
         long nativeId;
         try {
             nativeId = GitLabSyncConstants.extractNumericId(data.noteGlobalId());
@@ -95,12 +94,12 @@ public class GitLabPullRequestReviewCommentProcessor {
             return null;
         }
 
-        Long providerId = provider.getId();
+        Long providerId = context.provider().getId();
 
         return commentRepository
             .findByNativeIdAndProviderId(nativeId, providerId)
-            .map(existing -> updateComment(existing, data, thread, pr, scopeId))
-            .orElseGet(() -> createComment(nativeId, data, thread, pr, author, provider, inReplyTo, scopeId));
+            .map(existing -> updateComment(existing, data, context.thread(), context.pr(), context.scopeId()))
+            .orElseGet(() -> createComment(nativeId, data, context));
     }
 
     private PullRequestReviewComment updateComment(
@@ -141,21 +140,12 @@ public class GitLabPullRequestReviewCommentProcessor {
         return existing;
     }
 
-    private PullRequestReviewComment createComment(
-        long nativeId,
-        DiffNoteData data,
-        PullRequestReviewThread thread,
-        PullRequest pr,
-        @Nullable User author,
-        GitProvider provider,
-        @Nullable PullRequestReviewComment inReplyTo,
-        Long scopeId
-    ) {
+    private PullRequestReviewComment createComment(long nativeId, DiffNoteData data, CommentContext context) {
         PullRequestReviewComment comment = new PullRequestReviewComment();
         comment.setNativeId(nativeId);
-        comment.setProvider(provider);
-        comment.setPullRequest(pr);
-        comment.setThread(thread);
+        comment.setProvider(context.provider());
+        comment.setPullRequest(context.pr());
+        comment.setThread(context.thread());
 
         String sanitizedBody = PostgresStringUtils.sanitize(data.body());
         comment.setBody(sanitizedBody != null ? sanitizedBody : "");
@@ -184,11 +174,11 @@ public class GitLabPullRequestReviewCommentProcessor {
         comment.setUpdatedAt(data.updatedAt());
 
         // Relationships
-        if (author != null) {
-            comment.setAuthor(author);
+        if (context.author() != null) {
+            comment.setAuthor(context.author());
         }
-        if (inReplyTo != null) {
-            comment.setInReplyTo(inReplyTo);
+        if (context.inReplyTo() != null) {
+            comment.setInReplyTo(context.inReplyTo());
         }
 
         PullRequestReviewComment saved = commentRepository.save(comment);
@@ -197,8 +187,8 @@ public class GitLabPullRequestReviewCommentProcessor {
         eventPublisher.publishEvent(
             new DomainEvent.ReviewCommentCreated(
                 EventPayload.ReviewCommentData.from(saved),
-                pr.getId(),
-                createSyncContext(pr, scopeId)
+                context.pr().getId(),
+                createSyncContext(context.pr(), context.scopeId())
             )
         );
 

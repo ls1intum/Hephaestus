@@ -167,7 +167,7 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
                 .hasSize(1)
                 .first()
                 .satisfies(event -> {
-                    assertThat(event.label().id()).isEqualTo(labelId);
+                    assertThat(event.label().id()).isEqualTo(result.getId());
                     assertThat(event.context().scopeId()).isEqualTo(testWorkspace.getId());
                     assertThat(event.context().repository().id()).isEqualTo(testRepository.getId());
                 });

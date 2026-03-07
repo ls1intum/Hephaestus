@@ -322,16 +322,11 @@ public class GitLabDiscussionSyncService {
         Instant firstCreatedAt = parseTimestamp((String) firstNote.get("createdAt"));
 
         // Create/update the thread
+        var threadData = new GitLabPullRequestReviewThreadProcessor.ThreadData(
+            discussionGlobalId, resolved, resolvedBy, filePath, newLine, firstCreatedAt
+        );
         PullRequestReviewThread thread = threadProcessor.findOrCreateThread(
-            discussionGlobalId,
-            resolved,
-            resolvedBy,
-            filePath,
-            newLine,
-            pr,
-            provider,
-            firstCreatedAt,
-            scopeId
+            threadData, pr, provider, scopeId
         );
 
         // Process each note in the discussion as a review comment
@@ -389,14 +384,13 @@ public class GitLabDiscussionSyncService {
                 parseTimestamp((String) noteNode.get("updatedAt"))
             );
 
-            PullRequestReviewComment comment = reviewCommentProcessor.findOrCreateComment(
-                noteData,
-                thread,
-                pr,
-                author,
-                provider,
+            var commentContext = new GitLabPullRequestReviewCommentProcessor.CommentContext(
+                thread, pr, author, provider,
                 previousComment, // first note has no parent, subsequent notes are replies
                 scopeId
+            );
+            PullRequestReviewComment comment = reviewCommentProcessor.findOrCreateComment(
+                noteData, commentContext
             );
 
             if (comment != null) {

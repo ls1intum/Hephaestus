@@ -48,52 +48,53 @@ public class GitLabPullRequestReviewThreadProcessor {
     }
 
     /**
-     * Finds or creates a review thread from a GitLab discussion.
-     * <p>
-     * Since GitLab Discussion IDs are hex hashes (not numeric), we look up by
-     * {@code nodeId + providerId} and use a deterministic hash as {@code nativeId}.
-     *
-     * @param discussionGlobalId GitLab global ID (e.g. "gid://gitlab/Discussion/abc123def...")
-     * @param resolved whether the discussion is resolved
-     * @param resolvedBy the user who resolved the discussion (null if unresolved)
-     * @param filePath the file path from the first note's position
-     * @param newLine the new line number from the first note's position
-     * @param pr the parent pull request
-     * @param provider the git provider
-     * @param createdAt the creation timestamp of the first note
-     * @param scopeId the scope ID for event context
-     * @return the thread entity (never null)
+     * Groups the discussion-level data needed to find or create a review thread.
      */
-    @Transactional
-    public PullRequestReviewThread findOrCreateThread(
+    public record ThreadData(
         String discussionGlobalId,
         boolean resolved,
         @Nullable User resolvedBy,
         @Nullable String filePath,
         @Nullable Integer newLine,
+        @Nullable Instant createdAt
+    ) {}
+
+    /**
+     * Groups the webhook-level data needed to find or create a webhook thread.
+     */
+    public record WebhookThreadData(
+        long noteNativeId,
+        @Nullable String filePath,
+        @Nullable Integer newLine,
+        @Nullable Instant createdAt,
+        @Nullable Instant updatedAt
+    ) {}
+
+    /**
+     * Finds or creates a review thread from a GitLab discussion.
+     * <p>
+     * Since GitLab Discussion IDs are hex hashes (not numeric), we look up by
+     * {@code nodeId + providerId} and use a deterministic hash as {@code nativeId}.
+     *
+     * @param data the discussion-level data (global ID, resolution state, file position, timestamp)
+     * @param pr the parent pull request
+     * @param provider the git provider
+     * @param scopeId the scope ID for event context
+     * @return the thread entity (never null)
+     */
+    @Transactional
+    public PullRequestReviewThread findOrCreateThread(
+        ThreadData data,
         PullRequest pr,
         GitProvider provider,
-        @Nullable Instant createdAt,
         Long scopeId
     ) {
         Long providerId = provider.getId();
 
         return threadRepository
-            .findByNodeIdAndProviderId(discussionGlobalId, providerId)
-            .map(existing -> updateThread(existing, resolved, resolvedBy, pr, scopeId))
-            .orElseGet(() ->
-                createThread(
-                    discussionGlobalId,
-                    resolved,
-                    resolvedBy,
-                    filePath,
-                    newLine,
-                    pr,
-                    provider,
-                    createdAt,
-                    scopeId
-                )
-            );
+            .findByNodeIdAndProviderId(data.discussionGlobalId(), providerId)
+            .map(existing -> updateThread(existing, data.resolved(), data.resolvedBy(), pr, scopeId))
+            .orElseGet(() -> createThread(data, pr, provider, scopeId));
     }
 
     /**
@@ -102,34 +103,35 @@ public class GitLabPullRequestReviewThreadProcessor {
      * Webhooks don't carry the discussion ID, so we use the note's numeric ID as nativeId.
      * The GraphQL discussion sync will reconcile this into the proper discussion later
      * by matching on the note within the thread.
+     *
+     * @param data the webhook-level data (note native ID, file position, timestamps)
+     * @param pr the parent pull request
+     * @param provider the git provider
+     * @return the thread entity (never null)
      */
     @Transactional
     public PullRequestReviewThread findOrCreateWebhookThread(
-        long noteNativeId,
-        @Nullable String filePath,
-        @Nullable Integer newLine,
+        WebhookThreadData data,
         PullRequest pr,
-        GitProvider provider,
-        @Nullable Instant createdAt,
-        @Nullable Instant updatedAt
+        GitProvider provider
     ) {
         Long providerId = provider.getId();
 
         return threadRepository
-            .findByNativeIdAndProviderId(noteNativeId, providerId)
+            .findByNativeIdAndProviderId(data.noteNativeId(), providerId)
             .orElseGet(() -> {
                 PullRequestReviewThread thread = new PullRequestReviewThread();
-                thread.setNativeId(noteNativeId);
+                thread.setNativeId(data.noteNativeId());
                 thread.setProvider(provider);
                 thread.setPullRequest(pr);
-                thread.setPath(filePath);
-                thread.setLine(newLine);
+                thread.setPath(data.filePath());
+                thread.setLine(data.newLine());
                 thread.setState(PullRequestReviewThread.State.UNRESOLVED);
-                thread.setCreatedAt(createdAt);
-                thread.setUpdatedAt(updatedAt);
+                thread.setCreatedAt(data.createdAt());
+                thread.setUpdatedAt(data.updatedAt());
 
                 PullRequestReviewThread saved = threadRepository.save(thread);
-                log.debug("Created webhook thread: nativeId={}, path={}", noteNativeId, filePath);
+                log.debug("Created webhook thread: nativeId={}, path={}", data.noteNativeId(), data.filePath());
                 return saved;
             });
     }
@@ -175,37 +177,32 @@ public class GitLabPullRequestReviewThreadProcessor {
     }
 
     private PullRequestReviewThread createThread(
-        String discussionGlobalId,
-        boolean resolved,
-        @Nullable User resolvedBy,
-        @Nullable String filePath,
-        @Nullable Integer newLine,
+        ThreadData data,
         PullRequest pr,
         GitProvider provider,
-        @Nullable Instant createdAt,
         Long scopeId
     ) {
-        long nativeId = deterministicNativeId(discussionGlobalId);
+        long nativeId = deterministicNativeId(data.discussionGlobalId());
 
         PullRequestReviewThread thread = new PullRequestReviewThread();
         thread.setNativeId(nativeId);
-        thread.setNodeId(discussionGlobalId);
+        thread.setNodeId(data.discussionGlobalId());
         thread.setProvider(provider);
         thread.setPullRequest(pr);
-        thread.setPath(filePath);
-        thread.setLine(newLine);
-        thread.setState(resolved ? PullRequestReviewThread.State.RESOLVED : PullRequestReviewThread.State.UNRESOLVED);
-        if (resolved && resolvedBy != null) {
-            thread.setResolvedBy(resolvedBy);
+        thread.setPath(data.filePath());
+        thread.setLine(data.newLine());
+        thread.setState(data.resolved() ? PullRequestReviewThread.State.RESOLVED : PullRequestReviewThread.State.UNRESOLVED);
+        if (data.resolved() && data.resolvedBy() != null) {
+            thread.setResolvedBy(data.resolvedBy());
         }
-        thread.setCreatedAt(createdAt);
-        thread.setUpdatedAt(createdAt);
+        thread.setCreatedAt(data.createdAt());
+        thread.setUpdatedAt(data.createdAt());
 
         PullRequestReviewThread saved = threadRepository.save(thread);
-        log.debug("Created thread from GitLab discussion: nodeId={}, path={}", discussionGlobalId, filePath);
+        log.debug("Created thread from GitLab discussion: nodeId={}, path={}", data.discussionGlobalId(), data.filePath());
 
         // Publish resolved event if the thread was already resolved when first synced
-        if (resolved) {
+        if (data.resolved()) {
             publishThreadStateEvent(saved, pr, scopeId);
         }
 
