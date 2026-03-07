@@ -27,6 +27,8 @@ public interface LabelRepository extends JpaRepository<Label, Long> {
     )
     Optional<Label> findByRepositoryIdAndName(@Param("repositoryId") Long repositoryId, @Param("name") String name);
 
+    Optional<Label> findByNativeIdAndProviderId(Long nativeId, Long providerId);
+
     List<Label> findAllByRepository_Id(Long repositoryId);
 
     /**
@@ -42,14 +44,15 @@ public interface LabelRepository extends JpaRepository<Label, Long> {
     @Transactional
     @Query(
         value = """
-        INSERT INTO label (id, name, color, repository_id)
-        VALUES (:id, :name, :color, :repositoryId)
+        INSERT INTO label (native_id, provider_id, name, color, repository_id)
+        VALUES (:nativeId, :providerId, :name, :color, :repositoryId)
         ON CONFLICT (repository_id, name) DO NOTHING
         """,
         nativeQuery = true
     )
     int insertIfAbsent(
-        @Param("id") Long id,
+        @Param("nativeId") Long nativeId,
+        @Param("providerId") Long providerId,
         @Param("name") String name,
         @Param("color") String color,
         @Param("repositoryId") Long repositoryId

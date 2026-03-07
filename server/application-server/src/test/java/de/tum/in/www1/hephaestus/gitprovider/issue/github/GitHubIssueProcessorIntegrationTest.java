@@ -513,7 +513,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             // Then
             assertThat(result.getLabels()).hasSize(1);
             assertThat(result.getLabels().iterator().next().getName()).isEqualTo("bug");
-            assertThat(labelRepository.findById(labelId)).isPresent();
+            assertThat(labelRepository.findByNativeIdAndProviderId(labelId, githubProvider.getId())).isPresent();
         }
 
         @Test
@@ -1294,7 +1294,8 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             // Create a label and associate it with the issue
             de.tum.in.www1.hephaestus.gitprovider.label.Label label =
                 new de.tum.in.www1.hephaestus.gitprovider.label.Label();
-            label.setId(100001L);
+            label.setNativeId(100001L);
+            label.setProvider(githubProvider);
             label.setName("bug");
             label.setColor("d73a4a");
             label.setRepository(testRepository);

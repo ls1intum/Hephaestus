@@ -300,9 +300,9 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         User approver = findOrCreateUser(event.user(), context.providerId());
         if (approver == null) return pr;
 
-        long reviewId = generateApprovalReviewId(pr.getNativeId(), approver.getNativeId());
-        if (reviewRepository.findById(reviewId).isEmpty()) {
-            PullRequestReview review = createApprovalReview(reviewId, pr, approver);
+        long approvalNativeId = generateApprovalNativeId(pr.getNativeId(), approver.getNativeId());
+        if (reviewRepository.findByNativeIdAndProviderId(approvalNativeId, context.providerId()).isEmpty()) {
+            PullRequestReview review = createApprovalReview(approvalNativeId, pr, approver);
             reviewRepository.save(review);
             pr.addReview(review);
 
@@ -327,9 +327,9 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         User approver = findOrCreateUser(event.user(), context.providerId());
         if (approver == null) return pr;
 
-        long reviewId = generateApprovalReviewId(pr.getNativeId(), approver.getNativeId());
+        long approvalNativeId = generateApprovalNativeId(pr.getNativeId(), approver.getNativeId());
         reviewRepository
-            .findById(reviewId)
+            .findByNativeIdAndProviderId(approvalNativeId, context.providerId())
             .ifPresent(review -> {
                 // Capture event payload BEFORE removeReview() nullifies the PR back-reference
                 var reviewData = EventPayload.ReviewData.from(review);
@@ -667,30 +667,31 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
     }
 
     /**
-     * Generates a deterministic negative review ID for a GitLab approval.
+     * Generates a deterministic native ID for a GitLab approval review.
      * <p>
-     * Layout: {@code [sign=1][mrNativeId (31 bits)][userNativeId (32 bits)]}.
-     * Forces the sign bit via {@code | Long.MIN_VALUE}, guaranteeing a negative ID
-     * that cannot collide with GitHub's positive review IDs.
+     * Layout: {@code [mrNativeId (31 bits)][userNativeId (32 bits)]}, with bit 63 cleared
+     * to guarantee a positive result.
      * <p>
-     * Collision-free when MR native IDs fit in 31 bits and user native IDs fit in 32 bits.
-     * When either exceeds its range, collisions become possible due to bit truncation,
-     * and a warning is logged.
+     * Collision-free when MR native IDs fit in 31 bits ({@code <= Integer.MAX_VALUE})
+     * and user native IDs fit in 32 bits. When either exceeds its safe range,
+     * collisions become possible due to bit truncation, and a warning is logged.
      */
-    static long generateApprovalReviewId(long mrNativeId, long userNativeId) {
-        if ((mrNativeId >>> 31) != 0 || (userNativeId >>> 32) != 0) {
+    static long generateApprovalNativeId(long mrNativeId, long userNativeId) {
+        if (mrNativeId > Integer.MAX_VALUE || userNativeId > Integer.MAX_VALUE) {
             log.warn(
-                "Native IDs exceed safe range, review ID may collide: mrNativeId={}, userNativeId={}",
+                "Native IDs exceed safe range, review nativeId may collide: mrNativeId={}, userNativeId={}",
                 mrNativeId,
                 userNativeId
             );
         }
-        return ((mrNativeId << 32) | (userNativeId & 0xFFFFFFFFL)) | Long.MIN_VALUE;
+        long combined = ((mrNativeId & 0xFFFFFFFFL) << 32) | (userNativeId & 0xFFFFFFFFL);
+        return combined & Long.MAX_VALUE; // ensure positive
     }
 
-    private PullRequestReview createApprovalReview(long reviewId, PullRequest pr, User approver) {
+    private PullRequestReview createApprovalReview(long approvalNativeId, PullRequest pr, User approver) {
         PullRequestReview review = new PullRequestReview();
-        review.setId(reviewId);
+        review.setNativeId(approvalNativeId);
+        review.setProvider(pr.getProvider());
         review.setState(PullRequestReview.State.APPROVED);
         review.setHtmlUrl(pr.getHtmlUrl() + "#approvals");
         review.setSubmittedAt(pr.getUpdatedAt() != null ? pr.getUpdatedAt() : Instant.now());
@@ -709,14 +710,14 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
     ) {
         if (syncApprovers == null) return;
 
-        // Pre-load existing review IDs in memory to avoid N+1 findById calls
-        Set<Long> existingReviewIds = pr
+        // Pre-load existing review nativeIds in memory to avoid N+1 lookups
+        Set<Long> existingNativeIds = pr
             .getReviews()
             .stream()
-            .map(PullRequestReview::getId)
+            .map(PullRequestReview::getNativeId)
             .collect(Collectors.toSet());
 
-        Set<Long> expectedReviewIds = new HashSet<>();
+        Set<Long> expectedNativeIds = new HashSet<>();
 
         for (SyncUserData approver : syncApprovers) {
             User user = findOrCreateUser(
@@ -729,11 +730,11 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             );
             if (user == null) continue;
 
-            long reviewId = generateApprovalReviewId(pr.getNativeId(), user.getNativeId());
-            expectedReviewIds.add(reviewId);
+            long approvalNativeId = generateApprovalNativeId(pr.getNativeId(), user.getNativeId());
+            expectedNativeIds.add(approvalNativeId);
 
-            if (!existingReviewIds.contains(reviewId)) {
-                PullRequestReview review = createApprovalReview(reviewId, pr, user);
+            if (!existingNativeIds.contains(approvalNativeId)) {
+                PullRequestReview review = createApprovalReview(approvalNativeId, pr, user);
                 reviewRepository.save(review);
                 pr.addReview(review);
                 log.debug("Created approval review from sync: prId={}, reviewerId={}", pr.getId(), user.getLogin());
@@ -748,18 +749,19 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         }
 
         // Remove stale approval reviews (user no longer in approvedBy)
+        // Only target reviews from this provider with APPROVED state
         Set<PullRequestReview> staleReviews = pr
             .getReviews()
             .stream()
             .filter(r -> r.getState() == PullRequestReview.State.APPROVED)
-            .filter(r -> r.getId() < 0) // Only GitLab-generated reviews (negative IDs)
-            .filter(r -> !expectedReviewIds.contains(r.getId()))
+            .filter(r -> r.getProvider() != null && r.getProvider().getId().equals(providerId))
+            .filter(r -> !expectedNativeIds.contains(r.getNativeId()))
             .collect(Collectors.toSet());
 
         for (PullRequestReview stale : staleReviews) {
             pr.removeReview(stale);
             reviewRepository.delete(stale);
-            log.debug("Removed stale approval review from sync: prId={}, reviewId={}", pr.getId(), stale.getId());
+            log.debug("Removed stale approval review from sync: prId={}, nativeId={}", pr.getId(), stale.getNativeId());
         }
     }
 

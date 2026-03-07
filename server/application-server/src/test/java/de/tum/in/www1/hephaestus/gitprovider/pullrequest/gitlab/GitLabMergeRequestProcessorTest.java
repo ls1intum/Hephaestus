@@ -656,8 +656,10 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 Optional.of(approver)
             );
 
-            long expectedReviewId = GitLabMergeRequestProcessor.generateApprovalReviewId(RAW_MR_ID, RAW_APPROVER_ID);
-            when(reviewRepository.findById(expectedReviewId)).thenReturn(Optional.empty());
+            long expectedReviewId = GitLabMergeRequestProcessor.generateApprovalNativeId(RAW_MR_ID, RAW_APPROVER_ID);
+            when(reviewRepository.findByNativeIdAndProviderId(expectedReviewId, PROVIDER_ID)).thenReturn(
+                Optional.empty()
+            );
 
             GitLabMergeRequestEventDTO event = createApprovalEvent("approved", "opened");
             PullRequest result = processor.processApproved(event, createContext());
@@ -670,7 +672,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
             PullRequestReview savedReview = reviewCaptor.getValue();
             assertThat(savedReview.getState()).isEqualTo(PullRequestReview.State.APPROVED);
             assertThat(savedReview.getAuthor()).isEqualTo(approver);
-            assertThat(savedReview.getId()).isEqualTo(expectedReviewId);
+            assertThat(savedReview.getNativeId()).isEqualTo(expectedReviewId);
 
             ArgumentCaptor<Object> eventCaptor = ArgumentCaptor.forClass(Object.class);
             verify(eventPublisher, atLeastOnce()).publishEvent(eventCaptor.capture());
@@ -701,9 +703,9 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 Optional.of(approver)
             );
 
-            long expectedReviewId = GitLabMergeRequestProcessor.generateApprovalReviewId(RAW_MR_ID, RAW_APPROVER_ID);
+            long expectedNativeId = GitLabMergeRequestProcessor.generateApprovalNativeId(RAW_MR_ID, RAW_APPROVER_ID);
             PullRequestReview existingReview = new PullRequestReview();
-            existingReview.setId(expectedReviewId);
+            existingReview.setNativeId(expectedNativeId);
             existingReview.setState(PullRequestReview.State.APPROVED);
             existingReview.setHtmlUrl("https://gitlab.com/gitlab-org/gitlab/-/merge_requests/5#approvals");
             existingReview.setSubmittedAt(Instant.now());
@@ -711,7 +713,9 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
             existingReview.setPullRequest(pr);
             pr.getReviews().add(existingReview);
 
-            when(reviewRepository.findById(expectedReviewId)).thenReturn(Optional.of(existingReview));
+            when(reviewRepository.findByNativeIdAndProviderId(expectedNativeId, PROVIDER_ID)).thenReturn(
+                Optional.of(existingReview)
+            );
 
             GitLabMergeRequestEventDTO event = createApprovalEvent("unapproved", "opened");
             PullRequest result = processor.processUnapproved(event, createContext());
@@ -753,11 +757,13 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
             );
 
             // Review ALREADY exists — simulates duplicate approval webhook
-            long expectedReviewId = GitLabMergeRequestProcessor.generateApprovalReviewId(RAW_MR_ID, RAW_APPROVER_ID);
+            long expectedNativeId = GitLabMergeRequestProcessor.generateApprovalNativeId(RAW_MR_ID, RAW_APPROVER_ID);
             PullRequestReview existingReview = new PullRequestReview();
-            existingReview.setId(expectedReviewId);
+            existingReview.setNativeId(expectedNativeId);
             existingReview.setState(PullRequestReview.State.APPROVED);
-            when(reviewRepository.findById(expectedReviewId)).thenReturn(Optional.of(existingReview));
+            when(reviewRepository.findByNativeIdAndProviderId(expectedNativeId, PROVIDER_ID)).thenReturn(
+                Optional.of(existingReview)
+            );
 
             GitLabMergeRequestEventDTO event = createApprovalEvent("approved", "opened");
             PullRequest result = processor.processApproved(event, createContext());
@@ -786,8 +792,10 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
             );
 
             // No existing review — findById returns empty
-            long expectedReviewId = GitLabMergeRequestProcessor.generateApprovalReviewId(RAW_MR_ID, RAW_APPROVER_ID);
-            when(reviewRepository.findById(expectedReviewId)).thenReturn(Optional.empty());
+            long expectedReviewId = GitLabMergeRequestProcessor.generateApprovalNativeId(RAW_MR_ID, RAW_APPROVER_ID);
+            when(reviewRepository.findByNativeIdAndProviderId(expectedReviewId, PROVIDER_ID)).thenReturn(
+                Optional.empty()
+            );
 
             GitLabMergeRequestEventDTO event = createApprovalEvent("unapproved", "opened");
             PullRequest result = processor.processUnapproved(event, createContext());
@@ -1450,9 +1458,10 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
             staleApprover.setNativeId(99999L);
             staleApprover.setLogin("staleuser");
 
-            long staleReviewId = GitLabMergeRequestProcessor.generateApprovalReviewId(RAW_MR_ID, 99999L);
+            long staleNativeId = GitLabMergeRequestProcessor.generateApprovalNativeId(RAW_MR_ID, 99999L);
             PullRequestReview staleReview = new PullRequestReview();
-            staleReview.setId(staleReviewId);
+            staleReview.setNativeId(staleNativeId);
+            staleReview.setProvider(gitLabProvider);
             staleReview.setState(PullRequestReview.State.APPROVED);
             staleReview.setHtmlUrl("https://gitlab.com/gitlab-org/gitlab/-/merge_requests/5#approvals");
             staleReview.setSubmittedAt(Instant.now());
@@ -1743,15 +1752,15 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
     class ApprovalReviewIdGeneration {
 
         @Test
-        @DisplayName("generates unique negative IDs for different (mr, user) pairs")
+        @DisplayName("generates unique IDs for different (mr, user) pairs")
         void uniqueIdsForDifferentPairs() {
-            long id1 = GitLabMergeRequestProcessor.generateApprovalReviewId(100, 200);
-            long id2 = GitLabMergeRequestProcessor.generateApprovalReviewId(100, 201);
-            long id3 = GitLabMergeRequestProcessor.generateApprovalReviewId(101, 200);
+            long id1 = GitLabMergeRequestProcessor.generateApprovalNativeId(100, 200);
+            long id2 = GitLabMergeRequestProcessor.generateApprovalNativeId(100, 201);
+            long id3 = GitLabMergeRequestProcessor.generateApprovalNativeId(101, 200);
 
-            assertThat(id1).isNegative();
-            assertThat(id2).isNegative();
-            assertThat(id3).isNegative();
+            assertThat(id1).isPositive();
+            assertThat(id2).isPositive();
+            assertThat(id3).isPositive();
             assertThat(id1).isNotEqualTo(id2).isNotEqualTo(id3);
             assertThat(id2).isNotEqualTo(id3);
         }
@@ -1759,25 +1768,27 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         @Test
         @DisplayName("deterministic: same inputs produce same output")
         void deterministicOutput() {
-            long id1 = GitLabMergeRequestProcessor.generateApprovalReviewId(999555, 12345);
-            long id2 = GitLabMergeRequestProcessor.generateApprovalReviewId(999555, 12345);
+            long id1 = GitLabMergeRequestProcessor.generateApprovalNativeId(999555, 12345);
+            long id2 = GitLabMergeRequestProcessor.generateApprovalNativeId(999555, 12345);
             assertThat(id1).isEqualTo(id2);
         }
 
         @Test
-        @DisplayName("always negative for max 32-bit MR ID (2^32 - 1)")
-        void alwaysNegativeForMax32BitMrId() {
+        @DisplayName("result is always positive even for max 32-bit MR ID (sign bit cleared)")
+        void alwaysPositiveForMax32BitMrId() {
             long maxSafe = (1L << 32) - 1; // 4294967295
-            long id = GitLabMergeRequestProcessor.generateApprovalReviewId(maxSafe, 1);
-            assertThat(id).isNegative();
+            long id = GitLabMergeRequestProcessor.generateApprovalNativeId(maxSafe, 1);
+            // (0xFFFFFFFF << 32) | 1 would set sign bit, but & Long.MAX_VALUE clears it
+            assertThat(id).isPositive();
         }
 
         @Test
-        @DisplayName("safe for max 32-bit user ID (2^32 - 1)")
-        void safeForMax32BitUserId() {
+        @DisplayName("result is positive for max 32-bit user ID with small MR ID")
+        void positiveForMax32BitUserId() {
             long maxUser = (1L << 32) - 1; // 4294967295
-            long id = GitLabMergeRequestProcessor.generateApprovalReviewId(1, maxUser);
-            assertThat(id).isNegative();
+            long id = GitLabMergeRequestProcessor.generateApprovalNativeId(1, maxUser);
+            // (1 << 32) | 0xFFFFFFFF = 0x1_FFFFFFFF which is positive
+            assertThat(id).isPositive();
         }
     }
 

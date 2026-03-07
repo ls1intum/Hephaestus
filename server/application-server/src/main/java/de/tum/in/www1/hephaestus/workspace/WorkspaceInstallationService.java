@@ -242,7 +242,7 @@ public class WorkspaceInstallationService {
         }
 
         if (repositorySelection != null) {
-            workspace.setGithubRepositorySelection(repositorySelection);
+            workspace.setRepositorySelection(repositorySelection);
         }
 
         if (workspace.getInstallationLinkedAt() == null) {
@@ -353,8 +353,8 @@ public class WorkspaceInstallationService {
         }
 
         Workspace workspace = workspaceOpt.get();
-        if (workspace.getGithubRepositorySelection() != selection) {
-            workspace.setGithubRepositorySelection(selection);
+        if (workspace.getRepositorySelection() != selection) {
+            workspace.setRepositorySelection(selection);
             workspace = workspaceRepository.save(workspace);
         }
 
