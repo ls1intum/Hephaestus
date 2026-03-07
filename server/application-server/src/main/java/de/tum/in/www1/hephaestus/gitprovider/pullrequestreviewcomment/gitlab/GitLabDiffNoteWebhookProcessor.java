@@ -135,11 +135,13 @@ public class GitLabDiffNoteWebhookProcessor extends BaseGitLabProcessor {
         // Webhooks don't provide the discussion ID, so we use the note ID as the thread nativeId.
         // The GraphQL discussion sync will reconcile this into the proper discussion later.
         var webhookThreadData = new GitLabPullRequestReviewThreadProcessor.WebhookThreadData(
-            attrs.id(), threadPath, threadLine, createdAt, updatedAt
+            attrs.id(),
+            threadPath,
+            threadLine,
+            createdAt,
+            updatedAt
         );
-        PullRequestReviewThread thread = threadProcessor.findOrCreateWebhookThread(
-            webhookThreadData, pr, provider
-        );
+        PullRequestReviewThread thread = threadProcessor.findOrCreateWebhookThread(webhookThreadData, pr, provider);
 
         // Resolve author
         User author = findOrCreateUser(event.user(), context.providerId());
@@ -163,13 +165,14 @@ public class GitLabDiffNoteWebhookProcessor extends BaseGitLabProcessor {
         );
 
         var commentContext = new GitLabPullRequestReviewCommentProcessor.CommentContext(
-            thread, pr, author, provider,
+            thread,
+            pr,
+            author,
+            provider,
             null, // no parent for webhook diff notes
             context.scopeId()
         );
-        PullRequestReviewComment comment = reviewCommentProcessor.findOrCreateComment(
-            noteData, commentContext
-        );
+        PullRequestReviewComment comment = reviewCommentProcessor.findOrCreateComment(noteData, commentContext);
 
         if (comment != null) {
             log.debug("Processed diff note webhook: noteId={}, mrIid={}", attrs.id(), embeddedMr.iid());

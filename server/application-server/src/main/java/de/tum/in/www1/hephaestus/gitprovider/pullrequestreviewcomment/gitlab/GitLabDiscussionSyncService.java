@@ -323,11 +323,14 @@ public class GitLabDiscussionSyncService {
 
         // Create/update the thread
         var threadData = new GitLabPullRequestReviewThreadProcessor.ThreadData(
-            discussionGlobalId, resolved, resolvedBy, filePath, newLine, firstCreatedAt
+            discussionGlobalId,
+            resolved,
+            resolvedBy,
+            filePath,
+            newLine,
+            firstCreatedAt
         );
-        PullRequestReviewThread thread = threadProcessor.findOrCreateThread(
-            threadData, pr, provider, scopeId
-        );
+        PullRequestReviewThread thread = threadProcessor.findOrCreateThread(threadData, pr, provider, scopeId);
 
         // Process each note in the discussion as a review comment
         PullRequestReviewComment previousComment = null;
@@ -385,13 +388,14 @@ public class GitLabDiscussionSyncService {
             );
 
             var commentContext = new GitLabPullRequestReviewCommentProcessor.CommentContext(
-                thread, pr, author, provider,
+                thread,
+                pr,
+                author,
+                provider,
                 previousComment, // first note has no parent, subsequent notes are replies
                 scopeId
             );
-            PullRequestReviewComment comment = reviewCommentProcessor.findOrCreateComment(
-                noteData, commentContext
-            );
+            PullRequestReviewComment comment = reviewCommentProcessor.findOrCreateComment(noteData, commentContext);
 
             if (comment != null) {
                 diffNotes++;

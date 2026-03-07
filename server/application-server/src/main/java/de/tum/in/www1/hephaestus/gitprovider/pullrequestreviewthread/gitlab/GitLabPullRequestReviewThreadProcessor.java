@@ -176,12 +176,7 @@ public class GitLabPullRequestReviewThreadProcessor {
         return existing;
     }
 
-    private PullRequestReviewThread createThread(
-        ThreadData data,
-        PullRequest pr,
-        GitProvider provider,
-        Long scopeId
-    ) {
+    private PullRequestReviewThread createThread(ThreadData data, PullRequest pr, GitProvider provider, Long scopeId) {
         long nativeId = deterministicNativeId(data.discussionGlobalId());
 
         PullRequestReviewThread thread = new PullRequestReviewThread();
@@ -191,7 +186,9 @@ public class GitLabPullRequestReviewThreadProcessor {
         thread.setPullRequest(pr);
         thread.setPath(data.filePath());
         thread.setLine(data.newLine());
-        thread.setState(data.resolved() ? PullRequestReviewThread.State.RESOLVED : PullRequestReviewThread.State.UNRESOLVED);
+        thread.setState(
+            data.resolved() ? PullRequestReviewThread.State.RESOLVED : PullRequestReviewThread.State.UNRESOLVED
+        );
         if (data.resolved() && data.resolvedBy() != null) {
             thread.setResolvedBy(data.resolvedBy());
         }
@@ -199,7 +196,11 @@ public class GitLabPullRequestReviewThreadProcessor {
         thread.setUpdatedAt(data.createdAt());
 
         PullRequestReviewThread saved = threadRepository.save(thread);
-        log.debug("Created thread from GitLab discussion: nodeId={}, path={}", data.discussionGlobalId(), data.filePath());
+        log.debug(
+            "Created thread from GitLab discussion: nodeId={}, path={}",
+            data.discussionGlobalId(),
+            data.filePath()
+        );
 
         // Publish resolved event if the thread was already resolved when first synced
         if (data.resolved()) {
