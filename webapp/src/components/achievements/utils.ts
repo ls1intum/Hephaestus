@@ -121,17 +121,24 @@ export function generateSkillTreeData(
 	const nodeDepths = new Map<string, number>();
 	let maxTreeDepth = 0;
 
-	const getNodeDepth = (id: string): number => {
+	const getNodeDepth = (id: string, visiting = new Set<string>()): number => {
 		if (nodeDepths.has(id)) return nodeDepths.get(id)!;
+		if (visiting.has(id)) {
+			nodeDepths.set(id, 0);
+			return 0;
+		}
+		visiting.add(id);
 		const ach = achievementMap.get(id as any);
 		const parentId = (ach as any)?.parentId ?? ach?.parent;
 		if (!ach || parentId === undefined || parentId === id) {
 			nodeDepths.set(id, 0);
+			visiting.delete(id);
 			return 0;
 		}
-		const depth = getNodeDepth(parentId) + 1;
+		const depth = getNodeDepth(parentId, visiting) + 1;
 		nodeDepths.set(id, depth);
 		if (depth > maxTreeDepth) maxTreeDepth = depth;
+		visiting.delete(id);
 		return depth;
 	};
 
