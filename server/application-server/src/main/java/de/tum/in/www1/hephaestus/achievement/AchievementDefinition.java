@@ -35,87 +35,95 @@ import java.util.*;
 public enum AchievementDefinition {
 
     /* ========================================================================
-     * Pull Request Achievements (Level 1-7)
+     * Pull Request Achievements
      *
      * <h3>Pull Request Achievement Chain</h3>
      * <pre>
-     * Level 1: FIRST_PULL      (1 PR)   - "First Merge"
-     * Level 2: PR_BEGINNER     (3 PRs)  - "Beginner Integrator"
-     * Level 3: PR_APPRENTICE   (5 PRs)  - "Apprentice Integrator"
-     * Level 4: INTEGRATION_REGULAR (10 PRs) - "Integration Regular"
-     * Level 5: PR_SPECIALIST   (25 PRs) - "Integration Specialist"
-     * Level 6: INTEGRATION_EXPERT (50 PRs) - "Integration Expert"
-     * Level 7: MASTER_INTEGRATOR (100 PRs) - "Master Integrator"
+     * Level 1: PR_MERGED_COMMON_1      (1 PR)   - "First Leaf"
+     * Level 2: BRANCH_GRAFTER  (3 PRs)  - "Branch Grafter"
+     * Level 3: TREE_SURGEON    (7 PRs)  - "Tree Surgeon"
+     * Level 4: TRUNK_MASTER    (15 PRs) - "Trunk Master"
+     * Level 5: FOREST_KEEPER   (30 PRs) - "Forest Keeper"
+     * Level 6: ROOT_OF_ORIGIN  (50 PRs) - "Root of Origin"
+     *
+     * Special: SPEEDSTER       (Fast PR) - "Speedster"
      * </pre>
      * ======================================================================== */
 
 
-    FIRST_PULL(
-        "first_pull",
+    PR_MERGED_COMMON_1(
+        "pr.merged.common.1",
         AchievementCategory.PULL_REQUESTS,
         AchievementRarity.COMMON,
         new LinearAchievementProgress(1),
         null,
+        false,
         Set.of(ActivityEventType.PULL_REQUEST_MERGED),
         StandardCountEvaluator.class
     ),
 
-    PR_BEGINNER(
-        "pr_beginner",
+    PR_MERGED_COMMON_2(
+        "pr.merged.common.2",
         AchievementCategory.PULL_REQUESTS,
         AchievementRarity.COMMON,
         new LinearAchievementProgress(3),
-        FIRST_PULL,
+        PR_MERGED_COMMON_1,
+        false,
         Set.of(ActivityEventType.PULL_REQUEST_MERGED),
         StandardCountEvaluator.class
     ),
 
-    PR_APPRENTICE(
-        "pr_apprentice",
+    PR_MERGED_UNCOMMON(
+        "pr.merged.uncommon",
         AchievementCategory.PULL_REQUESTS,
         AchievementRarity.UNCOMMON,
-        new LinearAchievementProgress(5),
-        PR_BEGINNER,
+        new LinearAchievementProgress(7),
+        PR_MERGED_COMMON_2,
+        false,
         Set.of(ActivityEventType.PULL_REQUEST_MERGED),
         StandardCountEvaluator.class
     ),
 
-    INTEGRATION_REGULAR(
-        "integration_regular",
-        AchievementCategory.PULL_REQUESTS,
-        AchievementRarity.UNCOMMON,
-        new LinearAchievementProgress( 10),
-        PR_APPRENTICE,
-        Set.of(ActivityEventType.PULL_REQUEST_MERGED),
-        StandardCountEvaluator.class
-    ),
-
-    PR_SPECIALIST(
-        "pr_specialist",
+    PR_MERGED_RARE(
+        "pr.merged.rare",
         AchievementCategory.PULL_REQUESTS,
         AchievementRarity.RARE,
-        new LinearAchievementProgress( 25),
-        INTEGRATION_REGULAR,
+        new LinearAchievementProgress(15),
+        PR_MERGED_UNCOMMON,
+        false,
         Set.of(ActivityEventType.PULL_REQUEST_MERGED),
         StandardCountEvaluator.class
     ),
 
-    INTEGRATION_EXPERT(
-        "integration_expert",
+    PR_MERGED_EPIC(
+        "pr.merged.epic",
         AchievementCategory.PULL_REQUESTS,
         AchievementRarity.EPIC,
-        new LinearAchievementProgress( 50),
-        PR_SPECIALIST,
+        new LinearAchievementProgress(30),
+        PR_MERGED_RARE,
+        false,
         Set.of(ActivityEventType.PULL_REQUEST_MERGED),
         StandardCountEvaluator.class
     ),
 
-    MASTER_INTEGRATOR(
-        "master_integrator",
+    PR_MERGED_LEGENDARY(
+        "pr.merged.legendary",
         AchievementCategory.PULL_REQUESTS,
         AchievementRarity.LEGENDARY,
-        new LinearAchievementProgress( 100),
-        INTEGRATION_EXPERT,
+        new LinearAchievementProgress(50),
+        PR_MERGED_EPIC,
+        false,
+        Set.of(ActivityEventType.PULL_REQUEST_MERGED),
+        StandardCountEvaluator.class
+    ),
+
+    PR_SPECIAL_SPEEDSTER(
+        "pr.special.speedster",
+        AchievementCategory.PULL_REQUESTS,
+        AchievementRarity.EPIC,
+        new LinearAchievementProgress(1),
+        null, // tbd parent
+        false,
         Set.of(ActivityEventType.PULL_REQUEST_MERGED),
         StandardCountEvaluator.class
     ),
@@ -130,6 +138,7 @@ public enum AchievementDefinition {
         AchievementRarity.COMMON,
         new LinearAchievementProgress( 1),
         null,
+        false,
         Set.of(
             ActivityEventType.REVIEW_APPROVED,
             ActivityEventType.REVIEW_CHANGES_REQUESTED,
@@ -144,6 +153,7 @@ public enum AchievementDefinition {
         AchievementRarity.COMMON,
         new LinearAchievementProgress( 10),
         FIRST_REVIEW,
+        false,
         Set.of(
             ActivityEventType.REVIEW_APPROVED,
             ActivityEventType.REVIEW_CHANGES_REQUESTED,
@@ -158,6 +168,7 @@ public enum AchievementDefinition {
         AchievementRarity.EPIC,
         new LinearAchievementProgress( 100),
         REVIEW_ROOKIE,
+        false,
         Set.of(
             ActivityEventType.REVIEW_APPROVED,
             ActivityEventType.REVIEW_CHANGES_REQUESTED,
@@ -176,6 +187,7 @@ public enum AchievementDefinition {
         AchievementRarity.EPIC,
         new LinearAchievementProgress( 100),
         null,
+        false,
         Set.of(ActivityEventType.REVIEW_COMMENT_CREATED),
         StandardCountEvaluator.class
     ),
@@ -190,6 +202,7 @@ public enum AchievementDefinition {
         AchievementRarity.LEGENDARY,
         new LinearAchievementProgress( 50),
         null,
+        false,
         Set.of(ActivityEventType.REVIEW_APPROVED),
         StandardCountEvaluator.class
     );
@@ -197,10 +210,6 @@ public enum AchievementDefinition {
     @NonNull
     @Getter(onMethod_ = @JsonValue)
     private final String id;
-
-    /* TODO: Moving the Achievements display characteristics to the frontend
-        as it is part of the client and potentially useful for localization */
-
 
     private final AchievementCategory category;
     /**
@@ -221,6 +230,12 @@ public enum AchievementDefinition {
 
     /**
      * -- GETTER --
+     * Boolean value that denotes if the achievement should be hidden to the player when not unlocked
+     */
+    private final boolean isHidden;
+
+    /**
+     * -- GETTER --
      * Activity event types that contribute to unlocking this achievement.
      */
     private final Set<ActivityEventType> triggerEvents;
@@ -238,6 +253,7 @@ public enum AchievementDefinition {
         AchievementRarity rarity,
         AchievementProgress requirements,
         @Nullable AchievementDefinition parent,
+        boolean isHidden,
         Set<ActivityEventType> triggerEvents,
         Class<? extends AchievementEvaluator> evaluatorClass
     ) {
@@ -246,6 +262,7 @@ public enum AchievementDefinition {
         this.rarity = rarity;
         this.requirements = requirements;
         this.parent = parent;
+        this.isHidden = isHidden;
         this.triggerEvents = triggerEvents;
         this.evaluatorClass = evaluatorClass;
     }
@@ -267,9 +284,6 @@ public enum AchievementDefinition {
      * @throws IllegalArgumentException if ID is unknown
      */
     public static AchievementDefinition fromId(String id) {
-        if (id == null) {
-            throw new IllegalArgumentException("Achievement ID cannot be null");
-        }
         for (AchievementDefinition type : values()) {
             if (type.id.equals(id)) {
                 return type;
