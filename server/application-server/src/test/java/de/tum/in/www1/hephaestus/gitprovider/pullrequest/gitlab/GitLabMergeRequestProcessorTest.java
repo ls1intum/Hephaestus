@@ -1500,17 +1500,20 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 .thenReturn(author);
 
             // New approver from sync (reconcileApprovals resolves via gitLabUserService)
+            // Lenient because the merge user call passes all nulls (unmatched invocation)
             User newApprover = createApproverEntity();
-            when(
-                gitLabUserService.findOrCreateUser(
-                    eq("gid://gitlab/User/11111"),
-                    anyString(),
-                    any(),
-                    any(),
-                    any(),
-                    eq(PROVIDER_ID)
+            lenient()
+                .when(
+                    gitLabUserService.findOrCreateUser(
+                        eq("gid://gitlab/User/11111"),
+                        anyString(),
+                        any(),
+                        any(),
+                        any(),
+                        eq(PROVIDER_ID)
+                    )
                 )
-            ).thenReturn(newApprover);
+                .thenReturn(newApprover);
 
             var syncData = new GitLabMergeRequestProcessor.SyncMergeRequestData(
                 "gid://gitlab/MergeRequest/999555",

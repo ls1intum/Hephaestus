@@ -391,7 +391,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 .thenReturn(Optional.of(issue));
 
             User author = createUserEntity();
-            when(userRepository.findByNativeIdAndProviderId(RAW_USER_ID, PROVIDER_ID)).thenReturn(Optional.of(author));
+            when(gitLabUserService.findOrCreateUser(any(GitLabWebhookUser.class), eq(PROVIDER_ID))).thenReturn(author);
 
             GitLabIssueEventDTO event = createEvent("open", "opened", false);
             Issue result = processor.process(event, createContext());
@@ -447,7 +447,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 .thenReturn(Optional.of(issue));
 
             User author = createUserEntity();
-            when(userRepository.findByNativeIdAndProviderId(RAW_USER_ID, PROVIDER_ID)).thenReturn(Optional.of(author));
+            when(gitLabUserService.findOrCreateUser(any(GitLabWebhookUser.class), eq(PROVIDER_ID))).thenReturn(author);
 
             GitLabIssueEventDTO event = createEvent("close", "closed", false);
             Issue result = processor.processClosed(event, createContext());
@@ -469,7 +469,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 .thenReturn(Optional.of(issue));
 
             User author = createUserEntity();
-            when(userRepository.findByNativeIdAndProviderId(RAW_USER_ID, PROVIDER_ID)).thenReturn(Optional.of(author));
+            when(gitLabUserService.findOrCreateUser(any(GitLabWebhookUser.class), eq(PROVIDER_ID))).thenReturn(author);
 
             GitLabIssueEventDTO event = createEvent("reopen", "opened", false);
             Issue result = processor.processReopened(event, createContext());
@@ -499,7 +499,16 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 .thenReturn(Optional.of(issue));
 
             User author = createUserEntity();
-            when(userRepository.findByNativeIdAndProviderId(RAW_USER_ID, PROVIDER_ID)).thenReturn(Optional.of(author));
+            when(
+                gitLabUserService.findOrCreateUser(
+                    anyString(),
+                    anyString(),
+                    anyString(),
+                    anyString(),
+                    anyString(),
+                    eq(PROVIDER_ID)
+                )
+            ).thenReturn(author);
 
             var syncData = new GitLabIssueProcessor.SyncIssueData(
                 "gid://gitlab/Issue/422296",
