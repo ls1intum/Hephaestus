@@ -30,6 +30,17 @@ public interface TeamRepository extends JpaRepository<Team, Long> {
     Optional<Team> findByOrganizationIgnoreCaseAndName(String organization, String name);
 
     /**
+     * Find a team by organization and slug (the provider-agnostic natural key).
+     * <p>
+     * For GitHub: slug = team slug. For GitLab: slug = relative path from root group.
+     *
+     * @param organization the organization login (case-insensitive)
+     * @param slug the team slug
+     * @return the team if found
+     */
+    Optional<Team> findByOrganizationIgnoreCaseAndSlug(String organization, String slug);
+
+    /**
      * Fetch teams with collections eagerly loaded for DTO conversion.
      * Uses EntityGraph to fetch repoPermissions (with nested repository),
      * and memberships (with users).

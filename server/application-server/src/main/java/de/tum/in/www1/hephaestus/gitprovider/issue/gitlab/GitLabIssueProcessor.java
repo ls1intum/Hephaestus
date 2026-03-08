@@ -20,6 +20,7 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.gitprovider.user.gitlab.GitLabUserService;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
@@ -53,6 +54,7 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
     private final ApplicationEventPublisher eventPublisher;
 
     public GitLabIssueProcessor(
+        GitLabUserService gitLabUserService,
         IssueRepository issueRepository,
         MilestoneRepository milestoneRepository,
         UserRepository userRepository,
@@ -64,6 +66,7 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
         ApplicationEventPublisher eventPublisher
     ) {
         super(
+            gitLabUserService,
             userRepository,
             labelRepository,
             repositoryRepository,

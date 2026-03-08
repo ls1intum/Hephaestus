@@ -64,6 +64,11 @@ public class GitHubTeamProcessor {
         if (dto.name() != null) {
             team.setName(dto.name());
         }
+        // Persist slug (URL-safe identifier); fall back to name if not provided
+        String slug = dto.slug() != null ? dto.slug() : dto.name();
+        if (slug != null) {
+            team.setSlug(slug);
+        }
         if (dto.description() != null) {
             team.setDescription(dto.description());
         }

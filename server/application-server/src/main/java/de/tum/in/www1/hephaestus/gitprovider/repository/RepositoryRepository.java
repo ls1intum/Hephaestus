@@ -86,6 +86,12 @@ public interface RepositoryRepository extends JpaRepository<Repository, Long> {
      * @param isPrivate      whether the repository is private
      * @param organizationId the organization ID (nullable)
      */
+    /**
+     * Finds all repositories belonging to a specific organization (by login) and provider.
+     * Used by GitLab team sync to find repos owned by a subgroup.
+     */
+    List<Repository> findAllByOrganization_LoginIgnoreCaseAndProviderId(String login, Long providerId);
+
     @Transactional
     @Modifying
     @Query(

@@ -18,6 +18,7 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.gitlab.GitL
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.gitprovider.user.gitlab.GitLabUserService;
 import java.time.Instant;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -52,6 +53,7 @@ public class GitLabDiffNoteWebhookProcessor extends BaseGitLabProcessor {
     private final GitLabPullRequestReviewCommentProcessor reviewCommentProcessor;
 
     public GitLabDiffNoteWebhookProcessor(
+        GitLabUserService gitLabUserService,
         UserRepository userRepository,
         LabelRepository labelRepository,
         RepositoryRepository repositoryRepository,
@@ -63,6 +65,7 @@ public class GitLabDiffNoteWebhookProcessor extends BaseGitLabProcessor {
         GitLabPullRequestReviewCommentProcessor reviewCommentProcessor
     ) {
         super(
+            gitLabUserService,
             userRepository,
             labelRepository,
             repositoryRepository,
