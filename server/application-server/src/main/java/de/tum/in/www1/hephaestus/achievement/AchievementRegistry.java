@@ -16,6 +16,8 @@ import java.io.InputStream;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
+import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
+
 /**
  * Registry acting as the central source of truth for all achievements defined in achievements.yml.
  * Replaces the previous AchievementDefinition enum.
@@ -25,7 +27,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 @Service
 public class AchievementRegistry {
-    private static final String ACHIEVEMENTS_FILE_PATH = "achievements.yml";
+    private static final String ACHIEVEMENTS_FILE_PATH = "achievements/achievements.yml";
 
     private final ObjectMapper yamlMapper;
 
@@ -35,7 +37,7 @@ public class AchievementRegistry {
 
     public AchievementRegistry() {
         this.yamlMapper = new ObjectMapper(new YAMLFactory())
-            // Configure to ignore unknown properties if any
+            .registerModule(new ParameterNamesModule())
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
             .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS);
     }

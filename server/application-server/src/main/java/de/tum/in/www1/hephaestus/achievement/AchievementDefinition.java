@@ -24,7 +24,7 @@ import java.util.Set;
  *                       Resolved at runtime via the Spring-managed evaluator strategy map.
  */
 public record AchievementDefinition(
-    @NonNull @JsonValue String id,
+    @NonNull String id,
     @NonNull AchievementCategory category,
     @NonNull AchievementRarity rarity,
     @NonNull AchievementProgress requirements,
