@@ -202,5 +202,17 @@
   "milestone.all_legendary": {
     "x": 504,
     "y": 432
+  },
+  "issue.special.hive_mind": {
+    "x": -192,
+    "y": 144
+  },
+  "issue.special.necromancer": {
+    "x": -288,
+    "y": 144
+  },
+  "issue.special.oracle": {
+    "x": -408,
+    "y": 144
   }
 }

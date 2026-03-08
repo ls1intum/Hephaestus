@@ -178,6 +178,7 @@ achievements:
       triggerEvents:
       evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator"
     - id: "commit.special.brute_force"
+      parent: "milestones.first_action"
       category: commits
       rarity: uncommon
       isHidden: true

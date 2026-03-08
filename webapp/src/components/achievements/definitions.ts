@@ -5,6 +5,8 @@ import {
 	Clock1Icon,
 	ClockFadingIcon,
 	DropletsIcon,
+	EyeIcon,
+	GhostIcon,
 	HammerIcon,
 	LanguagesIcon,
 	LibraryIcon,
@@ -13,6 +15,7 @@ import {
 	ScanEyeIcon,
 	ScanLineIcon,
 	SquaresIntersectIcon,
+	UsersIcon,
 } from "lucide-react";
 import { SingularityIcon } from "@/components/achievements/singularity-icon.tsx";
 import { defaultCategoryIcons } from "@/components/achievements/styles.ts";
@@ -225,6 +228,21 @@ const issueAchievement = {
 		name: "Terminator",
 		description: "Close a total of 50 issues",
 		icon: IssueClosedIcon,
+	},
+	"issue.special.hive_mind": {
+		name: "Hive Mind",
+		description: "Close an issue with 10 or more unique participants",
+		icon: UsersIcon,
+	},
+	"issue.special.necromancer": {
+		name: "Necromancer",
+		description: "Open an issue and close it by yourself without anyone else interacting with it",
+		icon: GhostIcon,
+	},
+	"issue.special.oracle": {
+		name: "Oracle",
+		description: "Close an issue that has been open for over 6 month",
+		icon: EyeIcon,
 	},
 } satisfies PartialAchievementRegistry;
 

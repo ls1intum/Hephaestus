@@ -1,11 +1,15 @@
 import { useMutation } from "@tanstack/react-query";
-import { Trophy } from "lucide-react";
+import { RefreshCw, Trophy } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { recalculateUserAchievementsMutation } from "@/api/@tanstack/react-query.gen";
+import {
+	recalculateUserAchievementsMutation,
+	reloadAchievementsMutation,
+} from "@/api/@tanstack/react-query.gen";
 import type { ExtendedUserTeams } from "@/components/admin/types";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { useAuth } from "@/integrations/auth/AuthContext";
 import { AdminAchievementsTable } from "./AdminAchievementsTable";
 
 interface AdminAchievementsPageProps {
@@ -19,10 +23,25 @@ export function AdminAchievementsPage({
 	isLoading,
 	workspaceSlug,
 }: AdminAchievementsPageProps) {
+	const { username } = useAuth();
 	const [isRecalculatingAll, setIsRecalculatingAll] = useState(false);
 	const [recalculatingUsers, setRecalculatingUsers] = useState<Set<string>>(new Set());
 
 	const recalculateMutation = useMutation(recalculateUserAchievementsMutation());
+	const reloadMutation = useMutation(reloadAchievementsMutation());
+
+	const handleReload = async () => {
+		toast.promise(
+			reloadMutation.mutateAsync({
+				path: { workspaceSlug, login: username || "" },
+			}),
+			{
+				loading: "Reloading achievement definitions...",
+				success: "Successfully reloaded achievements from YAML",
+				error: "Failed to reload achievement definitions",
+			},
+		);
+	};
 
 	const handleRecalculateAll = async () => {
 		if (!users.length) return;
@@ -91,22 +110,41 @@ export function AdminAchievementsPage({
 						Recalculate achievements for users in this workspace.
 					</p>
 				</div>
-				<Button
-					onClick={handleRecalculateAll}
-					disabled={isLoading || isRecalculatingAll || users.length === 0}
-				>
-					{isRecalculatingAll ? (
-						<>
-							<Spinner className="mr-2 h-4 w-4" />
-							Recalculating All...
-						</>
-					) : (
-						<>
-							<Trophy className="mr-2 h-4 w-4" />
-							Recalculate All
-						</>
-					)}
-				</Button>
+				<div className="flex items-center gap-2">
+					<Button
+						variant="outline"
+						onClick={handleReload}
+						disabled={isLoading || reloadMutation.isPending}
+					>
+						{reloadMutation.isPending ? (
+							<>
+								<Spinner className="mr-2 h-4 w-4" />
+								Reloading...
+							</>
+						) : (
+							<>
+								<RefreshCw className="mr-2 h-4 w-4" />
+								Reload Definitions
+							</>
+						)}
+					</Button>
+					<Button
+						onClick={handleRecalculateAll}
+						disabled={isLoading || isRecalculatingAll || users.length === 0}
+					>
+						{isRecalculatingAll ? (
+							<>
+								<Spinner className="mr-2 h-4 w-4" />
+								Recalculating All...
+							</>
+						) : (
+							<>
+								<Trophy className="mr-2 h-4 w-4" />
+								Recalculate All
+							</>
+						)}
+					</Button>
+				</div>
 			</div>
 
 			<AdminAchievementsTable
