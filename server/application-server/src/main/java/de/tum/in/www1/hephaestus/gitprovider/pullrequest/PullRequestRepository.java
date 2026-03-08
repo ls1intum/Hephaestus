@@ -64,6 +64,24 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
     Optional<PullRequest> findByIdWithAssignees(@Param("id") Long id);
 
     /**
+     * Finds a pull request by ID with assignees and repository eagerly fetched.
+     * Used by the bad practice detection pipeline where the PR entity is accessed
+     * outside the original Hibernate session (async event listeners, scheduled tasks).
+     *
+     * @param id the pull request ID
+     * @return the pull request with assignees and repository loaded, or empty if not found
+     */
+    @Query(
+        """
+        SELECT p FROM PullRequest p
+        LEFT JOIN FETCH p.assignees
+        LEFT JOIN FETCH p.repository
+        WHERE p.id = :id
+        """
+    )
+    Optional<PullRequest> findByIdWithAssigneesAndRepository(@Param("id") Long id);
+
+    /**
      * Finds a pull request by ID with repository eagerly fetched.
      * Required for passing PRs across transaction boundaries where the repository
      * relationship needs to be accessed (e.g., for logging nameWithOwner).
