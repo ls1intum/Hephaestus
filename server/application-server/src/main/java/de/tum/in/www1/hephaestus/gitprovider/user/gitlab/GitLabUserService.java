@@ -7,7 +7,6 @@ import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,9 +16,12 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>
  * Extracted from {@link de.tum.in.www1.hephaestus.gitprovider.common.gitlab.BaseGitLabProcessor}
  * to allow independent injection and reuse without requiring a processor instance.
+ * <p>
+ * Not conditional on GitLab being enabled because it is injected into
+ * {@link de.tum.in.www1.hephaestus.gitprovider.common.gitlab.BaseGitLabProcessor}
+ * which is always available (its subclasses handle webhook/sync events).
  */
 @Service
-@ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
 public class GitLabUserService {
 
     private static final Logger log = LoggerFactory.getLogger(GitLabUserService.class);
