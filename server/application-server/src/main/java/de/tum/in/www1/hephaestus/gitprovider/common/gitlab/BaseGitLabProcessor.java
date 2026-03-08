@@ -101,7 +101,7 @@ public abstract class BaseGitLabProcessor {
 
         long nativeId = dto.id();
         String login = dto.username();
-        String name = dto.name() != null ? dto.name() : login;
+        String name = dto.name();
         String avatarUrl = dto.avatarUrl() != null ? dto.avatarUrl() : "";
         String htmlUrl = gitLabProperties.defaultServerUrl() + "/" + login;
 
@@ -152,7 +152,7 @@ public abstract class BaseGitLabProcessor {
             return null;
         }
 
-        String resolvedName = name != null ? name : username;
+        String resolvedName = name;
         String resolvedAvatarUrl = avatarUrl != null ? avatarUrl : "";
         String resolvedHtmlUrl = webUrl != null ? webUrl : (gitLabProperties.defaultServerUrl() + "/" + username);
 

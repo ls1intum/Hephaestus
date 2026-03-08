@@ -26,6 +26,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.springframework.lang.NonNull;
+import org.springframework.lang.Nullable;
 
 /**
  * Represents a Git provider user (GitHub user, bot, or organization).
@@ -66,8 +67,9 @@ public class User extends BaseGitServiceEntity {
     @NonNull
     private String avatarUrl;
 
-    @NonNull
-    // Equals login if not fetched / existing
+    @Nullable
+    // Display name from Git provider; null until populated by API sync.
+    // DTOs fall back to login for display when this is null.
     private String name;
 
     private String email;
