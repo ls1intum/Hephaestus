@@ -217,7 +217,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
         VALUES (:nativeId, :providerId, :login, :name, :avatarUrl, :htmlUrl, :type, :email, :createdAt, :updatedAt)
         ON CONFLICT (provider_id, native_id) DO UPDATE SET
             login = EXCLUDED.login,
-            name = EXCLUDED.name,
+            name = COALESCE(EXCLUDED.name, "user".name),
             avatar_url = EXCLUDED.avatar_url,
             html_url = EXCLUDED.html_url,
             type = EXCLUDED.type,
