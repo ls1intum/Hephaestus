@@ -26,6 +26,7 @@ import { useMentorChat } from "@/hooks/useMentorChat";
 import { type AuthContextType, useAuth } from "@/integrations/auth/AuthContext";
 import { isPosthogEnabled } from "@/integrations/posthog/config";
 import { useTheme } from "@/integrations/theme";
+import { getProviderSlug } from "@/lib/provider";
 import type { ChatMessage } from "@/lib/types";
 
 interface MyRouterContext {
@@ -223,7 +224,7 @@ function HeaderContainer() {
  */
 function ProviderColorScope({ children }: { children: React.ReactNode }) {
 	const { providerType } = useActiveWorkspaceSlug();
-	return <div data-provider={providerType.toLowerCase()}>{children}</div>;
+	return <div data-provider={getProviderSlug(providerType)}>{children}</div>;
 }
 
 function AppSidebarContainer() {

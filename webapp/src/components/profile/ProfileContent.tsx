@@ -112,7 +112,7 @@ export function ProfileContent({
 	const { icon: PrIcon } = getPullRequestStateIcon(providerType, "OPEN");
 
 	// Use server-provided reviewed PRs if available, otherwise extract from review activity
-	const reviewedPRsForPopover: ReviewedPullRequest[] =
+	const reviewedPullRequestsForPopover: ReviewedPullRequest[] =
 		reviewedPullRequests && reviewedPullRequests.length > 0
 			? reviewedPullRequests
 			: (reviewActivity ?? [])
@@ -135,7 +135,7 @@ export function ProfileContent({
 						<div className="flex flex-wrap items-center gap-3">
 							<h3 className="text-lg font-semibold">Review activity</h3>
 							<ActivityBadges
-								reviewedPullRequests={reviewedPRsForPopover}
+								reviewedPullRequests={reviewedPullRequestsForPopover}
 								approvals={reviewStats.approvals}
 								changeRequests={reviewStats.changeRequests}
 								comments={reviewStats.comments}

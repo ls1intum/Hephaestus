@@ -11,7 +11,10 @@ import {
 	GitLabMergeRequestDraftIcon,
 	GitLabMergeRequestIcon,
 } from "../gitlab-icons";
+import type { PullRequestState } from "../provider-icons";
 import { getPullRequestStateIcon } from "../provider-icons";
+
+const ALL_STATES: PullRequestState[] = ["OPEN", "CLOSED", "MERGED"];
 
 describe("getPullRequestStateIcon", () => {
 	describe("GitHub provider", () => {
@@ -71,23 +74,34 @@ describe("getPullRequestStateIcon", () => {
 			expect(result.icon).toBe(GitLabMergeRequestClosedIcon);
 			expect(result.colorClass).toBe("text-provider-closed-foreground");
 		});
+
+		it("ignores isDraft when state is not OPEN", () => {
+			const merged = getPullRequestStateIcon("GITLAB", "MERGED", true);
+			expect(merged.icon).toBe(GitLabMergeIcon);
+			const closed = getPullRequestStateIcon("GITLAB", "CLOSED", true);
+			expect(closed.icon).toBe(GitLabMergeRequestClosedIcon);
+		});
 	});
 
 	it("uses same color classes for both providers", () => {
-		const states: Array<"OPEN" | "CLOSED" | "MERGED"> = ["OPEN", "CLOSED", "MERGED"];
-		for (const state of states) {
-			const gh = getPullRequestStateIcon("GITHUB", state);
-			const gl = getPullRequestStateIcon("GITLAB", state);
-			expect(gh.colorClass).toBe(gl.colorClass);
+		for (const state of ALL_STATES) {
+			const githubResult = getPullRequestStateIcon("GITHUB", state);
+			const gitlabResult = getPullRequestStateIcon("GITLAB", state);
+			expect(githubResult.colorClass).toBe(gitlabResult.colorClass);
 		}
 	});
 
 	it("uses different icon components per provider", () => {
-		const states: Array<"OPEN" | "CLOSED" | "MERGED"> = ["OPEN", "CLOSED", "MERGED"];
-		for (const state of states) {
-			const gh = getPullRequestStateIcon("GITHUB", state);
-			const gl = getPullRequestStateIcon("GITLAB", state);
-			expect(gh.icon).not.toBe(gl.icon);
+		for (const state of ALL_STATES) {
+			const githubResult = getPullRequestStateIcon("GITHUB", state);
+			const gitlabResult = getPullRequestStateIcon("GITLAB", state);
+			expect(githubResult.icon).not.toBe(gitlabResult.icon);
 		}
+	});
+
+	it("returns a valid icon component and a Tailwind color class", () => {
+		const result = getPullRequestStateIcon("GITHUB", "OPEN");
+		expect(result.icon).toBeDefined();
+		expect(result.colorClass).toMatch(/^text-provider-/);
 	});
 });

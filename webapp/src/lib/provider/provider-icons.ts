@@ -4,6 +4,7 @@ import {
 	GitPullRequestDraftIcon,
 	GitPullRequestIcon,
 } from "@primer/octicons-react";
+import type { ComponentType } from "react";
 import {
 	GitLabMergeIcon,
 	GitLabMergeRequestClosedIcon,
@@ -13,9 +14,12 @@ import {
 import type { ProviderType } from "./provider-terms";
 
 /** Minimal icon component interface satisfied by both octicons and GitLab SVG wrappers. */
-export type IconComponent = React.ComponentType<{ size?: number; className?: string }>;
+export type IconComponent = ComponentType<{ size?: number; className?: string }>;
 
-interface PullRequestStateIconResult {
+/** Pull request / merge request lifecycle state. */
+export type PullRequestState = "OPEN" | "CLOSED" | "MERGED";
+
+export interface PullRequestStateIconResult {
 	icon: IconComponent;
 	colorClass: string;
 }
@@ -45,7 +49,7 @@ const PROVIDER_ICONS: Record<ProviderType, IconMap> = {
  */
 export function getPullRequestStateIcon(
 	provider: ProviderType,
-	state: "OPEN" | "CLOSED" | "MERGED",
+	state: PullRequestState,
 	isDraft?: boolean,
 ): PullRequestStateIconResult {
 	const icons = PROVIDER_ICONS[provider];

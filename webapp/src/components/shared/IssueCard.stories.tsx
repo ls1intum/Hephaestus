@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { withProvider } from "@/stories/decorators";
 import { IssueCard } from "./IssueCard";
 
 /**
@@ -86,7 +87,7 @@ type Story = StoryObj<typeof meta>;
 /**
  * An open pull request with enhancement and frontend labels.
  */
-export const OpenPR: Story = {
+export const OpenPullRequest: Story = {
 	args: {
 		isLoading: false,
 		title: "Implement new dashboard features",
@@ -109,7 +110,7 @@ export const OpenPR: Story = {
 /**
  * A draft pull request for major refactoring work that's still in progress.
  */
-export const DraftPR: Story = {
+export const DraftPullRequest: Story = {
 	args: {
 		isLoading: false,
 		title: "WIP: Refactor authentication module",
@@ -132,7 +133,7 @@ export const DraftPR: Story = {
 /**
  * A merged pull request that fixed a critical bug with high priority.
  */
-export const MergedPR: Story = {
+export const MergedPullRequest: Story = {
 	args: {
 		isLoading: false,
 		title: "Fix critical security vulnerability",
@@ -155,7 +156,7 @@ export const MergedPR: Story = {
 /**
  * A closed pull request that was not merged, typically indicating the proposed changes were rejected.
  */
-export const ClosedPR: Story = {
+export const ClosedPullRequest: Story = {
 	args: {
 		isLoading: false,
 		title: "Add experimental feature (closed without merge)",
@@ -189,7 +190,7 @@ export const Loading: Story = {
  */
 export const WithNoLinkWrapper: Story = {
 	args: {
-		...OpenPR.args,
+		...OpenPullRequest.args,
 		noLinkWrapper: true,
 	},
 };
@@ -199,7 +200,7 @@ export const WithNoLinkWrapper: Story = {
  */
 export const WithRightContent: Story = {
 	args: {
-		...OpenPR.args,
+		...OpenPullRequest.args,
 		rightContent: (
 			<Button variant="outline" size="sm" className="ml-4">
 				<RefreshCw className="size-3.5 mr-1" />
@@ -214,7 +215,7 @@ export const WithRightContent: Story = {
  */
 export const WithNoLinkWrapperAndRightContent: Story = {
 	args: {
-		...OpenPR.args,
+		...OpenPullRequest.args,
 		noLinkWrapper: true,
 		rightContent: (
 			<Button variant="outline" size="sm" className="ml-4">
@@ -225,52 +226,51 @@ export const WithNoLinkWrapperAndRightContent: Story = {
 	},
 };
 
-// --- GitLab variants ---
-import { gitlabDecorator } from "@/stories/decorators";
+// --- Alternate provider variants ---
 
 /**
- * GitLab open merge request with GitLab MR icon and green color.
+ * Open merge request with provider-native icon and green color.
  */
-export const GitLabOpenMR: Story = {
-	decorators: [gitlabDecorator],
+export const OpenMergeRequest: Story = {
+	decorators: [withProvider("GITLAB")],
 	args: {
-		...OpenPR.args,
+		...OpenPullRequest.args,
 		providerType: "GITLAB",
 		htmlUrl: "https://gitlab.com/ls1intum/Hephaestus/-/merge_requests/42",
 	},
 };
 
 /**
- * GitLab draft merge request.
+ * Draft merge request with muted color.
  */
-export const GitLabDraftMR: Story = {
-	decorators: [gitlabDecorator],
+export const DraftMergeRequest: Story = {
+	decorators: [withProvider("GITLAB")],
 	args: {
-		...DraftPR.args,
+		...DraftPullRequest.args,
 		providerType: "GITLAB",
 		htmlUrl: "https://gitlab.com/ls1intum/Artemis/-/merge_requests/87",
 	},
 };
 
 /**
- * GitLab merged MR with blue merged color (vs GitHub purple).
+ * Merged merge request with blue merged color (vs GitHub purple).
  */
-export const GitLabMergedMR: Story = {
-	decorators: [gitlabDecorator],
+export const MergedMergeRequest: Story = {
+	decorators: [withProvider("GITLAB")],
 	args: {
-		...MergedPR.args,
+		...MergedPullRequest.args,
 		providerType: "GITLAB",
 		htmlUrl: "https://gitlab.com/ls1intum/Athena/-/merge_requests/103",
 	},
 };
 
 /**
- * GitLab closed merge request (not merged).
+ * Closed merge request (not merged).
  */
-export const GitLabClosedMR: Story = {
-	decorators: [gitlabDecorator],
+export const ClosedMergeRequest: Story = {
+	decorators: [withProvider("GITLAB")],
 	args: {
-		...ClosedPR.args,
+		...ClosedPullRequest.args,
 		providerType: "GITLAB",
 		htmlUrl: "https://gitlab.com/ls1intum/ExampleRepo/-/merge_requests/75",
 	},

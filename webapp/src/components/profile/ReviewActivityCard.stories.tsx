@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
+import { withProvider } from "@/stories/decorators";
 import { ReviewActivityCard } from "./ReviewActivityCard";
 
 /**
@@ -200,14 +201,13 @@ export const WithCodeInTitle: Story = {
 	},
 };
 
-// --- GitLab variants ---
-import { gitlabDecorator } from "@/stories/decorators";
+// --- Alternate provider variants ---
 
 /**
- * GitLab: Approved review showing GitLab-native colors.
+ * Approved review with alternate provider colors.
  */
-export const GitLabApproved: Story = {
-	decorators: [gitlabDecorator],
+export const ApprovedMergeRequest: Story = {
+	decorators: [withProvider("GITLAB")],
 	args: {
 		...Approved.args,
 		providerType: "GITLAB",
@@ -216,10 +216,10 @@ export const GitLabApproved: Story = {
 };
 
 /**
- * GitLab: Unknown review state showing GitLab MR icon instead of GitHub PR icon.
+ * Unknown review state with provider-native merge request icon.
  */
-export const GitLabUnknown: Story = {
-	decorators: [gitlabDecorator],
+export const UnknownMergeRequest: Story = {
+	decorators: [withProvider("GITLAB")],
 	args: {
 		...Unknown.args,
 		providerType: "GITLAB",

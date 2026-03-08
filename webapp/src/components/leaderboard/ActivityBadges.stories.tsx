@@ -1,8 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/react";
+import { withProvider } from "@/stories/decorators";
 import { ActivityBadges } from "./ActivityBadges";
 import type { ReviewedPullRequest } from "./ReviewsPopover";
 
-const basePRs: ReviewedPullRequest[] = [
+const basePullRequests: ReviewedPullRequest[] = [
 	{
 		id: 1,
 		number: 42,
@@ -54,7 +55,7 @@ const meta = {
 	component: ActivityBadges,
 	tags: ["autodocs"],
 	args: {
-		reviewedPullRequests: basePRs,
+		reviewedPullRequests: basePullRequests,
 		approvals: 3,
 		changeRequests: 1,
 		comments: 5,
@@ -76,7 +77,7 @@ export const Default: Story = {};
  */
 export const ReviewsOnly: Story = {
 	args: {
-		reviewedPullRequests: basePRs,
+		reviewedPullRequests: basePullRequests,
 		approvals: 0,
 		changeRequests: 0,
 		comments: 0,
@@ -109,5 +110,17 @@ export const Loading: Story = {
 		changeRequests: 0,
 		comments: 0,
 		codeComments: 0,
+	},
+};
+
+// --- Alternate provider variant ---
+
+/**
+ * Alternate provider with merge request icon and provider-native colors.
+ */
+export const MergeRequestProvider: Story = {
+	decorators: [withProvider("GITLAB")],
+	args: {
+		providerType: "GITLAB",
 	},
 };

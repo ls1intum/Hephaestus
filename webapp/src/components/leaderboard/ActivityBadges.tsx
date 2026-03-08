@@ -59,7 +59,7 @@ export function ActivityBadges({
 			{reviewedPullRequests.length > 0 && (
 				<>
 					<ReviewsPopover
-						reviewedPRs={reviewedPullRequests}
+						reviewedPullRequests={reviewedPullRequests}
 						highlight={highlightReviews}
 						providerType={providerType}
 					/>

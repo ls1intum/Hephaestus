@@ -1,11 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/react";
+import type { PullRequestState } from "./provider-icons";
 import { getPullRequestStateIcon } from "./provider-icons";
 import type { ProviderType } from "./provider-terms";
-import { getProviderTerms } from "./provider-terms";
+import { getProviderSlug, getProviderTerms } from "./provider-terms";
 
 /**
  * Visual reference for all provider-specific pull request / merge request icons.
- * Shows every state (open, draft, merged, closed) for each provider (GitHub, GitLab)
+ * Shows every state (open, draft, merged, closed) for each provider
  * with their correct icons and color tokens.
  */
 const meta = {
@@ -16,7 +17,7 @@ const meta = {
 		docs: {
 			description: {
 				component:
-					"Gallery of all pull request / merge request state icons for GitHub and GitLab. Each provider uses its own native icons with provider-aware color tokens.",
+					"Gallery of all pull request / merge request state icons. Each provider uses its own native icons with provider-aware color tokens.",
 			},
 		},
 	},
@@ -26,18 +27,18 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 const STATES = [
-	{ state: "OPEN" as const, isDraft: false, label: "Open" },
-	{ state: "OPEN" as const, isDraft: true, label: "Draft" },
-	{ state: "MERGED" as const, isDraft: false, label: "Merged" },
-	{ state: "CLOSED" as const, isDraft: false, label: "Closed" },
-];
+	{ state: "OPEN", isDraft: false, label: "Open" },
+	{ state: "OPEN", isDraft: true, label: "Draft" },
+	{ state: "MERGED", isDraft: false, label: "Merged" },
+	{ state: "CLOSED", isDraft: false, label: "Closed" },
+] as const satisfies readonly { state: PullRequestState; isDraft: boolean; label: string }[];
 
 function IconRow({ provider, size = 20 }: { provider: ProviderType; size?: number }) {
 	const terms = getProviderTerms(provider);
 	return (
 		<div className="flex flex-col gap-3">
 			<h3 className="text-sm font-semibold">
-				{provider === "GITHUB" ? "GitHub" : "GitLab"} — {terms.pullRequest}
+				{terms.displayName} — {terms.pullRequest}
 			</h3>
 			<div className="flex gap-6">
 				{STATES.map(({ state, isDraft, label }) => {
@@ -72,14 +73,14 @@ export const GitHub: Story = {
  */
 export const GitLab: Story = {
 	render: () => (
-		<div data-provider="gitlab">
+		<div data-provider={getProviderSlug("GITLAB")}>
 			<IconRow provider="GITLAB" />
 		</div>
 	),
 };
 
 /**
- * Side-by-side comparison of GitHub and GitLab icons at the default size.
+ * Side-by-side comparison of icons at the default size.
  * Highlights the visual differences between providers — different icons and
  * different color palettes (e.g. GitHub purple vs GitLab blue for merged).
  */
@@ -87,7 +88,7 @@ export const Comparison: Story = {
 	render: () => (
 		<div className="flex flex-col gap-8">
 			<IconRow provider="GITHUB" />
-			<div data-provider="gitlab">
+			<div data-provider={getProviderSlug("GITLAB")}>
 				<IconRow provider="GITLAB" />
 			</div>
 		</div>
@@ -102,7 +103,14 @@ export const Comparison: Story = {
 	},
 };
 
-const COLOR_TOKENS = [
+interface ColorToken {
+	token: string;
+	label: string;
+	bgClass: string;
+	fgClass: string;
+}
+
+const COLOR_TOKENS: readonly ColorToken[] = [
 	{
 		token: "open",
 		label: "Open",
@@ -141,10 +149,11 @@ const COLOR_TOKENS = [
 	},
 ];
 
-function ColorSwatches({ provider }: { provider: "GitHub" | "GitLab" }) {
+function ColorSwatches({ provider }: { provider: ProviderType }) {
+	const { displayName } = getProviderTerms(provider);
 	return (
 		<div className="flex flex-col gap-3">
-			<h3 className="text-sm font-semibold">{provider}</h3>
+			<h3 className="text-sm font-semibold">{displayName}</h3>
 			<div className="flex gap-4">
 				{COLOR_TOKENS.map(({ token, label, bgClass, fgClass }) => (
 					<div key={token} className="flex flex-col items-center gap-2">
@@ -161,14 +170,13 @@ function ColorSwatches({ provider }: { provider: "GitHub" | "GitLab" }) {
 /**
  * Provider color tokens side by side. Shows the background and foreground colors
  * for each semantic token (open, merged, closed, danger, success, muted).
- * GitHub uses Primer colors (e.g. purple for merged), GitLab uses Pajamas colors (e.g. blue for merged).
  */
 export const ColorTokens: Story = {
 	render: () => (
 		<div className="flex flex-col gap-8">
-			<ColorSwatches provider="GitHub" />
-			<div data-provider="gitlab">
-				<ColorSwatches provider="GitLab" />
+			<ColorSwatches provider="GITHUB" />
+			<div data-provider={getProviderSlug("GITLAB")}>
+				<ColorSwatches provider="GITLAB" />
 			</div>
 		</div>
 	),
@@ -191,26 +199,30 @@ export const Sizes: Story = {
 		const sizes = [12, 16, 20, 24, 32];
 		return (
 			<div className="flex flex-col gap-8">
-				{(["GITHUB", "GITLAB"] as const).map((provider) => (
-					<div key={provider} data-provider={provider === "GITLAB" ? "gitlab" : undefined}>
-						<h3 className="mb-3 text-sm font-semibold">
-							{provider === "GITHUB" ? "GitHub" : "GitLab"}
-						</h3>
-						<div className="flex gap-6 items-end">
-							{sizes.map((size) => {
-								const { icon: Icon, colorClass } = getPullRequestStateIcon(provider, "OPEN");
-								return (
-									<div key={size} className="flex flex-col items-center gap-2">
-										<div className={colorClass}>
-											<Icon size={size} />
+				{(["GITHUB", "GITLAB"] as const).map((provider) => {
+					const { displayName } = getProviderTerms(provider);
+					return (
+						<div
+							key={provider}
+							data-provider={provider === "GITLAB" ? getProviderSlug(provider) : undefined}
+						>
+							<h3 className="mb-3 text-sm font-semibold">{displayName}</h3>
+							<div className="flex gap-6 items-end">
+								{sizes.map((size) => {
+									const { icon: Icon, colorClass } = getPullRequestStateIcon(provider, "OPEN");
+									return (
+										<div key={size} className="flex flex-col items-center gap-2">
+											<div className={colorClass}>
+												<Icon size={size} />
+											</div>
+											<span className="text-xs text-muted-foreground">{size}px</span>
 										</div>
-										<span className="text-xs text-muted-foreground">{size}px</span>
-									</div>
-								);
-							})}
+									);
+								})}
+							</div>
 						</div>
-					</div>
-				))}
+					);
+				})}
 			</div>
 		);
 	},

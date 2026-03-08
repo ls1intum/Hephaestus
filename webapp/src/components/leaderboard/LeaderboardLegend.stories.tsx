@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
+import { withProvider } from "@/stories/decorators";
 import { LeaderboardLegend } from "./LeaderboardLegend";
 
 /**
@@ -25,14 +26,13 @@ type Story = StoryObj<typeof meta>;
  */
 export const Default: Story = {};
 
-// --- GitLab variant ---
-import { gitlabDecorator } from "@/stories/decorators";
+// --- Alternate provider variant ---
 
 /**
- * GitLab version — shows "merge requests" terminology and GitLab MR icon.
+ * Alternate provider — shows "merge requests" terminology and provider-native icon.
  */
-export const GitLab: Story = {
-	decorators: [gitlabDecorator],
+export const MergeRequestProvider: Story = {
+	decorators: [withProvider("GITLAB")],
 	args: {
 		providerType: "GITLAB",
 	},
