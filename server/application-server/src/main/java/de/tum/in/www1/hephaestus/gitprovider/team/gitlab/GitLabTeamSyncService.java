@@ -9,6 +9,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncException;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabDescendantGroupResponse;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabGroupMemberResponse;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabPageInfo;
@@ -255,7 +256,7 @@ public class GitLabTeamSyncService {
                     response != null ? response.getErrors() : "null"
                 );
                 graphQlClientProvider.recordFailure(
-                    new RuntimeException("Invalid GraphQL response for descendant groups")
+                    new GitLabSyncException("Invalid GraphQL response for descendant groups")
                 );
                 return false;
             }
@@ -448,7 +449,9 @@ public class GitLabTeamSyncService {
 
             if (response == null || !response.isValid()) {
                 log.warn("Failed to fetch group members: groupPath={}, page={}", groupFullPath, pageCount);
-                graphQlClientProvider.recordFailure(new RuntimeException("Invalid GraphQL response for group members"));
+                graphQlClientProvider.recordFailure(
+                    new GitLabSyncException("Invalid GraphQL response for group members")
+                );
                 return false;
             }
             graphQlClientProvider.recordSuccess();
