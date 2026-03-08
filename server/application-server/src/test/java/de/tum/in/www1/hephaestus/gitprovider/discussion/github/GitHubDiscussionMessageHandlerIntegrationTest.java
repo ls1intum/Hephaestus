@@ -431,7 +431,7 @@ class GitHubDiscussionMessageHandlerIntegrationTest extends BaseIntegrationTest 
             });
 
             // Verify label was created in repository
-            assertThat(labelRepository.findById(FIXTURE_LABEL_ID)).isPresent();
+            assertThat(labelRepository.findByNativeIdAndProviderId(FIXTURE_LABEL_ID, gitProvider.getId())).isPresent();
         }
 
         @Test

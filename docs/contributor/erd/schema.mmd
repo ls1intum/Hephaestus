@@ -297,6 +297,8 @@ erDiagram
         TIMESTAMPTZ last_sync_at
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
+        BIGINT native_id UK "NOT NULL"
+        BIGINT provider_id FK,UK "NOT NULL"
     }
 
     Milestone {
@@ -453,6 +455,8 @@ erDiagram
         TIMESTAMP created_at
         TIMESTAMP updated_at
         BOOLEAN author_can_push_to_repository
+        BIGINT native_id UK "NOT NULL"
+        BIGINT provider_id FK,UK "NOT NULL"
     }
 
     PullRequestReviewComment {
@@ -601,7 +605,7 @@ erDiagram
         TIMESTAMPTZ users_synced_at
         VARCHAR(120) account_login
         VARCHAR(255) git_provider_mode
-        VARCHAR(255) github_repository_selection
+        VARCHAR(255) repository_selection
         BIGINT installation_id
         TIMESTAMPTZ installation_linked_at
         BIGINT organization_id FK,UK
@@ -681,6 +685,7 @@ erDiagram
     GitProvider ||--|| Issue : references
     Repository ||--|| Issue : has
     GitProvider ||--|| IssueComment : commented_on
+    GitProvider ||--|| Label : labeled
     Repository ||--|| Label : labeled
     GitProvider ||--|| Milestone : references
     Repository ||--|| Milestone : has
@@ -692,6 +697,7 @@ erDiagram
     Project ||--|| ProjectItem : has
     GitProvider ||--|| ProjectItem : references
     GitProvider ||--|| ProjectStatusUpdate : references
+    GitProvider ||--|| PullRequestReview : reviewed
     GitProvider ||--|| PullRequestReviewComment : commented_on
     GitProvider ||--|| PullRequestReviewThread : reviewed
     PullRequestReviewComment ||--|| PullRequestReviewThread : reviewed

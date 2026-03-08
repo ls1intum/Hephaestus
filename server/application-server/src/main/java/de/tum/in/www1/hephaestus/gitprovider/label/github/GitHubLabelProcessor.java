@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.label.github;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
 import de.tum.in.www1.hephaestus.gitprovider.common.LabelIdUtils;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
@@ -43,10 +44,16 @@ public class GitHubLabelProcessor {
     private static final Logger log = LoggerFactory.getLogger(GitHubLabelProcessor.class);
 
     private final LabelRepository labelRepository;
+    private final GitProviderRepository gitProviderRepository;
     private final ApplicationEventPublisher eventPublisher;
 
-    public GitHubLabelProcessor(LabelRepository labelRepository, ApplicationEventPublisher eventPublisher) {
+    public GitHubLabelProcessor(
+        LabelRepository labelRepository,
+        GitProviderRepository gitProviderRepository,
+        ApplicationEventPublisher eventPublisher
+    ) {
         this.labelRepository = labelRepository;
+        this.gitProviderRepository = gitProviderRepository;
         this.eventPublisher = eventPublisher;
     }
 
@@ -74,13 +81,13 @@ public class GitHubLabelProcessor {
         }
 
         // Always check by unique key (repository_id + name) FIRST - this is the constraint we enforce.
-        // This handles the case where GraphQL sync created a label with a deterministic ID,
+        // This handles the case where GraphQL sync created a label with a deterministic nativeId,
         // then NATS replay sends a webhook with the actual GitHub databaseId.
         Optional<Label> existingOpt = labelRepository.findByRepositoryIdAndName(repository.getId(), dto.name());
 
-        // Fall back to ID lookup if name lookup didn't find it (handles label renames)
+        // Fall back to nativeId lookup if name lookup didn't find it (handles label renames)
         if (existingOpt.isEmpty() && dto.id() != null) {
-            existingOpt = labelRepository.findById(dto.id());
+            existingOpt = labelRepository.findByNativeIdAndProviderId(dto.id(), context.providerId());
         }
         boolean isNew = existingOpt.isEmpty();
 
@@ -88,15 +95,15 @@ public class GitHubLabelProcessor {
 
         // Set or update fields
         // For labels, all fields including description are always updated (null values are allowed)
-        // CRITICAL: NEVER change the ID of an existing (managed) entity - Hibernate will throw
-        // "identifier of an instance was altered" exception. Only set ID for NEW entities.
+        // CRITICAL: NEVER change the nativeId/provider of an existing (managed) entity - Hibernate will throw
+        // "identifier of an instance was altered" exception. Only set these for NEW entities.
         if (isNew) {
-            if (dto.id() != null) {
-                label.setId(dto.id());
-            } else {
-                // Generate deterministic ID for new labels from GraphQL (which doesn't provide databaseId)
-                label.setId(generateDeterministicId(repository.getId(), dto.name()));
-            }
+            long nativeId = dto.id() != null ? dto.id() : generateDeterministicId(repository.getId(), dto.name());
+            label.setNativeId(nativeId);
+            // CRITICAL: Use getReferenceById to get a proxy bound to the current session.
+            // context.provider() returns a proxy from the outer session (REQUIRES_NEW suspends it),
+            // which causes "Illegally attempted to associate proxy with two open sessions".
+            label.setProvider(gitProviderRepository.getReferenceById(context.providerId()));
         }
         label.setName(dto.name()); // name is always required
         if (dto.color() != null) {
@@ -137,13 +144,13 @@ public class GitHubLabelProcessor {
     }
 
     /**
-     * Delete a label by its ID.
+     * Delete a label by its database ID.
      * <p>
      * IMPORTANT: For bidirectional @ManyToMany relationships,
      * we must sync both sides of the relationship before deleting to avoid
      * constraint violations or stale references in the persistence context.
      *
-     * @param labelId the label database ID
+     * @param labelId the label database ID (synthetic PK)
      * @param context processing context with scope information
      */
     @Transactional
@@ -152,18 +159,36 @@ public class GitHubLabelProcessor {
             return;
         }
 
-        labelRepository
-            .findById(labelId)
-            .ifPresent(label -> {
-                // CRITICAL: Remove from all referencing Issues before deletion
-                // to sync bidirectional ManyToMany relationship
-                label.removeAllIssues();
+        labelRepository.findById(labelId).ifPresent(label -> deleteLabel(label, context));
+    }
 
-                labelRepository.delete(label);
-                eventPublisher.publishEvent(
-                    new DomainEvent.LabelDeleted(labelId, label.getName(), EventContext.from(context))
-                );
-                log.info("Deleted label: labelId={}, labelName={}", labelId, label.getName());
-            });
+    /**
+     * Delete a label by its native ID (provider-assigned ID).
+     * Used by webhook handlers where only the native ID is available.
+     *
+     * @param nativeId the label's native ID from the provider
+     * @param context processing context with scope information
+     */
+    @Transactional
+    public void deleteByNativeId(Long nativeId, ProcessingContext context) {
+        if (nativeId == null) {
+            return;
+        }
+
+        labelRepository
+            .findByNativeIdAndProviderId(nativeId, context.providerId())
+            .ifPresent(label -> deleteLabel(label, context));
+    }
+
+    private void deleteLabel(Label label, ProcessingContext context) {
+        // CRITICAL: Remove from all referencing Issues before deletion
+        // to sync bidirectional ManyToMany relationship
+        label.removeAllIssues();
+
+        labelRepository.delete(label);
+        eventPublisher.publishEvent(
+            new DomainEvent.LabelDeleted(label.getId(), label.getName(), EventContext.from(context))
+        );
+        log.info("Deleted label: labelId={}, labelName={}", label.getId(), label.getName());
     }
 }

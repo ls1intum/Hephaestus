@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequestreview;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntity;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
@@ -9,11 +10,11 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
-import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
@@ -24,18 +25,17 @@ import lombok.ToString;
 import org.springframework.lang.NonNull;
 
 @Entity
-@Table(name = "pull_request_review")
+@Table(
+    name = "pull_request_review",
+    uniqueConstraints = {
+        @UniqueConstraint(name = "uq_pr_review_provider_native_id", columnNames = { "provider_id", "native_id" }),
+    }
+)
 @Getter
 @Setter
 @NoArgsConstructor
-public class PullRequestReview {
-
-    @Id
-    protected Long id;
-
-    private Instant createdAt;
-
-    private Instant updatedAt;
+@ToString(callSuper = true)
+public class PullRequestReview extends BaseGitServiceEntity {
 
     @Column(columnDefinition = "TEXT")
     private String body;
@@ -122,18 +122,5 @@ public class PullRequestReview {
         DISMISSED,
         /** Unknown or unmapped state (fallback for forward compatibility). */
         UNKNOWN,
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        PullRequestReview that = (PullRequestReview) o;
-        return id != null && id.equals(that.id);
-    }
-
-    @Override
-    public int hashCode() {
-        return getClass().hashCode();
     }
 }

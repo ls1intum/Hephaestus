@@ -939,7 +939,9 @@ export const label = pgTable(
 	"label",
 	{
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		id: bigint({ mode: "number" }).primaryKey().notNull(),
+		id: bigint({ mode: "number" })
+			.primaryKey()
+			.generatedByDefaultAsIdentity({ name: "label_id_seq", startWith: 1, increment: 1, cache: 1 }),
 		color: varchar({ length: 255 }),
 		description: varchar({ length: 255 }),
 		name: varchar({ length: 255 }),
@@ -948,6 +950,10 @@ export const label = pgTable(
 		lastSyncAt: timestamp("last_sync_at", { withTimezone: true, mode: "string" }),
 		createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }),
 		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		nativeId: bigint("native_id", { mode: "number" }).notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		providerId: bigint("provider_id", { mode: "number" }).notNull(),
 	},
 	(table) => [
 		foreignKey({
@@ -955,7 +961,13 @@ export const label = pgTable(
 			foreignColumns: [repository.id],
 			name: "fk2951edbl9g9y8ee1q97e2ff75",
 		}),
+		foreignKey({
+			columns: [table.providerId],
+			foreignColumns: [gitProvider.id],
+			name: "fk_label_provider",
+		}),
 		unique("uq_label_repository_name").on(table.name, table.repositoryId),
+		unique("uq_label_provider_native_id").on(table.nativeId, table.providerId),
 	],
 );
 
@@ -1383,7 +1395,12 @@ export const pullRequestReview = pgTable(
 	"pull_request_review",
 	{
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		id: bigint({ mode: "number" }).primaryKey().notNull(),
+		id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({
+			name: "pull_request_review_id_seq",
+			startWith: 1,
+			increment: 1,
+			cache: 1,
+		}),
 		commitId: varchar("commit_id", { length: 255 }),
 		htmlUrl: varchar("html_url", { length: 255 }),
 		isDismissed: boolean("is_dismissed").notNull(),
@@ -1397,6 +1414,10 @@ export const pullRequestReview = pgTable(
 		createdAt: timestamp("created_at", { mode: "string" }),
 		updatedAt: timestamp("updated_at", { mode: "string" }),
 		authorCanPushToRepository: boolean("author_can_push_to_repository"),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		nativeId: bigint("native_id", { mode: "number" }).notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		providerId: bigint("provider_id", { mode: "number" }).notNull(),
 	},
 	(table) => [
 		index("idx_pr_review_author_id").using("btree", table.authorId.asc().nullsLast()),
@@ -1412,6 +1433,12 @@ export const pullRequestReview = pgTable(
 			foreignColumns: [issue.id],
 			name: "fkio96gq2jetvy6a4in9nl8vkvd",
 		}),
+		foreignKey({
+			columns: [table.providerId],
+			foreignColumns: [gitProvider.id],
+			name: "fk_pr_review_provider",
+		}),
+		unique("uq_pr_review_provider_native_id").on(table.nativeId, table.providerId),
 	],
 );
 
@@ -1842,7 +1869,7 @@ export const workspace = pgTable(
 		usersSyncedAt: timestamp("users_synced_at", { withTimezone: true, mode: "string" }),
 		accountLogin: varchar("account_login", { length: 120 }),
 		gitProviderMode: varchar("git_provider_mode", { length: 255 }),
-		githubRepositorySelection: varchar("github_repository_selection", { length: 255 }),
+		repositorySelection: varchar("repository_selection", { length: 255 }),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		installationId: bigint("installation_id", { mode: "number" }),
 		installationLinkedAt: timestamp("installation_linked_at", {

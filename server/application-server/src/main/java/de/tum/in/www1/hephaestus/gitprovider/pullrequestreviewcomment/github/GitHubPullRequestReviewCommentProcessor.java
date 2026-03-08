@@ -302,9 +302,11 @@ public class GitHubPullRequestReviewCommentProcessor {
         // Outdated flag (whether the comment's code context has changed)
         comment.setOutdated(dto.outdated());
 
-        // Link to review if present
+        // Link to review if present (reviewId is the provider's native ID, not the JPA PK)
         if (dto.reviewId() != null) {
-            reviewRepository.findById(dto.reviewId()).ifPresent(comment::setReview);
+            reviewRepository
+                .findByNativeIdAndProviderId(dto.reviewId(), pr.getRepository().getProvider().getId())
+                .ifPresent(comment::setReview);
         }
 
         // Link author if present - ensure user exists (create if needed)

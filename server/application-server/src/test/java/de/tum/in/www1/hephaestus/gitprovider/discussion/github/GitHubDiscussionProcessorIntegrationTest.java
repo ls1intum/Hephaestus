@@ -516,7 +516,7 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             // Then
             assertThat(result.getLabels()).hasSize(1);
             assertThat(result.getLabels().iterator().next().getName()).isEqualTo("bug");
-            assertThat(labelRepository.findById(labelId)).isPresent();
+            assertThat(labelRepository.findByNativeIdAndProviderId(labelId, githubProvider.getId())).isPresent();
         }
 
         @Test
