@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.achievement;
 
 import de.tum.in.www1.hephaestus.activity.ActivityEventType;
+import de.tum.in.www1.hephaestus.activity.ActivityTargetType;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 
 import java.time.Instant;
@@ -16,11 +17,20 @@ import java.time.Instant;
  * @param eventType the type of activity that was recorded
  * @param occurredAt when the activity actually occurred (source timestamp, not ingestion time)
  * @param workspaceId the workspace where the activity occurred
+ * @param targetType the type of the target entity
+ * @param targetId the ID of the target entity
  *
  * @see AchievementEventListener
  * @see de.tum.in.www1.hephaestus.activity.ActivityEventService
  */
-public record ActivitySavedEvent(User user, ActivityEventType eventType, Instant occurredAt, Long workspaceId) {
+public record ActivitySavedEvent(
+    User user,
+    ActivityEventType eventType,
+    Instant occurredAt,
+    Long workspaceId,
+    ActivityTargetType targetType,
+    Long targetId
+) {
     /**
      * Check if this event has a valid user for achievement evaluation.
      *

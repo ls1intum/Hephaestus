@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.achievement.evaluator;
 
 import de.tum.in.www1.hephaestus.achievement.AchievementService;
+import de.tum.in.www1.hephaestus.achievement.ActivitySavedEvent;
 import de.tum.in.www1.hephaestus.achievement.UserAchievement;
 import de.tum.in.www1.hephaestus.achievement.progress.AchievementProgress;
 import de.tum.in.www1.hephaestus.achievement.progress.LinearAchievementProgress;
@@ -24,9 +25,10 @@ public interface AchievementEvaluator {
      * The caller is responsible for persisting the entity.
      *
      * @param userAchievement the achievement progress record to update
+     * @param event the activity event that triggered the evaluation
      * @return {@code true} if the achievement was unlocked during update, else {@code false}
      * @see AchievementProgress
      * @see LinearAchievementProgress
      */
-    boolean updateProgress(UserAchievement userAchievement);
+    boolean updateProgress(UserAchievement userAchievement, ActivitySavedEvent event);
 }

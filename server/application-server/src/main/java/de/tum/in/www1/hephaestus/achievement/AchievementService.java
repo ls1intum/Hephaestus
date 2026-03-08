@@ -37,11 +37,11 @@ import java.util.stream.Collectors;
  *
  * <h3>Achievement Evaluation Flow (Incremental)</h3>
  * <pre>
- * 1. Receive event type that was just recorded
+ * 1. Receive activity saved event that was just recorded
  * 2. Find all achievements triggered by that event type
  * 3. Fetch (or create) UserAchievement progress records
  * 4. Resolve the evaluator for each achievement via type.getEvaluatorClass()
- * 5. Increment currentValue via the resolved {@link AchievementEvaluator}
+ * 5. Increment currentValue via the resolved {@link AchievementEvaluator} (passing the event context)
  * 6. If currentValue &gt;= requiredCount AND not yet unlocked, set unlockedAt
  * 7. Save the progress record
  * </pre>
@@ -111,28 +111,30 @@ public class AchievementService {
     }
 
     /**
-     * Check and unlock any achievements triggered by the given event type.
+     * Check and unlock any achievements triggered by the given activity saved event.
      *
      * <p>This method increments progress on all achievements triggered by the
-     * specified event type and unlocks any that have reached their threshold.
+     * event's type and unlocks any that have reached their threshold.
      *
-     * <p>The {@code occurredAt} timestamp is used as the unlock time instead of
+     * <p>The {@code occurredAt} timestamp from the event is used as the unlock time instead of
      * {@link Instant#now()}. This ensures that achievements unlocked during
      * historical data syncs or backfills carry the timestamp of the earliest
      * qualifying activity event, not the moment of processing.
      *
-     * @param user       the user to check achievements for
-     * @param eventType  the activity event type that was just recorded
-     * @param occurredAt when the activity actually occurred (source timestamp)
+     * @param event the activity saved event containing user, type, and timestamp
      * @return list of newly unlocked achievement types (empty if none)
      */
-    @CacheEvict(value = ACHIEVEMENT_PROGRESS_CACHE, key = "#user.id", condition = "#user != null")
+    @CacheEvict(value = ACHIEVEMENT_PROGRESS_CACHE, key = "#event.user().getId()", condition = "#event.hasUser()")
     @Transactional
-    public List<AchievementDefinition> checkAndUnlock(User user, ActivityEventType eventType, Instant occurredAt) {
-        if (user == null) {
+    public List<AchievementDefinition> checkAndUnlock(ActivitySavedEvent event) {
+        if (!event.hasUser()) {
             log.debug("Skipping achievement check: user is null");
             return List.of();
         }
+
+        User user = event.user();
+        ActivityEventType eventType = event.eventType();
+        Instant occurredAt = event.occurredAt();
 
         // Find achievements triggered by this event type
         List<AchievementDefinition> candidates = AchievementDefinition.getByTriggerEvent(eventType);
@@ -169,7 +171,7 @@ public class AchievementService {
 
             // Resolve evaluator and increment progress
             AchievementEvaluator evaluator = resolveEvaluator(achievementDefinition);
-            boolean wasUnlocked = evaluator.updateProgress(uaProgress);
+            boolean wasUnlocked = evaluator.updateProgress(uaProgress, event);
 
             if (wasUnlocked) {
                 uaProgress.setUnlockedAt(occurredAt);

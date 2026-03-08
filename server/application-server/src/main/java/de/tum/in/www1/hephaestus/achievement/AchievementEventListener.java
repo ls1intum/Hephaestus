@@ -62,9 +62,7 @@ public class AchievementEventListener {
         }
 
         try {
-            List<AchievementDefinition> unlocked = achievementService.checkAndUnlock(
-                event.user(), event.eventType(), event.occurredAt()
-            );
+            List<AchievementDefinition> unlocked = achievementService.checkAndUnlock(event);
 
             if (!unlocked.isEmpty()) {
                 log.info(

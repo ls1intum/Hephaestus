@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.achievement.evaluator;
 
 import de.tum.in.www1.hephaestus.achievement.AchievementDefinition;
+import de.tum.in.www1.hephaestus.achievement.ActivitySavedEvent;
 import de.tum.in.www1.hephaestus.achievement.UserAchievement;
 import de.tum.in.www1.hephaestus.achievement.progress.LinearAchievementProgress;
 import lombok.extern.slf4j.Slf4j;
@@ -22,7 +23,7 @@ import org.springframework.stereotype.Component;
 public class StandardCountEvaluator implements AchievementEvaluator {
 
     @Override
-    public boolean updateProgress(UserAchievement userAchievement) {
+    public boolean updateProgress(UserAchievement userAchievement, ActivitySavedEvent event) {
         if (!(userAchievement.getProgressData() instanceof LinearAchievementProgress(int current, int target))) {
             log.warn("Expected LinearAchievementProgress but received {} for achievement: {}",
                 userAchievement.getProgressData(),
