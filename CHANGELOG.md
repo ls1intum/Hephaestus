@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.25.2](https://github.com/ls1intum/Hephaestus/compare/v0.25.1...v0.25.2) (2026-03-08)
+
+### 🐛 Bug Fixes
+
+* **gitprovider:** prevent webhooks from overwriting user display names with login ([#811](https://github.com/ls1intum/Hephaestus/issues/811)) ([4a57b2a](https://github.com/ls1intum/Hephaestus/commit/4a57b2aa0f97234e25b60f4c903b7456967566b4))
+* **server:** resolve LazyInitializationException in bad practice detection pipeline ([#801](https://github.com/ls1intum/Hephaestus/issues/801)) ([4800db4](https://github.com/ls1intum/Hephaestus/commit/4800db4fe25b209acf66ccaf605ba3d065b0efc7))
+
 ## [0.25.1](https://github.com/ls1intum/Hephaestus/compare/v0.25.0...v0.25.1) (2026-03-08)
 
 ### 🐛 Bug Fixes
