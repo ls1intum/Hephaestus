@@ -400,8 +400,22 @@ public class LeaderboardService {
         return result;
     }
 
+    /**
+     * Compute league-change statistics for a single user.
+     *
+     * <p>The method always generates the <strong>global</strong> (workspace-wide, unfiltered)
+     * leaderboard for the given timeframe and locates the user's entry in it.  This ensures
+     * that projected league point changes are consistent regardless of which team filter
+     * the caller is currently viewing.
+     *
+     * @param workspace the workspace context
+     * @param login     the user's git-provider login
+     * @param after     start of the timeframe (inclusive)
+     * @param before    end of the timeframe (exclusive)
+     * @return projected league point change
+     */
     @Transactional(readOnly = true)
-    public LeagueChangeDTO computeUserLeagueStats(Workspace workspace, String login, LeaderboardEntryDTO entry) {
+    public LeagueChangeDTO computeUserLeagueStats(Workspace workspace, String login, Instant after, Instant before) {
         User user = userRepository.findByLogin(login).orElseThrow(() -> new EntityNotFoundException("User", login));
 
         if (workspace == null || workspace.getId() == null) {
@@ -409,6 +423,28 @@ public class LeaderboardService {
         }
 
         Long workspaceId = workspace.getId();
+
+        // Always use the GLOBAL leaderboard (team = "all") so that league points are
+        // independent of any team filter the caller might be viewing.
+        List<LeaderboardEntryDTO> globalLeaderboard = createLeaderboard(
+            workspace,
+            after,
+            before,
+            "all",
+            LeaderboardSortType.SCORE,
+            LeaderboardMode.INDIVIDUAL
+        );
+
+        LeaderboardEntryDTO entry = globalLeaderboard
+            .stream()
+            .filter(e -> e.user() != null && login.equalsIgnoreCase(e.user().login()))
+            .findFirst()
+            .orElse(null);
+
+        if (entry == null) {
+            // User has no activity in this timeframe — no projected change
+            return new LeagueChangeDTO(login, 0);
+        }
 
         int currentLeaguePoints = workspaceMembershipService.getCurrentLeaguePoints(workspaceId, user);
         int projectedNewPoints = leaguePointsService.calculateNewPoints(user, currentLeaguePoints, entry);
