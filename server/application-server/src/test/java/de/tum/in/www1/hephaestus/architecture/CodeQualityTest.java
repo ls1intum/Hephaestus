@@ -478,7 +478,8 @@ class CodeQualityTest extends HephaestusArchitectureTest {
             Set<String> knownCycleBreakers = Set.of(
                 "WorkspaceActivationService",
                 "WorkspaceProvisioningAdapter", // Lazy-loaded to break circular reference with GitHubDataSyncService
-                "WorkspaceRepositoryMonitorService"
+                "WorkspaceRepositoryMonitorService",
+                "GitLabWebhookService" // Optional GitLab beans gated by @ConditionalOnProperty
             );
 
             ArchCondition<JavaField> beInKnownClass = new ArchCondition<>("be in a known cycle-breaking class") {

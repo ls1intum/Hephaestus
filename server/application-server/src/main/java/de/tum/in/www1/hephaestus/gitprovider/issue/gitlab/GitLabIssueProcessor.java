@@ -14,6 +14,8 @@ import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.issue.gitlab.dto.GitLabIssueEventDTO;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
+import de.tum.in.www1.hephaestus.gitprovider.milestone.Milestone;
+import de.tum.in.www1.hephaestus.gitprovider.milestone.MilestoneRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
@@ -47,10 +49,12 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
     private static final Logger log = LoggerFactory.getLogger(GitLabIssueProcessor.class);
 
     private final IssueRepository issueRepository;
+    private final MilestoneRepository milestoneRepository;
     private final ApplicationEventPublisher eventPublisher;
 
     public GitLabIssueProcessor(
         IssueRepository issueRepository,
+        MilestoneRepository milestoneRepository,
         UserRepository userRepository,
         LabelRepository labelRepository,
         RepositoryRepository repositoryRepository,
@@ -68,6 +72,7 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
             gitLabProperties
         );
         this.issueRepository = issueRepository;
+        this.milestoneRepository = milestoneRepository;
         this.eventPublisher = eventPublisher;
     }
 
@@ -148,7 +153,8 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
         @Nullable String authorWebUrl,
         int commentsCount,
         @Nullable List<SyncLabelData> syncLabels,
-        @Nullable List<SyncAssigneeData> syncAssignees
+        @Nullable List<SyncAssigneeData> syncAssignees,
+        @Nullable Integer milestoneIid
     ) {}
 
     /**
@@ -200,6 +206,15 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
         // State mapping
         Issue.State issueState = convertState(data.state());
 
+        // Resolve milestone by iid + repository (milestones are synced before issues)
+        Long milestoneId = null;
+        if (data.milestoneIid() != null) {
+            milestoneId = milestoneRepository
+                .findByNumberAndRepositoryId(data.milestoneIid(), repository.getId())
+                .map(Milestone::getId)
+                .orElse(null);
+        }
+
         Instant now = Instant.now();
         issueRepository.upsertCore(
             nativeId,
@@ -218,7 +233,7 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
             parseGitLabTimestamp(data.updatedAt()),
             author != null ? author.getId() : null,
             repository.getId(),
-            null, // milestoneId
+            milestoneId,
             null, // issueTypeId
             null, // parentIssueId
             null, // subIssuesTotal

@@ -1,9 +1,10 @@
 package de.tum.in.www1.hephaestus.gitprovider.organization.gitlab;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
-import static de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants.DEFAULT_PAGE_SIZE;
+import static de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants.GROUP_PROJECTS_PAGE_SIZE;
 import static de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants.MAX_PAGINATION_PAGES;
 import static de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants.adaptPageSize;
+import static de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants.extractEntityId;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
@@ -19,8 +20,10 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.gitlab.GitLabProjectProcessor;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -224,7 +227,10 @@ public class GitLabGroupSyncService {
                     }
                 }
 
-                int pageSize = adaptPageSize(DEFAULT_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId));
+                int pageSize = adaptPageSize(
+                    GROUP_PROJECTS_PAGE_SIZE,
+                    graphQlClientProvider.getRateLimitRemaining(scopeId)
+                );
                 HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
 
                 ClientGraphQlResponse response = client
@@ -353,13 +359,14 @@ public class GitLabGroupSyncService {
 
             int totalPages = pageCount + 1;
 
-            // Null nodes indicate a deserialization issue (codec misconfiguration)
-            // or GitLab access restrictions. Either way, this is unexpected and should be investigated.
+            // Null nodes typically indicate GitLab server-side timeouts when resolving
+            // complex nested fields (e.g., group{} sub-objects per project node).
+            // This causes data loss — the affected projects are silently dropped.
             if (projectsRedacted > 0) {
                 log.warn(
-                    "Deserialization returned {} null project node(s): groupPath={}, " +
+                    "GraphQL returned {} null project node(s) (likely server-side timeout): groupPath={}, " +
                         "synced={}, nullNodes={}, reportedCount={}. " +
-                        "This may indicate a WebClient codec misconfiguration.",
+                        "Consider reducing GROUP_PROJECTS_PAGE_SIZE.",
                     projectsRedacted,
                     safeGroupPath,
                     syncedRepositories.size(),
@@ -399,13 +406,37 @@ public class GitLabGroupSyncService {
                 );
             }
 
+            // Reconciliation pass: re-query with includeSubgroups=false to recover
+            // any direct projects silently dropped by the GitLab includeSubgroups bug.
+            // See: https://gitlab.com/gitlab-org/gitlab/-/issues/33419
+            int projectsReconciled = 0;
+            if (!hadApiFailure && topLevelOrganization != null) {
+                Set<Long> seenNativeIds = new HashSet<>();
+                for (Repository repo : syncedRepositories) {
+                    seenNativeIds.add(repo.getNativeId());
+                }
+
+                List<Repository> reconciled = reconcileDirectProjects(
+                    scopeId,
+                    groupFullPath,
+                    topLevelOrganization,
+                    provider,
+                    providerId,
+                    seenNativeIds
+                );
+                projectsReconciled = reconciled.size();
+                syncedRepositories.addAll(reconciled);
+            }
+
             log.info(
-                "Synced group projects: scopeId={}, groupPath={}, synced={}, failed={}, redacted={}, pages={}",
+                "Synced group projects: scopeId={}, groupPath={}, synced={}, failed={}, redacted={}, " +
+                    "reconciled={}, pages={}",
                 scopeId,
                 safeGroupPath,
                 syncedRepositories.size(),
                 projectsSkipped,
                 projectsRedacted,
+                projectsReconciled,
                 totalPages
             );
 
@@ -418,11 +449,17 @@ public class GitLabGroupSyncService {
                     projectsSkipped
                 );
             }
-            // Only actual processing failures count as errors; redacted projects are expected
-            if (projectsSkipped > 0) {
-                return GitLabSyncResult.withErrors(syncedRepositories, totalPages, projectsSkipped, projectsRedacted);
+            // Both processing failures and redacted (null) projects indicate incomplete sync
+            if (projectsSkipped > 0 || projectsRedacted > 0) {
+                return GitLabSyncResult.withErrors(
+                    syncedRepositories,
+                    totalPages,
+                    projectsSkipped,
+                    projectsRedacted,
+                    projectsReconciled
+                );
             }
-            return GitLabSyncResult.completed(syncedRepositories, totalPages, projectsRedacted);
+            return GitLabSyncResult.completed(syncedRepositories, totalPages, projectsRedacted, projectsReconciled);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             log.warn("Interrupted during group project sync: scopeId={}, groupPath={}", scopeId, safeGroupPath);
@@ -448,6 +485,140 @@ public class GitLabGroupSyncService {
                 projectsSkipped
             );
         }
+    }
+
+    /**
+     * Reconciliation pass: fetches direct projects (excludeSubgroups) and processes any that
+     * were missing from the primary sync. This works around a GitLab bug where
+     * {@code includeSubgroups: true} can silently drop direct projects on certain versions.
+     *
+     * @see <a href="https://gitlab.com/gitlab-org/gitlab/-/issues/33419">GitLab #33419</a>
+     */
+    private List<Repository> reconcileDirectProjects(
+        Long scopeId,
+        String groupFullPath,
+        Organization topLevelOrganization,
+        GitProvider provider,
+        Long providerId,
+        Set<Long> seenNativeIds
+    ) {
+        String safeGroupPath = sanitizeForLog(groupFullPath);
+        List<Repository> reconciled = new ArrayList<>();
+
+        try {
+            String reconCursor = null;
+            int reconPageCount = 0;
+
+            do {
+                // Canonical rate limit pattern: acquirePermission + waitIfRateLimitLow per page.
+                // This waits up to 70s for rate limit reset (GitLab resets every 60s) instead
+                // of skipping reconciliation — consistent with all other GitLab sync services.
+                graphQlClientProvider.acquirePermission();
+                try {
+                    graphQlClientProvider.waitIfRateLimitLow(scopeId);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    log.warn("Interrupted during reconciliation rate limit wait: groupPath={}", safeGroupPath);
+                    break;
+                }
+
+                int pageSize = adaptPageSize(
+                    GROUP_PROJECTS_PAGE_SIZE,
+                    graphQlClientProvider.getRateLimitRemaining(scopeId)
+                );
+                HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
+
+                ClientGraphQlResponse response = client
+                    .documentName(GET_GROUP_PROJECTS_DOCUMENT)
+                    .variable("fullPath", groupFullPath)
+                    .variable("first", pageSize)
+                    .variable("after", reconCursor)
+                    .variable("includeSubgroups", false)
+                    .execute()
+                    .block(gitLabProperties.extendedGraphqlTimeout());
+
+                if (response == null || !response.isValid()) {
+                    log.warn(
+                        "Reconciliation query failed: groupPath={}, page={}, errors={}",
+                        safeGroupPath,
+                        reconPageCount,
+                        response != null ? response.getErrors() : "null response"
+                    );
+                    graphQlClientProvider.recordFailure(new GitLabSyncException("Invalid GraphQL response"));
+                    break;
+                }
+
+                graphQlClientProvider.recordSuccess();
+
+                List<GitLabProjectResponse> projects = response
+                    .field("group.projects.nodes")
+                    .toEntityList(GitLabProjectResponse.class);
+
+                for (GitLabProjectResponse project : projects) {
+                    if (project == null || project.id() == null) {
+                        continue;
+                    }
+                    try {
+                        long nativeId = extractEntityId(project.id());
+                        if (seenNativeIds.contains(nativeId)) {
+                            continue;
+                        }
+                        // Direct projects belong to the top-level group
+                        Repository repo = projectProcessor.processGraphQlResponse(
+                            project,
+                            topLevelOrganization,
+                            provider
+                        );
+                        if (repo != null) {
+                            reconciled.add(repo);
+                            seenNativeIds.add(nativeId);
+                        }
+                    } catch (Exception e) {
+                        log.warn(
+                            "Failed to reconcile project: fullPath={}, error={}",
+                            sanitizeForLog(project.fullPath()),
+                            e.getMessage()
+                        );
+                    }
+                }
+
+                GitLabPageInfo pageInfo = response.field("group.projects.pageInfo").toEntity(GitLabPageInfo.class);
+
+                if (pageInfo == null || !pageInfo.hasNextPage()) {
+                    break;
+                }
+
+                reconCursor = pageInfo.endCursor();
+                if (reconCursor == null) {
+                    log.warn(
+                        "Reconciliation cursor null despite hasNextPage=true: groupPath={}, page={}",
+                        safeGroupPath,
+                        reconPageCount
+                    );
+                    break;
+                }
+                reconPageCount++;
+
+                Thread.sleep(gitLabProperties.paginationThrottle().toMillis());
+            } while (reconPageCount < MAX_PAGINATION_PAGES);
+
+            if (!reconciled.isEmpty()) {
+                log.warn(
+                    "Reconciliation recovered {} direct project(s) missing from includeSubgroups query: " +
+                        "groupPath={} (GitLab bug https://gitlab.com/gitlab-org/gitlab/-/issues/33419)",
+                    reconciled.size(),
+                    safeGroupPath
+                );
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.warn("Interrupted during reconciliation: groupPath={}", safeGroupPath);
+        } catch (Exception e) {
+            graphQlClientProvider.recordFailure(e);
+            log.warn("Reconciliation failed (primary sync results preserved): groupPath={}", safeGroupPath, e);
+        }
+
+        return reconciled;
     }
 
     /**

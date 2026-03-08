@@ -49,6 +49,7 @@ public class WorkspaceActivationService {
     private final WorkspaceRepository workspaceRepository;
     private final OrganizationRepository organizationRepository;
     private final RepositoryRepository repositoryRepository;
+    private final RepositoryToMonitorRepository repositoryToMonitorRepository;
 
     // Services
     private final NatsConsumerService natsConsumerService;
@@ -57,6 +58,7 @@ public class WorkspaceActivationService {
     // Lazy-loaded to break circular reference with sync services
     private final ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider;
     private final ObjectProvider<GitLabSyncServiceHolder> gitLabSyncServiceHolderProvider;
+    private final ObjectProvider<GitLabWebhookService> gitLabWebhookServiceProvider;
 
     // Infrastructure
     private final AsyncTaskExecutor monitoringExecutor;
@@ -67,10 +69,12 @@ public class WorkspaceActivationService {
         WorkspaceRepository workspaceRepository,
         OrganizationRepository organizationRepository,
         RepositoryRepository repositoryRepository,
+        RepositoryToMonitorRepository repositoryToMonitorRepository,
         NatsConsumerService natsConsumerService,
         WorkspaceScopeFilter workspaceScopeFilter,
         ObjectProvider<GitHubDataSyncService> gitHubDataSyncServiceProvider,
         ObjectProvider<GitLabSyncServiceHolder> gitLabSyncServiceHolderProvider,
+        ObjectProvider<GitLabWebhookService> gitLabWebhookServiceProvider,
         @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor
     ) {
         this.natsProperties = natsProperties;
@@ -78,10 +82,12 @@ public class WorkspaceActivationService {
         this.workspaceRepository = workspaceRepository;
         this.organizationRepository = organizationRepository;
         this.repositoryRepository = repositoryRepository;
+        this.repositoryToMonitorRepository = repositoryToMonitorRepository;
         this.natsConsumerService = natsConsumerService;
         this.workspaceScopeFilter = workspaceScopeFilter;
         this.gitHubDataSyncServiceProvider = gitHubDataSyncServiceProvider;
         this.gitLabSyncServiceHolderProvider = gitLabSyncServiceHolderProvider;
+        this.gitLabWebhookServiceProvider = gitLabWebhookServiceProvider;
         this.monitoringExecutor = monitoringExecutor;
     }
 
@@ -229,6 +235,23 @@ public class WorkspaceActivationService {
             WorkspaceContextHolder.setContext(workspaceContext);
             try {
                 if (workspace.getProviderType() == GitProviderType.GITLAB) {
+                    // Phase 0: Token rotation + webhook registration (before sync)
+                    // Runs before sync so the webhook is ready before any events arrive,
+                    // and token rotation ensures subsequent API calls use a fresh token.
+                    var webhookService = gitLabWebhookServiceProvider.getIfAvailable();
+                    if (webhookService != null) {
+                        // rotateTokenIfNeeded catches exceptions internally (non-fatal)
+                        webhookService.rotateTokenIfNeeded(workspace);
+
+                        var webhookResult = webhookService.registerWebhook(workspace);
+                        log.info(
+                            "Webhook setup: workspaceId={}, registered={}, reason={}",
+                            workspace.getId(),
+                            webhookResult.registered(),
+                            webhookResult.failureReason()
+                        );
+                    }
+
                     // GitLab: sync group and its projects via GraphQL
                     // Group metadata is extracted from the first page response (no extra API call)
                     var gitLabServices = gitLabSyncServiceHolderProvider.getIfAvailable();
@@ -245,16 +268,22 @@ public class WorkspaceActivationService {
                                 workspace.getAccountLogin()
                             );
                             log.info(
-                                "GitLab sync result: workspaceId={}, status={}, synced={}, failed={}, redacted={}, pages={}",
+                                "GitLab sync result: workspaceId={}, status={}, synced={}, failed={}, " +
+                                    "redacted={}, reconciled={}, pages={}",
                                 workspace.getId(),
                                 result.status(),
                                 result.synced().size(),
                                 result.projectsSkipped(),
                                 result.projectsRedacted(),
+                                result.projectsReconciled(),
                                 result.pagesCompleted()
                             );
                             // Link workspace to organization after sync (org was created during sync)
                             linkWorkspaceToOrganization(workspace);
+
+                            // Register synced repositories as monitored for this workspace.
+                            // This is analogous to ensureRepositoryMonitorForInstallation() for GitHub.
+                            ensureRepositoryMonitorsForGitLab(workspace, result.synced());
 
                             // Sync issues and merge requests for each project.
                             // lastSyncAt is updated ONCE per repo after ALL sync phases complete,
@@ -551,6 +580,41 @@ public class WorkspaceActivationService {
                         }
                     });
             });
+    }
+
+    /**
+     * Ensures each synced GitLab repository has a corresponding {@link RepositoryToMonitor} entry.
+     * Analogous to {@code ensureRepositoryMonitorForInstallation()} for GitHub App installations.
+     */
+    @Transactional
+    void ensureRepositoryMonitorsForGitLab(Workspace workspace, List<Repository> syncedRepos) {
+        // Bulk-fetch existing monitors to avoid N+1 queries
+        Set<String> existing = repositoryToMonitorRepository
+            .findByWorkspaceId(workspace.getId())
+            .stream()
+            .map(RepositoryToMonitor::getNameWithOwner)
+            .collect(java.util.stream.Collectors.toSet());
+
+        int created = 0;
+        for (Repository repo : syncedRepos) {
+            String nwo = repo.getNameWithOwner();
+            if (existing.contains(nwo)) {
+                continue;
+            }
+            RepositoryToMonitor monitor = new RepositoryToMonitor();
+            monitor.setNameWithOwner(nwo);
+            monitor.setWorkspace(workspace);
+            repositoryToMonitorRepository.save(monitor);
+            created++;
+        }
+        if (created > 0) {
+            log.info(
+                "Created repository monitors for GitLab workspace: workspaceId={}, created={}, total={}",
+                workspace.getId(),
+                created,
+                syncedRepos.size()
+            );
+        }
     }
 
     private boolean isBlank(String value) {

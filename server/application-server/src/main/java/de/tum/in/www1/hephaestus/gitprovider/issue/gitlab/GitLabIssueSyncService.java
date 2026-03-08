@@ -277,6 +277,7 @@ public class GitLabIssueSyncService {
         String updatedAt = node.get("updatedAt") != null ? node.get("updatedAt").toString() : null;
         String closedAt = node.get("closedAt") != null ? node.get("closedAt").toString() : null;
         int userNotesCount = node.get("userNotesCount") != null ? ((Number) node.get("userNotesCount")).intValue() : 0;
+        Integer milestoneIid = extractMilestoneIid(node);
 
         // Author
         String authorGlobalId = null,
@@ -384,7 +385,8 @@ public class GitLabIssueSyncService {
             authorWebUrl,
             userNotesCount,
             syncLabels,
-            syncAssignees
+            syncAssignees,
+            milestoneIid
         );
         Issue issue = issueProcessor.processFromSync(syncData, repository, scopeId);
 
@@ -398,6 +400,28 @@ public class GitLabIssueSyncService {
         }
 
         return issue;
+    }
+
+    // ========================================================================
+    // Milestone extraction
+    // ========================================================================
+
+    @SuppressWarnings("unchecked")
+    @Nullable
+    private static Integer extractMilestoneIid(Map<String, Object> node) {
+        Map<String, Object> milestone = (Map<String, Object>) node.get("milestone");
+        if (milestone == null) {
+            return null;
+        }
+        Object iid = milestone.get("iid");
+        if (iid == null) {
+            return null;
+        }
+        try {
+            return Integer.parseInt(iid.toString());
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     // ========================================================================

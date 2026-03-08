@@ -162,7 +162,7 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
         @NonNull ProcessingContext context
     ) {
         return reviewRepository
-            .findById(dto.id())
+            .findByNativeIdAndProviderId(dto.id(), context.providerId())
             .map(review -> updateReview(review, dto, context))
             .orElseGet(() -> createReview(dto, pr, context));
     }
@@ -170,20 +170,20 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
     /**
      * Process a review dismissal.
      *
-     * @param reviewId the ID of the review to dismiss
+     * @param reviewNativeId the native ID of the review to dismiss
      * @param context processing context with scope information
      */
     @Transactional
-    public void processDismissed(Long reviewId, @NonNull ProcessingContext context) {
+    public void processDismissed(Long reviewNativeId, @NonNull ProcessingContext context) {
         reviewRepository
-            .findById(reviewId)
+            .findByNativeIdAndProviderId(reviewNativeId, context.providerId())
             .ifPresent(review -> {
                 review.setDismissed(true);
                 review = reviewRepository.save(review);
                 EventPayload.ReviewData.from(review).ifPresent(reviewData ->
                     eventPublisher.publishEvent(new DomainEvent.ReviewDismissed(reviewData, EventContext.from(context)))
                 );
-                log.debug("Dismissed review: reviewId={}", reviewId);
+                log.debug("Dismissed review: nativeId={}", reviewNativeId);
             });
     }
 
@@ -233,7 +233,8 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
         @NonNull ProcessingContext context
     ) {
         PullRequestReview review = new PullRequestReview();
-        review.setId(dto.id());
+        review.setNativeId(dto.id());
+        review.setProvider(context.provider());
         review.setBody(dto.body());
         PullRequestReview.State newState = mapState(dto.state());
         if (newState == PullRequestReview.State.DISMISSED) {

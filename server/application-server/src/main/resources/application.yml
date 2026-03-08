@@ -1,7 +1,7 @@
 spring:
     application:
         name: Hephaestus
-        version: "0.23.1"
+        version: "0.25.1"
 
     config:
         import: optional:file:.env[.properties]
@@ -384,6 +384,18 @@ hephaestus:
         pagination-throttle: ${GITLAB_PAGINATION_THROTTLE:200ms}
         # Cache duration for token validation results (default: 5m)
         token-validation-cache-duration: ${GITLAB_TOKEN_CACHE_DURATION:5m}
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # WEBHOOK AUTO-REGISTRATION
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Shared secret with webhook-ingest for GitLab webhook auto-registration.
+    # Both services use the same WEBHOOK_SECRET: application-server registers
+    # webhooks with it, webhook-ingest verifies incoming payloads against it.
+    webhook:
+        external-url: ${WEBHOOK_EXTERNAL_URL:}
+        secret: ${WEBHOOK_SECRET:}
+        token-rotation-threshold-days: ${WEBHOOK_TOKEN_ROTATION_THRESHOLD_DAYS:7}
+        token-rotation-validity-days: ${WEBHOOK_TOKEN_ROTATION_VALIDITY_DAYS:90}
 
     # ═══════════════════════════════════════════════════════════════════════════
     # GITHUB AUTHENTICATION

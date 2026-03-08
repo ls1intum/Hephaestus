@@ -95,7 +95,7 @@ class GitLabLabelProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(result.getCreatedAt()).isNotNull();
             assertThat(result.getUpdatedAt()).isNotNull();
             assertThat(result.getLastSyncAt()).isNotNull();
-            assertThat(result.getId()).isNegative(); // deterministic ID
+            assertThat(result.getNativeId()).isNegative(); // deterministic ID
 
             assertThat(eventListener.getCreatedEvents()).hasSize(1);
         }

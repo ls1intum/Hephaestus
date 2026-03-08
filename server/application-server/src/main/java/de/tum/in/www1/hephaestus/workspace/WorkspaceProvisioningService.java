@@ -132,7 +132,7 @@ public class WorkspaceProvisioningService {
 
         workspace.setGitProviderMode(Workspace.GitProviderMode.PAT_ORG);
         workspace.setPersonalAccessToken(config.token());
-        workspace.setGithubRepositorySelection(RepositorySelection.SELECTED);
+        workspace.setRepositorySelection(RepositorySelection.SELECTED);
 
         Workspace savedWorkspace = workspaceRepository.save(workspace);
         log.info(

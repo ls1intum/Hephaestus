@@ -24,6 +24,8 @@ import de.tum.in.www1.hephaestus.gitprovider.common.spi.RepositoryScopeFilter;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.ScopeIdResolver;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
+import de.tum.in.www1.hephaestus.gitprovider.milestone.Milestone;
+import de.tum.in.www1.hephaestus.gitprovider.milestone.MilestoneRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.gitlab.dto.GitLabMergeRequestEventDTO;
@@ -84,6 +86,9 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
     private RepositoryScopeFilter repositoryScopeFilter;
 
     @Mock
+    private MilestoneRepository milestoneRepository;
+
+    @Mock
     private ApplicationEventPublisher eventPublisher;
 
     private GitLabMergeRequestProcessor processor;
@@ -103,6 +108,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         processor = new GitLabMergeRequestProcessor(
             pullRequestRepository,
             reviewRepository,
+            milestoneRepository,
             userRepository,
             labelRepository,
             repositoryRepository,
@@ -650,8 +656,10 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 Optional.of(approver)
             );
 
-            long expectedReviewId = GitLabMergeRequestProcessor.generateApprovalReviewId(RAW_MR_ID, RAW_APPROVER_ID);
-            when(reviewRepository.findById(expectedReviewId)).thenReturn(Optional.empty());
+            long expectedReviewId = GitLabMergeRequestProcessor.generateApprovalNativeId(RAW_MR_ID, RAW_APPROVER_ID);
+            when(reviewRepository.findByNativeIdAndProviderId(expectedReviewId, PROVIDER_ID)).thenReturn(
+                Optional.empty()
+            );
 
             GitLabMergeRequestEventDTO event = createApprovalEvent("approved", "opened");
             PullRequest result = processor.processApproved(event, createContext());
@@ -664,7 +672,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
             PullRequestReview savedReview = reviewCaptor.getValue();
             assertThat(savedReview.getState()).isEqualTo(PullRequestReview.State.APPROVED);
             assertThat(savedReview.getAuthor()).isEqualTo(approver);
-            assertThat(savedReview.getId()).isEqualTo(expectedReviewId);
+            assertThat(savedReview.getNativeId()).isEqualTo(expectedReviewId);
 
             ArgumentCaptor<Object> eventCaptor = ArgumentCaptor.forClass(Object.class);
             verify(eventPublisher, atLeastOnce()).publishEvent(eventCaptor.capture());
@@ -695,9 +703,9 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 Optional.of(approver)
             );
 
-            long expectedReviewId = GitLabMergeRequestProcessor.generateApprovalReviewId(RAW_MR_ID, RAW_APPROVER_ID);
+            long expectedNativeId = GitLabMergeRequestProcessor.generateApprovalNativeId(RAW_MR_ID, RAW_APPROVER_ID);
             PullRequestReview existingReview = new PullRequestReview();
-            existingReview.setId(expectedReviewId);
+            existingReview.setNativeId(expectedNativeId);
             existingReview.setState(PullRequestReview.State.APPROVED);
             existingReview.setHtmlUrl("https://gitlab.com/gitlab-org/gitlab/-/merge_requests/5#approvals");
             existingReview.setSubmittedAt(Instant.now());
@@ -705,7 +713,9 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
             existingReview.setPullRequest(pr);
             pr.getReviews().add(existingReview);
 
-            when(reviewRepository.findById(expectedReviewId)).thenReturn(Optional.of(existingReview));
+            when(reviewRepository.findByNativeIdAndProviderId(expectedNativeId, PROVIDER_ID)).thenReturn(
+                Optional.of(existingReview)
+            );
 
             GitLabMergeRequestEventDTO event = createApprovalEvent("unapproved", "opened");
             PullRequest result = processor.processUnapproved(event, createContext());
@@ -747,11 +757,13 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
             );
 
             // Review ALREADY exists — simulates duplicate approval webhook
-            long expectedReviewId = GitLabMergeRequestProcessor.generateApprovalReviewId(RAW_MR_ID, RAW_APPROVER_ID);
+            long expectedNativeId = GitLabMergeRequestProcessor.generateApprovalNativeId(RAW_MR_ID, RAW_APPROVER_ID);
             PullRequestReview existingReview = new PullRequestReview();
-            existingReview.setId(expectedReviewId);
+            existingReview.setNativeId(expectedNativeId);
             existingReview.setState(PullRequestReview.State.APPROVED);
-            when(reviewRepository.findById(expectedReviewId)).thenReturn(Optional.of(existingReview));
+            when(reviewRepository.findByNativeIdAndProviderId(expectedNativeId, PROVIDER_ID)).thenReturn(
+                Optional.of(existingReview)
+            );
 
             GitLabMergeRequestEventDTO event = createApprovalEvent("approved", "opened");
             PullRequest result = processor.processApproved(event, createContext());
@@ -780,8 +792,10 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
             );
 
             // No existing review — findById returns empty
-            long expectedReviewId = GitLabMergeRequestProcessor.generateApprovalReviewId(RAW_MR_ID, RAW_APPROVER_ID);
-            when(reviewRepository.findById(expectedReviewId)).thenReturn(Optional.empty());
+            long expectedReviewId = GitLabMergeRequestProcessor.generateApprovalNativeId(RAW_MR_ID, RAW_APPROVER_ID);
+            when(reviewRepository.findByNativeIdAndProviderId(expectedReviewId, PROVIDER_ID)).thenReturn(
+                Optional.empty()
+            );
 
             GitLabMergeRequestEventDTO event = createApprovalEvent("unapproved", "opened");
             PullRequest result = processor.processUnapproved(event, createContext());
@@ -1134,6 +1148,207 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         }
 
         @Test
+        @DisplayName("processFromSync() links milestone when milestoneIid is provided")
+        void processFromSyncLinksMilestone() {
+            PullRequest pr = createPullRequestEntity();
+            when(pullRequestRepository.findByRepositoryIdAndNumber(REPO_ID, MR_IID))
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.of(pr));
+
+            User author = createUserEntity();
+            when(userRepository.findByNativeIdAndProviderId(RAW_USER_ID, PROVIDER_ID)).thenReturn(Optional.of(author));
+
+            Milestone milestone = new Milestone();
+            milestone.setId(42L);
+            milestone.setNumber(3);
+            when(milestoneRepository.findByNumberAndRepositoryId(3, REPO_ID)).thenReturn(Optional.of(milestone));
+
+            var syncData = new GitLabMergeRequestProcessor.SyncMergeRequestData(
+                "gid://gitlab/MergeRequest/999555",
+                "5",
+                "Add awesome feature",
+                null,
+                "opened",
+                false,
+                null,
+                null,
+                false,
+                "https://gitlab.com/gitlab-org/gitlab/-/merge_requests/5",
+                null,
+                null,
+                null,
+                null,
+                0,
+                0,
+                0,
+                0,
+                "feature/awesome-feature",
+                "main",
+                null,
+                null,
+                false,
+                0,
+                "gid://gitlab/User/12345",
+                "testuser",
+                "Test User",
+                "https://gitlab.com/uploads/avatar.png",
+                "https://gitlab.com/testuser",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                3
+            );
+            processor.processFromSync(syncData, testRepo, 1L);
+
+            verify(pullRequestRepository).upsertCore(
+                eq(RAW_MR_ID),
+                eq(PROVIDER_ID),
+                eq(MR_IID),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                eq(REPO_ID),
+                eq(42L),
+                any(),
+                anyBoolean(),
+                anyBoolean(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any()
+            );
+        }
+
+        @Test
+        @DisplayName("processFromSync() passes null milestoneId when milestone not found")
+        void processFromSyncMilestoneNotFound() {
+            PullRequest pr = createPullRequestEntity();
+            when(pullRequestRepository.findByRepositoryIdAndNumber(REPO_ID, MR_IID))
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.of(pr));
+
+            User author = createUserEntity();
+            when(userRepository.findByNativeIdAndProviderId(RAW_USER_ID, PROVIDER_ID)).thenReturn(Optional.of(author));
+
+            when(milestoneRepository.findByNumberAndRepositoryId(99, REPO_ID)).thenReturn(Optional.empty());
+
+            var syncData = new GitLabMergeRequestProcessor.SyncMergeRequestData(
+                "gid://gitlab/MergeRequest/999555",
+                "5",
+                "Add awesome feature",
+                null,
+                "opened",
+                false,
+                null,
+                null,
+                false,
+                "https://gitlab.com/gitlab-org/gitlab/-/merge_requests/5",
+                null,
+                null,
+                null,
+                null,
+                0,
+                0,
+                0,
+                0,
+                "feature/awesome-feature",
+                "main",
+                null,
+                null,
+                false,
+                0,
+                "gid://gitlab/User/12345",
+                "testuser",
+                "Test User",
+                "https://gitlab.com/uploads/avatar.png",
+                "https://gitlab.com/testuser",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                99
+            );
+            processor.processFromSync(syncData, testRepo, 1L);
+
+            verify(pullRequestRepository).upsertCore(
+                eq(RAW_MR_ID),
+                eq(PROVIDER_ID),
+                eq(MR_IID),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                eq(REPO_ID),
+                eq((Long) null),
+                any(),
+                anyBoolean(),
+                anyBoolean(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+                any()
+            );
+        }
+
+        @Test
+        @DisplayName("processFromSync() skips milestone lookup when milestoneIid is null")
+        void processFromSyncNullMilestoneIid() {
+            PullRequest pr = createPullRequestEntity();
+            when(pullRequestRepository.findByRepositoryIdAndNumber(REPO_ID, MR_IID))
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.of(pr));
+
+            var syncData = createSyncData();
+            processor.processFromSync(syncData, testRepo, 1L);
+
+            verify(milestoneRepository, never()).findByNumberAndRepositoryId(anyInt(), anyLong());
+        }
+
+        @Test
         @DisplayName("processFromSync() with invalid globalId skips processing")
         void processFromSyncInvalidGlobalId() {
             var syncData = new GitLabMergeRequestProcessor.SyncMergeRequestData(
@@ -1161,6 +1376,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 null,
                 false,
                 0,
+                null,
                 null,
                 null,
                 null,
@@ -1222,6 +1438,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 null,
                 null,
                 null,
+                null,
                 null
             );
             PullRequest result = processor.processFromSync(syncData, testRepo, 1L);
@@ -1241,9 +1458,10 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
             staleApprover.setNativeId(99999L);
             staleApprover.setLogin("staleuser");
 
-            long staleReviewId = GitLabMergeRequestProcessor.generateApprovalReviewId(RAW_MR_ID, 99999L);
+            long staleNativeId = GitLabMergeRequestProcessor.generateApprovalNativeId(RAW_MR_ID, 99999L);
             PullRequestReview staleReview = new PullRequestReview();
-            staleReview.setId(staleReviewId);
+            staleReview.setNativeId(staleNativeId);
+            staleReview.setProvider(gitLabProvider);
             staleReview.setState(PullRequestReview.State.APPROVED);
             staleReview.setHtmlUrl("https://gitlab.com/gitlab-org/gitlab/-/merge_requests/5#approvals");
             staleReview.setSubmittedAt(Instant.now());
@@ -1313,7 +1531,8 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                         "https://gitlab.com/uploads/avatar.png",
                         "https://gitlab.com/reviewer1"
                     )
-                )
+                ),
+                null
             );
             processor.processFromSync(syncData, testRepo, 1L);
 
@@ -1482,6 +1701,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 null,
                 null,
                 null,
+                null,
                 null
             );
             processor.processFromSync(syncData, testRepo, 1L);
@@ -1532,15 +1752,15 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
     class ApprovalReviewIdGeneration {
 
         @Test
-        @DisplayName("generates unique negative IDs for different (mr, user) pairs")
+        @DisplayName("generates unique IDs for different (mr, user) pairs")
         void uniqueIdsForDifferentPairs() {
-            long id1 = GitLabMergeRequestProcessor.generateApprovalReviewId(100, 200);
-            long id2 = GitLabMergeRequestProcessor.generateApprovalReviewId(100, 201);
-            long id3 = GitLabMergeRequestProcessor.generateApprovalReviewId(101, 200);
+            long id1 = GitLabMergeRequestProcessor.generateApprovalNativeId(100, 200);
+            long id2 = GitLabMergeRequestProcessor.generateApprovalNativeId(100, 201);
+            long id3 = GitLabMergeRequestProcessor.generateApprovalNativeId(101, 200);
 
-            assertThat(id1).isNegative();
-            assertThat(id2).isNegative();
-            assertThat(id3).isNegative();
+            assertThat(id1).isPositive();
+            assertThat(id2).isPositive();
+            assertThat(id3).isPositive();
             assertThat(id1).isNotEqualTo(id2).isNotEqualTo(id3);
             assertThat(id2).isNotEqualTo(id3);
         }
@@ -1548,25 +1768,27 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         @Test
         @DisplayName("deterministic: same inputs produce same output")
         void deterministicOutput() {
-            long id1 = GitLabMergeRequestProcessor.generateApprovalReviewId(999555, 12345);
-            long id2 = GitLabMergeRequestProcessor.generateApprovalReviewId(999555, 12345);
+            long id1 = GitLabMergeRequestProcessor.generateApprovalNativeId(999555, 12345);
+            long id2 = GitLabMergeRequestProcessor.generateApprovalNativeId(999555, 12345);
             assertThat(id1).isEqualTo(id2);
         }
 
         @Test
-        @DisplayName("always negative for max 32-bit MR ID (2^32 - 1)")
-        void alwaysNegativeForMax32BitMrId() {
+        @DisplayName("result is always positive even for max 32-bit MR ID (sign bit cleared)")
+        void alwaysPositiveForMax32BitMrId() {
             long maxSafe = (1L << 32) - 1; // 4294967295
-            long id = GitLabMergeRequestProcessor.generateApprovalReviewId(maxSafe, 1);
-            assertThat(id).isNegative();
+            long id = GitLabMergeRequestProcessor.generateApprovalNativeId(maxSafe, 1);
+            // (0xFFFFFFFF << 32) | 1 would set sign bit, but & Long.MAX_VALUE clears it
+            assertThat(id).isPositive();
         }
 
         @Test
-        @DisplayName("safe for max 32-bit user ID (2^32 - 1)")
-        void safeForMax32BitUserId() {
+        @DisplayName("result is positive for max 32-bit user ID with small MR ID")
+        void positiveForMax32BitUserId() {
             long maxUser = (1L << 32) - 1; // 4294967295
-            long id = GitLabMergeRequestProcessor.generateApprovalReviewId(1, maxUser);
-            assertThat(id).isNegative();
+            long id = GitLabMergeRequestProcessor.generateApprovalNativeId(1, maxUser);
+            // (1 << 32) | 0xFFFFFFFF = 0x1_FFFFFFFF which is positive
+            assertThat(id).isPositive();
         }
     }
 
@@ -1796,6 +2018,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
             "Test User",
             "https://gitlab.com/uploads/avatar.png",
             "https://gitlab.com/testuser",
+            null,
             null,
             null,
             null,

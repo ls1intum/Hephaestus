@@ -812,7 +812,8 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
      */
     private Label createLabel(String name, String color, Repository labelRepository) {
         Label newLabel = new Label();
-        newLabel.setId(entityIdGenerator.incrementAndGet());
+        newLabel.setNativeId(entityIdGenerator.incrementAndGet());
+        newLabel.setProvider(ensureGitHubProvider());
         newLabel.setName(name);
         newLabel.setColor(color);
         newLabel.setDescription("Test label: " + name);

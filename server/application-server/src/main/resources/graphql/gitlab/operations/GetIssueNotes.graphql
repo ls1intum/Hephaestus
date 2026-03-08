@@ -13,9 +13,6 @@ query GetIssueNotes($fullPath: ID!, $iid: String!, $first: Int!, $after: String)
                     system
                     internal
                     url
-                    position {
-                        filePath
-                    }
                     author {
                         ...GitLabUserFields
                     }

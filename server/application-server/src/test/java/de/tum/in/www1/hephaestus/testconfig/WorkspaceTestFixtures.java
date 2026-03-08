@@ -69,7 +69,7 @@ public final class WorkspaceTestFixtures {
         }
 
         public WorkspaceBuilder withRepositorySelection(RepositorySelection selection) {
-            workspace.setGithubRepositorySelection(selection);
+            workspace.setRepositorySelection(selection);
             return this;
         }
 

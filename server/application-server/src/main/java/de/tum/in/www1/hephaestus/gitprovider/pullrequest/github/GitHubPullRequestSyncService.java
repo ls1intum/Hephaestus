@@ -106,7 +106,7 @@ public class GitHubPullRequestSyncService {
      * If a transaction is rolled back, the PR entity is detached but the ID
      * allows us to verify the PR exists before syncing reviews.
      */
-    private record PullRequestWithReviewCursor(Long pullRequestId, String reviewCursor) {}
+    private record PullRequestWithReviewCursor(Long pullRequestId, String reviewCursor, int inlineCount) {}
 
     /**
      * Container for PRs that need additional review thread/comment pagination.
@@ -714,7 +714,8 @@ public class GitHubPullRequestSyncService {
                 int additionalReviews = reviewSyncService.syncRemainingReviews(
                     scopeId,
                     pr,
-                    prWithCursor.reviewCursor()
+                    prWithCursor.reviewCursor(),
+                    prWithCursor.inlineCount()
                 );
                 totalReviewsSynced += additionalReviews;
             }
@@ -863,7 +864,11 @@ public class GitHubPullRequestSyncService {
             // Store PR ID instead of entity reference to survive transaction rollbacks
             if (embeddedReviews.needsPagination()) {
                 prsNeedingReviewPagination.add(
-                    new PullRequestWithReviewCursor(entity.getId(), embeddedReviews.endCursor())
+                    new PullRequestWithReviewCursor(
+                        entity.getId(),
+                        embeddedReviews.endCursor(),
+                        embeddedReviews.reviews().size()
+                    )
                 );
             }
 

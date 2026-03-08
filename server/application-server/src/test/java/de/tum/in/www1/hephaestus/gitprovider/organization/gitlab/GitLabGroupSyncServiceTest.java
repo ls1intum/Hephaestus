@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -253,10 +254,8 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
             when(groupProcessor.process(any(), anyLong())).thenReturn(org);
             when(graphQlClientProvider.getRateLimitRemaining(1L)).thenReturn(100);
 
-            Repository repo1 = new Repository();
-            repo1.setId(10L);
-            Repository repo2 = new Repository();
-            repo2.setId(20L);
+            Repository repo1 = createTestRepository(10L);
+            Repository repo2 = createTestRepository(20L);
             when(projectProcessor.processGraphQlResponse(eq(proj1), any(), any())).thenReturn(repo1);
             when(projectProcessor.processGraphQlResponse(eq(proj2), any(), any())).thenReturn(repo2);
 
@@ -267,6 +266,7 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
             assertThat(result.synced()).extracting(Repository::getId).containsExactly(10L, 20L);
             assertThat(result.projectsSkipped()).isZero();
             assertThat(result.projectsRedacted()).isZero();
+            assertThat(result.projectsReconciled()).isZero();
         }
 
         @Test
@@ -286,10 +286,8 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
             when(groupProcessor.process(any(), anyLong())).thenReturn(org);
             when(graphQlClientProvider.getRateLimitRemaining(1L)).thenReturn(100);
 
-            Repository repo1 = new Repository();
-            repo1.setId(10L);
-            Repository repo2 = new Repository();
-            repo2.setId(20L);
+            Repository repo1 = createTestRepository(10L);
+            Repository repo2 = createTestRepository(20L);
             when(projectProcessor.processGraphQlResponse(eq(proj1), any(), any())).thenReturn(repo1);
             when(projectProcessor.processGraphQlResponse(eq(proj2), any(), any())).thenReturn(repo2);
 
@@ -313,8 +311,7 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
             when(groupProcessor.process(any(), anyLong())).thenReturn(org);
             when(graphQlClientProvider.getRateLimitRemaining(1L)).thenReturn(100);
 
-            Repository repo1 = new Repository();
-            repo1.setId(10L);
+            Repository repo1 = createTestRepository(10L);
             when(projectProcessor.processGraphQlResponse(eq(proj1), any(), any())).thenReturn(repo1);
             when(projectProcessor.processGraphQlResponse(eq(proj2), any(), any())).thenReturn(null);
 
@@ -338,8 +335,7 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
             when(groupProcessor.process(any(), anyLong())).thenReturn(org);
             when(graphQlClientProvider.getRateLimitRemaining(1L)).thenReturn(100);
 
-            Repository repo2 = new Repository();
-            repo2.setId(20L);
+            Repository repo2 = createTestRepository(20L);
             when(projectProcessor.processGraphQlResponse(eq(proj1), any(), any())).thenThrow(
                 new RuntimeException("DB error")
             );
@@ -354,8 +350,8 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("null nodes from GitLab access restrictions are counted as redacted, not errors")
-        void nullNodes_countedAsRedacted_notErrors() {
+        @DisplayName("null nodes from GitLab timeouts produce COMPLETED_WITH_ERRORS")
+        void nullNodes_countedAsRedacted_producesErrors() {
             var proj1 = createMinimalProject("gid://gitlab/Project/10", "my-org/proj-a", "proj-a");
 
             // Simulate GitLab returning [proj1, null, null] — 2 null nodes due to access restrictions
@@ -371,14 +367,13 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
             when(groupProcessor.process(any(), anyLong())).thenReturn(org);
             when(graphQlClientProvider.getRateLimitRemaining(1L)).thenReturn(100);
 
-            Repository repo1 = new Repository();
-            repo1.setId(10L);
+            Repository repo1 = createTestRepository(10L);
             when(projectProcessor.processGraphQlResponse(eq(proj1), any(), any())).thenReturn(repo1);
 
             GitLabSyncResult result = service.syncGroupProjects(1L, "my-org");
 
-            // Redacted nodes should NOT cause COMPLETED_WITH_ERRORS
-            assertThat(result.status()).isEqualTo(GitLabSyncResult.Status.COMPLETED);
+            // Redacted nodes indicate data loss and should produce COMPLETED_WITH_ERRORS
+            assertThat(result.status()).isEqualTo(GitLabSyncResult.Status.COMPLETED_WITH_ERRORS);
             assertThat(result.synced()).hasSize(1);
             assertThat(result.projectsSkipped()).isZero();
             assertThat(result.projectsRedacted()).isEqualTo(2);
@@ -426,8 +421,7 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
             when(groupProcessor.process(eq(subGroupResponse), anyLong())).thenReturn(subOrg);
             when(graphQlClientProvider.getRateLimitRemaining(1L)).thenReturn(100);
 
-            Repository repo1 = new Repository();
-            repo1.setId(10L);
+            Repository repo1 = createTestRepository(10L);
             when(projectProcessor.processGraphQlResponse(eq(proj1), eq(subOrg), any())).thenReturn(repo1);
 
             GitLabSyncResult result = service.syncGroupProjects(1L, "my-org");
@@ -459,7 +453,187 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
             assertThat(result.status()).isEqualTo(GitLabSyncResult.Status.ABORTED_ERROR);
         }
 
+        // -- Reconciliation Tests (GitLab #33419 workaround) --
+
+        @Test
+        @DisplayName("reconciliation recovers direct projects dropped by includeSubgroups bug")
+        void reconciliation_recoversDroppedDirectProjects() {
+            // Subgroup query returns only proj-a (simulates bug dropping proj-b)
+            var projA = createMinimalProject("gid://gitlab/Project/10", "my-org/proj-a", "proj-a");
+            var projB = createMinimalProject("gid://gitlab/Project/20", "my-org/proj-b", "proj-b");
+
+            // Phase 1: includeSubgroups=true — returns only projA (bug drops projB)
+            ClientGraphQlResponse mainPage = mockProjectsPageWithGroup(List.of(projA), null);
+            // Phase 2: includeSubgroups=false — returns both projA and projB
+            ClientGraphQlResponse reconPage = mockProjectsPage(List.of(projA, projB), null);
+
+            HttpGraphQlClient client = mockClient();
+            mockSequentialExecute(client, mainPage, reconPage);
+            when(groupProcessor.process(any(), anyLong())).thenReturn(org);
+            when(graphQlClientProvider.getRateLimitRemaining(1L)).thenReturn(100);
+
+            Repository repoA = createTestRepository(10L);
+            Repository repoB = createTestRepository(20L);
+            when(projectProcessor.processGraphQlResponse(eq(projA), any(), any())).thenReturn(repoA);
+            when(projectProcessor.processGraphQlResponse(eq(projB), any(), any())).thenReturn(repoB);
+
+            GitLabSyncResult result = service.syncGroupProjects(1L, "my-org");
+
+            assertThat(result.status()).isEqualTo(GitLabSyncResult.Status.COMPLETED);
+            assertThat(result.synced()).hasSize(2);
+            assertThat(result.synced()).extracting(Repository::getNativeId).containsExactlyInAnyOrder(10L, 20L);
+            assertThat(result.projectsReconciled()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("no reconciliation needed when all projects present in subgroup query")
+        void noReconciliationNeeded_whenAllProjectsPresent() {
+            var projA = createMinimalProject("gid://gitlab/Project/10", "my-org/proj-a", "proj-a");
+            var projB = createMinimalProject("gid://gitlab/Project/20", "my-org/proj-b", "proj-b");
+
+            // Phase 1: returns both projects
+            ClientGraphQlResponse mainPage = mockProjectsPageWithGroup(List.of(projA, projB), null);
+            // Phase 2: returns same projects (all duplicates, nothing to reconcile)
+            ClientGraphQlResponse reconPage = mockProjectsPage(List.of(projA, projB), null);
+
+            HttpGraphQlClient client = mockClient();
+            mockSequentialExecute(client, mainPage, reconPage);
+            when(groupProcessor.process(any(), anyLong())).thenReturn(org);
+            when(graphQlClientProvider.getRateLimitRemaining(1L)).thenReturn(100);
+
+            Repository repoA = createTestRepository(10L);
+            Repository repoB = createTestRepository(20L);
+            when(projectProcessor.processGraphQlResponse(eq(projA), any(), any())).thenReturn(repoA);
+            when(projectProcessor.processGraphQlResponse(eq(projB), any(), any())).thenReturn(repoB);
+
+            GitLabSyncResult result = service.syncGroupProjects(1L, "my-org");
+
+            assertThat(result.status()).isEqualTo(GitLabSyncResult.Status.COMPLETED);
+            assertThat(result.synced()).hasSize(2);
+            assertThat(result.projectsReconciled()).isZero();
+        }
+
+        @Test
+        @DisplayName("subgroup query succeeds but reconciliation fails gracefully")
+        void subgroupSucceeds_reconciliationFails_preservesSubgroupResults() {
+            var projA = createMinimalProject("gid://gitlab/Project/10", "my-org/proj-a", "proj-a");
+
+            // Phase 1: succeeds
+            ClientGraphQlResponse mainPage = mockProjectsPageWithGroup(List.of(projA), null);
+            // Phase 2: invalid response
+            ClientGraphQlResponse reconPage = mock(ClientGraphQlResponse.class);
+            when(reconPage.isValid()).thenReturn(false);
+            when(reconPage.getErrors()).thenReturn(List.of());
+
+            HttpGraphQlClient client = mockClient();
+            mockSequentialExecute(client, mainPage, reconPage);
+            when(groupProcessor.process(any(), anyLong())).thenReturn(org);
+            when(graphQlClientProvider.getRateLimitRemaining(1L)).thenReturn(100);
+
+            Repository repoA = createTestRepository(10L);
+            when(projectProcessor.processGraphQlResponse(eq(projA), any(), any())).thenReturn(repoA);
+
+            GitLabSyncResult result = service.syncGroupProjects(1L, "my-org");
+
+            // Primary results preserved despite reconciliation failure
+            assertThat(result.status()).isEqualTo(GitLabSyncResult.Status.COMPLETED);
+            assertThat(result.synced()).hasSize(1);
+            assertThat(result.projectsReconciled()).isZero();
+        }
+
+        @Test
+        @DisplayName("reconciliation waits for rate limit reset then proceeds")
+        void reconciliationWaitsForRateLimit_thenProceeds() throws InterruptedException {
+            var projA = createMinimalProject("gid://gitlab/Project/10", "my-org/proj-a", "proj-a");
+            var projB = createMinimalProject("gid://gitlab/Project/20", "my-org/proj-b", "proj-b");
+
+            // Phase 1: returns only projA (bug drops projB)
+            ClientGraphQlResponse mainPage = mockProjectsPageWithGroup(List.of(projA), null);
+            // Phase 2: reconciliation finds projB after rate limit wait
+            ClientGraphQlResponse reconPage = mockProjectsPage(List.of(projA, projB), null);
+
+            HttpGraphQlClient client = mockClient();
+            mockSequentialExecute(client, mainPage, reconPage);
+            when(groupProcessor.process(any(), anyLong())).thenReturn(org);
+            when(graphQlClientProvider.getRateLimitRemaining(1L)).thenReturn(100);
+            // waitIfRateLimitLow is called unconditionally — it handles the wait internally
+            when(graphQlClientProvider.waitIfRateLimitLow(1L)).thenReturn(true);
+
+            Repository repoA = createTestRepository(10L);
+            Repository repoB = createTestRepository(20L);
+            when(projectProcessor.processGraphQlResponse(eq(projA), any(), any())).thenReturn(repoA);
+            when(projectProcessor.processGraphQlResponse(eq(projB), any(), any())).thenReturn(repoB);
+
+            GitLabSyncResult result = service.syncGroupProjects(1L, "my-org");
+
+            assertThat(result.status()).isEqualTo(GitLabSyncResult.Status.COMPLETED);
+            assertThat(result.synced()).hasSize(2);
+            assertThat(result.projectsReconciled()).isEqualTo(1);
+            // Verify canonical rate limit pattern: waitIfRateLimitLow called during reconciliation
+            verify(graphQlClientProvider, atLeast(1)).waitIfRateLimitLow(1L);
+            // Verify circuit breaker checked per page during reconciliation
+            verify(graphQlClientProvider, atLeast(2)).acquirePermission();
+        }
+
+        @Test
+        @DisplayName("extreme bug: all projects only in direct query")
+        void allProjectsOnlyInDirect_extremeBugManifestation() {
+            var projA = createMinimalProject("gid://gitlab/Project/10", "my-org/proj-a", "proj-a");
+            var projB = createMinimalProject("gid://gitlab/Project/20", "my-org/proj-b", "proj-b");
+
+            // Phase 1: includeSubgroups=true returns empty (extreme bug)
+            ClientGraphQlResponse mainPage = mockProjectsPageWithGroup(List.of(), null);
+            // Phase 2: includeSubgroups=false returns all direct projects
+            ClientGraphQlResponse reconPage = mockProjectsPage(List.of(projA, projB), null);
+
+            HttpGraphQlClient client = mockClient();
+            mockSequentialExecute(client, mainPage, reconPage);
+            when(groupProcessor.process(any(), anyLong())).thenReturn(org);
+            when(graphQlClientProvider.getRateLimitRemaining(1L)).thenReturn(100);
+
+            Repository repoA = createTestRepository(10L);
+            Repository repoB = createTestRepository(20L);
+            when(projectProcessor.processGraphQlResponse(eq(projA), any(), any())).thenReturn(repoA);
+            when(projectProcessor.processGraphQlResponse(eq(projB), any(), any())).thenReturn(repoB);
+
+            GitLabSyncResult result = service.syncGroupProjects(1L, "my-org");
+
+            assertThat(result.status()).isEqualTo(GitLabSyncResult.Status.COMPLETED);
+            assertThat(result.synced()).hasSize(2);
+            assertThat(result.projectsReconciled()).isEqualTo(2);
+        }
+
+        @Test
+        @DisplayName("reconciliation skipped when primary sync had API failure")
+        void reconciliationSkipped_whenPrimarySyncHadApiFailure() {
+            HttpGraphQlClient client = mockClient();
+            ClientGraphQlResponse invalidResp = mock(ClientGraphQlResponse.class);
+            when(invalidResp.isValid()).thenReturn(false);
+            when(invalidResp.getErrors()).thenReturn(List.of());
+
+            HttpGraphQlClient.RequestSpec requestSpec = mock(HttpGraphQlClient.RequestSpec.class);
+            when(client.documentName(anyString())).thenReturn(requestSpec);
+            when(requestSpec.variable(anyString(), any())).thenReturn(requestSpec);
+            when(requestSpec.execute()).thenReturn(Mono.just(invalidResp));
+
+            when(graphQlClientProvider.getRateLimitRemaining(1L)).thenReturn(100);
+
+            GitLabSyncResult result = service.syncGroupProjects(1L, "my-org");
+
+            // API failure → hadApiFailure=true → reconciliation not attempted
+            assertThat(result.status()).isEqualTo(GitLabSyncResult.Status.ABORTED_ERROR);
+            assertThat(result.synced()).isEmpty();
+            assertThat(result.projectsReconciled()).isZero();
+        }
+
         // -- SyncGroupProjects Helpers --
+
+        private static Repository createTestRepository(long nativeId) {
+            Repository repo = new Repository();
+            repo.setId(nativeId);
+            repo.setNativeId(nativeId);
+            return repo;
+        }
 
         private static final GitLabGroupResponse DEFAULT_GROUP = new GitLabGroupResponse(
             "gid://gitlab/Group/1",

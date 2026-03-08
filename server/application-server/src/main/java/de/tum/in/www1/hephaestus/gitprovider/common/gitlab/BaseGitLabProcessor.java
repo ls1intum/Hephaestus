@@ -27,6 +27,7 @@ import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.lang.Nullable;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Base class for GitLab entity processors with shared helper methods.
@@ -124,7 +125,12 @@ public abstract class BaseGitLabProcessor {
      * Finds or creates a user from GraphQL data (id, username, name, avatarUrl, webUrl).
      * <p>
      * Public because sync services need to resolve users from GraphQL response data.
+     * {@code @Transactional} is required because the underlying {@code upsertUser} is a
+     * {@code @Modifying} native query. This method is called through the Spring proxy
+     * from external beans (e.g. {@code GitLabDiscussionSyncService}), so the annotation
+     * is effective.
      */
+    @Transactional
     @Nullable
     public User findOrCreateUser(
         String globalId,
@@ -184,22 +190,22 @@ public abstract class BaseGitLabProcessor {
             return existing.get();
         }
 
-        Long labelId =
+        long nativeId =
             dto.id() != null
                 ? GitLabSyncConstants.toEntityId(dto.id())
                 : generateDeterministicLabelId(repository.getId(), dto.title());
+        Long providerId = repository.getProvider().getId();
 
-        int inserted = labelRepository.insertIfAbsent(labelId, dto.title(), dto.color(), repository.getId());
-        if (inserted == 0) {
-            return labelRepository.findByRepositoryIdAndName(repository.getId(), dto.title()).orElse(null);
-        }
-        return labelRepository.findById(labelId).orElse(null);
+        labelRepository.insertIfAbsent(nativeId, providerId, dto.title(), dto.color(), repository.getId());
+        return labelRepository.findByRepositoryIdAndName(repository.getId(), dto.title()).orElse(null);
     }
 
     /**
      * Finds or creates a label from GraphQL data (title, color).
      * <p>
      * Public because sync services need to resolve labels from GraphQL response data.
+     * {@code @Transactional} is required because the underlying {@code insertIfAbsent}
+     * is a native query that needs an active transaction.
      * <p>
      * Uses deterministic composite IDs based on (repositoryId, labelName) rather than
      * GitLab global IDs. GitLab group-level labels share the same global ID across all
@@ -207,6 +213,7 @@ public abstract class BaseGitLabProcessor {
      * global ID would cause primary key collisions when the same label appears in
      * multiple projects.
      */
+    @Transactional
     @Nullable
     public Label findOrCreateLabel(@Nullable String title, @Nullable String color, Repository repository) {
         if (title == null || title.isBlank()) {
@@ -218,13 +225,11 @@ public abstract class BaseGitLabProcessor {
             return existing.get();
         }
 
-        Long labelId = generateDeterministicLabelId(repository.getId(), title);
+        long nativeId = generateDeterministicLabelId(repository.getId(), title);
+        Long providerId = repository.getProvider().getId();
 
-        int inserted = labelRepository.insertIfAbsent(labelId, title, color, repository.getId());
-        if (inserted == 0) {
-            return labelRepository.findByRepositoryIdAndName(repository.getId(), title).orElse(null);
-        }
-        return labelRepository.findById(labelId).orElse(null);
+        labelRepository.insertIfAbsent(nativeId, providerId, title, color, repository.getId());
+        return labelRepository.findByRepositoryIdAndName(repository.getId(), title).orElse(null);
     }
 
     /** Produces a negative deterministic ID from (repositoryId, labelName) to avoid collisions with real label IDs. */

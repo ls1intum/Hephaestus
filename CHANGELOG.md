@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.25.1](https://github.com/ls1intum/Hephaestus/compare/v0.25.0...v0.25.1) (2026-03-08)
+
+### 🐛 Bug Fixes
+
+* **gitprovider:** workaround for GitLab includeSubgroups bug dropping direct projects ([#809](https://github.com/ls1intum/Hephaestus/issues/809)) ([68406ba](https://github.com/ls1intum/Hephaestus/commit/68406ba3b67d1017e49b762ed6a098d7205adc55))
+
+### ♻️ Code Refactoring
+
+* **db:** rename github_id to remote_id, add provider_type discriminator ([#808](https://github.com/ls1intum/Hephaestus/issues/808)) ([8debddc](https://github.com/ls1intum/Hephaestus/commit/8debddc2b0a8952600566391fad14bf82f952805))
+
+## [0.25.0](https://github.com/ls1intum/Hephaestus/compare/v0.24.0...v0.25.0) (2026-03-07)
+
+### 🚀 Features
+
+* **workspace:** GitLab webhook auto-registration ([#804](https://github.com/ls1intum/Hephaestus/issues/804)) ([460e273](https://github.com/ls1intum/Hephaestus/commit/460e27345ce390443688cb0f867bcc5653a363d0))
+* **workspace:** GitLab workspace deletion and cleanup ([#805](https://github.com/ls1intum/Hephaestus/issues/805)) ([0649c6c](https://github.com/ls1intum/Hephaestus/commit/0649c6c62a0d2a02285fdade7b3ec90f31bb2524))
+
+## [0.24.0](https://github.com/ls1intum/Hephaestus/compare/v0.23.1...v0.24.0) (2026-03-05)
+
+### 🚀 Features
+
+* **workspace:** GitLab workspace creation API ([#797](https://github.com/ls1intum/Hephaestus/issues/797)) ([c961169](https://github.com/ls1intum/Hephaestus/commit/c9611692381e449b6703ae9cdcee761aa21b7100))
+
 ## [0.23.1](https://github.com/ls1intum/Hephaestus/compare/v0.23.0...v0.23.1) (2026-03-04)
 
 ### 🐛 Bug Fixes

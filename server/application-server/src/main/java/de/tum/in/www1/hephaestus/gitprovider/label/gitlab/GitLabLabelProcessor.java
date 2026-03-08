@@ -72,7 +72,8 @@ public class GitLabLabelProcessor {
         Label label = existingOpt.orElseGet(Label::new);
 
         if (isNew) {
-            label.setId(LabelIdUtils.generateDeterministicId(repository.getId(), dto.title()));
+            label.setNativeId(LabelIdUtils.generateDeterministicId(repository.getId(), dto.title()));
+            label.setProvider(repository.getProvider());
         }
         label.setName(dto.title());
         if (dto.color() != null) {

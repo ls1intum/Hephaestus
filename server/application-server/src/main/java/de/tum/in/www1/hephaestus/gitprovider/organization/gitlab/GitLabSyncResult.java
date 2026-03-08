@@ -10,18 +10,21 @@ import java.util.List;
  * Provides structured feedback about the sync outcome, including partial success
  * scenarios where some projects were synced but others failed.
  *
- * @param status            the overall sync outcome
- * @param synced            successfully synced repositories (unmodifiable)
- * @param pagesCompleted    number of pagination pages successfully fetched
- * @param projectsSkipped   number of individual projects that failed to process
- * @param projectsRedacted  number of projects returned as null by GitLab due to access restrictions
+ * @param status              the overall sync outcome
+ * @param synced              successfully synced repositories (unmodifiable)
+ * @param pagesCompleted      number of pagination pages successfully fetched
+ * @param projectsSkipped     number of individual projects that failed to process
+ * @param projectsRedacted    number of projects returned as null by GitLab due to access restrictions
+ * @param projectsReconciled  number of direct projects recovered by the reconciliation pass
+ *                            (workaround for <a href="https://gitlab.com/gitlab-org/gitlab/-/issues/33419">GitLab #33419</a>)
  */
 public record GitLabSyncResult(
     Status status,
     List<Repository> synced,
     int pagesCompleted,
     int projectsSkipped,
-    int projectsRedacted
+    int projectsRedacted,
+    int projectsReconciled
 ) {
     public enum Status {
         /** All projects synced successfully. */
@@ -35,13 +38,19 @@ public record GitLabSyncResult(
     }
 
     /** Successful sync with no errors. */
-    public static GitLabSyncResult completed(List<Repository> synced, int pagesCompleted, int projectsRedacted) {
+    public static GitLabSyncResult completed(
+        List<Repository> synced,
+        int pagesCompleted,
+        int projectsRedacted,
+        int projectsReconciled
+    ) {
         return new GitLabSyncResult(
             Status.COMPLETED,
             Collections.unmodifiableList(synced),
             pagesCompleted,
             0,
-            projectsRedacted
+            projectsRedacted,
+            projectsReconciled
         );
     }
 
@@ -50,14 +59,16 @@ public record GitLabSyncResult(
         List<Repository> synced,
         int pagesCompleted,
         int projectsSkipped,
-        int projectsRedacted
+        int projectsRedacted,
+        int projectsReconciled
     ) {
         return new GitLabSyncResult(
             Status.COMPLETED_WITH_ERRORS,
             Collections.unmodifiableList(synced),
             pagesCompleted,
             projectsSkipped,
-            projectsRedacted
+            projectsRedacted,
+            projectsReconciled
         );
     }
 
@@ -73,6 +84,7 @@ public record GitLabSyncResult(
             Collections.unmodifiableList(syncedSoFar),
             pagesCompleted,
             projectsSkipped,
+            0,
             0
         );
     }
