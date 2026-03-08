@@ -1,6 +1,6 @@
 import {
 	ClockIcon,
-	CommentIcon,
+	CodeReviewIcon,
 	EyeClosedIcon,
 	GitCommitIcon,
 	GitPullRequestIcon,
@@ -29,7 +29,7 @@ export const categoryLabels = {
 export const defaultCategoryIcons = {
 	pull_requests: GitPullRequestIcon,
 	commits: GitCommitIcon,
-	communication: CommentIcon,
+	communication: CodeReviewIcon,
 	issues: IssueOpenedIcon,
 	milestones: MilestoneIcon,
 } as const satisfies Record<AchievementCategory, React.ElementType>;

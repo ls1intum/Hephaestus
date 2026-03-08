@@ -1,4 +1,15 @@
-import { CodeReviewIcon } from "@primer/octicons-react";
+import { IssueClosedIcon, IssueOpenedIcon } from "@primer/octicons-react";
+import {
+	Clock1Icon,
+	ClockFadingIcon,
+	DropletsIcon,
+	LanguagesIcon,
+	LibraryIcon,
+	MoonStarIcon,
+	PocketKnifeIcon,
+	ScanEyeIcon,
+} from "lucide-react";
+import { SingularityIcon } from "@/components/achievements/singularity-icon.tsx";
 import { defaultCategoryIcons } from "@/components/achievements/styles.ts";
 import type { AchievementDisplay, AchievementId } from "@/components/achievements/types.ts";
 
@@ -6,72 +17,195 @@ import type { AchievementDisplay, AchievementId } from "@/components/achievement
 type PartialAchievementRegistry = Partial<Record<AchievementId, AchievementDisplay>>;
 
 const pullRequestAchievement = {
-	first_pull: {
-		name: "First Merge",
+	"pr.merged.common.1": {
+		name: "First Leaf",
 		description: "Merge your first Pull Request",
 		icon: defaultCategoryIcons.pull_requests,
 	},
-	pr_beginner: {
-		name: "Beginner Integrator",
-		description: "Merge 3 Pull Requests",
+	"pr.merged.common.2": {
+		name: "Branch Grafter",
+		description: "Merge 3 Pull Requests in total",
 		icon: defaultCategoryIcons.pull_requests,
 	},
-	pr_apprentice: {
-		name: "Apprentice Integrator",
-		description: "Merge 5 Pull Requests",
+	"pr.merged.uncommon": {
+		name: "Tree Surgeon",
+		description: "Merge 5 Pull Requests in total",
 		icon: defaultCategoryIcons.pull_requests,
 	},
-	integration_regular: {
-		name: "Integration Regular",
-		description: "Merge 10 Pull Requests",
+	"pr.merged.rare": {
+		name: "Trunk Master",
+		description: "Merge 10 Pull Requests in total",
 		icon: defaultCategoryIcons.pull_requests,
 	},
-	pr_specialist: {
-		name: "Integration Specialist",
+	"pr.merged.epic": {
+		name: "Forest Keeper",
 		description: "Merge 25 Pull Requests",
 		icon: defaultCategoryIcons.pull_requests,
 	},
-	integration_expert: {
-		name: "Integration Expert",
+	"pr.merged.legendary": {
+		name: "Root of Origin",
 		description: "Merge 50 Pull Requests",
 		icon: defaultCategoryIcons.pull_requests,
 	},
-	master_integrator: {
-		name: "Master Integrator",
-		description: "Merge 100 Pull Requests",
-		icon: defaultCategoryIcons.pull_requests,
+	"pr.special.speedster": {
+		name: "Speedster",
+		description: "",
+		icon: Clock1Icon,
 	},
 } satisfies PartialAchievementRegistry;
 
+const commitAchievements = {
+	// currently not imeplented since they are commented out
+} satisfies PartialAchievementRegistry;
+
 const communicationAchievements = {
-	first_review: {
-		name: "First Review",
-		description: "Submit your first code review",
+	"review.common.1": {
+		name: "Peer Check",
+		description: "Write a review on a PR not authored by yourself",
 		icon: defaultCategoryIcons.communication,
 	},
-	review_rookie: {
-		name: "Review Rookie",
-		description: "Submit 10 code reviews",
+	"review.common.2": {
+		name: "Feedback loop",
+		description: "Write at least 10 reviews on PRs not authored by yourself",
 		icon: defaultCategoryIcons.communication,
 	},
-	review_master: {
-		name: "Review Master",
-		description: "Submit 100 code reviews",
+	"review.uncommon.1": {
+		name: "Sanity Checker",
+		description: "Write at least 25 reviews on PRs not authored by yourself",
 		icon: defaultCategoryIcons.communication,
 	},
-	code_commenter: {
-		name: "Code Commenter",
-		description: "Post 100 code comments",
+	"review.uncommon.2": {
+		name: "Review Councillor",
+		description: "Write at least 50 reviews on PRs not authored by yourself",
 		icon: defaultCategoryIcons.communication,
 	},
-	helpful_reviewer: {
-		name: "Helpful Reviewer",
-		description: "Approve 50 pull requests",
-		icon: CodeReviewIcon,
+	"review.rare": {
+		name: "Quality Sentinel",
+		description: "Write at least 100 reviews on PRs not authored by yourself",
+		icon: defaultCategoryIcons.communication,
+	},
+	"review.epic": {
+		name: "Principle Mentor",
+		description: "Write at least 200 reviews on PRs not authored by yourself",
+		icon: defaultCategoryIcons.communication,
+	},
+	"review.legendary": {
+		name: "Architecture Filter",
+		description: "Write at least 500 reviews on PRs not authored by yourself",
+		icon: defaultCategoryIcons.communication,
+	},
+	"review.mythic": {
+		name: "All Seeing Eye",
+		description: "Write at least 1000 reviews on PRs not authored by yourself",
+		icon: ScanEyeIcon,
+	},
+} satisfies PartialAchievementRegistry;
+
+const issueAchievement = {
+	"issue.open.common.1": {
+		name: "Houston, We Have a Problem!",
+		description: "Open an issue",
+		icon: IssueOpenedIcon,
+	},
+	"issue.open.common.2": {
+		name: "Junior Scout",
+		description: "Open a total of 5 issues",
+		icon: IssueOpenedIcon,
+	},
+	"issue.open.uncommon": {
+		name: "Bug Tracer",
+		description: "Open a total of 10 issues",
+		icon: IssueOpenedIcon,
+	},
+	"issue.open.rare": {
+		name: "Backlog Influencer",
+		description: "Open a total of 15 issues",
+		icon: IssueOpenedIcon,
+	},
+	"issue.open.epic": {
+		name: "Issue Architect",
+		description: "Open a total of 30 issues",
+		icon: IssueOpenedIcon,
+	},
+	"issue.open.legendary": {
+		name: "Chief Complaining Officer",
+		description: "Open a total of 50 issues",
+		icon: IssueOpenedIcon,
+	},
+	"issue.close.common.1": {
+		name: "Take That, Bug!",
+		description: "Close an issues",
+		icon: IssueClosedIcon,
+	},
+	"issue.close.common.2": {
+		name: "Repository Janitor",
+		description: "Close a total of 5 issues",
+		icon: IssueClosedIcon,
+	},
+	"issue.close.uncommon": {
+		name: "Firefighter",
+		description: "Close a total of 10 issues",
+		icon: IssueClosedIcon,
+	},
+	"issue.close.rare": {
+		name: "Bug Reaper",
+		description: "Close a total of 15 issues",
+		icon: IssueClosedIcon,
+	},
+	"issue.close.epic": {
+		name: "Pest Doctor",
+		description: "Close a total of 30 issues",
+		icon: IssueClosedIcon,
+	},
+	"issue.close.legendary": {
+		name: "Terminator",
+		description: "Close a total of 50 issues",
+		icon: IssueClosedIcon,
+	},
+} satisfies PartialAchievementRegistry;
+
+const milestoneAchievements = {
+	"milestone.first_action": {
+		name: "First Blood",
+		description: "Do your first action in a workspace",
+		icon: DropletsIcon,
+	},
+	"milestone.polyglot": {
+		name: "Polyglot",
+		description: "Commit in 3 different programming languages in total",
+		icon: LanguagesIcon,
+	},
+	"milestone.night_owl": {
+		name: "Night Owl",
+		description: "Commit 5 times between 1-5 a.m. on the same day",
+		icon: MoonStarIcon,
+	},
+	"milestone.long_time_return": {
+		name: "The Ancient One",
+		description: "Return after 3 months of inactivity",
+		icon: ClockFadingIcon,
+	},
+	"milestone.all_rare": {
+		name: "Swiss Army Knife",
+		description: "Unlock the rare achievement in every major category line",
+		icon: PocketKnifeIcon,
+	},
+	"milestone.all_epic": {
+		name: "Librarian of Alexandria",
+		description: "Unlock the epic achievement in every major category line",
+		icon: LibraryIcon,
+	},
+	"milestone.all_legendary": {
+		name: "Singularity",
+		description: "Unlock the legendary achievement in every major category line",
+		icon: SingularityIcon,
 	},
 } satisfies PartialAchievementRegistry;
 
 export const ACHIEVEMENT_REGISTRY = {
 	...pullRequestAchievement,
+	...commitAchievements,
 	...communicationAchievements,
+	...issueAchievement,
+	...milestoneAchievements,
 } as const satisfies Record<AchievementId, AchievementDisplay>;
