@@ -50,7 +50,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <ol>
  *   <li>A — Fetch descendant groups and create Team entities</li>
  *   <li>B — Resolve parent references (two-pass)</li>
- *   <li>C — Sync direct+inherited members per team</li>
+ *   <li>C — Sync direct members per team</li>
  *   <li>D — Sync team-repo permissions (repos whose org = subgroup fullPath)</li>
  *   <li>E — Cleanup stale teams (only if sync completed fully)</li>
  * </ol>
@@ -372,6 +372,12 @@ public class GitLabTeamSyncService {
     // ========================================================================
 
     int syncTeamMembers(HttpGraphQlClient client, Long scopeId, Long teamId, String groupFullPath, Long providerId) {
+        // Phase C.1: Fetch all members via GraphQL OUTSIDE a transaction
+        // to avoid holding a DB connection during network I/O and throttle delays.
+        List<GitLabGroupMemberResponse> allMembers = new java.util.ArrayList<>();
+        boolean memberSyncComplete = fetchAllGroupMembers(client, scopeId, groupFullPath, allMembers);
+
+        // Phase C.2: Apply membership diff in a short transaction
         Integer result = transactionTemplate.execute(status -> {
             Team team = teamRepository
                 .findById(teamId)
@@ -383,74 +389,9 @@ public class GitLabTeamSyncService {
                 .collect(Collectors.toMap(tm -> tm.getUser().getId(), tm -> tm));
 
             Set<Long> syncedMemberIds = new HashSet<>();
-            String cursor = null;
-            int pageCount = 0;
-            boolean memberSyncComplete = false;
 
-            while (true) {
-                pageCount++;
-                if (pageCount >= MAX_PAGINATION_PAGES) {
-                    log.warn("Reached max pagination for members: groupPath={}", groupFullPath);
-                    break;
-                }
-
-                try {
-                    graphQlClientProvider.acquirePermission();
-                    graphQlClientProvider.waitIfRateLimitLow(scopeId);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    break;
-                }
-
-                int pageSize = adaptPageSize(MEMBER_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId));
-
-                ClientGraphQlResponse response = client
-                    .documentName(GET_GROUP_MEMBERS_DOCUMENT)
-                    .variable("fullPath", groupFullPath)
-                    .variable("first", pageSize)
-                    .variable("after", cursor)
-                    .execute()
-                    .block(gitLabProperties.graphqlTimeout());
-
-                if (response == null || !response.isValid()) {
-                    log.warn("Failed to fetch group members: groupPath={}, page={}", groupFullPath, pageCount);
-                    graphQlClientProvider.recordFailure(
-                        new RuntimeException("Invalid GraphQL response for group members")
-                    );
-                    break;
-                }
-                graphQlClientProvider.recordSuccess();
-
-                List<GitLabGroupMemberResponse> members = response
-                    .field("group.groupMembers.nodes")
-                    .toEntityList(GitLabGroupMemberResponse.class);
-
-                if (members != null) {
-                    for (GitLabGroupMemberResponse member : members) {
-                        processMember(member, team, providerId, existingMemberships, syncedMemberIds);
-                    }
-                }
-
-                GitLabPageInfo memberPageInfo = response
-                    .field("group.groupMembers.pageInfo")
-                    .toEntity(GitLabPageInfo.class);
-
-                if (memberPageInfo == null || !memberPageInfo.hasNextPage()) {
-                    memberSyncComplete = true;
-                    break;
-                }
-
-                cursor = memberPageInfo.endCursor();
-                if (cursor == null) {
-                    log.warn(
-                        "Member pagination cursor is null despite hasNextPage=true: groupPath={}, page={}",
-                        groupFullPath,
-                        pageCount
-                    );
-                    break;
-                }
-
-                throttle();
+            for (GitLabGroupMemberResponse member : allMembers) {
+                processMember(member, team, providerId, existingMemberships, syncedMemberIds);
             }
 
             if (memberSyncComplete) {
@@ -463,6 +404,83 @@ public class GitLabTeamSyncService {
         });
 
         return result != null ? result : 0;
+    }
+
+    /**
+     * Fetches all group members via paginated GraphQL calls.
+     * Runs OUTSIDE a transaction to avoid holding a DB connection during network I/O.
+     *
+     * @return true if pagination completed normally, false if interrupted or failed
+     */
+    private boolean fetchAllGroupMembers(
+        HttpGraphQlClient client,
+        Long scopeId,
+        String groupFullPath,
+        List<GitLabGroupMemberResponse> allMembers
+    ) {
+        String cursor = null;
+        int pageCount = 0;
+
+        while (true) {
+            pageCount++;
+            if (pageCount >= MAX_PAGINATION_PAGES) {
+                log.warn("Reached max pagination for members: groupPath={}", groupFullPath);
+                return false;
+            }
+
+            try {
+                graphQlClientProvider.acquirePermission();
+                graphQlClientProvider.waitIfRateLimitLow(scopeId);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
+
+            int pageSize = adaptPageSize(MEMBER_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId));
+
+            ClientGraphQlResponse response = client
+                .documentName(GET_GROUP_MEMBERS_DOCUMENT)
+                .variable("fullPath", groupFullPath)
+                .variable("first", pageSize)
+                .variable("after", cursor)
+                .execute()
+                .block(gitLabProperties.graphqlTimeout());
+
+            if (response == null || !response.isValid()) {
+                log.warn("Failed to fetch group members: groupPath={}, page={}", groupFullPath, pageCount);
+                graphQlClientProvider.recordFailure(new RuntimeException("Invalid GraphQL response for group members"));
+                return false;
+            }
+            graphQlClientProvider.recordSuccess();
+
+            List<GitLabGroupMemberResponse> members = response
+                .field("group.groupMembers.nodes")
+                .toEntityList(GitLabGroupMemberResponse.class);
+
+            if (members != null) {
+                allMembers.addAll(members);
+            }
+
+            GitLabPageInfo memberPageInfo = response
+                .field("group.groupMembers.pageInfo")
+                .toEntity(GitLabPageInfo.class);
+
+            if (memberPageInfo == null || !memberPageInfo.hasNextPage()) {
+                return true;
+            }
+
+            cursor = memberPageInfo.endCursor();
+            if (cursor == null) {
+                log.warn(
+                    "Member pagination cursor is null despite hasNextPage=true: groupPath={}, page={}",
+                    groupFullPath,
+                    pageCount
+                );
+                return false;
+            }
+
+            throttle();
+        }
     }
 
     private void processMember(
@@ -499,8 +517,7 @@ public class GitLabTeamSyncService {
             return;
         }
 
-        // Deduplicate: with INHERITED relations, same user can appear multiple times.
-        // Use add() return value to detect duplicates — prevents persist collision.
+        // Deduplicate: same user could appear on multiple pages in edge cases.
         if (!syncedMemberIds.add(user.getId())) {
             return;
         }
@@ -541,7 +558,6 @@ public class GitLabTeamSyncService {
         int removed = 0;
         for (TeamMembership membership : new HashSet<>(team.getMemberships())) {
             if (!syncedMemberIds.contains(membership.getUser().getId())) {
-                teamMembershipRepository.delete(membership);
                 team.removeMembership(membership);
                 removed++;
             }
@@ -608,24 +624,26 @@ public class GitLabTeamSyncService {
     // ========================================================================
 
     private void removeDeletedTeams(String groupFullPath, Set<Long> syncedNativeIds, Long providerId) {
-        List<Team> existingTeams = teamRepository.findAllByOrganizationIgnoreCase(groupFullPath);
-        int removed = 0;
+        transactionTemplate.executeWithoutResult(status -> {
+            List<Team> existingTeams = teamRepository.findAllByOrganizationIgnoreCase(groupFullPath);
+            int removed = 0;
 
-        for (Team team : existingTeams) {
-            // Only delete teams from the same provider
-            if (
-                team.getProvider() != null &&
-                team.getProvider().getId().equals(providerId) &&
-                !syncedNativeIds.contains(team.getNativeId())
-            ) {
-                teamProcessor.delete(team.getNativeId(), providerId);
-                removed++;
+            for (Team team : existingTeams) {
+                // Only delete teams from the same provider
+                if (
+                    team.getProvider() != null &&
+                    team.getProvider().getId().equals(providerId) &&
+                    !syncedNativeIds.contains(team.getNativeId())
+                ) {
+                    teamProcessor.delete(team.getNativeId(), providerId);
+                    removed++;
+                }
             }
-        }
 
-        if (removed > 0) {
-            log.info("Removed stale teams: groupPath={}, count={}", groupFullPath, removed);
-        }
+            if (removed > 0) {
+                log.info("Removed stale teams: groupPath={}, count={}", groupFullPath, removed);
+            }
+        });
     }
 
     // ========================================================================

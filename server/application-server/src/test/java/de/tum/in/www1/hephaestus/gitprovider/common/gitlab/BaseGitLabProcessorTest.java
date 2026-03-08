@@ -169,8 +169,6 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
             user.setId(-18024L);
             user.setLogin("ga84xah");
 
-            when(userRepository.findByNativeIdAndProviderId(18024L, 1L)).thenReturn(Optional.of(user));
-
             GitLabWebhookUser dto = new GitLabWebhookUser(
                 18024L,
                 "ga84xah",
@@ -178,6 +176,8 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
                 "https://avatar.url",
                 null
             );
+
+            when(gitLabUserService.findOrCreateUser(dto, 1L)).thenReturn(user);
 
             User result = processor.callFindOrCreateUser(dto);
 
@@ -220,7 +220,16 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
             User user = new User();
             user.setId(-18024L);
 
-            when(userRepository.findByNativeIdAndProviderId(18024L, 1L)).thenReturn(Optional.of(user));
+            when(
+                gitLabUserService.findOrCreateUser(
+                    "gid://gitlab/User/18024",
+                    "ga84xah",
+                    "Felix Dietrich",
+                    "https://avatar.url",
+                    "https://gitlab.lrz.de/ga84xah",
+                    1L
+                )
+            ).thenReturn(user);
 
             User result = processor.callFindOrCreateUser(
                 "gid://gitlab/User/18024",

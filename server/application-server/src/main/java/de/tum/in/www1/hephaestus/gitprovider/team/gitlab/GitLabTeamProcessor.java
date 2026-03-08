@@ -5,6 +5,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabDescendantGroupResponse;
 import de.tum.in.www1.hephaestus.gitprovider.team.Team;
 import de.tum.in.www1.hephaestus.gitprovider.team.TeamRepository;
+import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -62,12 +63,12 @@ public class GitLabTeamProcessor {
         Long providerId = provider.getId();
         String slug = computeRelativePath(group.fullPath(), rootFullPath);
 
-        // Upsert: try nativeId first, then natural key (organization + slug)
+        // Upsert: try nativeId first, then natural key (organization + slug + provider)
         Team team = teamRepository
             .findByNativeIdAndProviderId(nativeId, providerId)
             .orElseGet(() ->
                 teamRepository
-                    .findByOrganizationIgnoreCaseAndSlug(rootFullPath, slug)
+                    .findByOrganizationIgnoreCaseAndSlugAndProviderId(rootFullPath, slug, providerId)
                     .orElseGet(() -> {
                         Team t = new Team();
                         t.setNativeId(nativeId);
@@ -83,7 +84,8 @@ public class GitLabTeamProcessor {
         team.setName(group.name());
         team.setSlug(slug);
         team.setHtmlUrl(group.webUrl());
-        team.setPrivacy(Team.Privacy.VISIBLE);
+        team.setPrivacy(mapVisibility(group.visibility()));
+        team.setLastSyncAt(Instant.now());
 
         if (group.description() != null) {
             team.setDescription(group.description());
@@ -121,6 +123,21 @@ public class GitLabTeamProcessor {
                 teamRepository.delete(team);
                 log.info("Deleted GitLab team: teamId={}, name={}", teamId, teamName);
             });
+    }
+
+    /**
+     * Maps GitLab visibility to Team privacy.
+     * Private groups → SECRET, public/internal → VISIBLE.
+     */
+    static Team.Privacy mapVisibility(String visibility) {
+        if (visibility == null) {
+            return Team.Privacy.VISIBLE;
+        }
+        return switch (visibility.toLowerCase()) {
+            case "private" -> Team.Privacy.SECRET;
+            case "public", "internal" -> Team.Privacy.VISIBLE;
+            default -> Team.Privacy.VISIBLE;
+        };
     }
 
     /**

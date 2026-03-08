@@ -100,6 +100,7 @@ class GitHubMembershipMessageHandlerIntegrationTest extends BaseIntegrationTest 
         testTeam.setNativeId(teamId);
         testTeam.setProvider(gitProvider);
         testTeam.setName(name);
+        testTeam.setSlug(name);
         testTeam.setHtmlUrl("https://github.com/orgs/HephaestusTest/teams/" + name);
         testTeam.setOrganization(testOrganization.getLogin());
         testTeam = teamRepository.save(testTeam);
