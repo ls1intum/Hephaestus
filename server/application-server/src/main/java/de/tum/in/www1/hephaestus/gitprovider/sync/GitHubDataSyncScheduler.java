@@ -18,7 +18,9 @@ import de.tum.in.www1.hephaestus.gitprovider.project.Project;
 import de.tum.in.www1.hephaestus.gitprovider.project.github.GitHubProjectSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.subissue.github.GitHubSubIssueSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.sync.SyncResult;
+import de.tum.in.www1.hephaestus.gitprovider.team.github.GitHubTeamSyncService;
 import jakarta.annotation.PostConstruct;
+import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -86,6 +88,7 @@ public class GitHubDataSyncScheduler {
     private final GitHubIssueDependencySyncService issueDependencySyncService;
     private final GitHubProjectSyncService projectSyncService;
     private final GitHubOrganizationSyncService organizationSyncService;
+    private final GitHubTeamSyncService teamSyncService;
     private final OrganizationRepository organizationRepository;
     private final SyncSchedulerProperties syncSchedulerProperties;
     private final RateLimitTracker rateLimitTracker;
@@ -100,6 +103,7 @@ public class GitHubDataSyncScheduler {
         GitHubIssueDependencySyncService issueDependencySyncService,
         GitHubProjectSyncService projectSyncService,
         GitHubOrganizationSyncService organizationSyncService,
+        GitHubTeamSyncService teamSyncService,
         OrganizationRepository organizationRepository,
         SyncSchedulerProperties syncSchedulerProperties,
         RateLimitTracker rateLimitTracker,
@@ -113,6 +117,7 @@ public class GitHubDataSyncScheduler {
         this.issueDependencySyncService = issueDependencySyncService;
         this.projectSyncService = projectSyncService;
         this.organizationSyncService = organizationSyncService;
+        this.teamSyncService = teamSyncService;
         this.organizationRepository = organizationRepository;
         this.syncSchedulerProperties = syncSchedulerProperties;
         this.rateLimitTracker = rateLimitTracker;
@@ -312,6 +317,10 @@ public class GitHubDataSyncScheduler {
                 // in the FK for any items whose issues now exist.
                 projectSyncService.relinkOrphanedProjectItems();
 
+                // Sync teams AFTER repositories exist (team repo permissions need repos).
+                // This mirrors the startup sync order in GitHubDataSyncService.
+                syncTeams(session);
+
                 // Sync sub-issues and issue dependencies via GraphQL
                 // These are scope-level relationships that require issues/PRs to exist first
                 // Skip if rate limit is critically low to avoid wasting API calls
@@ -351,6 +360,51 @@ public class GitHubDataSyncScheduler {
             throw e;
         } catch (Exception e) {
             log.error("Failed to sync sub-issues: scopeId={}, scopeSlug={}", session.scopeId(), session.slug(), e);
+        }
+    }
+
+    private void syncTeams(SyncSession session) {
+        String accountLogin = session.accountLogin();
+        if (accountLogin == null || accountLogin.isBlank()) {
+            log.debug("Skipped team sync: reason=noAccountLogin, scopeId={}", session.scopeId());
+            return;
+        }
+
+        // Skip if rate limit is critically low to avoid wasting API calls
+        if (rateLimitTracker.isCritical(session.scopeId())) {
+            log.warn(
+                "Skipped team sync: reason=rateLimitCritical, scopeId={}, remaining={}",
+                session.scopeId(),
+                rateLimitTracker.getRemaining(session.scopeId())
+            );
+            return;
+        }
+
+        try {
+            log.debug(
+                "Starting team sync: scopeId={}, scopeSlug={}, orgLogin={}",
+                session.scopeId(),
+                session.slug(),
+                sanitizeForLog(accountLogin)
+            );
+            int teamCount = teamSyncService.syncTeamsForOrganization(session.scopeId(), accountLogin);
+            syncTargetProvider.updateTeamsSyncTimestamp(session.scopeId(), Instant.now());
+            log.debug(
+                "Completed team sync: scopeId={}, orgLogin={}, teamCount={}",
+                session.scopeId(),
+                sanitizeForLog(accountLogin),
+                teamCount
+            );
+        } catch (InstallationNotFoundException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error(
+                "Failed to sync teams: scopeId={}, scopeSlug={}, orgLogin={}",
+                session.scopeId(),
+                session.slug(),
+                sanitizeForLog(accountLogin),
+                e
+            );
         }
     }
 
