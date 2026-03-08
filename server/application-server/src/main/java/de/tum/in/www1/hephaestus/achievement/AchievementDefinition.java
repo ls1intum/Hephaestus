@@ -2,15 +2,20 @@ package de.tum.in.www1.hephaestus.achievement;
 
 import com.fasterxml.jackson.annotation.JsonValue;
 import de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator;
+import de.tum.in.www1.hephaestus.achievement.evaluator.ReviewCountEvaluator;
 import de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator;
 import de.tum.in.www1.hephaestus.achievement.progress.AchievementProgress;
+import de.tum.in.www1.hephaestus.achievement.progress.BinaryAchievementProgress;
 import de.tum.in.www1.hephaestus.achievement.progress.LinearAchievementProgress;
 import de.tum.in.www1.hephaestus.activity.ActivityEventType;
 import lombok.Getter;
 import org.springframework.lang.NonNull;
 import org.springframework.lang.Nullable;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Set;
 
 /**
  * The source of truth for all achievement definitions.
@@ -129,14 +134,154 @@ public enum AchievementDefinition {
     ),
 
     // ========================================================================
+    // Commit Achievements
+    // ========================================================================
+
+    /* !!! currently not available since Commit Events are not processed !!!
+
+    COMMIT_COMMON_1(
+        "commit.common.1",
+        AchievementCategory.COMMITS,
+        AchievementRarity.COMMON,
+        new LinearAchievementProgress(1),
+        null,
+        false,
+        Set.of(ActivityEventType.COMMIT_PUSHED),
+        StandardCountEvaluator.class
+    ),
+
+    COMMIT_COMMON_2(
+        "commit.common.2",
+        AchievementCategory.COMMITS,
+        AchievementRarity.COMMON,
+        new LinearAchievementProgress(10),
+        COMMIT_COMMON_1,
+        false,
+        Set.of(ActivityEventType.COMMIT_PUSHED),
+        StandardCountEvaluator.class
+    ),
+
+    COMMIT_UNCOMMON_1(
+        "commit.uncommon.1",
+        AchievementCategory.COMMITS,
+        AchievementRarity.UNCOMMON,
+        new LinearAchievementProgress(50),
+        COMMIT_COMMON_2,
+        false,
+        Set.of(ActivityEventType.COMMIT_PUSHED),
+        StandardCountEvaluator.class
+    ),
+
+    COMMIT_UNCOMMON_2(
+        "commit.uncommon.2",
+        AchievementCategory.COMMITS,
+        AchievementRarity.UNCOMMON,
+        new LinearAchievementProgress(100),
+        COMMIT_UNCOMMON_1,
+        false,
+        Set.of(ActivityEventType.COMMIT_PUSHED),
+        StandardCountEvaluator.class
+    ),
+
+    COMMIT_RARE(
+        "commit.rare",
+        AchievementCategory.COMMITS,
+        AchievementRarity.RARE,
+        new LinearAchievementProgress(250),
+        COMMIT_UNCOMMON_2,
+        false,
+        Set.of(ActivityEventType.COMMIT_PUSHED),
+        StandardCountEvaluator.class
+    ),
+
+    COMMIT_EPIC(
+        "commit.epic",
+        AchievementCategory.COMMITS,
+        AchievementRarity.EPIC,
+        new LinearAchievementProgress(500),
+        COMMIT_RARE,
+        false,
+        Set.of(ActivityEventType.COMMIT_PUSHED),
+        StandardCountEvaluator.class
+    ),
+
+    COMMIT_LEGENDARY(
+        "commit.legendary",
+        AchievementCategory.COMMITS,
+        AchievementRarity.LEGENDARY,
+        new LinearAchievementProgress(1000),
+        COMMIT_EPIC,
+        false,
+        Set.of(ActivityEventType.COMMIT_PUSHED),
+        StandardCountEvaluator.class
+    ),
+
+    COMMIT_MYTHIC(
+        "commit.mythic",
+        AchievementCategory.COMMITS,
+        AchievementRarity.MYTHIC,
+        new LinearAchievementProgress(2000),
+        COMMIT_LEGENDARY,
+        false,
+        Set.of(ActivityEventType.COMMIT_PUSHED),
+        StandardCountEvaluator.class
+    ),
+
+    COMMIT_SPECIAL_ITSY_BITSY(
+        "commit.special.itsy_bitsy",
+        AchievementCategory.COMMITS,
+        AchievementRarity.UNCOMMON,
+        new BinaryAchievementProgress(false),
+        null,
+        false,
+        Set.of(ActivityEventType.COMMIT_PUSHED),
+        AchievementEvaluator.class // TODO: adjust that later based on single line change
+    ),
+
+    COMMIT_SPECIAL_ATOMIC_CHANGES(
+        "commit.special.atomic_changes",
+        AchievementCategory.COMMITS,
+        AchievementRarity.RARE,
+        new BinaryAchievementProgress(false),
+        null,
+        false,
+        Set.of(ActivityEventType.COMMIT_PUSHED),
+        AchievementEvaluator.class // TODO: adjust that later (10 commits in row, max 3 lines in 2 files)
+    ),
+
+    COMMIT_SPECIAL_BRUTE_FORCE(
+        "commit.special.brute_force",
+        AchievementCategory.COMMITS,
+        AchievementRarity.UNCOMMON,
+        new BinaryAchievementProgress(false),
+        null,
+        false,
+        Set.of(ActivityEventType.COMMIT_PUSHED),
+        AchievementEvaluator.class // TODO: adjust that later (5 commits in 5 mins)
+    ),
+
+    COMMIT_SPECIAL_CROSS_BOUNDARY(
+        "commit.special.cross_boundary",
+        AchievementCategory.COMMITS,
+        AchievementRarity.RARE,
+        new BinaryAchievementProgress(false),
+        null,
+        false,
+        Set.of(ActivityEventType.COMMIT_PUSHED),
+        AchievementEvaluator.class // TODO: adjust that later (2 different programming languages)
+    ),
+
+     TODO: Remove the block comment markers to re-enable when the DomainEvent for commits is implemented! */
+
+    // ========================================================================
     // Review Achievements (triggered by any review activity)
     // ========================================================================
 
-    FIRST_REVIEW(
-        "first_review",
+    REVIEW_COMMON_1(
+        "review.common.1",
         AchievementCategory.COMMUNICATION,
         AchievementRarity.COMMON,
-        new LinearAchievementProgress( 1),
+        new LinearAchievementProgress(1),
         null,
         false,
         Set.of(
@@ -144,68 +289,380 @@ public enum AchievementDefinition {
             ActivityEventType.REVIEW_CHANGES_REQUESTED,
             ActivityEventType.REVIEW_COMMENTED
         ),
-        StandardCountEvaluator.class
+        ReviewCountEvaluator.class
     ),
 
-    REVIEW_ROOKIE(
-        "review_rookie",
+    REVIEW_COMMON_2(
+        "review.common.2",
         AchievementCategory.COMMUNICATION,
         AchievementRarity.COMMON,
-        new LinearAchievementProgress( 10),
-        FIRST_REVIEW,
+        new LinearAchievementProgress(10),
+        REVIEW_COMMON_1,
         false,
         Set.of(
             ActivityEventType.REVIEW_APPROVED,
             ActivityEventType.REVIEW_CHANGES_REQUESTED,
             ActivityEventType.REVIEW_COMMENTED
         ),
-        StandardCountEvaluator.class
+        ReviewCountEvaluator.class
     ),
 
-    REVIEW_MASTER(
-        "review_master",
+    REVIEW_UNCOMMON_1(
+        "review.uncommon.1",
         AchievementCategory.COMMUNICATION,
-        AchievementRarity.EPIC,
-        new LinearAchievementProgress( 100),
-        REVIEW_ROOKIE,
+        AchievementRarity.UNCOMMON,
+        new LinearAchievementProgress(25),
+        REVIEW_COMMON_2,
         false,
         Set.of(
             ActivityEventType.REVIEW_APPROVED,
             ActivityEventType.REVIEW_CHANGES_REQUESTED,
             ActivityEventType.REVIEW_COMMENTED
         ),
-        StandardCountEvaluator.class
+        ReviewCountEvaluator.class
+    ),
+
+    REVIEW_UNCOMMON_2(
+        "review.uncommon.2",
+        AchievementCategory.COMMUNICATION,
+        AchievementRarity.UNCOMMON,
+        new LinearAchievementProgress(50),
+        REVIEW_UNCOMMON_1,
+        false,
+        Set.of(
+            ActivityEventType.REVIEW_APPROVED,
+            ActivityEventType.REVIEW_CHANGES_REQUESTED,
+            ActivityEventType.REVIEW_COMMENTED
+        ),
+        ReviewCountEvaluator.class
+    ),
+
+    REVIEW_RARE(
+        "review.rare",
+        AchievementCategory.COMMUNICATION,
+        AchievementRarity.RARE,
+        new LinearAchievementProgress(100),
+        REVIEW_UNCOMMON_2,
+        false,
+        Set.of(
+            ActivityEventType.REVIEW_APPROVED,
+            ActivityEventType.REVIEW_CHANGES_REQUESTED,
+            ActivityEventType.REVIEW_COMMENTED
+        ),
+        ReviewCountEvaluator.class
+    ),
+
+    REVIEW_EPIC(
+        "review.epic",
+        AchievementCategory.COMMUNICATION,
+        AchievementRarity.EPIC,
+        new LinearAchievementProgress(200),
+        REVIEW_RARE,
+        false,
+        Set.of(
+            ActivityEventType.REVIEW_APPROVED,
+            ActivityEventType.REVIEW_CHANGES_REQUESTED,
+            ActivityEventType.REVIEW_COMMENTED
+        ),
+        ReviewCountEvaluator.class
+    ),
+
+    REVIEW_LEGENDARY(
+        "review.legendary",
+        AchievementCategory.COMMUNICATION,
+        AchievementRarity.LEGENDARY,
+        new LinearAchievementProgress(500),
+        REVIEW_EPIC,
+        false,
+        Set.of(
+            ActivityEventType.REVIEW_APPROVED,
+            ActivityEventType.REVIEW_CHANGES_REQUESTED,
+            ActivityEventType.REVIEW_COMMENTED
+        ),
+        ReviewCountEvaluator.class
+    ),
+
+    REVIEW_MYTHIC(
+        "review.mythic",
+        AchievementCategory.COMMUNICATION,
+        AchievementRarity.MYTHIC,
+        new LinearAchievementProgress(1000),
+        REVIEW_LEGENDARY,
+        false,
+        Set.of(
+            ActivityEventType.REVIEW_APPROVED,
+            ActivityEventType.REVIEW_CHANGES_REQUESTED,
+            ActivityEventType.REVIEW_COMMENTED
+        ),
+        ReviewCountEvaluator.class
     ),
 
     // ========================================================================
     // Comment Achievements (triggered by inline code review comments)
+    // !!! Currently no achievements in this category (is part of communication)
     // ========================================================================
 
-    CODE_COMMENTER(
-        "code_commenter",
-        AchievementCategory.COMMUNICATION,
-        AchievementRarity.EPIC,
-        new LinearAchievementProgress( 100),
+    // ========================================================================
+    // ISSUES (triggered by issue open and closed events)
+    // ========================================================================
+
+    ISSUE_OPEN_COMMON_1(
+        "issue.open.common.1",
+        AchievementCategory.ISSUES,
+        AchievementRarity.COMMON,
+        new LinearAchievementProgress(1),
         null,
         false,
-        Set.of(ActivityEventType.REVIEW_COMMENT_CREATED),
+        Set.of(ActivityEventType.ISSUE_CREATED),
         StandardCountEvaluator.class
     ),
 
-    // ========================================================================
-    // Approval Achievements (triggered by review approvals)
-    // ========================================================================
+    ISSUE_OPEN_COMMON_2(
+        "issue.open.common.2",
+        AchievementCategory.ISSUES,
+        AchievementRarity.COMMON,
+        new LinearAchievementProgress(5),
+        ISSUE_OPEN_COMMON_1,
+        false,
+        Set.of(ActivityEventType.ISSUE_CREATED),
+        StandardCountEvaluator.class
+    ),
 
-    HELPFUL_REVIEWER(
-        "helpful_reviewer",
-        AchievementCategory.COMMUNICATION,
+    ISSUE_OPEN_UNCOMMON(
+        "issue.open.uncommon",
+        AchievementCategory.ISSUES,
+        AchievementRarity.UNCOMMON,
+        new LinearAchievementProgress(10),
+        ISSUE_OPEN_COMMON_2,
+        false,
+        Set.of(ActivityEventType.ISSUE_CREATED),
+        StandardCountEvaluator.class
+    ),
+
+    ISSUE_OPEN_RARE(
+        "issue.open.rare",
+        AchievementCategory.ISSUES,
+        AchievementRarity.RARE,
+        new LinearAchievementProgress(15),
+        ISSUE_OPEN_UNCOMMON,
+        false,
+        Set.of(ActivityEventType.ISSUE_CREATED),
+        StandardCountEvaluator.class
+    ),
+
+    ISSUE_OPEN_EPIC(
+        "issue.open.epic",
+        AchievementCategory.ISSUES,
+        AchievementRarity.EPIC,
+        new LinearAchievementProgress(30),
+        ISSUE_OPEN_RARE,
+        false,
+        Set.of(ActivityEventType.ISSUE_CREATED),
+        StandardCountEvaluator.class
+    ),
+
+    ISSUE_OPEN_LEGENDARY(
+        "issue.open.legendary",
+        AchievementCategory.ISSUES,
         AchievementRarity.LEGENDARY,
-        new LinearAchievementProgress( 50),
+        new LinearAchievementProgress(50),
+        ISSUE_OPEN_EPIC,
+        false,
+        Set.of(ActivityEventType.ISSUE_CREATED),
+        StandardCountEvaluator.class
+    ),
+
+    ISSUE_CLOSE_COMMON_1(
+        "issue.close.common.1",
+        AchievementCategory.ISSUES,
+        AchievementRarity.COMMON,
+        new LinearAchievementProgress(1),
         null,
         false,
-        Set.of(ActivityEventType.REVIEW_APPROVED),
+        Set.of(ActivityEventType.ISSUE_CLOSED),
         StandardCountEvaluator.class
-    );
+    ),
+
+    ISSUE_CLOSE_COMMON_2(
+        "issue.close.common.2",
+        AchievementCategory.ISSUES,
+        AchievementRarity.COMMON,
+        new LinearAchievementProgress(5),
+        ISSUE_CLOSE_COMMON_1,
+        false,
+        Set.of(ActivityEventType.ISSUE_CLOSED),
+        StandardCountEvaluator.class
+    ),
+
+    ISSUE_CLOSE_UNCOMMON(
+        "issue.close.uncommon",
+        AchievementCategory.ISSUES,
+        AchievementRarity.UNCOMMON,
+        new LinearAchievementProgress(10),
+        ISSUE_CLOSE_COMMON_2,
+        false,
+        Set.of(ActivityEventType.ISSUE_CLOSED),
+        StandardCountEvaluator.class
+    ),
+
+    ISSUE_CLOSE_RARE(
+        "issue.close.rare",
+        AchievementCategory.ISSUES,
+        AchievementRarity.RARE,
+        new LinearAchievementProgress(15),
+        ISSUE_CLOSE_UNCOMMON,
+        false,
+        Set.of(ActivityEventType.ISSUE_CLOSED),
+        StandardCountEvaluator.class
+    ),
+
+    ISSUE_CLOSE_EPIC(
+        "issue.close.epic",
+        AchievementCategory.ISSUES,
+        AchievementRarity.EPIC,
+        new LinearAchievementProgress(30),
+        ISSUE_CLOSE_RARE,
+        false,
+        Set.of(ActivityEventType.ISSUE_CLOSED),
+        StandardCountEvaluator.class
+    ),
+
+    ISSUE_CLOSE_LEGENDARY(
+        "issue.close.legendary",
+        AchievementCategory.ISSUES,
+        AchievementRarity.LEGENDARY,
+        new LinearAchievementProgress(50),
+        ISSUE_CLOSE_EPIC,
+        false,
+        Set.of(ActivityEventType.ISSUE_CLOSED),
+        StandardCountEvaluator.class
+    ),
+
+    /* TODO: Those special achievements need extra evaluators
+
+    ISSUE_SPECIAL_HIVE_MIND(
+        "issue.special.hive_mind",
+        AchievementCategory.ISSUES,
+        AchievementRarity.RARE,
+        new BinaryAchievementProgress(),
+        ISSUE_CLOSE_COMMON_1,
+        false,
+        Set.of(ActivityEventType.ISSUE_CLOSED),
+        AchievementEvaluator.class
+    ),
+
+    ISSUE_SPECIAL_ORACLE(
+        "issue.special.oracle",
+        AchievementCategory.ISSUES,
+        AchievementRarity.EPIC,
+        new BinaryAchievementProgress(),
+        ISSUE_CLOSE_COMMON_1,
+        true,
+        Set.of(ActivityEventType.ISSUE_CLOSED),
+        AchievementEvaluator.class
+    ),
+    ISSUE_SPECIAL_NECROMANCER(
+        "issue.special.necromancer",
+        AchievementCategory.ISSUES,
+        AchievementRarity.EPIC,
+        new BinaryAchievementProgress(),
+        ISSUE_CLOSE_COMMON_1,
+        true,
+        Set.of(ActivityEventType.ISSUE_CLOSED),
+        AchievementEvaluator.class
+    ),
+
+     */
+
+    // ========================================================================
+    // MILESTONES (standalone, sectional and intersectional (tbd: multi parent relationship)
+    // ========================================================================
+
+    MILESTONE_FIRST_ACTION(
+        "milestone.first_action",
+        AchievementCategory.MILESTONES,
+        AchievementRarity.COMMON,
+        new LinearAchievementProgress(1),
+        null,
+        false,
+        Set.of(ActivityEventType.PULL_REQUEST_OPENED,
+            ActivityEventType.PULL_REQUEST_CLOSED,
+            ActivityEventType.ISSUE_CREATED,
+            ActivityEventType.ISSUE_CLOSED,
+            ActivityEventType.REVIEW_APPROVED,
+            ActivityEventType.REVIEW_CHANGES_REQUESTED,
+            ActivityEventType.REVIEW_COMMENTED),
+        StandardCountEvaluator.class
+    ),
+
+    MILESTONE_POLYGLOT(
+        "milestone.polyglot",
+        AchievementCategory.MILESTONES,
+        AchievementRarity.UNCOMMON,
+        new BinaryAchievementProgress(),
+        MILESTONE_FIRST_ACTION,
+        false,
+        Set.of(),
+        AchievementEvaluator.class
+    ),
+
+    MILESTONE_NIGHT_OWL(
+        "milestone.night_owl",
+        AchievementCategory.MILESTONES,
+        AchievementRarity.EPIC,
+        new BinaryAchievementProgress(),
+        MILESTONE_FIRST_ACTION,
+        true,
+        Set.of(),
+        AchievementEvaluator.class
+    ),
+
+    MILESTONE_LONG_TIME_RETURN(
+        "milestone.long_time_return",
+        AchievementCategory.MILESTONES,
+        AchievementRarity.EPIC,
+        new BinaryAchievementProgress(),
+        null, // TODO: should be self-referenced for standalone achievements
+        true,
+        Set.of(),
+        AchievementEvaluator.class
+    ),
+
+    MILESTONE_ALL_RARE(
+        "milestone.all_rare",
+        AchievementCategory.MILESTONES,
+        AchievementRarity.EPIC,
+        new BinaryAchievementProgress(),
+        null, // TODO: should be self-referenced for standalone achievements
+        true,
+        Set.of(),
+        AchievementEvaluator.class
+    ),
+
+    MILESTONE_ALL_EPIC(
+        "milestone.all_epic",
+        AchievementCategory.MILESTONES,
+        AchievementRarity.LEGENDARY,
+        new BinaryAchievementProgress(),
+        MILESTONE_ALL_RARE,
+        true,
+        Set.of(),
+        AchievementEvaluator.class
+    ),
+
+    MILESTONE_ALL_LEGENDARY(
+        "milestone.all_legendary",
+        AchievementCategory.MILESTONES,
+        AchievementRarity.MYTHIC,
+        new BinaryAchievementProgress(),
+        MILESTONE_ALL_EPIC,
+        true,
+        Set.of(),
+        AchievementEvaluator.class
+    ),
+
+    ;
+    // =========================================================================
 
     @NonNull
     @Getter(onMethod_ = @JsonValue)
