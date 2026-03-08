@@ -56,24 +56,24 @@
     "y": -360
   },
   "commit.special.itsy_bitsy": {
-    "x": -288,
-    "y": -528
+    "x": 192,
+    "y": -288
   },
   "commit.special.brute_force": {
-    "x": 312,
-    "y": -552
+    "x": 216,
+    "y": -408
   },
   "commit.rare": {
     "x": -96,
     "y": -432
   },
   "commit.special.atomic_changes": {
-    "x": 456,
-    "y": -648
+    "x": 312,
+    "y": -504
   },
   "commit.special.cross_boundary": {
-    "x": -456,
-    "y": -672
+    "x": -240,
+    "y": -336
   },
   "commit.epic": {
     "x": 72,
@@ -159,6 +159,10 @@
     "x": -552,
     "y": 72
   },
+  "issue.special.hive_mind": {
+    "x": -192,
+    "y": 144
+  },
   "issue.open.epic": {
     "x": -720,
     "y": -72
@@ -166,6 +170,14 @@
   "issue.close.epic": {
     "x": -720,
     "y": 72
+  },
+  "issue.special.oracle": {
+    "x": -408,
+    "y": 144
+  },
+  "issue.special.necromancer": {
+    "x": -288,
+    "y": 144
   },
   "issue.open.legendary": {
     "x": -960,
@@ -177,19 +189,19 @@
   },
   "milestone.first_action": {
     "x": 192,
-    "y": -192
+    "y": -72
   },
   "milestone.polyglot": {
-    "x": 360,
-    "y": -192
+    "x": 408,
+    "y": -120
   },
   "milestone.night_owl": {
-    "x": 288,
-    "y": -288
+    "x": 312,
+    "y": -240
   },
   "milestone.long_time_return": {
-    "x": -336,
-    "y": -336
+    "x": -432,
+    "y": -432
   },
   "milestone.all_rare": {
     "x": 336,
@@ -202,17 +214,5 @@
   "milestone.all_legendary": {
     "x": 504,
     "y": 432
-  },
-  "issue.special.hive_mind": {
-    "x": -192,
-    "y": 144
-  },
-  "issue.special.necromancer": {
-    "x": -288,
-    "y": 144
-  },
-  "issue.special.oracle": {
-    "x": -408,
-    "y": 144
   }
 }

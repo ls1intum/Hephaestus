@@ -10,15 +10,13 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.cache.CacheManager;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.Optional;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.core.env.Environment;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -46,6 +44,7 @@ public class AchievementController {
     private final AchievementRegistry achievementRegistry;
     private final UserRepository userRepository;
     private final Environment env;
+    private final CacheManager cacheManager;
 
     /**
      * Get all achievements with progress for a specific user.
@@ -145,10 +144,6 @@ public class AchievementController {
         return ResponseEntity.accepted().build();
     }
 
-    /**
-     * Hot-reload the achievements configuration.
-     * Drops the current caching and internal registry, parsing the YAML again.
-     */
     @PostMapping("/reload")
     @Operation(
         summary = "Reload achievements configuration",
@@ -158,6 +153,14 @@ public class AchievementController {
     public ResponseEntity<Void> reloadAchievements(WorkspaceContext workspaceContext, @PathVariable String login) {
         log.info("Admin requested achievement configuration reload in workspace: {}", workspaceContext.slug());
         achievementRegistry.reload();
+
+        // Clear the cache to ensure the frontend gets updated definitions
+        var cache = cacheManager.getCache(AchievementService.ACHIEVEMENT_PROGRESS_CACHE);
+        if (cache != null) {
+            log.info("Clearing achievement progress cache after reload");
+            cache.clear();
+        }
+
         return ResponseEntity.ok().build();
     }
 }

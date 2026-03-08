@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { ReactFlowProvider } from "@xyflow/react";
 import { getUserProfileOptions } from "@/api/@tanstack/react-query.gen";
@@ -7,6 +7,8 @@ import { SkillTreeDesigner } from "@/components/achievements/SkillTreeDesigner";
 import { useAllAchievementDefinitions } from "@/hooks/use-all-achievement-definitions";
 import { useAuth } from "@/integrations/auth/AuthContext";
 import { useWorkspaceStore } from "@/stores/workspace-store";
+import { reloadAchievementsMutation } from "@/api/@tanstack/react-query.gen";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/achievement-designer")(
 	{
@@ -15,8 +17,38 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/ach
 );
 
 function AchievementDesignerPage() {
+	const queryClient = useQueryClient();
 	const { userProfile, getUserGithubProfilePictureUrl, username } = useAuth();
 	const selectedSlug = useWorkspaceStore((state) => state.selectedSlug);
+
+	const reloadMutation = useMutation({
+		...reloadAchievementsMutation(),
+		onSuccess: () => {
+			toast.promise(Promise.resolve(), {
+				loading: "Reloading achievement definitions...",
+				success: () => {
+					// Invalidate both definitions and user progress queries
+					queryClient.invalidateQueries({
+						predicate: (query) => {
+							const id = (query.queryKey[0] as any)?._id;
+							return id === "getUserAchievements" || id === "getAllAchievementDefinitions";
+						},
+					});
+					return "Successfully reloaded achievements from YAML";
+				},
+				error: "Failed to reload achievement definitions",
+			});
+		},
+	});
+
+	const handleReload = () => {
+		reloadMutation.mutate({
+			path: {
+				workspaceSlug: selectedSlug || "",
+				login: username || "",
+			},
+		});
+	};
 
 	// Fetch real profile data if we have a workspace context
 	const profileQuery = useQuery({
@@ -44,6 +76,8 @@ function AchievementDesignerPage() {
 					showZoomControls={true}
 					isError={allDefinitionsQuery.isError}
 					isLoading={allDefinitionsQuery.isLoading}
+					onReload={handleReload}
+					isReloading={reloadMutation.isPending}
 				/>
 
 				<div className="flex-1 flex overflow-hidden">

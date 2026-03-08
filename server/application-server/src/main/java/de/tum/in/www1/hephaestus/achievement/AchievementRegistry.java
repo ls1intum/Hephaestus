@@ -9,9 +9,11 @@ import de.tum.in.www1.hephaestus.activity.ActivityEventType;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 
+import java.io.File;
 import java.io.InputStream;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -52,15 +54,33 @@ public class AchievementRegistry {
      * Rebuilds all internal maps and parent relationships.
      */
     public synchronized void reload() {
-        log.info("Loading achievements from {}", ACHIEVEMENTS_FILE_PATH);
         try {
             Resource resource = new ClassPathResource(ACHIEVEMENTS_FILE_PATH);
-            try (InputStream is = resource.getInputStream()) {
-                Map<String, List<AchievementDefinition>> root = yamlMapper.readValue(
-                    is,
-                    new TypeReference<>() {
-                    }
-                );
+        String sourcePath = "src/main/resources/" + ACHIEVEMENTS_FILE_PATH;
+        File sourceFile = new File(sourcePath);
+
+        // In development, prefer the source file over the classpath resource
+        // This allows hot-reloading without requiring a recompile/resource sync
+        if (sourceFile.exists()) {
+            log.info("Found source file at {}, using it for hot-reload.", sourceFile.getAbsolutePath());
+            resource = new FileSystemResource(sourceFile);
+        } else {
+            // Also try relative to the submodule if we are at project root
+            File submoduleSourceFile = new File("server/application-server/" + sourcePath);
+            if (submoduleSourceFile.exists()) {
+                log.info("Found source file at {}, using it for hot-reload.", submoduleSourceFile.getAbsolutePath());
+                resource = new FileSystemResource(submoduleSourceFile);
+            } else {
+                log.info("Loading achievements from classpath: {}", ACHIEVEMENTS_FILE_PATH);
+            }
+        }
+
+        try (InputStream is = resource.getInputStream()) {
+            Map<String, List<AchievementDefinition>> root = yamlMapper.readValue(
+                is,
+                new TypeReference<>() {
+                }
+            );
 
                 List<AchievementDefinition> records = root.getOrDefault("achievements", List.of());
 
@@ -68,20 +88,26 @@ public class AchievementRegistry {
                 Map<String, AchievementDefinition> tempIdMap = new HashMap<>();
                 for (AchievementDefinition record : records) {
                     if (tempIdMap.containsKey(record.id())) {
-                        log.warn("Duplicate achievement ID found in YAML: {}", record.id());
+                        log.warn("Duplicate achievement ID found in YAML: {}. Skipping duplicate.", record.id());
+                        continue;
                     }
                     tempIdMap.put(record.id(), record);
                 }
 
                 // Verify parent references
+                boolean hasErrors = false;
                 for (AchievementDefinition record : records) {
                     if (record.parent() != null && !record.parent().isEmpty()) {
                         if (!tempIdMap.containsKey(record.parent())) {
                             log.error("Achievement '{}' references unknown parent: '{}'", record.id(), record.parent());
-                            // In a strict environment, throw exception to fail startup
-                            throw new IllegalStateException("Invalid parent reference: " + record.parent());
+                            hasErrors = true;
                         }
                     }
+                }
+
+                if (hasErrors) {
+                    log.error("Achievements configuration contains errors. Please check the logs above.");
+                    // We still proceed with what we have, or could decide to not update if we want "all or nothing"
                 }
 
                 // Swap maps atomically-ish (we are in synchronized block)
@@ -92,8 +118,7 @@ public class AchievementRegistry {
 
             }
         } catch (Exception e) {
-            log.error("Failed to load achievements.yml", e);
-            throw new RuntimeException("Could not load achievements configuration", e);
+            log.error("Failed to load achievements.yml! The registry might be empty or outdated.", e);
         }
     }
 

@@ -45,6 +45,15 @@ export const raritySizes = {
 	mythic: "size-24", // 96px
 } as const satisfies Record<AchievementRarity, string>;
 
+export const rarityPixelSizes = {
+	common: 40,
+	uncommon: 48,
+	rare: 56,
+	epic: 64,
+	legendary: 80,
+	mythic: 96,
+} as const satisfies Record<AchievementRarity, number>;
+
 export const rarityLabels = {
 	common: "Common",
 	uncommon: "Uncommon",

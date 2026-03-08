@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=achievements-schema.json
 achievements:
     # ========================================================================
     # Pull Request Achievements
@@ -68,6 +69,7 @@ achievements:
           - PULL_REQUEST_MERGED
       evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
     - id: "pr.special.speedster"
+      parent: "pr.merged.uncommon"
       category: pull_requests
       rarity: epic
       isHidden: true
@@ -165,11 +167,13 @@ achievements:
       category: commits
       rarity: uncommon
       isHidden: true
+      parent: "commit.common.2"
       requirements:
           type: BinaryAchievementProgress
       triggerEvents:
       evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator"
     - id: "commit.special.atomic_changes"
+      parent: "commit.special.brute_force"
       category: commits
       rarity: rare
       isHidden: true
@@ -178,7 +182,7 @@ achievements:
       triggerEvents:
       evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator"
     - id: "commit.special.brute_force"
-      parent: "milestones.first_action"
+      parent: "commit.uncommon.2"
       category: commits
       rarity: uncommon
       isHidden: true
@@ -187,6 +191,7 @@ achievements:
       triggerEvents:
       evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator"
     - id: "commit.special.cross_boundary"
+      parent: "commit.uncommon.1"
       category: commits
       rarity: rare
       isHidden: false
@@ -502,6 +507,7 @@ achievements:
       triggerEvents:
       evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator"
     - id: "milestone.long_time_return"
+      parent: "milestone.long_time_return"
       category: milestones
       rarity: epic
       isHidden: true

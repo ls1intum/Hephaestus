@@ -1,5 +1,5 @@
 import { useReactFlow } from "@xyflow/react";
-import { List, Loader2, Map as MapIcon, Maximize2, Sparkles, ZoomIn, ZoomOut } from "lucide-react";
+import { List, Loader2, Map as MapIcon, Maximize2, RefreshCw, Sparkles, ZoomIn, ZoomOut } from "lucide-react";
 import type { ViewMode } from "@/components/achievements/types";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -10,6 +10,8 @@ interface HeaderProps {
 	showZoomControls?: boolean;
 	isError?: boolean;
 	isLoading?: boolean;
+	onReload?: () => void;
+	isReloading?: boolean;
 }
 
 export function AchievementHeader({
@@ -18,6 +20,8 @@ export function AchievementHeader({
 	showZoomControls = true,
 	isError = false,
 	isLoading = false,
+	onReload,
+	isReloading = false,
 }: HeaderProps) {
 	const reactFlow = useReactFlow();
 
@@ -41,7 +45,9 @@ export function AchievementHeader({
 				</div>
 				<div>
 					<h1 className="text-lg font-bold text-foreground">Contributor Journey</h1>
-					<p className="text-xs text-muted-foreground">Track your own contributions</p>
+					<p className="text-xs text-muted-foreground">
+						{onReload ? "Designer Mode — Configure achievement layouts" : "Track your own contributions"}
+					</p>
 				</div>
 			</div>
 
@@ -101,6 +107,19 @@ export function AchievementHeader({
 							<Maximize2 className="w-4 h-4" />
 						</Button>
 					</div>
+				)}
+
+				{onReload && (
+					<Button
+						variant="outline"
+						size="sm"
+						onClick={onReload}
+						disabled={isReloading}
+						className="gap-2 bg-background/50 backdrop-blur-sm border-primary/20 hover:border-primary/50 text-xs h-9"
+					>
+						<RefreshCw className={`w-3.5 h-3.5 ${isReloading ? "animate-spin" : ""}`} />
+						Reload Definitions
+					</Button>
 				)}
 			</div>
 		</header>

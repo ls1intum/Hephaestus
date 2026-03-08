@@ -1,4 +1,4 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { RefreshCw, Trophy } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -23,6 +23,7 @@ export function AdminAchievementsPage({
 	isLoading,
 	workspaceSlug,
 }: AdminAchievementsPageProps) {
+	const queryClient = useQueryClient();
 	const { username } = useAuth();
 	const [isRecalculatingAll, setIsRecalculatingAll] = useState(false);
 	const [recalculatingUsers, setRecalculatingUsers] = useState<Set<string>>(new Set());
@@ -37,7 +38,16 @@ export function AdminAchievementsPage({
 			}),
 			{
 				loading: "Reloading achievement definitions...",
-				success: "Successfully reloaded achievements from YAML",
+				success: () => {
+					// Invalidate both definitions and user progress queries
+					queryClient.invalidateQueries({
+						predicate: (query) => {
+							const id = (query.queryKey[0] as any)?._id;
+							return id === "getUserAchievements" || id === "getAllAchievementDefinitions";
+						},
+					});
+					return "Successfully reloaded achievements from YAML";
+				},
 				error: "Failed to reload achievement definitions",
 			},
 		);
