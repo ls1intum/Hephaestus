@@ -39,6 +39,54 @@
     "x": 0,
     "y": -120
   },
+  "commit.common.1": {
+    "x": 0,
+    "y": -192
+  },
+  "commit.common.2": {
+    "x": 72,
+    "y": -240
+  },
+  "commit.uncommon.1": {
+    "x": -72,
+    "y": -288
+  },
+  "commit.uncommon.2": {
+    "x": 72,
+    "y": -360
+  },
+  "commit.special.itsy_bitsy": {
+    "x": -288,
+    "y": -528
+  },
+  "commit.special.brute_force": {
+    "x": 312,
+    "y": -552
+  },
+  "commit.rare": {
+    "x": -96,
+    "y": -432
+  },
+  "commit.special.atomic_changes": {
+    "x": 456,
+    "y": -648
+  },
+  "commit.special.cross_boundary": {
+    "x": -456,
+    "y": -672
+  },
+  "commit.epic": {
+    "x": 72,
+    "y": -504
+  },
+  "commit.legendary": {
+    "x": -72,
+    "y": -576
+  },
+  "commit.mythic": {
+    "x": 72,
+    "y": -696
+  },
   "label-communication": {
     "x": 0,
     "y": 120

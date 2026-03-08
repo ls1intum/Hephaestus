@@ -1,19 +1,23 @@
 import { IssueClosedIcon, IssueOpenedIcon } from "@primer/octicons-react";
 import {
+	AnvilIcon,
+	AtomIcon,
 	Clock1Icon,
 	ClockFadingIcon,
 	DropletsIcon,
+	HammerIcon,
 	LanguagesIcon,
 	LibraryIcon,
 	MoonStarIcon,
 	PocketKnifeIcon,
 	ScanEyeIcon,
+	ScanLineIcon,
+	SquaresIntersectIcon,
 } from "lucide-react";
 import { SingularityIcon } from "@/components/achievements/singularity-icon.tsx";
 import { defaultCategoryIcons } from "@/components/achievements/styles.ts";
 import type { AchievementDisplay, AchievementId } from "@/components/achievements/types.ts";
 
-// type PartialAchievementRegistry = Partial<Record<AchievementId, Partial<AchievementDisplay>>>;
 type PartialAchievementRegistry = Partial<Record<AchievementId, AchievementDisplay>>;
 
 const pullRequestAchievement = {
@@ -55,7 +59,67 @@ const pullRequestAchievement = {
 } satisfies PartialAchievementRegistry;
 
 const commitAchievements = {
-	// currently not implemented since they are commented out
+	"commit.common.1": {
+		name: '"Hello World!"',
+		description: "Commit your first code changes",
+		icon: defaultCategoryIcons.commits,
+	},
+	"commit.common.2": {
+		name: "Data Fragment",
+		description: "Push 10 commits in total",
+		icon: defaultCategoryIcons.commits,
+	},
+	"commit.uncommon.1": {
+		name: "Version Controller",
+		description: "Push 50 commits in total",
+		icon: defaultCategoryIcons.commits,
+	},
+	"commit.uncommon.2": {
+		name: "Continuous Integrator",
+		description: "Push 100 commits in total",
+		icon: defaultCategoryIcons.commits,
+	},
+	"commit.rare": {
+		name: "System Shaper",
+		description: "Push 250 commits in total",
+		icon: defaultCategoryIcons.commits,
+	},
+	"commit.epic": {
+		name: "Core Constructor",
+		description: "Push 500 commits in total",
+		icon: defaultCategoryIcons.commits,
+	},
+	"commit.legendary": {
+		name: "Master Builder",
+		description: "Push 1000 commits in total",
+		icon: defaultCategoryIcons.commits,
+	},
+	"commit.mythic": {
+		name: "The Forges Flames",
+		description: "Push 2000 commits in total",
+		icon: AnvilIcon,
+	},
+	"commit.special.itsy_bitsy": {
+		name: "Itsy Bitsy ...",
+		description: "Push a commit with only one line of code changed",
+		icon: ScanLineIcon,
+	},
+	"commit.special.atomic_changes": {
+		name: "Atomic Reconstruction",
+		description: "Push 10 commits in a row that change at most 3 lines of code in at most 2 files.",
+		icon: AtomIcon,
+	},
+	"commit.special.brute_force": {
+		name: "Brute Force",
+		description: "Commit 5 times in 5 minutes",
+		icon: HammerIcon,
+	},
+	"commit.special.cross_boundary": {
+		name: "Cross-Boundary Dev",
+		description:
+			"Push a commit that changes files with at least 2 different programming languages.",
+		icon: SquaresIntersectIcon,
+	},
 } satisfies PartialAchievementRegistry;
 
 const communicationAchievements = {

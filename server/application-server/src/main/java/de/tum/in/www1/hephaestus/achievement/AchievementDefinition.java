@@ -128,16 +128,16 @@ public enum AchievementDefinition {
         AchievementRarity.EPIC,
         new LinearAchievementProgress(1),
         null, // tbd parent
-        false,
+        true,
         Set.of(ActivityEventType.PULL_REQUEST_MERGED),
-        StandardCountEvaluator.class
+        AchievementEvaluator.class // TODO: Needs its own evaluator
     ),
 
     // ========================================================================
     // Commit Achievements
     // ========================================================================
 
-    /* !!! currently not available since Commit Events are not processed !!!
+    // TODO currently not available since Commit Events are not processed !!!
 
     COMMIT_COMMON_1(
         "commit.common.1",
@@ -146,7 +146,7 @@ public enum AchievementDefinition {
         new LinearAchievementProgress(1),
         null,
         false,
-        Set.of(ActivityEventType.COMMIT_PUSHED),
+        Set.of(),
         StandardCountEvaluator.class
     ),
 
@@ -157,7 +157,7 @@ public enum AchievementDefinition {
         new LinearAchievementProgress(10),
         COMMIT_COMMON_1,
         false,
-        Set.of(ActivityEventType.COMMIT_PUSHED),
+        Set.of(),
         StandardCountEvaluator.class
     ),
 
@@ -168,7 +168,7 @@ public enum AchievementDefinition {
         new LinearAchievementProgress(50),
         COMMIT_COMMON_2,
         false,
-        Set.of(ActivityEventType.COMMIT_PUSHED),
+        Set.of(),
         StandardCountEvaluator.class
     ),
 
@@ -179,7 +179,7 @@ public enum AchievementDefinition {
         new LinearAchievementProgress(100),
         COMMIT_UNCOMMON_1,
         false,
-        Set.of(ActivityEventType.COMMIT_PUSHED),
+        Set.of(),
         StandardCountEvaluator.class
     ),
 
@@ -190,7 +190,7 @@ public enum AchievementDefinition {
         new LinearAchievementProgress(250),
         COMMIT_UNCOMMON_2,
         false,
-        Set.of(ActivityEventType.COMMIT_PUSHED),
+        Set.of(),
         StandardCountEvaluator.class
     ),
 
@@ -201,7 +201,7 @@ public enum AchievementDefinition {
         new LinearAchievementProgress(500),
         COMMIT_RARE,
         false,
-        Set.of(ActivityEventType.COMMIT_PUSHED),
+        Set.of(),
         StandardCountEvaluator.class
     ),
 
@@ -212,7 +212,7 @@ public enum AchievementDefinition {
         new LinearAchievementProgress(1000),
         COMMIT_EPIC,
         false,
-        Set.of(ActivityEventType.COMMIT_PUSHED),
+        Set.of(),
         StandardCountEvaluator.class
     ),
 
@@ -223,7 +223,7 @@ public enum AchievementDefinition {
         new LinearAchievementProgress(2000),
         COMMIT_LEGENDARY,
         false,
-        Set.of(ActivityEventType.COMMIT_PUSHED),
+        Set.of(),
         StandardCountEvaluator.class
     ),
 
@@ -233,8 +233,8 @@ public enum AchievementDefinition {
         AchievementRarity.UNCOMMON,
         new BinaryAchievementProgress(false),
         null,
-        false,
-        Set.of(ActivityEventType.COMMIT_PUSHED),
+        true,
+        Set.of(),
         AchievementEvaluator.class // TODO: adjust that later based on single line change
     ),
 
@@ -244,8 +244,8 @@ public enum AchievementDefinition {
         AchievementRarity.RARE,
         new BinaryAchievementProgress(false),
         null,
-        false,
-        Set.of(ActivityEventType.COMMIT_PUSHED),
+        true,
+        Set.of(),
         AchievementEvaluator.class // TODO: adjust that later (10 commits in row, max 3 lines in 2 files)
     ),
 
@@ -255,8 +255,8 @@ public enum AchievementDefinition {
         AchievementRarity.UNCOMMON,
         new BinaryAchievementProgress(false),
         null,
-        false,
-        Set.of(ActivityEventType.COMMIT_PUSHED),
+        true,
+        Set.of(),
         AchievementEvaluator.class // TODO: adjust that later (5 commits in 5 mins)
     ),
 
@@ -267,11 +267,9 @@ public enum AchievementDefinition {
         new BinaryAchievementProgress(false),
         null,
         false,
-        Set.of(ActivityEventType.COMMIT_PUSHED),
+        Set.of(),
         AchievementEvaluator.class // TODO: adjust that later (2 different programming languages)
     ),
-
-     TODO: Remove the block comment markers to re-enable when the DomainEvent for commits is implemented! */
 
     // ========================================================================
     // Review Achievements (triggered by any review activity)
@@ -388,7 +386,7 @@ public enum AchievementDefinition {
         AchievementRarity.MYTHIC,
         new LinearAchievementProgress(1000),
         REVIEW_LEGENDARY,
-        false,
+        true,
         Set.of(
             ActivityEventType.REVIEW_APPROVED,
             ActivityEventType.REVIEW_CHANGES_REQUESTED,

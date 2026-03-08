@@ -2240,6 +2240,18 @@ components:
           - pr.merged.epic
           - pr.merged.legendary
           - pr.special.speedster
+          - commit.common.1
+          - commit.common.2
+          - commit.uncommon.1
+          - commit.uncommon.2
+          - commit.rare
+          - commit.epic
+          - commit.legendary
+          - commit.mythic
+          - commit.special.itsy_bitsy
+          - commit.special.atomic_changes
+          - commit.special.brute_force
+          - commit.special.cross_boundary
           - review.common.1
           - review.common.2
           - review.uncommon.1
@@ -2279,6 +2291,18 @@ components:
           - pr.merged.epic
           - pr.merged.legendary
           - pr.special.speedster
+          - commit.common.1
+          - commit.common.2
+          - commit.uncommon.1
+          - commit.uncommon.2
+          - commit.rare
+          - commit.epic
+          - commit.legendary
+          - commit.mythic
+          - commit.special.itsy_bitsy
+          - commit.special.atomic_changes
+          - commit.special.brute_force
+          - commit.special.cross_boundary
           - review.common.1
           - review.common.2
           - review.uncommon.1
