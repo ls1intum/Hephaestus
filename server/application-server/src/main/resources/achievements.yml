@@ -1,0 +1,536 @@
+achievements:
+    # ========================================================================
+    # Pull Request Achievements
+    # ========================================================================
+    - id: "pr.merged.common.1"
+      category: pull_requests
+      rarity: common
+      isHidden: false
+      requirements:
+          type: LinearAchievementProgress
+          target: 1
+      triggerEvents:
+          - PULL_REQUEST_MERGED
+      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+    - id: "pr.merged.common.2"
+      category: pull_requests
+      rarity: common
+      isHidden: false
+      requirements:
+          type: LinearAchievementProgress
+          target: 3
+      parent: "pr.merged.common.1"
+      triggerEvents:
+          - PULL_REQUEST_MERGED
+      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+    - id: "pr.merged.uncommon"
+      category: pull_requests
+      rarity: uncommon
+      isHidden: false
+      requirements:
+          type: LinearAchievementProgress
+          target: 7
+      parent: "pr.merged.common.2"
+      triggerEvents:
+          - PULL_REQUEST_MERGED
+      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+    - id: "pr.merged.rare"
+      category: pull_requests
+      rarity: rare
+      isHidden: false
+      requirements:
+          type: LinearAchievementProgress
+          target: 15
+      parent: "pr.merged.uncommon"
+      triggerEvents:
+          - PULL_REQUEST_MERGED
+      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+    - id: "pr.merged.epic"
+      category: pull_requests
+      rarity: epic
+      isHidden: false
+      requirements:
+          type: LinearAchievementProgress
+          target: 30
+      parent: "pr.merged.rare"
+      triggerEvents:
+          - PULL_REQUEST_MERGED
+      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+    - id: "pr.merged.legendary"
+      category: pull_requests
+      rarity: legendary
+      isHidden: false
+      requirements:
+          type: LinearAchievementProgress
+          target: 50
+      parent: "pr.merged.epic"
+      triggerEvents:
+          - PULL_REQUEST_MERGED
+      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+    - id: "pr.special.speedster"
+      category: pull_requests
+      rarity: epic
+      isHidden: true
+      requirements:
+          type: LinearAchievementProgress
+          target: 1
+      triggerEvents:
+          - PULL_REQUEST_MERGED
+      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator"
+
+    # ========================================================================
+    # Commit Achievements
+    # ========================================================================
+
+    - id: "commit.common.1"
+      category: commits
+      rarity: common
+      isHidden: false
+      requirements:
+          type: LinearAchievementProgress
+          target: 1
+      triggerEvents:
+      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+    - id: "commit.common.2"
+      category: commits
+      rarity: common
+      isHidden: false
+      requirements:
+          type: LinearAchievementProgress
+          target: 10
+      parent: "commit.common.1"
+      triggerEvents:
+      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+    - id: "commit.uncommon.1"
+      category: commits
+      rarity: uncommon
+      isHidden: false
+      requirements:
+          type: LinearAchievementProgress
+          target: 50
+      parent: "commit.common.2"
+      triggerEvents:
+      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+    - id: "commit.uncommon.2"
+      category: commits
+      rarity: uncommon
+      isHidden: false
+      requirements:
+          type: LinearAchievementProgress
+          target: 100
+      parent: "commit.uncommon.1"
+      triggerEvents:
+      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+    - id: "commit.rare"
+      category: commits
+      rarity: rare
+      isHidden: false
+      requirements:
+          type: LinearAchievementProgress
+          target: 250
+      parent: "commit.uncommon.2"
+      triggerEvents:
+      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+    - id: "commit.epic"
+      category: commits
+      rarity: epic
+      isHidden: false
+      requirements:
+          type: LinearAchievementProgress
+          target: 500
+      parent: "commit.rare"
+      triggerEvents:
+      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+    - id: "commit.legendary"
+      category: commits
+      rarity: legendary
+      isHidden: false
+      requirements:
+          type: LinearAchievementProgress
+          target: 1000
+      parent: "commit.epic"
+      triggerEvents:
+      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+    - id: "commit.mythic"
+      category: commits
+      rarity: mythic
+      isHidden: false
+      requirements:
+          type: LinearAchievementProgress
+          target: 2000
+      parent: "commit.legendary"
+      triggerEvents:
+      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+    - id: "commit.special.itsy_bitsy"
+      category: commits
+      rarity: uncommon
+      isHidden: true
+      requirements:
+          type: BinaryAchievementProgress
+      triggerEvents:
+      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator"
+    - id: "commit.special.atomic_changes"
+      category: commits
+      rarity: rare
+      isHidden: true
+      requirements:
+          type: BinaryAchievementProgress
+      triggerEvents:
+      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator"
+    - id: "commit.special.brute_force"
+      category: commits
+      rarity: uncommon
+      isHidden: true
+      requirements:
+          type: BinaryAchievementProgress
+      triggerEvents:
+      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator"
+    - id: "commit.special.cross_boundary"
+      category: commits
+      rarity: rare
+      isHidden: false
+      requirements:
+          type: BinaryAchievementProgress
+      triggerEvents:
+      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator"
+
+    # ========================================================================
+    # Review Achievements
+    # ========================================================================
+
+    - id: "review.common.1"
+      category: communication
+      rarity: common
+      isHidden: false
+      requirements:
+          type: LinearAchievementProgress
+          target: 1
+      triggerEvents:
+          - REVIEW_APPROVED
+          - REVIEW_CHANGES_REQUESTED
+          - REVIEW_COMMENTED
+      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.ReviewCountEvaluator"
+    - id: "review.common.2"
+      category: communication
+      rarity: common
+      isHidden: false
+      requirements:
+          type: LinearAchievementProgress
+          target: 10
+      parent: "review.common.1"
+      triggerEvents:
+          - REVIEW_APPROVED
+          - REVIEW_CHANGES_REQUESTED
+          - REVIEW_COMMENTED
+      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.ReviewCountEvaluator"
+    - id: "review.uncommon.1"
+      category: communication
+      rarity: uncommon
+      isHidden: false
+      requirements:
+          type: LinearAchievementProgress
+          target: 25
+      parent: "review.common.2"
+      triggerEvents:
+          - REVIEW_APPROVED
+          - REVIEW_CHANGES_REQUESTED
+          - REVIEW_COMMENTED
+      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.ReviewCountEvaluator"
+    - id: "review.uncommon.2"
+      category: communication
+      rarity: uncommon
+      isHidden: false
+      requirements:
+          type: LinearAchievementProgress
+          target: 50
+      parent: "review.uncommon.1"
+      triggerEvents:
+          - REVIEW_APPROVED
+          - REVIEW_CHANGES_REQUESTED
+          - REVIEW_COMMENTED
+      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.ReviewCountEvaluator"
+    - id: "review.rare"
+      category: communication
+      rarity: rare
+      isHidden: false
+      requirements:
+          type: LinearAchievementProgress
+          target: 100
+      parent: "review.uncommon.2"
+      triggerEvents:
+          - REVIEW_APPROVED
+          - REVIEW_CHANGES_REQUESTED
+          - REVIEW_COMMENTED
+      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.ReviewCountEvaluator"
+    - id: "review.epic"
+      category: communication
+      rarity: epic
+      isHidden: false
+      requirements:
+          type: LinearAchievementProgress
+          target: 200
+      parent: "review.rare"
+      triggerEvents:
+          - REVIEW_APPROVED
+          - REVIEW_CHANGES_REQUESTED
+          - REVIEW_COMMENTED
+      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.ReviewCountEvaluator"
+    - id: "review.legendary"
+      category: communication
+      rarity: legendary
+      isHidden: false
+      requirements:
+          type: LinearAchievementProgress
+          target: 500
+      parent: "review.epic"
+      triggerEvents:
+          - REVIEW_APPROVED
+          - REVIEW_CHANGES_REQUESTED
+          - REVIEW_COMMENTED
+      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.ReviewCountEvaluator"
+    - id: "review.mythic"
+      category: communication
+      rarity: mythic
+      isHidden: true
+      requirements:
+          type: LinearAchievementProgress
+          target: 1000
+      parent: "review.legendary"
+      triggerEvents:
+          - REVIEW_APPROVED
+          - REVIEW_CHANGES_REQUESTED
+          - REVIEW_COMMENTED
+      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.ReviewCountEvaluator"
+
+    # ========================================================================
+    # Issue Achievements
+    # ========================================================================
+
+    - id: "issue.open.common.1"
+      category: issues
+      rarity: common
+      isHidden: false
+      requirements:
+          type: LinearAchievementProgress
+          target: 1
+      triggerEvents:
+          - ISSUE_CREATED
+      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+    - id: "issue.open.common.2"
+      category: issues
+      rarity: common
+      isHidden: false
+      requirements:
+          type: LinearAchievementProgress
+          target: 5
+      parent: "issue.open.common.1"
+      triggerEvents:
+          - ISSUE_CREATED
+      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+    - id: "issue.open.uncommon"
+      category: issues
+      rarity: uncommon
+      isHidden: false
+      requirements:
+          type: LinearAchievementProgress
+          target: 10
+      parent: "issue.open.common.2"
+      triggerEvents:
+          - ISSUE_CREATED
+      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+    - id: "issue.open.rare"
+      category: issues
+      rarity: rare
+      isHidden: false
+      requirements:
+          type: LinearAchievementProgress
+          target: 15
+      parent: "issue.open.uncommon"
+      triggerEvents:
+          - ISSUE_CREATED
+      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+    - id: "issue.open.epic"
+      category: issues
+      rarity: epic
+      isHidden: false
+      requirements:
+          type: LinearAchievementProgress
+          target: 30
+      parent: "issue.open.rare"
+      triggerEvents:
+          - ISSUE_CREATED
+      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+    - id: "issue.open.legendary"
+      category: issues
+      rarity: legendary
+      isHidden: false
+      requirements:
+          type: LinearAchievementProgress
+          target: 50
+      parent: "issue.open.epic"
+      triggerEvents:
+          - ISSUE_CREATED
+      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+    - id: "issue.close.common.1"
+      category: issues
+      rarity: common
+      isHidden: false
+      requirements:
+          type: LinearAchievementProgress
+          target: 1
+      triggerEvents:
+          - ISSUE_CLOSED
+      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+    - id: "issue.close.common.2"
+      category: issues
+      rarity: common
+      isHidden: false
+      requirements:
+          type: LinearAchievementProgress
+          target: 5
+      parent: "issue.close.common.1"
+      triggerEvents:
+          - ISSUE_CLOSED
+      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+    - id: "issue.close.uncommon"
+      category: issues
+      rarity: uncommon
+      isHidden: false
+      requirements:
+          type: LinearAchievementProgress
+          target: 10
+      parent: "issue.close.common.2"
+      triggerEvents:
+          - ISSUE_CLOSED
+      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+    - id: "issue.close.rare"
+      category: issues
+      rarity: rare
+      isHidden: false
+      requirements:
+          type: LinearAchievementProgress
+          target: 15
+      parent: "issue.close.uncommon"
+      triggerEvents:
+          - ISSUE_CLOSED
+      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+    - id: "issue.close.epic"
+      category: issues
+      rarity: epic
+      isHidden: false
+      requirements:
+          type: LinearAchievementProgress
+          target: 30
+      parent: "issue.close.rare"
+      triggerEvents:
+          - ISSUE_CLOSED
+      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+    - id: "issue.close.legendary"
+      category: issues
+      rarity: legendary
+      isHidden: false
+      requirements:
+          type: LinearAchievementProgress
+          target: 50
+      parent: "issue.close.epic"
+      triggerEvents:
+          - ISSUE_CLOSED
+      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+    - id: "issue.special.hive_mind"
+      category: issues
+      rarity: rare
+      isHidden: false
+      requirements:
+          type: BinaryAchievementProgress
+      parent: "issue.close.common.1"
+      triggerEvents:
+          - ISSUE_CLOSED
+      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator"
+    - id: "issue.special.oracle"
+      category: issues
+      rarity: epic
+      isHidden: true
+      requirements:
+          type: BinaryAchievementProgress
+      parent: "issue.close.common.1"
+      triggerEvents:
+          - ISSUE_CLOSED
+      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator"
+    - id: "issue.special.necromancer"
+      category: issues
+      rarity: epic
+      isHidden: true
+      requirements:
+          type: BinaryAchievementProgress
+      parent: "issue.close.common.1"
+      triggerEvents:
+          - ISSUE_CLOSED
+      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator"
+    - id: "milestone.first_action"
+      category: milestones
+      rarity: common
+      isHidden: false
+      requirements:
+          type: LinearAchievementProgress
+          target: 1
+      triggerEvents:
+          - PULL_REQUEST_OPENED
+          - PULL_REQUEST_CLOSED
+          - ISSUE_CREATED
+          - ISSUE_CLOSED
+          - REVIEW_APPROVED
+          - REVIEW_CHANGES_REQUESTED
+          - REVIEW_COMMENTED
+      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+    - id: "milestone.polyglot"
+      category: milestones
+      rarity: uncommon
+      isHidden: false
+      requirements:
+          type: BinaryAchievementProgress
+      parent: "milestone.first_action"
+      triggerEvents:
+      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator"
+    - id: "milestone.night_owl"
+      category: milestones
+      rarity: epic
+      isHidden: true
+      requirements:
+          type: BinaryAchievementProgress
+      parent: "milestone.first_action"
+      triggerEvents:
+      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator"
+    - id: "milestone.long_time_return"
+      category: milestones
+      rarity: epic
+      isHidden: true
+      requirements:
+          type: BinaryAchievementProgress
+      triggerEvents:
+      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator"
+    - id: "milestone.all_rare"
+      category: milestones
+      rarity: epic
+      isHidden: true
+      requirements:
+          type: BinaryAchievementProgress
+      triggerEvents:
+      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator"
+    - id: "milestone.all_epic"
+      category: milestones
+      rarity: legendary
+      isHidden: true
+      requirements:
+          type: BinaryAchievementProgress
+      parent: "milestone.all_rare"
+      triggerEvents:
+      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator"
+    - id: "milestone.all_legendary"
+      category: milestones
+      rarity: mythic
+      isHidden: true
+      requirements:
+          type: BinaryAchievementProgress
+      parent: "milestone.all_epic"
+      triggerEvents:
+      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator"

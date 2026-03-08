@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.achievement;
 
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
@@ -33,11 +34,9 @@ import java.util.List;
  * @see ActivitySavedEvent
  * @see AchievementService
  */
+@Slf4j
 @Component
 public class AchievementEventListener {
-
-    private static final Logger log = LoggerFactory.getLogger(AchievementEventListener.class);
-
     private final AchievementService achievementService;
 
     public AchievementEventListener(AchievementService achievementService) {
@@ -69,7 +68,7 @@ public class AchievementEventListener {
                     "User {} unlocked {} achievement(s): {}",
                     event.user().getLogin(),
                     unlocked.size(),
-                    unlocked.stream().map(AchievementDefinition::getId).toList()
+                    unlocked.stream().map(AchievementDefinition::id).toList()
                 );
             }
         } catch (Exception e) {

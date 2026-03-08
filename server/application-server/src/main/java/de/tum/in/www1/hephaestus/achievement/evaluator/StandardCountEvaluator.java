@@ -16,7 +16,7 @@ import org.springframework.stereotype.Component;
  * causes the achievement to unlock (current == target).
  *
  * @see AchievementEvaluator
- * @see AchievementDefinition#getEvaluatorClass()
+ * @see AchievementDefinition#evaluatorClass()
  */
 @Slf4j
 @Component

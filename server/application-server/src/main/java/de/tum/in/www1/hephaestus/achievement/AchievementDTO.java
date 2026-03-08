@@ -33,7 +33,7 @@ public record AchievementDTO(
     @NonNull
     @Schema(description = "Visual level tier/rarity for badge styling", example = "common")
     AchievementRarity rarity,
-    @Nullable @Schema(description = "Parent achievement in progression chain", example = "first_pull") AchievementDefinition parent,
+    @Nullable @Schema(description = "Parent achievement in progression chain", example = "first_pull") String parent,
     @NonNull @Schema(description = "Current status of the achievement for this user", example = "unlocked") AchievementStatus status,
 //    @NonNull @Schema(description = "Current progress count (e.g., 4 PRs merged)", example = "4") long progress,
 //    @NonNull @Schema(description = "Required count to unlock (e.g., 5 PRs)", example = "5") long maxProgress,
@@ -59,12 +59,9 @@ public record AchievementDTO(
     ) {
         return new AchievementDTO(
             definition,
-//            definition.getName(),
-//            definition.getDescription(),
-//            definition.getIcon(),
-            definition.getCategory(),
-            definition.getRarity(),
-            definition.getParent(),
+            definition.category(),
+            definition.rarity(),
+            definition.parent(),
             status,
             progressData,
             unlockedAt

@@ -4,6 +4,7 @@ import de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator;
 import de.tum.in.www1.hephaestus.achievement.progress.AchievementProgress;
 import de.tum.in.www1.hephaestus.activity.ActivityEventType;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.CacheEvict;
@@ -27,9 +28,9 @@ import java.util.stream.Collectors;
  *   <li>Unlocks achievements by setting {@code unlockedAt} when the threshold is met</li>
  * </ul>
  *
- * <h3>Enum-Strategy Pattern</h3>
+ * <h3>Strategy Pattern</h3>
  * <p>Each {@link AchievementDefinition} declares its evaluator class via
- * {@link AchievementDefinition#getEvaluatorClass()}. This service builds a strategy map from
+ * {@link AchievementDefinition#evaluatorClass()}. This service builds a strategy map from
  * all Spring-managed {@link AchievementEvaluator} beans at startup, keyed by their
  * concrete class. At evaluation time, the correct evaluator is resolved from this map
  * without any switch/if logic — ensuring the system is open for extension (add a new
@@ -55,6 +56,7 @@ import java.util.stream.Collectors;
  * @see AchievementDefinition
  * @see AchievementEvaluator
  */
+@Slf4j
 @Service
 public class AchievementService {
 
@@ -63,9 +65,6 @@ public class AchievementService {
      * <p>Key format: user login (workspace-scoped).
      */
     public static final String ACHIEVEMENT_PROGRESS_CACHE = "achievementProgress";
-
-    private static final Logger log = LoggerFactory.getLogger(AchievementService.class);
-
     private final UserAchievementRepository userAchievementRepository;
 
     /**
@@ -73,12 +72,15 @@ public class AchievementService {
      * Built once at construction from all {@link AchievementEvaluator} beans in the context.
      */
     private final Map<Class<? extends AchievementEvaluator>, AchievementEvaluator> evaluatorMap;
+    private final AchievementRegistry achievementRegistry;
 
     public AchievementService(
         UserAchievementRepository userAchievementRepository,
-        List<AchievementEvaluator> evaluators
+        List<AchievementEvaluator> evaluators,
+        AchievementRegistry achievementRegistry
     ) {
         this.userAchievementRepository = userAchievementRepository;
+        this.achievementRegistry = achievementRegistry;
         this.evaluatorMap = evaluators
             .stream()
             .collect(Collectors.toMap(AchievementEvaluator::getClass, Function.identity()));
@@ -97,17 +99,26 @@ public class AchievementService {
      * @throws IllegalStateException if no evaluator bean is registered for the definition's evaluatorClass
      */
     private AchievementEvaluator resolveEvaluator(AchievementDefinition definition) {
-        AchievementEvaluator evaluator = evaluatorMap.get(definition.getEvaluatorClass());
-        if (evaluator == null) {
-            throw new IllegalStateException(
-                "No AchievementEvaluator bean registered for class: " +
-                    definition.getEvaluatorClass().getName() +
-                    " (required by achievement " +
-                    definition.getId() +
-                    ")"
-            );
+        try {
+            Class<?> clazz = Class.forName(definition.evaluatorClass());
+            if (!AchievementEvaluator.class.isAssignableFrom(clazz)) {
+                throw new IllegalStateException("Evaluator class does not implement AchievementEvaluator: " + definition.evaluatorClass());
+            }
+            @SuppressWarnings("unchecked")
+            AchievementEvaluator evaluator = evaluatorMap.get((Class<? extends AchievementEvaluator>) clazz);
+            if (evaluator == null) {
+                throw new IllegalStateException(
+                    "No AchievementEvaluator bean registered for class: " +
+                        definition.evaluatorClass() +
+                        " (required by achievement " +
+                        definition.id() +
+                        ")"
+                );
+            }
+            return evaluator;
+        } catch (ClassNotFoundException e) {
+            throw new IllegalStateException("Evaluator class not found: " + definition.evaluatorClass(), e);
         }
-        return evaluator;
     }
 
     /**
@@ -137,14 +148,14 @@ public class AchievementService {
         Instant occurredAt = event.occurredAt();
 
         // Find achievements triggered by this event type
-        List<AchievementDefinition> candidates = AchievementDefinition.getByTriggerEvent(eventType);
+        List<AchievementDefinition> candidates = achievementRegistry.getByTriggerEvent(eventType);
         if (candidates.isEmpty()) {
             log.debug("No achievements triggered by event type: {}", eventType);
             return List.of();
         }
 
         // Fetch existing progress records for the triggered achievement types
-        Set<String> candidateIds = candidates.stream().map(AchievementDefinition::getId).collect(Collectors.toSet());
+        Set<String> candidateIds = candidates.stream().map(AchievementDefinition::id).collect(Collectors.toSet());
 
         Map<String, UserAchievement> existingMap = userAchievementRepository
             .findByUserIdAndAchievementIdIn(user.getId(), candidateIds)
@@ -155,12 +166,12 @@ public class AchievementService {
 
         for (AchievementDefinition achievementDefinition : candidates) {
             // Get existing progress or create a new record
-            UserAchievement uaProgress = existingMap.get(achievementDefinition.getId());
+            UserAchievement uaProgress = existingMap.get(achievementDefinition.id());
             if (uaProgress == null) {
                 uaProgress = UserAchievement.builder()
                     .user(user)
-                    .achievementId(achievementDefinition.getId())
-                    .progressData(achievementDefinition.getRequirements())
+                    .achievementId(achievementDefinition.id())
+                    .progressData(achievementDefinition.requirements())
                     .build();
             }
 
@@ -179,7 +190,7 @@ public class AchievementService {
                 log.info(
                     "Achievement unlocked: userId={}, achievement={}, progress={}, occurredAt={}",
                     user.getId(),
-                    achievementDefinition.getId(),
+                    achievementDefinition.id(),
                     uaProgress.getProgressData(),
                     occurredAt
                 );
@@ -216,7 +227,7 @@ public class AchievementService {
     @Transactional(readOnly = true)
     public boolean isUnlocked(Long userId, AchievementDefinition achievement) {
         return userAchievementRepository
-            .findByUserIdAndAchievementId(userId, achievement.getId())
+            .findByUserIdAndAchievementId(userId, achievement.id())
             .map(ua -> ua.getUnlockedAt() != null)
             .orElse(false);
     }
@@ -255,8 +266,8 @@ public class AchievementService {
 
         // Build DTOs for all achievements
         List<AchievementDTO> result = new ArrayList<>();
-        for (AchievementDefinition achievement : AchievementDefinition.values()) {
-            UserAchievement progress = progressMap.get(achievement.getId());
+        for (AchievementDefinition achievement : achievementRegistry.values()) {
+            UserAchievement progress = progressMap.get(achievement.id());
             if (progress == null)
                 continue;
             AchievementStatus status = computeStatus(achievement, progressMap);
@@ -279,20 +290,20 @@ public class AchievementService {
      */
     private AchievementStatus computeStatus(AchievementDefinition achievement, Map<String, UserAchievement> progressMap) {
         // Check if this achievement is unlocked
-        UserAchievement progress = progressMap.get(achievement.getId());
+        UserAchievement progress = progressMap.get(achievement.id());
         if (progress != null && progress.getUnlockedAt() != null) {
             return AchievementStatus.UNLOCKED;
         }
 
         // Check parent
-        AchievementDefinition parent = achievement.getParent();
-        if (parent == null) {
+        String parentId = achievement.parent();
+        if (parentId == null || parentId.isEmpty()) {
             // Root achievement with no parent is always available
             return AchievementStatus.AVAILABLE;
         }
 
         // Parent must be unlocked for this to be available
-        UserAchievement parentProgress = progressMap.get(parent.getId());
+        UserAchievement parentProgress = progressMap.get(parentId);
         if (parentProgress != null && parentProgress.getUnlockedAt() != null) {
             return AchievementStatus.AVAILABLE;
         }
@@ -301,18 +312,18 @@ public class AchievementService {
     }
 
     public List<String> getAllAchievementDefinitionIds() {
-        return Arrays.stream(AchievementDefinition.values()).map(AchievementDefinition::getId).toList();
+        return achievementRegistry.values().stream().map(AchievementDefinition::id).toList();
     }
 
     /**
      * Return all definitions as LOCKED with 0 progress
      */
     public List<AchievementDTO> getAllAchievementDefinitions() {
-        return Arrays.stream(AchievementDefinition.values())
+        return achievementRegistry.values().stream()
             .map(def -> AchievementDTO.fromDefinition(
                 def,
                 AchievementStatus.LOCKED,
-                def.getRequirements(),
+                def.requirements(),
                 Optional.empty()
             ))
             .toList();

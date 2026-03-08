@@ -7,7 +7,7 @@
  *
  * <h3>Core Components</h3>
  * <ul>
- *   <li>{@link AchievementDefinition} - Enum defining all achievements (source of truth)</li>
+ *   <li>{@link AchievementDefinition} - Record defining an achievement (loaded from achievements.yml)</li>
  *   <li>{@link UserAchievement} - JPA entity tracking achievement progress and unlocks per user</li>
  *   <li>{@link AchievementService} - Business logic for incrementing progress and unlocking achievements</li>
  *   <li>{@link AchievementEvaluator} - Strategy interface for progress updates</li>

@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Optional;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.env.Environment;
@@ -33,16 +34,16 @@ import de.tum.in.www1.hephaestus.workspace.authorization.RequireAtLeastWorkspace
  * Achievements are global to users (not workspace-specific), but this endpoint
  * respects workspace membership for access control.
  */
+@Slf4j
 @WorkspaceScopedController
 @RequestMapping("/users/{login}/achievements")
 @Tag(name = "Achievements", description = "User achievement progress and unlocks")
 @RequiredArgsConstructor
 public class AchievementController {
 
-    private static final Logger log = LoggerFactory.getLogger(AchievementController.class);
-
     private final AchievementService achievementService;
     private final AchievementRecalculationService achievementRecalculationService;
+    private final AchievementRegistry achievementRegistry;
     private final UserRepository userRepository;
     private final Environment env;
 
@@ -142,5 +143,21 @@ public class AchievementController {
         achievementRecalculationService.recalculateUser(user);
 
         return ResponseEntity.accepted().build();
+    }
+
+    /**
+     * Hot-reload the achievements configuration.
+     * Drops the current caching and internal registry, parsing the YAML again.
+     */
+    @PostMapping("/reload")
+    @Operation(
+        summary = "Reload achievements configuration",
+        description = "Hot reloads the achievements.yml configuration without requiring a restart. Admin only."
+    )
+    @RequireAtLeastWorkspaceAdmin
+    public ResponseEntity<Void> reloadAchievements(WorkspaceContext workspaceContext, @PathVariable String login) {
+        log.info("Admin requested achievement configuration reload in workspace: {}", workspaceContext.slug());
+        achievementRegistry.reload();
+        return ResponseEntity.ok().build();
     }
 }

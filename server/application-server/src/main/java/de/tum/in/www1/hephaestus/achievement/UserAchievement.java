@@ -2,7 +2,6 @@ package de.tum.in.www1.hephaestus.achievement;
 
 import de.tum.in.www1.hephaestus.achievement.progress.AchievementProgress;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
-import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -13,10 +12,8 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
-import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import java.time.Instant;
-import java.util.Map;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -24,10 +21,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.annotations.Type;
 import org.hibernate.type.SqlTypes;
 import org.springframework.lang.Nullable;
-import org.springframework.validation.annotation.Validated;
 
 /**
  * Tracks achievement progress and unlocks per user.
@@ -48,7 +43,7 @@ import org.springframework.validation.annotation.Validated;
  *
  * <h3>Achievement Lookup</h3>
  * <p>The {@code achievementId} stores the string ID from {@link AchievementDefinition}.
- * To get the full achievement metadata, use {@link AchievementDefinition#fromId(String)}.
+ * To get the full achievement metadata, use {@link AchievementRegistry#getById(String)}.
  *
  * @see AchievementDefinition
  * @see AchievementService#checkAndUnlock
@@ -86,9 +81,9 @@ public class UserAchievement {
     private User user;
 
     /**
-     * The achievement ID (references {@link AchievementDefinition#getId()}).
+     * The achievement ID (references {@link AchievementDefinition#id()}).
      *
-     * <p>We store the string ID rather than the enum directly because:
+     * <p>We store the string ID rather than the record directly because:
      * <ul>
      *   <li>Enum values may be renamed in code without breaking data</li>
      *   <li>Achievement definitions are in code, not database</li>
@@ -129,13 +124,5 @@ public class UserAchievement {
         }
     }
 
-    /**
-     * Get the full achievement definition metadata.
-     *
-     * @return the achievement definition, or throws if the ID is unknown
-     * @throws IllegalArgumentException if achievementId is not a valid AchievementDefinition
-     */
-    public AchievementDefinition getAchievementDefinition() {
-        return AchievementDefinition.fromId(achievementId);
-    }
+    // Removed direct getAchievementDefinition to avoid Entity-Service coupling
 }
