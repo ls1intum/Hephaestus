@@ -35,6 +35,7 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.gitprovider.user.gitlab.GitLabUserService;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import java.time.Duration;
 import java.time.Instant;
@@ -63,6 +64,9 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
     private static final Long PROVIDER_ID = 2L;
     private static final long RAW_APPROVER_ID = 11111L;
     private static final long ENTITY_APPROVER_ID = 300L;
+
+    @Mock
+    private GitLabUserService gitLabUserService;
 
     @Mock
     private PullRequestRepository pullRequestRepository;
@@ -106,6 +110,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         );
 
         processor = new GitLabMergeRequestProcessor(
+            gitLabUserService,
             pullRequestRepository,
             reviewRepository,
             milestoneRepository,

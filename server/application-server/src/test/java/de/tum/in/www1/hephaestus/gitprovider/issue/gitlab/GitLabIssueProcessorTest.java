@@ -31,6 +31,7 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.gitprovider.user.gitlab.GitLabUserService;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import java.time.Duration;
 import java.util.HashSet;
@@ -56,6 +57,9 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
     private static final long RAW_USER_ID = 18024L;
     private static final long ENTITY_USER_ID = 200L;
     private static final Long PROVIDER_ID = 2L;
+
+    @Mock
+    private GitLabUserService gitLabUserService;
 
     @Mock
     private IssueRepository issueRepository;
@@ -96,6 +100,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
         );
 
         processor = new GitLabIssueProcessor(
+            gitLabUserService,
             issueRepository,
             milestoneRepository,
             userRepository,

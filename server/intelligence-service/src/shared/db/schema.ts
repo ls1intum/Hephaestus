@@ -439,6 +439,7 @@ export const discussion = pgTable(
 			name: "fk_discussion_provider",
 		}),
 		unique("uq_discussion_repo_number").on(table.number, table.repositoryId),
+		unique("uknlcwyn2relkgw95s8okgpkqrt").on(table.number, table.repositoryId),
 		unique("uk_discussion_answer_comment_id").on(table.answerCommentId),
 		unique("uq_discussion_provider_native_id").on(table.nativeId, table.providerId),
 	],
@@ -469,6 +470,7 @@ export const discussionCategory = pgTable(
 			name: "fk_discussion_category_repository",
 		}).onDelete("cascade"),
 		unique("uq_discussion_category_repo_slug").on(table.slug, table.repositoryId),
+		unique("uk6cjmvjyh5jc9bfnn8i9wggbo5").on(table.slug, table.repositoryId),
 	],
 );
 
@@ -1729,6 +1731,7 @@ export const team = pgTable(
 		nativeId: bigint("native_id", { mode: "number" }).notNull(),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		providerId: bigint("provider_id", { mode: "number" }).notNull(),
+		slug: varchar({ length: 512 }).notNull(),
 	},
 	(table) => [
 		foreignKey({
@@ -1736,10 +1739,10 @@ export const team = pgTable(
 			foreignColumns: [gitProvider.id],
 			name: "fk_team_provider",
 		}),
-		unique("uk_team_provider_organization_name").on(
-			table.name,
+		unique("uk_team_provider_organization_slug").on(
 			table.organization,
 			table.providerId,
+			table.slug,
 		),
 		unique("uq_team_provider_native_id").on(table.nativeId, table.providerId),
 	],

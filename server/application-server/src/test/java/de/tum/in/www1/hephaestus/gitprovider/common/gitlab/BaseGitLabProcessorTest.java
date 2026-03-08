@@ -20,6 +20,7 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.gitprovider.user.gitlab.GitLabUserService;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import java.time.Duration;
 import java.time.Instant;
@@ -38,6 +39,9 @@ import org.mockito.Mock;
 @Tag("unit")
 @DisplayName("BaseGitLabProcessor")
 class BaseGitLabProcessorTest extends BaseUnitTest {
+
+    @Mock
+    private GitLabUserService gitLabUserService;
 
     @Mock
     private UserRepository userRepository;
@@ -68,6 +72,7 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
         );
 
         processor = new TestProcessor(
+            gitLabUserService,
             userRepository,
             labelRepository,
             repositoryRepository,
@@ -377,6 +382,7 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
     private static class TestProcessor extends BaseGitLabProcessor {
 
         TestProcessor(
+            GitLabUserService gitLabUserService,
             UserRepository userRepository,
             LabelRepository labelRepository,
             RepositoryRepository repositoryRepository,
@@ -385,6 +391,7 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
             GitLabProperties gitLabProperties
         ) {
             super(
+                gitLabUserService,
                 userRepository,
                 labelRepository,
                 repositoryRepository,
