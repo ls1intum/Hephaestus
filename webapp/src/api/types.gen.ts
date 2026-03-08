@@ -877,7 +877,7 @@ export type Profile = {
  * Linear progress with current and target counts
  */
 export type LinearAchievementProgress = Omit<AchievementProgress, 'type'> & {
-    current: number;
+    current?: number;
     target: number;
     type: 'LinearAchievementProgress';
 };
@@ -1105,11 +1105,11 @@ export type Achievement = {
     /**
      * Unique identifier for the achievement
      */
-    id: 'pr.merged.common.1' | 'pr.merged.common.2' | 'pr.merged.uncommon' | 'pr.merged.rare' | 'pr.merged.epic' | 'pr.merged.legendary' | 'pr.special.speedster' | 'commit.common.1' | 'commit.common.2' | 'commit.uncommon.1' | 'commit.uncommon.2' | 'commit.rare' | 'commit.epic' | 'commit.legendary' | 'commit.mythic' | 'commit.special.itsy_bitsy' | 'commit.special.atomic_changes' | 'commit.special.brute_force' | 'commit.special.cross_boundary' | 'review.common.1' | 'review.common.2' | 'review.uncommon.1' | 'review.uncommon.2' | 'review.rare' | 'review.epic' | 'review.legendary' | 'review.mythic' | 'issue.open.common.1' | 'issue.open.common.2' | 'issue.open.uncommon' | 'issue.open.rare' | 'issue.open.epic' | 'issue.open.legendary' | 'issue.close.common.1' | 'issue.close.common.2' | 'issue.close.uncommon' | 'issue.close.rare' | 'issue.close.epic' | 'issue.close.legendary' | 'milestone.first_action' | 'milestone.polyglot' | 'milestone.night_owl' | 'milestone.long_time_return' | 'milestone.all_rare' | 'milestone.all_epic' | 'milestone.all_legendary';
+    id: string;
     /**
      * Parent achievement in progression chain
      */
-    parent?: 'pr.merged.common.1' | 'pr.merged.common.2' | 'pr.merged.uncommon' | 'pr.merged.rare' | 'pr.merged.epic' | 'pr.merged.legendary' | 'pr.special.speedster' | 'commit.common.1' | 'commit.common.2' | 'commit.uncommon.1' | 'commit.uncommon.2' | 'commit.rare' | 'commit.epic' | 'commit.legendary' | 'commit.mythic' | 'commit.special.itsy_bitsy' | 'commit.special.atomic_changes' | 'commit.special.brute_force' | 'commit.special.cross_boundary' | 'review.common.1' | 'review.common.2' | 'review.uncommon.1' | 'review.uncommon.2' | 'review.rare' | 'review.epic' | 'review.legendary' | 'review.mythic' | 'issue.open.common.1' | 'issue.open.common.2' | 'issue.open.uncommon' | 'issue.open.rare' | 'issue.open.epic' | 'issue.open.legendary' | 'issue.close.common.1' | 'issue.close.common.2' | 'issue.close.uncommon' | 'issue.close.rare' | 'issue.close.epic' | 'issue.close.legendary' | 'milestone.first_action' | 'milestone.polyglot' | 'milestone.night_owl' | 'milestone.long_time_return' | 'milestone.all_rare' | 'milestone.all_epic' | 'milestone.all_legendary';
+    parent?: string;
     /**
      * The structured progress data based on the achievements evaluator
      */
@@ -2765,4 +2765,24 @@ export type RecalculateUserAchievementsResponses = {
      * Recalculation task started successfully
      */
     202: unknown;
+};
+
+export type ReloadAchievementsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        login: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/users/{login}/achievements/reload';
+};
+
+export type ReloadAchievementsResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
 };

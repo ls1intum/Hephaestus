@@ -8,6 +8,8 @@ import org.springframework.lang.Nullable;
 
 import java.util.Set;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
 /**
  * Record acting as the central source of truth for all achievement definitions.
  * Replaces the previous AchievementDefinition enum and maintains metadata from achievements.yml.
@@ -23,6 +25,7 @@ import java.util.Set;
  * @param evaluatorClass The implementation class used to evaluate progress for this achievement.
  *                       Resolved at runtime via the Spring-managed evaluator strategy map.
  */
+@Schema(name = "AchievementDefinition", description = "Static definition metadata for an achievement")
 public record AchievementDefinition(
     @NonNull String id,
     @NonNull AchievementCategory category,

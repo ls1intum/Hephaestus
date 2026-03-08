@@ -2213,6 +2213,30 @@ paths:
       summary: Recalculate user achievements
       tags:
       - Achievements
+  /workspaces/{workspaceSlug}/users/{login}/achievements/reload:
+    post:
+      description: Hot reloads the achievements.yml configuration without requiring
+        a restart. Admin only.
+      operationId: reloadAchievements
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: login
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+      summary: Reload achievements configuration
+      tags:
+      - Achievements
 components:
   schemas:
     Achievement:
@@ -2232,104 +2256,10 @@ components:
         id:
           type: string
           description: Unique identifier for the achievement
-          enum:
-          - pr.merged.common.1
-          - pr.merged.common.2
-          - pr.merged.uncommon
-          - pr.merged.rare
-          - pr.merged.epic
-          - pr.merged.legendary
-          - pr.special.speedster
-          - commit.common.1
-          - commit.common.2
-          - commit.uncommon.1
-          - commit.uncommon.2
-          - commit.rare
-          - commit.epic
-          - commit.legendary
-          - commit.mythic
-          - commit.special.itsy_bitsy
-          - commit.special.atomic_changes
-          - commit.special.brute_force
-          - commit.special.cross_boundary
-          - review.common.1
-          - review.common.2
-          - review.uncommon.1
-          - review.uncommon.2
-          - review.rare
-          - review.epic
-          - review.legendary
-          - review.mythic
-          - issue.open.common.1
-          - issue.open.common.2
-          - issue.open.uncommon
-          - issue.open.rare
-          - issue.open.epic
-          - issue.open.legendary
-          - issue.close.common.1
-          - issue.close.common.2
-          - issue.close.uncommon
-          - issue.close.rare
-          - issue.close.epic
-          - issue.close.legendary
-          - milestone.first_action
-          - milestone.polyglot
-          - milestone.night_owl
-          - milestone.long_time_return
-          - milestone.all_rare
-          - milestone.all_epic
-          - milestone.all_legendary
-          example: first_pull
+          example: pr.merged.common.1
         parent:
           type: string
           description: Parent achievement in progression chain
-          enum:
-          - pr.merged.common.1
-          - pr.merged.common.2
-          - pr.merged.uncommon
-          - pr.merged.rare
-          - pr.merged.epic
-          - pr.merged.legendary
-          - pr.special.speedster
-          - commit.common.1
-          - commit.common.2
-          - commit.uncommon.1
-          - commit.uncommon.2
-          - commit.rare
-          - commit.epic
-          - commit.legendary
-          - commit.mythic
-          - commit.special.itsy_bitsy
-          - commit.special.atomic_changes
-          - commit.special.brute_force
-          - commit.special.cross_boundary
-          - review.common.1
-          - review.common.2
-          - review.uncommon.1
-          - review.uncommon.2
-          - review.rare
-          - review.epic
-          - review.legendary
-          - review.mythic
-          - issue.open.common.1
-          - issue.open.common.2
-          - issue.open.uncommon
-          - issue.open.rare
-          - issue.open.epic
-          - issue.open.legendary
-          - issue.close.common.1
-          - issue.close.common.2
-          - issue.close.uncommon
-          - issue.close.rare
-          - issue.close.epic
-          - issue.close.legendary
-          - milestone.first_action
-          - milestone.polyglot
-          - milestone.night_owl
-          - milestone.long_time_return
-          - milestone.all_rare
-          - milestone.all_epic
-          - milestone.all_legendary
           example: first_pull
         progressData:
           description: The structured progress data based on the achievements evaluator
@@ -2744,7 +2674,6 @@ components:
             format: int32
       description: Linear progress with current and target counts
       required:
-      - current
       - target
     Profile:
       type: object

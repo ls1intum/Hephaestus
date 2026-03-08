@@ -23,7 +23,7 @@ import java.util.Optional;
  */
 @Schema(description = "Achievement with user-specific progress information")
 public record AchievementDTO(
-    @NonNull @Schema(description = "Unique identifier for the achievement", example = "first_pull") AchievementDefinition id,
+    @NonNull @Schema(description = "Unique identifier for the achievement", example = "pr.merged.common.1") String id,
 //    @NonNull @Schema(description = "Human-readable name", example = "First Merge") String name,
 //    @NonNull
 //    @Schema(description = "Description of how to earn the achievement", example = "Merge your first pull request")
@@ -58,7 +58,7 @@ public record AchievementDTO(
         Optional<Instant> unlockedAt
     ) {
         return new AchievementDTO(
-            definition,
+            definition.id(),
             definition.category(),
             definition.rarity(),
             definition.parent(),
