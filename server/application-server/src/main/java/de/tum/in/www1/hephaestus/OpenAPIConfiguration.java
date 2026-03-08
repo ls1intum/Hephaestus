@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus;
 
+import de.tum.in.www1.hephaestus.achievement.AchievementRegistry;
 import io.swagger.v3.oas.annotations.OpenAPIDefinition;
 import io.swagger.v3.oas.annotations.enums.SecuritySchemeType;
 import io.swagger.v3.oas.annotations.info.Contact;
@@ -68,11 +69,18 @@ public class OpenAPIConfiguration {
     private static final List<String> SAFE_DOMAIN_SUFFIXES = List.of("AchievementProgress");
 
     @Bean
-    public OpenApiCustomizer schemaCustomizer() {
+    public OpenApiCustomizer schemaCustomizer(AchievementRegistry registry) {
         return openApi -> {
             processApplicationServerSchemas(openApi);
             importIntelligenceServiceSpec(openApi);
             processAllPaths(openApi);
+
+            // Inject AchievementId enum based on registry keys
+            if (openApi.getComponents() != null) {
+                Schema<String> idSchema = new StringSchema();
+                idSchema.setEnum(new ArrayList<>(registry.getAchievementIds()));
+                openApi.getComponents().addSchemas("AchievementId", idSchema);
+            }
         };
     }
 

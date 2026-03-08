@@ -148,6 +148,15 @@ public class AchievementRegistry {
     }
 
     /**
+     * Get all registered achievement IDs.
+     *
+     * @return a set of all achievement IDs
+     */
+    public Set<String> getAchievementIds() {
+        return Collections.unmodifiableSet(achievementsById.keySet());
+    }
+
+    /**
      * Get all registered achievements.
      *
      * @return an unmodifiable list of all achievements

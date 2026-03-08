@@ -23,7 +23,7 @@ import java.util.Optional;
  */
 @Schema(description = "Achievement with user-specific progress information")
 public record AchievementDTO(
-    @NonNull @Schema(description = "Unique identifier for the achievement", example = "pr.merged.common.1") String id,
+    @NonNull @Schema(description = "Unique identifier for the achievement", example = "pr.merged.common.1", implementation = String.class, ref = "#/components/schemas/AchievementId") String id,
 //    @NonNull @Schema(description = "Human-readable name", example = "First Merge") String name,
 //    @NonNull
 //    @Schema(description = "Description of how to earn the achievement", example = "Merge your first pull request")

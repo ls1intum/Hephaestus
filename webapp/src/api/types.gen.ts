@@ -1094,6 +1094,8 @@ export type AssignRoleRequest = {
     userId: number;
 };
 
+export type AchievementId = 'issue.close.epic' | 'issue.open.uncommon' | 'milestone.long_time_return' | 'review.rare' | 'commit.legendary' | 'review.legendary' | 'commit.common.2' | 'commit.common.1' | 'issue.special.hive_mind' | 'issue.open.common.1' | 'issue.open.common.2' | 'commit.epic' | 'pr.merged.common.2' | 'pr.merged.common.1' | 'milestone.all_epic' | 'issue.open.legendary' | 'review.uncommon.2' | 'issue.open.rare' | 'review.uncommon.1' | 'pr.merged.epic' | 'review.mythic' | 'milestone.night_owl' | 'commit.special.itsy_bitsy' | 'commit.mythic' | 'pr.special.speedster' | 'milestone.first_action' | 'review.epic' | 'commit.special.brute_force' | 'issue.close.rare' | 'commit.rare' | 'issue.close.uncommon' | 'issue.close.common.1' | 'issue.close.common.2' | 'milestone.all_rare' | 'commit.special.cross_boundary' | 'commit.uncommon.1' | 'commit.uncommon.2' | 'issue.special.necromancer' | 'pr.merged.rare' | 'issue.special.oracle' | 'pr.merged.legendary' | 'issue.open.epic' | 'milestone.all_legendary' | 'pr.merged.uncommon' | 'milestone.polyglot' | 'issue.close.legendary' | 'review.common.1' | 'review.common.2' | 'commit.special.atomic_changes';
+
 /**
  * Achievement with user-specific progress information
  */
@@ -1105,7 +1107,7 @@ export type Achievement = {
     /**
      * Unique identifier for the achievement
      */
-    id: string;
+    id: AchievementId;
     /**
      * Parent achievement in progression chain
      */
