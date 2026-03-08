@@ -49,13 +49,13 @@ const pullRequestAchievement = {
 	},
 	"pr.special.speedster": {
 		name: "Speedster",
-		description: "",
+		description: "Open a PR and close it in 5 minutes or less",
 		icon: Clock1Icon,
 	},
 } satisfies PartialAchievementRegistry;
 
 const commitAchievements = {
-	// currently not imeplented since they are commented out
+	// currently not implemented since they are commented out
 } satisfies PartialAchievementRegistry;
 
 const communicationAchievements = {

@@ -5,15 +5,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.data.jpa.repository.QueryHints;
-import jakarta.persistence.QueryHint;
-import java.util.stream.Stream;
 
 /**
  * Activity event repository with leaderboard aggregation queries.
@@ -503,16 +503,16 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
     );
 
     /**
-     * Stream all activity events for a specific actor in chronological order.
+     * Slice all activity events for a specific actor in chronological order.
      *
      * <p>Used for recalculating achievements correctly after historical data syncs.
-     * Uses a specific fetch size to prevent out-of-memory errors for users with
-     * tens of thousands of commits.
+     * Uses Slice instead of Stream to prevent open-cursor issues when interleaving
+     * nested database queries during processing.
      *
      * @param actorId the user's ID
-     * @return stream of activity events ordered by occurred_at ASC
+     * @param pageable the pagination information
+     * @return slice of activity events ordered by occurred_at ASC
      */
-    @QueryHints(value = @QueryHint(name = org.hibernate.jpa.HibernateHints.HINT_FETCH_SIZE, value = "500"))
     @Query(
         """
         SELECT e
@@ -521,5 +521,8 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         ORDER BY e.occurredAt ASC
         """
     )
-    Stream<ActivityEvent> streamByActorIdOrderByOccurredAtAsc(@Param("actorId") Long actorId);
+    Slice<ActivityEvent> findSliceByActorIdOrderByOccurredAtAsc(
+        @Param("actorId") Long actorId,
+        Pageable pageable
+    );
 }

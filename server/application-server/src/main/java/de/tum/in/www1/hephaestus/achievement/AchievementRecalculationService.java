@@ -2,15 +2,17 @@ package de.tum.in.www1.hephaestus.achievement;
 
 import de.tum.in.www1.hephaestus.activity.ActivityEvent;
 import de.tum.in.www1.hephaestus.activity.ActivityEventRepository;
+import de.tum.in.www1.hephaestus.activity.ActivityTargetType;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.stream.Stream;
 
 /**
  * Service dedicated strictly to recalculating achievement progress from scratch.
@@ -47,17 +49,32 @@ public class AchievementRecalculationService {
         // 1. Wipe existing state
         userAchievementRepository.deleteByUserId(user.getId());
 
-        // 2. Replay all events chronologically
+        // 2. Replay all events chronologically in batches to avoid open-cursor DB errors
         int count = 0;
-        try (Stream<ActivityEvent> events = activityEventRepository.streamByActorIdOrderByOccurredAtAsc(user.getId())) {
-            for (ActivityEvent event : (Iterable<ActivityEvent>) events::iterator) {
-                achievementService.checkAndUnlock(user, event.getEventType(), event.getOccurredAt());
+        Pageable pageable = PageRequest.of(0, 500);
+
+        while (true) {
+            Slice<ActivityEvent> slice = activityEventRepository.findSliceByActorIdOrderByOccurredAtAsc(user.getId(), pageable);
+            for (ActivityEvent event : slice.getContent()) {
+                ActivitySavedEvent savedEvent = new ActivitySavedEvent(
+                    event.getActor(),
+                    event.getEventType(),
+                    event.getOccurredAt(),
+                    event.getWorkspace().getId(),
+                    ActivityTargetType.fromValue(event.getTargetType()),
+                    event.getTargetId()
+                );
+                achievementService.checkAndUnlock(savedEvent);
                 count++;
 
                 if (count % 1000 == 0) {
                     log.debug("Recalculation progress for user {}: processed {} events", user.getLogin(), count);
                 }
             }
+            if (!slice.hasNext()) {
+                break;
+            }
+            pageable = slice.nextPageable();
         }
 
         log.info("Completed achievement recalculation for user: login={}, eventsProcessed={}", user.getLogin(), count);
