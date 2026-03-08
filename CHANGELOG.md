@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.25.1](https://github.com/ls1intum/Hephaestus/compare/v0.25.0...v0.25.1) (2026-03-08)
+
+### 🐛 Bug Fixes
+
+* **gitprovider:** workaround for GitLab includeSubgroups bug dropping direct projects ([#809](https://github.com/ls1intum/Hephaestus/issues/809)) ([68406ba](https://github.com/ls1intum/Hephaestus/commit/68406ba3b67d1017e49b762ed6a098d7205adc55))
+
+### ♻️ Code Refactoring
+
+* **db:** rename github_id to remote_id, add provider_type discriminator ([#808](https://github.com/ls1intum/Hephaestus/issues/808)) ([8debddc](https://github.com/ls1intum/Hephaestus/commit/8debddc2b0a8952600566391fad14bf82f952805))
+
 ## [0.25.0](https://github.com/ls1intum/Hephaestus/compare/v0.24.0...v0.25.0) (2026-03-07)
 
 ### 🚀 Features
