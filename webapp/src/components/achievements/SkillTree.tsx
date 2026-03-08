@@ -15,6 +15,7 @@ import { type AnyAchievementEdge, generateSkillTreeData } from "@/components/ach
 import { AchievementEdge } from "./AchievementEdge.tsx";
 import { AchievementNode } from "./AchievementNode.tsx";
 import { AvatarNode } from "./AvatarNode.tsx";
+import { CategoryLabelNode } from "./CategoryLabels.tsx";
 import { EqualizerEdge } from "./EqualizerEdge.tsx";
 import { SkillTreeGraphBackground } from "./SkillTreeGraphBackground.tsx";
 import { SynthwaveEdge } from "./SynthwaveEdge.tsx";
@@ -22,6 +23,7 @@ import { SynthwaveEdge } from "./SynthwaveEdge.tsx";
 const nodeTypes: NodeTypes = {
 	achievement: AchievementNode,
 	avatar: AvatarNode,
+	categoryLabel: CategoryLabelNode,
 };
 
 const edgeTypes: EdgeTypes = {
@@ -120,7 +122,10 @@ export function SkillTree({ user, achievements }: SkillTreeProps) {
 
 				{/* Mini map */}
 				<MiniMap
-					nodeColor={(node: AchievementNode | AvatarNode) => {
+					nodeColor={(node: NonNullable<Parameters<typeof MiniMap>[0]>["nodeColor"] extends ((n: infer T) => any) | undefined | string ? (T extends { type: string } ? T : (AchievementNode | AvatarNode | CategoryLabelNode)) : (AchievementNode | AvatarNode | CategoryLabelNode)) => {
+						if (node.type === "categoryLabel") {
+							return "rgba(0,0,0,0)";
+						}
 						if (node.type === "achievement") {
 							const status = node.data.achievement.status;
 							if (isDark) {

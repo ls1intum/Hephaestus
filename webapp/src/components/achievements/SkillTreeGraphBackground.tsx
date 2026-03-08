@@ -1,5 +1,4 @@
 import { useViewport } from "@xyflow/react";
-import { CategoryLabels } from "./CategoryLabels";
 
 interface SkillTreeGraphBackgroundProps {
 	/** If true, renders designer-mode axis lines through the origin. */
@@ -71,9 +70,6 @@ export function SkillTreeGraphBackground({ showAxes = false }: SkillTreeGraphBac
 						<div className="w-160 h-160 rounded-full border border-primary/5 absolute" />
 					</>
 				)}
-
-				{/* Category labels */}
-				<CategoryLabels />
 			</div>
 		</div>
 	);

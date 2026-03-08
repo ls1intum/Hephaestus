@@ -11,6 +11,8 @@ import {
 	rarityWeights,
 	type UIAchievement,
 } from "@/components/achievements/types.ts";
+import type { CategoryLabelNode } from "@/components/achievements/CategoryLabels.tsx";
+import { categoryMeta } from "@/components/achievements/styles.ts";
 import coordinatesData from "./coordinates.json";
 
 export function sortByRarity<T extends { rarity: AchievementRarity }>(achievements: T[]): T[] {
@@ -85,10 +87,10 @@ export function generateSkillTreeData(
 	achievements: UIAchievement[] = [],
 	edgeDisplayMode: EdgeDisplayMode = "equalizer-static",
 ): {
-	nodes: (AchievementNode | AvatarNode)[];
+	nodes: (AchievementNode | AvatarNode | CategoryLabelNode)[];
 	edges: AnyAchievementEdge[];
 } {
-	const nodes: (AchievementNode | AvatarNode)[] = [];
+	const nodes: (AchievementNode | AvatarNode | CategoryLabelNode)[] = [];
 
 	// Build lookup map for achievements by ID
 	const achievementMap = new Map(achievements.map((a) => [a.id, a]));
@@ -189,6 +191,37 @@ export function generateSkillTreeData(
 		const categoryAchievements = achievements
 			.filter((a) => a.category === category)
 			.sort(compareByRarity);
+
+		if (category !== "milestones") {
+			const labelNodeId = `label-${category}`;
+			const meta = categoryMeta[category];
+			const labelSavedCoords = (coordinatesData as Record<string, { x: number; y: number }>)[
+				labelNodeId
+			];
+			const labelRadius = 900;
+			let x = labelSavedCoords?.x;
+			let y = labelSavedCoords?.y;
+
+			if (x === undefined || y === undefined) {
+				const radians = (meta.angle * Math.PI) / 180;
+				x = Math.round(Math.cos(radians) * labelRadius);
+				y = Math.round(Math.sin(radians) * labelRadius);
+			}
+
+			nodes.push({
+				id: labelNodeId,
+				position: {
+					x: x,
+					y: y,
+				},
+				data: {
+					category: category,
+					name: meta.name,
+				},
+				type: "categoryLabel",
+				zIndex: 5,
+			} satisfies CategoryLabelNode);
+		}
 
 		for (const achievement of categoryAchievements) {
 			const savedCoords = (coordinatesData as Record<string, { x: number; y: number }>)[

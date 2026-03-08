@@ -22,6 +22,7 @@ import {
 import { AchievementEdge } from "./AchievementEdge.tsx";
 import { AchievementNode } from "./AchievementNode.tsx";
 import { AvatarNode } from "./AvatarNode.tsx";
+import { CategoryLabelNode } from "./CategoryLabels.tsx";
 import { DesignerToolbar, type SnapGridSize } from "./DesignerToolbar.tsx";
 import { EqualizerEdge } from "./EqualizerEdge.tsx";
 import { SkillTreeGraphBackground } from "./SkillTreeGraphBackground.tsx";
@@ -30,6 +31,7 @@ import { SynthwaveEdge } from "./SynthwaveEdge.tsx";
 const nodeTypes: NodeTypes = {
 	achievement: AchievementNode,
 	avatar: AvatarNode,
+	categoryLabel: CategoryLabelNode,
 };
 
 const edgeTypes: EdgeTypes = {
@@ -67,7 +69,7 @@ export interface SkillTreeDesignerProps {
 }
 
 export function SkillTreeDesigner({ user, allDefinitions }: SkillTreeDesignerProps) {
-	const [nodes, setNodes, onNodesChangeRef] = useNodesState<AchievementNode | AvatarNode>([]);
+	const [nodes, setNodes, onNodesChangeRef] = useNodesState<AchievementNode | AvatarNode | CategoryLabelNode>([]);
 	const [edges, setEdges, onEdgesChange] = useEdgesState<AnyAchievementEdge>([]);
 	const [isDraggable, setIsDraggable] = useState(true);
 	const [isSnapping, setIsSnapping] = useState(true);
@@ -106,6 +108,12 @@ export function SkillTreeDesigner({ user, allDefinitions }: SkillTreeDesignerPro
 		const layoutMap = nodes.reduce(
 			(coords, node) => {
 				if (node.type === "avatar") coords.avatar = { x: 0, y: 0 };
+				if (node.type === "categoryLabel") {
+					coords[node.id] = {
+						x: Math.round(node.position.x),
+						y: Math.round(node.position.y),
+					};
+				}
 				if (node.type === "achievement") {
 					const rawId = node.data.achievement.id;
 					coords[rawId] = {
@@ -179,11 +187,13 @@ export function SkillTreeDesigner({ user, allDefinitions }: SkillTreeDesignerPro
 
 			<ReactFlow
 				nodes={nodes.map(
-					(n) =>
-						({
+					(n) => {
+						if (n.type === 'categoryLabel') return n;
+						return {
 							...n,
 							data: { ...n.data, showTooltips },
-						}) as AchievementNode | AvatarNode,
+						} as AchievementNode | AvatarNode;
+					}
 				)}
 				edges={edges}
 				onNodesChange={handleNodesChange}
@@ -236,7 +246,10 @@ export function SkillTreeDesigner({ user, allDefinitions }: SkillTreeDesignerPro
 					showInteractive={false}
 				/>
 				<MiniMap
-					nodeColor={(node: AchievementNode | AvatarNode) => {
+					nodeColor={(node: AchievementNode | AvatarNode | CategoryLabelNode) => {
+						if (node.type === "categoryLabel") {
+							return "rgba(0,0,0,0)";
+						}
 						if (node.type === "achievement") {
 							const status = node.data.achievement.status;
 							if (isDark) {
