@@ -21,10 +21,8 @@ import de.tum.in.www1.hephaestus.gitprovider.common.spi.OrganizationMembershipLi
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationMemberRole;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationMembershipRepository;
-import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
-import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -35,7 +33,8 @@ import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Service for synchronizing GitLab group memberships via GraphQL API.
@@ -47,6 +46,11 @@ import org.springframework.transaction.annotation.Transactional;
  * The sync populates {@code OrganizationMembership} records and fires
  * {@link OrganizationMembershipListener#onOrganizationMembershipsSynced}
  * so downstream modules (e.g., workspace) can reconcile their member lists.
+ * <p>
+ * <b>Concurrency:</b> User upserts follow the same pattern as
+ * {@code GitHubUserProcessor}: advisory lock → free login conflicts → native SQL
+ * upsert, all within an isolated REQUIRES_NEW transaction to prevent unique
+ * constraint violations on login renames.
  */
 @Service
 @ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
@@ -62,29 +66,31 @@ public class GitLabGroupMemberSyncService {
     private static final int ADMIN_ACCESS_LEVEL_THRESHOLD = 40;
 
     private final GitLabGraphQlClientProvider graphQlClientProvider;
-    private final OrganizationRepository organizationRepository;
     private final OrganizationMembershipRepository organizationMembershipRepository;
     private final UserRepository userRepository;
     private final GitProviderRepository gitProviderRepository;
     private final GitLabProperties gitLabProperties;
     private final OrganizationMembershipListener organizationMembershipListener;
+    private final TransactionTemplate requiresNewTransaction;
 
     public GitLabGroupMemberSyncService(
         GitLabGraphQlClientProvider graphQlClientProvider,
-        OrganizationRepository organizationRepository,
         OrganizationMembershipRepository organizationMembershipRepository,
         UserRepository userRepository,
         GitProviderRepository gitProviderRepository,
         GitLabProperties gitLabProperties,
-        @Nullable OrganizationMembershipListener organizationMembershipListener
+        @Nullable OrganizationMembershipListener organizationMembershipListener,
+        TransactionTemplate transactionTemplate
     ) {
         this.graphQlClientProvider = graphQlClientProvider;
-        this.organizationRepository = organizationRepository;
         this.organizationMembershipRepository = organizationMembershipRepository;
         this.userRepository = userRepository;
         this.gitProviderRepository = gitProviderRepository;
         this.gitLabProperties = gitLabProperties;
         this.organizationMembershipListener = organizationMembershipListener;
+        // Isolated transaction for each user upsert — matches GitHubUserProcessor pattern.
+        this.requiresNewTransaction = new TransactionTemplate(transactionTemplate.getTransactionManager());
+        this.requiresNewTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
     /**
@@ -93,11 +99,14 @@ public class GitLabGroupMemberSyncService {
      * Paginates through the {@code GetGroupMembers} GraphQL query, upserts each
      * member as a User + OrganizationMembership, removes stale memberships,
      * and fires the organization-synced event.
+     * <p>
+     * Circuit breaker permission and rate limit checks are performed per page,
+     * matching the canonical pattern in {@code GitLabGroupSyncService.reconcileDirectProjects}.
      *
      * @param scopeId       the workspace/scope ID for authentication
      * @param groupFullPath the full path of the group (e.g., "org/team")
      * @param organization  the Organization entity for this group
-     * @return the number of members synced, or -1 on failure
+     * @return the number of unique members synced, or -1 on failure
      */
     public int syncGroupMemberships(Long scopeId, String groupFullPath, Organization organization) {
         if (organization == null || groupFullPath == null || groupFullPath.isBlank()) {
@@ -111,33 +120,27 @@ public class GitLabGroupMemberSyncService {
 
         String safeGroupPath = sanitizeForLog(groupFullPath);
         GitProvider provider = resolveProvider();
-        if (provider == null) {
-            return -1;
-        }
         Long providerId = provider.getId();
 
         Set<Long> syncedUserIds = new HashSet<>();
-        int memberCount = 0;
         String cursor = null;
         int pageCount = 0;
         boolean syncCompletedNormally = false;
 
         try {
-            graphQlClientProvider.acquirePermission();
-
             do {
-                // Rate limit awareness between pages
-                if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
-                    try {
-                        graphQlClientProvider.waitIfRateLimitLow(scopeId);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        log.warn(
-                            "Interrupted during rate limit wait: context=groupMemberSync, groupPath={}",
-                            safeGroupPath
-                        );
-                        break;
-                    }
+                // Per-page circuit breaker + rate limit wait
+                // (matches reconcileDirectProjects canonical pattern)
+                graphQlClientProvider.acquirePermission();
+                try {
+                    graphQlClientProvider.waitIfRateLimitLow(scopeId);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    log.warn(
+                        "Interrupted during rate limit wait: context=groupMemberSync, groupPath={}",
+                        safeGroupPath
+                    );
+                    break;
                 }
 
                 int pageSize = adaptPageSize(DEFAULT_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId));
@@ -163,6 +166,17 @@ public class GitLabGroupMemberSyncService {
                     break;
                 }
 
+                // Check for partial errors (GraphQL can return data + errors simultaneously)
+                if (response.getErrors() != null && !response.getErrors().isEmpty()) {
+                    log.warn(
+                        "Partial GraphQL errors in group members response: scopeId={}, groupPath={}, page={}, errors={}",
+                        scopeId,
+                        safeGroupPath,
+                        pageCount,
+                        response.getErrors()
+                    );
+                }
+
                 graphQlClientProvider.recordSuccess();
 
                 List<GitLabGroupMemberResponse> members = response
@@ -174,15 +188,14 @@ public class GitLabGroupMemberSyncService {
                         continue;
                     }
 
-                    User user = ensureUserExists(member.user(), providerId);
-                    if (user == null) {
+                    Long userId = upsertUser(member.user(), providerId);
+                    if (userId == null) {
                         continue;
                     }
 
                     OrganizationMemberRole role = mapAccessLevel(member.accessLevel());
-                    organizationMembershipRepository.upsertMembership(organization.getId(), user.getId(), role);
-                    syncedUserIds.add(user.getId());
-                    memberCount++;
+                    organizationMembershipRepository.upsertMembership(organization.getId(), userId, role);
+                    syncedUserIds.add(userId);
                 }
 
                 // Check pagination
@@ -218,8 +231,9 @@ public class GitLabGroupMemberSyncService {
                 );
             }
 
-            // Fire sync event so downstream modules can reconcile
-            if (organizationMembershipListener != null) {
+            // Fire sync event only on complete sync — downstream reconciliation
+            // should not run on partial data to avoid incorrect member removal.
+            if (syncCompletedNormally && organizationMembershipListener != null) {
                 organizationMembershipListener.onOrganizationMembershipsSynced(
                     new OrganizationSyncedEvent(organization.getId(), organization.getLogin())
                 );
@@ -229,12 +243,12 @@ public class GitLabGroupMemberSyncService {
                 "Synced group memberships: scopeId={}, groupPath={}, memberCount={}, pages={}, complete={}",
                 scopeId,
                 safeGroupPath,
-                memberCount,
+                syncedUserIds.size(),
                 pageCount + 1,
                 syncCompletedNormally
             );
 
-            return memberCount;
+            return syncedUserIds.size();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             log.warn("Interrupted during group membership sync: groupPath={}", safeGroupPath);
@@ -247,12 +261,19 @@ public class GitLabGroupMemberSyncService {
     }
 
     /**
-     * Ensures a User entity exists for the given GitLab member.
-     * Uses find-or-create with {@code UserRepository} since no GitLabUserProcessor exists.
+     * Upserts a User entity for the given GitLab member using native SQL.
+     * <p>
+     * Runs in a REQUIRES_NEW transaction following the concurrency-safe pattern
+     * from {@code GitHubUserProcessor}: advisory lock → free login conflicts → upsert.
+     * This prevents unique constraint violations when a GitLab user renames their
+     * username and another user previously held that login.
+     *
+     * @param memberUser the GitLab member user data
+     * @param providerId the GitLab provider's database ID
+     * @return the user's database ID, or null if the GID is invalid
      */
-    @Transactional
     @Nullable
-    User ensureUserExists(GitLabMemberUser memberUser, Long providerId) {
+    Long upsertUser(GitLabMemberUser memberUser, Long providerId) {
         long nativeId;
         try {
             nativeId = extractNumericId(memberUser.id());
@@ -261,29 +282,42 @@ public class GitLabGroupMemberSyncService {
             return null;
         }
 
-        User user = userRepository
-            .findByNativeIdAndProviderId(nativeId, providerId)
-            .orElseGet(() -> {
-                User newUser = new User();
-                newUser.setNativeId(nativeId);
-                newUser.setProvider(gitProviderRepository.getReferenceById(providerId));
-                newUser.setCreatedAt(Instant.now());
-                newUser.setType(User.Type.USER);
-                return newUser;
-            });
+        String login = memberUser.username();
+        String name = memberUser.name();
+        String avatarUrl = memberUser.avatarUrl() != null ? memberUser.avatarUrl() : "";
+        String htmlUrl = memberUser.webUrl() != null ? memberUser.webUrl() : "";
 
-        user.setLogin(memberUser.username());
-        user.setName(memberUser.name());
-        user.setAvatarUrl(memberUser.avatarUrl() != null ? memberUser.avatarUrl() : "");
-        user.setHtmlUrl(memberUser.webUrl() != null ? memberUser.webUrl() : "");
+        requiresNewTransaction.executeWithoutResult(status -> {
+            boolean locked = userRepository.tryAcquireLoginLock(login, providerId);
+            if (locked) {
+                userRepository.freeLoginConflicts(login, nativeId, providerId);
+            } else {
+                log.debug("Could not acquire advisory lock for login={}, proceeding with upsert", login);
+            }
+            userRepository.upsertUser(
+                nativeId,
+                providerId,
+                login,
+                name,
+                avatarUrl,
+                htmlUrl,
+                User.Type.USER.name(),
+                null,
+                null,
+                null
+            );
+        });
 
-        return userRepository.save(user);
+        // Load the persisted entity to get the database-assigned ID.
+        // The REQUIRES_NEW transaction has committed, so this query sees the upserted row.
+        return userRepository.findByNativeIdAndProviderId(nativeId, providerId).map(User::getId).orElse(null);
     }
 
     /**
      * Maps a GitLab access level to a provider-agnostic organization member role.
      * <p>
-     * OWNER(50) and MAINTAINER(40) → ADMIN; DEVELOPER(30), REPORTER(20), GUEST(10) → MEMBER.
+     * OWNER(50) and MAINTAINER(40) → ADMIN; DEVELOPER(30), REPORTER(20),
+     * PLANNER(15), GUEST(10), MINIMAL_ACCESS(5) → MEMBER.
      */
     static OrganizationMemberRole mapAccessLevel(@Nullable GitLabAccessLevel accessLevel) {
         if (accessLevel == null || accessLevel.integerValue() == null) {
@@ -312,13 +346,19 @@ public class GitLabGroupMemberSyncService {
         }
     }
 
-    @Nullable
+    /**
+     * Resolves the GitLab provider entity from the database.
+     *
+     * @return the GitLab provider
+     * @throws IllegalStateException if no GitLab provider is found
+     */
     private GitProvider resolveProvider() {
         return gitProviderRepository
             .findByTypeAndServerUrl(GitProviderType.GITLAB, gitLabProperties.defaultServerUrl())
-            .orElseGet(() -> {
-                log.error("GitProvider not found: type=GITLAB, serverUrl={}", gitLabProperties.defaultServerUrl());
-                return null;
-            });
+            .orElseThrow(() ->
+                new IllegalStateException(
+                    "GitProvider not found for type=GITLAB, serverUrl=" + gitLabProperties.defaultServerUrl()
+                )
+            );
     }
 }

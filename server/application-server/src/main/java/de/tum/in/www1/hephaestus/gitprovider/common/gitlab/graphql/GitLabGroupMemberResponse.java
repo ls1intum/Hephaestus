@@ -34,7 +34,8 @@ public record GitLabGroupMemberResponse(@Nullable GitLabMemberUser user, @Nullab
     /**
      * Access level for a group member.
      * <p>
-     * GitLab access levels: GUEST(10), REPORTER(20), DEVELOPER(30), MAINTAINER(40), OWNER(50).
+     * GitLab access levels: MINIMAL_ACCESS(5), GUEST(10), PLANNER(15), REPORTER(20),
+     * DEVELOPER(30), MAINTAINER(40), OWNER(50).
      *
      * @param stringValue  human-readable access level (e.g., "DEVELOPER")
      * @param integerValue numeric access level (e.g., 30)

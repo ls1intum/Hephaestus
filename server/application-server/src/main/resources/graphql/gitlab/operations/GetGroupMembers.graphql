@@ -7,11 +7,7 @@ query GetGroupMembers($fullPath: ID!, $first: Int!, $after: String) {
             }
             nodes {
                 user {
-                    id
-                    username
-                    name
-                    avatarUrl
-                    webUrl
+                    ...GitLabUserFields
                 }
                 accessLevel {
                     stringValue
