@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
-import { OctagonXIcon } from "lucide-react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { ArrowLeftIcon, OctagonXIcon } from "lucide-react";
 import { useReducer } from "react";
 import { toast } from "sonner";
 import {
@@ -10,22 +10,22 @@ import {
 } from "@/api/@tanstack/react-query.gen";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import {
-	Dialog,
-	DialogContent,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
+import { ConfigureWorkspaceStep } from "@/components/workspace/create-workspace/ConfigureWorkspaceStep";
+import { ConnectGitLabStep } from "@/components/workspace/create-workspace/ConnectGitLabStep";
+import { SelectGroupStep } from "@/components/workspace/create-workspace/SelectGroupStep";
+import { workspaceDetailsSchema } from "@/components/workspace/create-workspace/schemas";
+import { WizardStepIndicator } from "@/components/workspace/create-workspace/WizardStepIndicator";
+import {
+	initialWizardState,
+	WizardContext,
+	wizardReducer,
+} from "@/components/workspace/create-workspace/wizard-context";
 import { useWorkspaceStore } from "@/stores/workspace-store";
-import { ConfigureWorkspaceStep } from "./ConfigureWorkspaceStep";
-import { ConnectGitLabStep } from "./ConnectGitLabStep";
-import { SelectGroupStep } from "./SelectGroupStep";
-import { workspaceDetailsSchema } from "./schemas";
-import { WizardStepIndicator } from "./WizardStepIndicator";
-import { initialWizardState, WizardContext, wizardReducer } from "./wizard-context";
+
+export const Route = createFileRoute("/_authenticated/workspaces/new/gitlab")({
+	component: GitLabWizardPage,
+});
 
 const STEP_META = [
 	{
@@ -36,13 +36,7 @@ const STEP_META = [
 	{ title: "Configure Workspace", description: "Set a name and URL slug for your workspace." },
 ] as const;
 
-export function CreateWorkspaceDialog({
-	open,
-	onOpenChange,
-}: {
-	open: boolean;
-	onOpenChange: (open: boolean) => void;
-}) {
+function GitLabWizardPage() {
 	const [state, dispatch] = useReducer(wizardReducer, initialWizardState);
 	const queryClient = useQueryClient();
 	const navigate = useNavigate();
@@ -56,8 +50,6 @@ export function CreateWorkspaceDialog({
 			queryClient.invalidateQueries({ queryKey: listWorkspacesQueryKey() });
 			setSelectedSlug(data.workspaceSlug);
 			toast.success(`Workspace "${data.displayName}" created`);
-			onOpenChange(false);
-			dispatch({ type: "RESET" });
 			navigate({
 				to: "/w/$workspaceSlug",
 				params: { workspaceSlug: data.workspaceSlug },
@@ -72,14 +64,6 @@ export function CreateWorkspaceDialog({
 			}
 		},
 	});
-
-	const handleClose = (nextOpen: boolean) => {
-		if (!nextOpen) {
-			dispatch({ type: "RESET" });
-			listGroups.reset();
-		}
-		onOpenChange(nextOpen);
-	};
 
 	const canAdvanceFromStep1 = state.preflightResult?.valid === true;
 	const canAdvanceFromStep2 = state.selectedGroup !== null;
@@ -129,67 +113,73 @@ export function CreateWorkspaceDialog({
 	const meta = STEP_META[state.step - 1];
 	const isTransitioning = listGroups.isPending;
 	const isCreating = createWorkspace.isPending;
-
-	// Key step components by step number so local state resets on step change
 	const stepKey = `step-${state.step}`;
 
 	return (
-		<Dialog open={open} onOpenChange={handleClose}>
-			<DialogContent className="sm:max-w-lg">
-				<DialogHeader>
-					<DialogTitle>{meta.title}</DialogTitle>
-					<DialogDescription>{meta.description}</DialogDescription>
-				</DialogHeader>
+		<div className="mx-auto max-w-lg py-8">
+			<Link
+				to="/workspaces/new"
+				className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-6"
+			>
+				<ArrowLeftIcon className="size-3.5" />
+				Back
+			</Link>
 
-				<WizardStepIndicator currentStep={state.step} />
+			<div className="space-y-1.5 mb-6">
+				<h1 className="text-2xl font-semibold tracking-tight">{meta.title}</h1>
+				<p className="text-muted-foreground">{meta.description}</p>
+			</div>
 
+			<WizardStepIndicator currentStep={state.step} />
+
+			<div className="mt-6">
 				<WizardContext.Provider value={{ state, dispatch }}>
 					{state.step === 1 && <ConnectGitLabStep key={stepKey} />}
 					{state.step === 2 && <SelectGroupStep key={stepKey} />}
 					{state.step === 3 && <ConfigureWorkspaceStep key={stepKey} />}
 				</WizardContext.Provider>
+			</div>
 
-				{listGroups.isError && state.step === 1 && (
-					<Alert variant="destructive">
-						<OctagonXIcon />
-						<AlertTitle>Failed to load groups</AlertTitle>
-						<AlertDescription>
-							Could not fetch accessible groups. Your token may lack the required scopes.
-						</AlertDescription>
-					</Alert>
+			{listGroups.isError && state.step === 1 && (
+				<Alert variant="destructive" className="mt-4">
+					<OctagonXIcon />
+					<AlertTitle>Failed to load groups</AlertTitle>
+					<AlertDescription>
+						Could not fetch accessible groups. Your token may lack the required scopes.
+					</AlertDescription>
+				</Alert>
+			)}
+
+			<div className="flex justify-end gap-2 mt-6">
+				{state.step > 1 && (
+					<Button
+						variant="outline"
+						onClick={() => dispatch({ type: "GO_BACK" })}
+						disabled={isCreating}
+					>
+						Back
+					</Button>
 				)}
-
-				<DialogFooter>
-					{state.step > 1 && (
-						<Button
-							variant="outline"
-							onClick={() => dispatch({ type: "GO_BACK" })}
-							disabled={isCreating}
-						>
-							Back
-						</Button>
-					)}
-					{state.step < 3 && (
-						<Button
-							onClick={handleNext}
-							disabled={
-								(state.step === 1 && !canAdvanceFromStep1) ||
-								(state.step === 2 && !canAdvanceFromStep2) ||
-								isTransitioning
-							}
-						>
-							{isTransitioning && <Spinner className="mr-2" />}
-							Next
-						</Button>
-					)}
-					{state.step === 3 && (
-						<Button onClick={handleSubmit} disabled={!canSubmit || isCreating}>
-							{isCreating && <Spinner className="mr-2" />}
-							Create Workspace
-						</Button>
-					)}
-				</DialogFooter>
-			</DialogContent>
-		</Dialog>
+				{state.step < 3 && (
+					<Button
+						onClick={handleNext}
+						disabled={
+							(state.step === 1 && !canAdvanceFromStep1) ||
+							(state.step === 2 && !canAdvanceFromStep2) ||
+							isTransitioning
+						}
+					>
+						{isTransitioning && <Spinner className="mr-2" />}
+						Next
+					</Button>
+				)}
+				{state.step === 3 && (
+					<Button onClick={handleSubmit} disabled={!canSubmit || isCreating}>
+						{isCreating && <Spinner className="mr-2" />}
+						Create Workspace
+					</Button>
+				)}
+			</div>
+		</div>
 	);
 }

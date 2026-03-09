@@ -7,7 +7,6 @@ import {
 	useNavigate,
 	useRouter,
 } from "@tanstack/react-router";
-import { useState } from "react";
 import { Toaster } from "sonner";
 
 import { getGroupedThreadsOptions, getUserSettingsOptions } from "@/api/@tanstack/react-query.gen";
@@ -20,7 +19,6 @@ import { Copilot } from "@/components/mentor/Copilot";
 import { defaultPartRenderers } from "@/components/mentor/renderers";
 import { PostHogSurveyWidget } from "@/components/surveys/posthog-survey-widget";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { CreateWorkspaceDialog } from "@/components/workspace/create-workspace";
 import environment from "@/environment";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { useWorkspaceAccess } from "@/hooks/use-workspace-access";
@@ -238,7 +236,6 @@ function AppSidebarContainer() {
 	const hasWorkspace = Boolean(workspaceSlug);
 	const workspaceList = Array.isArray(workspaces) ? workspaces : [];
 	const activeWorkspace = workspaceList.find((ws) => ws.workspaceSlug === workspaceSlug);
-	const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
 	const sidebarContext: SidebarContext =
 		pathname === "/mentor" || /^\/w\/[^/]+\/mentor/.test(pathname) ? "mentor" : "main";
@@ -268,28 +265,25 @@ function AppSidebarContainer() {
 	};
 
 	const handleAddWorkspace = () => {
-		setIsCreateDialogOpen(true);
+		navigate({ to: "/workspaces/new" });
 	};
 
 	return (
-		<>
-			<AppSidebar
-				username={username}
-				isAdmin={workspaceAccess.isAdmin}
-				hasMentorAccess={hasRole("mentor_access")}
-				context={sidebarContext}
-				workspaces={workspaceList}
-				activeWorkspace={activeWorkspace}
-				onWorkspaceChange={handleWorkspaceChange}
-				onAddWorkspace={handleAddWorkspace}
-				workspacesLoading={workspaceAccess.isLoading}
-				mentorThreadGroups={sidebarContext === "mentor" ? threadGroups : undefined}
-				mentorThreadsLoading={sidebarContext === "mentor" ? mentorThreadsLoading : undefined}
-				mentorThreadsError={
-					sidebarContext === "mentor" && mentorThreadsError ? "Failed to load threads" : undefined
-				}
-			/>
-			<CreateWorkspaceDialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen} />
-		</>
+		<AppSidebar
+			username={username}
+			isAdmin={workspaceAccess.isAdmin}
+			hasMentorAccess={hasRole("mentor_access")}
+			context={sidebarContext}
+			workspaces={workspaceList}
+			activeWorkspace={activeWorkspace}
+			onWorkspaceChange={handleWorkspaceChange}
+			onAddWorkspace={handleAddWorkspace}
+			workspacesLoading={workspaceAccess.isLoading}
+			mentorThreadGroups={sidebarContext === "mentor" ? threadGroups : undefined}
+			mentorThreadsLoading={sidebarContext === "mentor" ? mentorThreadsLoading : undefined}
+			mentorThreadsError={
+				sidebarContext === "mentor" && mentorThreadsError ? "Failed to load threads" : undefined
+			}
+		/>
 	);
 }
