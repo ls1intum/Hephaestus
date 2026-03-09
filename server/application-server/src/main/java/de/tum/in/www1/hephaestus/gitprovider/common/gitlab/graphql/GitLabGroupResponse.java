@@ -17,6 +17,7 @@ import org.springframework.lang.Nullable;
  * @param webUrl      web URL for the group (non-null per schema)
  * @param description group description (nullable)
  * @param visibility  visibility level: {@code public}, {@code internal}, or {@code private} (nullable)
+ * @param parent      parent group for nested groups (nullable; top-level groups have no parent)
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitLabGroupResponse(
@@ -26,5 +27,6 @@ public record GitLabGroupResponse(
     @Nullable String avatarUrl,
     String webUrl,
     @Nullable String description,
-    @Nullable String visibility
+    @Nullable String visibility,
+    @Nullable GitLabGroupResponse parent
 ) {}

@@ -26,9 +26,9 @@ public class OrganizationMembership {
     private Long userId;
 
     /**
-     * The user's role in the organization.
-     * <p>
-     * Maps to GitHub's OrganizationMemberRole enum values: ADMIN, MEMBER.
+     * The user's role in the organization (provider-agnostic).
+     *
+     * @see OrganizationMemberRole
      */
     @Enumerated(EnumType.STRING)
     @Column(name = "role", length = 32, nullable = false)

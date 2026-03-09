@@ -35,14 +35,14 @@ import lombok.ToString;
  * Root tenant entity in Hephaestus's multi-tenant architecture.
  *
  * <p>A Workspace represents an isolated tenant boundary, scoping all domain data
- * (repositories, users, issues, PRs, teams) to a single GitHub organization or user account.
+ * (repositories, users, issues, PRs, teams) to a single git provider organization or user account.
  * All workspace-scoped queries are filtered by {@code workspace_id} to enforce tenant isolation.
  *
  * <h2>Multi-Tenancy Model</h2>
  * <ul>
  *   <li><b>Isolation:</b> Each workspace operates independently with its own data, settings, and members</li>
  *   <li><b>Identity:</b> Uniquely identified by {@link #workspaceSlug} (URL-safe) and internal {@link #id}</li>
- *   <li><b>Ownership:</b> Linked to a GitHub account via {@link #accountLogin} and optionally a GitHub App installation</li>
+ *   <li><b>Ownership:</b> Linked to a git provider account via {@link #accountLogin} and optionally a GitHub App installation</li>
  * </ul>
  *
  * <h2>Authentication Modes</h2>
@@ -196,12 +196,12 @@ public class Workspace {
     /** GitHub App installation ID (null for PAT-based and GitLab workspaces) */
     private Long installationId;
 
-    /** Git provider account login (organization or user login, e.g., "ls1intum") */
+    /** Git provider account login (GitHub org login or GitLab group path, e.g., "ls1intum" or "org/team") */
     @Column(name = "account_login", nullable = false, length = 120)
     @NotBlank(message = "Account login is required")
     private String accountLogin;
 
-    /** Whether the GitHub account is an organization or individual user */
+    /** Whether the git provider account is an organization/group or individual user */
     @Enumerated(EnumType.STRING)
     @Column(name = "account_type", nullable = false, length = 10)
     @NotNull(message = "Account type is required")
@@ -242,7 +242,8 @@ public class Workspace {
     private Instant installationLinkedAt;
 
     /**
-     * Synced GitHub Organization entity (populated after initial organization sync).
+     * Synced organization entity — GitHub organization or GitLab group
+     * (populated after initial organization sync).
      * Null for user-type workspaces or before first sync completes.
      */
     @OneToOne(fetch = FetchType.LAZY)
@@ -337,7 +338,7 @@ public class Workspace {
     // ========================================================================
 
     /**
-     * Authentication mode for GitHub API access.
+     * Authentication mode for git provider API access.
      *
      * <h2>Production vs Development</h2>
      * <ul>
