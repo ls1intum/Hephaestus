@@ -8,6 +8,7 @@ import {
 	useRouter,
 } from "@tanstack/react-router";
 import type React from "react";
+import { useState } from "react";
 import { Toaster } from "sonner";
 import { getGroupedThreadsOptions, getUserSettingsOptions } from "@/api/@tanstack/react-query.gen";
 import Footer from "@/components/core/Footer";
@@ -19,6 +20,7 @@ import { Copilot } from "@/components/mentor/Copilot";
 import { defaultPartRenderers } from "@/components/mentor/renderers";
 import { PostHogSurveyWidget } from "@/components/surveys/posthog-survey-widget";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { CreateWorkspaceDialog } from "@/components/workspace/create-workspace";
 import environment from "@/environment";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { useWorkspaceAccess } from "@/hooks/use-workspace-access";
@@ -245,6 +247,7 @@ function AppSidebarContainer() {
 	const hasWorkspace = Boolean(workspaceSlug);
 	const workspaceList = Array.isArray(workspaces) ? workspaces : [];
 	const activeWorkspace = workspaceList.find((ws) => ws.workspaceSlug === workspaceSlug);
+	const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
 	const sidebarContext: SidebarContext =
 		pathname === "/mentor" || /^\/w\/[^/]+\/mentor/.test(pathname) ? "mentor" : "main";
@@ -274,28 +277,28 @@ function AppSidebarContainer() {
 	};
 
 	const handleAddWorkspace = () => {
-		// TODO: Replace with actual GitHub App installation URL or a proper dialog
-		alert(
-			"To create a workspace, please install the Hephaestus GitHub App on your repository. Contact your administrator for the installation URL.",
-		);
+		setIsCreateDialogOpen(true);
 	};
 
 	return (
-		<AppSidebar
-			username={username}
-			isAdmin={workspaceAccess.isAdmin}
-			hasMentorAccess={hasMentorAccess}
-			context={sidebarContext}
-			workspaces={workspaceList}
-			activeWorkspace={activeWorkspace}
-			onWorkspaceChange={handleWorkspaceChange}
-			onAddWorkspace={handleAddWorkspace}
-			workspacesLoading={workspaceAccess.isLoading}
-			mentorThreadGroups={sidebarContext === "mentor" ? threadGroups : undefined}
-			mentorThreadsLoading={sidebarContext === "mentor" ? mentorThreadsLoading : undefined}
-			mentorThreadsError={
-				sidebarContext === "mentor" && mentorThreadsError ? "Failed to load threads" : undefined
-			}
-		/>
+		<>
+			<AppSidebar
+				username={username}
+				isAdmin={workspaceAccess.isAdmin}
+				hasMentorAccess={hasMentorAccess}
+				context={sidebarContext}
+				workspaces={workspaceList}
+				activeWorkspace={activeWorkspace}
+				onWorkspaceChange={handleWorkspaceChange}
+				onAddWorkspace={handleAddWorkspace}
+				workspacesLoading={workspaceAccess.isLoading}
+				mentorThreadGroups={sidebarContext === "mentor" ? threadGroups : undefined}
+				mentorThreadsLoading={sidebarContext === "mentor" ? mentorThreadsLoading : undefined}
+				mentorThreadsError={
+					sidebarContext === "mentor" && mentorThreadsError ? "Failed to load threads" : undefined
+				}
+			/>
+			<CreateWorkspaceDialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen} />
+		</>
 	);
 }

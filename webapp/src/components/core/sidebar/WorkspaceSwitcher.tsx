@@ -1,4 +1,4 @@
-import { ChevronsUpDown, Plus } from "lucide-react";
+import { ChevronsUpDown, GitlabIcon, Plus } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { WorkspaceListItem } from "@/api/types.gen";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -10,6 +10,9 @@ import {
 	DropdownMenuLabel,
 	DropdownMenuSeparator,
 	DropdownMenuShortcut,
+	DropdownMenuSub,
+	DropdownMenuSubContent,
+	DropdownMenuSubTrigger,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -202,12 +205,20 @@ export function WorkspaceSwitcher({
 							</DropdownMenuItem>
 						))}
 						<DropdownMenuSeparator />
-						<DropdownMenuItem className="gap-2 p-2" onClick={() => onAddWorkspace?.()} disabled>
-							<div className="flex size-6 items-center justify-center rounded-md border bg-background">
-								<Plus className="size-4" />
-							</div>
-							<div className="font-medium text-muted-foreground">Add workspace</div>
-						</DropdownMenuItem>
+						<DropdownMenuSub>
+							<DropdownMenuSubTrigger className="gap-2 p-2">
+								<div className="flex size-6 items-center justify-center rounded-md border bg-background">
+									<Plus className="size-4" />
+								</div>
+								<div className="font-medium text-muted-foreground">Add workspace</div>
+							</DropdownMenuSubTrigger>
+							<DropdownMenuSubContent>
+								<DropdownMenuItem className="gap-2" onClick={() => onAddWorkspace?.()}>
+									<GitlabIcon className="size-4" />
+									GitLab
+								</DropdownMenuItem>
+							</DropdownMenuSubContent>
+						</DropdownMenuSub>
 					</DropdownMenuContent>
 				</DropdownMenu>
 			</SidebarMenuItem>
