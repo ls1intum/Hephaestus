@@ -1463,9 +1463,9 @@ export type CreateWorkspaceRequest = {
      */
     gitProviderMode?: 'PAT_ORG' | 'GITHUB_APP_INSTALLATION' | 'GITLAB_PAT';
     /**
-     * User ID of the workspace owner
+     * User ID of the workspace owner. If omitted, the authenticated user becomes the owner.
      */
-    ownerUserId: number;
+    ownerUserId?: number;
     /**
      * Personal Access Token for GitLab API access. Required when gitProviderMode is GITLAB_PAT. Stored encrypted at rest.
      */

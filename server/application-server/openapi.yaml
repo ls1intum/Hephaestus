@@ -3419,7 +3419,8 @@ components:
         ownerUserId:
           type: integer
           format: int64
-          description: User ID of the workspace owner
+          description: "User ID of the workspace owner. If omitted, the authenticated\
+            \ user becomes the owner."
         personalAccessToken:
           type: string
           description: Personal Access Token for GitLab API access. Required when
@@ -3439,7 +3440,6 @@ components:
       - accountLogin
       - accountType
       - displayName
-      - ownerUserId
       - workspaceSlug
     Document:
       type: object
