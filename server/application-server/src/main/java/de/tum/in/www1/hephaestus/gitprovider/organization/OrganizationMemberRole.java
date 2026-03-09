@@ -1,9 +1,10 @@
 package de.tum.in.www1.hephaestus.gitprovider.organization;
 
 /**
- * The role of a user in an organization.
+ * The role of a user in an organization (provider-agnostic).
  * <p>
- * Maps to GitHub's OrganizationMemberRole enum values.
+ * GitHub: maps directly to OrganizationMemberRole (ADMIN, MEMBER).
+ * GitLab: OWNER/MAINTAINER → ADMIN, DEVELOPER/REPORTER/GUEST → MEMBER.
  */
 public enum OrganizationMemberRole {
     /** The user is an administrator of the organization. */

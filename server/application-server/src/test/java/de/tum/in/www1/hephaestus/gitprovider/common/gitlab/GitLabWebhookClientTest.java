@@ -97,7 +97,8 @@ class GitLabWebhookClientTest extends BaseUnitTest {
                 null,
                 "https://gitlab.com/my-org",
                 null,
-                "public"
+                "public",
+                null
             );
             when(retrieveSpec.toEntity(GitLabGroupResponse.class)).thenReturn(Mono.just(groupResponse));
 

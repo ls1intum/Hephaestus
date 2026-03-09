@@ -12,6 +12,12 @@ import lombok.Setter;
 import lombok.ToString;
 import org.springframework.lang.NonNull;
 
+/**
+ * Represents an organizational grouping entity from a Git provider.
+ * <p>
+ * Maps to: GitHub Organization, GitLab Group (including nested groups).
+ * Provider-scoped by {@code (provider_id, native_id)} unique constraint.
+ */
 @Entity
 @Getter
 @Setter
@@ -26,6 +32,12 @@ import org.springframework.lang.NonNull;
 )
 public class Organization extends BaseGitServiceEntity {
 
+    /**
+     * Provider-scoped human-readable identifier.
+     * <p>
+     * GitHub: flat organization login (e.g., {@code "ls1intum"}).
+     * GitLab: full group path, may include slashes (e.g., {@code "org/team"}).
+     */
     @Column(name = "login", nullable = false)
     private String login;
 

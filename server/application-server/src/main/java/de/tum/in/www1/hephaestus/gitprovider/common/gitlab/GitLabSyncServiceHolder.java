@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.common.gitlab;
 import de.tum.in.www1.hephaestus.gitprovider.issue.gitlab.GitLabIssueSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.label.gitlab.GitLabLabelSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.gitlab.GitLabMilestoneSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.organization.gitlab.GitLabGroupMemberSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.organization.gitlab.GitLabGroupSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.gitlab.GitLabMergeRequestSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.team.gitlab.GitLabTeamSyncService;
@@ -21,6 +22,7 @@ import org.springframework.stereotype.Component;
 public class GitLabSyncServiceHolder {
 
     private final GitLabGroupSyncService groupSyncService;
+    private final GitLabGroupMemberSyncService groupMemberSyncService;
     private final GitLabLabelSyncService labelSyncService;
     private final GitLabMilestoneSyncService milestoneSyncService;
     private final GitLabIssueSyncService issueSyncService;
@@ -29,6 +31,7 @@ public class GitLabSyncServiceHolder {
 
     public GitLabSyncServiceHolder(
         @Nullable GitLabGroupSyncService groupSyncService,
+        @Nullable GitLabGroupMemberSyncService groupMemberSyncService,
         @Nullable GitLabLabelSyncService labelSyncService,
         @Nullable GitLabMilestoneSyncService milestoneSyncService,
         @Nullable GitLabIssueSyncService issueSyncService,
@@ -36,6 +39,7 @@ public class GitLabSyncServiceHolder {
         @Nullable GitLabTeamSyncService teamSyncService
     ) {
         this.groupSyncService = groupSyncService;
+        this.groupMemberSyncService = groupMemberSyncService;
         this.labelSyncService = labelSyncService;
         this.milestoneSyncService = milestoneSyncService;
         this.issueSyncService = issueSyncService;
@@ -46,6 +50,11 @@ public class GitLabSyncServiceHolder {
     @Nullable
     public GitLabGroupSyncService getGroupSyncService() {
         return groupSyncService;
+    }
+
+    @Nullable
+    public GitLabGroupMemberSyncService getGroupMemberSyncService() {
+        return groupMemberSyncService;
     }
 
     @Nullable
