@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.25.3](https://github.com/ls1intum/Hephaestus/compare/v0.25.2...v0.25.3) (2026-03-08)
+
+### 🐛 Bug Fixes
+
+* **gitprovider:** resolve team repository permission sync using native IDs instead of internal IDs ([#813](https://github.com/ls1intum/Hephaestus/issues/813)) ([5d8fc62](https://github.com/ls1intum/Hephaestus/commit/5d8fc62d9fd5c6a9956f164a5d53760d4aa7d897))
+
 ## [0.25.2](https://github.com/ls1intum/Hephaestus/compare/v0.25.1...v0.25.2) (2026-03-08)
 
 ### 🐛 Bug Fixes
