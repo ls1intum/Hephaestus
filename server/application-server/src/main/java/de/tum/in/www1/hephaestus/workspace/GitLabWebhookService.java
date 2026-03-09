@@ -340,10 +340,9 @@ public class GitLabWebhookService {
         }
 
         List<Workspace> gitLabWorkspaces = workspaceRepository
-            .findAll()
+            .findByStatus(Workspace.WorkspaceStatus.ACTIVE)
             .stream()
             .filter(ws -> ws.getProviderType() == GitProviderType.GITLAB)
-            .filter(ws -> ws.getStatus() == Workspace.WorkspaceStatus.ACTIVE)
             .filter(ws -> ws.getGitlabWebhookId() != null && ws.getGitlabGroupId() != null)
             .toList();
 
