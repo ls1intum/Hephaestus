@@ -213,106 +213,67 @@ export const Locked: Story = {
 		</div>
 	),
 };
+
 /**
- * Standalone achievements featuring the energetic energy field aura.
- * Self-referential parent property triggers the aura effect.
- * The aura scales automatically with the node size across all rarities.
+ * All rarities displayed with their standalone aura effect.
+ * This is used for root nodes in the skill tree (achievements with no parents).
  */
-export const Standalone: Story = {
+export const StandaloneAuras: Story = {
 	render: () => (
-		<div className="flex flex-col gap-32">
-			<div className="flex flex-col gap-8">
-				<h3 className="text-sm font-bold text-center text-primary/80 uppercase tracking-widest">
-					Unlocked (Full Energy)
-				</h3>
-				<div className="flex items-center justify-center gap-20">
-					{rarities.map((rarity) => (
-						<div key={`unlocked-${rarity}`} className="relative w-24 h-24 flex items-center justify-center">
-							<AchievementNode
-								id={`node-standalone-unlocked-${rarity}`}
-								data={{
-									achievement: {
-										...rarityMocks[rarity],
-										status: "unlocked",
-										parent: rarityMocks[rarity].id,
-										unlockedAt: new Date(),
-									},
-									showTooltips: true,
-								}}
-								{...sharedNodeProps}
-							/>
-							<div className="absolute -bottom-10 left-1/2 -translate-x-1/2 whitespace-nowrap text-center">
-								<span className="text-[10px] text-muted-foreground uppercase font-mono tracking-tighter">
-									{rarity}
-								</span>
-							</div>
-						</div>
-					))}
+		<div className="flex items-center justify-center gap-12">
+			{rarities.map((rarity) => (
+				<div key={rarity} className="relative w-24 h-24 flex items-center justify-center">
+					<AchievementNode
+						id={`node-aura-${rarity}`}
+						data={{
+							achievement: {
+								...rarityMocks[rarity],
+								status: "unlocked",
+							},
+							showTooltips: true,
+							forceAura: true,
+						}}
+						{...sharedNodeProps}
+					/>
+					<div className="absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap">
+						<span className="text-[10px] text-muted-foreground uppercase font-mono tracking-tighter">
+							{rarity}
+						</span>
+					</div>
 				</div>
-			</div>
+			))}
+		</div>
+	),
+};
 
-			<div className="flex flex-col gap-8">
-				<h3 className="text-sm font-bold text-center text-muted-foreground uppercase tracking-widest">
-					Available (Dormant Energy)
-				</h3>
-				<div className="flex items-center justify-center gap-20">
-					{rarities.map((rarity) => (
-						<div key={`available-${rarity}`} className="relative w-24 h-24 flex items-center justify-center">
-							<AchievementNode
-								id={`node-standalone-available-${rarity}`}
-								data={{
-									achievement: {
-										...rarityMocks[rarity],
-										status: "available",
-										parent: rarityMocks[rarity].id,
-										progressData: {
-											type: "LinearAchievementProgress",
-											current: 42,
-											target: 100,
-										},
-									},
-									showTooltips: true,
-								}}
-								{...sharedNodeProps}
-							/>
-							<div className="absolute -bottom-10 left-1/2 -translate-x-1/2 whitespace-nowrap text-center">
-								<span className="text-[10px] text-muted-foreground uppercase font-mono tracking-tighter">
-									{rarity}
-								</span>
-							</div>
-						</div>
-					))}
+/**
+ * All rarities displayed with their standalone aura effect while locked.
+ * The aura is more subtle and less active for locked achievements.
+ */
+export const StandaloneAurasLocked: Story = {
+	render: () => (
+		<div className="flex items-center justify-center gap-12">
+			{rarities.map((rarity) => (
+				<div key={rarity} className="relative w-24 h-24 flex items-center justify-center">
+					<AchievementNode
+						id={`node-aura-locked-${rarity}`}
+						data={{
+							achievement: {
+								...rarityMocks[rarity],
+								status: "locked",
+							},
+							showTooltips: true,
+							forceAura: true,
+						}}
+						{...sharedNodeProps}
+					/>
+					<div className="absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap">
+						<span className="text-[10px] text-muted-foreground uppercase font-mono tracking-tighter">
+							{rarity}
+						</span>
+					</div>
 				</div>
-			</div>
-
-			<div className="flex flex-col gap-8">
-				<h3 className="text-sm font-bold text-center text-muted-foreground/50 uppercase tracking-widest">
-					Locked (Dormant Energy)
-				</h3>
-				<div className="flex items-center justify-center gap-20">
-					{rarities.map((rarity) => (
-						<div key={`locked-${rarity}`} className="relative w-24 h-24 flex items-center justify-center">
-							<AchievementNode
-								id={`node-standalone-locked-${rarity}`}
-								data={{
-									achievement: {
-										...rarityMocks[rarity],
-										status: "locked",
-										parent: rarityMocks[rarity].id,
-									},
-									showTooltips: true,
-								}}
-								{...sharedNodeProps}
-							/>
-							<div className="absolute -bottom-10 left-1/2 -translate-x-1/2 whitespace-nowrap text-center">
-								<span className="text-[10px] text-muted-foreground uppercase font-mono tracking-tighter">
-									{rarity}
-								</span>
-							</div>
-						</div>
-					))}
-				</div>
-			</div>
+			))}
 		</div>
 	),
 };

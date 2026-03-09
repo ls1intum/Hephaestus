@@ -15,7 +15,7 @@ import {
 import { StandaloneAura } from "./StandaloneAura.tsx";
 
 export type AchievementNode = Node<
-	{ achievement: UIAchievement; showTooltips?: boolean; className?: string },
+	{ achievement: UIAchievement; showTooltips?: boolean; className?: string; forceAura?: boolean },
 	"achievement"
 >;
 
@@ -37,7 +37,8 @@ export function AchievementNode({ data }: NodeProps<AchievementNode>) {
 	const [isHovered, setIsHovered] = useState(false);
 	const Icon = achievement.icon;
 	const isMythic = achievement.rarity === "mythic";
-	const isStandalone = achievement.parent === achievement.id;
+	const isStandalone = achievement.parent === achievement.id || (achievement as any).parentId === achievement.id;
+	const showAura = data.forceAura || achievement.forceAura || isStandalone;
 
 	return (
 		<div>
@@ -49,7 +50,7 @@ export function AchievementNode({ data }: NodeProps<AchievementNode>) {
 			/>
 			<AchievementTooltip achievement={achievement} open={isHovered && data.showTooltips !== false}>
 				<div className="relative flex items-center justify-center">
-					{isStandalone && (
+					{showAura && (
 						<StandaloneAura
 							achievement={achievement}
 							size={rarityPixelSizes[achievement.rarity]}

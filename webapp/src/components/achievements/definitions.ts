@@ -276,11 +276,13 @@ const milestoneAchievements = {
 		name: "Librarian of Alexandria",
 		description: "Unlock the epic achievement in every major category line",
 		icon: LibraryIcon,
+		forceAura: true,
 	},
 	"milestone.all_legendary": {
 		name: "Singularity",
 		description: "Unlock the legendary achievement in every major category line",
 		icon: SingularityIcon,
+		forceAura: true,
 	},
 } satisfies PartialAchievementRegistry;
 

@@ -39,6 +39,7 @@ export type AchievementDisplay = {
 	name: string;
 	description: string;
 	icon: React.ElementType;
+	forceAura?: boolean;
 };
 
 export type UIAchievement = Achievement & AchievementDisplay;

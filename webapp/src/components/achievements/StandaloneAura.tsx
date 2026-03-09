@@ -49,34 +49,42 @@ export function StandaloneAura({ achievement, size }: StandaloneAuraProps) {
 
 			points.push(`${i === 0 ? "M" : "L"} ${x} ${y}`);
 		}
-		return points.join(" ") + " Z";
+		return `${points.join(" ")} Z`;
 	};
 
 	const baseRadius = size / 2;
 	const isUnlocked = achievement.status === "unlocked";
-	const color = `var(--rarity-${achievement.rarity})`;
+	const isMythic = achievement.rarity === "mythic";
+	const color = isMythic
+		? `url(#aura-mythic-gradient-${achievement.id})`
+		: `var(--rarity-${achievement.rarity})`;
 
-	// Define layers with relative parameters that scale with size
+	// Non-linear scaling: makes the aura relatively smaller on small nodes
+	// and relatively larger on large nodes for better visual balance.
+	const scaleModifier = (size / 64) ** 1.5;
+
+	// Define layers with parameters that scale non-linearly with node size
+	// Mythic has slightly more complex layers for "divine energy"
 	const layers = [
 		{
-			radius: baseRadius * 1.05,
-			amplitude: size * 0.05,
+			radius: baseRadius + 2 * scaleModifier,
+			amplitude: size * 0.05 * scaleModifier,
 			frequency: 5,
 			speed: 2.0,
 			opacity: 0.6,
 			width: 1.5,
 		},
 		{
-			radius: baseRadius * 1.15,
-			amplitude: size * 0.08,
+			radius: baseRadius + 5 * scaleModifier,
+			amplitude: size * 0.08 * scaleModifier,
 			frequency: 3,
 			speed: -1.5,
 			opacity: 0.4,
 			width: 1.0,
 		},
 		{
-			radius: baseRadius * 1.25,
-			amplitude: size * 0.04,
+			radius: baseRadius + 9 * scaleModifier,
+			amplitude: size * 0.04 * scaleModifier,
 			frequency: 8,
 			speed: 3.5,
 			opacity: 0.2,
@@ -84,7 +92,7 @@ export function StandaloneAura({ achievement, size }: StandaloneAuraProps) {
 		},
 	];
 
-	const viewSize = size * 2;
+	const viewSize = size * 2.5;
 
 	return (
 		<svg
@@ -97,15 +105,41 @@ export function StandaloneAura({ achievement, size }: StandaloneAuraProps) {
 				height: viewSize,
 				pointerEvents: "none",
 				overflow: "visible",
-				zIndex: -1,
 			}}
 			viewBox={`${-viewSize / 2} ${-viewSize / 2} ${viewSize} ${viewSize}`}
+			aria-hidden="true"
 		>
 			<defs>
 				<filter id={`aura-glow-${achievement.id}`} x="-50%" y="-50%" width="200%" height="200%">
 					<feGaussianBlur stdDeviation="3" result="blur" />
 					<feComposite in="SourceGraphic" in2="blur" operator="over" />
 				</filter>
+				{isMythic && (
+					<linearGradient
+						id={`aura-mythic-gradient-${achievement.id}`}
+						x1="0%"
+						y1="0%"
+						x2="100%"
+						y2="100%"
+					>
+						<stop offset="0%" stopColor="var(--rarity-mythic-from)">
+							<animate
+								attributeName="offset"
+								values="0; 0.5; 0"
+								dur="3s"
+								repeatCount="indefinite"
+							/>
+						</stop>
+						<stop offset="100%" stopColor="var(--rarity-mythic-to)">
+							<animate
+								attributeName="offset"
+								values="1; 0.5; 1"
+								dur="3s"
+								repeatCount="indefinite"
+							/>
+						</stop>
+					</linearGradient>
+				)}
 			</defs>
 			<g filter={`url(#aura-glow-${achievement.id})`}>
 				{layers.map((layer, i) => (

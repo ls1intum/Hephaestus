@@ -516,6 +516,7 @@ achievements:
       triggerEvents:
       evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator"
     - id: "milestone.all_rare"
+      parent: "milestone.all_rare"
       category: milestones
       rarity: epic
       isHidden: true
