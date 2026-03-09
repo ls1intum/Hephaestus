@@ -31,6 +31,7 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.gitprovider.user.gitlab.GitLabUserService;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import java.time.Duration;
 import java.util.HashSet;
@@ -56,6 +57,9 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
     private static final long RAW_USER_ID = 18024L;
     private static final long ENTITY_USER_ID = 200L;
     private static final Long PROVIDER_ID = 2L;
+
+    @Mock
+    private GitLabUserService gitLabUserService;
 
     @Mock
     private IssueRepository issueRepository;
@@ -96,6 +100,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
         );
 
         processor = new GitLabIssueProcessor(
+            gitLabUserService,
             issueRepository,
             milestoneRepository,
             userRepository,
@@ -386,7 +391,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 .thenReturn(Optional.of(issue));
 
             User author = createUserEntity();
-            when(userRepository.findByNativeIdAndProviderId(RAW_USER_ID, PROVIDER_ID)).thenReturn(Optional.of(author));
+            when(gitLabUserService.findOrCreateUser(any(GitLabWebhookUser.class), eq(PROVIDER_ID))).thenReturn(author);
 
             GitLabIssueEventDTO event = createEvent("open", "opened", false);
             Issue result = processor.process(event, createContext());
@@ -442,7 +447,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 .thenReturn(Optional.of(issue));
 
             User author = createUserEntity();
-            when(userRepository.findByNativeIdAndProviderId(RAW_USER_ID, PROVIDER_ID)).thenReturn(Optional.of(author));
+            when(gitLabUserService.findOrCreateUser(any(GitLabWebhookUser.class), eq(PROVIDER_ID))).thenReturn(author);
 
             GitLabIssueEventDTO event = createEvent("close", "closed", false);
             Issue result = processor.processClosed(event, createContext());
@@ -464,7 +469,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 .thenReturn(Optional.of(issue));
 
             User author = createUserEntity();
-            when(userRepository.findByNativeIdAndProviderId(RAW_USER_ID, PROVIDER_ID)).thenReturn(Optional.of(author));
+            when(gitLabUserService.findOrCreateUser(any(GitLabWebhookUser.class), eq(PROVIDER_ID))).thenReturn(author);
 
             GitLabIssueEventDTO event = createEvent("reopen", "opened", false);
             Issue result = processor.processReopened(event, createContext());
@@ -494,7 +499,16 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 .thenReturn(Optional.of(issue));
 
             User author = createUserEntity();
-            when(userRepository.findByNativeIdAndProviderId(RAW_USER_ID, PROVIDER_ID)).thenReturn(Optional.of(author));
+            when(
+                gitLabUserService.findOrCreateUser(
+                    anyString(),
+                    anyString(),
+                    anyString(),
+                    anyString(),
+                    anyString(),
+                    eq(PROVIDER_ID)
+                )
+            ).thenReturn(author);
 
             var syncData = new GitLabIssueProcessor.SyncIssueData(
                 "gid://gitlab/Issue/422296",

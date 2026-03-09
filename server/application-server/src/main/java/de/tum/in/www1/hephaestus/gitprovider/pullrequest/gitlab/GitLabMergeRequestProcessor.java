@@ -24,6 +24,7 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.gitprovider.user.gitlab.GitLabUserService;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.HashSet;
@@ -60,6 +61,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
     private final ApplicationEventPublisher eventPublisher;
 
     public GitLabMergeRequestProcessor(
+        GitLabUserService gitLabUserService,
         PullRequestRepository pullRequestRepository,
         PullRequestReviewRepository reviewRepository,
         MilestoneRepository milestoneRepository,
@@ -72,6 +74,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         ApplicationEventPublisher eventPublisher
     ) {
         super(
+            gitLabUserService,
             userRepository,
             labelRepository,
             repositoryRepository,

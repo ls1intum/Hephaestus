@@ -1,0 +1,22 @@
+query GetGroupMembers($fullPath: ID!, $first: Int!, $after: String) {
+    group(fullPath: $fullPath) {
+        groupMembers(first: $first, after: $after, relations: [DIRECT]) {
+            pageInfo {
+                hasNextPage
+                endCursor
+            }
+            nodes {
+                accessLevel {
+                    stringValue
+                }
+                user {
+                    id
+                    username
+                    name
+                    avatarUrl
+                    webUrl
+                }
+            }
+        }
+    }
+}
