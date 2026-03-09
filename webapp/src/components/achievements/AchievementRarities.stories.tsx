@@ -43,7 +43,7 @@ const sharedNodeProps = {
 
 const meta = {
 	component: AchievementNode,
-	title: "Achievements/Rarity Showcase",
+	// title: "Achievements/Rarity Showcase",
 	parameters: {
 		layout: "centered",
 		docs: {

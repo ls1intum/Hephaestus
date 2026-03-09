@@ -17,7 +17,6 @@ import type { UIAchievement } from "./types";
  */
 const meta = {
 	component: AchievementNode,
-	title: "Achievements/AchievementNode",
 	parameters: {
 		layout: "centered",
 		docs: {

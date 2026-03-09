@@ -1,14 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { ReactFlowProvider } from "@xyflow/react";
-import { getUserProfileOptions } from "@/api/@tanstack/react-query.gen";
+import { toast } from "sonner";
+import { getUserProfileOptions, reloadAchievementsMutation } from "@/api/@tanstack/react-query.gen";
 import { AchievementHeader } from "@/components/achievements/AchievementHeader";
 import { SkillTreeDesigner } from "@/components/achievements/SkillTreeDesigner";
 import { useAllAchievementDefinitions } from "@/hooks/use-all-achievement-definitions";
 import { useAuth } from "@/integrations/auth/AuthContext";
 import { useWorkspaceStore } from "@/stores/workspace-store";
-import { reloadAchievementsMutation } from "@/api/@tanstack/react-query.gen";
-import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/achievement-designer")(
 	{
@@ -18,7 +17,7 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/ach
 
 function AchievementDesignerPage() {
 	const queryClient = useQueryClient();
-	const { userProfile, getUserGithubProfilePictureUrl, username } = useAuth();
+	const { userProfile, getUserProfilePictureUrl, username } = useAuth();
 	const selectedSlug = useWorkspaceStore((state) => state.selectedSlug);
 
 	const reloadMutation = useMutation({
@@ -64,7 +63,7 @@ function AchievementDesignerPage() {
 	// Derived user data for the skill tree
 	const user = {
 		name: profileQuery.data?.userInfo?.name || userProfile?.name || userProfile?.username || "",
-		avatarUrl: profileQuery.data?.userInfo?.avatarUrl || getUserGithubProfilePictureUrl(),
+		avatarUrl: profileQuery.data?.userInfo?.avatarUrl || getUserProfilePictureUrl(),
 		level: profileQuery.data?.xpRecord?.currentLevel ?? 1,
 		leaguePoints: profileQuery.data?.userInfo?.leaguePoints ?? 0,
 	};

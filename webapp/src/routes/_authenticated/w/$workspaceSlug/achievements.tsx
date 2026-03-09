@@ -12,7 +12,7 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/achieveme
  * Delegates to the shared AchievementsView component.
  */
 function AchievementsPage() {
-	const { userProfile, getUserGithubProfilePictureUrl, username } = useAuth();
+	const { userProfile, getUserProfilePictureUrl, username } = useAuth();
 	const selectedSlug = useWorkspaceStore((state) => state.selectedSlug);
 
 	return (
@@ -21,7 +21,7 @@ function AchievementsPage() {
 			targetUsername={username || ""}
 			isOwnProfile={true}
 			fallbackName={userProfile?.name || userProfile?.username}
-			fallbackAvatarUrl={getUserGithubProfilePictureUrl()}
+			fallbackAvatarUrl={getUserProfilePictureUrl()}
 		/>
 	);
 }

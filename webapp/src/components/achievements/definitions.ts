@@ -238,11 +238,13 @@ const issueAchievement = {
 		name: "Necromancer",
 		description: "Open an issue and close it by yourself without anyone else interacting with it",
 		icon: GhostIcon,
+		forceAura: true,
 	},
 	"issue.special.oracle": {
 		name: "Oracle",
 		description: "Close an issue that has been open for over 6 month",
 		icon: EyeIcon,
+		forceAura: true,
 	},
 } satisfies PartialAchievementRegistry;
 
@@ -266,11 +268,13 @@ const milestoneAchievements = {
 		name: "The Ancient One",
 		description: "Return after 3 months of inactivity",
 		icon: ClockFadingIcon,
+		forceAura: true,
 	},
 	"milestone.all_rare": {
 		name: "Swiss Army Knife",
 		description: "Unlock the rare achievement in every major category line",
 		icon: PocketKnifeIcon,
+		forceAura: true,
 	},
 	"milestone.all_epic": {
 		name: "Librarian of Alexandria",

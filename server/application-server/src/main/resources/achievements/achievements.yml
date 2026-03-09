@@ -443,32 +443,32 @@ achievements:
           - ISSUE_CLOSED
       evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
     - id: "issue.special.hive_mind"
+      parent: "issue.close.common.2"
       category: issues
       rarity: rare
       isHidden: false
       requirements:
           type: BinaryAchievementProgress
-      parent: "issue.close.common.1"
       triggerEvents:
           - ISSUE_CLOSED
       evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator"
     - id: "issue.special.oracle"
+      parent: "issue.close.common.2"
       category: issues
       rarity: epic
       isHidden: true
       requirements:
           type: BinaryAchievementProgress
-      parent: "issue.close.common.1"
       triggerEvents:
           - ISSUE_CLOSED
       evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator"
     - id: "issue.special.necromancer"
+      parent: "issue.special.necromancer"
       category: issues
       rarity: epic
       isHidden: true
       requirements:
           type: BinaryAchievementProgress
-      parent: "issue.close.common.1"
       triggerEvents:
           - ISSUE_CLOSED
       evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator"

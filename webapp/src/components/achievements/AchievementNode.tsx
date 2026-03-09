@@ -37,9 +37,7 @@ export function AchievementNode({ data }: NodeProps<AchievementNode>) {
 	const [isHovered, setIsHovered] = useState(false);
 	const Icon = achievement.icon;
 	const isMythic = achievement.rarity === "mythic";
-	const isStandalone =
-		achievement.parent === achievement.id || (achievement as any).parentId === achievement.id;
-	const showAura = data.forceAura || achievement.forceAura || isStandalone;
+	const showAura = data.forceAura || achievement.forceAura;
 
 	return (
 		<div>
