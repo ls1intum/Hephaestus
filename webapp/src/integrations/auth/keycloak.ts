@@ -172,9 +172,9 @@ class KeycloakService {
 	}
 
 	/**
-	 * Get the user's GitHub ID if available
+	 * Get the user's git provider ID if available (e.g. GitHub user ID).
 	 */
-	public getUserGithubId(): string | undefined {
+	public getGitProviderId(): string | undefined {
 		return this.keycloak?.tokenParsed?.github_id;
 	}
 
@@ -193,20 +193,22 @@ class KeycloakService {
 	}
 
 	/**
-	 * Get the user's GitHub profile picture URL
+	 * Get the user's profile picture URL from their identity provider.
+	 * Currently supports GitHub; GitLab IDP support will need an equivalent lookup.
 	 */
-	public getUserGithubProfilePictureUrl(): string {
-		const githubId = this.getUserGithubId();
-		if (githubId) {
-			return `https://avatars.githubusercontent.com/u/${githubId}`;
+	public getUserProfilePictureUrl(): string {
+		const providerId = this.getGitProviderId();
+		if (providerId) {
+			return `https://avatars.githubusercontent.com/u/${providerId}`;
 		}
 		return "";
 	}
 
 	/**
-	 * Get the user's GitHub profile URL
+	 * Get the user's profile URL on their identity provider.
+	 * Currently supports GitHub; GitLab IDP support will need an equivalent lookup.
 	 */
-	public getUserGithubProfileUrl(): string {
+	public getUserProfileUrl(): string {
 		const username = this.getUsername();
 		if (username) {
 			return `https://github.com/${username}`;

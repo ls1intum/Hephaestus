@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
+import { withProvider } from "@/stories/decorators";
 import { LeaderboardLegend } from "./LeaderboardLegend";
 
 /**
@@ -24,3 +25,15 @@ type Story = StoryObj<typeof meta>;
  * Includes access to detailed scoring explanation via modal.
  */
 export const Default: Story = {};
+
+// --- Alternate provider variant ---
+
+/**
+ * Alternate provider — shows "merge requests" terminology and provider-native icon.
+ */
+export const MergeRequestProvider: Story = {
+	decorators: [withProvider("GITLAB")],
+	args: {
+		providerType: "GITLAB",
+	},
+};

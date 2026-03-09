@@ -1,27 +1,35 @@
-import { CheckIcon, CopyIcon, GitPullRequestIcon } from "@primer/octicons-react";
+import { CheckIcon, CopyIcon } from "@primer/octicons-react";
 import { useEffect, useState } from "react";
 import type { PullRequestBaseInfo, PullRequestInfo } from "@/api/types.gen";
 import { Button } from "@/components/ui/button";
 import { CardTitle } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { getProviderTerms, getPullRequestStateIcon, type ProviderType } from "@/lib/provider";
 import { cn } from "@/lib/utils";
 
 export type ReviewedPullRequest = PullRequestInfo | PullRequestBaseInfo;
 
 export interface ReviewsPopoverProps {
-	reviewedPRs: readonly ReviewedPullRequest[];
+	reviewedPullRequests: readonly ReviewedPullRequest[];
 	highlight?: boolean;
+	providerType?: ProviderType;
 }
 
-export function ReviewsPopover({ reviewedPRs, highlight = false }: ReviewsPopoverProps) {
+export function ReviewsPopover({
+	reviewedPullRequests,
+	highlight = false,
+	providerType = "GITHUB",
+}: ReviewsPopoverProps) {
 	const [isOpen, setIsOpen] = useState(false);
 	const [showCopySuccess, setShowCopySuccess] = useState(false);
-	const hasReviews = reviewedPRs?.length > 0;
+	const hasReviews = reviewedPullRequests.length > 0;
+	const terms = getProviderTerms(providerType);
+	const { icon: PrIcon } = getPullRequestStateIcon(providerType, "OPEN");
 
 	// Sort reviewed PRs by repository name and PR number
-	const sortedReviewedPRs = reviewedPRs
-		? [...reviewedPRs].sort((a, b) => {
+	const sortedReviewedPullRequests = reviewedPullRequests
+		? [...reviewedPullRequests].sort((a, b) => {
 				if (a.repository?.name === b.repository?.name) {
 					return a.number - b.number;
 				}
@@ -35,7 +43,7 @@ export function ReviewsPopover({ reviewedPRs, highlight = false }: ReviewsPopove
 
 		// Create HTML for clipboard
 		const htmlList = `<ul>
-      ${sortedReviewedPRs
+      ${sortedReviewedPullRequests
 				.map(
 					(pullRequest) =>
 						`<li><a href="${pullRequest.htmlUrl}">${pullRequest.repository?.name ?? ""} #${pullRequest.number}</a></li>`,
@@ -44,7 +52,7 @@ export function ReviewsPopover({ reviewedPRs, highlight = false }: ReviewsPopove
     </ul>`;
 
 		// Create markdown text
-		const plainText = sortedReviewedPRs
+		const plainText = sortedReviewedPullRequests
 			.map(
 				(pullRequest) =>
 					`[${pullRequest.repository?.name ?? ""} #${pullRequest.number}](${pullRequest.htmlUrl})`,
@@ -96,13 +104,13 @@ export function ReviewsPopover({ reviewedPRs, highlight = false }: ReviewsPopove
 						className={cn(
 							"flex items-center gap-1",
 							!highlight
-								? "text-github-muted-foreground"
+								? "text-provider-muted-foreground"
 								: "border-primary bg-accent hover:bg-foreground hover:text-background",
 						)}
 						onClick={(e) => e.stopPropagation()}
 					>
-						<GitPullRequestIcon size={16} />
-						{reviewedPRs?.length || 0}
+						<PrIcon size={16} />
+						{reviewedPullRequests.length}
 					</Button>
 				}
 			/>
@@ -113,8 +121,8 @@ export function ReviewsPopover({ reviewedPRs, highlight = false }: ReviewsPopove
 			>
 				<div className="flex flex-wrap justify-between items-center gap-4">
 					<CardTitle className="flex items-center gap-2">
-						<GitPullRequestIcon size={20} />
-						<h4 className="font-medium leading-none">Reviewed PRs</h4>
+						<PrIcon size={20} />
+						<h4 className="font-medium leading-none">Reviewed {terms.pullRequestsShort}</h4>
 					</CardTitle>
 					<Button variant="outline" size="icon" onClick={copyPullRequests}>
 						{showCopySuccess ? (
@@ -128,11 +136,11 @@ export function ReviewsPopover({ reviewedPRs, highlight = false }: ReviewsPopove
 					<ScrollArea
 						className="rounded-md -mr-2.5"
 						style={{
-							height: `min(200px, ${36 * sortedReviewedPRs.length}px)`,
+							height: `min(200px, ${36 * sortedReviewedPullRequests.length}px)`,
 						}}
 					>
 						<div className="flex flex-col rounded-md text-muted-foreground text-sm pr-2.5">
-							{sortedReviewedPRs.map((pullRequest) => (
+							{sortedReviewedPullRequests.map((pullRequest) => (
 								<a
 									key={pullRequest.id}
 									href={pullRequest.htmlUrl}

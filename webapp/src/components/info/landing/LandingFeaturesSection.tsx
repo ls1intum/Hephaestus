@@ -31,15 +31,15 @@ export function LandingFeaturesSection() {
 						<CardContent>
 							<ul className="space-y-2">
 								<li className="flex gap-2 items-start">
-									<CheckCheck className="size-5 mt-1 text-github-success-foreground" />
+									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
 									<span>Weekly leaderboards with GitHub integration</span>
 								</li>
 								<li className="flex gap-2 items-start">
-									<CheckCheck className="size-5 mt-1 text-github-success-foreground" />
+									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
 									<span>Team competitions across multiple repositories</span>
 								</li>
 								<li className="flex gap-2 items-start">
-									<CheckCheck className="size-5 mt-1 text-github-success-foreground" />
+									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
 									<span>Structured league system for ongoing engagement</span>
 								</li>
 							</ul>
@@ -59,15 +59,15 @@ export function LandingFeaturesSection() {
 						<CardContent>
 							<ul className="space-y-2">
 								<li className="flex gap-2 items-start">
-									<CheckCheck className="size-5 mt-1 text-github-success-foreground" />
+									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
 									<span>SRL-guided weekly reflection</span>
 								</li>
 								<li className="flex gap-2 items-start">
-									<CheckCheck className="size-5 mt-1 text-github-success-foreground" />
+									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
 									<span>Repo activity context for objective feedback</span>
 								</li>
 								<li className="flex gap-2 items-start">
-									<CheckCheck className="size-5 mt-1 text-github-success-foreground" />
+									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
 									<span>Goal setting and progress tracking</span>
 								</li>
 							</ul>
