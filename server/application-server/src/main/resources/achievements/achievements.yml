@@ -91,7 +91,7 @@ achievements:
       requirements:
           type: LinearAchievementProgress
           target: 1
-      triggerEvents:
+      triggerEvents: []
       evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
     - id: "commit.common.2"
       category: commits
@@ -101,7 +101,7 @@ achievements:
           type: LinearAchievementProgress
           target: 10
       parent: "commit.common.1"
-      triggerEvents:
+      triggerEvents: []
       evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
     - id: "commit.uncommon.1"
       category: commits
@@ -111,7 +111,7 @@ achievements:
           type: LinearAchievementProgress
           target: 50
       parent: "commit.common.2"
-      triggerEvents:
+      triggerEvents: []
       evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
     - id: "commit.uncommon.2"
       category: commits
@@ -121,7 +121,7 @@ achievements:
           type: LinearAchievementProgress
           target: 100
       parent: "commit.uncommon.1"
-      triggerEvents:
+      triggerEvents: []
       evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
     - id: "commit.rare"
       category: commits
@@ -131,7 +131,7 @@ achievements:
           type: LinearAchievementProgress
           target: 250
       parent: "commit.uncommon.2"
-      triggerEvents:
+      triggerEvents: []
       evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
     - id: "commit.epic"
       category: commits
@@ -141,7 +141,7 @@ achievements:
           type: LinearAchievementProgress
           target: 500
       parent: "commit.rare"
-      triggerEvents:
+      triggerEvents: []
       evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
     - id: "commit.legendary"
       category: commits
@@ -151,7 +151,7 @@ achievements:
           type: LinearAchievementProgress
           target: 1000
       parent: "commit.epic"
-      triggerEvents:
+      triggerEvents: []
       evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
     - id: "commit.mythic"
       category: commits
@@ -161,7 +161,7 @@ achievements:
           type: LinearAchievementProgress
           target: 2000
       parent: "commit.legendary"
-      triggerEvents:
+      triggerEvents: []
       evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
     - id: "commit.special.itsy_bitsy"
       category: commits
@@ -170,7 +170,7 @@ achievements:
       parent: "commit.common.2"
       requirements:
           type: BinaryAchievementProgress
-      triggerEvents:
+      triggerEvents: []
       evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator"
     - id: "commit.special.atomic_changes"
       parent: "commit.special.brute_force"
@@ -179,7 +179,7 @@ achievements:
       isHidden: true
       requirements:
           type: BinaryAchievementProgress
-      triggerEvents:
+      triggerEvents: []
       evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator"
     - id: "commit.special.brute_force"
       parent: "commit.uncommon.2"
@@ -188,7 +188,7 @@ achievements:
       isHidden: true
       requirements:
           type: BinaryAchievementProgress
-      triggerEvents:
+      triggerEvents: []
       evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator"
     - id: "commit.special.cross_boundary"
       parent: "commit.uncommon.1"
@@ -197,7 +197,7 @@ achievements:
       isHidden: false
       requirements:
           type: BinaryAchievementProgress
-      triggerEvents:
+      triggerEvents: []
       evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator"
 
     # ========================================================================
@@ -495,7 +495,7 @@ achievements:
       requirements:
           type: BinaryAchievementProgress
       parent: "milestone.first_action"
-      triggerEvents:
+      triggerEvents: []
       evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator"
     - id: "milestone.night_owl"
       category: milestones
@@ -504,7 +504,7 @@ achievements:
       requirements:
           type: BinaryAchievementProgress
       parent: "milestone.first_action"
-      triggerEvents:
+      triggerEvents: []
       evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator"
     - id: "milestone.long_time_return"
       parent: "milestone.long_time_return"
@@ -513,7 +513,7 @@ achievements:
       isHidden: true
       requirements:
           type: BinaryAchievementProgress
-      triggerEvents:
+      triggerEvents: []
       evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator"
     - id: "milestone.all_rare"
       parent: "milestone.all_rare"
@@ -522,7 +522,7 @@ achievements:
       isHidden: true
       requirements:
           type: BinaryAchievementProgress
-      triggerEvents:
+      triggerEvents: []
       evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator"
     - id: "milestone.all_epic"
       category: milestones
