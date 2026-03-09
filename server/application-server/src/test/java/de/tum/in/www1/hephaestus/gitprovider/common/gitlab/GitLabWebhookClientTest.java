@@ -154,13 +154,19 @@ class GitLabWebhookClientTest extends BaseUnitTest {
             WebhookConfig config = new WebhookConfig(
                 "https://example.com/webhooks/gitlab",
                 "secret123",
-                true,
-                true,
-                true,
-                true,
-                false,
-                true,
-                true
+                true, // mergeRequestsEvents
+                true, // issuesEvents
+                true, // confidentialIssuesEvents
+                true, // noteEvents
+                false, // confidentialNoteEvents
+                true, // pushEvents
+                true, // tagPushEvents
+                false, // pipelineEvents
+                true, // milestoneEvents
+                true, // memberEvents
+                true, // subgroupEvents
+                true, // projectEvents
+                true // enableSslVerification
             );
 
             WebhookInfo result = webhookClient.registerGroupWebhook(SCOPE_ID, GROUP_ID, config);

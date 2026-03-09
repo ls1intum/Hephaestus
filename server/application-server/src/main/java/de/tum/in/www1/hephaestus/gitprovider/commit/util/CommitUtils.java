@@ -34,4 +34,17 @@ public class CommitUtils {
     public String buildCommitUrl(String nameWithOwner, String sha) {
         return "https://github.com/" + nameWithOwner + "/commit/" + sha;
     }
+
+    /**
+     * Builds the web URL for a commit on a GitLab instance.
+     *
+     * @param serverUrl     the GitLab server base URL (e.g., {@code "https://gitlab.lrz.de"})
+     * @param nameWithOwner project path ({@code "group/subgroup/project"})
+     * @param sha           full commit SHA
+     * @return the commit URL on GitLab
+     */
+    public String buildGitLabCommitUrl(String serverUrl, String nameWithOwner, String sha) {
+        String base = serverUrl.endsWith("/") ? serverUrl.substring(0, serverUrl.length() - 1) : serverUrl;
+        return base + "/" + nameWithOwner + "/-/commit/" + sha;
+    }
 }

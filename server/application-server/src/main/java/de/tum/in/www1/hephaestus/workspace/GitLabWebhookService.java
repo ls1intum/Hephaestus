@@ -12,6 +12,7 @@ import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -221,10 +222,16 @@ public class GitLabWebhookService {
                 webhookProperties.secret(),
                 true, // merge_requests_events
                 true, // issues_events
+                true, // confidential_issues_events
                 true, // note_events
+                true, // confidential_note_events
                 true, // push_events
+                true, // tag_push_events
                 false, // pipeline_events
                 true, // milestone_events
+                true, // member_events
+                true, // subgroup_events
+                true, // project_events
                 true // enable_ssl_verification
             );
 
@@ -314,6 +321,79 @@ public class GitLabWebhookService {
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public void deregisterWebhookByWorkspaceId(Long workspaceId) {
         workspaceRepository.findById(workspaceId).ifPresent(this::deregisterWebhook);
+    }
+
+    /**
+     * Periodic health check for GitLab webhooks.
+     * <p>
+     * GitLab auto-disables webhooks after 40 consecutive failures. This scheduled
+     * method verifies that registered webhooks still exist and re-registers them
+     * if they were deleted or disabled externally.
+     * <p>
+     * Runs every 6 hours. Non-fatal: errors are logged but don't affect other operations.
+     */
+    @Scheduled(cron = "0 0 */6 * * *")
+    public void checkWebhookHealth() {
+        var client = webhookClientProvider.getIfAvailable();
+        if (client == null || !webhookProperties.isConfigured()) {
+            return;
+        }
+
+        List<Workspace> gitLabWorkspaces = workspaceRepository
+            .findAll()
+            .stream()
+            .filter(ws -> ws.getProviderType() == GitProviderType.GITLAB)
+            .filter(ws -> ws.getStatus() == Workspace.WorkspaceStatus.ACTIVE)
+            .filter(ws -> ws.getGitlabWebhookId() != null && ws.getGitlabGroupId() != null)
+            .toList();
+
+        if (gitLabWorkspaces.isEmpty()) return;
+
+        int checked = 0,
+            reregistered = 0;
+        for (Workspace workspace : gitLabWorkspaces) {
+            try {
+                Optional<WebhookInfo> existing = client.getGroupWebhook(
+                    workspace.getId(),
+                    workspace.getGitlabGroupId(),
+                    workspace.getGitlabWebhookId()
+                );
+                checked++;
+
+                if (existing.isEmpty()) {
+                    log.warn(
+                        "Webhook missing (likely auto-disabled), re-registering: workspaceId={}, webhookId={}",
+                        workspace.getId(),
+                        workspace.getGitlabWebhookId()
+                    );
+                    // Clear stored ID so registerWebhook creates a new one
+                    workspace.setGitlabWebhookId(null);
+                    workspaceRepository.save(workspace);
+
+                    WebhookSetupResult result = registerWebhook(workspace);
+                    if (result.registered()) {
+                        reregistered++;
+                        log.info(
+                            "Re-registered webhook: workspaceId={}, newWebhookId={}",
+                            workspace.getId(),
+                            workspace.getGitlabWebhookId()
+                        );
+                    } else {
+                        log.warn(
+                            "Failed to re-register webhook: workspaceId={}, reason={}",
+                            workspace.getId(),
+                            result.failureReason()
+                        );
+                    }
+                }
+            } catch (Exception e) {
+                log.debug("Webhook health check failed: workspaceId={}", workspace.getId(), e);
+            }
+        }
+
+        if (reregistered > 0) {
+            log.info("Webhook health check: checked={}, reregistered={}", checked, reregistered);
+        }
     }
 
     private void clearWebhookFields(Workspace workspace) {

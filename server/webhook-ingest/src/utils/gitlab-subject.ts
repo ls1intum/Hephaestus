@@ -95,6 +95,39 @@ function extractFromObjectAttributes(payload: Record<string, unknown>): {
 }
 
 /**
+ * Normalizes GitLab event names that don't use object_kind.
+ *
+ * GitLab member and subgroup events use granular event_name values
+ * (e.g., "user_add_to_group", "subgroup_create") instead of object_kind.
+ * We normalize these to canonical types so a single NATS consumer handler
+ * can process all variants of the same logical event.
+ *
+ * Work item events (object_kind: "work_item") are normalized to "issue"
+ * since GitLab work items (epics, tasks, incidents) share the same
+ * payload structure as issues and should be handled by the issue handler.
+ */
+function normalizeEventName(raw: string): string {
+	const lower = raw.toLowerCase();
+	// Member events: user_add_to_group, user_remove_from_group, user_update_for_group, etc.
+	if (lower.startsWith("user_") && lower.includes("_group")) {
+		return "member";
+	}
+	// Subgroup events: subgroup_create, subgroup_destroy
+	if (lower.startsWith("subgroup_")) {
+		return "subgroup";
+	}
+	// Project events: project_create, project_destroy, project_rename, project_transfer
+	if (lower.startsWith("project_")) {
+		return "project";
+	}
+	// Work item events → route to issue handler (epics, tasks, incidents are work items)
+	if (lower === "work_item") {
+		return "issue";
+	}
+	return lower;
+}
+
+/**
  * Build NATS subject for GitLab webhook payload.
  *
  * Follows the format: gitlab.<namespace>.<project>.<event_name>
@@ -106,9 +139,11 @@ export function buildGitLabSubject(payload: Record<string, unknown>): string {
 		(payload.event_name as string) ||
 		"unknown"
 	).toLowerCase();
+	// Normalize granular event names to canonical types for handler routing
+	const normalizedEventName = normalizeEventName(rawEventName);
 
 	// Sanitize event name for NATS subject safety
-	const eventName = sanitizeToken(rawEventName) || "unknown";
+	const eventName = sanitizeToken(normalizedEventName) || "unknown";
 
 	// Try extraction strategies in order of priority
 	let result = extractFromProject(payload);

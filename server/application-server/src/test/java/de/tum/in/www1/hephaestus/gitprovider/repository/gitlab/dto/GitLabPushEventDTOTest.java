@@ -35,6 +35,15 @@ class GitLabPushEventDTOTest extends BaseUnitTest {
             assertThat(dto.projectId()).isEqualTo(246765L);
             assertThat(dto.totalCommitsCount()).isEqualTo(3);
 
+            // Commits
+            assertThat(dto.commits()).isNotNull().hasSize(3);
+            assertThat(dto.commits().get(0).id()).isEqualTo("9c5dedd52046bb5213189afc25f75e608a98d462");
+            assertThat(dto.commits().get(0).message()).isEqualTo("Initial commit");
+            assertThat(dto.commits().get(0).author()).isNotNull();
+            assertThat(dto.commits().get(0).author().name()).isEqualTo("Dietrich, Felix (Timotheus Johannes)");
+            assertThat(dto.commits().get(0).added()).containsExactly("README.md");
+            assertThat(dto.commits().get(0).changedFilesCount()).isEqualTo(1);
+
             // Project info
             assertThat(dto.project()).isNotNull();
             assertThat(dto.project().id()).isEqualTo(246765L);
@@ -83,7 +92,7 @@ class GitLabPushEventDTOTest extends BaseUnitTest {
         @DisplayName("returns true for default branch ref")
         void defaultBranch_returnsTrue() {
             var projectInfo = new GitLabPushEventDTO.ProjectInfo(1L, "proj", null, "url", null, "org/proj", "main", 0);
-            var dto = new GitLabPushEventDTO("push", "refs/heads/main", "b", "a", null, 1L, projectInfo, 1);
+            var dto = new GitLabPushEventDTO("push", "refs/heads/main", "b", "a", null, 1L, projectInfo, 1, null);
 
             assertThat(dto.isDefaultBranch()).isTrue();
         }
@@ -92,7 +101,7 @@ class GitLabPushEventDTOTest extends BaseUnitTest {
         @DisplayName("returns false for non-default branch ref")
         void nonDefaultBranch_returnsFalse() {
             var projectInfo = new GitLabPushEventDTO.ProjectInfo(1L, "proj", null, "url", null, "org/proj", "main", 0);
-            var dto = new GitLabPushEventDTO("push", "refs/heads/feature", "b", "a", null, 1L, projectInfo, 1);
+            var dto = new GitLabPushEventDTO("push", "refs/heads/feature", "b", "a", null, 1L, projectInfo, 1, null);
 
             assertThat(dto.isDefaultBranch()).isFalse();
         }
@@ -100,7 +109,7 @@ class GitLabPushEventDTOTest extends BaseUnitTest {
         @Test
         @DisplayName("returns false when project is null")
         void nullProject_returnsFalse() {
-            var dto = new GitLabPushEventDTO("push", "refs/heads/main", "b", "a", null, 1L, null, 0);
+            var dto = new GitLabPushEventDTO("push", "refs/heads/main", "b", "a", null, 1L, null, 0, null);
 
             assertThat(dto.isDefaultBranch()).isFalse();
         }
@@ -121,7 +130,8 @@ class GitLabPushEventDTOTest extends BaseUnitTest {
                 null,
                 1L,
                 null,
-                0
+                0,
+                null
             );
 
             assertThat(dto.isBranchDeletion()).isTrue();
@@ -130,21 +140,21 @@ class GitLabPushEventDTOTest extends BaseUnitTest {
         @Test
         @DisplayName("null after SHA is not branch deletion")
         void nullAfter_isNotBranchDeletion() {
-            var dto = new GitLabPushEventDTO("push", "refs/heads/main", "abc", null, null, 1L, null, 0);
+            var dto = new GitLabPushEventDTO("push", "refs/heads/main", "abc", null, null, 1L, null, 0, null);
             assertThat(dto.isBranchDeletion()).isFalse();
         }
 
         @Test
         @DisplayName("short zero string is not branch deletion")
         void shortZeroString_isNotBranchDeletion() {
-            var dto = new GitLabPushEventDTO("push", "refs/heads/main", "abc", "000", null, 1L, null, 0);
+            var dto = new GitLabPushEventDTO("push", "refs/heads/main", "abc", "000", null, 1L, null, 0, null);
             assertThat(dto.isBranchDeletion()).isFalse();
         }
 
         @Test
         @DisplayName("non-zero after SHA is not branch deletion")
         void nonZeroAfter_isNotBranchDeletion() {
-            var dto = new GitLabPushEventDTO("push", "refs/heads/main", "abc123", "def456", null, 1L, null, 1);
+            var dto = new GitLabPushEventDTO("push", "refs/heads/main", "abc123", "def456", null, 1L, null, 1, null);
 
             assertThat(dto.isBranchDeletion()).isFalse();
         }

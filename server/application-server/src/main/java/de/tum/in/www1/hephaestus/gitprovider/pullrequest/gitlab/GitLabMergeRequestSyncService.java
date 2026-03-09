@@ -11,6 +11,7 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.gitlab.GitLabDiscussionSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.sync.SyncResult;
+import de.tum.in.www1.hephaestus.gitprovider.sync.backfill.BackfillBatchResult;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -39,6 +40,7 @@ public class GitLabMergeRequestSyncService {
     private static final Logger log = LoggerFactory.getLogger(GitLabMergeRequestSyncService.class);
 
     private static final String GET_PROJECT_MRS_DOCUMENT = "GetProjectMergeRequests";
+    private static final String GET_PROJECT_MRS_HISTORICAL_DOCUMENT = "GetProjectMergeRequestsHistorical";
     private static final String GET_MR_APPROVALS_DOCUMENT = "GetMergeRequestApprovals";
     private static final String GET_MR_REVIEWERS_DOCUMENT = "GetMergeRequestReviewers";
     private static final String GET_MR_LABELS_DOCUMENT = "GetMergeRequestLabels";
@@ -279,6 +281,136 @@ public class GitLabMergeRequestSyncService {
         @Nullable String webUrl
     ) {
         static final UserFields EMPTY = new UserFields(null, null, null, null, null);
+    }
+
+    // ========================================================================
+    // Historical backfill
+    // ========================================================================
+
+    /**
+     * Backfills historical merge requests using {@code CREATED_DESC} ordering.
+     * Fetches pages until maxItems is reached or no more pages remain.
+     *
+     * @param scopeId    workspace scope ID
+     * @param repository the repository to backfill
+     * @param cursor     pagination cursor from a previous batch (null for first batch)
+     * @param maxItems   max items to process in this batch
+     * @return backfill batch result with IID range and next cursor
+     */
+    public BackfillBatchResult backfillMergeRequests(
+        Long scopeId,
+        Repository repository,
+        @Nullable String cursor,
+        int maxItems
+    ) {
+        String projectPath = repository.getNameWithOwner();
+        String safeProjectPath = sanitizeForLog(projectPath);
+
+        int totalProcessed = 0;
+        int minIid = Integer.MAX_VALUE;
+        int maxIid = -1;
+        boolean hasMore = false;
+        String currentCursor = cursor;
+
+        try {
+            int remaining = maxItems;
+
+            while (remaining > 0) {
+                graphQlClientProvider.acquirePermission();
+                graphQlClientProvider.waitIfRateLimitLow(scopeId);
+
+                int rateLimitRemaining = graphQlClientProvider.getRateLimitRemaining(scopeId);
+                int pageSize = Math.min(
+                    GitLabSyncConstants.adaptPageSize(GitLabSyncConstants.ISSUE_SYNC_PAGE_SIZE, rateLimitRemaining),
+                    remaining
+                );
+
+                HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
+                ClientGraphQlResponse response = client
+                    .documentName(GET_PROJECT_MRS_HISTORICAL_DOCUMENT)
+                    .variable("fullPath", projectPath)
+                    .variable("first", pageSize)
+                    .variable("after", currentCursor)
+                    .execute()
+                    .block(gitLabProperties.extendedGraphqlTimeout());
+
+                if (response == null || !response.isValid()) {
+                    graphQlClientProvider.recordFailure(new GitLabSyncException("Invalid response for historical MRs"));
+                    return BackfillBatchResult.abortedWithError();
+                }
+                graphQlClientProvider.recordSuccess();
+
+                @SuppressWarnings({ "unchecked", "rawtypes" })
+                List<Map<String, Object>> nodes = (List) response
+                    .field("project.mergeRequests.nodes")
+                    .toEntityList(Map.class);
+
+                if (nodes == null || nodes.isEmpty()) break;
+
+                for (Map<String, Object> mrNode : nodes) {
+                    try {
+                        Object iidObj = mrNode.get("iid");
+                        if (iidObj != null) {
+                            int iid =
+                                iidObj instanceof Number n ? n.intValue() : Integer.parseInt(String.valueOf(iidObj));
+                            minIid = Math.min(minIid, iid);
+                            maxIid = Math.max(maxIid, iid);
+                        }
+                        processMrNode(mrNode, repository, scopeId);
+                        totalProcessed++;
+                    } catch (Exception e) {
+                        log.warn(
+                            "Error in historical MR backfill: project={}, iid={}",
+                            safeProjectPath,
+                            mrNode.get("iid"),
+                            e
+                        );
+                    }
+                }
+
+                remaining -= nodes.size();
+
+                GitLabPageInfo pageInfo = response
+                    .field("project.mergeRequests.pageInfo")
+                    .toEntity(GitLabPageInfo.class);
+
+                if (pageInfo == null || !pageInfo.hasNextPage()) break;
+
+                currentCursor = pageInfo.endCursor();
+                hasMore = true;
+
+                Thread.sleep(gitLabProperties.paginationThrottle().toMillis());
+            }
+
+            boolean complete = !hasMore;
+            String resumeCursor = complete ? null : currentCursor;
+
+            if (totalProcessed > 0) {
+                log.info(
+                    "Historical MR backfill batch: project={}, processed={}, iidRange=[{},{}]",
+                    safeProjectPath,
+                    totalProcessed,
+                    minIid,
+                    maxIid
+                );
+            }
+
+            return new BackfillBatchResult(
+                totalProcessed,
+                minIid == Integer.MAX_VALUE ? -1 : minIid,
+                maxIid,
+                resumeCursor,
+                complete,
+                false
+            );
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.info("Historical MR backfill interrupted: project={}", safeProjectPath);
+            return BackfillBatchResult.abortedWithError();
+        } catch (Exception e) {
+            log.warn("Historical MR backfill failed: project={}", safeProjectPath, e);
+            return BackfillBatchResult.abortedWithError();
+        }
     }
 
     // ========================================================================

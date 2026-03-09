@@ -11,6 +11,7 @@ import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.gitlab.GitLabNoteSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.sync.SyncResult;
+import de.tum.in.www1.hephaestus.gitprovider.sync.backfill.BackfillBatchResult;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -40,6 +41,7 @@ public class GitLabIssueSyncService {
     private static final Logger log = LoggerFactory.getLogger(GitLabIssueSyncService.class);
 
     private static final String GET_PROJECT_ISSUES_DOCUMENT = "GetProjectIssues";
+    private static final String GET_PROJECT_ISSUES_HISTORICAL_DOCUMENT = "GetProjectIssuesHistorical";
     private static final String GET_ISSUE_LABELS_DOCUMENT = "GetIssueLabels";
     private static final String GET_ISSUE_ASSIGNEES_DOCUMENT = "GetIssueAssignees";
 
@@ -249,6 +251,133 @@ public class GitLabIssueSyncService {
         );
 
         return result;
+    }
+
+    /**
+     * Backfills historical issues for a repository using {@code CREATED_DESC} ordering.
+     * Fetches one page of issues at a time, tracking IID range for checkpoint progress.
+     *
+     * @param scopeId    workspace scope ID
+     * @param repository the repository to backfill
+     * @param cursor     pagination cursor from a previous batch (null for first batch)
+     * @param maxItems   max items to process in this batch
+     * @return backfill batch result with IID range and next cursor
+     */
+    public BackfillBatchResult backfillIssues(
+        Long scopeId,
+        Repository repository,
+        @Nullable String cursor,
+        int maxItems
+    ) {
+        String projectPath = repository.getNameWithOwner();
+        String safeProjectPath = sanitizeForLog(projectPath);
+
+        int totalProcessed = 0;
+        int minIid = Integer.MAX_VALUE;
+        int maxIid = -1;
+        String nextCursor = null;
+        boolean hasMore = false;
+
+        try {
+            int remaining = maxItems;
+            String currentCursor = cursor;
+
+            while (remaining > 0) {
+                graphQlClientProvider.acquirePermission();
+                graphQlClientProvider.waitIfRateLimitLow(scopeId);
+
+                int rateLimitRemaining = graphQlClientProvider.getRateLimitRemaining(scopeId);
+                int pageSize = Math.min(
+                    GitLabSyncConstants.adaptPageSize(GitLabSyncConstants.ISSUE_SYNC_PAGE_SIZE, rateLimitRemaining),
+                    remaining
+                );
+
+                HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
+                ClientGraphQlResponse response = client
+                    .documentName(GET_PROJECT_ISSUES_HISTORICAL_DOCUMENT)
+                    .variable("fullPath", projectPath)
+                    .variable("first", pageSize)
+                    .variable("after", currentCursor)
+                    .execute()
+                    .block(gitLabProperties.extendedGraphqlTimeout());
+
+                if (response == null || !response.isValid()) {
+                    graphQlClientProvider.recordFailure(
+                        new GitLabSyncException("Invalid response for historical issues")
+                    );
+                    return BackfillBatchResult.abortedWithError();
+                }
+                graphQlClientProvider.recordSuccess();
+
+                @SuppressWarnings({ "unchecked", "rawtypes" })
+                List<Map<String, Object>> nodes = (List) response.field("project.issues.nodes").toEntityList(Map.class);
+
+                if (nodes == null || nodes.isEmpty()) break;
+
+                for (Map<String, Object> issueNode : nodes) {
+                    try {
+                        Object iidObj = issueNode.get("iid");
+                        if (iidObj != null) {
+                            int iid =
+                                iidObj instanceof Number n ? n.intValue() : Integer.parseInt(String.valueOf(iidObj));
+                            minIid = Math.min(minIid, iid);
+                            maxIid = Math.max(maxIid, iid);
+                        }
+                        processIssueNode(issueNode, repository, scopeId);
+                        totalProcessed++;
+                    } catch (Exception e) {
+                        log.warn(
+                            "Error in historical issue backfill: project={}, iid={}",
+                            safeProjectPath,
+                            issueNode.get("iid"),
+                            e
+                        );
+                    }
+                }
+
+                remaining -= nodes.size();
+
+                GitLabPageInfo pageInfo = response.field("project.issues.pageInfo").toEntity(GitLabPageInfo.class);
+
+                if (pageInfo == null || !pageInfo.hasNextPage()) break;
+
+                currentCursor = pageInfo.endCursor();
+                hasMore = true;
+
+                Thread.sleep(gitLabProperties.paginationThrottle().toMillis());
+            }
+
+            // currentCursor holds the endCursor from the last fetched page.
+            // If we stopped because of maxItems limit and there's more data, save it.
+            boolean complete = !hasMore;
+            String resumeCursor = complete ? null : currentCursor;
+
+            if (totalProcessed > 0) {
+                log.info(
+                    "Historical issue backfill batch: project={}, processed={}, iidRange=[{},{}]",
+                    safeProjectPath,
+                    totalProcessed,
+                    minIid,
+                    maxIid
+                );
+            }
+
+            return new BackfillBatchResult(
+                totalProcessed,
+                minIid == Integer.MAX_VALUE ? -1 : minIid,
+                maxIid,
+                resumeCursor,
+                complete,
+                false
+            );
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.info("Historical issue backfill interrupted: project={}", safeProjectPath);
+            return BackfillBatchResult.abortedWithError();
+        } catch (Exception e) {
+            log.warn("Historical issue backfill failed: project={}", safeProjectPath, e);
+            return BackfillBatchResult.abortedWithError();
+        }
     }
 
     /**

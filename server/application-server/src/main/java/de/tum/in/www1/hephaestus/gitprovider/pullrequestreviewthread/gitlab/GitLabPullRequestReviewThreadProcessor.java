@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.gitlab;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.EventContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.EventPayload;
@@ -213,7 +214,7 @@ public class GitLabPullRequestReviewThreadProcessor {
     private void publishThreadStateEvent(PullRequestReviewThread thread, PullRequest pr, Long scopeId) {
         EventPayload.ReviewThreadData.from(thread).ifPresent(threadData -> {
             RepositoryRef repoRef = pr.getRepository() != null ? RepositoryRef.from(pr.getRepository()) : null;
-            EventContext ctx = EventContext.forSync(scopeId, repoRef);
+            EventContext ctx = EventContext.forSync(scopeId, repoRef, GitProviderType.GITLAB);
 
             if (thread.getState() == PullRequestReviewThread.State.RESOLVED) {
                 eventPublisher.publishEvent(new DomainEvent.ReviewThreadResolved(threadData, ctx));
