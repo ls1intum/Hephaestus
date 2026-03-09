@@ -4,6 +4,10 @@ import de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator;
 import de.tum.in.www1.hephaestus.achievement.progress.AchievementProgress;
 import de.tum.in.www1.hephaestus.activity.ActivityEventType;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import java.time.Instant;
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,11 +15,6 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.Instant;
-import java.util.*;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /**
  * Service for evaluating and unlocking achievements via incremental progress updates.
@@ -102,7 +101,9 @@ public class AchievementService {
         try {
             Class<?> clazz = Class.forName(definition.evaluatorClass());
             if (!AchievementEvaluator.class.isAssignableFrom(clazz)) {
-                throw new IllegalStateException("Evaluator class does not implement AchievementEvaluator: " + definition.evaluatorClass());
+                throw new IllegalStateException(
+                    "Evaluator class does not implement AchievementEvaluator: " + definition.evaluatorClass()
+                );
             }
             @SuppressWarnings("unchecked")
             AchievementEvaluator evaluator = evaluatorMap.get((Class<? extends AchievementEvaluator>) clazz);
@@ -268,8 +269,7 @@ public class AchievementService {
         List<AchievementDTO> result = new ArrayList<>();
         for (AchievementDefinition achievement : achievementRegistry.values()) {
             UserAchievement progress = progressMap.get(achievement.id());
-            if (progress == null)
-                continue;
+            if (progress == null) continue;
             AchievementStatus status = computeStatus(achievement, progressMap);
             AchievementProgress progressData = progress.getProgressData();
             Optional<Instant> unlockedAt = Optional.ofNullable(progress.getUnlockedAt());
@@ -288,7 +288,10 @@ public class AchievementService {
      *   <li>LOCKED if not unlocked and parent is not unlocked</li>
      * </ul>
      */
-    private AchievementStatus computeStatus(AchievementDefinition achievement, Map<String, UserAchievement> progressMap) {
+    private AchievementStatus computeStatus(
+        AchievementDefinition achievement,
+        Map<String, UserAchievement> progressMap
+    ) {
         // Check if this achievement is unlocked
         UserAchievement progress = progressMap.get(achievement.id());
         if (progress != null && progress.getUnlockedAt() != null) {
@@ -319,13 +322,12 @@ public class AchievementService {
      * Return all definitions as LOCKED with 0 progress
      */
     public List<AchievementDTO> getAllAchievementDefinitions() {
-        return achievementRegistry.values().stream()
-            .map(def -> AchievementDTO.fromDefinition(
-                def,
-                AchievementStatus.LOCKED,
-                def.requirements(),
-                Optional.empty()
-            ))
+        return achievementRegistry
+            .values()
+            .stream()
+            .map(def ->
+                AchievementDTO.fromDefinition(def, AchievementStatus.LOCKED, def.requirements(), Optional.empty())
+            )
             .toList();
     }
 }

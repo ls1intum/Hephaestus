@@ -3,12 +3,10 @@ package de.tum.in.www1.hephaestus.achievement;
 import com.fasterxml.jackson.annotation.JsonValue;
 import de.tum.in.www1.hephaestus.achievement.progress.AchievementProgress;
 import de.tum.in.www1.hephaestus.activity.ActivityEventType;
+import io.swagger.v3.oas.annotations.media.Schema;
+import java.util.Set;
 import org.springframework.lang.NonNull;
 import org.springframework.lang.Nullable;
-
-import java.util.Set;
-
-import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
  * Record acting as the central source of truth for all achievement definitions.
@@ -35,5 +33,4 @@ public record AchievementDefinition(
     boolean isHidden,
     @Nullable Set<ActivityEventType> triggerEvents,
     @NonNull String evaluatorClass
-) {
-}
+) {}

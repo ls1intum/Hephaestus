@@ -44,7 +44,11 @@ public class AchievementRecalculationService {
     @Transactional
     @CacheEvict(value = AchievementService.ACHIEVEMENT_PROGRESS_CACHE, key = "#user.id", condition = "#user != null")
     public void recalculateUser(User user) {
-        log.info("Starting complete achievement recalculation for user: userId={}, login={}", user.getId(), user.getLogin());
+        log.info(
+            "Starting complete achievement recalculation for user: userId={}, login={}",
+            user.getId(),
+            user.getLogin()
+        );
 
         // 1. Wipe existing state
         userAchievementRepository.deleteByUserId(user.getId());
@@ -54,7 +58,10 @@ public class AchievementRecalculationService {
         Pageable pageable = PageRequest.of(0, 500);
 
         while (true) {
-            Slice<ActivityEvent> slice = activityEventRepository.findSliceByActorIdOrderByOccurredAtAsc(user.getId(), pageable);
+            Slice<ActivityEvent> slice = activityEventRepository.findSliceByActorIdOrderByOccurredAtAsc(
+                user.getId(),
+                pageable
+            );
             for (ActivityEvent event : slice.getContent()) {
                 ActivitySavedEvent savedEvent = new ActivitySavedEvent(
                     event.getActor(),

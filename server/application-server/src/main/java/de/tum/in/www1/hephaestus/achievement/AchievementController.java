@@ -4,26 +4,24 @@ import de.tum.in.www1.hephaestus.core.exception.AccessForbiddenException;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.springframework.cache.CacheManager;
-
 import java.util.Arrays;
 import java.util.List;
-
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.CacheManager;
 import org.springframework.core.env.Environment;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-import de.tum.in.www1.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 
 /**
  * Controller for user achievement endpoints.
@@ -125,16 +123,17 @@ public class AchievementController {
         summary = "Recalculate user achievements",
         description = "Wipes and historically recalculates a user's achievement timeline. Admin only."
     )
-    @ApiResponse(
-        responseCode = "202",
-        description = "Recalculation task started successfully"
-    )
+    @ApiResponse(responseCode = "202", description = "Recalculation task started successfully")
     @RequireAtLeastWorkspaceAdmin
     public ResponseEntity<Void> recalculateUserAchievements(
         WorkspaceContext workspaceContext,
         @PathVariable String login
     ) {
-        log.info("Admin requested achievement recalculation for user: {} in workspace: {}", login, workspaceContext.slug());
+        log.info(
+            "Admin requested achievement recalculation for user: {} in workspace: {}",
+            login,
+            workspaceContext.slug()
+        );
 
         User user = userRepository.findByLogin(login).orElseThrow(() -> new EntityNotFoundException("User", login));
 

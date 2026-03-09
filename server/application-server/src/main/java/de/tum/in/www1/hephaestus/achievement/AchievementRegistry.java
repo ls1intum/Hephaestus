@@ -5,20 +5,18 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import de.tum.in.www1.hephaestus.activity.ActivityEventType;
 import jakarta.annotation.PostConstruct;
+import java.io.File;
+import java.io.InputStream;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
-
-import java.io.File;
-import java.io.InputStream;
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-
-import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 
 /**
  * Registry acting as the central source of truth for all achievements defined in achievements.yml.
@@ -29,6 +27,7 @@ import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 @Slf4j
 @Service
 public class AchievementRegistry {
+
     private static final String ACHIEVEMENTS_FILE_PATH = "achievements/achievements.yml";
 
     private final ObjectMapper yamlMapper;
@@ -56,31 +55,30 @@ public class AchievementRegistry {
     public synchronized void reload() {
         try {
             Resource resource = new ClassPathResource(ACHIEVEMENTS_FILE_PATH);
-        String sourcePath = "src/main/resources/" + ACHIEVEMENTS_FILE_PATH;
-        File sourceFile = new File(sourcePath);
+            String sourcePath = "src/main/resources/" + ACHIEVEMENTS_FILE_PATH;
+            File sourceFile = new File(sourcePath);
 
-        // In development, prefer the source file over the classpath resource
-        // This allows hot-reloading without requiring a recompile/resource sync
-        if (sourceFile.exists()) {
-            log.info("Found source file at {}, using it for hot-reload.", sourceFile.getAbsolutePath());
-            resource = new FileSystemResource(sourceFile);
-        } else {
-            // Also try relative to the submodule if we are at project root
-            File submoduleSourceFile = new File("server/application-server/" + sourcePath);
-            if (submoduleSourceFile.exists()) {
-                log.info("Found source file at {}, using it for hot-reload.", submoduleSourceFile.getAbsolutePath());
-                resource = new FileSystemResource(submoduleSourceFile);
+            // In development, prefer the source file over the classpath resource
+            // This allows hot-reloading without requiring a recompile/resource sync
+            if (sourceFile.exists()) {
+                log.info("Found source file at {}, using it for hot-reload.", sourceFile.getAbsolutePath());
+                resource = new FileSystemResource(sourceFile);
             } else {
-                log.info("Loading achievements from classpath: {}", ACHIEVEMENTS_FILE_PATH);
-            }
-        }
-
-        try (InputStream is = resource.getInputStream()) {
-            Map<String, List<AchievementDefinition>> root = yamlMapper.readValue(
-                is,
-                new TypeReference<>() {
+                // Also try relative to the submodule if we are at project root
+                File submoduleSourceFile = new File("server/application-server/" + sourcePath);
+                if (submoduleSourceFile.exists()) {
+                    log.info(
+                        "Found source file at {}, using it for hot-reload.",
+                        submoduleSourceFile.getAbsolutePath()
+                    );
+                    resource = new FileSystemResource(submoduleSourceFile);
+                } else {
+                    log.info("Loading achievements from classpath: {}", ACHIEVEMENTS_FILE_PATH);
                 }
-            );
+            }
+
+            try (InputStream is = resource.getInputStream()) {
+                Map<String, List<AchievementDefinition>> root = yamlMapper.readValue(is, new TypeReference<>() {});
 
                 List<AchievementDefinition> records = root.getOrDefault("achievements", List.of());
 
@@ -115,7 +113,6 @@ public class AchievementRegistry {
                 this.allAchievements = new ArrayList<>(records);
 
                 log.info("Successfully loaded {} achievements into the registry.", achievementsById.size());
-
             }
         } catch (Exception e) {
             log.error("Failed to load achievements.yml! The registry might be empty or outdated.", e);
@@ -154,7 +151,8 @@ public class AchievementRegistry {
      * @return a list of achievements in the category, ordered by rarity
      */
     public List<AchievementDefinition> getByCategory(AchievementCategory category) {
-        return allAchievements.stream()
+        return allAchievements
+            .stream()
             .filter(a -> a.category() == category)
             .sorted(Comparator.comparing(AchievementDefinition::rarity, AchievementRarity.RARITY_COMPARATOR))
             .toList();
@@ -167,7 +165,8 @@ public class AchievementRegistry {
      * @return list of achievements
      */
     public List<AchievementDefinition> getByTriggerEvent(ActivityEventType eventType) {
-        return allAchievements.stream()
+        return allAchievements
+            .stream()
             .filter(a -> a.triggerEvents() != null && a.triggerEvents().contains(eventType))
             .toList();
     }

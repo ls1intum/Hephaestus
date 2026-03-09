@@ -31,6 +31,7 @@ class ActivityEventServiceTest extends BaseUnitTest {
 
     @Mock
     private ExperiencePointProperties xpProperties;
+
     @Mock
     private ApplicationEventPublisher eventPublisher;
 
@@ -42,7 +43,13 @@ class ActivityEventServiceTest extends BaseUnitTest {
         meterRegistry = new SimpleMeterRegistry();
         // Use lenient stubbing since not all tests exercise XP clamping path
         lenient().when(xpProperties.maxXpPerEvent()).thenReturn(1000.0);
-        service = new ActivityEventService(eventRepository, workspaceRepository, xpProperties, meterRegistry, eventPublisher);
+        service = new ActivityEventService(
+            eventRepository,
+            workspaceRepository,
+            xpProperties,
+            meterRegistry,
+            eventPublisher
+        );
     }
 
     @Test

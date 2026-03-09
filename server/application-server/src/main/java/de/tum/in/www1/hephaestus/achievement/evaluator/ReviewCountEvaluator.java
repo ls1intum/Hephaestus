@@ -30,16 +30,19 @@ public class ReviewCountEvaluator implements AchievementEvaluator {
     @Override
     public boolean updateProgress(UserAchievement userAchievement, ActivitySavedEvent event) {
         if (!(userAchievement.getProgressData() instanceof LinearAchievementProgress(int current, int target))) {
-            log.warn("Expected LinearAchievementProgress but received {} for achievement: {}",
+            log.warn(
+                "Expected LinearAchievementProgress but received {} for achievement: {}",
                 userAchievement.getProgressData(),
-                userAchievement.getAchievementId());
+                userAchievement.getAchievementId()
+            );
             return false;
         }
 
         boolean isNotAuthoredByOneself = false;
 
         if (event.targetType() == de.tum.in.www1.hephaestus.activity.ActivityTargetType.REVIEW) {
-            isNotAuthoredByOneself = reviewRepository.findById(event.targetId())
+            isNotAuthoredByOneself = reviewRepository
+                .findById(event.targetId())
                 .map(review -> {
                     if (review.getPullRequest() == null || review.getPullRequest().getAuthor() == null) {
                         return true;
@@ -48,7 +51,8 @@ public class ReviewCountEvaluator implements AchievementEvaluator {
                 })
                 .orElse(false);
         } else if (event.targetType() == de.tum.in.www1.hephaestus.activity.ActivityTargetType.REVIEW_COMMENT) {
-            isNotAuthoredByOneself = reviewCommentRepository.findById(event.targetId())
+            isNotAuthoredByOneself = reviewCommentRepository
+                .findById(event.targetId())
                 .map(comment -> {
                     if (comment.getPullRequest() == null || comment.getPullRequest().getAuthor() == null) {
                         return true;

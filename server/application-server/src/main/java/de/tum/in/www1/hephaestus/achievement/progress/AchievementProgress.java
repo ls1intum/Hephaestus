@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.achievement.progress;
 
-
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -13,18 +12,12 @@ import io.swagger.v3.oas.annotations.media.Schema;
  *
  */
 
-@JsonTypeInfo(
-    use = JsonTypeInfo.Id.NAME,
-    include = JsonTypeInfo.As.PROPERTY,
-    property = "type"
+@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "type")
+@JsonSubTypes(
+    {
+        @JsonSubTypes.Type(value = LinearAchievementProgress.class, name = "LinearAchievementProgress"),
+        @JsonSubTypes.Type(value = BinaryAchievementProgress.class, name = "BinaryAchievementProgress"),
+    }
 )
-@JsonSubTypes({
-    @JsonSubTypes.Type(value = LinearAchievementProgress.class, name = "LinearAchievementProgress"),
-    @JsonSubTypes.Type(value = BinaryAchievementProgress.class, name = "BinaryAchievementProgress"),
-})
-@Schema(
-    name = "AchievementProgress",
-    description = "Polymorphic progress data"
-)
-public interface AchievementProgress {
-}
+@Schema(name = "AchievementProgress", description = "Polymorphic progress data")
+public interface AchievementProgress {}

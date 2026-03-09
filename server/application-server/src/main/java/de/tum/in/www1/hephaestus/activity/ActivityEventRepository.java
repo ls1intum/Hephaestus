@@ -5,7 +5,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -500,10 +499,7 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         """,
         nativeQuery = true
     )
-    long countByActorIdAndEventTypes(
-        @Param("actorId") Long actorId,
-        @Param("eventTypes") Set<String> eventTypes
-    );
+    long countByActorIdAndEventTypes(@Param("actorId") Long actorId, @Param("eventTypes") Set<String> eventTypes);
 
     /**
      * Slice all activity events for a specific actor in chronological order.
@@ -524,8 +520,5 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         ORDER BY e.occurredAt ASC
         """
     )
-    Slice<ActivityEvent> findSliceByActorIdOrderByOccurredAtAsc(
-        @Param("actorId") Long actorId,
-        Pageable pageable
-    );
+    Slice<ActivityEvent> findSliceByActorIdOrderByOccurredAtAsc(@Param("actorId") Long actorId, Pageable pageable);
 }

@@ -6,13 +6,9 @@ import jakarta.validation.constraints.PositiveOrZero;
 
 @Schema(name = "LinearAchievementProgress", description = "Linear progress with current and target counts")
 public record LinearAchievementProgress(
-    @PositiveOrZero
-    @JsonProperty
-    int current,
+    @PositiveOrZero @JsonProperty int current,
 
-    @PositiveOrZero
-    @JsonProperty(required = true)
-    int target
+    @PositiveOrZero @JsonProperty(required = true) int target
 ) implements AchievementProgress {
     public LinearAchievementProgress(int target) {
         this(0, target);

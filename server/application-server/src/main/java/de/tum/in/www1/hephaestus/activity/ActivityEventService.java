@@ -11,16 +11,15 @@ import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import io.micrometer.observation.annotation.Observed;
+import java.time.Instant;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.Instant;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Records activity events with XP.
@@ -178,7 +177,9 @@ public class ActivityEventService {
         xpDistribution.record(roundedXp);
 
         // Publish event for downstream listeners (e.g., achievement system)
-        eventPublisher.publishEvent(new ActivitySavedEvent(actor, eventType, occurredAt, workspaceId, targetType, targetId));
+        eventPublisher.publishEvent(
+            new ActivitySavedEvent(actor, eventType, occurredAt, workspaceId, targetType, targetId)
+        );
 
         // Structured logging with trace context
         log.info(

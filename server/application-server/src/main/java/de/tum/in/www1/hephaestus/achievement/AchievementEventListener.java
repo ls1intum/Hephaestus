@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.achievement;
 
+import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -9,8 +10,6 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
-
-import java.util.List;
 
 /**
  * Event listener that triggers achievement evaluation on activity events.
@@ -37,6 +36,7 @@ import java.util.List;
 @Slf4j
 @Component
 public class AchievementEventListener {
+
     private final AchievementService achievementService;
 
     public AchievementEventListener(AchievementService achievementService) {
