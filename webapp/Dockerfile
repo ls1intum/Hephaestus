@@ -1,7 +1,7 @@
-# syntax=docker/dockerfile:1.4
+# syntax=docker/dockerfile:1.22@sha256:4a43a54dd1fedceb30ba47e76cfcf2b47304f4161c0caeac2db1c61804ea3c91
 
 # Stage 1: Build
-FROM node:22-alpine AS build
+FROM node:22-alpine@sha256:8094c002d08262dba12645a3b4a15cd6cd627d30bc782f53229a2ec13ee22a00 AS build
 WORKDIR /app
 
 # Copy package.json for dependency installation
@@ -29,7 +29,7 @@ RUN ln -s /app/node_modules /server/intelligence-service/node_modules
 RUN npm run build
 
 # Stage 2: Serve
-FROM nginx:stable-alpine
+FROM nginx:stable-alpine@sha256:15e96e59aa3b0aada3a121296e3bce117721f42d88f5f64217ef4b18f458c6ab
 
 # Bake git metadata into the image using build arguments provided by Coolify
 ARG COOLIFY_BRANCH
