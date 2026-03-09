@@ -1,6 +1,8 @@
 package de.tum.in.www1.hephaestus.achievement;
 
 import java.util.List;
+
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,8 +57,8 @@ public class AchievementEventListener {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onActivitySaved(ActivitySavedEvent event) {
-        if (!event.hasUser()) {
-            log.debug("Skipping achievement check for system event: eventType={}", event.eventType());
+        if (event.user().isEmpty()) {
+            log.debug("Skipping achievement check for system event: eventType={}\nReason: event has no user", event.eventType());
             return;
         }
 
@@ -66,7 +68,7 @@ public class AchievementEventListener {
             if (!unlocked.isEmpty()) {
                 log.info(
                     "User {} unlocked {} achievement(s): {}",
-                    event.user().getLogin(),
+                    event.user().get().getLogin(),
                     unlocked.size(),
                     unlocked.stream().map(AchievementDefinition::id).toList()
                 );
@@ -75,7 +77,7 @@ public class AchievementEventListener {
             // Log but don't rethrow - achievements are non-critical
             log.error(
                 "Failed to evaluate achievements: userId={}, eventType={}",
-                event.user().getId(),
+                event.user().get().getId(),
                 event.eventType(),
                 e
             );

@@ -1,9 +1,11 @@
 package de.tum.in.www1.hephaestus.achievement;
 
+import de.tum.in.www1.hephaestus.activity.ActivityEventService;
 import de.tum.in.www1.hephaestus.activity.ActivityEventType;
 import de.tum.in.www1.hephaestus.activity.ActivityTargetType;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import java.time.Instant;
+import java.util.Optional;
 
 /**
  * Spring application event published when an activity event is successfully recorded.
@@ -12,7 +14,7 @@ import java.time.Instant;
  * The achievement system listens for these events to evaluate whether users have
  * unlocked new achievements.
  *
- * @param user the user who performed the activity (may be null for system events)
+ * @param user the user who performed the activity (may be {@link Optional#empty()} for system events)
  * @param eventType the type of activity that was recorded
  * @param occurredAt when the activity actually occurred (source timestamp, not ingestion time)
  * @param workspaceId the workspace where the activity occurred
@@ -20,23 +22,13 @@ import java.time.Instant;
  * @param targetId the ID of the target entity
  *
  * @see AchievementEventListener
- * @see de.tum.in.www1.hephaestus.activity.ActivityEventService
+ * @see ActivityEventService
  */
 public record ActivitySavedEvent(
-    User user,
+    Optional<User> user,
     ActivityEventType eventType,
     Instant occurredAt,
     Long workspaceId,
     ActivityTargetType targetType,
     Long targetId
-) {
-    /**
-     * Check if this event has a valid user for achievement evaluation.
-     *
-     * <p>System events (null user) cannot trigger achievements since
-     * achievements are always attributed to a specific user.
-     */
-    public boolean hasUser() {
-        return user != null;
-    }
-}
+) {}

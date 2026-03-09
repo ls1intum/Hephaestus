@@ -141,15 +141,15 @@ public class AchievementService {
      * @param event the activity saved event containing user, type, and timestamp
      * @return list of newly unlocked achievement types (empty if none)
      */
-    @CacheEvict(value = ACHIEVEMENT_PROGRESS_CACHE, key = "#event.user().getId()", condition = "#event.hasUser()")
+    @CacheEvict(value = ACHIEVEMENT_PROGRESS_CACHE, key = "#event.user().get().getId()", condition = "#event.user().isPresent()")
     @Transactional
     public List<AchievementDefinition> checkAndUnlock(ActivitySavedEvent event) {
-        if (!event.hasUser()) {
-            log.debug("Skipping achievement check: user is null");
+        if (event.user().isEmpty()) {
+            log.debug("Skipping achievement check: user is empty");
             return List.of();
         }
 
-        User user = event.user();
+        User user = event.user().get();
         ActivityEventType eventType = event.eventType();
         Instant occurredAt = event.occurredAt();
 

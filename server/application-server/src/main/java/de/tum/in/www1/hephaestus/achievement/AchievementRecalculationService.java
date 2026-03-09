@@ -14,6 +14,8 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Optional;
+
 /**
  * Service dedicated strictly to recalculating achievement progress from scratch.
  *
@@ -64,7 +66,7 @@ public class AchievementRecalculationService {
             );
             for (ActivityEvent event : slice.getContent()) {
                 ActivitySavedEvent savedEvent = new ActivitySavedEvent(
-                    event.getActor(),
+                    Optional.ofNullable(event.getActor()),
                     event.getEventType(),
                     event.getOccurredAt(),
                     event.getWorkspace().getId(),

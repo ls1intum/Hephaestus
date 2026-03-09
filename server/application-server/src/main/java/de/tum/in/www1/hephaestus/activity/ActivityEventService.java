@@ -12,6 +12,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import io.micrometer.observation.annotation.Observed;
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -178,7 +179,7 @@ public class ActivityEventService {
 
         // Publish event for downstream listeners (e.g., achievement system)
         eventPublisher.publishEvent(
-            new ActivitySavedEvent(actor, eventType, occurredAt, workspaceId, targetType, targetId)
+            new ActivitySavedEvent(Optional.ofNullable(actor), eventType, occurredAt, workspaceId, targetType, targetId)
         );
 
         // Structured logging with trace context
@@ -188,7 +189,7 @@ public class ActivityEventService {
             targetId,
             roundedXp,
             workspaceId,
-            actor.getId()
+            actor != null ? actor.getId() : null
         );
         return true;
     }

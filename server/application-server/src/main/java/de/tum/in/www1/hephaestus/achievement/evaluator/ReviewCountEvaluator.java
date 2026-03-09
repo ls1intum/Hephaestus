@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.achievement.evaluator;
 import de.tum.in.www1.hephaestus.achievement.ActivitySavedEvent;
 import de.tum.in.www1.hephaestus.achievement.UserAchievement;
 import de.tum.in.www1.hephaestus.achievement.progress.LinearAchievementProgress;
+import de.tum.in.www1.hephaestus.activity.ActivityTargetType;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewCommentRepository;
 import lombok.extern.slf4j.Slf4j;
@@ -40,24 +41,26 @@ public class ReviewCountEvaluator implements AchievementEvaluator {
 
         boolean isNotAuthoredByOneself = false;
 
-        if (event.targetType() == de.tum.in.www1.hephaestus.activity.ActivityTargetType.REVIEW) {
+        if (event.targetType() == ActivityTargetType.REVIEW) {
             isNotAuthoredByOneself = reviewRepository
                 .findById(event.targetId())
                 .map(review -> {
-                    if (review.getPullRequest() == null || review.getPullRequest().getAuthor() == null) {
+                    if (review.getPullRequest() == null || review.getPullRequest().getAuthor() == null)
                         return true;
-                    }
-                    return !review.getPullRequest().getAuthor().getId().equals(event.user().getId());
+                    if (event.user().isEmpty())
+                        return false;
+                    return !review.getPullRequest().getAuthor().getId().equals(event.user().get().getId());
                 })
                 .orElse(false);
-        } else if (event.targetType() == de.tum.in.www1.hephaestus.activity.ActivityTargetType.REVIEW_COMMENT) {
+        } else if (event.targetType() == ActivityTargetType.REVIEW_COMMENT) {
             isNotAuthoredByOneself = reviewCommentRepository
                 .findById(event.targetId())
                 .map(comment -> {
-                    if (comment.getPullRequest() == null || comment.getPullRequest().getAuthor() == null) {
+                    if (comment.getPullRequest() == null || comment.getPullRequest().getAuthor() == null)
                         return true;
-                    }
-                    return !comment.getPullRequest().getAuthor().getId().equals(event.user().getId());
+                    if (event.user().isEmpty())
+                        return false;
+                    return !comment.getPullRequest().getAuthor().getId().equals(event.user().get().getId());
                 })
                 .orElse(false);
         }
