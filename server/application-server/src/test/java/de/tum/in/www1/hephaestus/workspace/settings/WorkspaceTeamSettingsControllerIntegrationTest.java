@@ -771,6 +771,7 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
         Team newTeam = new Team();
         newTeam.setNativeId(entityIdGenerator.incrementAndGet());
         newTeam.setName(name);
+        newTeam.setSlug(name);
         newTeam.setOrganization(organization);
         newTeam.setDescription("Test team: " + name);
         newTeam.setHtmlUrl("https://github.com/orgs/" + organization + "/teams/" + name);
@@ -812,7 +813,8 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
      */
     private Label createLabel(String name, String color, Repository labelRepository) {
         Label newLabel = new Label();
-        newLabel.setId(entityIdGenerator.incrementAndGet());
+        newLabel.setNativeId(entityIdGenerator.incrementAndGet());
+        newLabel.setProvider(ensureGitHubProvider());
         newLabel.setName(name);
         newLabel.setColor(color);
         newLabel.setDescription("Test label: " + name);

@@ -1011,7 +1011,8 @@ public class HistoricalBackfillService {
                     int additionalReviews = reviewSyncService.syncRemainingReviews(
                         scopeId,
                         prWithCursor.pullRequest(),
-                        prWithCursor.reviewCursor()
+                        prWithCursor.reviewCursor(),
+                        prWithCursor.inlineCount()
                     );
                     totalReviewsSynced += additionalReviews;
                     if (additionalReviews > 0) {
@@ -1209,7 +1210,11 @@ public class HistoricalBackfillService {
                         // Track PRs that need additional review pagination (with cursor for efficient continuation)
                         if (embeddedReviews.needsPagination()) {
                             prsNeedingReviewPagination.add(
-                                new PullRequestWithReviewCursor(processed, embeddedReviews.endCursor())
+                                new PullRequestWithReviewCursor(
+                                    processed,
+                                    embeddedReviews.endCursor(),
+                                    embeddedReviews.reviews().size()
+                                )
                             );
                         }
 
@@ -1291,7 +1296,7 @@ public class HistoricalBackfillService {
     /**
      * Container for PRs that need additional review pagination.
      */
-    private record PullRequestWithReviewCursor(PullRequest pullRequest, String reviewCursor) {}
+    private record PullRequestWithReviewCursor(PullRequest pullRequest, String reviewCursor, int inlineCount) {}
 
     /**
      * Result of processing a page of pull requests with embedded reviews and comments.

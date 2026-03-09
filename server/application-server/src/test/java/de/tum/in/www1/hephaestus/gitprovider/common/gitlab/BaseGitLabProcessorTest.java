@@ -8,6 +8,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.dto.GitLabWebhookLabel;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.dto.GitLabWebhookUser;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.RepositoryScopeFilter;
@@ -18,6 +20,7 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.gitprovider.user.gitlab.GitLabUserService;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import java.time.Duration;
 import java.time.Instant;
@@ -36,6 +39,9 @@ import org.mockito.Mock;
 @Tag("unit")
 @DisplayName("BaseGitLabProcessor")
 class BaseGitLabProcessorTest extends BaseUnitTest {
+
+    @Mock
+    private GitLabUserService gitLabUserService;
 
     @Mock
     private UserRepository userRepository;
@@ -66,6 +72,7 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
         );
 
         processor = new TestProcessor(
+            gitLabUserService,
             userRepository,
             labelRepository,
             repositoryRepository,
@@ -74,9 +81,15 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
             properties
         );
 
+        GitProvider gitLabProvider = new GitProvider();
+        gitLabProvider.setId(2L);
+        gitLabProvider.setType(GitProviderType.GITLAB);
+        gitLabProvider.setServerUrl("https://gitlab.lrz.de");
+
         testRepo = new Repository();
         testRepo.setId(-246765L);
         testRepo.setNameWithOwner("hephaestustest/demo-repository");
+        testRepo.setProvider(gitLabProvider);
     }
 
     // ========================================================================
@@ -156,8 +169,6 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
             user.setId(-18024L);
             user.setLogin("ga84xah");
 
-            when(userRepository.findByNativeIdAndProviderId(18024L, 1L)).thenReturn(Optional.of(user));
-
             GitLabWebhookUser dto = new GitLabWebhookUser(
                 18024L,
                 "ga84xah",
@@ -165,6 +176,8 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
                 "https://avatar.url",
                 null
             );
+
+            when(gitLabUserService.findOrCreateUser(dto, 1L)).thenReturn(user);
 
             User result = processor.callFindOrCreateUser(dto);
 
@@ -207,7 +220,16 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
             User user = new User();
             user.setId(-18024L);
 
-            when(userRepository.findByNativeIdAndProviderId(18024L, 1L)).thenReturn(Optional.of(user));
+            when(
+                gitLabUserService.findOrCreateUser(
+                    "gid://gitlab/User/18024",
+                    "ga84xah",
+                    "Felix Dietrich",
+                    "https://avatar.url",
+                    "https://gitlab.lrz.de/ga84xah",
+                    1L
+                )
+            ).thenReturn(user);
 
             User result = processor.callFindOrCreateUser(
                 "gid://gitlab/User/18024",
@@ -259,22 +281,20 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
             Label result = processor.callFindOrCreateLabel(dto, testRepo);
 
             assertThat(result).isSameAs(existing);
-            verify(labelRepository, never()).insertIfAbsent(anyLong(), anyString(), anyString(), anyLong());
+            verify(labelRepository, never()).insertIfAbsent(anyLong(), anyLong(), anyString(), anyString(), anyLong());
         }
 
         @Test
         @DisplayName("creates new label with native ID")
         void createsNewLabelWithNativeId() {
-            when(labelRepository.findByRepositoryIdAndName(testRepo.getId(), "enhancement")).thenReturn(
-                Optional.empty()
-            );
-
             Label created = new Label();
             created.setId(85907L);
             created.setName("enhancement");
 
-            when(labelRepository.insertIfAbsent(85907L, "enhancement", "#a2eeef", testRepo.getId())).thenReturn(1);
-            when(labelRepository.findById(85907L)).thenReturn(Optional.of(created));
+            when(labelRepository.findByRepositoryIdAndName(testRepo.getId(), "enhancement"))
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.of(created));
+            when(labelRepository.insertIfAbsent(85907L, 2L, "enhancement", "#a2eeef", testRepo.getId())).thenReturn(1);
 
             GitLabWebhookLabel dto = new GitLabWebhookLabel(85907L, "enhancement", "#a2eeef");
             Label result = processor.callFindOrCreateLabel(dto, testRepo);
@@ -371,6 +391,7 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
     private static class TestProcessor extends BaseGitLabProcessor {
 
         TestProcessor(
+            GitLabUserService gitLabUserService,
             UserRepository userRepository,
             LabelRepository labelRepository,
             RepositoryRepository repositoryRepository,
@@ -379,6 +400,7 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
             GitLabProperties gitLabProperties
         ) {
             super(
+                gitLabUserService,
                 userRepository,
                 labelRepository,
                 repositoryRepository,

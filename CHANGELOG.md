@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.25.3](https://github.com/ls1intum/Hephaestus/compare/v0.25.2...v0.25.3) (2026-03-08)
+
+### 🐛 Bug Fixes
+
+* **gitprovider:** resolve team repository permission sync using native IDs instead of internal IDs ([#813](https://github.com/ls1intum/Hephaestus/issues/813)) ([5d8fc62](https://github.com/ls1intum/Hephaestus/commit/5d8fc62d9fd5c6a9956f164a5d53760d4aa7d897))
+
+## [0.25.2](https://github.com/ls1intum/Hephaestus/compare/v0.25.1...v0.25.2) (2026-03-08)
+
+### 🐛 Bug Fixes
+
+* **gitprovider:** prevent webhooks from overwriting user display names with login ([#811](https://github.com/ls1intum/Hephaestus/issues/811)) ([4a57b2a](https://github.com/ls1intum/Hephaestus/commit/4a57b2aa0f97234e25b60f4c903b7456967566b4))
+* **server:** resolve LazyInitializationException in bad practice detection pipeline ([#801](https://github.com/ls1intum/Hephaestus/issues/801)) ([4800db4](https://github.com/ls1intum/Hephaestus/commit/4800db4fe25b209acf66ccaf605ba3d065b0efc7))
+
+## [0.25.1](https://github.com/ls1intum/Hephaestus/compare/v0.25.0...v0.25.1) (2026-03-08)
+
+### 🐛 Bug Fixes
+
+* **gitprovider:** workaround for GitLab includeSubgroups bug dropping direct projects ([#809](https://github.com/ls1intum/Hephaestus/issues/809)) ([68406ba](https://github.com/ls1intum/Hephaestus/commit/68406ba3b67d1017e49b762ed6a098d7205adc55))
+
+### ♻️ Code Refactoring
+
+* **db:** rename github_id to remote_id, add provider_type discriminator ([#808](https://github.com/ls1intum/Hephaestus/issues/808)) ([8debddc](https://github.com/ls1intum/Hephaestus/commit/8debddc2b0a8952600566391fad14bf82f952805))
+
 ## [0.25.0](https://github.com/ls1intum/Hephaestus/compare/v0.24.0...v0.25.0) (2026-03-07)
 
 ### 🚀 Features

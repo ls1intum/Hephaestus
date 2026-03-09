@@ -595,43 +595,49 @@ public class GitHubTeamSyncService {
         }
 
         Set<TeamRepositoryPermission> freshPermissions = new HashSet<>();
+        Long providerId = team.getProvider().getId();
 
         for (var repoEdge : allRepoEdges) {
             if (repoEdge == null || repoEdge.getNode() == null || repoEdge.getNode().getDatabaseId() == null) {
                 continue;
             }
 
-            Long repoId = repoEdge.getNode().getDatabaseId().longValue();
+            Long repoNativeId = repoEdge.getNode().getDatabaseId().longValue();
             String repoName = repoEdge.getNode().getNameWithOwner();
 
-            // Skip unknown repos (not monitored by this scope)
-            boolean exists = repositoryRepository.existsById(repoId);
-            if (!exists) {
+            // Look up by native ID + provider (NOT by internal auto-increment ID).
+            // GitHub's databaseId is the provider's native numeric ID, which is different
+            // from our internal auto-increment primary key.
+            var repoOpt = repositoryRepository.findByNativeIdAndProviderId(repoNativeId, providerId);
+            if (repoOpt.isEmpty()) {
                 log.trace(
-                    "Skipping unmonitored repository: teamName={}, repoId={}, repoName={}",
+                    "Skipping unmonitored repository: teamName={}, repoNativeId={}, repoName={}",
                     sanitizeForLog(team.getName()),
-                    repoId,
+                    repoNativeId,
                     sanitizeForLog(repoName)
                 );
                 continue;
             }
+
+            Repository repo = repoOpt.get();
             log.trace(
-                "Found monitored repository for team: teamName={}, repoId={}, repoName={}",
+                "Found monitored repository for team: teamName={}, repoNativeId={}, internalId={}, repoName={}",
                 sanitizeForLog(team.getName()),
-                repoId,
+                repoNativeId,
+                repo.getId(),
                 sanitizeForLog(repoName)
             );
 
-            Repository repoRef = repositoryRepository.getReferenceById(repoId);
             TeamRepositoryPermission.PermissionLevel level = convertPermission(repoEdge.getPermission());
 
-            // Find existing permission or create new
+            // Find existing permission or create new (compare by internal repository ID)
+            final Long internalRepoId = repo.getId();
             TeamRepositoryPermission permission = team
                 .getRepoPermissions()
                 .stream()
-                .filter(existing -> Objects.equals(existing.getRepository().getId(), repoId))
+                .filter(existing -> Objects.equals(existing.getRepository().getId(), internalRepoId))
                 .findFirst()
-                .orElseGet(() -> new TeamRepositoryPermission(team, repoRef, level));
+                .orElseGet(() -> new TeamRepositoryPermission(team, repo, level));
 
             permission.setPermission(level);
             freshPermissions.add(permission);

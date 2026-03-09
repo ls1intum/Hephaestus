@@ -9,6 +9,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabEventType;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabMessageHandler;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabWebhookContextResolver;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.gitlab.dto.GitLabNoteEventDTO;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.gitlab.GitLabDiffNoteWebhookProcessor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -23,16 +24,19 @@ public class GitLabNoteMessageHandler extends GitLabMessageHandler<GitLabNoteEve
     private static final Logger log = LoggerFactory.getLogger(GitLabNoteMessageHandler.class);
 
     private final GitLabIssueCommentProcessor issueCommentProcessor;
+    private final GitLabDiffNoteWebhookProcessor diffNoteProcessor;
     private final GitLabWebhookContextResolver contextResolver;
 
     GitLabNoteMessageHandler(
         GitLabIssueCommentProcessor issueCommentProcessor,
+        GitLabDiffNoteWebhookProcessor diffNoteProcessor,
         GitLabWebhookContextResolver contextResolver,
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate
     ) {
         super(GitLabNoteEventDTO.class, deserializer, transactionTemplate);
         this.issueCommentProcessor = issueCommentProcessor;
+        this.diffNoteProcessor = diffNoteProcessor;
         this.contextResolver = contextResolver;
     }
 
@@ -106,11 +110,7 @@ public class GitLabNoteMessageHandler extends GitLabMessageHandler<GitLabNoteEve
             case "Issue" -> issueCommentProcessor.processIssueNote(event, context);
             case "MergeRequest" -> {
                 if (event.isDiffNote()) {
-                    log.debug(
-                        "Skipped diff note: projectPath={}, noteId={}",
-                        safeProjectPath,
-                        event.objectAttributes().id()
-                    );
+                    diffNoteProcessor.processDiffNote(event, context);
                 } else {
                     issueCommentProcessor.processMergeRequestNote(event, context);
                 }

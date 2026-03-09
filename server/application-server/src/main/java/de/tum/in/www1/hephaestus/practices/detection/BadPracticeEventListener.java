@@ -277,18 +277,27 @@ public class BadPracticeEventListener {
     }
 
     /**
-     * Schedule detection with 1-hour delay.
-     * Used for opened, updated, ready, synchronized, and reopened events.
+     * Fetches the pull request with assignees and repository eagerly loaded.
+     * Uses {@code findByIdWithAssigneesAndRepository} to ensure both associations
+     * are initialized before the entity is passed to the scheduler, which may
+     * access them outside the current Hibernate session.
      */
+    private PullRequest fetchPullRequestForDetection(Long pullRequestId, int pullRequestNumber) {
+        PullRequest pullRequest = pullRequestRepository.findByIdWithAssigneesAndRepository(pullRequestId).orElse(null);
+        if (pullRequest == null) {
+            log.warn(
+                "Skipped bad practice detection: reason=pullRequestNotFound, prNumber={}, prId={}",
+                pullRequestNumber,
+                pullRequestId
+            );
+        }
+        return pullRequest;
+    }
+
     private void scheduleDetectionWithDelay(Long pullRequestId, int pullRequestNumber) {
         try {
-            PullRequest pullRequest = pullRequestRepository.findByIdWithAssignees(pullRequestId).orElse(null);
+            PullRequest pullRequest = fetchPullRequestForDetection(pullRequestId, pullRequestNumber);
             if (pullRequest == null) {
-                log.warn(
-                    "Skipped bad practice detection: reason=pullRequestNotFound, prNumber={}, prId={}",
-                    pullRequestNumber,
-                    pullRequestId
-                );
                 return;
             }
             badPracticeDetectorScheduler.detectBadPracticeForPrWhenOpenedOrReadyForReviewEvent(pullRequest);
@@ -303,13 +312,8 @@ public class BadPracticeEventListener {
      */
     private void triggerReadyLabelDetection(Long pullRequestId, int pullRequestNumber, String labelName) {
         try {
-            PullRequest pullRequest = pullRequestRepository.findByIdWithAssignees(pullRequestId).orElse(null);
+            PullRequest pullRequest = fetchPullRequestForDetection(pullRequestId, pullRequestNumber);
             if (pullRequest == null) {
-                log.warn(
-                    "Skipped bad practice detection: reason=pullRequestNotFound, prNumber={}, prId={}",
-                    pullRequestNumber,
-                    pullRequestId
-                );
                 return;
             }
             // Use the scheduler method that checks exact label names and runs immediately
@@ -324,13 +328,8 @@ public class BadPracticeEventListener {
      */
     private void triggerClosedDetection(Long pullRequestId, int pullRequestNumber) {
         try {
-            PullRequest pullRequest = pullRequestRepository.findByIdWithAssignees(pullRequestId).orElse(null);
+            PullRequest pullRequest = fetchPullRequestForDetection(pullRequestId, pullRequestNumber);
             if (pullRequest == null) {
-                log.warn(
-                    "Skipped bad practice detection: reason=pullRequestNotFound, prNumber={}, prId={}",
-                    pullRequestNumber,
-                    pullRequestId
-                );
                 return;
             }
             badPracticeDetectorScheduler.detectBadPracticeForPrIfClosedEvent(pullRequest);

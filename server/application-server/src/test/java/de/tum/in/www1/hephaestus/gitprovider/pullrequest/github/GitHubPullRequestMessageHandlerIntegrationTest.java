@@ -418,7 +418,7 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
             });
 
             // Verify label was created in repository
-            assertThat(labelRepository.findById(FIXTURE_LABEL_ID)).isPresent();
+            assertThat(labelRepository.findByNativeIdAndProviderId(FIXTURE_LABEL_ID, testProvider.getId())).isPresent();
 
             // Verify Labeled event was published
             assertThat(eventListener.getLabeledEvents()).hasSize(1);

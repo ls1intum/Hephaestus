@@ -88,9 +88,10 @@ public abstract class BaseGitHubProcessor {
         // ALWAYS check by unique key (repository_id + name) FIRST - this is the constraint we enforce.
         Optional<Label> existingOpt = labelRepository.findByRepositoryIdAndName(repository.getId(), dto.name());
 
-        // Fall back to ID lookup if name lookup didn't find it (handles label renames)
+        // Fall back to nativeId lookup if name lookup didn't find it (handles label renames)
         if (existingOpt.isEmpty() && dto.id() != null) {
-            existingOpt = labelRepository.findById(dto.id());
+            Long providerId = repository.getProvider().getId();
+            existingOpt = labelRepository.findByNativeIdAndProviderId(dto.id(), providerId);
         }
 
         if (existingOpt.isPresent()) {
@@ -99,32 +100,24 @@ public abstract class BaseGitHubProcessor {
 
         // Use atomic insert to prevent race conditions.
         // If another thread inserted first, this returns 0 and we fetch the winner.
-        Long labelId = dto.id() != null ? dto.id() : generateDeterministicLabelId(repository.getId(), dto.name());
-        int inserted = labelRepository.insertIfAbsent(labelId, dto.name(), dto.color(), repository.getId());
+        long nativeId =
+            dto.id() != null
+                ? dto.id()
+                : de.tum.in.www1.hephaestus.gitprovider.common.LabelIdUtils.generateDeterministicId(
+                      repository.getId(),
+                      dto.name()
+                  );
+        Long providerId = repository.getProvider().getId();
+        int inserted = labelRepository.insertIfAbsent(
+            nativeId,
+            providerId,
+            dto.name(),
+            dto.color(),
+            repository.getId()
+        );
 
-        if (inserted == 0) {
-            // Another thread inserted first - fetch the winner
-            // Note: orElse(null) is safe here - if conflict occurred, the row exists.
-            // The only failure case is concurrent DELETE which is not a supported operation.
-            return labelRepository.findByRepositoryIdAndName(repository.getId(), dto.name()).orElse(null);
-        }
-
-        // We inserted - fetch the entity to return a managed instance
-        // Note: Same transaction guarantees visibility (PostgreSQL MVCC).
-        return labelRepository.findById(labelId).orElse(null);
-    }
-
-    /**
-     * Generate a deterministic negative ID for labels created from GraphQL data.
-     * <p>
-     * Uses bit shifting to combine repo ID and label name hash without collision.
-     * The formula repositoryId * 31 + labelName.hashCode() can produce collisions.
-     * Uses negative values to avoid collision with real GitHub label IDs which are
-     * always positive.
-     */
-    private Long generateDeterministicLabelId(Long repositoryId, String labelName) {
-        long combined = (repositoryId << 32) | (labelName.hashCode() & 0xFFFFFFFFL);
-        return -combined;
+        // Always fetch by business key — the PK is auto-generated and unknown here.
+        return labelRepository.findByRepositoryIdAndName(repository.getId(), dto.name()).orElse(null);
     }
 
     /**

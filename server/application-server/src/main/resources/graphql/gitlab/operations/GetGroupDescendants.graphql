@@ -1,0 +1,22 @@
+query GetGroupDescendants($fullPath: ID!, $first: Int!, $after: String) {
+    group(fullPath: $fullPath) {
+        descendantGroups(first: $first, after: $after, includeParentDescendants: false) {
+            pageInfo {
+                hasNextPage
+                endCursor
+            }
+            nodes {
+                id
+                fullPath
+                name
+                description
+                webUrl
+                visibility
+                parent {
+                    id
+                    fullPath
+                }
+            }
+        }
+    }
+}

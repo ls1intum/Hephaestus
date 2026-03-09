@@ -118,7 +118,7 @@ public class GitHubUserProcessor {
         }
 
         String login = dto.login();
-        String name = dto.name() != null ? dto.name() : login;
+        String name = dto.name();
         String avatarUrl = dto.avatarUrl() != null ? dto.avatarUrl() : "";
         String htmlUrl = dto.htmlUrl() != null ? dto.htmlUrl() : "";
         User.Type userType = dto.getEffectiveType();

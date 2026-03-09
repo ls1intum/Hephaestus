@@ -268,12 +268,14 @@ public class WorkspaceActivationService {
                                 workspace.getAccountLogin()
                             );
                             log.info(
-                                "GitLab sync result: workspaceId={}, status={}, synced={}, failed={}, redacted={}, pages={}",
+                                "GitLab sync result: workspaceId={}, status={}, synced={}, failed={}, " +
+                                    "redacted={}, reconciled={}, pages={}",
                                 workspace.getId(),
                                 result.status(),
                                 result.synced().size(),
                                 result.projectsSkipped(),
                                 result.projectsRedacted(),
+                                result.projectsReconciled(),
                                 result.pagesCompleted()
                             );
                             // Link workspace to organization after sync (org was created during sync)
@@ -423,6 +425,24 @@ public class WorkspaceActivationService {
                                         mrCompletedRepos,
                                         totalMRs
                                     );
+                                }
+                            }
+
+                            // Phase 3: Sync teams (subgroups → Team entities with members and repo permissions)
+                            var teamSyncService = gitLabServices.getTeamSyncService();
+                            if (teamSyncService != null) {
+                                try {
+                                    int teamsCount = teamSyncService.syncTeamsForGroup(
+                                        workspace.getId(),
+                                        workspace.getAccountLogin()
+                                    );
+                                    log.info(
+                                        "GitLab team sync complete: workspaceId={}, teams={}",
+                                        workspace.getId(),
+                                        teamsCount
+                                    );
+                                } catch (Exception e) {
+                                    log.warn("Failed to sync teams: workspaceId={}", workspace.getId(), e);
                                 }
                             }
                         }
