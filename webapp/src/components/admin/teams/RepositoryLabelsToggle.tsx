@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import type { LabelInfo, RepositoryInfo, TeamInfo } from "@/api/types.gen";
-import { GithubBadge } from "@/components/shared/GithubBadge";
+import { LabelBadge } from "@/components/shared/LabelBadge";
 import { cn } from "@/lib/utils";
 
 export interface RepositoryLabelsToggleProps {
@@ -60,7 +60,7 @@ export function RepositoryLabelsToggle({
 								onClick={() => handleToggle(label)}
 								title={isActive ? "Click to remove from team" : "Click to add to team"}
 							>
-								<GithubBadge
+								<LabelBadge
 									label={label.name}
 									color={label.color}
 									className={cn(

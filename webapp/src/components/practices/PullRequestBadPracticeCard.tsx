@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import type { ProviderType } from "@/lib/provider";
 import { BadPracticeCard } from "./BadPracticeCard";
 import { filterGoodAndBadPractices } from "./utils";
 
@@ -26,9 +27,11 @@ export interface BadPracticeFeedback {
 
 /**
  * Props for the PullRequestBadPracticeCard component
- * @description Displays a GitHub pull request with its metadata and detected bad practices
+ * @description Displays a pull request / merge request with its metadata and detected bad practices
  */
 export interface PullRequestBadPracticeCardProps {
+	/** Provider type for rendering correct icons */
+	providerType?: ProviderType;
 	/** Unique identifier of the pull request */
 	id: number;
 	/** The title of the pull request */
@@ -39,7 +42,7 @@ export interface PullRequestBadPracticeCardProps {
 	additions?: number;
 	/** Number of line deletions in the PR */
 	deletions?: number;
-	/** URL to the pull request on GitHub */
+	/** URL to the pull request or merge request */
 	htmlUrl?: string;
 	/** Name of the repository containing the PR */
 	repositoryName?: string;
@@ -104,6 +107,7 @@ export interface PullRequestBadPracticeCardProps {
 }
 
 export function PullRequestBadPracticeCard({
+	providerType = "GITHUB",
 	id,
 	title = "",
 	number = 0,
@@ -200,6 +204,7 @@ export function PullRequestBadPracticeCard({
 	return (
 		<IssueCard
 			className="min-w-sm"
+			providerType={providerType}
 			isLoading={isLoading}
 			title={title}
 			number={number}
@@ -238,11 +243,11 @@ export function PullRequestBadPracticeCard({
 					{/* Show no content message if nothing to display */}
 					{!hasCurrentAnalysis && !hasPreviousAnalysis && (
 						<div className="flex items-center justify-center px-4 pb-4 w-full">
-							<span className="text-sm text-github-muted-foreground">No analysis available</span>
+							<span className="text-sm text-provider-muted-foreground">No analysis available</span>
 						</div>
 					)}
 					{badPracticeSummary && (
-						<p className="px-4 pb-2 text-sm text-pretty text-github-muted-foreground">
+						<p className="px-4 pb-2 text-sm text-pretty text-provider-muted-foreground">
 							{badPracticeSummary}
 						</p>
 					)}
@@ -260,18 +265,18 @@ export function PullRequestBadPracticeCard({
 									<AccordionTrigger className="w-full group">
 										<div className="flex w-full items-center justify-between gap-2">
 											<span className="font-medium">Current analysis</span>
-											<span className="text-github-muted-foreground">
+											<span className="text-provider-muted-foreground">
 												{issueCount > 0 ? (
-													<span className="text-github-danger-foreground accent-github-danger-foreground group-hover:underline decorator-github-danger-foreground font-medium">
+													<span className="text-provider-danger-foreground group-hover:underline decoration-provider-danger-foreground font-medium">
 														{issueCount} issue{issueCount !== 1 ? "s" : ""}
 													</span>
 												) : goodCount > 0 ? (
-													<span className="text-github-success-foreground group-hover:underline decorator-github-success-foreground font-medium">
+													<span className="text-provider-success-foreground group-hover:underline decoration-provider-success-foreground font-medium">
 														{goodCount} good practice
 														{goodCount !== 1 ? "s" : ""}
 													</span>
 												) : resolvedCount > 0 ? (
-													<span className="group-hover:underline decorator-github-muted-foreground font-medium">
+													<span className="group-hover:underline decoration-provider-muted-foreground font-medium">
 														All resolved
 													</span>
 												) : (
@@ -317,7 +322,7 @@ export function PullRequestBadPracticeCard({
 									<AccordionTrigger className="w-full">
 										<div className="flex w-full items-center justify-between gap-2">
 											<span className="font-medium">Previous analysis</span>
-											<span className="text-github-muted-foreground">
+											<span className="text-provider-muted-foreground">
 												{orderedOldBadPractices.length} result
 												{orderedOldBadPractices.length !== 1 ? "s" : ""}
 											</span>

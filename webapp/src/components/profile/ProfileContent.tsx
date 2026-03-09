@@ -1,4 +1,4 @@
-import { CodeReviewIcon, GitPullRequestIcon } from "@primer/octicons-react";
+import { CodeReviewIcon } from "@primer/octicons-react";
 import { Link } from "@tanstack/react-router";
 import type {
 	ProfileActivityStats,
@@ -8,6 +8,7 @@ import type {
 } from "@/api/types.gen";
 import { ActivityBadges } from "@/components/leaderboard/ActivityBadges";
 import { Button } from "@/components/ui/button";
+import { getProviderTerms, getPullRequestStateIcon, type ProviderType } from "@/lib/provider";
 import type { LeaderboardSchedule } from "@/lib/timeframe";
 import type { ReviewedPullRequest } from "../leaderboard/ReviewsPopover";
 import { EmptyState } from "../shared/EmptyState";
@@ -16,6 +17,7 @@ import { ProfileTimeframePicker } from "./ProfileTimeframePicker";
 import { ReviewActivityCard } from "./ReviewActivityCard";
 
 export interface ProfileContentProps {
+	providerType?: ProviderType;
 	reviewActivity?: ProfileReviewActivity[];
 	openPullRequests?: PullRequestInfo[];
 	/** Server-computed activity stats; falls back to client computation if not provided */
@@ -35,6 +37,7 @@ export interface ProfileContentProps {
 }
 
 export function ProfileContent({
+	providerType = "GITHUB",
 	reviewActivity = [],
 	openPullRequests = [],
 	activityStats,
@@ -105,9 +108,11 @@ export function ProfileContent({
 	};
 
 	const reviewStats = normalizeStats(activityStats);
+	const terms = getProviderTerms(providerType);
+	const { icon: PrIcon } = getPullRequestStateIcon(providerType, "OPEN");
 
 	// Use server-provided reviewed PRs if available, otherwise extract from review activity
-	const reviewedPRsForPopover: ReviewedPullRequest[] =
+	const reviewedPullRequestsForPopover: ReviewedPullRequest[] =
 		reviewedPullRequests && reviewedPullRequests.length > 0
 			? reviewedPullRequests
 			: (reviewActivity ?? [])
@@ -130,12 +135,13 @@ export function ProfileContent({
 						<div className="flex flex-wrap items-center gap-3">
 							<h3 className="text-lg font-semibold">Review activity</h3>
 							<ActivityBadges
-								reviewedPullRequests={reviewedPRsForPopover}
+								reviewedPullRequests={reviewedPullRequestsForPopover}
 								approvals={reviewStats.approvals}
 								changeRequests={reviewStats.changeRequests}
 								comments={reviewStats.comments}
 								codeComments={reviewStats.codeComments}
 								isLoading={isLoading}
+								providerType={providerType}
 							/>
 						</div>
 					</div>
@@ -151,6 +157,7 @@ export function ProfileContent({
 									pullRequest={activity.pullRequest}
 									repositoryName={activity.pullRequest?.repository?.name}
 									score={activity.score}
+									providerType={providerType}
 								/>
 							))
 						) : (
@@ -167,10 +174,10 @@ export function ProfileContent({
 					</div>
 				</div>
 
-				{/* Open Pull Requests */}
+				{/* Open Pull Requests / Merge Requests */}
 				<div className="flex flex-col gap-2">
 					<span className="flex justify-between items-center">
-						<h3 className="text-lg font-semibold">Open pull requests</h3>
+						<h3 className="text-lg font-semibold">Open {terms.pullRequests.toLowerCase()}</h3>
 						<Button
 							variant="secondary"
 							render={
@@ -200,16 +207,17 @@ export function ProfileContent({
 									isMerged={pullRequest.isMerged}
 									createdAt={pullRequest.createdAt}
 									pullRequestLabels={pullRequest.labels}
+									providerType={providerType}
 								/>
 							))
 						) : (
 							<EmptyState
-								icon={GitPullRequestIcon}
-								title="No open pull requests"
+								icon={PrIcon}
+								title={`No open ${terms.pullRequests.toLowerCase()}`}
 								description={
 									currUserIsDashboardUser
-										? "Pull requests you create will appear here."
-										: `${displayName || username} doesn't have any open pull requests.`
+										? `${terms.pullRequests} you create will appear here.`
+										: `${displayName || username} doesn't have any open ${terms.pullRequests.toLowerCase()}.`
 								}
 							/>
 						)}

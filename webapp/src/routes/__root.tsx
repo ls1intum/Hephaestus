@@ -26,6 +26,7 @@ import { useMentorChat } from "@/hooks/useMentorChat";
 import { type AuthContextType, useAuth } from "@/integrations/auth/AuthContext";
 import { isPosthogEnabled } from "@/integrations/posthog/config";
 import { useTheme } from "@/integrations/theme";
+import { getProviderSlug } from "@/lib/provider";
 import type { ChatMessage } from "@/lib/types";
 
 interface MyRouterContext {
@@ -61,22 +62,24 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 
 		return (
 			<>
-				<SidebarProvider>
-					<AppSidebarContainer />
-					<SidebarInset>
-						<HeaderContainer />
-						<div className="min-h-[calc(100dvh-4rem)] flex flex-col">
-							<main className={`${isMentorRoute ? "" : "p-4"}`}>
-								<Outlet />
-							</main>
-							{!isMentorRoute && (
-								<div className="flex justify-end flex-col h-full">
-									<Footer buildInfo={environment.buildInfo} />
-								</div>
-							)}
-						</div>
-					</SidebarInset>
-				</SidebarProvider>
+				<ProviderColorScope>
+					<SidebarProvider>
+						<AppSidebarContainer />
+						<SidebarInset>
+							<HeaderContainer />
+							<div className="min-h-[calc(100dvh-4rem)] flex flex-col">
+								<main className={`${isMentorRoute ? "" : "p-4"}`}>
+									<Outlet />
+								</main>
+								{!isMentorRoute && (
+									<div className="flex justify-end flex-col h-full">
+										<Footer buildInfo={environment.buildInfo} />
+									</div>
+								)}
+							</div>
+						</SidebarInset>
+					</SidebarProvider>
+				</ProviderColorScope>
 				<Toaster theme={theme} />
 				{showCopilot && <GlobalCopilot />}
 				{!isLoading && isAuthenticated && allowSurveys && <PostHogSurveyWidget />}
@@ -212,6 +215,16 @@ function HeaderContainer() {
 			onLogout={logout}
 		/>
 	);
+}
+
+/**
+ * Sets `data-provider` attribute on a wrapper div so provider-aware CSS custom
+ * properties (--color-provider-*) resolve to the correct palette (GitHub Primer
+ * or GitLab Pajamas) based on the active workspace's provider type.
+ */
+function ProviderColorScope({ children }: { children: React.ReactNode }) {
+	const { providerType } = useActiveWorkspaceSlug();
+	return <div data-provider={getProviderSlug(providerType)}>{children}</div>;
 }
 
 function AppSidebarContainer() {

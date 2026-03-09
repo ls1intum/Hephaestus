@@ -48,7 +48,7 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/")({
 function LeaderboardContainer() {
 	// Get the current user from auth context
 	const { username } = useAuth();
-	const { workspaceSlug, isLoading: isWorkspaceLoading } = useActiveWorkspaceSlug();
+	const { workspaceSlug, providerType, isLoading: isWorkspaceLoading } = useActiveWorkspaceSlug();
 	const slug = workspaceSlug ?? "";
 	const hasWorkspace = Boolean(workspaceSlug);
 	const showNoWorkspace = !isWorkspaceLoading && !hasWorkspace;
@@ -318,6 +318,7 @@ function LeaderboardContainer() {
 
 	return (
 		<LeaderboardPage
+			providerType={providerType}
 			leaderboard={leaderboardQuery.data || []}
 			isLoading={
 				isWorkspaceLoading ||

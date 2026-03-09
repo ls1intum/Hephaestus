@@ -6,13 +6,21 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
+import { getProviderTerms, type ProviderType } from "@/lib/provider";
 
 interface ScoringExplanationDialogProps {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
+	providerType?: ProviderType;
 }
 
-export function ScoringExplanationDialog({ open, onOpenChange }: ScoringExplanationDialogProps) {
+export function ScoringExplanationDialog({
+	open,
+	onOpenChange,
+	providerType = "GITHUB",
+}: ScoringExplanationDialogProps) {
+	const terms = getProviderTerms(providerType);
+
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
 			<DialogContent className="max-w-2xl">
@@ -24,21 +32,25 @@ export function ScoringExplanationDialog({ open, onOpenChange }: ScoringExplanat
 					<DialogDescription>How your contribution score is calculated</DialogDescription>
 				</DialogHeader>
 
-				<div className="text-sm text-github-muted-foreground space-y-3">
+				<div className="text-sm text-provider-muted-foreground space-y-3">
 					<p>
 						The score approximates your contribution activity by evaluating your review interactions
-						and the complexity of the pull requests you've reviewed.
+						and the complexity of the {terms.pullRequests.toLowerCase()} you've reviewed.
 						<span className="font-medium"> Change requests are valued highest</span>, followed by
 						approvals and comments. The score increases with the number of review interactions.
 					</p>
 
 					<p>
-						Pull request complexity &mdash; based on factors like changed files, commits, additions,
-						and deletions &mdash; also enhances your score;
-						<span className="font-medium"> more complex pull requests contribute more</span>.
+						{terms.pullRequest} complexity &mdash; based on factors like changed files, commits,
+						additions, and deletions &mdash; also enhances your score;
+						<span className="font-medium">
+							{" "}
+							more complex {terms.pullRequests.toLowerCase()} contribute more
+						</span>
+						.
 					</p>
 
-					<div className="bg-github-muted rounded-md p-4 font-mono text-xs">
+					<div className="bg-provider-muted rounded-md p-4 font-mono text-xs">
 						<p className="font-medium">Score Calculation Formula</p>
 						<p className="mt-1">
 							score = (10 × interactionScore × complexityScore) / (interactionScore +

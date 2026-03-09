@@ -167,7 +167,7 @@ const meta = {
 			control: "boolean",
 		},
 		username: {
-			description: "GitHub username of the profile owner",
+			description: "Username of the profile owner",
 			control: "text",
 		},
 		workspaceSlug: {

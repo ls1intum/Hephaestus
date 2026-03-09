@@ -1,4 +1,5 @@
 import type { LeaderboardEntry, UserInfo } from "@/api/types.gen";
+import type { ProviderType } from "@/lib/provider";
 import { LeaderboardFilter } from "./LeaderboardFilter";
 import { LeaderboardLegend } from "./LeaderboardLegend";
 import { LeaderboardOverview } from "./LeaderboardOverview";
@@ -8,6 +9,7 @@ import type { LeaderboardSortType } from "./SortFilter";
 export type LeaderboardVariant = "INDIVIDUAL" | "TEAM";
 
 interface LeaderboardPageProps {
+	providerType?: ProviderType;
 	leaderboard?: LeaderboardEntry[];
 	isLoading: boolean;
 	currentUser?: UserInfo;
@@ -36,6 +38,7 @@ interface LeaderboardPageProps {
 }
 
 export function LeaderboardPage({
+	providerType = "GITHUB",
 	leaderboard,
 	isLoading,
 	currentUser,
@@ -108,12 +111,13 @@ export function LeaderboardPage({
 								onUserClick={onUserClick}
 								onTeamClick={onTeamClick}
 								teamLabelsById={teamLabelsById}
+								providerType={providerType}
 							/>
 						</div>
 					</div>
 
 					<div className="col-span-1 xl:sticky xl:top-4 xl:self-start xl:max-h-[calc(100vh-2rem)] xl:overflow-auto">
-						<LeaderboardLegend />
+						<LeaderboardLegend providerType={providerType} />
 					</div>
 				</div>
 			</div>

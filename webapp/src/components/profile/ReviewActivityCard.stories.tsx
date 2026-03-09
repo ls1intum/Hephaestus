@@ -1,8 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/react";
+import { withProvider } from "@/stories/decorators";
 import { ReviewActivityCard } from "./ReviewActivityCard";
 
 /**
- * Card component that displays a user's review activity for a specific pull request.
+ * Card component that displays a user's review activity for a pull request / merge request.
  * Shows the review state, submission time, and score earned from the review.
  */
 const meta = {
@@ -143,7 +144,7 @@ export const Loading: Story = {
 export const Dismissed: Story = {
 	args: {
 		isLoading: false,
-		state: "COMMENTED",
+		state: "DISMISSED",
 		submittedAt: new Date(),
 		htmlUrl: "https://github.com/ls1intum/Hephaestus/pull/99",
 		pullRequest: {
@@ -159,7 +160,7 @@ export const Dismissed: Story = {
 };
 
 /**
- * Shows a review with an unknown state that doesn't match standard GitHub review states.
+ * Shows a review with an unknown state.
  */
 export const Unknown: Story = {
 	args: {
@@ -197,5 +198,31 @@ export const WithCodeInTitle: Story = {
 		},
 		repositoryName: "Hephaestus",
 		score: 5,
+	},
+};
+
+// --- Alternate provider variants ---
+
+/**
+ * Approved review with alternate provider colors.
+ */
+export const ApprovedMergeRequest: Story = {
+	decorators: [withProvider("GITLAB")],
+	args: {
+		...Approved.args,
+		providerType: "GITLAB",
+		htmlUrl: "https://gitlab.com/ls1intum/Hephaestus/-/merge_requests/42",
+	},
+};
+
+/**
+ * Unknown review state with provider-native merge request icon.
+ */
+export const UnknownMergeRequest: Story = {
+	decorators: [withProvider("GITLAB")],
+	args: {
+		...Unknown.args,
+		providerType: "GITLAB",
+		htmlUrl: "https://gitlab.com/ls1intum/ExampleRepo/-/merge_requests/78",
 	},
 };
