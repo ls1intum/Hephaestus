@@ -2,17 +2,17 @@ import type { Achievement } from "@/api";
 import type { AchievementEdge } from "@/components/achievements/AchievementEdge.tsx";
 import type { AchievementNode } from "@/components/achievements/AchievementNode.tsx";
 import type { AvatarNode } from "@/components/achievements/AvatarNode.tsx";
+import type { CategoryLabelNode } from "@/components/achievements/CategoryLabels.tsx";
 import { ACHIEVEMENT_REGISTRY } from "@/components/achievements/definitions.ts";
 import type { EqualizerEdge } from "@/components/achievements/EqualizerEdge.tsx";
 import type { SynthwaveEdge } from "@/components/achievements/SynthwaveEdge.tsx";
+import { categoryMeta } from "@/components/achievements/styles.ts";
 import {
 	type AchievementCategory,
 	type AchievementRarity,
 	rarityWeights,
 	type UIAchievement,
 } from "@/components/achievements/types.ts";
-import type { CategoryLabelNode } from "@/components/achievements/CategoryLabels.tsx";
-import { categoryMeta } from "@/components/achievements/styles.ts";
 import coordinatesData from "./coordinates.json";
 
 export function sortByRarity<T extends { rarity: AchievementRarity }>(achievements: T[]): T[] {

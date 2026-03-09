@@ -2,11 +2,6 @@ import type React from "react";
 import type { Achievement } from "@/api/types.gen";
 
 /**
- * Achievement id type derived from the backend AchievementDefinition enum.
- */
-export type AchievementId = Achievement["id"];
-
-/**
  * Achievement category type derived from the generated Achievement type.
  */
 export type AchievementCategory = Achievement["category"];

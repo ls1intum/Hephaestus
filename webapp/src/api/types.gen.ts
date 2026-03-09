@@ -897,7 +897,7 @@ export type Profile = {
  * Linear progress with current and target counts
  */
 export type LinearAchievementProgress = Omit<AchievementProgress, 'type'> & {
-    current?: number;
+    current: number;
     target: number;
     type: 'LinearAchievementProgress';
 };
@@ -1164,7 +1164,7 @@ export type ChatMessageVote = {
  * Binary progress indicating unlocked state
  */
 export type BinaryAchievementProgress = Omit<AchievementProgress, 'type'> & {
-    unlocked?: boolean;
+    unlocked: boolean;
     type: 'BinaryAchievementProgress';
 };
 
@@ -1196,7 +1196,7 @@ export type AssignRoleRequest = {
     userId: number;
 };
 
-export type AchievementId = 'issue.close.epic' | 'issue.open.uncommon' | 'milestone.long_time_return' | 'review.rare' | 'commit.legendary' | 'review.legendary' | 'commit.common.2' | 'commit.common.1' | 'issue.special.hive_mind' | 'issue.open.common.1' | 'issue.open.common.2' | 'commit.epic' | 'pr.merged.common.2' | 'pr.merged.common.1' | 'milestone.all_epic' | 'issue.open.legendary' | 'review.uncommon.2' | 'issue.open.rare' | 'review.uncommon.1' | 'pr.merged.epic' | 'review.mythic' | 'milestone.night_owl' | 'commit.special.itsy_bitsy' | 'commit.mythic' | 'pr.special.speedster' | 'milestone.first_action' | 'review.epic' | 'commit.special.brute_force' | 'issue.close.rare' | 'commit.rare' | 'issue.close.uncommon' | 'issue.close.common.1' | 'issue.close.common.2' | 'milestone.all_rare' | 'commit.special.cross_boundary' | 'commit.uncommon.1' | 'commit.uncommon.2' | 'issue.special.necromancer' | 'pr.merged.rare' | 'issue.special.oracle' | 'pr.merged.legendary' | 'issue.open.epic' | 'milestone.all_legendary' | 'pr.merged.uncommon' | 'milestone.polyglot' | 'issue.close.legendary' | 'review.common.1' | 'review.common.2' | 'commit.special.atomic_changes';
+export type AchievementId = 'commit.common.1' | 'commit.common.2' | 'commit.epic' | 'commit.legendary' | 'commit.mythic' | 'commit.rare' | 'commit.special.atomic_changes' | 'commit.special.brute_force' | 'commit.special.cross_boundary' | 'commit.special.itsy_bitsy' | 'commit.uncommon.1' | 'commit.uncommon.2' | 'issue.close.common.1' | 'issue.close.common.2' | 'issue.close.epic' | 'issue.close.legendary' | 'issue.close.rare' | 'issue.close.uncommon' | 'issue.open.common.1' | 'issue.open.common.2' | 'issue.open.epic' | 'issue.open.legendary' | 'issue.open.rare' | 'issue.open.uncommon' | 'issue.special.hive_mind' | 'issue.special.necromancer' | 'issue.special.oracle' | 'milestone.all_epic' | 'milestone.all_legendary' | 'milestone.all_rare' | 'milestone.first_action' | 'milestone.long_time_return' | 'milestone.night_owl' | 'milestone.polyglot' | 'pr.merged.common.1' | 'pr.merged.common.2' | 'pr.merged.epic' | 'pr.merged.legendary' | 'pr.merged.rare' | 'pr.merged.uncommon' | 'pr.special.speedster' | 'review.common.1' | 'review.common.2' | 'review.epic' | 'review.legendary' | 'review.mythic' | 'review.rare' | 'review.uncommon.1' | 'review.uncommon.2';
 
 /**
  * Achievement with user-specific progress information
@@ -1210,6 +1210,10 @@ export type Achievement = {
      * Unique identifier for the achievement
      */
     id: AchievementId;
+    /**
+     * Whether the achievement should be hidden until unlocked
+     */
+    isHidden?: boolean;
     /**
      * Parent achievement in progression chain
      */

@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { UIAchievement } from "@/components/achievements/types.ts";
 import { cn } from "@/lib/utils";
 import { AchievementTooltip } from "./AchievementTooltip.tsx";
+import { StandaloneAura } from "./StandaloneAura.tsx";
 import {
 	mythicBackgroundVars,
 	rarityIconSizes,
@@ -12,7 +13,6 @@ import {
 	rarityStylingClasses,
 	statusBackgrounds,
 } from "./styles.ts";
-import { StandaloneAura } from "./StandaloneAura.tsx";
 
 export type AchievementNode = Node<
 	{ achievement: UIAchievement; showTooltips?: boolean; className?: string; forceAura?: boolean },

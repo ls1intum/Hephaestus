@@ -26,8 +26,7 @@ public record AchievementDTO(
     @Schema(
         description = "Unique identifier for the achievement",
         example = "pr.merged.common.1",
-        implementation = String.class,
-        ref = "#/components/schemas/AchievementId"
+        ref = "AchievementId"
     )
     String id,
     //    @NonNull @Schema(description = "Human-readable name", example = "First Merge") String name,
