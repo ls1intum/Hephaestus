@@ -71,7 +71,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
         assertThat(problem.getTitle()).isEqualTo("Validation failed");
         assertThat(problem.getProperties().get("errors"))
             .asInstanceOf(InstanceOfAssertFactories.map(String.class, Object.class))
-            .containsKeys("workspaceSlug", "displayName", "accountLogin", "accountType", "ownerUserId");
+            .containsKeys("workspaceSlug", "displayName", "accountLogin", "accountType");
     }
 
     @Test

@@ -50,8 +50,10 @@ public record CreateWorkspaceRequestDTO(
     @Schema(description = "Type of account (USER or ORG)", requiredMode = Schema.RequiredMode.REQUIRED)
     AccountType accountType,
 
-    @NotNull(message = "Owner user ID is required")
-    @Schema(description = "User ID of the workspace owner", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(
+        description = "User ID of the workspace owner. If omitted, the authenticated user becomes the owner.",
+        requiredMode = Schema.RequiredMode.NOT_REQUIRED
+    )
     Long ownerUserId,
 
     @Schema(
