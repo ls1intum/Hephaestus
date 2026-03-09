@@ -69,9 +69,7 @@ export interface SkillTreeDesignerProps {
 }
 
 export function SkillTreeDesigner({ user, allDefinitions }: SkillTreeDesignerProps) {
-	const [nodes, setNodes, onNodesChangeRef] = useNodesState<
-		AchievementNode | AvatarNode | CategoryLabelNode
-	>([]);
+	const [nodes, setNodes, onNodesChangeRef] = useNodesState<AchievementNode | AvatarNode | CategoryLabelNode>([]);
 	const [edges, setEdges, onEdgesChange] = useEdgesState<AnyAchievementEdge>([]);
 	const [isDraggable, setIsDraggable] = useState(true);
 	const [isSnapping, setIsSnapping] = useState(true);
@@ -188,13 +186,15 @@ export function SkillTreeDesigner({ user, allDefinitions }: SkillTreeDesignerPro
 			/>
 
 			<ReactFlow
-				nodes={nodes.map((n) => {
-					if (n.type === "categoryLabel") return n;
-					return {
-						...n,
-						data: { ...n.data, showTooltips },
-					} as AchievementNode | AvatarNode;
-				})}
+				nodes={nodes.map(
+					(n) => {
+						if (n.type === 'categoryLabel') return n;
+						return {
+							...n,
+							data: { ...n.data, showTooltips },
+						} as AchievementNode | AvatarNode;
+					}
+				)}
 				edges={edges}
 				onNodesChange={handleNodesChange}
 				onEdgesChange={onEdgesChange}
