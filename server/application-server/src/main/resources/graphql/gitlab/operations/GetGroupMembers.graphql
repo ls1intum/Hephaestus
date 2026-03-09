@@ -6,15 +6,12 @@ query GetGroupMembers($fullPath: ID!, $first: Int!, $after: String) {
                 endCursor
             }
             nodes {
+                user {
+                    ...GitLabUserFields
+                }
                 accessLevel {
                     stringValue
-                }
-                user {
-                    id
-                    username
-                    name
-                    avatarUrl
-                    webUrl
+                    integerValue
                 }
             }
         }

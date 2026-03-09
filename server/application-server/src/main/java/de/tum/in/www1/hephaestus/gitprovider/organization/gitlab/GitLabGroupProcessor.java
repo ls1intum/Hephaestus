@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.organization.gitlab;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabGroupResponse;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
@@ -15,8 +16,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Processor for GitLab groups, mapping them to {@link Organization} entities.
  * <p>
- * Uses the thread-safe PostgreSQL upsert pattern via {@link OrganizationRepository#upsert}
- * to handle concurrent webhook and sync events for the same group.
+ * Uses the JPA find-or-create pattern (consistent with {@code GitHubOrganizationProcessor})
+ * to handle both create and update scenarios.
  * <p>
  * <b>Key mapping decisions:</b>
  * <ul>
@@ -33,19 +34,26 @@ public class GitLabGroupProcessor {
     private static final Logger log = LoggerFactory.getLogger(GitLabGroupProcessor.class);
 
     private final OrganizationRepository organizationRepository;
+    private final GitProviderRepository gitProviderRepository;
 
-    public GitLabGroupProcessor(OrganizationRepository organizationRepository) {
+    public GitLabGroupProcessor(
+        OrganizationRepository organizationRepository,
+        GitProviderRepository gitProviderRepository
+    ) {
         this.organizationRepository = organizationRepository;
+        this.gitProviderRepository = gitProviderRepository;
     }
 
     /**
      * Processes a GitLab group GraphQL response into an Organization entity.
      * <p>
-     * Uses upsert for thread-safe concurrent inserts. If the group already exists,
-     * its mutable fields (name, avatar, URL) are updated. IDs are provider-scoped
-     * native IDs, avoiding collision with other providers via the (provider_id, native_id) unique constraint.
+     * Uses find-or-create for consistent persistence with the GitHub processor.
+     * If the group already exists, its mutable fields (login, name, avatar, URL) are updated.
+     * IDs are provider-scoped native IDs, avoiding collision with other providers via the
+     * (provider_id, native_id) unique constraint.
      *
-     * @param group the GitLab group GraphQL response
+     * @param group      the GitLab group GraphQL response
+     * @param providerId the FK ID of the GitProvider entity
      * @return the persisted Organization entity, or null if the response is invalid
      */
     @Transactional
@@ -64,23 +72,29 @@ public class GitLabGroupProcessor {
             return null;
         }
 
-        String login = group.fullPath();
-        String name = group.name() != null ? group.name() : login;
-        String avatarUrl = group.avatarUrl();
-        String htmlUrl = group.webUrl();
-
-        organizationRepository.upsert(nativeId, providerId, login, name, avatarUrl, htmlUrl);
         Organization organization = organizationRepository
             .findByNativeIdAndProviderId(nativeId, providerId)
-            .orElse(null);
-        if (organization != null) {
-            Instant now = Instant.now();
-            organization.setLastSyncAt(now);
-            organization.setUpdatedAt(now);
-            if (organization.getCreatedAt() == null) {
-                organization.setCreatedAt(now);
-            }
+            .orElseGet(() -> {
+                Organization org = new Organization();
+                org.setNativeId(nativeId);
+                org.setProvider(gitProviderRepository.getReferenceById(providerId));
+                org.setCreatedAt(Instant.now());
+                return org;
+            });
+
+        // Update mutable fields
+        organization.setLogin(group.fullPath());
+        organization.setName(group.name() != null ? group.name() : group.fullPath());
+        organization.setAvatarUrl(group.avatarUrl());
+        organization.setHtmlUrl(group.webUrl());
+        organization.setLastSyncAt(Instant.now());
+
+        Organization saved = organizationRepository.save(organization);
+        if (organization.getId() == null) {
+            log.debug("Created organization from GitLab group: nativeId={}, login={}", nativeId, group.fullPath());
+        } else {
+            log.debug("Updated organization from GitLab group: nativeId={}, login={}", nativeId, group.fullPath());
         }
-        return organization;
+        return saved;
     }
 }

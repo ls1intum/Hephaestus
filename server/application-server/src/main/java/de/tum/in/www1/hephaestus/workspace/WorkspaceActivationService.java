@@ -281,6 +281,25 @@ public class WorkspaceActivationService {
                             // Link workspace to organization after sync (org was created during sync)
                             linkWorkspaceToOrganization(workspace);
 
+                            // Sync group memberships (closes security gap: removed members lose access)
+                            var memberSyncService = gitLabServices.getGroupMemberSyncService();
+                            if (memberSyncService != null) {
+                                organizationRepository
+                                    .findByLoginIgnoreCase(workspace.getAccountLogin())
+                                    .ifPresent(linkedOrg -> {
+                                        int membersSynced = memberSyncService.syncGroupMemberships(
+                                            workspace.getId(),
+                                            workspace.getAccountLogin(),
+                                            linkedOrg
+                                        );
+                                        log.info(
+                                            "GitLab membership sync: workspaceId={}, membersSynced={}",
+                                            workspace.getId(),
+                                            membersSynced
+                                        );
+                                    });
+                            }
+
                             // Register synced repositories as monitored for this workspace.
                             // This is analogous to ensureRepositoryMonitorForInstallation() for GitHub.
                             ensureRepositoryMonitorsForGitLab(workspace, result.synced());

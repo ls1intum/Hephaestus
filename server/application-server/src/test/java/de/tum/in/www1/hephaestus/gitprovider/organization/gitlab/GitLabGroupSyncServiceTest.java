@@ -118,7 +118,8 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
                     null,
                     "https://gitlab.com/my-org",
                     null,
-                    "public"
+                    "public",
+                    null
                 )
             );
             when(groupProcessor.process(any(GitLabGroupResponse.class), anyLong())).thenReturn(org);
@@ -389,7 +390,8 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
                 null,
                 "https://gitlab.com/my-org/sub-team",
                 null,
-                "public"
+                "public",
+                null
             );
 
             // Project has its own group (from subgroup)
@@ -642,7 +644,8 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
             null,
             "https://gitlab.com/my-org",
             null,
-            "public"
+            "public",
+            null
         );
 
         private GitLabProjectResponse createMinimalProject(String gid, String fullPath, String name) {
