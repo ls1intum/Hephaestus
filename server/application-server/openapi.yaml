@@ -279,9 +279,9 @@ paths:
       tags:
       - Leaderboard
   /workspaces/{workspaceSlug}/leaderboard/users/{login}/league-stats:
-    post:
-      description: Computes projected league point changes for a specific user based
-        on their leaderboard entry
+    get:
+      description: Computes projected league point changes for a specific user using
+        the global leaderboard
       operationId: computeUserLeagueStats
       parameters:
       - description: Workspace slug
@@ -297,13 +297,20 @@ paths:
         required: true
         schema:
           type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/LeaderboardEntry"
-        description: the user's current leaderboard entry for comparison
+      - description: start of the time range (inclusive)
+        in: query
+        name: after
         required: true
+        schema:
+          type: string
+          format: date-time
+      - description: end of the time range (exclusive)
+        in: query
+        name: before
+        required: true
+        schema:
+          type: string
+          format: date-time
       responses:
         "200":
           content:
@@ -311,6 +318,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/LeagueChange"
           description: league change statistics including projected point delta
+      security: []
       summary: Calculate user league stats
       tags:
       - Leaderboard

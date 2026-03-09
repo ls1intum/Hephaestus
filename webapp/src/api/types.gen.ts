@@ -1383,10 +1383,7 @@ export type GetLeaderboardResponses = {
 export type GetLeaderboardResponse = GetLeaderboardResponses[keyof GetLeaderboardResponses];
 
 export type ComputeUserLeagueStatsData = {
-    /**
-     * the user's current leaderboard entry for comparison
-     */
-    body: LeaderboardEntry;
+    body?: never;
     path: {
         /**
          * Workspace slug
@@ -1397,7 +1394,16 @@ export type ComputeUserLeagueStatsData = {
          */
         login: string;
     };
-    query?: never;
+    query: {
+        /**
+         * start of the time range (inclusive)
+         */
+        after: Date;
+        /**
+         * end of the time range (exclusive)
+         */
+        before: Date;
+    };
     url: '/workspaces/{workspaceSlug}/leaderboard/users/{login}/league-stats';
 };
 
