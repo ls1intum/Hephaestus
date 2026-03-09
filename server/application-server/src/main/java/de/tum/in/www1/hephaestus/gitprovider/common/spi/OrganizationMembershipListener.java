@@ -37,18 +37,18 @@ public interface OrganizationMembershipListener {
     /**
      * Event data for organization sync completion.
      *
-     * @param organizationId    the GitHub organization ID
-     * @param organizationLogin the GitHub organization login
+     * @param organizationId    the organization's internal database ID
+     * @param organizationLogin the organization login (GitHub login or GitLab group path)
      */
     record OrganizationSyncedEvent(Long organizationId, String organizationLogin) {}
 
     /**
      * Event data for organization membership changes.
      *
-     * @param organizationId    the GitHub organization ID
-     * @param organizationLogin the GitHub organization login
-     * @param userId            the GitHub user ID
-     * @param userLogin         the GitHub user login
+     * @param organizationId    the organization's internal database ID
+     * @param organizationLogin the organization login (GitHub login or GitLab group path)
+     * @param userId            the user's internal database ID
+     * @param userLogin         the user login
      * @param role              the membership role (e.g., "admin", "member"), null for removals
      */
     record MembershipChangedEvent(

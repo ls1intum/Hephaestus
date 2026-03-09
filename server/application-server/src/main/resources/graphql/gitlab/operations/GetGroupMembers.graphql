@@ -6,15 +6,16 @@ query GetGroupMembers($fullPath: ID!, $first: Int!, $after: String) {
                 endCursor
             }
             nodes {
-                accessLevel {
-                    stringValue
-                }
                 user {
                     id
                     username
                     name
                     avatarUrl
                     webUrl
+                }
+                accessLevel {
+                    stringValue
+                    integerValue
                 }
             }
         }

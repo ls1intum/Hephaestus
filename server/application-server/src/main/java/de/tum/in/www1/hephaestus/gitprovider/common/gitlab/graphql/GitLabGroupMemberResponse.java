@@ -4,39 +4,41 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import org.springframework.lang.Nullable;
 
 /**
- * Response POJO for GitLab group member GraphQL queries.
+ * Response POJO for GitLab Group Member GraphQL queries.
  * <p>
- * Maps to nodes returned by {@code group.groupMembers} in the
- * {@code GetGroupMembers} query.
+ * Maps to the {@code groupMembers.nodes} field returned by the {@code GetGroupMembers} query.
  *
- * @param accessLevel the member's access level
- * @param user        the member's user information
+ * @param user        the member user data
+ * @param accessLevel the member's access level in the group
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record GitLabGroupMemberResponse(@Nullable AccessLevelRef accessLevel, @Nullable UserRef user) {
+public record GitLabGroupMemberResponse(@Nullable GitLabMemberUser user, @Nullable GitLabAccessLevel accessLevel) {
     /**
-     * Access level information.
-     *
-     * @param stringValue the access level enum value (e.g., DEVELOPER, MAINTAINER, OWNER)
-     */
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public record AccessLevelRef(@Nullable String stringValue) {}
-
-    /**
-     * User information from the group membership.
+     * User data from a group membership node.
      *
      * @param id        GitLab Global ID (e.g., {@code gid://gitlab/User/42})
-     * @param username  the user's login handle
+     * @param username  the user's login name
      * @param name      the user's display name (nullable)
      * @param avatarUrl the user's avatar URL (nullable)
      * @param webUrl    the user's profile URL (nullable)
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record UserRef(
+    public record GitLabMemberUser(
         String id,
         String username,
         @Nullable String name,
         @Nullable String avatarUrl,
         @Nullable String webUrl
     ) {}
+
+    /**
+     * Access level for a group member.
+     * <p>
+     * GitLab access levels: GUEST(10), REPORTER(20), DEVELOPER(30), MAINTAINER(40), OWNER(50).
+     *
+     * @param stringValue  human-readable access level (e.g., "DEVELOPER")
+     * @param integerValue numeric access level (e.g., 30)
+     */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record GitLabAccessLevel(@Nullable String stringValue, @Nullable Integer integerValue) {}
 }

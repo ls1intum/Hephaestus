@@ -111,7 +111,8 @@ class GitLabProjectSyncServiceTest extends BaseUnitTest {
                 null,
                 "https://gitlab.com/my-org",
                 null,
-                "public"
+                "public",
+                null
             );
             var projectData = new GitLabProjectResponse(
                 "gid://gitlab/Project/123",
@@ -220,7 +221,8 @@ class GitLabProjectSyncServiceTest extends BaseUnitTest {
                 null,
                 "https://gitlab.com/my-org",
                 null,
-                "public"
+                "public",
+                null
             );
             var projectData = new GitLabProjectResponse(
                 "gid://gitlab/Project/789",
