@@ -244,7 +244,7 @@ function LeaderboardContainer() {
 				before: parsedBefore ?? new Date(),
 			},
 		}),
-		enabled: hasWorkspace && Boolean(username) && Boolean(parsedAfter),
+		enabled: hasWorkspace && Boolean(username) && Boolean(parsedAfter) && Boolean(parsedBefore),
 	});
 
 	if (showNoWorkspace) {

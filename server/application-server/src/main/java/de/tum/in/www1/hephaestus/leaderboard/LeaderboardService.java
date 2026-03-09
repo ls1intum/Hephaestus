@@ -416,7 +416,9 @@ public class LeaderboardService {
      */
     @Transactional(readOnly = true)
     public LeagueChangeDTO computeUserLeagueStats(Workspace workspace, String login, Instant after, Instant before) {
-        User user = userRepository.findByLogin(login).orElseThrow(() -> new EntityNotFoundException("User", login));
+        User user = userRepository
+            .findByLoginWithEagerMergedPullRequests(login)
+            .orElseThrow(() -> new EntityNotFoundException("User", login));
 
         if (workspace == null || workspace.getId() == null) {
             throw new IllegalStateException("Workspace context is required to compute league stats");
