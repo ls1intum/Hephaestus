@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.27.0](https://github.com/ls1intum/Hephaestus/compare/v0.26.0...v0.27.0) (2026-03-09)
+
+### 🚀 Features
+
+* **webapp:** provider-agnostic UI abstractions for GitHub and GitLab ([#807](https://github.com/ls1intum/Hephaestus/issues/807)) ([571904f](https://github.com/ls1intum/Hephaestus/commit/571904fe17822914dc6685f6d7ae370c478387d5))
+
 ## [0.26.0](https://github.com/ls1intum/Hephaestus/compare/v0.25.3...v0.26.0) (2026-03-09)
 
 ### 🚀 Features
