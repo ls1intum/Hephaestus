@@ -32,6 +32,7 @@ interface RuntimeEnvVars {
 	GIT_BRANCH?: string;
 	GIT_COMMIT?: string;
 	DEPLOYED_AT?: string;
+	GITHUB_APP_URL?: string;
 }
 
 // Dev defaults (used when window.__ENV__ is not set)
@@ -53,6 +54,7 @@ const defaults: RuntimeEnvVars = {
 	GIT_BRANCH: "",
 	GIT_COMMIT: "",
 	DEPLOYED_AT: "",
+	GITHUB_APP_URL: "",
 };
 
 const env = (key: keyof RuntimeEnvVars): string => window.__ENV__?.[key] ?? defaults[key] ?? "";
@@ -88,6 +90,10 @@ const environment = {
 	legal: {
 		imprintHtml: env("LEGAL_IMPRINT_HTML"),
 		privacyHtml: env("LEGAL_PRIVACY_HTML"),
+	},
+
+	github: {
+		appUrl: env("GITHUB_APP_URL"),
 	},
 
 	devtools: {
