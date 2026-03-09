@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.26.0](https://github.com/ls1intum/Hephaestus/compare/v0.25.3...v0.26.0) (2026-03-09)
+
+### 🚀 Features
+
+* **gitprovider:** add GitLab team sync for subgroups ([#812](https://github.com/ls1intum/Hephaestus/issues/812)) ([3c5aaf1](https://github.com/ls1intum/Hephaestus/commit/3c5aaf1a7fa31b90d5685f4f59913bfefda1c3e7))
+
 ## [0.25.3](https://github.com/ls1intum/Hephaestus/compare/v0.25.2...v0.25.3) (2026-03-08)
 
 ### 🐛 Bug Fixes
