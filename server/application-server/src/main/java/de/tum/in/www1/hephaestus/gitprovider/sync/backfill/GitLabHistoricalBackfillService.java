@@ -2,18 +2,17 @@ package de.tum.in.www1.hephaestus.gitprovider.sync.backfill;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncServiceHolder;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.BackfillStateProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncSession;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncTarget;
 import de.tum.in.www1.hephaestus.gitprovider.issue.gitlab.GitLabIssueSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.gitlab.GitLabMergeRequestSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.sync.SyncSchedulerProperties;
-import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitor;
-import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitorRepository;
-import de.tum.in.www1.hephaestus.workspace.Workspace;
-import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
-import de.tum.in.www1.hephaestus.workspace.WorkspaceScopeFilter;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -26,7 +25,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Historical backfill service for GitLab repositories.
@@ -35,7 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
  * sync services with {@code CREATED_DESC} ordering to fetch historical data
  * that predates the initial incremental sync window.
  * <p>
- * Backfill state is tracked on {@link RepositoryToMonitor} entities using the same
+ * Backfill state is tracked via the {@link BackfillStateProvider} SPI using the same
  * fields as GitHub backfill (highWaterMark, checkpoint, backfillLastRunAt).
  * <p>
  * Each cycle processes one batch per repository, respecting cooldowns between runs.
@@ -48,10 +46,9 @@ public class GitLabHistoricalBackfillService {
     private static final Duration COOLDOWN_NORMAL = Duration.ofMinutes(5);
     private static final Duration COOLDOWN_ERROR = Duration.ofMinutes(15);
 
-    private final WorkspaceRepository workspaceRepository;
+    private final SyncTargetProvider syncTargetProvider;
     private final RepositoryRepository repositoryRepository;
-    private final RepositoryToMonitorRepository rtmRepository;
-    private final WorkspaceScopeFilter workspaceScopeFilter;
+    private final OrganizationRepository organizationRepository;
     private final ObjectProvider<GitLabSyncServiceHolder> syncServiceHolderProvider;
     private final SyncSchedulerProperties syncSchedulerProperties;
 
@@ -59,17 +56,15 @@ public class GitLabHistoricalBackfillService {
     private final Map<Long, Instant> repositoryCooldowns = new ConcurrentHashMap<>();
 
     public GitLabHistoricalBackfillService(
-        WorkspaceRepository workspaceRepository,
+        SyncTargetProvider syncTargetProvider,
         RepositoryRepository repositoryRepository,
-        RepositoryToMonitorRepository rtmRepository,
-        WorkspaceScopeFilter workspaceScopeFilter,
+        OrganizationRepository organizationRepository,
         ObjectProvider<GitLabSyncServiceHolder> syncServiceHolderProvider,
         SyncSchedulerProperties syncSchedulerProperties
     ) {
-        this.workspaceRepository = workspaceRepository;
+        this.syncTargetProvider = syncTargetProvider;
         this.repositoryRepository = repositoryRepository;
-        this.rtmRepository = rtmRepository;
-        this.workspaceScopeFilter = workspaceScopeFilter;
+        this.organizationRepository = organizationRepository;
         this.syncServiceHolderProvider = syncServiceHolderProvider;
         this.syncSchedulerProperties = syncSchedulerProperties;
     }
@@ -88,45 +83,36 @@ public class GitLabHistoricalBackfillService {
         GitLabMergeRequestSyncService mrSync = services.getMergeRequestSyncService();
         if (issueSync == null && mrSync == null) return 0;
 
-        List<Workspace> gitLabWorkspaces = workspaceRepository
-            .findAll()
-            .stream()
-            .filter(ws -> ws.getStatus() == Workspace.WorkspaceStatus.ACTIVE)
-            .filter(ws -> ws.getProviderType() == GitProviderType.GITLAB)
-            .filter(workspaceScopeFilter::isWorkspaceAllowed)
-            .toList();
-
-        if (gitLabWorkspaces.isEmpty()) return 0;
+        List<SyncSession> sessions = syncTargetProvider.getGitLabSyncSessions();
+        if (sessions.isEmpty()) return 0;
 
         int batchSize = syncSchedulerProperties.backfill().batchSize();
         AtomicInteger processed = new AtomicInteger(0);
 
-        for (Workspace workspace : gitLabWorkspaces) {
-            List<RepositoryToMonitor> monitors = rtmRepository.findByWorkspaceId(workspace.getId());
+        for (SyncSession session : sessions) {
+            Long providerId = getGitLabProviderId(session.accountLogin());
 
-            for (RepositoryToMonitor rtm : monitors) {
-                if (rtm.isBackfillComplete()) continue;
-                if (isOnCooldown(rtm.getId())) continue;
+            for (SyncTarget target : session.syncTargets()) {
+                if (target.isBackfillComplete()) continue;
+                if (isOnCooldown(target.id())) continue;
 
                 // Only backfill repos that have completed initial sync
-                if (rtm.getIssuesSyncedAt() == null && rtm.getPullRequestsSyncedAt() == null) {
+                if (target.lastIssuesSyncedAt() == null && target.lastPullRequestsSyncedAt() == null) {
                     continue;
                 }
 
-                Long providerId =
-                    workspace.getOrganization() != null && workspace.getOrganization().getProvider() != null
-                        ? workspace.getOrganization().getProvider().getId()
-                        : null;
-
                 Optional<Repository> repoOpt =
                     providerId != null
-                        ? repositoryRepository.findByNameWithOwnerAndProviderId(rtm.getNameWithOwner(), providerId)
-                        : repositoryRepository.findByNameWithOwner(rtm.getNameWithOwner());
+                        ? repositoryRepository.findByNameWithOwnerAndProviderId(
+                              target.repositoryNameWithOwner(),
+                              providerId
+                          )
+                        : repositoryRepository.findByNameWithOwner(target.repositoryNameWithOwner());
 
                 if (repoOpt.isEmpty()) continue;
                 Repository repo = repoOpt.get();
 
-                boolean worked = backfillRepository(workspace.getId(), repo, rtm, issueSync, mrSync, batchSize);
+                boolean worked = backfillRepository(session.scopeId(), repo, target, issueSync, mrSync, batchSize);
 
                 if (worked) {
                     processed.incrementAndGet();
@@ -140,7 +126,7 @@ public class GitLabHistoricalBackfillService {
     private boolean backfillRepository(
         Long scopeId,
         Repository repo,
-        RepositoryToMonitor rtm,
+        SyncTarget target,
         GitLabIssueSyncService issueSync,
         GitLabMergeRequestSyncService mrSync,
         int batchSize
@@ -149,125 +135,126 @@ public class GitLabHistoricalBackfillService {
         boolean didWork = false;
 
         // Backfill issues
-        if (issueSync != null && !rtm.isIssueBackfillComplete()) {
+        if (issueSync != null && !target.isIssueBackfillComplete()) {
             try {
                 BackfillBatchResult result = issueSync.backfillIssues(
                     scopeId,
                     repo,
-                    rtm.getIssueSyncCursor(),
+                    target.issueSyncCursor(),
                     batchSize
                 );
 
                 if (result.aborted()) {
-                    repositoryCooldowns.put(rtm.getId(), Instant.now().plus(COOLDOWN_ERROR));
+                    repositoryCooldowns.put(target.id(), Instant.now().plus(COOLDOWN_ERROR));
                     return false;
                 }
 
                 if (result.count() > 0) {
                     didWork = true;
-                    updateIssueBackfillState(rtm, result);
+                    updateIssueBackfillState(target, result);
                 }
 
-                if (result.complete() && result.count() == 0 && !rtm.isIssueBackfillInitialized()) {
+                if (result.complete() && result.count() == 0 && !target.isIssueBackfillInitialized()) {
                     // No issues at all — mark as complete
-                    rtm.setIssueBackfillHighWaterMark(0);
-                    rtm.setIssueBackfillCheckpoint(0);
-                    rtmRepository.save(rtm);
+                    syncTargetProvider.updateIssueBackfillState(target.id(), 0, 0, null);
                 }
             } catch (Exception e) {
                 log.warn("Issue backfill failed: repo={}", safeName, e);
-                repositoryCooldowns.put(rtm.getId(), Instant.now().plus(COOLDOWN_ERROR));
+                repositoryCooldowns.put(target.id(), Instant.now().plus(COOLDOWN_ERROR));
                 return didWork;
             }
         }
 
         // Backfill merge requests
-        if (mrSync != null && !rtm.isPullRequestBackfillComplete()) {
+        if (mrSync != null && !target.isPullRequestBackfillComplete()) {
             try {
                 BackfillBatchResult result = mrSync.backfillMergeRequests(
                     scopeId,
                     repo,
-                    rtm.getPullRequestSyncCursor(),
+                    target.pullRequestSyncCursor(),
                     batchSize
                 );
 
                 if (result.aborted()) {
-                    repositoryCooldowns.put(rtm.getId(), Instant.now().plus(COOLDOWN_ERROR));
+                    repositoryCooldowns.put(target.id(), Instant.now().plus(COOLDOWN_ERROR));
                     return didWork;
                 }
 
                 if (result.count() > 0) {
                     didWork = true;
-                    updateMrBackfillState(rtm, result);
+                    updateMrBackfillState(target, result);
                 }
 
-                if (result.complete() && result.count() == 0 && !rtm.isPullRequestBackfillInitialized()) {
-                    rtm.setPullRequestBackfillHighWaterMark(0);
-                    rtm.setPullRequestBackfillCheckpoint(0);
-                    rtmRepository.save(rtm);
+                if (result.complete() && result.count() == 0 && !target.isPullRequestBackfillInitialized()) {
+                    syncTargetProvider.updatePullRequestBackfillState(target.id(), 0, 0, null);
                 }
             } catch (Exception e) {
                 log.warn("MR backfill failed: repo={}", safeName, e);
-                repositoryCooldowns.put(rtm.getId(), Instant.now().plus(COOLDOWN_ERROR));
+                repositoryCooldowns.put(target.id(), Instant.now().plus(COOLDOWN_ERROR));
                 return didWork;
             }
         }
 
         if (didWork) {
-            rtm.setBackfillLastRunAt(Instant.now());
-            rtmRepository.save(rtm);
-            repositoryCooldowns.put(rtm.getId(), Instant.now().plus(COOLDOWN_NORMAL));
+            syncTargetProvider.updateIssueBackfillState(target.id(), null, null, Instant.now());
+            repositoryCooldowns.put(target.id(), Instant.now().plus(COOLDOWN_NORMAL));
         }
 
         return didWork;
     }
 
-    @Transactional
-    void updateIssueBackfillState(RepositoryToMonitor rtm, BackfillBatchResult result) {
+    private void updateIssueBackfillState(SyncTarget target, BackfillBatchResult result) {
         // Initialize high water mark on first batch
-        if (!rtm.isIssueBackfillInitialized() && result.maxIid() > 0) {
-            rtm.setIssueBackfillHighWaterMark(result.maxIid());
+        Integer highWaterMark = null;
+        if (!target.isIssueBackfillInitialized() && result.maxIid() > 0) {
+            highWaterMark = result.maxIid();
         }
 
         // Update checkpoint (lowest IID seen — backfill counts down)
-        if (result.minIid() > 0) {
-            rtm.setIssueBackfillCheckpoint(result.minIid());
+        Integer checkpoint = result.minIid() > 0 ? result.minIid() : null;
+
+        // If complete and no more pages, mark done
+        if (result.complete() && result.nextCursor() == null) {
+            checkpoint = 0;
         }
+
+        syncTargetProvider.updateIssueBackfillState(target.id(), highWaterMark, checkpoint, null);
 
         // Save cursor for pagination resumption
-        rtm.setIssueSyncCursor(result.nextCursor());
-
-        // If complete and checkpoint reached 1 or below, mark done
-        if (result.complete() && result.nextCursor() == null) {
-            rtm.setIssueBackfillCheckpoint(0);
-            rtm.setIssueSyncCursor(null);
-        }
-
-        rtmRepository.save(rtm);
+        String cursor = (result.complete() && result.nextCursor() == null) ? null : result.nextCursor();
+        syncTargetProvider.updateIssueSyncCursor(target.id(), cursor);
     }
 
-    @Transactional
-    void updateMrBackfillState(RepositoryToMonitor rtm, BackfillBatchResult result) {
-        if (!rtm.isPullRequestBackfillInitialized() && result.maxIid() > 0) {
-            rtm.setPullRequestBackfillHighWaterMark(result.maxIid());
+    private void updateMrBackfillState(SyncTarget target, BackfillBatchResult result) {
+        Integer highWaterMark = null;
+        if (!target.isPullRequestBackfillInitialized() && result.maxIid() > 0) {
+            highWaterMark = result.maxIid();
         }
 
-        if (result.minIid() > 0) {
-            rtm.setPullRequestBackfillCheckpoint(result.minIid());
-        }
-
-        rtm.setPullRequestSyncCursor(result.nextCursor());
+        Integer checkpoint = result.minIid() > 0 ? result.minIid() : null;
 
         if (result.complete() && result.nextCursor() == null) {
-            rtm.setPullRequestBackfillCheckpoint(0);
-            rtm.setPullRequestSyncCursor(null);
+            checkpoint = 0;
         }
 
-        rtmRepository.save(rtm);
+        syncTargetProvider.updatePullRequestBackfillState(target.id(), highWaterMark, checkpoint, null);
+
+        String cursor = (result.complete() && result.nextCursor() == null) ? null : result.nextCursor();
+        syncTargetProvider.updatePullRequestSyncCursor(target.id(), cursor);
     }
 
-    private boolean isOnCooldown(Long rtmId) {
-        Instant cooldownUntil = repositoryCooldowns.get(rtmId);
+    private boolean isOnCooldown(Long syncTargetId) {
+        Instant cooldownUntil = repositoryCooldowns.get(syncTargetId);
         return cooldownUntil != null && Instant.now().isBefore(cooldownUntil);
+    }
+
+    /**
+     * Resolves the GitLab provider ID by looking up the organization.
+     */
+    private Long getGitLabProviderId(String accountLogin) {
+        return organizationRepository
+            .findByLoginIgnoreCase(accountLogin)
+            .map(org -> org.getProvider() != null ? org.getProvider().getId() : null)
+            .orElse(null);
     }
 }
