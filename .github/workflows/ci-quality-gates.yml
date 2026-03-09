@@ -200,6 +200,8 @@ jobs:
           git add .
           if ! git diff --cached --quiet; then
             echo "❌ OpenAPI out of sync. Run: npm run generate:api"
+            git diff --cached --name-only
+            git diff --cached | head -200
             exit 1
           fi
 
