@@ -6,7 +6,7 @@ import { WizardStepIndicator } from "./WizardStepIndicator";
  * Shows three steps (Connect, Select Group, Configure) with
  * completed, current, and future states.
  */
-const meta: Meta<typeof WizardStepIndicator> = {
+const meta = {
 	component: WizardStepIndicator,
 	tags: ["autodocs"],
 	parameters: {
@@ -32,7 +32,7 @@ const meta: Meta<typeof WizardStepIndicator> = {
 			</div>
 		),
 	],
-};
+} satisfies Meta<typeof WizardStepIndicator>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
