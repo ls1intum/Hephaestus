@@ -20,6 +20,7 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.gitprovider.user.gitlab.GitLabUserService;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import java.time.Duration;
 import java.time.Instant;
@@ -38,6 +39,9 @@ import org.mockito.Mock;
 @Tag("unit")
 @DisplayName("BaseGitLabProcessor")
 class BaseGitLabProcessorTest extends BaseUnitTest {
+
+    @Mock
+    private GitLabUserService gitLabUserService;
 
     @Mock
     private UserRepository userRepository;
@@ -68,6 +72,7 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
         );
 
         processor = new TestProcessor(
+            gitLabUserService,
             userRepository,
             labelRepository,
             repositoryRepository,
@@ -164,8 +169,6 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
             user.setId(-18024L);
             user.setLogin("ga84xah");
 
-            when(userRepository.findByNativeIdAndProviderId(18024L, 1L)).thenReturn(Optional.of(user));
-
             GitLabWebhookUser dto = new GitLabWebhookUser(
                 18024L,
                 "ga84xah",
@@ -173,6 +176,8 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
                 "https://avatar.url",
                 null
             );
+
+            when(gitLabUserService.findOrCreateUser(dto, 1L)).thenReturn(user);
 
             User result = processor.callFindOrCreateUser(dto);
 
@@ -215,7 +220,16 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
             User user = new User();
             user.setId(-18024L);
 
-            when(userRepository.findByNativeIdAndProviderId(18024L, 1L)).thenReturn(Optional.of(user));
+            when(
+                gitLabUserService.findOrCreateUser(
+                    "gid://gitlab/User/18024",
+                    "ga84xah",
+                    "Felix Dietrich",
+                    "https://avatar.url",
+                    "https://gitlab.lrz.de/ga84xah",
+                    1L
+                )
+            ).thenReturn(user);
 
             User result = processor.callFindOrCreateUser(
                 "gid://gitlab/User/18024",
@@ -377,6 +391,7 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
     private static class TestProcessor extends BaseGitLabProcessor {
 
         TestProcessor(
+            GitLabUserService gitLabUserService,
             UserRepository userRepository,
             LabelRepository labelRepository,
             RepositoryRepository repositoryRepository,
@@ -385,6 +400,7 @@ class BaseGitLabProcessorTest extends BaseUnitTest {
             GitLabProperties gitLabProperties
         ) {
             super(
+                gitLabUserService,
                 userRepository,
                 labelRepository,
                 repositoryRepository,

@@ -35,6 +35,7 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.gitprovider.user.gitlab.GitLabUserService;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import java.time.Duration;
 import java.time.Instant;
@@ -63,6 +64,9 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
     private static final Long PROVIDER_ID = 2L;
     private static final long RAW_APPROVER_ID = 11111L;
     private static final long ENTITY_APPROVER_ID = 300L;
+
+    @Mock
+    private GitLabUserService gitLabUserService;
 
     @Mock
     private PullRequestRepository pullRequestRepository;
@@ -106,6 +110,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         );
 
         processor = new GitLabMergeRequestProcessor(
+            gitLabUserService,
             pullRequestRepository,
             reviewRepository,
             milestoneRepository,
@@ -482,7 +487,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 .thenReturn(Optional.of(pr));
 
             User author = createUserEntity();
-            when(userRepository.findByNativeIdAndProviderId(RAW_USER_ID, PROVIDER_ID)).thenReturn(Optional.of(author));
+            when(gitLabUserService.findOrCreateUser(any(GitLabWebhookUser.class), eq(PROVIDER_ID))).thenReturn(author);
 
             GitLabMergeRequestEventDTO event = createEvent("open", "opened", false);
             PullRequest result = processor.process(event, createContext());
@@ -506,7 +511,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 .thenReturn(Optional.of(pr));
 
             User author = createUserEntity();
-            when(userRepository.findByNativeIdAndProviderId(RAW_USER_ID, PROVIDER_ID)).thenReturn(Optional.of(author));
+            when(gitLabUserService.findOrCreateUser(any(GitLabWebhookUser.class), eq(PROVIDER_ID))).thenReturn(author);
 
             GitLabMergeRequestEventDTO event = createEvent("update", "opened", false);
             PullRequest result = processor.process(event, createContext());
@@ -527,7 +532,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 .thenReturn(Optional.of(pr));
 
             User author = createUserEntity();
-            when(userRepository.findByNativeIdAndProviderId(RAW_USER_ID, PROVIDER_ID)).thenReturn(Optional.of(author));
+            when(gitLabUserService.findOrCreateUser(any(GitLabWebhookUser.class), eq(PROVIDER_ID))).thenReturn(author);
 
             GitLabMergeRequestEventDTO event = createEvent("update", "opened", false);
             PullRequest result = processor.process(event, createContext());
@@ -555,7 +560,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 .thenReturn(Optional.of(pr));
 
             User author = createUserEntity();
-            when(userRepository.findByNativeIdAndProviderId(RAW_USER_ID, PROVIDER_ID)).thenReturn(Optional.of(author));
+            when(gitLabUserService.findOrCreateUser(any(GitLabWebhookUser.class), eq(PROVIDER_ID))).thenReturn(author);
 
             GitLabMergeRequestEventDTO event = createEvent("close", "closed", false);
             PullRequest result = processor.processClosed(event, createContext());
@@ -584,7 +589,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 .thenReturn(Optional.of(pr));
 
             User author = createUserEntity();
-            when(userRepository.findByNativeIdAndProviderId(RAW_USER_ID, PROVIDER_ID)).thenReturn(Optional.of(author));
+            when(gitLabUserService.findOrCreateUser(any(GitLabWebhookUser.class), eq(PROVIDER_ID))).thenReturn(author);
 
             GitLabMergeRequestEventDTO event = createEvent("reopen", "opened", false);
             PullRequest result = processor.processReopened(event, createContext());
@@ -614,7 +619,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 .thenReturn(Optional.of(pr));
 
             User author = createUserEntity();
-            when(userRepository.findByNativeIdAndProviderId(RAW_USER_ID, PROVIDER_ID)).thenReturn(Optional.of(author));
+            when(gitLabUserService.findOrCreateUser(any(GitLabWebhookUser.class), eq(PROVIDER_ID))).thenReturn(author);
 
             GitLabMergeRequestEventDTO event = createEvent("merge", "merged", false);
             PullRequest result = processor.processMerged(event, createContext());
@@ -652,8 +657,8 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
             when(userRepository.findByNativeIdAndProviderId(RAW_USER_ID, PROVIDER_ID)).thenReturn(Optional.of(author));
 
             User approver = createApproverEntity();
-            when(userRepository.findByNativeIdAndProviderId(RAW_APPROVER_ID, PROVIDER_ID)).thenReturn(
-                Optional.of(approver)
+            when(gitLabUserService.findOrCreateUser(any(GitLabWebhookUser.class), eq(PROVIDER_ID))).thenReturn(
+                approver
             );
 
             long expectedReviewId = GitLabMergeRequestProcessor.generateApprovalNativeId(RAW_MR_ID, RAW_APPROVER_ID);
@@ -699,8 +704,8 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
             when(userRepository.findByNativeIdAndProviderId(RAW_USER_ID, PROVIDER_ID)).thenReturn(Optional.of(author));
 
             User approver = createApproverEntity();
-            when(userRepository.findByNativeIdAndProviderId(RAW_APPROVER_ID, PROVIDER_ID)).thenReturn(
-                Optional.of(approver)
+            when(gitLabUserService.findOrCreateUser(any(GitLabWebhookUser.class), eq(PROVIDER_ID))).thenReturn(
+                approver
             );
 
             long expectedNativeId = GitLabMergeRequestProcessor.generateApprovalNativeId(RAW_MR_ID, RAW_APPROVER_ID);
@@ -752,8 +757,8 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
             when(userRepository.findByNativeIdAndProviderId(RAW_USER_ID, PROVIDER_ID)).thenReturn(Optional.of(author));
 
             User approver = createApproverEntity();
-            when(userRepository.findByNativeIdAndProviderId(RAW_APPROVER_ID, PROVIDER_ID)).thenReturn(
-                Optional.of(approver)
+            when(gitLabUserService.findOrCreateUser(any(GitLabWebhookUser.class), eq(PROVIDER_ID))).thenReturn(
+                approver
             );
 
             // Review ALREADY exists — simulates duplicate approval webhook
@@ -787,8 +792,8 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
             when(userRepository.findByNativeIdAndProviderId(RAW_USER_ID, PROVIDER_ID)).thenReturn(Optional.of(author));
 
             User approver = createApproverEntity();
-            when(userRepository.findByNativeIdAndProviderId(RAW_APPROVER_ID, PROVIDER_ID)).thenReturn(
-                Optional.of(approver)
+            when(gitLabUserService.findOrCreateUser(any(GitLabWebhookUser.class), eq(PROVIDER_ID))).thenReturn(
+                approver
             );
 
             // No existing review — findById returns empty
@@ -823,7 +828,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 .thenReturn(Optional.of(pr));
 
             User author = createUserEntity();
-            when(userRepository.findByNativeIdAndProviderId(RAW_USER_ID, PROVIDER_ID)).thenReturn(Optional.of(author));
+            when(gitLabUserService.findOrCreateUser(any(GitLabWebhookUser.class), eq(PROVIDER_ID))).thenReturn(author);
 
             // Create event with mergeUserId matching the event user's ID
             var attrs = new GitLabMergeRequestEventDTO.ObjectAttributes(
@@ -1058,7 +1063,9 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 .thenReturn(Optional.of(pr));
 
             User author = createUserEntity();
-            when(userRepository.findByNativeIdAndProviderId(RAW_USER_ID, PROVIDER_ID)).thenReturn(Optional.of(author));
+            when(
+                gitLabUserService.findOrCreateUser(anyString(), anyString(), any(), any(), any(), eq(PROVIDER_ID))
+            ).thenReturn(author);
 
             var syncData = createSyncData();
             PullRequest result = processor.processFromSync(syncData, testRepo, 1L);
@@ -1156,7 +1163,9 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 .thenReturn(Optional.of(pr));
 
             User author = createUserEntity();
-            when(userRepository.findByNativeIdAndProviderId(RAW_USER_ID, PROVIDER_ID)).thenReturn(Optional.of(author));
+            when(
+                gitLabUserService.findOrCreateUser(anyString(), anyString(), any(), any(), any(), eq(PROVIDER_ID))
+            ).thenReturn(author);
 
             Milestone milestone = new Milestone();
             milestone.setId(42L);
@@ -1251,7 +1260,9 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 .thenReturn(Optional.of(pr));
 
             User author = createUserEntity();
-            when(userRepository.findByNativeIdAndProviderId(RAW_USER_ID, PROVIDER_ID)).thenReturn(Optional.of(author));
+            when(
+                gitLabUserService.findOrCreateUser(anyString(), anyString(), any(), any(), any(), eq(PROVIDER_ID))
+            ).thenReturn(author);
 
             when(milestoneRepository.findByNumberAndRepositoryId(99, REPO_ID)).thenReturn(Optional.empty());
 
@@ -1473,17 +1484,36 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 .thenReturn(Optional.of(pr))
                 .thenReturn(Optional.of(pr));
 
-            // Stub the author user lookup (processFromSync resolves the MR author)
+            // Stub the author user lookup (processFromSync resolves the MR author via gitLabUserService)
             User author = createUserEntity();
             lenient()
-                .when(userRepository.findByNativeIdAndProviderId(RAW_USER_ID, PROVIDER_ID))
-                .thenReturn(Optional.of(author));
+                .when(
+                    gitLabUserService.findOrCreateUser(
+                        eq("gid://gitlab/User/12345"),
+                        anyString(),
+                        any(),
+                        any(),
+                        any(),
+                        eq(PROVIDER_ID)
+                    )
+                )
+                .thenReturn(author);
 
-            // New approver from sync
+            // New approver from sync (reconcileApprovals resolves via gitLabUserService)
+            // Lenient because the merge user call passes all nulls (unmatched invocation)
             User newApprover = createApproverEntity();
-            when(userRepository.findByNativeIdAndProviderId(RAW_APPROVER_ID, PROVIDER_ID)).thenReturn(
-                Optional.of(newApprover)
-            );
+            lenient()
+                .when(
+                    gitLabUserService.findOrCreateUser(
+                        eq("gid://gitlab/User/11111"),
+                        anyString(),
+                        any(),
+                        any(),
+                        any(),
+                        eq(PROVIDER_ID)
+                    )
+                )
+                .thenReturn(newApprover);
 
             var syncData = new GitLabMergeRequestProcessor.SyncMergeRequestData(
                 "gid://gitlab/MergeRequest/999555",

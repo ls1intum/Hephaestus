@@ -771,6 +771,7 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
         Team newTeam = new Team();
         newTeam.setNativeId(entityIdGenerator.incrementAndGet());
         newTeam.setName(name);
+        newTeam.setSlug(name);
         newTeam.setOrganization(organization);
         newTeam.setDescription("Test team: " + name);
         newTeam.setHtmlUrl("https://github.com/orgs/" + organization + "/teams/" + name);

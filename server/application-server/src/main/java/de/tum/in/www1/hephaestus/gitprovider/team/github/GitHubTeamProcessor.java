@@ -64,6 +64,11 @@ public class GitHubTeamProcessor {
         if (dto.name() != null) {
             team.setName(dto.name());
         }
+        // Persist slug (URL-safe identifier); fall back to name if not provided
+        String slug = dto.slug() != null ? dto.slug() : dto.name();
+        if (slug != null) {
+            team.setSlug(slug);
+        }
         if (dto.description() != null) {
             team.setDescription(dto.description());
         }
@@ -96,15 +101,15 @@ public class GitHubTeamProcessor {
         try {
             saved = teamRepository.save(team);
         } catch (DataIntegrityViolationException e) {
-            // Unique constraint violation on (organization, name)
+            // Unique constraint violation on (provider_id, organization, slug)
             // This can happen when:
-            // 1. Team A had name "core" in org "myorg", renamed to "platform"
-            // 2. Team B (new) was created with name "core" in org "myorg"
+            // 1. Team A had slug "core" in org "myorg", renamed to "platform"
+            // 2. Team B (new) was created with slug "core" in org "myorg"
             // 3. We're processing Team B but Team A still has "core" in our DB
             //
-            // Solution: Find and update the conflicting team's name first
-            if (isNameConflict(e)) {
-                saved = handleNameConflict(team, orgLogin, dto, context);
+            // Solution: Find and update the conflicting team's slug first
+            if (isSlugConflict(e)) {
+                saved = handleSlugConflict(team, orgLogin, dto, context);
                 if (saved == null) {
                     return null;
                 }
@@ -166,66 +171,70 @@ public class GitHubTeamProcessor {
     }
 
     /**
-     * Check if the exception is a team name unique constraint violation.
+     * Check if the exception is a team slug unique constraint violation.
      */
-    private boolean isNameConflict(DataIntegrityViolationException e) {
+    private boolean isSlugConflict(DataIntegrityViolationException e) {
         String message = e.getMessage();
         if (message == null) {
             return false;
         }
-        return message.contains("uk_team_organization_name") || (message.contains("team") && message.contains("name"));
+        return (
+            message.contains("uk_team_provider_organization_slug") ||
+            (message.contains("team") && message.contains("slug"))
+        );
     }
 
     /**
-     * Handle a name conflict by finding the conflicting team and resolving it.
+     * Handle a slug conflict by finding the conflicting team and resolving it.
      * <p>
-     * When a team is renamed, another team can take the old name. This method:
-     * 1. Finds the team with the conflicting name
-     * 2. Updates that team's name to a placeholder
+     * When a team is renamed, another team can take the old slug. This method:
+     * 1. Finds the team with the conflicting slug
+     * 2. Updates that team's slug and name to a placeholder
      * 3. Retries the save for the new team
      *
      * @return the saved team, or null if unable to resolve
      */
-    private Team handleNameConflict(
+    private Team handleSlugConflict(
         Team team,
         String orgLogin,
         GitHubTeamEventDTO.GitHubTeamDTO dto,
         ProcessingContext context
     ) {
-        String teamName = dto.name();
+        String teamSlug = dto.slug() != null ? dto.slug() : dto.name();
 
-        // Find the team that has the conflicting name
-        Optional<Team> conflicting = teamRepository.findByOrganizationIgnoreCaseAndName(orgLogin, teamName);
+        // Find the team that has the conflicting slug
+        Optional<Team> conflicting = teamRepository.findByOrganizationIgnoreCaseAndSlug(orgLogin, teamSlug);
         if (conflicting.isEmpty()) {
             // Conflict resolved concurrently
-            log.debug("Team name conflict resolved concurrently: org={}, name={}", orgLogin, teamName);
+            log.debug("Team slug conflict resolved concurrently: org={}, slug={}", orgLogin, teamSlug);
             return teamRepository.save(team);
         }
 
         Team oldTeam = conflicting.get();
         if (oldTeam.getId().equals(team.getId())) {
             // Same team - shouldn't happen but handle gracefully
-            log.debug("Team name conflict was for same team: teamId={}", team.getId());
+            log.debug("Team slug conflict was for same team: teamId={}", team.getId());
             return teamRepository.save(team);
         }
 
-        // Rename the old team to free up the name
-        String renamedName = "RENAMED_" + oldTeam.getId();
+        // Rename the old team to free up the slug
+        String renamedSlug = "RENAMED_" + oldTeam.getId();
         log.info(
-            "Freeing up team name for renamed team: oldTeamId={}, oldName={}, newName={}, newTeamId={}",
+            "Freeing up team slug for renamed team: oldTeamId={}, oldSlug={}, newSlug={}, newTeamId={}",
             oldTeam.getId(),
-            teamName,
-            renamedName,
+            teamSlug,
+            renamedSlug,
             team.getId()
         );
-        oldTeam.setName(renamedName);
+        oldTeam.setSlug(renamedSlug);
+        oldTeam.setName("RENAMED_" + oldTeam.getId());
         teamRepository.save(oldTeam);
 
         // Retry the save
         try {
             return teamRepository.save(team);
         } catch (DataIntegrityViolationException e) {
-            log.warn("Team save still failed after freeing name: teamId={}, name={}", team.getId(), teamName, e);
+            log.warn("Team save still failed after freeing slug: teamId={}, slug={}", team.getId(), teamSlug, e);
             return null;
         }
     }

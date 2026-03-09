@@ -427,6 +427,24 @@ public class WorkspaceActivationService {
                                     );
                                 }
                             }
+
+                            // Phase 3: Sync teams (subgroups → Team entities with members and repo permissions)
+                            var teamSyncService = gitLabServices.getTeamSyncService();
+                            if (teamSyncService != null) {
+                                try {
+                                    int teamsCount = teamSyncService.syncTeamsForGroup(
+                                        workspace.getId(),
+                                        workspace.getAccountLogin()
+                                    );
+                                    log.info(
+                                        "GitLab team sync complete: workspaceId={}, teams={}",
+                                        workspace.getId(),
+                                        teamsCount
+                                    );
+                                } catch (Exception e) {
+                                    log.warn("Failed to sync teams: workspaceId={}", workspace.getId(), e);
+                                }
+                            }
                         }
                     } else {
                         log.warn(

@@ -1729,6 +1729,7 @@ export const team = pgTable(
 		nativeId: bigint("native_id", { mode: "number" }).notNull(),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		providerId: bigint("provider_id", { mode: "number" }).notNull(),
+		slug: varchar({ length: 512 }).notNull(),
 	},
 	(table) => [
 		foreignKey({
@@ -1736,10 +1737,10 @@ export const team = pgTable(
 			foreignColumns: [gitProvider.id],
 			name: "fk_team_provider",
 		}),
-		unique("uk_team_provider_organization_name").on(
-			table.name,
+		unique("uk_team_provider_organization_slug").on(
 			table.organization,
 			table.providerId,
+			table.slug,
 		),
 		unique("uq_team_provider_native_id").on(table.nativeId, table.providerId),
 	],

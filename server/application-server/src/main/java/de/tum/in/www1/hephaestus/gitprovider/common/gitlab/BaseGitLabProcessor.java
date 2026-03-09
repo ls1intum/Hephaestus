@@ -13,6 +13,7 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.gitprovider.user.gitlab.GitLabUserService;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
@@ -60,6 +61,7 @@ public abstract class BaseGitLabProcessor {
         .parseDefaulting(ChronoField.OFFSET_SECONDS, 0)
         .toFormatter();
 
+    protected final GitLabUserService gitLabUserService;
     protected final UserRepository userRepository;
     protected final LabelRepository labelRepository;
     protected final RepositoryRepository repositoryRepository;
@@ -68,6 +70,7 @@ public abstract class BaseGitLabProcessor {
     protected final GitLabProperties gitLabProperties;
 
     protected BaseGitLabProcessor(
+        GitLabUserService gitLabUserService,
         UserRepository userRepository,
         LabelRepository labelRepository,
         RepositoryRepository repositoryRepository,
@@ -75,6 +78,7 @@ public abstract class BaseGitLabProcessor {
         RepositoryScopeFilter repositoryScopeFilter,
         GitLabProperties gitLabProperties
     ) {
+        this.gitLabUserService = gitLabUserService;
         this.userRepository = userRepository;
         this.labelRepository = labelRepository;
         this.repositoryRepository = repositoryRepository;
@@ -90,45 +94,17 @@ public abstract class BaseGitLabProcessor {
     /**
      * Finds or creates a user from webhook data.
      * <p>
-     * Stores the raw GitLab user ID as {@code nativeId} with the given {@code providerId}.
-     * Constructs HTML URL from the GitLab server URL and username.
+     * Delegates to {@link GitLabUserService#findOrCreateUser(GitLabWebhookUser, Long)}.
      */
     @Nullable
     protected User findOrCreateUser(@Nullable GitLabWebhookUser dto, Long providerId) {
-        if (dto == null || dto.id() == null || dto.username() == null) {
-            return null;
-        }
-
-        long nativeId = dto.id();
-        String login = dto.username();
-        String name = dto.name();
-        String avatarUrl = dto.avatarUrl() != null ? dto.avatarUrl() : "";
-        String htmlUrl = gitLabProperties.defaultServerUrl() + "/" + login;
-
-        userRepository.upsertUser(
-            nativeId,
-            providerId,
-            login,
-            name,
-            avatarUrl,
-            htmlUrl,
-            User.Type.USER.name(),
-            dto.email(),
-            null, // createdAt — not in webhook
-            null // updatedAt — not in webhook
-        );
-
-        return userRepository.findByNativeIdAndProviderId(nativeId, providerId).orElse(null);
+        return gitLabUserService.findOrCreateUser(dto, providerId);
     }
 
     /**
      * Finds or creates a user from GraphQL data (id, username, name, avatarUrl, webUrl).
      * <p>
-     * Public because sync services need to resolve users from GraphQL response data.
-     * {@code @Transactional} is required because the underlying {@code upsertUser} is a
-     * {@code @Modifying} native query. This method is called through the Spring proxy
-     * from external beans (e.g. {@code GitLabDiscussionSyncService}), so the annotation
-     * is effective.
+     * Delegates to {@link GitLabUserService#findOrCreateUser(String, String, String, String, String, Long)}.
      */
     @Transactional
     @Nullable
@@ -140,36 +116,7 @@ public abstract class BaseGitLabProcessor {
         @Nullable String webUrl,
         Long providerId
     ) {
-        if (globalId == null || username == null) {
-            return null;
-        }
-
-        long nativeId;
-        try {
-            nativeId = GitLabSyncConstants.extractNumericId(globalId);
-        } catch (IllegalArgumentException e) {
-            log.warn("Skipped user resolution: reason=invalidGlobalId, gid={}", globalId);
-            return null;
-        }
-
-        String resolvedName = name;
-        String resolvedAvatarUrl = avatarUrl != null ? avatarUrl : "";
-        String resolvedHtmlUrl = webUrl != null ? webUrl : (gitLabProperties.defaultServerUrl() + "/" + username);
-
-        userRepository.upsertUser(
-            nativeId,
-            providerId,
-            username,
-            resolvedName,
-            resolvedAvatarUrl,
-            resolvedHtmlUrl,
-            User.Type.USER.name(),
-            null, // email — not available from GraphQL
-            null, // createdAt — not in GraphQL user data
-            null // updatedAt — not in GraphQL user data
-        );
-
-        return userRepository.findByNativeIdAndProviderId(nativeId, providerId).orElse(null);
+        return gitLabUserService.findOrCreateUser(globalId, username, name, avatarUrl, webUrl, providerId);
     }
 
     // ========================================================================

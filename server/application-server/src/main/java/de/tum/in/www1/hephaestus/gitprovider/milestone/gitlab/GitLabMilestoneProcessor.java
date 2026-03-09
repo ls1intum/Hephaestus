@@ -16,6 +16,7 @@ import de.tum.in.www1.hephaestus.gitprovider.milestone.gitlab.dto.GitLabMileston
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.gitprovider.user.gitlab.GitLabUserService;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -56,6 +57,7 @@ public class GitLabMilestoneProcessor extends BaseGitLabProcessor {
     private final ApplicationEventPublisher eventPublisher;
 
     public GitLabMilestoneProcessor(
+        GitLabUserService gitLabUserService,
         UserRepository userRepository,
         LabelRepository labelRepository,
         RepositoryRepository repositoryRepository,
@@ -67,6 +69,7 @@ public class GitLabMilestoneProcessor extends BaseGitLabProcessor {
         ApplicationEventPublisher eventPublisher
     ) {
         super(
+            gitLabUserService,
             userRepository,
             labelRepository,
             repositoryRepository,
