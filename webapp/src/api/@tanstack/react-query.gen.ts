@@ -299,24 +299,54 @@ export const getLeaderboardInfiniteOptions = (options: Options<GetLeaderboardDat
     queryKey: getLeaderboardInfiniteQueryKey(options)
 });
 
+export const computeUserLeagueStatsQueryKey = (options: Options<ComputeUserLeagueStatsData>) => createQueryKey('computeUserLeagueStats', options);
+
 /**
  * Calculate user league stats
  *
- * Computes projected league point changes for a specific user based on their leaderboard entry
+ * Computes projected league point changes for a specific user using the global leaderboard
  */
-export const computeUserLeagueStatsMutation = (options?: Partial<Options<ComputeUserLeagueStatsData>>): UseMutationOptions<ComputeUserLeagueStatsResponse, DefaultError, Options<ComputeUserLeagueStatsData>> => {
-    const mutationOptions: UseMutationOptions<ComputeUserLeagueStatsResponse, DefaultError, Options<ComputeUserLeagueStatsData>> = {
-        mutationFn: async (fnOptions) => {
-            const { data } = await computeUserLeagueStats({
-                ...options,
-                ...fnOptions,
-                throwOnError: true
-            });
-            return data;
-        }
-    };
-    return mutationOptions;
-};
+export const computeUserLeagueStatsOptions = (options: Options<ComputeUserLeagueStatsData>) => queryOptions<ComputeUserLeagueStatsResponse, DefaultError, ComputeUserLeagueStatsResponse, ReturnType<typeof computeUserLeagueStatsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await computeUserLeagueStats({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: computeUserLeagueStatsQueryKey(options)
+});
+
+export const computeUserLeagueStatsInfiniteQueryKey = (options: Options<ComputeUserLeagueStatsData>): QueryKey<Options<ComputeUserLeagueStatsData>> => createQueryKey('computeUserLeagueStats', options, true);
+
+/**
+ * Calculate user league stats
+ *
+ * Computes projected league point changes for a specific user using the global leaderboard
+ */
+export const computeUserLeagueStatsInfiniteOptions = (options: Options<ComputeUserLeagueStatsData>) => infiniteQueryOptions<ComputeUserLeagueStatsResponse, DefaultError, InfiniteData<ComputeUserLeagueStatsResponse>, QueryKey<Options<ComputeUserLeagueStatsData>>, Date | Pick<QueryKey<Options<ComputeUserLeagueStatsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
+// @ts-ignore
+{
+    queryFn: async ({ pageParam, queryKey, signal }) => {
+        // @ts-ignore
+        const page: Pick<QueryKey<Options<ComputeUserLeagueStatsData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
+            query: {
+                after: pageParam
+            }
+        };
+        const params = createInfiniteParams(queryKey, page);
+        const { data } = await computeUserLeagueStats({
+            ...options,
+            ...params,
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: computeUserLeagueStatsInfiniteQueryKey(options)
+});
 
 /**
  * Reset and recalculate workspace leagues

@@ -134,17 +134,9 @@ export const getLeaderboard = <ThrowOnError extends boolean = false>(options: Op
 /**
  * Calculate user league stats
  *
- * Computes projected league point changes for a specific user based on their leaderboard entry
+ * Computes projected league point changes for a specific user using the global leaderboard
  */
-export const computeUserLeagueStats = <ThrowOnError extends boolean = false>(options: Options<ComputeUserLeagueStatsData, ThrowOnError>) => (options.client ?? client).post<ComputeUserLeagueStatsResponses, unknown, ThrowOnError>({
-    security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/workspaces/{workspaceSlug}/leaderboard/users/{login}/league-stats',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
+export const computeUserLeagueStats = <ThrowOnError extends boolean = false>(options: Options<ComputeUserLeagueStatsData, ThrowOnError>) => (options.client ?? client).get<ComputeUserLeagueStatsResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/leaderboard/users/{login}/league-stats', ...options });
 
 /**
  * Reset and recalculate workspace leagues
