@@ -1,5 +1,14 @@
 import { useReactFlow } from "@xyflow/react";
-import { List, Loader2, Map as MapIcon, Maximize2, RefreshCw, Sparkles, ZoomIn, ZoomOut } from "lucide-react";
+import {
+	List,
+	Loader2,
+	Map as MapIcon,
+	Maximize2,
+	RefreshCw,
+	Sparkles,
+	ZoomIn,
+	ZoomOut,
+} from "lucide-react";
 import type { ViewMode } from "@/components/achievements/types";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -46,7 +55,9 @@ export function AchievementHeader({
 				<div>
 					<h1 className="text-lg font-bold text-foreground">Contributor Journey</h1>
 					<p className="text-xs text-muted-foreground">
-						{onReload ? "Designer Mode — Configure achievement layouts" : "Track your own contributions"}
+						{onReload
+							? "Designer Mode — Configure achievement layouts"
+							: "Track your own contributions"}
 					</p>
 				</div>
 			</div>

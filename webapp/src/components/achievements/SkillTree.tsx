@@ -122,7 +122,16 @@ export function SkillTree({ user, achievements }: SkillTreeProps) {
 
 				{/* Mini map */}
 				<MiniMap
-					nodeColor={(node: NonNullable<Parameters<typeof MiniMap>[0]>["nodeColor"] extends ((n: infer T) => any) | undefined | string ? (T extends { type: string } ? T : (AchievementNode | AvatarNode | CategoryLabelNode)) : (AchievementNode | AvatarNode | CategoryLabelNode)) => {
+					nodeColor={(
+						node: NonNullable<Parameters<typeof MiniMap>[0]>["nodeColor"] extends
+							| ((n: infer T) => any)
+							| undefined
+							| string
+							? T extends { type: string }
+								? T
+								: AchievementNode | AvatarNode | CategoryLabelNode
+							: AchievementNode | AvatarNode | CategoryLabelNode,
+					) => {
 						if (node.type === "categoryLabel") {
 							return "rgba(0,0,0,0)";
 						}
