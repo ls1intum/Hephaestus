@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.workspace;
 import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.in.www1.hephaestus.workspace.dto.CreateWorkspaceRequestDTO;
 import de.tum.in.www1.hephaestus.workspace.exception.*;
@@ -57,6 +58,7 @@ public class WorkspaceService {
 
     // Core repositories
     private final WorkspaceRepository workspaceRepository;
+    private final UserRepository userRepository;
 
     // Services
     private final WorkspaceSlugService workspaceSlugService;
@@ -66,12 +68,14 @@ public class WorkspaceService {
 
     public WorkspaceService(
         WorkspaceRepository workspaceRepository,
+        UserRepository userRepository,
         WorkspaceSlugService workspaceSlugService,
         WorkspaceSettingsService workspaceSettingsService,
         LeaguePointsRecalculator leaguePointsRecalculator,
         WorkspaceMembershipService workspaceMembershipService
     ) {
         this.workspaceRepository = workspaceRepository;
+        this.userRepository = userRepository;
         this.workspaceSlugService = workspaceSlugService;
         this.workspaceSettingsService = workspaceSettingsService;
         this.leaguePointsRecalculator = leaguePointsRecalculator;
@@ -158,12 +162,17 @@ public class WorkspaceService {
      */
     @Transactional
     public Workspace createWorkspace(CreateWorkspaceRequestDTO request) {
+        Long ownerUserId = request.ownerUserId();
+        if (ownerUserId == null) {
+            ownerUserId = userRepository.getCurrentUserElseThrow().getId();
+        }
+
         Workspace workspace = createWorkspace(
             request.workspaceSlug(),
             request.displayName(),
             request.accountLogin(),
             request.accountType(),
-            request.ownerUserId()
+            ownerUserId
         );
 
         if (request.gitProviderMode() != null) {
