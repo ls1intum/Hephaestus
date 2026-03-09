@@ -3,6 +3,8 @@ achievements:
     # ========================================================================
     # Pull Request Achievements
     # ========================================================================
+
+    # --- Main Line Pull Requests ---
     - id: "pr.merged.common.1"
       category: pull_requests
       rarity: common
@@ -12,18 +14,20 @@ achievements:
           target: 1
       triggerEvents:
           - PULL_REQUEST_MERGED
-      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+      evaluatorClass: StandardCountEvaluator
+
     - id: "pr.merged.common.2"
-      category: pull_requests
+      parent: "pr.merged.common.1"
       rarity: common
       isHidden: false
+      category: pull_requests
+      triggerEvents:
+          - PULL_REQUEST_MERGED
+      evaluatorClass: StandardCountEvaluator
       requirements:
           type: LinearAchievementProgress
           target: 3
-      parent: "pr.merged.common.1"
-      triggerEvents:
-          - PULL_REQUEST_MERGED
-      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+
     - id: "pr.merged.uncommon"
       category: pull_requests
       rarity: uncommon
@@ -34,7 +38,8 @@ achievements:
       parent: "pr.merged.common.2"
       triggerEvents:
           - PULL_REQUEST_MERGED
-      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+      evaluatorClass: StandardCountEvaluator
+
     - id: "pr.merged.rare"
       category: pull_requests
       rarity: rare
@@ -45,7 +50,8 @@ achievements:
       parent: "pr.merged.uncommon"
       triggerEvents:
           - PULL_REQUEST_MERGED
-      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+      evaluatorClass: StandardCountEvaluator
+
     - id: "pr.merged.epic"
       category: pull_requests
       rarity: epic
@@ -56,7 +62,8 @@ achievements:
       parent: "pr.merged.rare"
       triggerEvents:
           - PULL_REQUEST_MERGED
-      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+      evaluatorClass: StandardCountEvaluator
+
     - id: "pr.merged.legendary"
       category: pull_requests
       rarity: legendary
@@ -67,7 +74,9 @@ achievements:
       parent: "pr.merged.epic"
       triggerEvents:
           - PULL_REQUEST_MERGED
-      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+      evaluatorClass: StandardCountEvaluator
+
+    # --- Pull Request Specials ---
     - id: "pr.special.speedster"
       parent: "pr.merged.uncommon"
       category: pull_requests
@@ -78,12 +87,13 @@ achievements:
           target: 1
       triggerEvents:
           - PULL_REQUEST_MERGED
-      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator"
+      evaluatorClass: DummyEvaluator
 
     # ========================================================================
     # Commit Achievements
     # ========================================================================
 
+    # --- Main Line Commits ---
     - id: "commit.common.1"
       category: commits
       rarity: common
@@ -92,7 +102,8 @@ achievements:
           type: LinearAchievementProgress
           target: 1
       triggerEvents: []
-      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+      evaluatorClass: StandardCountEvaluator
+
     - id: "commit.common.2"
       category: commits
       rarity: common
@@ -102,7 +113,8 @@ achievements:
           target: 10
       parent: "commit.common.1"
       triggerEvents: []
-      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+      evaluatorClass: StandardCountEvaluator
+
     - id: "commit.uncommon.1"
       category: commits
       rarity: uncommon
@@ -112,7 +124,8 @@ achievements:
           target: 50
       parent: "commit.common.2"
       triggerEvents: []
-      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+      evaluatorClass: StandardCountEvaluator
+
     - id: "commit.uncommon.2"
       category: commits
       rarity: uncommon
@@ -122,7 +135,8 @@ achievements:
           target: 100
       parent: "commit.uncommon.1"
       triggerEvents: []
-      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+      evaluatorClass: StandardCountEvaluator
+
     - id: "commit.rare"
       category: commits
       rarity: rare
@@ -132,7 +146,8 @@ achievements:
           target: 250
       parent: "commit.uncommon.2"
       triggerEvents: []
-      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+      evaluatorClass: StandardCountEvaluator
+
     - id: "commit.epic"
       category: commits
       rarity: epic
@@ -142,7 +157,8 @@ achievements:
           target: 500
       parent: "commit.rare"
       triggerEvents: []
-      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+      evaluatorClass: StandardCountEvaluator
+
     - id: "commit.legendary"
       category: commits
       rarity: legendary
@@ -152,7 +168,8 @@ achievements:
           target: 1000
       parent: "commit.epic"
       triggerEvents: []
-      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+      evaluatorClass: StandardCountEvaluator
+
     - id: "commit.mythic"
       category: commits
       rarity: mythic
@@ -162,7 +179,9 @@ achievements:
           target: 2000
       parent: "commit.legendary"
       triggerEvents: []
-      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+      evaluatorClass: StandardCountEvaluator
+
+    # --- Commit Special Achievements ---
     - id: "commit.special.itsy_bitsy"
       category: commits
       rarity: uncommon
@@ -171,7 +190,8 @@ achievements:
       requirements:
           type: BinaryAchievementProgress
       triggerEvents: []
-      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator"
+      evaluatorClass: DummyEvaluator
+
     - id: "commit.special.atomic_changes"
       parent: "commit.special.brute_force"
       category: commits
@@ -180,7 +200,8 @@ achievements:
       requirements:
           type: BinaryAchievementProgress
       triggerEvents: []
-      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator"
+      evaluatorClass: DummyEvaluator
+
     - id: "commit.special.brute_force"
       parent: "commit.uncommon.2"
       category: commits
@@ -189,7 +210,8 @@ achievements:
       requirements:
           type: BinaryAchievementProgress
       triggerEvents: []
-      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator"
+      evaluatorClass: DummyEvaluator
+
     - id: "commit.special.cross_boundary"
       parent: "commit.uncommon.1"
       category: commits
@@ -198,12 +220,13 @@ achievements:
       requirements:
           type: BinaryAchievementProgress
       triggerEvents: []
-      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator"
+      evaluatorClass: DummyEvaluator
 
     # ========================================================================
     # Review Achievements
     # ========================================================================
 
+    # --- Main Line ---
     - id: "review.common.1"
       category: communication
       rarity: common
@@ -215,7 +238,8 @@ achievements:
           - REVIEW_APPROVED
           - REVIEW_CHANGES_REQUESTED
           - REVIEW_COMMENTED
-      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.ReviewCountEvaluator"
+      evaluatorClass: ReviewCountEvaluator
+
     - id: "review.common.2"
       category: communication
       rarity: common
@@ -228,7 +252,8 @@ achievements:
           - REVIEW_APPROVED
           - REVIEW_CHANGES_REQUESTED
           - REVIEW_COMMENTED
-      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.ReviewCountEvaluator"
+      evaluatorClass: ReviewCountEvaluator
+
     - id: "review.uncommon.1"
       category: communication
       rarity: uncommon
@@ -241,7 +266,8 @@ achievements:
           - REVIEW_APPROVED
           - REVIEW_CHANGES_REQUESTED
           - REVIEW_COMMENTED
-      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.ReviewCountEvaluator"
+      evaluatorClass: ReviewCountEvaluator
+
     - id: "review.uncommon.2"
       category: communication
       rarity: uncommon
@@ -254,7 +280,8 @@ achievements:
           - REVIEW_APPROVED
           - REVIEW_CHANGES_REQUESTED
           - REVIEW_COMMENTED
-      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.ReviewCountEvaluator"
+      evaluatorClass: ReviewCountEvaluator
+
     - id: "review.rare"
       category: communication
       rarity: rare
@@ -267,7 +294,8 @@ achievements:
           - REVIEW_APPROVED
           - REVIEW_CHANGES_REQUESTED
           - REVIEW_COMMENTED
-      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.ReviewCountEvaluator"
+      evaluatorClass: ReviewCountEvaluator
+
     - id: "review.epic"
       category: communication
       rarity: epic
@@ -280,7 +308,8 @@ achievements:
           - REVIEW_APPROVED
           - REVIEW_CHANGES_REQUESTED
           - REVIEW_COMMENTED
-      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.ReviewCountEvaluator"
+      evaluatorClass: ReviewCountEvaluator
+
     - id: "review.legendary"
       category: communication
       rarity: legendary
@@ -293,7 +322,8 @@ achievements:
           - REVIEW_APPROVED
           - REVIEW_CHANGES_REQUESTED
           - REVIEW_COMMENTED
-      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.ReviewCountEvaluator"
+      evaluatorClass: ReviewCountEvaluator
+
     - id: "review.mythic"
       category: communication
       rarity: mythic
@@ -306,12 +336,13 @@ achievements:
           - REVIEW_APPROVED
           - REVIEW_CHANGES_REQUESTED
           - REVIEW_COMMENTED
-      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.ReviewCountEvaluator"
+      evaluatorClass: ReviewCountEvaluator
 
     # ========================================================================
     # Issue Achievements
     # ========================================================================
 
+    # --- Main Line / Issue Open ---
     - id: "issue.open.common.1"
       category: issues
       rarity: common
@@ -321,7 +352,8 @@ achievements:
           target: 1
       triggerEvents:
           - ISSUE_CREATED
-      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+      evaluatorClass: StandardCountEvaluator
+
     - id: "issue.open.common.2"
       category: issues
       rarity: common
@@ -332,7 +364,8 @@ achievements:
       parent: "issue.open.common.1"
       triggerEvents:
           - ISSUE_CREATED
-      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+      evaluatorClass: StandardCountEvaluator
+
     - id: "issue.open.uncommon"
       category: issues
       rarity: uncommon
@@ -343,7 +376,8 @@ achievements:
       parent: "issue.open.common.2"
       triggerEvents:
           - ISSUE_CREATED
-      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+      evaluatorClass: StandardCountEvaluator
+
     - id: "issue.open.rare"
       category: issues
       rarity: rare
@@ -354,7 +388,8 @@ achievements:
       parent: "issue.open.uncommon"
       triggerEvents:
           - ISSUE_CREATED
-      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+      evaluatorClass: StandardCountEvaluator
+
     - id: "issue.open.epic"
       category: issues
       rarity: epic
@@ -365,7 +400,8 @@ achievements:
       parent: "issue.open.rare"
       triggerEvents:
           - ISSUE_CREATED
-      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+      evaluatorClass: StandardCountEvaluator
+
     - id: "issue.open.legendary"
       category: issues
       rarity: legendary
@@ -376,7 +412,9 @@ achievements:
       parent: "issue.open.epic"
       triggerEvents:
           - ISSUE_CREATED
-      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+      evaluatorClass: StandardCountEvaluator
+
+    # --- Main Line / Issue Close ---
     - id: "issue.close.common.1"
       category: issues
       rarity: common
@@ -386,7 +424,8 @@ achievements:
           target: 1
       triggerEvents:
           - ISSUE_CLOSED
-      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+      evaluatorClass: StandardCountEvaluator
+
     - id: "issue.close.common.2"
       category: issues
       rarity: common
@@ -397,7 +436,8 @@ achievements:
       parent: "issue.close.common.1"
       triggerEvents:
           - ISSUE_CLOSED
-      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+      evaluatorClass: StandardCountEvaluator
+
     - id: "issue.close.uncommon"
       category: issues
       rarity: uncommon
@@ -408,7 +448,8 @@ achievements:
       parent: "issue.close.common.2"
       triggerEvents:
           - ISSUE_CLOSED
-      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+      evaluatorClass: StandardCountEvaluator
+
     - id: "issue.close.rare"
       category: issues
       rarity: rare
@@ -419,7 +460,8 @@ achievements:
       parent: "issue.close.uncommon"
       triggerEvents:
           - ISSUE_CLOSED
-      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+      evaluatorClass: StandardCountEvaluator
+
     - id: "issue.close.epic"
       category: issues
       rarity: epic
@@ -430,7 +472,8 @@ achievements:
       parent: "issue.close.rare"
       triggerEvents:
           - ISSUE_CLOSED
-      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+      evaluatorClass: StandardCountEvaluator
+
     - id: "issue.close.legendary"
       category: issues
       rarity: legendary
@@ -441,7 +484,9 @@ achievements:
       parent: "issue.close.epic"
       triggerEvents:
           - ISSUE_CLOSED
-      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+      evaluatorClass: StandardCountEvaluator
+
+    # --- Issue Special Achievements ---
     - id: "issue.special.hive_mind"
       parent: "issue.close.common.2"
       category: issues
@@ -451,7 +496,8 @@ achievements:
           type: BinaryAchievementProgress
       triggerEvents:
           - ISSUE_CLOSED
-      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator"
+      evaluatorClass: DummyEvaluator
+
     - id: "issue.special.oracle"
       parent: "issue.close.common.2"
       category: issues
@@ -461,7 +507,8 @@ achievements:
           type: BinaryAchievementProgress
       triggerEvents:
           - ISSUE_CLOSED
-      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator"
+      evaluatorClass: DummyEvaluator
+
     - id: "issue.special.necromancer"
       parent: "issue.special.necromancer"
       category: issues
@@ -471,7 +518,9 @@ achievements:
           type: BinaryAchievementProgress
       triggerEvents:
           - ISSUE_CLOSED
-      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator"
+      evaluatorClass: DummyEvaluator
+
+    # --- Milestones ---
     - id: "milestone.first_action"
       category: milestones
       rarity: common
@@ -487,7 +536,8 @@ achievements:
           - REVIEW_APPROVED
           - REVIEW_CHANGES_REQUESTED
           - REVIEW_COMMENTED
-      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.StandardCountEvaluator"
+      evaluatorClass: StandardCountEvaluator
+
     - id: "milestone.polyglot"
       category: milestones
       rarity: uncommon
@@ -496,7 +546,8 @@ achievements:
           type: BinaryAchievementProgress
       parent: "milestone.first_action"
       triggerEvents: []
-      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator"
+      evaluatorClass: DummyEvaluator
+
     - id: "milestone.night_owl"
       category: milestones
       rarity: epic
@@ -505,7 +556,8 @@ achievements:
           type: BinaryAchievementProgress
       parent: "milestone.first_action"
       triggerEvents: []
-      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator"
+      evaluatorClass: DummyEvaluator
+
     - id: "milestone.long_time_return"
       parent: "milestone.long_time_return"
       category: milestones
@@ -514,7 +566,8 @@ achievements:
       requirements:
           type: BinaryAchievementProgress
       triggerEvents: []
-      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator"
+      evaluatorClass: DummyEvaluator
+
     - id: "milestone.all_rare"
       parent: "milestone.all_rare"
       category: milestones
@@ -523,7 +576,8 @@ achievements:
       requirements:
           type: BinaryAchievementProgress
       triggerEvents: []
-      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator"
+      evaluatorClass: DummyEvaluator
+
     - id: "milestone.all_epic"
       category: milestones
       rarity: legendary
@@ -531,8 +585,9 @@ achievements:
       requirements:
           type: BinaryAchievementProgress
       parent: "milestone.all_rare"
-      triggerEvents:
-      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator"
+      triggerEvents: []
+      evaluatorClass: DummyEvaluator
+
     - id: "milestone.all_legendary"
       category: milestones
       rarity: mythic
@@ -540,5 +595,5 @@ achievements:
       requirements:
           type: BinaryAchievementProgress
       parent: "milestone.all_epic"
-      triggerEvents:
-      evaluatorClass: "de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator"
+      triggerEvents: []
+      evaluatorClass: DummyEvaluator
