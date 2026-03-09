@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.27.1](https://github.com/ls1intum/Hephaestus/compare/v0.27.0...v0.27.1) (2026-03-09)
+
+### 🐛 Bug Fixes
+
+* **leaderboard:** compute league points change from global leaderboard instead of team-filtered view ([#816](https://github.com/ls1intum/Hephaestus/issues/816)) ([99cc455](https://github.com/ls1intum/Hephaestus/commit/99cc4559f4f24593e90578ca7ec0f475d055ebc6))
+
 ## [0.27.0](https://github.com/ls1intum/Hephaestus/compare/v0.26.0...v0.27.0) (2026-03-09)
 
 ### 🚀 Features
