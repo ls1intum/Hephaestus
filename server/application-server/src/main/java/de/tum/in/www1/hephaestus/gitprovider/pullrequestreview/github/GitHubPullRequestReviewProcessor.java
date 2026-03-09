@@ -14,6 +14,7 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.github.dto.GitHub
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserProcessor;
 import java.time.Instant;
 import java.util.Set;
 import org.slf4j.Logger;
@@ -51,9 +52,10 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
         PullRequestReviewRepository reviewRepository,
         PullRequestRepository prRepository,
         UserRepository userRepository,
+        GitHubUserProcessor gitHubUserProcessor,
         ApplicationEventPublisher eventPublisher
     ) {
-        super(userRepository, null, null);
+        super(userRepository, null, null, gitHubUserProcessor);
         this.reviewRepository = reviewRepository;
         this.prRepository = prRepository;
         this.eventPublisher = eventPublisher;
@@ -160,7 +162,7 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
         @NonNull ProcessingContext context
     ) {
         return reviewRepository
-            .findById(dto.id())
+            .findByNativeIdAndProviderId(dto.id(), context.providerId())
             .map(review -> updateReview(review, dto, context))
             .orElseGet(() -> createReview(dto, pr, context));
     }
@@ -168,20 +170,20 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
     /**
      * Process a review dismissal.
      *
-     * @param reviewId the ID of the review to dismiss
+     * @param reviewNativeId the native ID of the review to dismiss
      * @param context processing context with scope information
      */
     @Transactional
-    public void processDismissed(Long reviewId, @NonNull ProcessingContext context) {
+    public void processDismissed(Long reviewNativeId, @NonNull ProcessingContext context) {
         reviewRepository
-            .findById(reviewId)
+            .findByNativeIdAndProviderId(reviewNativeId, context.providerId())
             .ifPresent(review -> {
                 review.setDismissed(true);
                 review = reviewRepository.save(review);
                 EventPayload.ReviewData.from(review).ifPresent(reviewData ->
                     eventPublisher.publishEvent(new DomainEvent.ReviewDismissed(reviewData, EventContext.from(context)))
                 );
-                log.debug("Dismissed review: reviewId={}", reviewId);
+                log.debug("Dismissed review: nativeId={}", reviewNativeId);
             });
     }
 
@@ -209,6 +211,12 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
         if (dto.commitId() != null) {
             review.setCommitId(dto.commitId());
         }
+        if (dto.updatedAt() != null) {
+            review.setUpdatedAt(dto.updatedAt());
+        }
+        if (dto.authorCanPushToRepository() != null) {
+            review.setAuthorCanPushToRepository(dto.authorCanPushToRepository());
+        }
         PullRequestReview saved = reviewRepository.save(review);
         EventPayload.ReviewData.from(saved).ifPresent(reviewData ->
             eventPublisher.publishEvent(
@@ -225,7 +233,8 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
         @NonNull ProcessingContext context
     ) {
         PullRequestReview review = new PullRequestReview();
-        review.setId(dto.id());
+        review.setNativeId(dto.id());
+        review.setProvider(context.provider());
         review.setBody(dto.body());
         PullRequestReview.State newState = mapState(dto.state());
         if (newState == PullRequestReview.State.DISMISSED) {
@@ -242,9 +251,12 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
         review.setHtmlUrl(dto.htmlUrl() != null ? dto.htmlUrl() : "");
         review.setPullRequest(pr);
         review.setCommitId(dto.commitId());
+        review.setCreatedAt(dto.createdAt());
+        review.setUpdatedAt(dto.updatedAt());
+        review.setAuthorCanPushToRepository(dto.authorCanPushToRepository());
 
         if (dto.author() != null) {
-            User author = findOrCreateUser(dto.author());
+            User author = findOrCreateUser(dto.author(), context.providerId());
             if (author != null) {
                 review.setAuthor(author);
             }
@@ -328,7 +340,8 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
         }
 
         PullRequest pr = new PullRequest();
-        pr.setId(prId);
+        pr.setNativeId(prId);
+        pr.setProvider(context.provider());
         pr.setNumber(dto.number());
         pr.setTitle(sanitize(dto.title()));
         pr.setBody(sanitize(dto.body()));
@@ -361,7 +374,7 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
 
         // Link author
         if (dto.author() != null) {
-            User author = findOrCreateUser(dto.author());
+            User author = findOrCreateUser(dto.author(), context.providerId());
             pr.setAuthor(author);
         }
 

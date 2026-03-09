@@ -194,45 +194,51 @@ code {
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  /* GitHub specific colors from tailwind config */
-  --color-github-foreground: var(--fgColor-default);
-  --color-github-background: var(--bgColor-default);
-  --color-github-muted: var(--bgColor-muted);
-  --color-github-muted-foreground: var(--fgColor-muted);
-  --color-github-onemphasis: var(--bgColor-emphasis);
-  --color-github-onemphasis-foreground: var(--fgColor-onEmphasis);
-  --color-github-oninverse: var(--bgColor-inverse);
-  --color-github-oninverse-foreground: var(--fgColor-onInverse);
-  --color-github-white: var(--bgColor-white);
-  --color-github-white-foreground: var(--fgColor-white);
-  --color-github-black: var(--bgColor-black);
-  --color-github-black-foreground: var(--fgColor-black);
-  --color-github-disabled: var(--bgColor-disabled);
-  --color-github-disabled-foreground: var(--fgColor-disabled);
-  --color-github-link: var(--bgColor-link);
-  --color-github-link-foreground: var(--fgColor-link);
-  --color-github-neutral: var(--bgColor-neutral);
-  --color-github-neutral-foreground: var(--fgColor-neutral);
-  --color-github-accent: var(--bgColor-accent);
-  --color-github-accent-foreground: var(--fgColor-accent);
-  --color-github-success: var(--bgColor-success);
-  --color-github-success-foreground: var(--fgColor-success);
-  --color-github-open: var(--bgColor-open);
-  --color-github-open-foreground: var(--fgColor-open);
-  --color-github-attention: var(--bgColor-attention);
-  --color-github-attention-foreground: var(--fgColor-attention);
-  --color-github-severe: var(--bgColor-severe);
-  --color-github-severe-foreground: var(--fgColor-severe);
-  --color-github-danger: var(--bgColor-danger);
-  --color-github-danger-foreground: var(--fgColor-danger);
-  --color-github-closed: var(--bgColor-closed);
-  --color-github-closed-foreground: var(--fgColor-closed);
-  --color-github-done: var(--bgColor-done);
-  --color-github-done-foreground: var(--fgColor-done);
-  --color-github-upsell: var(--bgColor-upsell);
-  --color-github-upsell-foreground: var(--fgColor-upsell);
-  --color-github-sponsors: var(--bgColor-sponsors);
-  --color-github-sponsors-foreground: var(--fgColor-sponsors);
+  /* * Provider-aware semantic colors.
+  * Default values use @primer/primitives (GitHub) which handles light/dark via data-color-mode.
+	 * GitLab overrides are defined below via [data-provider="gitlab"] selectors.
+	 * Brand-only tokens (github-white, github-black) remain for GitHubSignInButton.
+	 */
+	--color-provider-foreground: var(--fgColor-default);
+  --color-provider-background: var(--bgColor-default);
+  --color-provider-muted: var(--bgColor-muted);
+  --color-provider-muted-foreground: var(--fgColor-muted);
+  --color-provider-onemphasis: var(--bgColor-emphasis);
+  --color-provider-onemphasis-foreground: var(--fgColor-onEmphasis);
+  --color-provider-oninverse: var(--bgColor-inverse);
+  --color-provider-oninverse-foreground: var(--fgColor-onInverse);
+  --color-provider-disabled: var(--bgColor-disabled);
+  --color-provider-disabled-foreground: var(--fgColor-disabled);
+  --color-provider-link: var(--bgColor-link);
+  --color-provider-link-foreground: var(--fgColor-link);
+  --color-provider-neutral: var(--bgColor-neutral);
+  --color-provider-neutral-foreground: var(--fgColor-neutral);
+  --color-provider-accent: var(--bgColor-accent);
+  --color-provider-accent-foreground: var(--fgColor-accent);
+  --color-provider-success: var(--bgColor-success);
+  --color-provider-success-foreground: var(--fgColor-success);
+  --color-provider-open: var(--bgColor-open);
+  --color-provider-open-foreground: var(--fgColor-open);
+  --color-provider-attention: var(--bgColor-attention);
+  --color-provider-attention-foreground: var(--fgColor-attention);
+  --color-provider-severe: var(--bgColor-severe);
+  --color-provider-severe-foreground: var(--fgColor-severe);
+  --color-provider-danger: var(--bgColor-danger);
+  --color-provider-danger-foreground: var(--fgColor-danger);
+  --color-provider-closed: var(--bgColor-closed);
+  --color-provider-closed-foreground: var(--fgColor-closed);
+  --color-provider-done: var(--bgColor-done);
+  --color-provider-done-foreground: var(--fgColor-done);
+  --color-provider-upsell: var(--bgColor-upsell);
+  --color-provider-upsell-foreground: var(--fgColor-upsell);
+  --color-provider-sponsors: var(--bgColor-sponsors);
+  --color-provider-sponsors-foreground: var(--fgColor-sponsors);
+
+	/* GitHub brand-only tokens (used by GitHubSignInButton) */
+	--color-github-white: var(--bgColor-white);
+	--color-github-white-foreground: var(--fgColor-white);
+	--color-github-black: var(--bgColor-black);
+	--color-github-black-foreground: var(--fgColor-black);
 
   /* League colors */
   --color-league-bronze: var(--league-bronze);
@@ -270,6 +276,88 @@ code {
   color: transparent;
 }
 
+/*
+ * GitLab Pajamas color overrides — light mode.
+ * Applied when a GitLab workspace is active via [data-provider="gitlab"].
+ * Values from https://design.gitlab.com/product-foundations/color/
+ */
+[data-provider="gitlab"] {
+	/* Foreground / text colors (Pajamas 500-level) */
+	--color-provider-foreground: #28272d;
+	--color-provider-muted-foreground: #737278;
+	--color-provider-success-foreground: #108548;
+	--color-provider-open-foreground: #108548;
+	--color-provider-danger-foreground: #dd2b0e;
+	--color-provider-closed-foreground: #dd2b0e;
+	--color-provider-done-foreground: #1f75cb;
+	--color-provider-attention-foreground: #ab6100;
+	--color-provider-severe-foreground: #ab6100;
+	--color-provider-link-foreground: #1f75cb;
+	--color-provider-neutral-foreground: #737278;
+	--color-provider-accent-foreground: #1f75cb;
+	--color-provider-disabled-foreground: #bfbfc3;
+	--color-provider-onemphasis-foreground: #fff;
+	--color-provider-oninverse-foreground: #28272d;
+	--color-provider-upsell-foreground: #7b58cf;
+	--color-provider-sponsors-foreground: #7b58cf;
+	/* Background colors (Pajamas 100-level) */
+	--color-provider-background: #fff;
+	--color-provider-muted: #dcdcde;
+	--color-provider-success: #c3e6cd;
+	--color-provider-open: #c3e6cd;
+	--color-provider-danger: #fdd4cd;
+	--color-provider-closed: #fdd4cd;
+	--color-provider-done: #cbe2f9;
+	--color-provider-attention: #f5d9a8;
+	--color-provider-severe: #f5d9a8;
+	--color-provider-link: #cbe2f9;
+	--color-provider-neutral: #dcdcde;
+	--color-provider-accent: #cbe2f9;
+	--color-provider-disabled: #ececef;
+	--color-provider-onemphasis: #28272d;
+	--color-provider-oninverse: #ececef;
+	--color-provider-upsell: #e1d8f9;
+	--color-provider-sponsors: #e1d8f9;
+}
+
+/* GitLab dark mode (Pajamas 400-level fg, 800-level bg) */
+.dark [data-provider="gitlab"] {
+	--color-provider-foreground: #ececef;
+	--color-provider-muted-foreground: #89888d;
+	--color-provider-success-foreground: #2da160;
+	--color-provider-open-foreground: #2da160;
+	--color-provider-danger-foreground: #ec5941;
+	--color-provider-closed-foreground: #ec5941;
+	--color-provider-done-foreground: #428fdc;
+	--color-provider-attention-foreground: #c17d10;
+	--color-provider-severe-foreground: #c17d10;
+	--color-provider-link-foreground: #428fdc;
+	--color-provider-neutral-foreground: #89888d;
+	--color-provider-accent-foreground: #428fdc;
+	--color-provider-disabled-foreground: #4c4b51;
+	--color-provider-onemphasis-foreground: #ececef;
+	--color-provider-oninverse-foreground: #ececef;
+	--color-provider-upsell-foreground: #9475db;
+	--color-provider-sponsors-foreground: #9475db;
+	--color-provider-background: #18171d;
+	--color-provider-muted: #3a383f;
+	--color-provider-success: #225131;
+	--color-provider-open: #225131;
+	--color-provider-danger: #812713;
+	--color-provider-closed: #812713;
+	--color-provider-done: #284779;
+	--color-provider-attention: #693c14;
+	--color-provider-severe: #693c14;
+	--color-provider-link: #284779;
+	--color-provider-neutral: #3a383f;
+	--color-provider-accent: #284779;
+	--color-provider-disabled: #28272d;
+	--color-provider-onemphasis: #ececef;
+	--color-provider-oninverse: #28272d;
+	--color-provider-upsell: #493c83;
+	--color-provider-sponsors: #493c83;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -278,7 +366,7 @@ code {
     @apply bg-background text-foreground;
   }
   code.textCode {
-    @apply bg-github-muted tracking-tight rounded px-1 py-0.5;
+    @apply bg-provider-muted tracking-tight rounded px-1 py-0.5;
   }
 }
 

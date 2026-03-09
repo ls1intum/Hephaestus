@@ -11,8 +11,8 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
+import org.hibernate.Hibernate;
 import org.springframework.stereotype.Component;
 
 /**
@@ -34,9 +34,8 @@ import org.springframework.stereotype.Component;
  * @see ExperiencePointStrategy
  */
 @Component
+@Slf4j
 public class ExperiencePointCalculator implements ExperiencePointStrategy {
-
-    private static final Logger log = LoggerFactory.getLogger(ExperiencePointCalculator.class);
 
     private final PullRequestRepository pullRequestRepository;
     private final Set<String> selfReviewAuthorLogins;
@@ -114,6 +113,55 @@ public class ExperiencePointCalculator implements ExperiencePointStrategy {
      */
     public double getXpIssueCreated() {
         return properties.xpAwards().issueCreated();
+    }
+
+    /**
+     * Get XP for project created (configurable).
+     */
+    public double getXpProjectCreated() {
+        return properties.xpAwards().projectCreated();
+    }
+
+    /**
+     * Get XP for project item created (configurable).
+     */
+    public double getXpProjectItemCreated() {
+        return properties.xpAwards().projectItemCreated();
+    }
+
+    /**
+     * Get XP for project status update created (configurable).
+     */
+    public double getXpProjectStatusUpdateCreated() {
+        return properties.xpAwards().projectStatusUpdateCreated();
+    }
+
+    /**
+     * Get XP for commit created (configurable).
+     */
+    public double getXpCommitCreated() {
+        return properties.xpAwards().commitCreated();
+    }
+
+    /**
+     * Get XP for discussion created (configurable).
+     */
+    public double getXpDiscussionCreated() {
+        return properties.xpAwards().discussionCreated();
+    }
+
+    /**
+     * Get XP for discussion answered (configurable).
+     */
+    public double getXpDiscussionAnswered() {
+        return properties.xpAwards().discussionAnswered();
+    }
+
+    /**
+     * Get XP for discussion comment created (configurable).
+     */
+    public double getXpDiscussionCommentCreated() {
+        return properties.xpAwards().discussionCommentCreated();
     }
 
     // ========================================================================
@@ -295,10 +343,16 @@ public class ExperiencePointCalculator implements ExperiencePointStrategy {
             return 0;
         }
 
+        // Unwrap Hibernate proxy to get the actual entity subclass.
+        // When IssueComment.issue is lazy-loaded, Hibernate creates an Issue$HibernateProxy
+        // that cannot be cast to PullRequest even when the underlying row is a PullRequest
+        // (SINGLE_TABLE inheritance). Unproxying resolves the real entity type.
+        issue = (Issue) Hibernate.unproxy(issue);
+
         PullRequest pullRequest;
 
-        if (issue.isPullRequest()) {
-            pullRequest = (PullRequest) issue;
+        if (issue instanceof PullRequest pr) {
+            pullRequest = pr;
         } else {
             if (issue.getRepository() == null) {
                 log.warn("Skipped XP calculation, issue has no repository: issueId={}", issue.getId());

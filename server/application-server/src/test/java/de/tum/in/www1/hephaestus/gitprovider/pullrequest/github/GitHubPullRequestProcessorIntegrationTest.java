@@ -2,8 +2,12 @@ package de.tum.in.www1.hephaestus.gitprovider.pullrequest.github;
 
 import static org.assertj.core.api.Assertions.*;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
+import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.label.github.dto.GitHubLabelDTO;
@@ -70,6 +74,9 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
     private OrganizationRepository organizationRepository;
 
     @Autowired
+    private GitProviderRepository gitProviderRepository;
+
+    @Autowired
     private WorkspaceRepository workspaceRepository;
 
     @Autowired
@@ -82,11 +89,15 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
     private MilestoneRepository milestoneRepository;
 
     @Autowired
+    private IssueRepository issueRepository;
+
+    @Autowired
     private TestPullRequestEventListener eventListener;
 
     private Repository testRepository;
     private Workspace testWorkspace;
     private Organization testOrganization;
+    private GitProvider githubProvider;
 
     @BeforeEach
     void setUp() {
@@ -96,20 +107,26 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
     }
 
     private void setupTestData() {
+        // Create GitHub provider
+        githubProvider = gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
+            .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com")));
+
         // Create organization matching fixture data
         testOrganization = new Organization();
-        testOrganization.setId(FIXTURE_ORG_ID);
-        testOrganization.setGithubId(FIXTURE_ORG_ID);
+        testOrganization.setNativeId(FIXTURE_ORG_ID);
         testOrganization.setLogin(FIXTURE_ORG_LOGIN);
         testOrganization.setCreatedAt(Instant.now());
         testOrganization.setUpdatedAt(Instant.now());
         testOrganization.setName("Hephaestus Test");
         testOrganization.setAvatarUrl("https://avatars.githubusercontent.com/u/" + FIXTURE_ORG_ID);
+        testOrganization.setHtmlUrl("https://github.com/" + FIXTURE_ORG_LOGIN);
+        testOrganization.setProvider(githubProvider);
         testOrganization = organizationRepository.save(testOrganization);
 
         // Create repository matching fixture data
         testRepository = new Repository();
-        testRepository.setId(FIXTURE_REPO_ID);
+        testRepository.setNativeId(FIXTURE_REPO_ID);
         testRepository.setName("TestRepository");
         testRepository.setNameWithOwner(FIXTURE_REPO_FULL_NAME);
         testRepository.setHtmlUrl("https://github.com/" + FIXTURE_REPO_FULL_NAME);
@@ -119,6 +136,7 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
         testRepository.setUpdatedAt(Instant.now());
         testRepository.setPushedAt(Instant.now());
         testRepository.setOrganization(testOrganization);
+        testRepository.setProvider(githubProvider);
         testRepository = repositoryRepository.save(testRepository);
 
         // Create workspace
@@ -186,7 +204,8 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             null, // reviewDecision
             null, // mergeStateStatus
             null, // isMergeable
-            false // maintainerCanModify
+            false, // maintainerCanModify
+            null // mergeCommitInfo
         );
     }
 
@@ -237,16 +256,17 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 null, // reviewDecision
                 null, // mergeStateStatus
                 null, // isMergeable
-                false // maintainerCanModify
+                false, // maintainerCanModify
+                null // mergeCommitInfo
             );
 
             // When
             PullRequest result = processor.process(dto, createContext());
 
-            // Then - should use databaseId
+            // Then - should use databaseId as native_id
             assertThat(result).isNotNull();
-            assertThat(result.getId()).isEqualTo(databaseId);
-            assertThat(pullRequestRepository.findById(databaseId)).isPresent();
+            assertThat(result.getNativeId()).isEqualTo(databaseId);
+            assertThat(pullRequestRepository.findByRepositoryIdAndNumber(testRepository.getId(), 1)).isPresent();
         }
 
         @Test
@@ -290,7 +310,8 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 null, // reviewDecision
                 null, // mergeStateStatus
                 null, // isMergeable
-                false // maintainerCanModify
+                false, // maintainerCanModify
+                null // mergeCommitInfo
             );
 
             // Verify the fallback works
@@ -299,10 +320,10 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             // When
             PullRequest result = processor.process(dto, createContext());
 
-            // Then - should use id as fallback
+            // Then - should use id as fallback for native_id
             assertThat(result).isNotNull();
-            assertThat(result.getId()).isEqualTo(webhookId);
-            assertThat(pullRequestRepository.findById(webhookId)).isPresent();
+            assertThat(result.getNativeId()).isEqualTo(webhookId);
+            assertThat(pullRequestRepository.findByRepositoryIdAndNumber(testRepository.getId(), 26)).isPresent();
         }
 
         @Test
@@ -345,7 +366,8 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 null, // reviewDecision
                 null, // mergeStateStatus
                 null, // isMergeable
-                false // maintainerCanModify
+                false, // maintainerCanModify
+                null // mergeCommitInfo
             );
 
             // Verify fallback returns null
@@ -357,6 +379,67 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             // Then
             assertThat(result).isNull();
             assertThat(eventListener.getCreatedEvents()).isEmpty();
+        }
+    }
+
+    // ==================== Issue Type Promotion Tests ====================
+
+    @Nested
+    @DisplayName("Issue Type Promotion (ISSUE -> PULL_REQUEST)")
+    class IssueTypePromotion {
+
+        @Test
+        @DisplayName("Should promote ISSUE to PULL_REQUEST when PR event arrives for existing Issue")
+        void shouldPromoteIssueToPullRequestWhenPREventArrives() {
+            // Arrange - insert an entity with issue_type='ISSUE' using the Issue upsert
+            Long entityId = FIXTURE_PR_ID;
+            int number = 26;
+            Instant now = Instant.now();
+
+            issueRepository.upsertCore(
+                entityId,
+                githubProvider.getId(),
+                number,
+                "Original Issue Title",
+                "Original issue body",
+                "OPEN",
+                null, // stateReason
+                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/issues/" + number,
+                false, // isLocked
+                null, // closedAt
+                0, // commentsCount
+                now, // lastSyncAt
+                now, // createdAt
+                now, // updatedAt
+                null, // authorId
+                testRepository.getId(), // use synthetic PK, not native ID
+                null, // milestoneId
+                null, // issueTypeId
+                null, // parentIssueId
+                null, // subIssuesTotal
+                null, // subIssuesCompleted
+                null // subIssuesPercentCompleted
+            );
+
+            // Verify entity exists as an Issue but NOT as a PullRequest
+            assertThat(issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), number)).isPresent();
+            assertThat(pullRequestRepository.findByRepositoryIdAndNumber(testRepository.getId(), number)).isEmpty();
+
+            // Act - process as a pull request
+            GitHubPullRequestDTO dto = createBasicPullRequestDto(entityId, number);
+            PullRequest result = processor.process(dto, createContext());
+
+            // Assert - should succeed (no IllegalStateException) and return a valid PR
+            assertThat(result).isNotNull();
+            assertThat(result.getNativeId()).isEqualTo(entityId);
+            assertThat(result.getNumber()).isEqualTo(number);
+            assertThat(result.getTitle()).isEqualTo("Test PR #" + number);
+
+            // Verify it's now findable as a PullRequest
+            assertThat(pullRequestRepository.findByRepositoryIdAndNumber(testRepository.getId(), number)).isPresent();
+
+            // Verify Created event was published (treated as new from PR perspective)
+            assertThat(eventListener.getCreatedEvents()).hasSize(1);
         }
     }
 
@@ -377,13 +460,13 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
 
             // Then
             assertThat(result).isNotNull();
-            assertThat(result.getId()).isEqualTo(FIXTURE_PR_ID);
+            assertThat(result.getNativeId()).isEqualTo(FIXTURE_PR_ID);
             assertThat(result.getNumber()).isEqualTo(26);
             assertThat(result.getTitle()).isEqualTo("Test PR #26");
             assertThat(result.getState()).isEqualTo(PullRequest.State.OPEN);
             assertThat(result.isDraft()).isFalse();
             assertThat(result.isMerged()).isFalse();
-            assertThat(result.getRepository().getId()).isEqualTo(FIXTURE_REPO_ID);
+            assertThat(result.getRepository().getNativeId()).isEqualTo(FIXTURE_REPO_ID);
 
             // Verify Created event
             assertThat(eventListener.getCreatedEvents()).hasSize(1);
@@ -403,7 +486,9 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             // Then
             assertThat(result.getAuthor()).isNotNull();
             assertThat(result.getAuthor().getLogin()).isEqualTo(FIXTURE_AUTHOR_LOGIN);
-            assertThat(userRepository.findById(FIXTURE_AUTHOR_ID)).isPresent();
+            assertThat(
+                userRepository.findByNativeIdAndProviderId(FIXTURE_AUTHOR_ID, githubProvider.getId())
+            ).isPresent();
         }
 
         @Test
@@ -458,7 +543,8 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 null, // reviewDecision
                 null, // mergeStateStatus
                 null, // isMergeable
-                false // maintainerCanModify
+                false, // maintainerCanModify
+                null // mergeCommitInfo
             );
 
             // When
@@ -468,7 +554,7 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(result.getLabels()).hasSize(1);
             Label label = result.getLabels().iterator().next();
             assertThat(label.getName()).isEqualTo(labelName);
-            assertThat(labelRepository.findById(labelId)).isPresent();
+            assertThat(labelRepository.findByNativeIdAndProviderId(labelId, githubProvider.getId())).isPresent();
         }
 
         @Test
@@ -527,7 +613,8 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 null, // reviewDecision
                 null, // mergeStateStatus
                 null, // isMergeable
-                false // maintainerCanModify
+                false, // maintainerCanModify
+                null // mergeCommitInfo
             );
 
             // When
@@ -536,7 +623,9 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
             // Then
             assertThat(result.getMilestone()).isNotNull();
             assertThat(result.getMilestone().getTitle()).isEqualTo("v1.0");
-            assertThat(milestoneRepository.findById(milestoneId)).isPresent();
+            assertThat(
+                milestoneRepository.findByNativeIdAndProviderId(milestoneId, githubProvider.getId())
+            ).isPresent();
         }
     }
 
@@ -589,7 +678,8 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 null, // reviewDecision
                 null, // mergeStateStatus
                 null, // isMergeable
-                false // maintainerCanModify
+                false, // maintainerCanModify
+                null // mergeCommitInfo
             );
 
             // When
@@ -646,7 +736,8 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 null, // reviewDecision
                 null, // mergeStateStatus
                 null, // isMergeable
-                false // maintainerCanModify
+                false, // maintainerCanModify
+                null // mergeCommitInfo
             );
 
             // When
@@ -706,7 +797,8 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 null, // reviewDecision
                 null, // mergeStateStatus
                 null, // isMergeable
-                false // maintainerCanModify
+                false, // maintainerCanModify
+                null // mergeCommitInfo
             );
             processor.process(draftDto, createContext());
             eventListener.clear();
@@ -747,7 +839,8 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 null, // reviewDecision
                 null, // mergeStateStatus
                 null, // isMergeable
-                false // maintainerCanModify
+                false, // maintainerCanModify
+                null // mergeCommitInfo
             );
 
             // When
@@ -808,7 +901,8 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 null, // reviewDecision
                 null, // mergeStateStatus
                 null, // isMergeable
-                false // maintainerCanModify
+                false, // maintainerCanModify
+                null // mergeCommitInfo
             );
 
             // When
@@ -869,7 +963,8 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 null, // reviewDecision
                 null, // mergeStateStatus
                 null, // isMergeable
-                false // maintainerCanModify
+                false, // maintainerCanModify
+                null // mergeCommitInfo
             );
 
             // When
@@ -941,7 +1036,8 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 null, // reviewDecision
                 null, // mergeStateStatus
                 null, // isMergeable
-                false // maintainerCanModify
+                false, // maintainerCanModify
+                null // mergeCommitInfo
             );
 
             // When
@@ -1002,7 +1098,8 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 null, // reviewDecision
                 null, // mergeStateStatus
                 null, // isMergeable
-                false // maintainerCanModify
+                false, // maintainerCanModify
+                null // mergeCommitInfo
             );
             processor.process(withLabelDto, createContext());
             eventListener.clear();
@@ -1043,7 +1140,8 @@ class GitHubPullRequestProcessorIntegrationTest extends BaseIntegrationTest {
                 null, // reviewDecision
                 null, // mergeStateStatus
                 null, // isMergeable
-                false // maintainerCanModify
+                false, // maintainerCanModify
+                null // mergeCommitInfo
             );
 
             // When

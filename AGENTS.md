@@ -3,133 +3,11 @@
 **⚠️ Do NOT stage, commit, or push unless you have permission to do so.**
 
 This file governs the entire repository. Each service has its own `AGENTS.md` with service-specific patterns:
+
 - `webapp/AGENTS.md` — React, TanStack, Tailwind patterns
 - `server/application-server/AGENTS.md` — Spring Boot, JPA, testing
 - `server/intelligence-service/AGENTS.md` — AI/Hono service patterns
 - `server/webhook-ingest/AGENTS.md` — Webhook processing, NATS
-
-## 0. Beads Issue Tracker
-
-Use **beads** (`bd` CLI) for persistent task tracking across sessions. This replaces markdown TODO lists.
-
-> **First-time setup**: Run `bd onboard` to see comprehensive integration instructions. It outputs AGENTS.md and Copilot configuration templates.
-
-### Why Beads?
-
-- **Persistent memory**: Issues survive context window resets
-- **Dependency graphs**: Track what blocks what with `bd dep`
-- **Ready work detection**: `bd ready` shows unblocked tasks by priority
-- **Git-synced**: Issues auto-export to `.beads/issues.jsonl` (commit with code)
-
-### Issue Types & Priorities
-
-| Type | Use For |
-|------|---------|
-| `bug` | Something broken |
-| `feature` | New functionality |
-| `task` | Work item (tests, docs, refactoring) |
-| `epic` | Large feature with subtasks |
-| `chore` | Maintenance |
-
-| Priority | Meaning |
-|----------|---------|
-| `0` | Critical (security, data loss, broken builds) |
-| `1` | High (major features, important bugs) |
-| `2` | Medium (default) |
-| `3` | Low (polish, optimization) |
-| `4` | Backlog |
-
-### Session Start Protocol
-
-At the **start of every session**, run:
-
-```bash
-bd ready --json          # What's unblocked and ready to work on?
-bd list --status open    # Full context of all open work
-bd blocked               # What's waiting on dependencies?
-```
-
-This gives you immediate context without re-reading documentation.
-
-### Core Workflow
-
-```bash
-# 1. Check ready work
-bd ready --json
-
-# 2. Claim a task
-bd update <id> --status in_progress
-
-# 3. Do the work...
-
-# 4. Discover new work? Track its origin!
-bd create "Found bug during refactor" -t bug -p 1
-bd dep add <new-id> <current-id> --type discovered-from
-
-# 5. Complete work
-bd close <id> --reason "Fixed in commit abc123"
-
-# 6. Session end check
-bd list --status open
-```
-
-### The `discovered-from` Pattern
-
-When you find new work while working on something else, **always link it**:
-
-```bash
-# Working on heph-abc, discover a race condition
-bd create "Race condition in SlackService" -t bug -p 1
-# Returns: heph-xyz
-
-# Link it to what you were working on
-bd dep add heph-xyz heph-abc --type discovered-from
-```
-
-**Why?** This creates an audit trail of how work was discovered, enabling:
-
-- Forensics: "Why did we create this issue?"
-- Context: "What was the agent doing when it found this?"
-- Priority: Discovered bugs often relate to active work
-
-### Session End Protocol
-
-Before ending any session:
-
-1. **File issues** for any discovered/remaining work
-2. **Close** completed issues with `--reason`
-3. **Verify** with `bd list --status open`
-4. **Commit** `.beads/issues.jsonl` with your code changes
-
-> **Note**: Beads auto-exports to JSONL after mutations (5s debounce). Just commit the file with your changes—no manual export needed.
-
-### Essential Commands
-
-```bash
-# Session management
-bd ready              # Unblocked issues, sorted by priority
-bd blocked            # Issues waiting on dependencies
-bd list --status open # All open issues
-bd stale --days 7     # Forgotten issues needing attention
-
-# Issue details
-bd show <id>          # Full issue details
-bd dep tree <id>      # Visualize dependency graph
-bd search "auth"      # Full-text search
-
-# Housekeeping
-bd doctor             # Check beads health
-bd sync               # Force sync with JSONL
-```
-
-### Rules
-
-- ✅ Use `bd` for ALL task tracking
-- ✅ Always use `--json` for programmatic parsing
-- ✅ Link discovered work with `discovered-from` dependencies
-- ✅ Commit `.beads/issues.jsonl` with code changes
-- ❌ Do NOT use markdown TODO lists
-- ❌ Do NOT create planning docs in repo root (use `history/` if needed)
 
 ## 1. Architecture map
 
@@ -153,31 +31,31 @@ Run the relevant commands locally before opening a PR:
 
 ### Aggregate commands (all services)
 
-| Concern | Command | Description |
-| --- | --- | --- |
-| Format everything | `npm run format` | Apply formatting to Java + TypeScript + webapp |
-| Check formatting | `npm run format:check` | Verify formatting without changes (CI) |
-| Lint everything | `npm run lint` | Format check + Biome + typecheck |
-| Full check | `npm run check` | Comprehensive: format + lint + typecheck |
-| CI check | `npm run ci` | CI-optimized check across all services |
+| Concern           | Command                | Description                                    |
+| ----------------- | ---------------------- | ---------------------------------------------- |
+| Format everything | `npm run format`       | Apply formatting to Java + TypeScript + webapp |
+| Check formatting  | `npm run format:check` | Verify formatting without changes (CI)         |
+| Lint everything   | `npm run lint`         | Format check + Biome + typecheck               |
+| Full check        | `npm run check`        | Comprehensive: format + lint + typecheck       |
+| CI check          | `npm run ci`           | CI-optimized check across all services         |
 
 ### Per-service commands
 
-| Service | Format | Format Check | Lint | Check |
-| --- | --- | --- | --- | --- |
-| **Webapp** | `npm run format:webapp` | `npm run format:webapp:check` | `npm run lint:webapp` | `npm run check:webapp` |
-| **Java** | `npm run format:java` | `npm run format:java:check` | — | — |
+| Service                  | Format                                | Format Check                                | Lint                                | Check                                |
+| ------------------------ | ------------------------------------- | ------------------------------------------- | ----------------------------------- | ------------------------------------ |
+| **Webapp**               | `npm run format:webapp`               | `npm run format:webapp:check`               | `npm run lint:webapp`               | `npm run check:webapp`               |
+| **Java**                 | `npm run format:java`                 | `npm run format:java:check`                 | —                                   | —                                    |
 | **Intelligence Service** | `npm run format:intelligence-service` | `npm run format:intelligence-service:check` | `npm run lint:intelligence-service` | `npm run check:intelligence-service` |
-| **Webhook Ingest** | `npm run format:webhook-ingest` | `npm run format:webhook-ingest:check` | `npm run lint:webhook-ingest` | `npm run check:webhook-ingest` |
+| **Webhook Ingest**       | `npm run format:webhook-ingest`       | `npm run format:webhook-ingest:check`       | `npm run lint:webhook-ingest`       | `npm run check:webhook-ingest`       |
 
 ### Additional commands
 
-| Concern | Command |
-| --- | --- |
-| Webapp build | `npm run build:webapp` |
-| Webapp tests | `npm run test:webapp` |
-| Webapp typecheck | `npm run typecheck:webapp` |
-| Webapp Storybook | `npm -w webapp run build-storybook` |
+| Concern                  | Command                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Webapp build             | `npm run build:webapp`                                                                                                                                                                                                                                                                                                                                                                                                |
+| Webapp tests             | `npm run test:webapp`                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Webapp typecheck         | `npm run typecheck:webapp`                                                                                                                                                                                                                                                                                                                                                                                            |
+| Webapp Storybook         | `npm -w webapp run build-storybook`                                                                                                                                                                                                                                                                                                                                                                                   |
 | Application-server tests | **Three test tiers:** <br>• `mvn test` runs unit tests (`@Tag("unit")`) <br>• `mvn verify` runs unit + integration tests (`@Tag("integration")`) <br>• `mvn test -Plive-tests` runs live GitHub API tests (`@Tag("live")`) <br><br>Live tests require GitHub App credentials configured in `application-live-local.yml` (gitignored). The Maven profile is the single guard—tests only run when explicitly activated. |
 
 **Script naming conventions:**
@@ -196,14 +74,14 @@ Document any skipped gate in the PR description with a rationale. Always finish 
 
 We rely heavily on generated artifacts. Never hand-edit these directories—regenerate instead:
 
-| Artifact | Source command |
-| --- | --- |
-| `server/application-server/openapi.yaml` | `npm run generate:api:application-server:specs` (runs `mvn verify -DskipTests=true -Dapp.profiles=specs`). |
-| `webapp/src/api/**/*`, `webapp/src/api/@tanstack/react-query.gen.ts`, `webapp/src/api/client.gen.ts`, `webapp/src/api/types.gen.ts` | `npm run generate:api:application-server:client` (wraps `npm -w webapp run openapi-ts`). |
-| `server/application-server/src/main/java/de/tum/in/www1/hephaestus/intelligenceservice/**` | `npm run generate:api:intelligence-service:client` (OpenAPI Generator CLI). |
-| `server/intelligence-service/openapi.yaml` | `npm run generate:api:intelligence-service:specs` (runs `npm -w server/intelligence-service run openapi:export`). |
-| `server/intelligence-service/src/shared/db/schema.ts` | `npm run db:generate-models:intelligence-service` (requires the application-server database to be reachable). |
-| `docs/contributor/erd/schema.mmd` | `npm run db:generate-erd-docs` (connects to the same Postgres instance). |
+| Artifact                                                                                                                            | Source command                                                                                                    |
+| ----------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `server/application-server/openapi.yaml`                                                                                            | `npm run generate:api:application-server:specs` (runs `mvn verify -DskipTests=true -Dapp.profiles=specs`).        |
+| `webapp/src/api/**/*`, `webapp/src/api/@tanstack/react-query.gen.ts`, `webapp/src/api/client.gen.ts`, `webapp/src/api/types.gen.ts` | `npm run generate:api:application-server:client` (wraps `npm -w webapp run openapi-ts`).                          |
+| `server/application-server/src/main/java/de/tum/in/www1/hephaestus/intelligenceservice/**`                                          | `npm run generate:api:intelligence-service:client` (OpenAPI Generator CLI).                                       |
+| `server/intelligence-service/openapi.yaml`                                                                                          | `npm run generate:api:intelligence-service:specs` (runs `npm -w server/intelligence-service run openapi:export`). |
+| `server/intelligence-service/src/shared/db/schema.ts`                                                                               | `npm run db:generate-models:intelligence-service` (requires the application-server database to be reachable).     |
+| `docs/contributor/erd/schema.mmd`                                                                                                   | `npm run db:generate-erd-docs` (connects to the same Postgres instance).                                          |
 
 Regeneration is destructive; stash local edits before running these commands. Check diffs carefully—generated clients must be committed alongside API changes.
 

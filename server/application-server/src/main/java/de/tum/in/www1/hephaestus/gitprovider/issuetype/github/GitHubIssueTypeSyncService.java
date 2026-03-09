@@ -1,14 +1,24 @@
 package de.tum.in.www1.hephaestus.gitprovider.issuetype.github;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.JITTER_FACTOR;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.LARGE_PAGE_SIZE;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.MAX_PAGINATION_PAGES;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_INITIAL_BACKOFF;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_BACKOFF;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
+import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.adaptPageSize;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.ExponentialBackoff;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoordinator;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlSyncCoordinator.GraphQlClassificationContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncProperties;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubTransportErrors;
+import de.tum.in.www1.hephaestus.gitprovider.common.github.GraphQlConnectionOverflowDetector;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider.SyncMetadata;
 import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHIssueTypeColor;
@@ -29,6 +39,8 @@ import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import reactor.core.publisher.Mono;
+import reactor.util.retry.Retry;
 
 /**
  * Service for syncing GitHub Issue Types from the organization level via GraphQL.
@@ -46,6 +58,8 @@ public class GitHubIssueTypeSyncService {
     private final GitHubSyncProperties syncProperties;
     private final GitHubExceptionClassifier exceptionClassifier;
     private final SyncSchedulerProperties syncSchedulerProperties;
+    private final GitHubGraphQlSyncCoordinator graphQlSyncHelper;
+    private static final int MAX_RETRY_ATTEMPTS = 3;
 
     public GitHubIssueTypeSyncService(
         IssueTypeRepository issueTypeRepository,
@@ -54,7 +68,8 @@ public class GitHubIssueTypeSyncService {
         GitHubGraphQlClientProvider graphQlClientProvider,
         GitHubSyncProperties syncProperties,
         GitHubExceptionClassifier exceptionClassifier,
-        SyncSchedulerProperties syncSchedulerProperties
+        SyncSchedulerProperties syncSchedulerProperties,
+        GitHubGraphQlSyncCoordinator graphQlSyncHelper
     ) {
         this.issueTypeRepository = issueTypeRepository;
         this.organizationRepository = organizationRepository;
@@ -63,6 +78,7 @@ public class GitHubIssueTypeSyncService {
         this.syncProperties = syncProperties;
         this.exceptionClassifier = exceptionClassifier;
         this.syncSchedulerProperties = syncSchedulerProperties;
+        this.graphQlSyncHelper = graphQlSyncHelper;
     }
 
     /**
@@ -106,9 +122,11 @@ public class GitHubIssueTypeSyncService {
         try {
             Set<String> syncedIds = new HashSet<>();
             int totalSynced = 0;
+            int reportedTotalCount = -1;
             String cursor = null;
             boolean hasNextPage = true;
             int pageCount = 0;
+            int retryAttempt = 0;
 
             while (hasNextPage) {
                 pageCount++;
@@ -121,15 +139,58 @@ public class GitHubIssueTypeSyncService {
                     break;
                 }
 
-                ClientGraphQlResponse graphQlResponse = client
-                    .documentName(GET_ISSUE_TYPES_DOCUMENT)
-                    .variable("login", orgLogin)
-                    .variable("first", LARGE_PAGE_SIZE)
-                    .variable("after", cursor)
-                    .execute()
+                final String currentCursor = cursor;
+                final int currentPage = pageCount;
+
+                ClientGraphQlResponse graphQlResponse = Mono.defer(() ->
+                    client
+                        .documentName(GET_ISSUE_TYPES_DOCUMENT)
+                        .variable("login", orgLogin)
+                        .variable(
+                            "first",
+                            adaptPageSize(LARGE_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
+                        )
+                        .variable("after", currentCursor)
+                        .execute()
+                )
+                    .retryWhen(
+                        Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                            .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                            .jitter(JITTER_FACTOR)
+                            .filter(GitHubTransportErrors::isTransportError)
+                            .doBeforeRetry(signal ->
+                                log.warn(
+                                    "Retrying after transport error: context=issueTypeSync, orgLogin={}, page={}, attempt={}, error={}",
+                                    safeOrgLogin,
+                                    currentPage,
+                                    signal.totalRetries() + 1,
+                                    signal.failure().getMessage()
+                                )
+                            )
+                    )
                     .block(syncProperties.graphqlTimeout());
 
                 if (graphQlResponse == null || !graphQlResponse.isValid()) {
+                    ClassificationResult classification = graphQlSyncHelper.classifyGraphQlErrors(graphQlResponse);
+                    if (classification != null) {
+                        if (
+                            graphQlSyncHelper.handleGraphQlClassification(
+                                new GraphQlClassificationContext(
+                                    classification,
+                                    retryAttempt,
+                                    MAX_RETRY_ATTEMPTS,
+                                    "issue type sync",
+                                    "orgLogin",
+                                    safeOrgLogin,
+                                    log
+                                )
+                            )
+                        ) {
+                            retryAttempt++;
+                            continue;
+                        }
+                        break;
+                    }
                     log.warn(
                         "Received invalid GraphQL response: orgLogin={}, errors={}",
                         safeOrgLogin,
@@ -143,8 +204,17 @@ public class GitHubIssueTypeSyncService {
 
                 // Check if we should pause due to rate limiting
                 if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
-                    log.warn("Aborting issue type sync due to critical rate limit: orgLogin={}", safeOrgLogin);
-                    break;
+                    if (
+                        !graphQlSyncHelper.waitForRateLimitIfNeeded(
+                            scopeId,
+                            "issue type sync",
+                            "orgLogin",
+                            safeOrgLogin,
+                            log
+                        )
+                    ) {
+                        break;
+                    }
                 }
 
                 GHIssueTypeConnection response = graphQlResponse
@@ -153,6 +223,10 @@ public class GitHubIssueTypeSyncService {
 
                 if (response == null || response.getNodes() == null) {
                     break;
+                }
+
+                if (reportedTotalCount < 0) {
+                    reportedTotalCount = response.getTotalCount();
                 }
 
                 for (var graphQlType : response.getNodes()) {
@@ -165,6 +239,12 @@ public class GitHubIssueTypeSyncService {
                 var pageInfo = response.getPageInfo();
                 hasNextPage = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
                 cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
+                retryAttempt = 0;
+            }
+
+            // Check for overflow: did we fetch fewer items than GitHub reported?
+            if (reportedTotalCount >= 0) {
+                GraphQlConnectionOverflowDetector.check("issueTypes", totalSynced, reportedTotalCount, safeOrgLogin);
             }
 
             removeDeletedIssueTypes(organization.getId(), syncedIds);
@@ -181,41 +261,20 @@ public class GitHubIssueTypeSyncService {
             return 0;
         } catch (Exception e) {
             ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
-            switch (classification.category()) {
-                case RATE_LIMITED -> log.warn(
-                    "Rate limited during issue type sync: orgLogin={}, scopeId={}, message={}",
-                    safeOrgLogin,
-                    scopeId,
-                    classification.message()
-                );
-                case NOT_FOUND -> log.warn(
-                    "Resource not found during issue type sync: orgLogin={}, scopeId={}, message={}",
-                    safeOrgLogin,
-                    scopeId,
-                    classification.message()
-                );
-                case AUTH_ERROR -> {
-                    log.error(
-                        "Authentication error during issue type sync: orgLogin={}, scopeId={}, message={}",
+            if (
+                !graphQlSyncHelper.handleGraphQlClassification(
+                    new GraphQlClassificationContext(
+                        classification,
+                        0,
+                        MAX_RETRY_ATTEMPTS,
+                        "issue type sync",
+                        "orgLogin",
                         safeOrgLogin,
-                        scopeId,
-                        classification.message()
-                    );
-                    throw e;
-                }
-                case RETRYABLE -> log.warn(
-                    "Retryable error during issue type sync: orgLogin={}, scopeId={}, message={}",
-                    safeOrgLogin,
-                    scopeId,
-                    classification.message()
-                );
-                default -> log.error(
-                    "Unexpected error during issue type sync: orgLogin={}, scopeId={}, message={}",
-                    safeOrgLogin,
-                    scopeId,
-                    classification.message(),
-                    e
-                );
+                        log
+                    )
+                )
+            ) {
+                return 0;
             }
             return 0;
         }

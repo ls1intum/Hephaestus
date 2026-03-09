@@ -3,8 +3,8 @@ package de.tum.in.www1.hephaestus.gitprovider.sync.backfill;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider;
 import de.tum.in.www1.hephaestus.gitprovider.sync.SyncSchedulerProperties;
 import java.util.concurrent.TimeUnit;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -25,7 +25,7 @@ import org.springframework.stereotype.Component;
  *   <li><b>API respect:</b> Doesn't hammer GitHub right after sync depletes rate limit</li>
  *   <li><b>Historical data isn't urgent:</b> Data sitting for months/years can wait 15 minutes</li>
  *   <li><b>Built-in guards:</b> The scheduler already checks rate limits, cooldowns, and
- *       {@code lastIssuesAndPullRequestsSyncedAt} to skip repos that haven't synced yet</li>
+ *       {@code lastIssuesSyncedAt}/{@code lastPullRequestsSyncedAt} to skip repos that haven't synced yet</li>
  * </ul>
  *
  * <h2>Configuration</h2>
@@ -42,11 +42,11 @@ import org.springframework.stereotype.Component;
  * @see HistoricalBackfillService
  * @see SyncSchedulerProperties.BackfillProperties
  */
+@Slf4j
 @Component
+@RequiredArgsConstructor
 @ConditionalOnProperty(name = "hephaestus.sync.backfill.enabled", havingValue = "true")
 public class HistoricalBackfillScheduler {
-
-    private static final Logger log = LoggerFactory.getLogger(HistoricalBackfillScheduler.class);
 
     private final HistoricalBackfillService backfillService;
     private final SyncSchedulerProperties syncSchedulerProperties;
@@ -55,14 +55,8 @@ public class HistoricalBackfillScheduler {
     @SuppressWarnings("unused")
     private final SyncTargetProvider syncTargetProvider;
 
-    public HistoricalBackfillScheduler(
-        HistoricalBackfillService backfillService,
-        SyncSchedulerProperties syncSchedulerProperties,
-        SyncTargetProvider syncTargetProvider
-    ) {
-        this.backfillService = backfillService;
-        this.syncSchedulerProperties = syncSchedulerProperties;
-        this.syncTargetProvider = syncTargetProvider;
+    @jakarta.annotation.PostConstruct
+    void logInitialization() {
         log.info(
             "Historical backfill scheduler initialized: batchSize={}, rateLimitThreshold={}, intervalSeconds={}",
             syncSchedulerProperties.backfill().batchSize(),

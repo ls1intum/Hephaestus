@@ -17,6 +17,7 @@ query GetRepository($owner: String!, $name: String!) {
         isDisabled
         isFork
         isPrivate
+        hasDiscussionsEnabled
         createdAt
         updatedAt
         pushedAt

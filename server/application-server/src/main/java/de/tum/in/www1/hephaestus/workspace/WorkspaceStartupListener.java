@@ -51,9 +51,23 @@ public class WorkspaceStartupListener {
     @EventListener(ApplicationReadyEvent.class)
     public void onApplicationReady() {
         // Phase 1: Provision workspaces (creates/loads workspace entities)
+        // Each provider bootstrap is isolated so a failure in one doesn't block others
         log.info("Starting workspace provisioning");
-        provisioningService.bootstrapDefaultPatWorkspace();
-        provisioningService.ensureGitHubAppInstallations();
+        try {
+            provisioningService.bootstrapDefaultPatWorkspace();
+        } catch (Exception e) {
+            log.error("GitHub PAT workspace bootstrap failed, continuing with other providers", e);
+        }
+        try {
+            provisioningService.bootstrapDefaultGitLabPatWorkspace();
+        } catch (Exception e) {
+            log.error("GitLab PAT workspace bootstrap failed, continuing with other providers", e);
+        }
+        try {
+            provisioningService.ensureGitHubAppInstallations();
+        } catch (Exception e) {
+            log.error("GitHub App installation bootstrap failed", e);
+        }
 
         // Phase 2: Signal that workspaces are initialized
         // Installation consumer can now start - it only needs workspaces to exist

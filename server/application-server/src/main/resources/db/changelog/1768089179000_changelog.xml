@@ -2210,6 +2210,8 @@
     -->
 
     <changeSet author="FelixTJDietrich" id="1768089179000-wipe-gitprovider-for-resync">
+        <!-- Accept the old checksum from before the FK drop/recreate fix was added -->
+        <validCheckSum>9:d597463d692611558a615031ebe54e5d</validCheckSum>
         <comment>
             Wipe all gitprovider data for fresh resync from GitHub.
             Users are preserved (stable GitHub IDs).
@@ -2257,9 +2259,16 @@
             TRUNCATE TABLE repository CASCADE;
 
             -- Wipe organization data
-            -- IMPORTANT: Unlink workspaces first to prevent CASCADE from deleting workspace/membership data
+            -- IMPORTANT: Drop the workspace FK temporarily to prevent TRUNCATE CASCADE
+            -- from wiping workspace data.  PostgreSQL TRUNCATE CASCADE is structural:
+            -- it follows FK definitions regardless of whether any rows actually reference
+            -- the truncated table, so UPDATE ... SET NULL is not sufficient.
             UPDATE workspace SET organization_id = NULL;
+            ALTER TABLE workspace DROP CONSTRAINT IF EXISTS fk_workspace_organization;
             TRUNCATE TABLE organization CASCADE;
+            ALTER TABLE workspace
+                ADD CONSTRAINT fk_workspace_organization
+                FOREIGN KEY (organization_id) REFERENCES organization(id);
 
             -- Re-enable triggers
             SET session_replication_role = 'origin';

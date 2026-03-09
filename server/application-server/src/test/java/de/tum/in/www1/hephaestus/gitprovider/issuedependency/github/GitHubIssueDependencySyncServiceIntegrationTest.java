@@ -2,6 +2,9 @@ package de.tum.in.www1.hephaestus.gitprovider.issuedependency.github;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
@@ -36,38 +39,50 @@ class GitHubIssueDependencySyncServiceIntegrationTest extends BaseIntegrationTes
     private RepositoryRepository repositoryRepository;
 
     @Autowired
+    private GitProviderRepository gitProviderRepository;
+
+    @Autowired
     private EntityManager entityManager;
 
+    private GitProvider gitProvider;
     private Repository testRepository;
     private Issue blockedIssue;
     private Issue blockingIssue;
 
     @BeforeEach
     void setUp() {
+        // Create git provider
+        gitProvider = gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
+            .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com")));
+
         // Create test repository
         testRepository = new Repository();
-        testRepository.setId(98765L);
+        testRepository.setNativeId(98765L);
         testRepository.setName("test-repo");
         testRepository.setNameWithOwner("test-org/test-repo");
         testRepository.setHtmlUrl("https://github.com/test-org/test-repo");
+        testRepository.setProvider(gitProvider);
         testRepository = repositoryRepository.save(testRepository);
 
         // Create issue that will be blocked
         blockedIssue = new Issue();
-        blockedIssue.setId(1001L);
+        blockedIssue.setNativeId(1001L);
         blockedIssue.setNumber(10);
         blockedIssue.setTitle("Feature: Implement something");
         blockedIssue.setState(Issue.State.OPEN);
         blockedIssue.setRepository(testRepository);
+        blockedIssue.setProvider(gitProvider);
         blockedIssue = issueRepository.save(blockedIssue);
 
         // Create issue that will block
         blockingIssue = new Issue();
-        blockingIssue.setId(1002L);
+        blockingIssue.setNativeId(1002L);
         blockingIssue.setNumber(5);
         blockingIssue.setTitle("Bug: Fix prerequisite");
         blockingIssue.setState(Issue.State.OPEN);
         blockingIssue.setRepository(testRepository);
+        blockingIssue.setProvider(gitProvider);
         blockingIssue = issueRepository.save(blockingIssue);
     }
 

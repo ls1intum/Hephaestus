@@ -15,6 +15,7 @@ import { PracticesPage } from "@/components/practices/PracticesPage";
 import { NoWorkspace } from "@/components/workspace/NoWorkspace";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { useAuth } from "@/integrations/auth/AuthContext";
+import { getProviderTerms } from "@/lib/provider";
 
 export const Route = createFileRoute(
 	"/_authenticated/w/$workspaceSlug/user/$username/best-practices",
@@ -26,7 +27,8 @@ export function BestPracticesContainer() {
 	const { username } = Route.useParams();
 	const { isCurrentUser } = useAuth();
 	const queryClient = useQueryClient();
-	const { workspaceSlug } = useActiveWorkspaceSlug();
+	const { workspaceSlug, providerType } = useActiveWorkspaceSlug();
+	const terms = getProviderTerms(providerType);
 	const slug = workspaceSlug ?? "";
 	const hasWorkspace = Boolean(workspaceSlug);
 	const showNoWorkspace = !hasWorkspace;
@@ -62,7 +64,7 @@ export function BestPracticesContainer() {
 		},
 		onError: () => {
 			toast.error(
-				"Your pull requests have not changed since the last detection. Try changing status or description, then run the detection again.",
+				`Your ${terms.pullRequests.toLowerCase()} have not changed since the last detection. Try changing status or description, then run the detection again.`,
 			);
 		},
 	});
@@ -110,7 +112,7 @@ export function BestPracticesContainer() {
 		},
 		onError: () => {
 			toast.error(
-				"This pull request has not changed since the last detection. Try changing status or description, then run the detection again.",
+				`This ${terms.pullRequest.toLowerCase()} has not changed since the last detection. Try changing status or description, then run the detection again.`,
 			);
 		},
 	});
@@ -182,6 +184,7 @@ export function BestPracticesContainer() {
 
 	return (
 		<PracticesPage
+			providerType={providerType}
 			activityData={activityQuery.data}
 			isLoading={activityQuery.isLoading}
 			isDetectingBadPractices={detect.isPending || detectBadPracticesForPullRequest.isPending}

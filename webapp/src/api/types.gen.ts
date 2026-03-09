@@ -79,7 +79,7 @@ export type WorkspaceMembership = {
  */
 export type WorkspaceListItem = {
     /**
-     * GitHub account login associated with this workspace
+     * Git provider account login associated with this workspace
      */
     accountLogin: string;
     /**
@@ -95,6 +95,10 @@ export type WorkspaceListItem = {
      */
     id: number;
     /**
+     * High-level git provider type (GITHUB or GITLAB)
+     */
+    providerType: 'GITHUB' | 'GITLAB';
+    /**
      * Current lifecycle status of the workspace (PENDING, ACTIVE, ARCHIVED)
      */
     status: string;
@@ -109,7 +113,7 @@ export type WorkspaceListItem = {
  */
 export type Workspace = {
     /**
-     * GitHub account login associated with this workspace
+     * Git provider account login associated with this workspace
      */
     accountLogin: string;
     /**
@@ -121,9 +125,17 @@ export type Workspace = {
      */
     displayName: string;
     /**
-     * Git provider mode (INSTALLATION or PAT)
+     * Git provider mode (PAT_ORG, GITHUB_APP_INSTALLATION, GITLAB_PAT)
      */
     gitProviderMode?: string;
+    /**
+     * Whether a GitLab webhook has been auto-registered for this workspace
+     */
+    gitlabWebhookRegistered: boolean;
+    /**
+     * Whether a Personal Access Token is configured
+     */
+    hasPersonalAccessToken: boolean;
     /**
      * Whether Slack signing secret is configured
      */
@@ -168,6 +180,14 @@ export type Workspace = {
      * Time for leaderboard notifications in HH:mm format
      */
     leaderboardScheduleTime?: string;
+    /**
+     * High-level git provider type derived from the authentication mode
+     */
+    providerType: 'GITHUB' | 'GITLAB';
+    /**
+     * Custom server URL for self-hosted instances (null for cloud defaults)
+     */
+    serverUrl?: string;
     /**
      * Current lifecycle status of the workspace (PENDING, ACTIVE, ARCHIVED)
      */
@@ -944,6 +964,76 @@ export type LeaderboardEntry = {
     user?: UserInfo;
 };
 
+/**
+ * Result of GitLab PAT validation
+ */
+export type GitLabPreflightResponse = {
+    /**
+     * Error message if validation failed
+     */
+    error?: string;
+    /**
+     * GitLab user ID or group ID
+     */
+    userId?: number;
+    /**
+     * Username of the token owner (personal tokens) or group name (group tokens)
+     */
+    username?: string;
+    /**
+     * Whether the token is valid
+     */
+    valid: boolean;
+};
+
+/**
+ * Request to validate a GitLab PAT or list accessible groups before workspace creation
+ */
+export type GitLabPreflightRequest = {
+    /**
+     * GitLab group full path, used as fallback for group/project tokens that cannot access /api/v4/user
+     */
+    groupFullPath?: string;
+    /**
+     * GitLab Personal Access Token to validate
+     */
+    personalAccessToken: string;
+    /**
+     * GitLab server URL. Defaults to https://gitlab.com if not specified.
+     */
+    serverUrl?: string;
+};
+
+/**
+ * GitLab group accessible to the provided PAT
+ */
+export type GitLabGroup = {
+    /**
+     * Group avatar URL
+     */
+    avatarUrl?: string;
+    /**
+     * Full group path including parent groups
+     */
+    fullPath: string;
+    /**
+     * GitLab group numeric ID
+     */
+    id: number;
+    /**
+     * Group display name
+     */
+    name: string;
+    /**
+     * Group visibility: public, internal, or private
+     */
+    visibility?: string;
+    /**
+     * Group web URL
+     */
+    webUrl?: string;
+};
+
 export type ErrorResponse = {
     /**
      * Human-readable error message
@@ -983,11 +1073,11 @@ export type DetectionResult = {
  */
 export type CreateWorkspaceRequest = {
     /**
-     * GitHub account login to associate with this workspace
+     * Git provider account login (GitHub org/user or GitLab group path)
      */
     accountLogin: string;
     /**
-     * Type of GitHub account (USER or ORGANIZATION)
+     * Type of account (USER or ORG)
      */
     accountType: 'ORG' | 'USER';
     /**
@@ -995,9 +1085,21 @@ export type CreateWorkspaceRequest = {
      */
     displayName: string;
     /**
+     * Git provider authentication mode. Defaults to PAT_ORG (GitHub PAT) if not specified.
+     */
+    gitProviderMode?: 'PAT_ORG' | 'GITHUB_APP_INSTALLATION' | 'GITLAB_PAT';
+    /**
      * User ID of the workspace owner
      */
     ownerUserId: number;
+    /**
+     * Personal Access Token for GitLab API access. Required when gitProviderMode is GITLAB_PAT. Stored encrypted at rest.
+     */
+    personalAccessToken?: string;
+    /**
+     * Custom server URL for self-hosted GitLab instances. Must use HTTPS. Defaults to https://gitlab.com if not specified.
+     */
+    serverUrl?: string;
     /**
      * URL-friendly identifier for the workspace
      */
@@ -1224,6 +1326,38 @@ export type CreateWorkspaceResponses = {
 
 export type CreateWorkspaceResponse = CreateWorkspaceResponses[keyof CreateWorkspaceResponses];
 
+export type ListGitLabGroupsData = {
+    body: GitLabPreflightRequest;
+    path?: never;
+    query?: never;
+    url: '/workspaces/gitlab/groups';
+};
+
+export type ListGitLabGroupsResponses = {
+    /**
+     * Accessible groups
+     */
+    200: Array<GitLabGroup>;
+};
+
+export type ListGitLabGroupsResponse = ListGitLabGroupsResponses[keyof ListGitLabGroupsResponses];
+
+export type GitLabPreflightData = {
+    body: GitLabPreflightRequest;
+    path?: never;
+    query?: never;
+    url: '/workspaces/gitlab/preflight';
+};
+
+export type GitLabPreflightResponses = {
+    /**
+     * Validation result
+     */
+    200: GitLabPreflightResponse;
+};
+
+export type GitLabPreflightResponse2 = GitLabPreflightResponses[keyof GitLabPreflightResponses];
+
 export type PurgeWorkspaceData = {
     body?: never;
     path: {
@@ -1309,10 +1443,7 @@ export type GetLeaderboardResponses = {
 export type GetLeaderboardResponse = GetLeaderboardResponses[keyof GetLeaderboardResponses];
 
 export type ComputeUserLeagueStatsData = {
-    /**
-     * the user's current leaderboard entry for comparison
-     */
-    body: LeaderboardEntry;
+    body?: never;
     path: {
         /**
          * Workspace slug
@@ -1323,7 +1454,16 @@ export type ComputeUserLeagueStatsData = {
          */
         login: string;
     };
-    query?: never;
+    query: {
+        /**
+         * start of the time range (inclusive)
+         */
+        after: Date;
+        /**
+         * end of the time range (exclusive)
+         */
+        before: Date;
+    };
     url: '/workspaces/{workspaceSlug}/leaderboard/users/{login}/league-stats';
 };
 
@@ -1423,7 +1563,7 @@ export type GetCurrentUserMembershipData = {
 
 export type GetCurrentUserMembershipResponses = {
     /**
-     * the current user's membership details
+     * the current user's membership details with effective role
      */
     200: WorkspaceMembership;
 };

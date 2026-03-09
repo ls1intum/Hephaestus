@@ -119,9 +119,12 @@ export function useActiveWorkspaceSlug() {
 		}
 	}, [isAuthenticated, selectedSlug, setSelectedSlug]);
 
+	const activeWorkspace = workspaces.find((ws) => ws.workspaceSlug === activeSlug);
+
 	return {
 		workspaceSlug: activeSlug,
 		workspaces,
+		providerType: activeWorkspace?.providerType ?? "GITHUB",
 		selectWorkspace: setSelectedSlug,
 		isLoading: query.isLoading,
 		error: query.error as Error | null,

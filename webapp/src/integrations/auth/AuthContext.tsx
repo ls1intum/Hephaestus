@@ -19,9 +19,9 @@ export interface AuthContextType {
 	hasRole: (role: string) => boolean;
 	isCurrentUser: (login?: string) => boolean;
 	getUserId: () => string | undefined;
-	getUserGithubId: () => string | undefined;
-	getUserGithubProfilePictureUrl: () => string;
-	getUserGithubProfileUrl: () => string;
+	getGitProviderId: () => string | undefined;
+	getUserProfilePictureUrl: () => string;
+	getUserProfileUrl: () => string;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -181,16 +181,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
 		return keycloakService.getUserId();
 	};
 
-	const getUserGithubId = () => {
-		return keycloakService.getUserGithubId();
+	const getGitProviderId = () => {
+		return keycloakService.getGitProviderId();
 	};
 
-	const getUserGithubProfilePictureUrl = () => {
-		return keycloakService.getUserGithubProfilePictureUrl();
+	const getUserProfilePictureUrl = () => {
+		return keycloakService.getUserProfilePictureUrl();
 	};
 
-	const getUserGithubProfileUrl = () => {
-		return keycloakService.getUserGithubProfileUrl();
+	const getUserProfileUrl = () => {
+		return keycloakService.getUserProfileUrl();
 	};
 
 	const value = {
@@ -204,9 +204,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
 		hasRole,
 		isCurrentUser,
 		getUserId,
-		getUserGithubId,
-		getUserGithubProfilePictureUrl,
-		getUserGithubProfileUrl,
+		getGitProviderId,
+		getUserProfilePictureUrl,
+		getUserProfileUrl,
 	};
 
 	return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

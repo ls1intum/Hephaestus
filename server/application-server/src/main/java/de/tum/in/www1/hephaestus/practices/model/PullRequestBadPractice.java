@@ -5,6 +5,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -12,8 +13,11 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.Instant;
-import java.util.Objects;
-import lombok.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
+import org.springframework.lang.NonNull;
 
 /**
  * Entity representing a detected bad practice in a pull request.
@@ -63,7 +67,7 @@ public class PullRequestBadPractice {
 
     /** The pull request where this bad practice was detected. */
     @NonNull
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "pullrequest_id")
     @ToString.Exclude
     private PullRequest pullRequest;
@@ -107,7 +111,7 @@ public class PullRequestBadPractice {
     private String detectionTraceId;
 
     /** The detection run that produced this bad practice. */
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "bad_practice_detection_id")
     @ToString.Exclude
     private BadPracticeDetection badPracticeDetection;
@@ -132,6 +136,6 @@ public class PullRequestBadPractice {
 
     @Override
     public int hashCode() {
-        return Objects.hashCode(id);
+        return getClass().hashCode();
     }
 }

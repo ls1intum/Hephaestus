@@ -49,7 +49,7 @@ public record UserInfoDTO(
             user.getLogin(),
             user.getEmail(),
             user.getAvatarUrl(),
-            user.getName(),
+            user.getName() != null ? user.getName() : user.getLogin(),
             user.getHtmlUrl(),
             leaguePoints
         );

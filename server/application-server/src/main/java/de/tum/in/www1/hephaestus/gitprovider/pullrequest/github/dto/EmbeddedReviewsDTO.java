@@ -23,9 +23,13 @@ public record EmbeddedReviewsDTO(
      * Creates an EmbeddedReviewsDTO from a GraphQL GHPullRequestReviewConnection.
      *
      * @param connection the GraphQL connection (may be null)
+     * @param context    contextual description for overflow logging (e.g. "PR #42 in owner/repo")
      * @return EmbeddedReviewsDTO or empty DTO if connection is null
      */
-    public static EmbeddedReviewsDTO fromConnection(@Nullable GHPullRequestReviewConnection connection) {
+    public static EmbeddedReviewsDTO fromConnection(
+        @Nullable GHPullRequestReviewConnection connection,
+        String context
+    ) {
         if (connection == null) {
             return empty();
         }

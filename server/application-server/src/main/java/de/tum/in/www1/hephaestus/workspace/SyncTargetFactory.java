@@ -21,10 +21,11 @@ public final class SyncTargetFactory {
      * @return a SyncTarget instance for use with sync services
      */
     public static SyncTarget create(Workspace workspace, RepositoryToMonitor rtm) {
-        AuthMode authMode =
-            workspace.getGitProviderMode() == Workspace.GitProviderMode.GITHUB_APP_INSTALLATION
-                ? AuthMode.GITHUB_APP
-                : AuthMode.PERSONAL_ACCESS_TOKEN;
+        AuthMode authMode = switch (workspace.getGitProviderMode()) {
+            case GITHUB_APP_INSTALLATION -> AuthMode.GITHUB_APP;
+            case PAT_ORG, GITLAB_PAT -> AuthMode.PERSONAL_ACCESS_TOKEN;
+            case null -> AuthMode.GITHUB_APP;
+        };
 
         return new SyncTarget(
             rtm.getId(),
@@ -35,7 +36,9 @@ public final class SyncTargetFactory {
             rtm.getNameWithOwner(),
             rtm.getLabelsSyncedAt(),
             rtm.getMilestonesSyncedAt(),
-            rtm.getIssuesAndPullRequestsSyncedAt(),
+            rtm.getIssuesSyncedAt(),
+            rtm.getPullRequestsSyncedAt(),
+            rtm.getDiscussionsSyncedAt(),
             rtm.getCollaboratorsSyncedAt(),
             rtm.getRepositorySyncedAt(),
             rtm.getIssueBackfillHighWaterMark(),
@@ -44,7 +47,8 @@ public final class SyncTargetFactory {
             rtm.getPullRequestBackfillCheckpoint(),
             rtm.getBackfillLastRunAt(),
             rtm.getIssueSyncCursor(),
-            rtm.getPullRequestSyncCursor()
+            rtm.getPullRequestSyncCursor(),
+            rtm.getDiscussionSyncCursor()
         );
     }
 }

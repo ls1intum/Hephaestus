@@ -1,0 +1,19 @@
+query GetProjectLabels($fullPath: ID!, $first: Int!, $after: String) {
+  project(fullPath: $fullPath) {
+    labels(first: $first, after: $after, includeAncestorGroups: true) {
+      count
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+      nodes {
+        id
+        title
+        color
+        description
+        createdAt
+        updatedAt
+      }
+    }
+  }
+}

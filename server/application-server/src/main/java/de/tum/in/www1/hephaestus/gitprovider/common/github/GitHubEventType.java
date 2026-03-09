@@ -28,6 +28,11 @@ public enum GitHubEventType {
     LABEL("label"),
     MILESTONE("milestone"),
     MEMBER("member"),
+    PUSH("push"),
+
+    // Discussion events
+    DISCUSSION("discussion"),
+    DISCUSSION_COMMENT("discussion_comment"),
 
     // Issue hierarchy events
     /** Available for subscription - test fixtures exist. */
@@ -42,6 +47,11 @@ public enum GitHubEventType {
     ORGANIZATION("organization"),
     TEAM("team"),
     MEMBERSHIP("membership"),
+
+    // GitHub Projects V2 events
+    PROJECTS_V2("projects_v2"),
+    PROJECTS_V2_ITEM("projects_v2_item"),
+    PROJECTS_V2_STATUS_UPDATE("projects_v2_status_update"),
 
     // Installation events
     INSTALLATION("installation"),

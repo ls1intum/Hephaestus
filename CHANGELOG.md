@@ -1,5 +1,140 @@
 # Changelog
 
+## [0.27.1](https://github.com/ls1intum/Hephaestus/compare/v0.27.0...v0.27.1) (2026-03-09)
+
+### 🐛 Bug Fixes
+
+* **leaderboard:** compute league points change from global leaderboard instead of team-filtered view ([#816](https://github.com/ls1intum/Hephaestus/issues/816)) ([99cc455](https://github.com/ls1intum/Hephaestus/commit/99cc4559f4f24593e90578ca7ec0f475d055ebc6))
+
+## [0.27.0](https://github.com/ls1intum/Hephaestus/compare/v0.26.0...v0.27.0) (2026-03-09)
+
+### 🚀 Features
+
+* **webapp:** provider-agnostic UI abstractions for GitHub and GitLab ([#807](https://github.com/ls1intum/Hephaestus/issues/807)) ([571904f](https://github.com/ls1intum/Hephaestus/commit/571904fe17822914dc6685f6d7ae370c478387d5))
+
+## [0.26.0](https://github.com/ls1intum/Hephaestus/compare/v0.25.3...v0.26.0) (2026-03-09)
+
+### 🚀 Features
+
+* **gitprovider:** add GitLab team sync for subgroups ([#812](https://github.com/ls1intum/Hephaestus/issues/812)) ([3c5aaf1](https://github.com/ls1intum/Hephaestus/commit/3c5aaf1a7fa31b90d5685f4f59913bfefda1c3e7))
+
+## [0.25.3](https://github.com/ls1intum/Hephaestus/compare/v0.25.2...v0.25.3) (2026-03-08)
+
+### 🐛 Bug Fixes
+
+* **gitprovider:** resolve team repository permission sync using native IDs instead of internal IDs ([#813](https://github.com/ls1intum/Hephaestus/issues/813)) ([5d8fc62](https://github.com/ls1intum/Hephaestus/commit/5d8fc62d9fd5c6a9956f164a5d53760d4aa7d897))
+
+## [0.25.2](https://github.com/ls1intum/Hephaestus/compare/v0.25.1...v0.25.2) (2026-03-08)
+
+### 🐛 Bug Fixes
+
+* **gitprovider:** prevent webhooks from overwriting user display names with login ([#811](https://github.com/ls1intum/Hephaestus/issues/811)) ([4a57b2a](https://github.com/ls1intum/Hephaestus/commit/4a57b2aa0f97234e25b60f4c903b7456967566b4))
+* **server:** resolve LazyInitializationException in bad practice detection pipeline ([#801](https://github.com/ls1intum/Hephaestus/issues/801)) ([4800db4](https://github.com/ls1intum/Hephaestus/commit/4800db4fe25b209acf66ccaf605ba3d065b0efc7))
+
+## [0.25.1](https://github.com/ls1intum/Hephaestus/compare/v0.25.0...v0.25.1) (2026-03-08)
+
+### 🐛 Bug Fixes
+
+* **gitprovider:** workaround for GitLab includeSubgroups bug dropping direct projects ([#809](https://github.com/ls1intum/Hephaestus/issues/809)) ([68406ba](https://github.com/ls1intum/Hephaestus/commit/68406ba3b67d1017e49b762ed6a098d7205adc55))
+
+### ♻️ Code Refactoring
+
+* **db:** rename github_id to remote_id, add provider_type discriminator ([#808](https://github.com/ls1intum/Hephaestus/issues/808)) ([8debddc](https://github.com/ls1intum/Hephaestus/commit/8debddc2b0a8952600566391fad14bf82f952805))
+
+## [0.25.0](https://github.com/ls1intum/Hephaestus/compare/v0.24.0...v0.25.0) (2026-03-07)
+
+### 🚀 Features
+
+* **workspace:** GitLab webhook auto-registration ([#804](https://github.com/ls1intum/Hephaestus/issues/804)) ([460e273](https://github.com/ls1intum/Hephaestus/commit/460e27345ce390443688cb0f867bcc5653a363d0))
+* **workspace:** GitLab workspace deletion and cleanup ([#805](https://github.com/ls1intum/Hephaestus/issues/805)) ([0649c6c](https://github.com/ls1intum/Hephaestus/commit/0649c6c62a0d2a02285fdade7b3ec90f31bb2524))
+
+## [0.24.0](https://github.com/ls1intum/Hephaestus/compare/v0.23.1...v0.24.0) (2026-03-05)
+
+### 🚀 Features
+
+* **workspace:** GitLab workspace creation API ([#797](https://github.com/ls1intum/Hephaestus/issues/797)) ([c961169](https://github.com/ls1intum/Hephaestus/commit/c9611692381e449b6703ae9cdcee761aa21b7100))
+
+## [0.23.1](https://github.com/ls1intum/Hephaestus/compare/v0.23.0...v0.23.1) (2026-03-04)
+
+### 🐛 Bug Fixes
+
+* **profile:** use static Tailwind classes for league badge background ([#798](https://github.com/ls1intum/Hephaestus/issues/798)) ([87ce571](https://github.com/ls1intum/Hephaestus/commit/87ce571b69fd7772751fbcef85c13e0160c3dda0))
+
+## [0.23.0](https://github.com/ls1intum/Hephaestus/compare/v0.22.0...v0.23.0) (2026-03-04)
+
+### 🚀 Features
+
+* **gitprovider:** GitLab sync — Labels & Milestones ([#795](https://github.com/ls1intum/Hephaestus/issues/795)) ([86839e3](https://github.com/ls1intum/Hephaestus/commit/86839e38d97d51b387eef6a554080e3302f69549))
+
+## [0.22.0](https://github.com/ls1intum/Hephaestus/compare/v0.21.2...v0.22.0) (2026-03-04)
+
+### 🚀 Features
+
+* **gitprovider:** GitLab sync — Notes & Comments ([#793](https://github.com/ls1intum/Hephaestus/issues/793)) ([3071f80](https://github.com/ls1intum/Hephaestus/commit/3071f80ad3246ae240c6950672b0644c784242d3))
+
+## [0.21.2](https://github.com/ls1intum/Hephaestus/compare/v0.21.1...v0.21.2) (2026-03-04)
+
+### 🐛 Bug Fixes
+
+* **workspace:** return effective role with super admin elevation in /members/me ([#790](https://github.com/ls1intum/Hephaestus/issues/790)) ([bccff72](https://github.com/ls1intum/Hephaestus/commit/bccff72c271995fc21d0b4457fb82c57c4015e5e))
+
+## [0.21.1](https://github.com/ls1intum/Hephaestus/compare/v0.21.0...v0.21.1) (2026-03-04)
+
+### 🐛 Bug Fixes
+
+* **teams:** resolve parent team IDs using internal PKs instead of GitHub native IDs ([#788](https://github.com/ls1intum/Hephaestus/issues/788)) ([40758d8](https://github.com/ls1intum/Hephaestus/commit/40758d8c75490c8440686cd62e628f644a1e689c))
+
+## [0.21.0](https://github.com/ls1intum/Hephaestus/compare/v0.20.2...v0.21.0) (2026-03-04)
+
+### 🚀 Features
+
+* **gitprovider:** GitLab sync — Merge Request entity ([#782](https://github.com/ls1intum/Hephaestus/issues/782)) ([ea9a441](https://github.com/ls1intum/Hephaestus/commit/ea9a441a87a01d126e389b11e6430af652534945))
+
+## [0.20.2](https://github.com/ls1intum/Hephaestus/compare/v0.20.1...v0.20.2) (2026-03-03)
+
+### 🐛 Bug Fixes
+
+* **gitprovider:** remove false-positive overflow warnings from sync pipeline ([#786](https://github.com/ls1intum/Hephaestus/issues/786)) ([7247502](https://github.com/ls1intum/Hephaestus/commit/7247502267f89629ef46ad4cb082ec1421d6edb4))
+* **ai:** treat empty env strings as unset for optional fields ([#785](https://github.com/ls1intum/Hephaestus/issues/785)) ([0cc8b53](https://github.com/ls1intum/Hephaestus/commit/0cc8b5338559c9b87616cafb3b514a9f605311ee))
+
+## [0.20.1](https://github.com/ls1intum/Hephaestus/compare/v0.20.0...v0.20.1) (2026-03-03)
+
+### 🐛 Bug Fixes
+
+* **db:** accept old Liquibase checksum for wipe-gitprovider changeset ([#783](https://github.com/ls1intum/Hephaestus/issues/783)) ([458779f](https://github.com/ls1intum/Hephaestus/commit/458779fc885681aac495d90d6d5293fd3657f278))
+
+## [0.20.0](https://github.com/ls1intum/Hephaestus/compare/v0.19.0...v0.20.0) (2026-03-02)
+
+### 🚀 Features
+
+* **config:** add Jean worktree setup script ([#764](https://github.com/ls1intum/Hephaestus/issues/764)) ([06003c1](https://github.com/ls1intum/Hephaestus/commit/06003c1b10b5410ecda947bdca526ac6b5c8dea9))
+* **gitprovider:** GitLab sync — Issue entity ([#777](https://github.com/ls1intum/Hephaestus/issues/777)) ([ee51df1](https://github.com/ls1intum/Hephaestus/commit/ee51df1fd9e32f4e80a68225cd02835e1725395a))
+
+## [0.19.0](https://github.com/ls1intum/Hephaestus/compare/v0.18.0...v0.19.0) (2026-02-25)
+
+### 🚀 Features
+
+* **gitprovider:** add GitHub Discussions synchronization ([#693](https://github.com/ls1intum/Hephaestus/issues/693)) ([5548634](https://github.com/ls1intum/Hephaestus/commit/5548634c6eb0b4d968feead17fb988f39ed9157b))
+
+## [0.18.0](https://github.com/ls1intum/Hephaestus/compare/v0.17.0...v0.18.0) (2026-02-23)
+
+### 🚀 Features
+
+* **gitprovider:** add GitHub commits sync with local checkout support ([#694](https://github.com/ls1intum/Hephaestus/issues/694)) ([3fa1229](https://github.com/ls1intum/Hephaestus/commit/3fa12294078df08e30cfc14fb324ca0e80d800a0))
+
+## [0.17.0](https://github.com/ls1intum/Hephaestus/compare/v0.16.0...v0.17.0) (2026-02-16)
+
+### 🚀 Features
+
+* **server:** add GitHub Projects V2 synchronization support ([#692](https://github.com/ls1intum/Hephaestus/issues/692)) ([fa602b3](https://github.com/ls1intum/Hephaestus/commit/fa602b387ecae0bdbd322c2f51ff785fc6a8077e))
+
+## [0.16.0](https://github.com/ls1intum/Hephaestus/compare/v0.15.0...v0.16.0) (2026-02-15)
+
+### 🚀 Features
+
+* **workspace:** auto-elevate super admins with membership to workspace ADMIN ([#759](https://github.com/ls1intum/Hephaestus/issues/759)) ([ca82899](https://github.com/ls1intum/Hephaestus/commit/ca82899ac39e046fb3b918ac842035ea609d5e77))
+* **config:** configurable host ports for local development ([#758](https://github.com/ls1intum/Hephaestus/issues/758)) ([19e7393](https://github.com/ls1intum/Hephaestus/commit/19e7393816fce4ca2fe5d997f8ff40123baf2ab1))
+
 ## [0.15.0](https://github.com/ls1intum/Hephaestus/compare/v0.14.0...v0.15.0) (2026-02-01)
 
 ### 🚀 Features

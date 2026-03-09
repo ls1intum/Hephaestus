@@ -2,6 +2,8 @@ package de.tum.in.www1.hephaestus.gitprovider.installation.github;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.exception.InstallationNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
@@ -29,14 +31,18 @@ public class GitHubInstallationMessageHandler extends GitHubMessageHandler<GitHu
 
     private static final Logger log = LoggerFactory.getLogger(GitHubInstallationMessageHandler.class);
 
+    private static final String GITHUB_SERVER_URL = "https://github.com";
+
     private final ProvisioningListener provisioningListener;
     private final OrganizationService organizationService;
     private final GitHubAppTokenService gitHubAppTokenService;
+    private final GitProviderRepository gitProviderRepository;
 
     GitHubInstallationMessageHandler(
         ProvisioningListener provisioningListener,
         OrganizationService organizationService,
         GitHubAppTokenService gitHubAppTokenService,
+        GitProviderRepository gitProviderRepository,
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate
     ) {
@@ -44,6 +50,7 @@ public class GitHubInstallationMessageHandler extends GitHubMessageHandler<GitHu
         this.provisioningListener = provisioningListener;
         this.organizationService = organizationService;
         this.gitHubAppTokenService = gitHubAppTokenService;
+        this.gitProviderRepository = gitProviderRepository;
     }
 
     @Override
@@ -165,7 +172,11 @@ public class GitHubInstallationMessageHandler extends GitHubMessageHandler<GitHu
 
         // Ensure organization identity is up-to-date if applicable
         if (account != null && "Organization".equalsIgnoreCase(account.type())) {
-            organizationService.upsertIdentity(account.id(), accountLogin);
+            Long providerId = gitProviderRepository
+                .findByTypeAndServerUrl(GitProviderType.GITHUB, GITHUB_SERVER_URL)
+                .orElseThrow(() -> new IllegalStateException("GitProvider not found for GitHub"))
+                .getId();
+            organizationService.upsertIdentity(account.id(), accountLogin, providerId);
         }
 
         // Handle activation for CREATED events

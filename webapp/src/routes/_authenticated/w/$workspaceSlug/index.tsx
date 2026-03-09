@@ -1,10 +1,10 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, retainSearchParams, useNavigate } from "@tanstack/react-router";
 import { formatISO } from "date-fns";
 import { useEffect } from "react";
 import { z } from "zod";
 import {
-	computeUserLeagueStatsMutation,
+	computeUserLeagueStatsOptions,
 	getAllTeamsOptions,
 	getLeaderboardOptions,
 	getUserProfileOptions,
@@ -48,7 +48,7 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/")({
 function LeaderboardContainer() {
 	// Get the current user from auth context
 	const { username } = useAuth();
-	const { workspaceSlug, isLoading: isWorkspaceLoading } = useActiveWorkspaceSlug();
+	const { workspaceSlug, providerType, isLoading: isWorkspaceLoading } = useActiveWorkspaceSlug();
 	const slug = workspaceSlug ?? "";
 	const hasWorkspace = Boolean(workspaceSlug);
 	const showNoWorkspace = !isWorkspaceLoading && !hasWorkspace;
@@ -235,23 +235,17 @@ function LeaderboardContainer() {
 
 	const leaderboardEnd = formatISO(endDate);
 
-	// Mutation for league points change data (POST endpoint used to compute stats)
-	const leagueStatsMutation = useMutation({
-		...computeUserLeagueStatsMutation({
+	// Query for league points change data (GET endpoint computes stats server-side using global leaderboard)
+	const leagueStatsQuery = useQuery({
+		...computeUserLeagueStatsOptions({
 			path: { workspaceSlug: slug, login: username || "" },
+			query: {
+				after: parsedAfter ?? new Date(),
+				before: parsedBefore ?? new Date(),
+			},
 		}),
+		enabled: hasWorkspace && Boolean(username) && Boolean(parsedAfter) && Boolean(parsedBefore),
 	});
-
-	// Trigger the mutation when we have a current user entry
-	// biome-ignore lint/correctness/useExhaustiveDependencies: mutate is stable from react-query
-	useEffect(() => {
-		if (hasWorkspace && username && currentUserEntry) {
-			leagueStatsMutation.mutate({
-				path: { workspaceSlug: slug, login: username },
-				body: currentUserEntry,
-			});
-		}
-	}, [hasWorkspace, username, currentUserEntry, slug]);
 
 	if (showNoWorkspace) {
 		return <NoWorkspace />;
@@ -324,6 +318,7 @@ function LeaderboardContainer() {
 
 	return (
 		<LeaderboardPage
+			providerType={providerType}
 			leaderboard={leaderboardQuery.data || []}
 			isLoading={
 				isWorkspaceLoading ||
@@ -333,7 +328,7 @@ function LeaderboardContainer() {
 			currentUser={userProfileQuery.data?.userInfo}
 			currentUserEntry={currentUserEntry}
 			leaguePoints={userProfileQuery.data?.userInfo?.leaguePoints}
-			leaguePointsChange={leagueStatsMutation.data?.leaguePointsChange}
+			leaguePointsChange={leagueStatsQuery.data?.leaguePointsChange}
 			teamOptions={teamOptions}
 			teamLabelsById={teamLabelsById}
 			selectedTeam={team}

@@ -1,86 +1,92 @@
 # Minimal test configuration for Spring Boot tests
 spring:
-  # Allow test configs to override production beans
-  main:
-    allow-bean-definition-overriding: true
-  # Database configuration for tests (overridden by Testcontainers)
-  datasource:
-    # These values will be overridden by @DynamicPropertySource in test classes
-    url: jdbc:postgresql://localhost:5432/test
-    driver-class-name: org.postgresql.Driver
-    username: test
-    password: test
-    # HikariCP configuration optimized for tests
-    # Note: Pool size increased to handle REQUIRES_NEW nested transactions
-    hikari:
-      maximum-pool-size: 10
-      minimum-idle: 2
-      max-lifetime: 120000  # 2 minutes (shorter for faster cleanup)
-      connection-timeout: 5000  # 5 seconds (fail fast)
-      idle-timeout: 30000  # 30 seconds (faster cleanup)
-      validation-timeout: 3000  # 3 seconds
-      leak-detection-threshold: 5000  # 5 seconds for leak detection
-      connection-test-query: SELECT 1
+    # Allow test configs to override production beans
+    main:
+        allow-bean-definition-overriding: true
+    # Database configuration for tests (overridden by Testcontainers)
+    datasource:
+        # These values will be overridden by @DynamicPropertySource in test classes
+        url: jdbc:postgresql://localhost:5432/test
+        driver-class-name: org.postgresql.Driver
+        username: test
+        password: test
+        # HikariCP configuration optimized for tests
+        # Note: Pool size increased to handle REQUIRES_NEW nested transactions
+        hikari:
+            maximum-pool-size: 10
+            minimum-idle: 2
+            max-lifetime: 120000 # 2 minutes (shorter for faster cleanup)
+            connection-timeout: 5000 # 5 seconds (fail fast)
+            idle-timeout: 30000 # 30 seconds (faster cleanup)
+            validation-timeout: 3000 # 3 seconds
+            leak-detection-threshold: 5000 # 5 seconds for leak detection
+            connection-test-query: SELECT 1
 
-  # JPA configuration for tests
-  jpa:
-    hibernate:
-      ddl-auto: create-drop
-    show-sql: false
+    # JPA configuration for tests
+    # Use 'create' instead of 'create-drop': the Testcontainer is ephemeral so
+    # DROP TABLE on shutdown is unnecessary.  With ~6 cached Spring contexts each
+    # trying to DROP against the same container during JVM shutdown, the cumulative
+    # connection-timeout delays exceed surefire's forkedProcessExitTimeoutInSeconds
+    # (60 s), causing a "timeout in the fork" build failure.
+    jpa:
+        hibernate:
+            ddl-auto: create
+        show-sql: false
 
-  # Test-specific configurations for faster shutdown
-  task:
-    execution:
-      shutdown:
-        await-termination: true
-        await-termination-period: 5s
+    # Test-specific configurations for faster shutdown
+    task:
+        execution:
+            shutdown:
+                await-termination: true
+                await-termination-period: 5s
 
-  # Disable liquibase for tests (use JPA auto DDL instead)
-  liquibase:
-    enabled: false
+    # Disable liquibase for tests (use JPA auto DDL instead)
+    liquibase:
+        enabled: false
 
-  # Security configuration for tests (minimal config)
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: http://localhost:8081/realms/test
+    # Security configuration for tests (minimal config)
+    security:
+        oauth2:
+            resourceserver:
+                jwt:
+                    issuer-uri: http://localhost:8081/realms/test
 
 # GitHub configuration for tests (matches actual property)
 github:
-  auth-token: test-token-not-real
-  app:
-    id: 0
-    privateKey: ""
+    auth-token: test-token-not-real
+    app:
+        id: 0
+        privateKey: ""
 
 # Disable workspace bootstrapping during tests to prevent API calls
 hephaestus:
-  workspace:
-    init-default: false  # Disable PAT workspace bootstrap
-  intelligence-service:
-    url: http://localhost:8080
-  cors:
-    allowed-origins:
-      - http://localhost:4200
-  webapp:
-    url: http://localhost:4200
-  # NATS configuration for tests
-  sync:
-    nats:
-      enabled: false
-      server: nats://localhost:4222
-      replay-timeframe-days: 1
-      durable-consumer-name: test-consumer
-
-monitoring:
-  run-on-startup: false
+    workspace:
+        init-default: false # Disable PAT workspace bootstrap
+    intelligence-service:
+        url: http://localhost:8080
+    cors:
+        allowed-origins:
+            - http://localhost:4200
+    webapp:
+        url: http://localhost:4200
+    # Sync configuration for tests
+    sync:
+        run-on-startup: false
+        nats:
+            enabled: false
+            server: nats://localhost:4222
+            replay-timeframe-days: 1
+            durable-consumer-name: test-consumer
+    git:
+        enabled: false
+        storage-path: /tmp/hephaestus-test-git-repos
 
 # Logging configuration for tests
 logging:
-  level:
-    root: WARN
-    de:
-      tum:
-        in:
-          www1:
-            hephaestus: INFO
+    level:
+        root: WARN
+        de:
+            tum:
+                in:
+                    www1:
+                        hephaestus: INFO

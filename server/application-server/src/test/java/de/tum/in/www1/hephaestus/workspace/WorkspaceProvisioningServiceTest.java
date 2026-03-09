@@ -8,9 +8,12 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,6 +47,9 @@ class WorkspaceProvisioningServiceTest {
     private UserRepository userRepository;
 
     @Mock
+    private GitProviderRepository gitProviderRepository;
+
+    @Mock
     private WorkspaceMembershipRepository workspaceMembershipRepository;
 
     @Mock
@@ -60,7 +66,17 @@ class WorkspaceProvisioningServiceTest {
     void setUp() {
         workspaceProperties = new WorkspaceProperties(
             true,
-            new WorkspaceProperties.DefaultProperties("aet-org", "pat-token", List.of())
+            new WorkspaceProperties.DefaultProperties("aet-org", "pat-token", List.of()),
+            false,
+            null
+        );
+
+        var gitLabProperties = new GitLabProperties(
+            "https://gitlab.com",
+            Duration.ofSeconds(30),
+            Duration.ofSeconds(60),
+            Duration.ofMillis(200),
+            Duration.ofMinutes(5)
         );
 
         provisioningService = new WorkspaceProvisioningService(
@@ -72,9 +88,11 @@ class WorkspaceProvisioningServiceTest {
             workspaceRepositoryMonitorService,
             gitHubAppTokenService,
             userRepository,
+            gitProviderRepository,
             workspaceMembershipRepository,
             workspaceMembershipService,
-            workspaceScopeFilter
+            workspaceScopeFilter,
+            gitLabProperties
         );
     }
 

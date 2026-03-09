@@ -20,8 +20,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
@@ -83,23 +81,29 @@ public class LeaderboardController {
     /**
      * Calculate league change statistics for a user.
      *
-     * <p>This endpoint computes projected league point changes based on the provided
-     * leaderboard entry. It does NOT modify any data - it's a calculation endpoint.
+     * <p>This endpoint computes projected league point changes by generating the
+     * <strong>global</strong> (workspace-wide, unfiltered) leaderboard for the given
+     * timeframe and locating the user's entry in it.  This ensures that league point
+     * projections are always consistent regardless of which team filter the caller is
+     * currently viewing.
      *
      * @param workspaceContext the resolved workspace context
      * @param login the user's GitHub login
-     * @param entry the user's current leaderboard entry for comparison
+     * @param after start of the time range (inclusive)
+     * @param before end of the time range (exclusive)
      * @return league change statistics including projected point delta
      */
-    @PostMapping("/users/{login}/league-stats")
+    @GetMapping("/users/{login}/league-stats")
     @Operation(
         summary = "Calculate user league stats",
-        description = "Computes projected league point changes for a specific user based on their leaderboard entry"
+        description = "Computes projected league point changes for a specific user using the global leaderboard"
     )
+    @SecurityRequirements
     public ResponseEntity<LeagueChangeDTO> computeUserLeagueStats(
         WorkspaceContext workspaceContext,
         @PathVariable String login,
-        @RequestBody LeaderboardEntryDTO entry
+        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant after,
+        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant before
     ) {
         Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
         log.info(
@@ -107,6 +111,6 @@ public class LeaderboardController {
             workspace.getId(),
             LoggingUtils.sanitizeForLog(login)
         );
-        return ResponseEntity.ok(leaderboardService.computeUserLeagueStats(workspace, login, entry));
+        return ResponseEntity.ok(leaderboardService.computeUserLeagueStats(workspace, login, after, before));
     }
 }

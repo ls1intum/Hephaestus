@@ -8,7 +8,7 @@ info:
     name: MIT License
     url: https://github.com/ls1intum/Hephaestus/blob/develop/LICENSE
   title: Hephaestus API
-  version: 0.15.0
+  version: 0.27.1
 servers:
 - description: Default Server URL
   url: /
@@ -137,6 +137,46 @@ paths:
       summary: Create a new workspace
       tags:
       - workspace-registry
+  /workspaces/gitlab/groups:
+    post:
+      operationId: listGitLabGroups
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GitLabPreflightRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GitLabGroup"
+          description: Accessible groups
+      summary: List GitLab groups accessible to a PAT
+      tags:
+      - workspace-registry
+  /workspaces/gitlab/preflight:
+    post:
+      operationId: gitLabPreflight
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GitLabPreflightRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GitLabPreflightResponse"
+          description: Validation result
+      summary: Validate a GitLab PAT before workspace creation
+      tags:
+      - workspace-registry
   /workspaces/{workspaceSlug}:
     delete:
       operationId: purgeWorkspace
@@ -241,9 +281,9 @@ paths:
       tags:
       - Leaderboard
   /workspaces/{workspaceSlug}/leaderboard/users/{login}/league-stats:
-    post:
-      description: Computes projected league point changes for a specific user based
-        on their leaderboard entry
+    get:
+      description: Computes projected league point changes for a specific user using
+        the global leaderboard
       operationId: computeUserLeagueStats
       parameters:
       - description: Workspace slug
@@ -259,13 +299,20 @@ paths:
         required: true
         schema:
           type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/LeaderboardEntry"
-        description: the user's current leaderboard entry for comparison
+      - description: start of the time range (inclusive)
+        in: query
+        name: after
         required: true
+        schema:
+          type: string
+          format: date-time
+      - description: end of the time range (exclusive)
+        in: query
+        name: before
+        required: true
+        schema:
+          type: string
+          format: date-time
       responses:
         "200":
           content:
@@ -273,6 +320,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/LeagueChange"
           description: league change statistics including projected point delta
+      security: []
       summary: Calculate user league stats
       tags:
       - Leaderboard
@@ -369,7 +417,11 @@ paths:
       - workspace-membership
   /workspaces/{workspaceSlug}/members/me:
     get:
-      description: Get the current user's membership in this workspace.
+      description: |-
+        Get the current user's membership in this workspace.
+         Super admins (Keycloak admin realm role) have their effective role elevated to ADMIN
+         if their database role is lower, matching the runtime authorization behaviour in
+         {@link WorkspaceAccessService WorkspaceAccessService}.
       operationId: getCurrentUserMembership
       parameters:
       - description: Workspace slug
@@ -385,7 +437,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/WorkspaceMembership"
-          description: the current user's membership details
+          description: the current user's membership details with effective role
       security: []
       summary: Get the current user's membership in this workspace.
       tags:
@@ -2511,11 +2563,12 @@ components:
       properties:
         accountLogin:
           type: string
-          description: GitHub account login to associate with this workspace
+          description: Git provider account login (GitHub org/user or GitLab group
+            path)
           example: my-org
         accountType:
           type: string
-          description: Type of GitHub account (USER or ORGANIZATION)
+          description: Type of account (USER or ORG)
           enum:
           - ORG
           - USER
@@ -2523,10 +2576,29 @@ components:
           type: string
           description: Human-readable name of the workspace
           example: My Workspace
+        gitProviderMode:
+          type: string
+          description: Git provider authentication mode. Defaults to PAT_ORG (GitHub
+            PAT) if not specified.
+          enum:
+          - PAT_ORG
+          - GITHUB_APP_INSTALLATION
+          - GITLAB_PAT
+          example: GITLAB_PAT
         ownerUserId:
           type: integer
           format: int64
           description: User ID of the workspace owner
+        personalAccessToken:
+          type: string
+          description: Personal Access Token for GitLab API access. Required when
+            gitProviderMode is GITLAB_PAT. Stored encrypted at rest.
+          example: your-gitlab-token
+        serverUrl:
+          type: string
+          description: Custom server URL for self-hosted GitLab instances. Must use
+            HTTPS. Defaults to https://gitlab.com if not specified.
+          example: https://gitlab.example.com
         workspaceSlug:
           type: string
           description: URL-friendly identifier for the workspace
@@ -2616,6 +2688,74 @@ components:
       - error
       x-hephaestus:
         export: true
+    GitLabGroup:
+      type: object
+      description: GitLab group accessible to the provided PAT
+      properties:
+        avatarUrl:
+          type: string
+          description: Group avatar URL
+        fullPath:
+          type: string
+          description: Full group path including parent groups
+          example: my-org/my-team
+        id:
+          type: integer
+          format: int64
+          description: GitLab group numeric ID
+        name:
+          type: string
+          description: Group display name
+        visibility:
+          type: string
+          description: "Group visibility: public, internal, or private"
+        webUrl:
+          type: string
+          description: Group web URL
+      required:
+      - fullPath
+      - id
+      - name
+    GitLabPreflightRequest:
+      type: object
+      description: Request to validate a GitLab PAT or list accessible groups before
+        workspace creation
+      properties:
+        groupFullPath:
+          type: string
+          description: "GitLab group full path, used as fallback for group/project\
+            \ tokens that cannot access /api/v4/user"
+          example: my-org/my-team
+        personalAccessToken:
+          type: string
+          description: GitLab Personal Access Token to validate
+          example: your-gitlab-token
+        serverUrl:
+          type: string
+          description: GitLab server URL. Defaults to https://gitlab.com if not specified.
+          example: https://gitlab.example.com
+      required:
+      - personalAccessToken
+    GitLabPreflightResponse:
+      type: object
+      description: Result of GitLab PAT validation
+      properties:
+        error:
+          type: string
+          description: Error message if validation failed
+        userId:
+          type: integer
+          format: int64
+          description: GitLab user ID or group ID
+        username:
+          type: string
+          description: Username of the token owner (personal tokens) or group name
+            (group tokens)
+        valid:
+          type: boolean
+          description: Whether the token is valid
+      required:
+      - valid
     LabelInfo:
       type: object
       description: Information about a label from a repository
@@ -3555,7 +3695,7 @@ components:
       properties:
         accountLogin:
           type: string
-          description: GitHub account login associated with this workspace
+          description: Git provider account login associated with this workspace
         createdAt:
           type: string
           format: date-time
@@ -3565,7 +3705,14 @@ components:
           description: Human-readable name of the workspace
         gitProviderMode:
           type: string
-          description: Git provider mode (INSTALLATION or PAT)
+          description: "Git provider mode (PAT_ORG, GITHUB_APP_INSTALLATION, GITLAB_PAT)"
+        gitlabWebhookRegistered:
+          type: boolean
+          description: Whether a GitLab webhook has been auto-registered for this
+            workspace
+        hasPersonalAccessToken:
+          type: boolean
+          description: Whether a Personal Access Token is configured
         hasSlackSigningSecret:
           type: boolean
           description: Whether Slack signing secret is configured
@@ -3605,6 +3752,17 @@ components:
           type: string
           description: Time for leaderboard notifications in HH:mm format
           example: 09:00
+        providerType:
+          type: string
+          description: High-level git provider type derived from the authentication
+            mode
+          enum:
+          - GITHUB
+          - GITLAB
+        serverUrl:
+          type: string
+          description: Custom server URL for self-hosted instances (null for cloud
+            defaults)
         status:
           type: string
           description: "Current lifecycle status of the workspace (PENDING, ACTIVE,\
@@ -3621,10 +3779,13 @@ components:
       - accountLogin
       - createdAt
       - displayName
+      - gitlabWebhookRegistered
+      - hasPersonalAccessToken
       - hasSlackSigningSecret
       - hasSlackToken
       - id
       - isPubliclyViewable
+      - providerType
       - status
       - updatedAt
       - workspaceSlug
@@ -3634,7 +3795,7 @@ components:
       properties:
         accountLogin:
           type: string
-          description: GitHub account login associated with this workspace
+          description: Git provider account login associated with this workspace
         createdAt:
           type: string
           format: date-time
@@ -3646,6 +3807,12 @@ components:
           type: integer
           format: int64
           description: Unique identifier of the workspace
+        providerType:
+          type: string
+          description: High-level git provider type (GITHUB or GITLAB)
+          enum:
+          - GITHUB
+          - GITLAB
         status:
           type: string
           description: "Current lifecycle status of the workspace (PENDING, ACTIVE,\
@@ -3659,6 +3826,7 @@ components:
       - createdAt
       - displayName
       - id
+      - providerType
       - status
       - workspaceSlug
     WorkspaceMembership:

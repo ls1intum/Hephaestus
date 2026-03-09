@@ -3,6 +3,9 @@ package de.tum.in.www1.hephaestus.gitprovider.organization.github;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
@@ -43,9 +46,13 @@ class GitHubOrganizationMessageHandlerIntegrationTest extends BaseIntegrationTes
     private WorkspaceRepository workspaceRepository;
 
     @Autowired
+    private GitProviderRepository gitProviderRepository;
+
+    @Autowired
     private ObjectMapper objectMapper;
 
     private Organization testOrganization;
+    private GitProvider githubProvider;
 
     @BeforeEach
     void setUp() {
@@ -54,15 +61,21 @@ class GitHubOrganizationMessageHandlerIntegrationTest extends BaseIntegrationTes
     }
 
     private void setupTestData() {
+        // Create GitHub provider (required by the handler)
+        githubProvider = gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
+            .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com")));
+
         // Create organization
         testOrganization = new Organization();
-        testOrganization.setId(215361191L);
-        testOrganization.setGithubId(215361191L);
+        testOrganization.setNativeId(215361191L);
         testOrganization.setLogin("HephaestusTest");
         testOrganization.setCreatedAt(Instant.now());
         testOrganization.setUpdatedAt(Instant.now());
         testOrganization.setName("Hephaestus Test");
         testOrganization.setAvatarUrl("https://avatars.githubusercontent.com/u/215361191?v=4");
+        testOrganization.setHtmlUrl("https://github.com/HephaestusTest");
+        testOrganization.setProvider(githubProvider);
         testOrganization = organizationRepository.save(testOrganization);
 
         // Create workspace
@@ -96,7 +109,9 @@ class GitHubOrganizationMessageHandlerIntegrationTest extends BaseIntegrationTes
         assertThat(organizationRepository.findById(testOrganization.getId())).isPresent();
         // User should be created if membership contains user info
         if (event.membership() != null && event.membership().user() != null) {
-            assertThat(userRepository.findById(event.membership().user().id())).isPresent();
+            assertThat(
+                userRepository.findByNativeIdAndProviderId(event.membership().user().id(), githubProvider.getId())
+            ).isPresent();
         }
     }
 
@@ -107,7 +122,8 @@ class GitHubOrganizationMessageHandlerIntegrationTest extends BaseIntegrationTes
         GitHubOrganizationEventDTO addEvent = loadPayload("organization.member_added");
         if (addEvent.membership() != null && addEvent.membership().user() != null) {
             User member = new User();
-            member.setId(addEvent.membership().user().id());
+            member.setNativeId(addEvent.membership().user().id());
+            member.setProvider(githubProvider);
             member.setLogin(addEvent.membership().user().login());
             member.setAvatarUrl(addEvent.membership().user().avatarUrl());
             member.setCreatedAt(Instant.now());

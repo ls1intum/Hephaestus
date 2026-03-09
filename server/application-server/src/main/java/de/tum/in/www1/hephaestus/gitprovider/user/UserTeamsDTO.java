@@ -29,7 +29,7 @@ public record UserTeamsDTO(
             user.getId(),
             user.getLogin(),
             user.getEmail(),
-            user.getName(),
+            user.getName() != null ? user.getName() : user.getLogin(),
             user.getHtmlUrl(),
             user
                 .getTeamMemberships()

@@ -21,6 +21,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.TaskScheduler;
@@ -195,15 +196,30 @@ public class BadPracticeDetectorScheduler {
         PullRequest pullRequest,
         boolean sendBadPracticeDetectionEmail
     ) {
-        BadPracticeDetectorTask badPracticeDetectorTask = new BadPracticeDetectorTask();
-        badPracticeDetectorTask.setPullRequestBadPracticeDetector(pullRequestBadPracticeDetector);
-        badPracticeDetectorTask.setNotificationSender(notificationSender);
-        badPracticeDetectorTask.setPullRequest(pullRequest);
-        badPracticeDetectorTask.setSendBadPracticeDetectionEmail(sendBadPracticeDetectionEmail);
-        resolveWorkspaceSlugForRepository(pullRequest.getRepository()).ifPresent(
-            badPracticeDetectorTask::setWorkspaceSlug
+        BadPracticeDetectorTask task = new BadPracticeDetectorTask();
+        task.setPullRequestBadPracticeDetector(pullRequestBadPracticeDetector);
+        task.setNotificationSender(notificationSender);
+        task.setPullRequestId(pullRequest.getId());
+        task.setSendBadPracticeDetectionEmail(sendBadPracticeDetectionEmail);
+
+        // Extract scalar data now while the Hibernate session is still open.
+        // The task may execute minutes or hours later when the session is closed,
+        // so we must not access lazy entity proxies at execution time.
+        task.setPullRequestNumber(pullRequest.getNumber());
+        task.setPullRequestTitle(pullRequest.getTitle());
+        task.setPullRequestHtmlUrl(pullRequest.getHtmlUrl());
+
+        Repository repository = pullRequest.getRepository();
+        task.setRepositoryName(repository != null ? repository.getName() : null);
+
+        task.setAssigneeLogins(
+            pullRequest.getAssignees() != null
+                ? pullRequest.getAssignees().stream().map(User::getLogin).collect(Collectors.toList())
+                : List.of()
         );
-        return badPracticeDetectorTask;
+
+        resolveWorkspaceSlugForRepository(repository).ifPresent(task::setWorkspaceSlug);
+        return task;
     }
 
     /**

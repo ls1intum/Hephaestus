@@ -11,16 +11,16 @@ import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import io.micrometer.observation.annotation.Observed;
-import java.time.Instant;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Instant;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Records activity events with XP.
@@ -45,10 +45,9 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * @see ActivityEventListener The only intended caller of this service
  */
+@Slf4j
 @Service
 public class ActivityEventService {
-
-    private static final Logger log = LoggerFactory.getLogger(ActivityEventService.class);
 
     private final ActivityEventRepository eventRepository;
     private final WorkspaceRepository workspaceRepository;
@@ -110,10 +109,10 @@ public class ActivityEventService {
      * <p>This method is idempotent: duplicate events (same event_key) are silently ignored.
      *
      * @return true if recorded successfully, false if:
-     *         <ul>
-     *           <li>Event is a duplicate (already exists with same event_key)</li>
-     *           <li>Workspace not found (logs warning, does not throw)</li>
-     *         </ul>
+     * <ul>
+     *   <li>Event is a duplicate (already exists with same event_key)</li>
+     *   <li>Workspace not found (logs warning, does not throw)</li>
+     * </ul>
      */
     @Transactional
     @Observed(name = "activity.record", contextualName = "record-activity-event")
@@ -188,7 +187,7 @@ public class ActivityEventService {
             targetId,
             roundedXp,
             workspaceId,
-            actor != null ? actor.getId() : null
+            actor.getId()
         );
         return true;
     }
@@ -226,11 +225,11 @@ public class ActivityEventService {
      * <p>Deleted events always have 0 XP since they represent data removal, not
      * value-adding activity.
      *
-     * @param workspaceId  the workspace ID
-     * @param eventType    the event type (e.g., COMMENT_DELETED, ISSUE_DELETED)
-     * @param occurredAt   when the deletion occurred
-     * @param targetType   the type of entity that was deleted
-     * @param targetId     the ID of the deleted entity
+     * @param workspaceId the workspace ID
+     * @param eventType   the event type (e.g., COMMENT_DELETED, ISSUE_DELETED)
+     * @param occurredAt  when the deletion occurred
+     * @param targetType  the type of entity that was deleted
+     * @param targetId    the ID of the deleted entity
      * @return true if recorded successfully, false otherwise
      */
     @Transactional

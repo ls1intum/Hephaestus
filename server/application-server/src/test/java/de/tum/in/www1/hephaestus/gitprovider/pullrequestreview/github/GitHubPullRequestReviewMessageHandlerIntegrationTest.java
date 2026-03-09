@@ -3,6 +3,9 @@ package de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.github;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
@@ -53,8 +56,12 @@ class GitHubPullRequestReviewMessageHandlerIntegrationTest extends BaseIntegrati
     private WorkspaceRepository workspaceRepository;
 
     @Autowired
+    private GitProviderRepository gitProviderRepository;
+
+    @Autowired
     private ObjectMapper objectMapper;
 
+    private GitProvider gitProvider;
     private Repository testRepository;
     private PullRequest testPullRequest;
 
@@ -65,10 +72,15 @@ class GitHubPullRequestReviewMessageHandlerIntegrationTest extends BaseIntegrati
     }
 
     private void setupTestData() {
+        // Create git provider
+        gitProvider = gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
+            .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, "https://github.com")));
+
         // Create organization
         Organization org = new Organization();
-        org.setId(215361191L);
-        org.setGithubId(215361191L);
+        org.setNativeId(215361191L);
+        org.setProvider(gitProvider);
         org.setLogin("HephaestusTest");
         org.setCreatedAt(Instant.now());
         org.setUpdatedAt(Instant.now());
@@ -78,7 +90,8 @@ class GitHubPullRequestReviewMessageHandlerIntegrationTest extends BaseIntegrati
 
         // Create repository
         testRepository = new Repository();
-        testRepository.setId(1000663383L);
+        testRepository.setNativeId(1000663383L);
+        testRepository.setProvider(gitProvider);
         testRepository.setName("TestRepository");
         testRepository.setNameWithOwner("HephaestusTest/TestRepository");
         testRepository.setHtmlUrl("https://github.com/HephaestusTest/TestRepository");
@@ -104,7 +117,8 @@ class GitHubPullRequestReviewMessageHandlerIntegrationTest extends BaseIntegrati
 
     private void createTestPullRequest(Long prId, int number) {
         testPullRequest = new PullRequest();
-        testPullRequest.setId(prId);
+        testPullRequest.setNativeId(prId);
+        testPullRequest.setProvider(gitProvider);
         testPullRequest.setNumber(number);
         testPullRequest.setTitle("Test Pull Request");
         testPullRequest.setState(PullRequest.State.OPEN);
@@ -129,18 +143,18 @@ class GitHubPullRequestReviewMessageHandlerIntegrationTest extends BaseIntegrati
         // Create the PR that the review belongs to
         createTestPullRequest(event.pullRequest().getDatabaseId(), event.pullRequest().number());
 
-        // Verify review doesn't exist initially
-        assertThat(reviewRepository.findById(event.review().id())).isEmpty();
+        // Verify review doesn't exist initially (lookup by native ID + provider)
+        assertThat(reviewRepository.findByNativeIdAndProviderId(event.review().id(), gitProvider.getId())).isEmpty();
 
         // When
         handler.handleEvent(event);
 
-        // Then
-        assertThat(reviewRepository.findById(event.review().id()))
+        // Then (lookup by native ID + provider, since JPA PK is auto-generated)
+        assertThat(reviewRepository.findByNativeIdAndProviderId(event.review().id(), gitProvider.getId()))
             .isPresent()
             .get()
             .satisfies(review -> {
-                assertThat(review.getId()).isEqualTo(event.review().id());
+                assertThat(review.getNativeId()).isEqualTo(event.review().id());
                 assertThat(review.getBody()).isEqualTo(event.review().body());
                 assertThat(review.getHtmlUrl()).isEqualTo(event.review().htmlUrl());
             });
@@ -161,7 +175,7 @@ class GitHubPullRequestReviewMessageHandlerIntegrationTest extends BaseIntegrati
         handler.handleEvent(editEvent);
 
         // Then
-        assertThat(reviewRepository.findById(editEvent.review().id()))
+        assertThat(reviewRepository.findByNativeIdAndProviderId(editEvent.review().id(), gitProvider.getId()))
             .isPresent()
             .get()
             .satisfies(review -> {
@@ -176,10 +190,11 @@ class GitHubPullRequestReviewMessageHandlerIntegrationTest extends BaseIntegrati
         GitHubPullRequestReviewEventDTO dismissEvent = loadPayload("pull_request_review.dismissed");
         createTestPullRequest(dismissEvent.pullRequest().getDatabaseId(), dismissEvent.pullRequest().number());
 
-        // Create the review first (simulate submitted state) with the ID that will be dismissed
-        PullRequest pr = pullRequestRepository.findById(dismissEvent.pullRequest().getDatabaseId()).orElseThrow();
+        // Create the review first (simulate submitted state) with the native ID that will be dismissed
+        PullRequest pr = testPullRequest;
         PullRequestReview existingReview = new PullRequestReview();
-        existingReview.setId(dismissEvent.review().id());
+        existingReview.setNativeId(dismissEvent.review().id());
+        existingReview.setProvider(gitProvider);
         existingReview.setState(PullRequestReview.State.APPROVED);
         existingReview.setPullRequest(pr);
         existingReview.setDismissed(false);
@@ -189,7 +204,7 @@ class GitHubPullRequestReviewMessageHandlerIntegrationTest extends BaseIntegrati
         handler.handleEvent(dismissEvent);
 
         // Then - review should be marked as dismissed
-        assertThat(reviewRepository.findById(dismissEvent.review().id()))
+        assertThat(reviewRepository.findByNativeIdAndProviderId(dismissEvent.review().id(), gitProvider.getId()))
             .isPresent()
             .get()
             .satisfies(review -> {

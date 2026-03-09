@@ -96,10 +96,9 @@ public class GitHubLabelSyncService {
         String owner = parsedName.get().owner();
         String name = parsedName.get().name();
 
-        HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
-        ProcessingContext context = ProcessingContext.forSync(scopeId, repository);
-
         try {
+            HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
+            ProcessingContext context = ProcessingContext.forSync(scopeId, repository);
             AtomicInteger totalSynced = new AtomicInteger(0);
             Set<String> syncedNames = new HashSet<>();
 

@@ -3,13 +3,20 @@ package de.tum.in.www1.hephaestus.workspace;
 import static de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubSyncConstants.GITHUB_API_BASE_URL;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import de.tum.in.www1.hephaestus.core.LoggingUtils;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.ProvisioningListener;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
@@ -36,9 +43,11 @@ public class WorkspaceProvisioningService {
     private final WorkspaceRepositoryMonitorService workspaceRepositoryMonitorService;
     private final GitHubAppTokenService gitHubAppTokenService;
     private final UserRepository userRepository;
+    private final GitProviderRepository gitProviderRepository;
     private final WorkspaceMembershipRepository workspaceMembershipRepository;
     private final WorkspaceMembershipService workspaceMembershipService;
     private final WorkspaceScopeFilter workspaceScopeFilter;
+    private final GitLabProperties gitLabProperties;
     private final WebClient webClient;
 
     public WorkspaceProvisioningService(
@@ -50,9 +59,11 @@ public class WorkspaceProvisioningService {
         WorkspaceRepositoryMonitorService workspaceRepositoryMonitorService,
         GitHubAppTokenService gitHubAppTokenService,
         UserRepository userRepository,
+        GitProviderRepository gitProviderRepository,
         WorkspaceMembershipRepository workspaceMembershipRepository,
         WorkspaceMembershipService workspaceMembershipService,
-        WorkspaceScopeFilter workspaceScopeFilter
+        WorkspaceScopeFilter workspaceScopeFilter,
+        GitLabProperties gitLabProperties
     ) {
         this.workspaceProperties = workspaceProperties;
         this.workspaceRepository = workspaceRepository;
@@ -62,9 +73,11 @@ public class WorkspaceProvisioningService {
         this.workspaceRepositoryMonitorService = workspaceRepositoryMonitorService;
         this.gitHubAppTokenService = gitHubAppTokenService;
         this.userRepository = userRepository;
+        this.gitProviderRepository = gitProviderRepository;
         this.workspaceMembershipRepository = workspaceMembershipRepository;
         this.workspaceMembershipService = workspaceMembershipService;
         this.workspaceScopeFilter = workspaceScopeFilter;
+        this.gitLabProperties = gitLabProperties;
         this.webClient = WebClient.builder()
             .baseUrl(GITHUB_API_BASE_URL)
             .defaultHeader(HttpHeaders.ACCEPT, "application/vnd.github+json")
@@ -72,6 +85,7 @@ public class WorkspaceProvisioningService {
             .build();
     }
 
+    /** Bootstrap a default GitHub PAT workspace from configuration properties. */
     @Transactional
     public void bootstrapDefaultPatWorkspace() {
         if (!workspaceProperties.initDefault()) {
@@ -118,7 +132,7 @@ public class WorkspaceProvisioningService {
 
         workspace.setGitProviderMode(Workspace.GitProviderMode.PAT_ORG);
         workspace.setPersonalAccessToken(config.token());
-        workspace.setGithubRepositorySelection(RepositorySelection.SELECTED);
+        workspace.setRepositorySelection(RepositorySelection.SELECTED);
 
         Workspace savedWorkspace = workspaceRepository.save(workspace);
         log.info(
@@ -145,6 +159,209 @@ public class WorkspaceProvisioningService {
         log.info("Completed PAT workspace provisioning: workspaceId={}", savedWorkspace.getId());
 
         ensureAdminMembership(savedWorkspace);
+    }
+
+    /**
+     * Bootstrap a default GitLab PAT workspace from configuration properties.
+     * Mirrors {@link #bootstrapDefaultPatWorkspace()} for GitLab.
+     */
+    @Transactional
+    public void bootstrapDefaultGitLabPatWorkspace() {
+        if (!workspaceProperties.initGitlabDefault()) {
+            log.debug("Skipped default GitLab PAT workspace bootstrap: reason=bootstrapDisabled");
+            return;
+        }
+
+        WorkspaceProperties.GitLabDefaultProperties config = workspaceProperties.gitlabDefault();
+
+        String groupPath = config.login() != null ? config.login().trim() : null;
+        if (isBlank(groupPath)) {
+            throw new IllegalStateException(
+                "Failed to derive group path for GitLab workspace bootstrap. Set hephaestus.workspace.gitlab-default.login."
+            );
+        }
+
+        if (isBlank(config.token())) {
+            throw new IllegalStateException(
+                "Missing PAT for GitLab workspace bootstrap. Set hephaestus.workspace.gitlab-default.token or GITLAB_PAT."
+            );
+        }
+
+        // Check if a workspace already exists for this group path
+        if (workspaceRepository.findByAccountLoginIgnoreCase(groupPath).isPresent()) {
+            log.debug("Skipped GitLab PAT workspace creation: reason=workspaceAlreadyExists, groupPath={}", groupPath);
+            return;
+        }
+
+        String serverUrl = resolveGitLabServerUrl(config.serverUrl());
+        Long ownerUserId = syncGitLabUserForPAT(config.token(), serverUrl, groupPath);
+
+        // Derive a valid slug from the group path (replace / with -)
+        String slug = groupPath.replace("/", "-");
+        // Use the last path segment as the display name
+        String displayName = groupPath.contains("/") ? groupPath.substring(groupPath.lastIndexOf('/') + 1) : groupPath;
+
+        Workspace workspace = workspaceService.createWorkspace(
+            slug,
+            displayName,
+            groupPath,
+            AccountType.ORG,
+            ownerUserId
+        );
+
+        workspace.setGitProviderMode(Workspace.GitProviderMode.GITLAB_PAT);
+        workspace.setPersonalAccessToken(config.token());
+        if (!isBlank(config.serverUrl())) {
+            workspace.setServerUrl(config.serverUrl().trim());
+        }
+
+        Workspace savedWorkspace = workspaceRepository.save(workspace);
+        log.info(
+            "Created default GitLab PAT workspace: groupPath={}, workspaceId={}",
+            savedWorkspace.getAccountLogin(),
+            savedWorkspace.getId()
+        );
+
+        ensureAdminMembership(savedWorkspace);
+    }
+
+    /**
+     * Resolves the GitLab server URL from the workspace config or falls back to the
+     * global default from {@link GitLabProperties}.
+     */
+    private String resolveGitLabServerUrl(String configServerUrl) {
+        if (!isBlank(configServerUrl)) {
+            String url = configServerUrl.trim();
+            return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
+        }
+        return gitLabProperties.defaultServerUrl();
+    }
+
+    /**
+     * Validates the GitLab token and upserts the token owner or a synthetic bot user.
+     * <p>
+     * First tries {@code GET /api/v4/user} which works for personal access tokens.
+     * If that returns 401 (as it does for group/project access tokens which have no
+     * user identity), falls back to {@code GET /api/v4/groups/:groupPath} to validate
+     * the token against the target group and creates a synthetic bot user from group info.
+     */
+    private Long syncGitLabUserForPAT(String patToken, String serverUrl, String groupPath) {
+        // Resolve the GitLab provider first so all lookups are provider-scoped
+        GitProvider provider = gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITLAB, serverUrl)
+            .orElse(null);
+
+        // If provider exists, check for existing user scoped to this provider
+        if (provider != null) {
+            Optional<User> existing = userRepository.findByLoginAndProviderId(groupPath, provider.getId());
+            if (existing.isPresent()) {
+                return existing.get().getId();
+            }
+        }
+
+        WebClient gitlabClient = WebClient.builder().build();
+
+        // Try personal access token endpoint first
+        GitLabTokenUserResponse userInfo = null;
+        try {
+            userInfo = gitlabClient
+                .get()
+                .uri(serverUrl + "/api/v4/user")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + patToken)
+                .retrieve()
+                .bodyToMono(GitLabTokenUserResponse.class)
+                .block(Duration.ofSeconds(10));
+        } catch (Exception e) {
+            log.debug(
+                "GET /api/v4/user failed (expected for group/project tokens): serverUrl={}, status={}",
+                serverUrl,
+                e.getMessage()
+            );
+        }
+
+        if (userInfo != null && userInfo.id() != null) {
+            // Personal access token — use user info directly
+            return upsertGitLabUser(
+                userInfo.id(),
+                userInfo.username() != null ? userInfo.username() : groupPath,
+                userInfo.name(),
+                userInfo.avatarUrl(),
+                userInfo.webUrl(),
+                serverUrl
+            );
+        }
+
+        // Fall back to group endpoint — validates the token against the target group
+        log.info("Falling back to group API for token validation: serverUrl={}, groupPath={}", serverUrl, groupPath);
+        GitLabGroupResponse groupInfo = gitlabClient
+            .get()
+            .uri(serverUrl + "/api/v4/groups/{groupPath}", groupPath)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + patToken)
+            .retrieve()
+            .bodyToMono(GitLabGroupResponse.class)
+            .block(Duration.ofSeconds(10));
+
+        if (groupInfo == null || groupInfo.id() == null) {
+            throw new IllegalStateException(
+                "Failed to validate GitLab token against group '" + groupPath + "' at " + serverUrl
+            );
+        }
+
+        // Create a synthetic bot user representing the group token owner
+        return upsertGitLabUser(
+            groupInfo.id(),
+            groupPath,
+            groupInfo.name() != null ? groupInfo.name() : groupPath,
+            groupInfo.avatarUrl(),
+            groupInfo.webUrl(),
+            serverUrl
+        );
+    }
+
+    private Long upsertGitLabUser(
+        Long nativeId,
+        String login,
+        String name,
+        String avatarUrl,
+        String webUrl,
+        String serverUrl
+    ) {
+        String safeName = name != null ? name : login;
+        String safeAvatar = avatarUrl != null ? avatarUrl : "";
+        String safeWebUrl = webUrl != null ? webUrl : "";
+
+        GitProvider provider = gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITLAB, serverUrl)
+            .orElseGet(() -> {
+                log.info("Creating GitProvider for self-hosted GitLab: serverUrl={}", serverUrl);
+                return gitProviderRepository.save(new GitProvider(GitProviderType.GITLAB, serverUrl));
+            });
+        Long providerId = provider.getId();
+
+        userRepository.acquireLoginLock(login, providerId);
+        userRepository.freeLoginConflicts(login, nativeId, providerId);
+        userRepository.upsertUser(
+            nativeId,
+            providerId,
+            login,
+            safeName,
+            safeAvatar,
+            safeWebUrl,
+            User.Type.BOT.name(),
+            null,
+            null,
+            null
+        );
+        log.info(
+            "Upserted user for GitLab PAT workspace bootstrap: userLogin={}, nativeId={}",
+            LoggingUtils.sanitizeForLog(login),
+            nativeId
+        );
+        // Retrieve the JPA-managed entity to get the auto-generated PK (provider-scoped)
+        return userRepository
+            .findByLoginAndProviderId(login, providerId)
+            .map(User::getId)
+            .orElseThrow(() -> new IllegalStateException("User not found after upsert: login=" + login));
     }
 
     private void ensureDefaultAdminMembershipIfPresent() {
@@ -189,10 +406,11 @@ public class WorkspaceProvisioningService {
     }
 
     /**
-     * Mirror each GitHub App installation into a local workspace.
-     * Uses GitHub REST API directly.
+     * Enumerates GitHub App installations and ensures each has a corresponding workspace.
+     * <p>
+     * Intentionally NOT {@code @Transactional}: each installation is provisioned
+     * in its own transaction so that a failure in one does not roll back others.
      */
-    @Transactional
     public void ensureGitHubAppInstallations() {
         if (!gitHubAppTokenService.isConfigured()) {
             log.info(
@@ -361,40 +579,61 @@ public class WorkspaceProvisioningService {
     }
 
     private Long syncGitHubUserForPAT(String patToken, String accountLogin) {
+        GitProvider provider = gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
+            .orElseThrow(() -> new IllegalStateException("GitProvider for GitHub not found"));
+        Long providerId = provider.getId();
+
+        // Check for existing user scoped to GitHub provider
+        Optional<User> existing = userRepository.findByLoginAndProviderId(accountLogin, providerId);
+        if (existing.isPresent()) {
+            return existing.get().getId();
+        }
+
+        // Fetch user info from GitHub to get the native user ID
+        GitHubUserResponse userInfo = webClient
+            .get()
+            .uri("/users/{login}", accountLogin)
+            .header(HttpHeaders.AUTHORIZATION, "Bearer " + patToken)
+            .retrieve()
+            .bodyToMono(GitHubUserResponse.class)
+            .block();
+
+        if (userInfo == null || userInfo.id() == null) {
+            throw new IllegalStateException("Failed to fetch GitHub user info for login '" + accountLogin + "'");
+        }
+
+        String login = userInfo.login() != null ? userInfo.login() : accountLogin;
+        String name = userInfo.name() != null ? userInfo.name() : accountLogin;
+        String avatar = userInfo.avatarUrl() != null ? userInfo.avatarUrl() : "";
+        String htmlUrl = userInfo.htmlUrl() != null ? userInfo.htmlUrl() : "";
+
+        // Use the three-step upsert (lock, free conflicts, insert)
+        // to avoid uk_user_login_lower violations under concurrency.
+        userRepository.acquireLoginLock(login, providerId);
+        userRepository.freeLoginConflicts(login, userInfo.id(), providerId);
+        userRepository.upsertUser(
+            userInfo.id(),
+            providerId,
+            login,
+            name,
+            avatar,
+            htmlUrl,
+            User.Type.USER.name(),
+            null, // email
+            null, // createdAt
+            null // updatedAt
+        );
+        log.info(
+            "Upserted user for PAT workspace bootstrap: userLogin={}, nativeId={}",
+            LoggingUtils.sanitizeForLog(login),
+            userInfo.id()
+        );
+        // Retrieve the JPA-managed entity to get the auto-generated PK (provider-scoped)
         return userRepository
-            .findByLogin(accountLogin)
+            .findByLoginAndProviderId(login, providerId)
             .map(User::getId)
-            .orElseGet(() -> {
-                // Fetch user info from GitHub to get the database ID
-                GitHubUserResponse userInfo = webClient
-                    .get()
-                    .uri("/users/{login}", accountLogin)
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + patToken)
-                    .retrieve()
-                    .bodyToMono(GitHubUserResponse.class)
-                    .block();
-
-                if (userInfo == null || userInfo.id() == null) {
-                    throw new IllegalStateException(
-                        "Failed to fetch GitHub user info for login '" + accountLogin + "'"
-                    );
-                }
-
-                User newUser = new User();
-                newUser.setId(userInfo.id());
-                newUser.setLogin(userInfo.login() != null ? userInfo.login() : accountLogin);
-                newUser.setName(userInfo.name() != null ? userInfo.name() : accountLogin);
-                newUser.setAvatarUrl(userInfo.avatarUrl() != null ? userInfo.avatarUrl() : "");
-                newUser.setHtmlUrl(userInfo.htmlUrl() != null ? userInfo.htmlUrl() : "");
-                newUser.setType(User.Type.USER);
-                newUser = userRepository.save(newUser);
-                log.info(
-                    "Created user for PAT workspace bootstrap: userLogin={}, userId={}",
-                    newUser.getLogin(),
-                    newUser.getId()
-                );
-                return newUser.getId();
-            });
+            .orElseThrow(() -> new IllegalStateException("User not found after upsert: login=" + login));
     }
 
     private record GitHubUserResponse(
@@ -419,4 +658,21 @@ public class WorkspaceProvisioningService {
     ) {}
 
     private record AccountDto(Long id, String login, String type, @JsonProperty("avatar_url") String avatarUrl) {}
+
+    // ============ DTOs for GitLab REST API ============
+
+    private record GitLabTokenUserResponse(
+        Long id,
+        String username,
+        String name,
+        @JsonProperty("avatar_url") String avatarUrl,
+        @JsonProperty("web_url") String webUrl
+    ) {}
+
+    private record GitLabGroupResponse(
+        Long id,
+        String name,
+        @JsonProperty("avatar_url") String avatarUrl,
+        @JsonProperty("web_url") String webUrl
+    ) {}
 }

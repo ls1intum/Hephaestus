@@ -10,7 +10,7 @@ import de.tum.in.www1.hephaestus.gitprovider.milestone.MilestoneRepository;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.github.dto.GitHubMilestoneDTO;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
-import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
 import java.time.Instant;
 import java.util.Optional;
@@ -40,18 +40,18 @@ public class GitHubMilestoneProcessor {
 
     private final MilestoneRepository milestoneRepository;
     private final IssueRepository issueRepository;
-    private final UserRepository userRepository;
+    private final GitHubUserProcessor gitHubUserProcessor;
     private final ApplicationEventPublisher eventPublisher;
 
     public GitHubMilestoneProcessor(
         MilestoneRepository milestoneRepository,
         IssueRepository issueRepository,
-        UserRepository userRepository,
+        GitHubUserProcessor gitHubUserProcessor,
         ApplicationEventPublisher eventPublisher
     ) {
         this.milestoneRepository = milestoneRepository;
         this.issueRepository = issueRepository;
-        this.userRepository = userRepository;
+        this.gitHubUserProcessor = gitHubUserProcessor;
         this.eventPublisher = eventPublisher;
     }
 
@@ -101,42 +101,24 @@ public class GitHubMilestoneProcessor {
 
         Milestone milestone = existingOpt.orElseGet(Milestone::new);
 
-        // Handle ID assignment:
-        // - If we have the real GitHub databaseId (from webhooks), always use it
-        // - If existing milestone has a different ID (e.g., generated deterministic ID),
-        //   delete it and create new with the real ID (Hibernate doesn't allow changing entity IDs)
-        // - For new milestones without databaseId (GraphQL), generate a deterministic ID
+        // Handle nativeId assignment:
+        // - If we have the real GitHub databaseId (from webhooks), use it as nativeId
+        // - If existing milestone has a different nativeId (e.g., generated deterministic value),
+        //   update it in place (PK is auto-generated, so no migration needed)
+        // - For new milestones without databaseId (GraphQL), generate a deterministic nativeId
         if (dto.id() != null) {
-            // We have the real GitHub databaseId
-            if (!isNew && !dto.id().equals(milestone.getId())) {
-                // Existing milestone has a different ID (likely a generated deterministic ID).
-                // Hibernate doesn't allow changing entity IDs, so we must delete and recreate.
-                Long oldMilestoneId = milestone.getId();
-                log.info(
-                    "Migrating milestone from generated to real ID: oldId={}, newId={}, milestoneNumber={}",
-                    oldMilestoneId,
-                    dto.id(),
-                    dto.number()
-                );
-                // CRITICAL: Clear issue references via direct database UPDATE before deletion.
-                // Using issueRepository.clearMilestoneReferences() instead of milestone.removeAllIssues()
-                // because the in-memory collection may be stale or not fully loaded, leading to
-                // FK constraint violations. The direct UPDATE ensures ALL database references are cleared.
-                int clearedCount = issueRepository.clearMilestoneReferences(oldMilestoneId);
-                if (clearedCount > 0) {
-                    log.debug("Cleared milestone references from {} issues before migration", clearedCount);
-                }
-                milestoneRepository.delete(milestone);
-                milestoneRepository.flush();
-                milestone = new Milestone();
-                isNew = true;
-            }
-            milestone.setId(dto.id());
+            // We have the real GitHub databaseId - use it as nativeId
+            milestone.setNativeId(dto.id());
         } else if (isNew) {
-            // New milestone from GraphQL (no databaseId) - generate deterministic ID
-            milestone.setId(generateDeterministicId(repository.getId(), dto.number()));
+            // New milestone from GraphQL (no databaseId) - generate deterministic nativeId
+            milestone.setNativeId(generateDeterministicId(repository.getId(), dto.number()));
         }
-        // else: existing milestone, keep its current ID (whether real or generated)
+        // else: existing milestone, keep its current nativeId (whether real or generated)
+
+        // Set provider for new milestones
+        if (isNew) {
+            milestone.setProvider(context.provider());
+        }
         if (dto.number() > 0) {
             milestone.setNumber(dto.number());
         }
@@ -179,7 +161,7 @@ public class GitHubMilestoneProcessor {
 
         // Set creator if provided
         if (creatorDto != null) {
-            User creator = findOrCreateUser(creatorDto);
+            User creator = findOrCreateUser(creatorDto, context.providerId());
             milestone.setCreator(creator);
         }
 
@@ -231,18 +213,19 @@ public class GitHubMilestoneProcessor {
      * Uses direct database UPDATE to ensure ALL references are cleared, not just
      * those loaded in the in-memory collection.
      *
-     * @param milestoneId the milestone database ID
+     * @param nativeId the milestone's native provider ID
      * @param context processing context with scope information
      */
     @Transactional
-    public void delete(Long milestoneId, ProcessingContext context) {
-        if (milestoneId == null) {
+    public void delete(Long nativeId, ProcessingContext context) {
+        if (nativeId == null) {
             return;
         }
 
         milestoneRepository
-            .findById(milestoneId)
+            .findByNativeIdAndProviderId(nativeId, context.providerId())
             .ifPresent(milestone -> {
+                Long milestoneId = milestone.getId();
                 // Clean up issue references via direct database UPDATE before deletion.
                 // Using issueRepository.clearMilestoneReferences() instead of milestone.removeAllIssues()
                 // because the in-memory collection may be stale or not fully loaded.
@@ -280,24 +263,7 @@ public class GitHubMilestoneProcessor {
     }
 
     @Nullable
-    private User findOrCreateUser(GitHubUserDTO dto) {
-        if (dto == null) {
-            return null;
-        }
-        Long userId = dto.getDatabaseId();
-        if (userId == null) {
-            return null;
-        }
-        return userRepository
-            .findById(userId)
-            .orElseGet(() -> {
-                User user = new User();
-                user.setId(userId);
-                user.setLogin(dto.login());
-                user.setAvatarUrl(dto.avatarUrl());
-                // Use login as fallback for name if null (name is @NonNull)
-                user.setName(dto.name() != null ? dto.name() : dto.login());
-                return userRepository.save(user);
-            });
+    private User findOrCreateUser(GitHubUserDTO dto, Long providerId) {
+        return gitHubUserProcessor.findOrCreate(dto, providerId);
     }
 }

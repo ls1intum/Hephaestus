@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.workspace.dto;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
@@ -18,9 +19,13 @@ public record WorkspaceDTO(
     @NonNull
     @Schema(description = "Current lifecycle status of the workspace (PENDING, ACTIVE, ARCHIVED)")
     String status,
-    @NonNull @Schema(description = "GitHub account login associated with this workspace") String accountLogin,
+    @NonNull @Schema(description = "Git provider account login associated with this workspace") String accountLogin,
     @Schema(description = "GitHub App installation ID, if linked") Long installationId,
-    @Schema(description = "Git provider mode (INSTALLATION or PAT)") String gitProviderMode,
+    @Schema(description = "Git provider mode (PAT_ORG, GITHUB_APP_INSTALLATION, GITLAB_PAT)") String gitProviderMode,
+    @NonNull
+    @Schema(description = "High-level git provider type derived from the authentication mode")
+    GitProviderType providerType,
+    @Schema(description = "Custom server URL for self-hosted instances (null for cloud defaults)") String serverUrl,
     @NonNull @Schema(description = "Timestamp when the workspace was created") Instant createdAt,
     @NonNull @Schema(description = "Timestamp when the workspace was last updated") Instant updatedAt,
     @Schema(description = "Timestamp when the GitHub App installation was linked") Instant installationLinkedAt,
@@ -31,8 +36,12 @@ public record WorkspaceDTO(
     @Schema(description = "Whether leaderboard notifications are enabled") Boolean leaderboardNotificationEnabled,
     @Schema(description = "Team name for leaderboard notifications") String leaderboardNotificationTeam,
     @Schema(description = "Slack channel ID for leaderboard notifications") String leaderboardNotificationChannelId,
+    @NonNull @Schema(description = "Whether a Personal Access Token is configured") Boolean hasPersonalAccessToken,
     @NonNull @Schema(description = "Whether Slack token is configured") Boolean hasSlackToken,
-    @NonNull @Schema(description = "Whether Slack signing secret is configured") Boolean hasSlackSigningSecret
+    @NonNull @Schema(description = "Whether Slack signing secret is configured") Boolean hasSlackSigningSecret,
+    @NonNull
+    @Schema(description = "Whether a GitLab webhook has been auto-registered for this workspace")
+    Boolean gitlabWebhookRegistered
 ) {
     public static WorkspaceDTO from(Workspace workspace) {
         return new WorkspaceDTO(
@@ -44,6 +53,8 @@ public record WorkspaceDTO(
             workspace.getAccountLogin(),
             workspace.getInstallationId(),
             workspace.getGitProviderMode() != null ? workspace.getGitProviderMode().name() : null,
+            workspace.getProviderType(),
+            workspace.getServerUrl(),
             workspace.getCreatedAt(),
             workspace.getUpdatedAt(),
             workspace.getInstallationLinkedAt(),
@@ -52,8 +63,10 @@ public record WorkspaceDTO(
             workspace.getLeaderboardNotificationEnabled(),
             workspace.getLeaderboardNotificationTeam(),
             workspace.getLeaderboardNotificationChannelId(),
+            workspace.getPersonalAccessToken() != null && !workspace.getPersonalAccessToken().isEmpty(),
             workspace.getSlackToken() != null && !workspace.getSlackToken().isEmpty(),
-            workspace.getSlackSigningSecret() != null && !workspace.getSlackSigningSecret().isEmpty()
+            workspace.getSlackSigningSecret() != null && !workspace.getSlackSigningSecret().isEmpty(),
+            workspace.getGitlabWebhookId() != null
         );
     }
 }

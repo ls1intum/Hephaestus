@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequestreview;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.BaseGitServiceEntity;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
@@ -8,11 +9,12 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.Id;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
@@ -23,16 +25,17 @@ import lombok.ToString;
 import org.springframework.lang.NonNull;
 
 @Entity
-@Table(name = "pull_request_review")
+@Table(
+    name = "pull_request_review",
+    uniqueConstraints = {
+        @UniqueConstraint(name = "uq_pr_review_provider_native_id", columnNames = { "provider_id", "native_id" }),
+    }
+)
 @Getter
 @Setter
 @NoArgsConstructor
-public class PullRequestReview {
-
-    @Id
-    protected Long id;
-
-    // Note: This entity does not have a createdAt and updatedAt field
+@ToString(callSuper = true)
+public class PullRequestReview extends BaseGitServiceEntity {
 
     @Column(columnDefinition = "TEXT")
     private String body;
@@ -52,12 +55,14 @@ public class PullRequestReview {
 
     private String commitId;
 
-    @ManyToOne
+    private Boolean authorCanPushToRepository;
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "author_id")
     @ToString.Exclude
     private User author;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "pull_request_id")
     @ToString.Exclude
     private PullRequest pullRequest;

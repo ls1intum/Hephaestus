@@ -1,0 +1,25 @@
+query GetIssueNotes($fullPath: ID!, $iid: String!, $first: Int!, $after: String) {
+    project(fullPath: $fullPath) {
+        issue(iid: $iid) {
+            notes(first: $first, after: $after, filter: ONLY_COMMENTS) {
+                count
+                pageInfo {
+                    hasNextPage
+                    endCursor
+                }
+                nodes {
+                    id
+                    body
+                    system
+                    internal
+                    url
+                    author {
+                        ...GitLabUserFields
+                    }
+                    createdAt
+                    updatedAt
+                }
+            }
+        }
+    }
+}

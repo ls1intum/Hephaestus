@@ -202,10 +202,9 @@ public class WorkspaceLifecycleService {
         log.debug("Invoked purge contributors: workspaceId={}, count={}", workspaceId, purgeContributors.size());
 
         // Step 5: Delete repository monitors
-        // Note: The RepositoryToMonitor entities are also managed via Workspace.repositoriesToMonitor
-        // with orphanRemoval=true, but we explicitly delete here for clarity and to ensure
-        // the collection is cleared before workspace save
-        repositoryToMonitorRepository.deleteAllByWorkspaceId(workspaceId);
+        // Use orphanRemoval cascade via collection.clear() — the bulk deleteAllByWorkspaceId()
+        // must NOT be combined with clear() because the bulk delete bypasses the persistence
+        // context, causing orphanRemoval to issue individual DELETEs for already-deleted rows.
         workspace.getRepositoriesToMonitor().clear();
         log.debug("Deleted repository monitors: workspaceId={}", workspaceId);
 
@@ -215,6 +214,20 @@ public class WorkspaceLifecycleService {
 
         // Step 7: Unlink organization (don't delete - Organization is a shared entity)
         workspace.setOrganization(null);
+
+        // Step 7b: Clear sensitive credentials (defense in depth — purged workspaces
+        // are retained for audit but should not hold decryptable secrets)
+        workspace.setPersonalAccessToken(null);
+        workspace.setSlackToken(null);
+        workspace.setSlackSigningSecret(null);
+
+        // Step 7c: Clear GitLab webhook references on the managed entity.
+        // The GitLabWebhookPurgeAdapter already deregistered the webhook via a suspended
+        // transaction (NOT_SUPPORTED), but that operates on a separate entity instance.
+        // We must clear these on the managed instance to prevent step 9's save from
+        // re-persisting stale values.
+        workspace.setGitlabGroupId(null);
+        workspace.setGitlabWebhookId(null);
 
         // Step 8: Clear sync timestamps for clean slate on potential reactivation
         // This ensures that if the workspace is ever reactivated, sync will fetch fresh data
@@ -292,7 +305,7 @@ public class WorkspaceLifecycleService {
 
     /**
      * Stop NATS consumer for a workspace.
-     * Only applies when NATS is enabled and workspace uses GitHub App mode.
+     * Applies to all provider types (GitHub App, GitLab PAT, etc.) when NATS is enabled.
      */
     private void stopNatsForWorkspace(Workspace workspace) {
         if (shouldUseNats(workspace)) {
@@ -302,7 +315,7 @@ public class WorkspaceLifecycleService {
 
     /**
      * Start NATS consumer for a workspace.
-     * Only applies when NATS is enabled and workspace uses GitHub App mode.
+     * Applies to all provider types (GitHub App, GitLab PAT, etc.) when NATS is enabled.
      */
     private void startNatsForWorkspace(Workspace workspace) {
         if (shouldUseNats(workspace)) {
@@ -312,14 +325,9 @@ public class WorkspaceLifecycleService {
 
     /**
      * Checks if NATS should be used for the given workspace.
-     * NATS consumers are only used when:
-     * <ul>
-     *   <li>NATS is enabled globally</li>
-     *   <li>Workspace exists</li>
-     *   <li>Workspace has an installation ID (GitHub App mode)</li>
-     * </ul>
+     * Must match the logic in {@code WorkspaceActivationService.shouldUseNats()}.
      */
     private boolean shouldUseNats(Workspace workspace) {
-        return natsProperties.enabled() && workspace != null && workspace.getInstallationId() != null;
+        return natsProperties.enabled() && workspace != null;
     }
 }

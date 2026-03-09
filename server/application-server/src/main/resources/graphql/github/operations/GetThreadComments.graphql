@@ -34,39 +34,12 @@ query GetThreadComments($threadId: ID!, $first: Int!, $after: String) {
                     updatedAt
                     state
                     url
+                    outdated
                     authorAssociation
 
                     # Comment author - supports User, Bot, Mannequin, and Organization types
                     author {
-                        __typename
-                        ... on User {
-                            id
-                            databaseId
-                            login
-                            avatarUrl
-                            name
-                            email
-                            createdAt
-                            updatedAt
-                        }
-                        ... on Bot {
-                            id
-                            databaseId
-                            login
-                            avatarUrl
-                        }
-                        ... on Mannequin {
-                            id
-                            databaseId
-                            login
-                            avatarUrl
-                        }
-                        ... on Organization {
-                            id
-                            databaseId
-                            login
-                            avatarUrl
-                        }
+                        ...ActorFields
                     }
 
                     # Reply to (for threading)

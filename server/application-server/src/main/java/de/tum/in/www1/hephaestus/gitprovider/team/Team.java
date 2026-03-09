@@ -24,7 +24,11 @@ import org.springframework.lang.NonNull;
 @Table(
     name = "team",
     uniqueConstraints = {
-        @UniqueConstraint(name = "uk_team_organization_name", columnNames = { "organization", "name" }),
+        @UniqueConstraint(
+            name = "uk_team_provider_organization_slug",
+            columnNames = { "provider_id", "organization", "slug" }
+        ),
+        @UniqueConstraint(name = "uq_team_provider_native_id", columnNames = { "provider_id", "native_id" }),
     }
 )
 @Getter
@@ -34,6 +38,19 @@ import org.springframework.lang.NonNull;
 public class Team extends BaseGitServiceEntity {
 
     private String name;
+
+    /**
+     * URL-safe unique identifier within the organization.
+     * <p>
+     * For GitHub: the team slug (e.g., "backend-core").
+     * For GitLab: relative path from root group (e.g., "group1/alpha").
+     * <p>
+     * Combined with {@code organization} and {@code provider_id}, this forms
+     * the natural key for team lookups.
+     */
+    @NonNull
+    @Column(length = 512)
+    private String slug;
 
     @Column(columnDefinition = "TEXT")
     private String description;
@@ -134,7 +151,6 @@ public class Team extends BaseGitServiceEntity {
     }
     // Ignored GitHub properties:
     // - nodeId
-    // - slug
     // - apiUrl               (API URL for this team)
     // - members_url       (templated URL for member listing)
     // - repositories_url  (templated URL for repos listing)

@@ -73,12 +73,9 @@ git --no-pager log origin/main..HEAD --oneline
 git --no-pager diff origin/main --stat | tail -20
 git status --short
 
-# PR status
-gh pr view --json number,state,mergeable,statusCheckRollup \
-  --jq '"PR #\(.number) \(.state) | failed=\([.statusCheckRollup[]?|select(.conclusion=="FAILURE")]|length)"' 2>/dev/null || echo "No PR"
-
-# Beads context
-bd show "$(git branch --show-current)" 2>/dev/null || true
+  # PR status
+  gh pr view --json number,state,mergeable,statusCheckRollup \
+    --jq '"PR #\(.number) \(.state) | failed=\([.statusCheckRollup[]?|select(.conclusion=="FAILURE")]|length)"' 2>/dev/null || echo "No PR"
 ```
 
 ---
@@ -336,7 +333,6 @@ Before claiming done, attack your own code:
 **You do NOT:**
 
 - Merge PRs (maintainer decides)
-- Close issues (update beads if configured)
 - Stop until mission complete or truly blocked
 
 **If blocked:** State exactly what you need and why. Be specific.

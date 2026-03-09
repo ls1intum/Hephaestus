@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.workspace;
 import static de.tum.in.www1.hephaestus.shared.LeaguePointsConstants.POINTS_DEFAULT;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserTeamsDTO;
 import de.tum.in.www1.hephaestus.testconfig.TestAuthUtils;
@@ -51,7 +52,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
     @Test
     @WithAdminUser
     void createWorkspaceWithInvalidPayloadReturnsValidationProblemDetail() {
-        var request = new CreateWorkspaceRequestDTO("INVALID SLUG", "", "", null, null);
+        var request = new CreateWorkspaceRequestDTO("INVALID SLUG", "", "", null, null, null, null, null);
 
         ProblemDetail problem = webTestClient
             .post()
@@ -82,7 +83,10 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             "Unauthenticated",
             "unauthenticated",
             AccountType.ORG,
-            owner.getId()
+            owner.getId(),
+            null,
+            null,
+            null
         );
 
         webTestClient
@@ -107,7 +111,10 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             "Mentor Space",
             "mentor-org",
             AccountType.ORG,
-            owner.getId()
+            owner.getId(),
+            null,
+            null,
+            null
         );
 
         webTestClient
@@ -133,7 +140,10 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             "Controller Space",
             "controller",
             AccountType.ORG,
-            owner.getId()
+            owner.getId(),
+            null,
+            null,
+            null
         );
 
         WorkspaceDTO created = webTestClient
@@ -152,6 +162,8 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
         WorkspaceDTO workspace = Objects.requireNonNull(created, "Workspace creation response was null");
         assertThat(workspace.workspaceSlug()).isEqualTo("controller-space");
         assertThat(workspace.status()).isEqualTo(Workspace.WorkspaceStatus.ACTIVE.name());
+        assertThat(workspace.providerType()).isEqualTo(GitProviderType.GITHUB);
+        assertThat(workspace.serverUrl()).isNull();
 
         Workspace persistedWorkspace = workspaceRepository.findById(workspace.id()).orElseThrow();
         ensureAdminMembership(persistedWorkspace);
@@ -181,6 +193,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             .getResponseBody();
         assertThat(workspaces).isNotNull();
         assertThat(workspaces).extracting(WorkspaceListItemDTO::workspaceSlug).contains(workspace.workspaceSlug());
+        assertThat(workspaces).extracting(WorkspaceListItemDTO::providerType).containsOnly(GitProviderType.GITHUB);
 
         var membership = workspaceMembershipRepository
             .findByWorkspace_IdAndUser_Id(workspace.id(), owner.getId())
@@ -431,7 +444,10 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             "Duplicate",
             "duplicate",
             AccountType.ORG,
-            owner.getId()
+            owner.getId(),
+            null,
+            null,
+            null
         );
 
         ProblemDetail problem = webTestClient

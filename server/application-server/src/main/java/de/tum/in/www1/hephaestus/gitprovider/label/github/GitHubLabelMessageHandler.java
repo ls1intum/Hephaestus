@@ -64,7 +64,7 @@ public class GitHubLabelMessageHandler extends GitHubMessageHandler<GitHubLabelE
         }
 
         if (event.actionType() == GitHubEventAction.Label.DELETED) {
-            labelProcessor.delete(labelDto.id(), context);
+            labelProcessor.deleteByNativeId(labelDto.id(), context);
         } else {
             labelProcessor.process(labelDto, context.repository(), context);
         }

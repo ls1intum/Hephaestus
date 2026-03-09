@@ -13,33 +13,33 @@ export const stateConfig: {
 	GOOD_PRACTICE: {
 		icon: Rocket,
 		text: "Good Practice",
-		color: "text-github-success-foreground",
+		color: "text-provider-success-foreground",
 	},
-	FIXED: { icon: Check, text: "Fixed", color: "text-github-done-foreground" },
+	FIXED: { icon: Check, text: "Fixed", color: "text-provider-done-foreground" },
 	CRITICAL_ISSUE: {
 		icon: Flame,
 		text: "Critical Issue",
-		color: "text-github-danger-foreground",
+		color: "text-provider-danger-foreground",
 	},
 	NORMAL_ISSUE: {
 		icon: AlertTriangle,
 		text: "Normal Issue",
-		color: "text-github-severe-foreground",
+		color: "text-provider-severe-foreground",
 	},
 	MINOR_ISSUE: {
 		icon: Bug,
 		text: "Minor Issue",
-		color: "text-github-attention-foreground",
+		color: "text-provider-attention-foreground",
 	},
 	WONT_FIX: {
 		icon: Ban,
 		text: "Won't Fix",
-		color: "text-github-muted-foreground",
+		color: "text-provider-muted-foreground",
 	},
 	WRONG: {
 		icon: XOctagon,
 		text: "Wrong",
-		color: "text-github-muted-foreground",
+		color: "text-provider-muted-foreground",
 	},
 };
 

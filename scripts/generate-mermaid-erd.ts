@@ -167,7 +167,7 @@ class MermaidErdGenerator {
 				CASE WHEN uk.column_name IS NOT NULL THEN 'YES' ELSE 'NO' END as is_unique_key
 			FROM information_schema.columns c
 			LEFT JOIN (
-				SELECT ku.column_name
+				SELECT DISTINCT ku.column_name
 				FROM information_schema.table_constraints tc
 				JOIN information_schema.key_column_usage ku
 				  ON tc.constraint_name = ku.constraint_name
@@ -177,7 +177,7 @@ class MermaidErdGenerator {
 				  AND tc.constraint_type = 'PRIMARY KEY'
 			) pk ON c.column_name = pk.column_name
 			LEFT JOIN (
-				SELECT ku.column_name
+				SELECT DISTINCT ku.column_name
 				FROM information_schema.table_constraints tc
 				JOIN information_schema.key_column_usage ku
 				  ON tc.constraint_name = ku.constraint_name
@@ -187,7 +187,7 @@ class MermaidErdGenerator {
 				  AND tc.constraint_type = 'FOREIGN KEY'
 			) fk ON c.column_name = fk.column_name
 			LEFT JOIN (
-				SELECT ku.column_name
+				SELECT DISTINCT ku.column_name
 				FROM information_schema.table_constraints tc
 				JOIN information_schema.key_column_usage ku
 				  ON tc.constraint_name = ku.constraint_name

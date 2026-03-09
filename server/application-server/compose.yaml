@@ -11,7 +11,7 @@ services:
       POSTGRES_PASSWORD: root
       POSTGRES_USER: root
     ports:
-      - '5432:5432'
+      - '${POSTGRES_PORT:-5432}:5432'
     networks:
       - app-network
     volumes:
@@ -35,7 +35,7 @@ services:
       - start-dev
       - --import-realm
     ports:
-      - '8081:8080'
+      - '${KEYCLOAK_PORT:-8081}:8080'
     volumes:
       # Mount realm config to import directory
       - ./keycloak-hephaestus-realm-example-config.json:/opt/keycloak/data/import/hephaestus-realm.json:ro

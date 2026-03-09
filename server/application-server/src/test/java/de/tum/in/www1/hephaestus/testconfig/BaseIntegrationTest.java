@@ -15,7 +15,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
-@Import({ TestSecurityConfig.class, GitHubIntegrationPostgresShutdown.class })
+@Import({ TestSecurityConfig.class, GitHubIntegrationPostgresShutdown.class, TestAsyncConfiguration.class })
 @Testcontainers
 @Tag("integration")
 public abstract class BaseIntegrationTest {
@@ -30,8 +30,11 @@ public abstract class BaseIntegrationTest {
         registry.add("spring.datasource.username", postgres::getUsername);
         registry.add("spring.datasource.password", postgres::getPassword);
 
-        // HikariCP configuration optimized for tests to prevent connection warnings
-        registry.add("spring.datasource.hikari.maximum-pool-size", () -> "5");
+        // HikariCP pool must be large enough for REQUIRES_NEW nested transactions
+        // when Surefire runs with -T 2C (parallel threads). Each @Transactional test
+        // holds one connection; REQUIRES_NEW (e.g. GitHubUserProcessor.executeUpsertWithDeadlockRetry,
+        // DatabaseTestUtils.doCleanDatabase) needs an additional one.
+        registry.add("spring.datasource.hikari.maximum-pool-size", () -> "10");
         registry.add("spring.datasource.hikari.minimum-idle", () -> "1");
         registry.add("spring.datasource.hikari.max-lifetime", () -> "300000"); // 5 minutes
         registry.add("spring.datasource.hikari.connection-timeout", () -> "10000"); // 10 seconds

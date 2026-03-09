@@ -72,6 +72,93 @@ erDiagram
         BIGINT workspace_id FK "NOT NULL"
     }
 
+    CommitContributor {
+        BIGINT id PK
+        BIGINT commit_id FK,UK "NOT NULL"
+        BIGINT user_id FK
+        VARCHAR(32) role UK "NOT NULL"
+        VARCHAR(255) name
+        VARCHAR(255) email UK "NOT NULL"
+        INTEGER ordinal "NOT NULL"
+    }
+
+    CommitFileChange {
+        BIGINT id PK
+        VARCHAR(1024) filename "NOT NULL"
+        VARCHAR(32) change_type "NOT NULL"
+        INTEGER additions "NOT NULL"
+        INTEGER deletions "NOT NULL"
+        INTEGER changes "NOT NULL"
+        VARCHAR(1024) previous_filename
+        BIGINT commit_id FK "NOT NULL"
+    }
+
+    CommitPullRequest {
+        BIGINT commit_id PK,FK
+        BIGINT pull_request_id PK,FK
+    }
+
+    Discussion {
+        BIGINT id PK
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+        INTEGER number UK "NOT NULL"
+        VARCHAR(1024) title "NOT NULL"
+        TEXT body
+        VARCHAR(512) html_url "NOT NULL"
+        VARCHAR(16) state "NOT NULL"
+        VARCHAR(32) state_reason
+        INTEGER upvote_count "NOT NULL"
+        BOOLEAN is_locked "NOT NULL"
+        VARCHAR(32) active_lock_reason
+        TIMESTAMPTZ closed_at
+        TIMESTAMPTZ answer_chosen_at
+        INTEGER comment_count "NOT NULL"
+        TIMESTAMPTZ last_sync_at
+        BIGINT repository_id FK,UK
+        BIGINT author_id FK
+        VARCHAR(128) category_id FK
+        BIGINT answer_chosen_by_id FK
+        BIGINT answer_comment_id FK,UK
+        BIGINT native_id UK "NOT NULL"
+        BIGINT provider_id FK,UK "NOT NULL"
+    }
+
+    DiscussionCategory {
+        VARCHAR(128) id PK
+        VARCHAR(255) name "NOT NULL"
+        VARCHAR(128) slug UK "NOT NULL"
+        VARCHAR(32) emoji
+        TEXT description
+        BOOLEAN is_answerable "NOT NULL"
+        BIGINT repository_id FK,UK
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+    }
+
+    DiscussionComment {
+        BIGINT id PK
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+        TEXT body
+        VARCHAR(512) html_url "NOT NULL"
+        BOOLEAN is_answer "NOT NULL"
+        BOOLEAN is_minimized "NOT NULL"
+        VARCHAR(64) minimized_reason
+        VARCHAR(32) author_association
+        TIMESTAMPTZ last_sync_at
+        BIGINT discussion_id FK
+        BIGINT author_id FK
+        BIGINT parent_comment_id FK
+        BIGINT native_id UK "NOT NULL"
+        BIGINT provider_id FK,UK "NOT NULL"
+    }
+
+    DiscussionLabel {
+        BIGINT discussion_id PK,FK
+        BIGINT label_id PK,FK
+    }
+
     Document {
         UUID id PK
         INTEGER version_number PK
@@ -83,8 +170,46 @@ erDiagram
         BIGINT workspace_id FK "NOT NULL"
     }
 
+    GitCommit {
+        BIGINT id PK
+        VARCHAR(40) sha UK "NOT NULL"
+        VARCHAR(1024) message "NOT NULL"
+        TEXT message_body
+        VARCHAR(512) html_url
+        TIMESTAMPTZ authored_at "NOT NULL"
+        TIMESTAMPTZ committed_at "NOT NULL"
+        INTEGER additions "NOT NULL"
+        INTEGER deletions "NOT NULL"
+        INTEGER changed_files "NOT NULL"
+        VARCHAR(255) author_email
+        VARCHAR(255) committer_email
+        BOOLEAN signature_valid
+        BOOLEAN authored_by_committer
+        BOOLEAN committed_via_web
+        INTEGER parent_count
+        TIMESTAMPTZ last_sync_at
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+        BIGINT repository_id FK,UK "NOT NULL"
+        BIGINT author_id FK
+        BIGINT committer_id FK
+        VARCHAR(32) signature_state
+        BOOLEAN signature_was_signed_by_github
+        VARCHAR(255) signature_signer_login
+        TEXT parent_shas
+        VARCHAR(32) status_check_rollup_state
+        VARCHAR(255) on_behalf_of_login
+    }
+
+    GitProvider {
+        BIGINT id PK
+        VARCHAR(10) type UK "NOT NULL"
+        VARCHAR(512) server_url UK "NOT NULL"
+        TIMESTAMPTZ created_at "NOT NULL"
+    }
+
     Issue {
-        VARCHAR(31) issue_type "NOT NULL"
+        VARCHAR(31) issue_type UK "NOT NULL"
         BIGINT id PK
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
@@ -121,6 +246,8 @@ erDiagram
         VARCHAR(40) head_ref_oid
         VARCHAR(255) base_ref_name
         VARCHAR(40) base_ref_oid
+        BIGINT native_id UK "NOT NULL"
+        BIGINT provider_id FK,UK "NOT NULL"
     }
 
     IssueAssignee {
@@ -142,6 +269,8 @@ erDiagram
         BIGINT author_id FK
         BIGINT issue_id FK
         TEXT body
+        BIGINT native_id UK "NOT NULL"
+        BIGINT provider_id FK,UK "NOT NULL"
     }
 
     IssueLabel {
@@ -168,6 +297,8 @@ erDiagram
         TIMESTAMPTZ last_sync_at
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
+        BIGINT native_id UK "NOT NULL"
+        BIGINT provider_id FK,UK "NOT NULL"
     }
 
     Milestone {
@@ -186,6 +317,8 @@ erDiagram
         INTEGER closed_issues_count "NOT NULL"
         INTEGER open_issues_count "NOT NULL"
         TIMESTAMPTZ last_sync_at
+        BIGINT native_id UK "NOT NULL"
+        BIGINT provider_id FK,UK "NOT NULL"
     }
 
     Organization {
@@ -193,17 +326,101 @@ erDiagram
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
         VARCHAR(255) avatar_url
-        BIGINT github_id UK "NOT NULL"
+        BIGINT native_id UK "NOT NULL"
         VARCHAR(255) html_url
         VARCHAR(255) login UK "NOT NULL"
         VARCHAR(255) name
         TIMESTAMPTZ last_sync_at
+        BIGINT provider_id FK,UK "NOT NULL"
     }
 
     OrganizationMembership {
         BIGINT organization_id PK
         BIGINT user_id PK
         VARCHAR(32) role
+    }
+
+    Project {
+        BIGINT id PK
+        VARCHAR(64) node_id UK
+        VARCHAR(32) owner_type UK "NOT NULL"
+        BIGINT owner_id UK "NOT NULL"
+        INTEGER number UK "NOT NULL"
+        VARCHAR(256) title
+        TEXT short_description
+        TEXT readme
+        BOOLEAN template "NOT NULL"
+        VARCHAR(512) url
+        BOOLEAN closed "NOT NULL"
+        TIMESTAMPTZ closed_at
+        BOOLEAN is_public "NOT NULL"
+        BIGINT creator_id FK
+        TIMESTAMPTZ last_sync_at
+        VARCHAR(256) item_sync_cursor
+        TIMESTAMPTZ items_synced_at
+        VARCHAR(256) field_sync_cursor
+        TIMESTAMPTZ fields_synced_at
+        VARCHAR(256) status_update_sync_cursor
+        TIMESTAMPTZ status_updates_synced_at
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+        BIGINT native_id UK "NOT NULL"
+        BIGINT provider_id FK,UK "NOT NULL"
+    }
+
+    ProjectField {
+        VARCHAR(64) id PK
+        BIGINT project_id FK,UK "NOT NULL"
+        VARCHAR(256) name UK "NOT NULL"
+        VARCHAR(32) data_type "NOT NULL"
+        JSONB options
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+    }
+
+    ProjectFieldValue {
+        BIGINT id PK
+        BIGINT item_id FK,UK "NOT NULL"
+        VARCHAR(64) field_id FK,UK "NOT NULL"
+        TEXT text_value
+        DOUBLE number_value
+        DATE date_value
+        VARCHAR(64) single_select_option_id
+        VARCHAR(64) iteration_id
+        TIMESTAMPTZ updated_at
+    }
+
+    ProjectItem {
+        BIGINT id PK
+        VARCHAR(64) node_id UK
+        BIGINT project_id FK,UK "NOT NULL"
+        VARCHAR(32) content_type "NOT NULL"
+        BIGINT issue_id FK
+        BIGINT content_database_id
+        VARCHAR(1024) draft_title
+        TEXT draft_body
+        BOOLEAN archived "NOT NULL"
+        BIGINT creator_id FK
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+        BIGINT native_id UK "NOT NULL"
+        BIGINT provider_id FK,UK "NOT NULL"
+    }
+
+    ProjectStatusUpdate {
+        BIGINT id PK
+        VARCHAR(64) node_id UK
+        BIGINT project_id FK "NOT NULL"
+        TEXT body
+        TEXT body_html
+        DATE start_date
+        DATE target_date
+        VARCHAR(32) status
+        BIGINT creator_id FK
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+        BIGINT native_id UK "NOT NULL"
+        BIGINT provider_id FK,UK "NOT NULL"
     }
 
     PullRequestBadPractice {
@@ -235,6 +452,11 @@ erDiagram
         BIGINT author_id FK
         BIGINT pull_request_id FK
         TEXT body
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
+        BOOLEAN author_can_push_to_repository
+        BIGINT native_id UK "NOT NULL"
+        BIGINT provider_id FK,UK "NOT NULL"
     }
 
     PullRequestReviewComment {
@@ -257,6 +479,9 @@ erDiagram
         BIGINT in_reply_to_id FK
         TEXT body
         TEXT diff_hunk
+        BOOLEAN outdated
+        BIGINT native_id UK "NOT NULL"
+        BIGINT provider_id FK,UK "NOT NULL"
     }
 
     PullRequestReviewThread {
@@ -275,6 +500,8 @@ erDiagram
         BOOLEAN outdated
         BOOLEAN collapsed
         BIGINT resolved_by_id FK
+        BIGINT native_id UK "NOT NULL"
+        BIGINT provider_id FK,UK "NOT NULL"
     }
 
     Repository {
@@ -293,6 +520,9 @@ erDiagram
         VARCHAR(255) visibility
         BIGINT organization_id FK
         TIMESTAMPTZ last_sync_at
+        BOOLEAN has_discussions_enabled "NOT NULL"
+        BIGINT native_id UK "NOT NULL"
+        BIGINT provider_id FK,UK "NOT NULL"
     }
 
     RepositoryCollaborator {
@@ -303,7 +533,6 @@ erDiagram
 
     RepositoryToMonitor {
         BIGINT id PK
-        TIMESTAMPTZ issues_and_pull_requests_synced_at
         TIMESTAMPTZ labels_synced_at
         TIMESTAMPTZ milestones_synced_at
         VARCHAR(255) name_with_owner
@@ -317,11 +546,15 @@ erDiagram
         INTEGER issue_backfill_checkpoint
         INTEGER pull_request_backfill_high_water_mark
         INTEGER pull_request_backfill_checkpoint
+        TIMESTAMPTZ issues_synced_at
+        TIMESTAMPTZ pull_requests_synced_at
+        VARCHAR(255) discussion_sync_cursor
+        TIMESTAMPTZ discussions_synced_at
     }
 
     Team {
         BIGINT id PK
-        VARCHAR(255) name UK
+        VARCHAR(255) name
         TIMESTAMPTZ created_at
         TEXT description
         VARCHAR(512) html_url
@@ -330,6 +563,9 @@ erDiagram
         BIGINT parent_id
         VARCHAR(32) privacy
         TIMESTAMPTZ updated_at
+        BIGINT native_id UK "NOT NULL"
+        BIGINT provider_id FK,UK "NOT NULL"
+        VARCHAR(512) slug UK "NOT NULL"
     }
 
     TeamMembership {
@@ -351,9 +587,11 @@ erDiagram
         VARCHAR(255) avatar_url
         VARCHAR(255) email
         VARCHAR(255) html_url
-        VARCHAR(255) login UK
+        VARCHAR(255) login
         VARCHAR(255) name
         VARCHAR(255) type
+        BIGINT native_id UK "NOT NULL"
+        BIGINT provider_id FK,UK "NOT NULL"
     }
 
     UserPreference {
@@ -368,7 +606,7 @@ erDiagram
         TIMESTAMPTZ users_synced_at
         VARCHAR(120) account_login
         VARCHAR(255) git_provider_mode
-        VARCHAR(255) github_repository_selection
+        VARCHAR(255) repository_selection
         BIGINT installation_id
         TIMESTAMPTZ installation_linked_at
         BIGINT organization_id FK,UK
@@ -392,6 +630,9 @@ erDiagram
         TIMESTAMPTZ sub_issues_synced_at
         TIMESTAMPTZ issue_types_synced_at
         TIMESTAMPTZ issue_dependencies_synced_at
+        VARCHAR(512) server_url
+        BIGINT gitlab_group_id
+        BIGINT gitlab_webhook_id
     }
 
     WorkspaceMembership {
@@ -435,10 +676,35 @@ erDiagram
     Workspace ||--|| ActivityEvent : has
     ChatMessage ||--|| ChatMessagePart : has
     ChatMessage ||--|| ChatThread : references
+    GitCommit ||--|| CommitContributor : has
+    DiscussionComment ||--|| Discussion : references
+    GitProvider ||--|| Discussion : references
+    Repository ||--|| Discussion : has
+    Repository ||--|| DiscussionCategory : has
+    GitProvider ||--|| DiscussionComment : commented_on
+    Repository ||--|| GitCommit : has
+    GitProvider ||--|| Issue : references
     Repository ||--|| Issue : has
+    GitProvider ||--|| IssueComment : commented_on
+    GitProvider ||--|| Label : labeled
     Repository ||--|| Label : labeled
+    GitProvider ||--|| Milestone : references
     Repository ||--|| Milestone : has
+    GitProvider ||--|| Organization : references
+    GitProvider ||--|| Project : references
+    Project ||--|| ProjectField : has
+    ProjectField ||--|| ProjectFieldValue : has
+    ProjectItem ||--|| ProjectFieldValue : has
+    Project ||--|| ProjectItem : has
+    GitProvider ||--|| ProjectItem : references
+    GitProvider ||--|| ProjectStatusUpdate : references
+    GitProvider ||--|| PullRequestReview : reviewed
+    GitProvider ||--|| PullRequestReviewComment : commented_on
+    GitProvider ||--|| PullRequestReviewThread : reviewed
     PullRequestReviewComment ||--|| PullRequestReviewThread : reviewed
+    GitProvider ||--|| Repository : references
+    GitProvider ||--|| Team : references
+    GitProvider ||--|| User : references
     User ||--|| UserPreference : has
     Organization ||--|| Workspace : has
     User ||--|| WorkspaceMembership : belongs_to
@@ -453,8 +719,18 @@ erDiagram
     ChatThread ||--o{ ChatMessage : has
     User ||--o{ ChatThread : has
     Workspace ||--o{ ChatThread : has
+    User ||--o{ CommitContributor : has
+    GitCommit ||--o{ CommitFileChange : has
+    User ||--o{ Discussion : references
+    User ||--o{ Discussion : authored_by
+    DiscussionCategory ||--o{ Discussion : has
+    User ||--o{ DiscussionComment : commented_on
+    Discussion ||--o{ DiscussionComment : commented_on
+    DiscussionComment ||--o{ DiscussionComment : commented_on
     User ||--o{ Document : has
     Workspace ||--o{ Document : has
+    User ||--o{ GitCommit : authored_by
+    User ||--o{ GitCommit : references
     User ||--o{ Issue : authored_by
     IssueType ||--o{ Issue : has
     User ||--o{ Issue : merged_by
@@ -464,6 +740,11 @@ erDiagram
     Issue ||--o{ IssueComment : commented_on
     Organization ||--o{ IssueType : has
     User ||--o{ Milestone : created_by
+    User ||--o{ Project : created_by
+    User ||--o{ ProjectItem : created_by
+    Issue ||--o{ ProjectItem : has
+    User ||--o{ ProjectStatusUpdate : created_by
+    Project ||--o{ ProjectStatusUpdate : has
     BadPracticeDetection ||--o{ PullRequestBadPractice : has
     Issue ||--o{ PullRequestBadPractice : references
     User ||--o{ PullRequestReview : reviewed
@@ -480,6 +761,10 @@ erDiagram
     Workspace ||--o{ WorkspaceSlugHistory : has
 
     %% Many-to-Many relationships
+    GitCommit }o--o{ CommitPullRequest : has
+    Issue }o--o{ CommitPullRequest : references
+    Discussion }o--o{ DiscussionLabel : labeled
+    Label }o--o{ DiscussionLabel : labeled
     Issue }o--o{ IssueAssignee : assigned_to
     User }o--o{ IssueAssignee : assigned_to
     Issue }o--o{ IssueBlocking : has

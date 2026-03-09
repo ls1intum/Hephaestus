@@ -6,6 +6,8 @@ import de.tum.in.www1.hephaestus.core.event.WorkspacesInitializedEvent;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.ExponentialBackoff;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandler;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubMessageHandlerRegistry;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabMessageHandler;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabMessageHandlerRegistry;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.NatsSubscriptionProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.NatsSubscriptionProvider.NatsSubscriptionInfo;
 import de.tum.in.www1.hephaestus.gitprovider.sync.exception.NatsConnectionException;
@@ -18,6 +20,7 @@ import io.nats.client.JetStreamOptions;
 import io.nats.client.JetStreamSubscription;
 import io.nats.client.Message;
 import io.nats.client.MessageConsumer;
+import io.nats.client.MessageHandler;
 import io.nats.client.Nats;
 import io.nats.client.Options;
 import io.nats.client.StreamContext;
@@ -154,15 +157,18 @@ public class NatsConsumerService {
     /** Virtual thread executor for scope message processing */
     private final ExecutorService virtualThreadExecutor = Executors.newVirtualThreadPerTaskExecutor();
 
-    private final GitHubMessageHandlerRegistry handlerRegistry;
+    private final GitHubMessageHandlerRegistry githubHandlerRegistry;
+    private final GitLabMessageHandlerRegistry gitlabHandlerRegistry;
     private final NatsSubscriptionProvider subscriptionProvider;
 
     public NatsConsumerService(
-        @Lazy GitHubMessageHandlerRegistry handlerRegistry,
+        @Lazy GitHubMessageHandlerRegistry githubHandlerRegistry,
+        @Lazy GitLabMessageHandlerRegistry gitlabHandlerRegistry,
         NatsSubscriptionProvider subscriptionProvider,
         NatsProperties natsProperties
     ) {
-        this.handlerRegistry = handlerRegistry;
+        this.githubHandlerRegistry = githubHandlerRegistry;
+        this.gitlabHandlerRegistry = gitlabHandlerRegistry;
         this.subscriptionProvider = subscriptionProvider;
         this.natsProperties = natsProperties;
     }
@@ -315,7 +321,12 @@ public class NatsConsumerService {
     /**
      * Updates the subjects for an existing scope consumer.
      * Call this when repositories are added/removed from a scope.
+     * <p>
      * NOTE: Does NOT start a consumer if one doesn't exist - use startConsumingScope for that.
+     * <p>
+     * LIMITATION: If a workspace's provider type changes (e.g., GitHub → GitLab), this method
+     * only updates subjects but does not recreate the consumer on the new stream. In that case,
+     * the consumer should be stopped and restarted via {@link #restartScopeConsumer(Long)}.
      *
      * @param scopeId The scope ID with updated repositories
      */
@@ -335,7 +346,12 @@ public class NatsConsumerService {
 
         virtualThreadExecutor.submit(() -> {
             try {
-                String[] newSubjects = buildScopeSubjects(scopeId);
+                var subscriptionInfoOpt = subscriptionProvider.getSubscriptionInfo(scopeId);
+                if (subscriptionInfoOpt.isEmpty()) {
+                    log.warn("No subscription info found during update: scopeId={}", scopeId);
+                    return;
+                }
+                String[] newSubjects = buildScopeSubjects(subscriptionInfoOpt.get());
                 existing.updateSubjects(newSubjects);
                 log.info("Updated consumer subjects: scopeId={}, subjectCount={}", scopeId, newSubjects.length);
             } catch (Exception e) {
@@ -363,7 +379,7 @@ public class NatsConsumerService {
         virtualThreadExecutor.submit(() -> {
             try {
                 consumer.stop();
-                cleanupConsumer(consumer.consumerName);
+                cleanupConsumer(consumer.streamName, consumer.consumerName);
                 log.info("Stopped consumer: scopeId={}", scopeId);
             } catch (Exception e) {
                 log.error("Failed to stop consumer: scopeId={}", scopeId, e);
@@ -376,7 +392,15 @@ public class NatsConsumerService {
     // =========================================================================
 
     private void setupScopeConsumer(Long scopeId) throws IOException {
-        String[] subjects = buildScopeSubjects(scopeId);
+        var subscriptionInfoOpt = subscriptionProvider.getSubscriptionInfo(scopeId);
+        if (subscriptionInfoOpt.isEmpty()) {
+            log.warn("No subscription info found: scopeId={}", scopeId);
+            return;
+        }
+
+        NatsSubscriptionInfo subscriptionInfo = subscriptionInfoOpt.get();
+        String[] subjects = buildScopeSubjects(subscriptionInfo);
+        String streamName = subscriptionInfo.natsStreamName();
 
         if (subjects.length == 0) {
             log.info("Skipped consumer setup: scopeId={}, reason=no subjects", scopeId);
@@ -390,7 +414,7 @@ public class NatsConsumerService {
             JetStreamOptions jsOptions = JetStreamOptions.builder()
                 .requestTimeout(natsProperties.consumer().requestTimeout())
                 .build();
-            StreamContext streamContext = natsConnection.getStreamContext("github", jsOptions);
+            StreamContext streamContext = natsConnection.getStreamContext(streamName, jsOptions);
             ConsumerContext consumerContext = createOrUpdateConsumer(streamContext, consumerName, subjects);
 
             ScopeConsumer scopeConsumer = new ScopeConsumer(
@@ -398,12 +422,13 @@ public class NatsConsumerService {
                 consumerName,
                 consumerContext,
                 streamContext,
-                subjects
+                subjects,
+                streamName
             );
             scopeConsumer.start();
 
             scopeConsumers.put(scopeId, scopeConsumer);
-            log.info("Started consumer: scopeId={}, subjectCount={}", scopeId, subjects.length);
+            log.info("Started consumer: scopeId={}, stream={}, subjectCount={}", scopeId, streamName, subjects.length);
         } catch (JetStreamApiException e) {
             throw new IOException("Failed to setup consumer for scope " + scopeId, e);
         }
@@ -420,7 +445,14 @@ public class NatsConsumerService {
             StreamContext streamContext = natsConnection.getStreamContext("github", jsOptions);
             ConsumerContext consumerContext = createOrUpdateConsumer(streamContext, consumerName, subjects);
 
-            installationConsumer = new ScopeConsumer(null, consumerName, consumerContext, streamContext, subjects);
+            installationConsumer = new ScopeConsumer(
+                null,
+                consumerName,
+                consumerContext,
+                streamContext,
+                subjects,
+                "github"
+            );
             installationConsumer.start();
             log.info("Started installation consumer: consumerName={}, subjectCount={}", consumerName, subjects.length);
         } catch (JetStreamApiException e) {
@@ -483,24 +515,20 @@ public class NatsConsumerService {
         return streamContext.createOrUpdateConsumer(configBuilder.build());
     }
 
-    private String[] buildScopeSubjects(Long scopeId) {
-        var subscriptionInfoOpt = subscriptionProvider.getSubscriptionInfo(scopeId);
-        if (subscriptionInfoOpt.isEmpty()) {
-            log.warn("No subscription info found: scopeId={}", scopeId);
-            return new String[0];
-        }
-
-        NatsSubscriptionInfo subscriptionInfo = subscriptionInfoOpt.get();
+    private String[] buildScopeSubjects(NatsSubscriptionInfo subscriptionInfo) {
+        String streamName = subscriptionInfo.natsStreamName();
         Set<String> subjects = new HashSet<>();
 
         // Add subjects for all repositories in the scope
         for (String repoNameWithOwner : subscriptionInfo.repositoryNamesWithOwner()) {
-            subjects.addAll(Arrays.asList(getRepositorySubjects(repoNameWithOwner)));
+            subjects.addAll(Arrays.asList(getRepositorySubjects(streamName, repoNameWithOwner)));
         }
 
         // Add organization-level subjects if scope has an organization
+        // Note: GitLab scopes may not use org-level subjects the same way as GitHub,
+        // but the wildcard approach is safe — it just won't match any messages.
         if (subscriptionInfo.hasOrganization()) {
-            subjects.addAll(Arrays.asList(getOrganizationSubjects(subscriptionInfo.organizationLogin())));
+            subjects.addAll(Arrays.asList(getOrganizationSubjects(streamName, subscriptionInfo.organizationLogin())));
         }
 
         return subjects.toArray(String[]::new);
@@ -522,12 +550,13 @@ public class NatsConsumerService {
      * creation validates each subject against the stream, causing O(n*m) timeouts
      * on large filter lists. Using wildcards reduces this to O(n) where n=repos.
      *
+     * @param streamName    the NATS stream name ("github" or "gitlab")
      * @param nameWithOwner repository identifier in "owner/repo" format
      * @return single-element array containing the wildcard subject
      */
-    private String[] getRepositorySubjects(String nameWithOwner) {
+    private String[] getRepositorySubjects(String streamName, String nameWithOwner) {
         // Use wildcard to match ALL events for this repository
-        return new String[] { getSubjectPrefix(nameWithOwner) + ".>" };
+        return new String[] { buildSubjectPrefix(streamName, nameWithOwner) + ".>" };
     }
 
     /**
@@ -536,12 +565,13 @@ public class NatsConsumerService {
      * <p>Organization events use {@code ?} as repo placeholder in the subject,
      * so we match {@code github.owner.?.>} for all org-level events.
      *
-     * @param owner the organization login
+     * @param streamName the NATS stream name ("github" or "gitlab")
+     * @param owner      the organization login
      * @return single-element array containing the wildcard subject
      */
-    private String[] getOrganizationSubjects(String owner) {
+    private String[] getOrganizationSubjects(String streamName, String owner) {
         // Use wildcard to match ALL org-level events (? is the repo placeholder)
-        return new String[] { getSubjectPrefix(owner + "/?") + ".>" };
+        return new String[] { buildSubjectPrefix(streamName, owner + "/?") + ".>" };
     }
 
     /**
@@ -549,29 +579,70 @@ public class NatsConsumerService {
      *
      * <p>Installation events use {@code ?/?} as owner/repo placeholder,
      * so we match {@code github.?.?.>} for all installation events.
+     * Installation events are GitHub-only (GitLab uses PAT-based auth).
      *
      * @return single-element array containing the wildcard subject
      */
     private String[] getInstallationSubjects() {
-        // Use wildcard to match ALL installation-level events
-        return new String[] { getSubjectPrefix("?/?") + ".>" };
+        // Use wildcard to match ALL installation-level events (GitHub-only)
+        return new String[] { buildSubjectPrefix("github", "?/?") + ".>" };
     }
 
-    private String getSubjectPrefix(String nameWithOwner) {
+    /**
+     * Builds the NATS subject prefix for a repository identifier.
+     * <p>
+     * Handles provider-specific namespace conventions:
+     * <ul>
+     *   <li><b>GitHub:</b> {@code owner/repo} → {@code github.owner.repo}
+     *       (always exactly 2 parts)</li>
+     *   <li><b>GitLab:</b> {@code group/subgroup/project} → {@code gitlab.group~subgroup.project}
+     *       (namespace parts joined with {@code ~}, matching webhook-ingest's gitlab-subject.ts)</li>
+     * </ul>
+     *
+     * @param streamName    the NATS stream name ("github" or "gitlab")
+     * @param nameWithOwner repository identifier (e.g., "owner/repo" or "group/sub/project")
+     * @return the subject prefix (e.g., "github.owner.repo" or "gitlab.group~sub.project")
+     * @throws IllegalArgumentException if nameWithOwner is null, empty, or has invalid format
+     */
+    static String buildSubjectPrefix(String streamName, String nameWithOwner) {
+        if (streamName == null || streamName.trim().isEmpty()) {
+            throw new IllegalArgumentException("Stream name cannot be null or empty.");
+        }
         if (nameWithOwner == null || nameWithOwner.trim().isEmpty()) {
             throw new IllegalArgumentException("Repository identifier cannot be null or empty.");
         }
 
-        String sanitized = nameWithOwner.replace(".", "~");
-        String[] parts = sanitized.split("/");
+        String sanitized = nameWithOwner.trim().replace(".", "~");
+        String[] parts = sanitized.split("/", -1);
+        if (Arrays.stream(parts).anyMatch(String::isBlank)) {
+            throw new IllegalArgumentException(
+                String.format("Invalid repository format: '%s'. Empty path segments are not allowed.", nameWithOwner)
+            );
+        }
 
+        if ("gitlab".equals(streamName)) {
+            // GitLab: supports nested namespaces (group/subgroup/project)
+            // Join all namespace parts with ~ and use last part as project
+            if (parts.length < 2) {
+                throw new IllegalArgumentException(
+                    String.format(
+                        "Invalid GitLab repository format: '%s'. Expected 'namespace/project'.",
+                        nameWithOwner
+                    )
+                );
+            }
+            String namespace = String.join("~", Arrays.copyOfRange(parts, 0, parts.length - 1));
+            String project = parts[parts.length - 1];
+            return streamName + "." + namespace + "." + project;
+        }
+
+        // GitHub: strictly 2-part format (owner/repo)
         if (parts.length != 2) {
             throw new IllegalArgumentException(
                 String.format("Invalid repository format: '%s'. Expected format 'owner/repository'.", nameWithOwner)
             );
         }
-
-        return "github." + parts[0] + "." + parts[1];
+        return streamName + "." + parts[0] + "." + parts[1];
     }
 
     private void handleMessage(Message msg) {
@@ -584,10 +655,25 @@ public class NatsConsumerService {
         try {
             String subject = msg.getSubject();
             String eventKey = subject.substring(subject.lastIndexOf('.') + 1);
-            GitHubMessageHandler<?> eventHandler = handlerRegistry.getHandler(eventKey);
+
+            // Route to the correct handler registry based on subject prefix.
+            // Unrecognized prefixes are acknowledged to prevent infinite redelivery.
+            MessageHandler eventHandler;
+            if (subject.startsWith("gitlab.")) {
+                eventHandler = gitlabHandlerRegistry.getHandler(eventKey);
+            } else if (subject.startsWith("github.")) {
+                eventHandler = githubHandlerRegistry.getHandler(eventKey);
+            } else {
+                log.warn(
+                    "Unknown subject prefix, acknowledging to prevent redelivery: subject={}",
+                    sanitizeForLog(subject)
+                );
+                msg.ack();
+                return;
+            }
 
             if (eventHandler == null) {
-                // DEBUG level, not WARN: This is expected behavior for GitHub events we don't need
+                // DEBUG level, not WARN: This is expected behavior for events we don't need
                 // to handle (e.g., check_run, check_suite, push). The message is still acknowledged
                 // so it won't be redelivered. Using WARN would pollute logs and mask real issues.
                 log.debug("No handler found for event: eventType={}", eventKey);
@@ -694,13 +780,13 @@ public class NatsConsumerService {
         }
     }
 
-    private void cleanupConsumer(String consumerName) {
+    private void cleanupConsumer(String streamName, String consumerName) {
         if (natsConnection == null || natsConnection.getStatus() != Connection.Status.CONNECTED) {
             return;
         }
 
         try {
-            natsConnection.jetStreamManagement().deleteConsumer("github", consumerName);
+            natsConnection.jetStreamManagement().deleteConsumer(streamName, consumerName);
         } catch (io.nats.client.JetStreamApiException e) {
             // Error code 10014 = consumer not found - this is expected during cleanup
             if (e.getApiErrorCode() == 10014) {
@@ -928,7 +1014,7 @@ public class NatsConsumerService {
         if (existing != null) {
             try {
                 existing.stop();
-                cleanupConsumer(existing.consumerName);
+                cleanupConsumer(existing.streamName, existing.consumerName);
             } catch (Exception e) {
                 log.warn("Failed to stop existing consumer during restart: scopeId={}", scopeId, e);
             }
@@ -954,7 +1040,7 @@ public class NatsConsumerService {
             installationConsumer = null;
             try {
                 existing.stop();
-                cleanupConsumer(existing.consumerName);
+                cleanupConsumer(existing.streamName, existing.consumerName);
             } catch (Exception e) {
                 log.warn("Failed to stop existing installation consumer during restart", e);
             }
@@ -1037,6 +1123,7 @@ public class NatsConsumerService {
 
         private final Long scopeId; // null for installation consumer
         private final String consumerName;
+        private final String streamName;
         private final ConsumerContext context;
         private final StreamContext streamContext;
         private volatile String[] currentSubjects;
@@ -1057,13 +1144,15 @@ public class NatsConsumerService {
             String consumerName,
             ConsumerContext context,
             StreamContext streamContext,
-            String[] subjects
+            String[] subjects,
+            String streamName
         ) {
             this.scopeId = scopeId;
             this.consumerName = consumerName;
             this.context = context;
             this.streamContext = streamContext;
             this.currentSubjects = subjects;
+            this.streamName = streamName;
         }
 
         synchronized void start() throws IOException, JetStreamApiException {

@@ -19,6 +19,7 @@ import {
 	useSidebar,
 } from "@/components/ui/sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getWorkspaceAvatarUrl } from "@/lib/provider";
 
 export function WorkspaceSwitcher({
 	workspaces,
@@ -130,7 +131,10 @@ export function WorkspaceSwitcher({
 								<AvatarImage
 									src={
 										activeWorkspace
-											? `https://github.com/${activeWorkspace.accountLogin}.png`
+											? (getWorkspaceAvatarUrl(
+													activeWorkspace.providerType ?? "GITHUB",
+													activeWorkspace.accountLogin,
+												) ?? undefined)
 											: undefined
 									}
 									alt={activeWorkspace?.displayName}
@@ -172,7 +176,12 @@ export function WorkspaceSwitcher({
 								<div className="flex size-6 items-center justify-center rounded-sm overflow-clip">
 									<Avatar className="size-6 rounded-sm">
 										<AvatarImage
-											src={`https://github.com/${workspace.accountLogin}.png`}
+											src={
+												getWorkspaceAvatarUrl(
+													workspace.providerType ?? "GITHUB",
+													workspace.accountLogin,
+												) ?? undefined
+											}
 											alt={workspace.displayName}
 										/>
 										<AvatarFallback className="rounded-sm text-xs bg-sidebar-primary text-sidebar-primary-foreground">

@@ -4,6 +4,7 @@ import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
+import de.tum.in.www1.hephaestus.workspace.dto.CreateWorkspaceRequestDTO;
 import de.tum.in.www1.hephaestus.workspace.exception.*;
 import de.tum.in.www1.hephaestus.workspace.settings.WorkspaceTeamSettingsService;
 import java.util.List;
@@ -146,6 +147,36 @@ public class WorkspaceService {
             // Unique constraint violation on slug
             throw new WorkspaceSlugConflictException(slug, e);
         }
+    }
+
+    /**
+     * Creates a workspace from a DTO, including optional git provider configuration.
+     *
+     * <p>For GitLab workspaces, the DTO should include {@code gitProviderMode = GITLAB_PAT}
+     * along with a personal access token and optional server URL. The PAT is automatically
+     * encrypted at rest via {@link de.tum.in.www1.hephaestus.core.security.EncryptedStringConverter}.
+     */
+    @Transactional
+    public Workspace createWorkspace(CreateWorkspaceRequestDTO request) {
+        Workspace workspace = createWorkspace(
+            request.workspaceSlug(),
+            request.displayName(),
+            request.accountLogin(),
+            request.accountType(),
+            request.ownerUserId()
+        );
+
+        if (request.gitProviderMode() != null) {
+            workspace.setGitProviderMode(request.gitProviderMode());
+        }
+        if (request.personalAccessToken() != null && !request.personalAccessToken().isBlank()) {
+            workspace.setPersonalAccessToken(request.personalAccessToken());
+        }
+        if (request.serverUrl() != null && !request.serverUrl().isBlank()) {
+            workspace.setServerUrl(request.serverUrl().trim());
+        }
+
+        return workspace;
     }
 
     private void createOwnerRole(Workspace workspace, Long ownerUserId) {

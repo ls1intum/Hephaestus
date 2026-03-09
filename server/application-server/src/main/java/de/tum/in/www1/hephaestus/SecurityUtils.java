@@ -1,5 +1,7 @@
 package de.tum.in.www1.hephaestus;
 
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -54,5 +56,29 @@ public final class SecurityUtils {
             return Optional.of(givenName);
         }
         return Optional.empty();
+    }
+
+    /**
+     * Check if the current user has the super admin realm role.
+     * Users with the admin realm role (configured via KEYCLOAK_GITHUB_ADMIN_USERNAME)
+     * can be elevated to workspace admin level by the authorization layer, but only for workspaces
+     * where they are members. This method itself only checks for the presence of the realm role.
+     *
+     * @return true if the current user has the admin realm role
+     */
+    public static boolean isSuperAdmin() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !(authentication.getPrincipal() instanceof Jwt jwt)) {
+            return false;
+        }
+
+        // Extract realm_access.roles from JWT claims (following SecurityConfig pattern)
+        var realmAccessObj = jwt.getClaims().get("realm_access");
+        if (!(realmAccessObj instanceof Map<?, ?> realmAccess)) {
+            return false;
+        }
+
+        var rolesObj = realmAccess.get("roles");
+        return rolesObj instanceof List<?> roles && roles.contains("admin");
     }
 }

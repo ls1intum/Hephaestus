@@ -67,7 +67,19 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         "ChatMessagePart", // through ChatMessage.thread.workspace
         "ChatMessageVote", // through ChatMessage (via messageId) -> ChatThread.workspace
         // Through Workspace.organization (ID-based relationship via JOIN)
-        "OrganizationMembership" // organizationId -> Workspace.organization
+        "OrganizationMembership", // organizationId -> Workspace.organization
+        // Through project owner (ID-based: ownerId -> Organization/Repository/User)
+        "Project", // ownerId -> Organization/Repository -> Workspace.organization
+        "ProjectItem", // through Project.ownerId OR issue -> Repository
+        "ProjectField", // through Project.ownerId
+        "ProjectFieldValue", // through ProjectItem.project OR ProjectField.project
+        // Through repository (commit -> Repository -> Organization <- Workspace)
+        "Commit", // through Repository -> Organization <- Workspace
+        "CommitFileChange", // through Commit -> Repository -> Organization <- Workspace
+        // Through repository (discussion -> Repository -> Organization <- Workspace)
+        "Discussion", // through Repository -> Organization <- Workspace
+        "DiscussionCategory", // through Repository -> Organization <- Workspace
+        "DiscussionComment" // through Discussion -> Repository -> Organization <- Workspace
     );
 
     /**
@@ -79,7 +91,8 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         "Organization", // Synced from GitHub, workspace is set separately
         "Workspace", // Is the tenant root
         "WorkspaceSlugHistory", // Tracks workspace slug changes
-        "IssueType" // GitHub issue types are workspace-scoped through issue
+        "IssueType", // GitHub issue types are workspace-scoped through issue
+        "GitProvider" // Global provider instances (e.g., github.com, gitlab.com)
     );
 
     // ========================================================================

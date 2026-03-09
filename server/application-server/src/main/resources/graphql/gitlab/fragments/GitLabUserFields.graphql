@@ -1,0 +1,10 @@
+# Reusable fragment for GitLab User interface fields.
+# Works with UserCore, MergeRequestAuthor, MergeRequestAssignee, MergeRequestReviewer,
+# and any other type implementing the User interface.
+fragment GitLabUserFields on User {
+    id
+    username
+    name
+    avatarUrl
+    webUrl
+}

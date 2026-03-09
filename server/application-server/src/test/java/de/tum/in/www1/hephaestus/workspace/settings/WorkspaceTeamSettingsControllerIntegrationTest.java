@@ -769,12 +769,14 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
      */
     private Team createTeam(String name, String organization) {
         Team newTeam = new Team();
-        newTeam.setId(entityIdGenerator.incrementAndGet());
+        newTeam.setNativeId(entityIdGenerator.incrementAndGet());
         newTeam.setName(name);
+        newTeam.setSlug(name);
         newTeam.setOrganization(organization);
         newTeam.setDescription("Test team: " + name);
         newTeam.setHtmlUrl("https://github.com/orgs/" + organization + "/teams/" + name);
         newTeam.setPrivacy(Team.Privacy.VISIBLE);
+        newTeam.setProvider(ensureGitHubProvider());
         return teamRepository.save(newTeam);
     }
 
@@ -789,7 +791,7 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
         String repoName = parts.length > 1 ? parts[1] : nameWithOwner;
 
         Repository repo = new Repository();
-        repo.setId(entityIdGenerator.incrementAndGet());
+        repo.setNativeId(entityIdGenerator.incrementAndGet());
         repo.setName(repoName);
         repo.setNameWithOwner(nameWithOwner);
         repo.setHtmlUrl("https://github.com/" + nameWithOwner);
@@ -797,6 +799,7 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
         repo.setPushedAt(Instant.now());
         repo.setCreatedAt(Instant.now());
         repo.setUpdatedAt(Instant.now());
+        repo.setProvider(ensureGitHubProvider());
         return repositoryRepository.save(repo);
     }
 
@@ -810,7 +813,8 @@ class WorkspaceTeamSettingsControllerIntegrationTest extends AbstractWorkspaceIn
      */
     private Label createLabel(String name, String color, Repository labelRepository) {
         Label newLabel = new Label();
-        newLabel.setId(entityIdGenerator.incrementAndGet());
+        newLabel.setNativeId(entityIdGenerator.incrementAndGet());
+        newLabel.setProvider(ensureGitHubProvider());
         newLabel.setName(name);
         newLabel.setColor(color);
         newLabel.setDescription("Test label: " + name);

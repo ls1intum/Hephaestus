@@ -3,16 +3,18 @@ import {
 	CommentDiscussionIcon,
 	CommentIcon,
 	FileDiffIcon,
-	GitPullRequestIcon,
 	InfoIcon,
 } from "@primer/octicons-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { getProviderTerms, getPullRequestStateIcon, type ProviderType } from "@/lib/provider";
 import { ScoringExplanationDialog } from "./ScoringExplanationDialog";
 
-export function LeaderboardLegend() {
+export function LeaderboardLegend({ providerType = "GITHUB" }: { providerType?: ProviderType }) {
 	const [showScoringModal, setShowScoringModal] = useState(false);
+	const terms = getProviderTerms(providerType);
+	const { icon: PrIcon } = getPullRequestStateIcon(providerType, "OPEN");
 
 	return (
 		<>
@@ -26,38 +28,38 @@ export function LeaderboardLegend() {
 				<CardContent>
 					<div className="space-y-3">
 						<div className="grid grid-cols-1 gap-2">
-							<div className="flex items-center gap-2 text-github-muted-foreground">
-								<GitPullRequestIcon className="h-4 w-4" />
-								<span>Reviewed pull requests</span>
+							<div className="flex items-center gap-2 text-provider-muted-foreground">
+								<PrIcon className="h-4 w-4" size={16} />
+								<span>Reviewed {terms.pullRequests.toLowerCase()}</span>
 							</div>
-							<div className="flex items-center gap-2 text-github-danger-foreground">
+							<div className="flex items-center gap-2 text-provider-danger-foreground">
 								<FileDiffIcon className="h-4 w-4" />
 								<span>Changes requested</span>
 							</div>
-							<div className="flex items-center gap-2 text-github-success-foreground">
+							<div className="flex items-center gap-2 text-provider-success-foreground">
 								<CheckIcon className="h-4 w-4" />
 								<span>Approvals</span>
 							</div>
-							<div className="flex items-center gap-2 text-github-muted-foreground">
+							<div className="flex items-center gap-2 text-provider-muted-foreground">
 								<CommentIcon className="h-4 w-4" />
 								<span>Comments</span>
 							</div>
-							<div className="flex items-center gap-2 text-github-muted-foreground">
+							<div className="flex items-center gap-2 text-provider-muted-foreground">
 								<CommentDiscussionIcon className="h-4 w-4" />
 								<span>Code comments</span>
 							</div>
 						</div>
 
 						<div className="pt-2 border-t">
-							<p className="text-sm text-github-muted-foreground mb-2">
-								Your score combines your review activity with the complexity of the pull requests
-								you've reviewed. Score calculation weighs change requests highest, followed by
-								approvals and comments.
+							<p className="text-sm text-provider-muted-foreground mb-2">
+								Your score combines your review activity with the complexity of the{" "}
+								{terms.pullRequests.toLowerCase()} you've reviewed. Score calculation weighs change
+								requests highest, followed by approvals and comments.
 							</p>
 							<Button
 								variant="outline"
 								size="sm"
-								className="text-github-link-foreground"
+								className="text-provider-link-foreground"
 								onClick={() => setShowScoringModal(true)}
 							>
 								View scoring formula
@@ -67,7 +69,11 @@ export function LeaderboardLegend() {
 				</CardContent>
 			</Card>
 
-			<ScoringExplanationDialog open={showScoringModal} onOpenChange={setShowScoringModal} />
+			<ScoringExplanationDialog
+				open={showScoringModal}
+				onOpenChange={setShowScoringModal}
+				providerType={providerType}
+			/>
 		</>
 	);
 }

@@ -293,6 +293,18 @@ public class PullRequestBadPracticeDetector {
     }
 
     /**
+     * Retrieves the most recent bad practice detection for a pull request.
+     * Used by {@link BadPracticeDetectorTask} to get detection results for notifications
+     * after {@code detectAndSyncBadPractices} has completed within its transactional boundary.
+     *
+     * @param pullRequestId the pull request ID
+     * @return the most recent detection, or null if none exists
+     */
+    public BadPracticeDetection getLatestDetection(Long pullRequestId) {
+        return badPracticeDetectionRepository.findMostRecentByPullRequestId(pullRequestId);
+    }
+
+    /**
      * Fallback method when circuit breaker is open or intelligence service call fails.
      *
      * @param pullRequest the pull request that was being analyzed

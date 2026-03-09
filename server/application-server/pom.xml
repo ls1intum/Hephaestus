@@ -12,7 +12,7 @@
     </parent>
     <groupId>de.tum.in.www1</groupId>
     <artifactId>hephaestus</artifactId>
-    <version>0.15.0</version>
+    <version>0.27.1</version>
     <name>Hephaestus</name>
     <description>AI-driven learning for better software development</description>
     <url/>
@@ -35,7 +35,7 @@
         <!-- Test Configuration -->
         <maven.test.failure.ignore>false</maven.test.failure.ignore>
         <maven.test.skip>false</maven.test.skip>
-        <hephaestus.surefire.timeout>180</hephaestus.surefire.timeout>
+        <hephaestus.surefire.timeout>300</hephaestus.surefire.timeout>
 
         <!-- Tag filtering: unit tests by default, exclude live tests -->
         <surefire.excludedGroups>live</surefire.excludedGroups>
@@ -58,6 +58,13 @@
 
         <!-- Maven wrapper version -->
         <maven.wrapper.version>3.9.12</maven.wrapper.version>
+
+        <!-- Local development port for Liquibase plugin (override via -Dpostgres.port=XXXX) -->
+        <postgres.port>5432</postgres.port>
+
+        <!-- Stale class cleanup: always enabled to prevent ghost .class files from CI caches.
+             Override with -DskipCleanStaleClasses=true only for local iterative dev. -->
+        <skipCleanStaleClasses>false</skipCleanStaleClasses>
     </properties>
     <dependencies>
         <dependency>
@@ -388,6 +395,12 @@
             <artifactId>netty-resolver-dns-native-macos</artifactId>
             <classifier>osx-aarch_64</classifier>
         </dependency>
+        <!-- JGit for local git repository operations -->
+        <dependency>
+            <groupId>org.eclipse.jgit</groupId>
+            <artifactId>org.eclipse.jgit</artifactId>
+            <version>7.5.0.202512021534-r</version>
+        </dependency>
     </dependencies>
     <dependencyManagement>
         <dependencies>
@@ -403,6 +416,38 @@
     </dependencyManagement>
     <build>
         <plugins>
+            <!--
+                Clean compiled classes before compilation to prevent orphaned .class files
+                from deleted/moved source files (e.g., CI cache restoring stale classes).
+                Only target/classes and target/test-classes are cleaned; generated-sources
+                and other cached artifacts are preserved.
+                Skipped by the quick profile for fast local development.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-clean-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>clean-stale-classes</id>
+                        <phase>initialize</phase>
+                        <goals>
+                            <goal>clean</goal>
+                        </goals>
+                        <configuration>
+                            <skip>${skipCleanStaleClasses}</skip>
+                            <excludeDefaultDirectories>true</excludeDefaultDirectories>
+                            <filesets>
+                                <fileset>
+                                    <directory>${project.build.outputDirectory}</directory>
+                                </fileset>
+                                <fileset>
+                                    <directory>${project.build.testOutputDirectory}</directory>
+                                </fileset>
+                            </filesets>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
@@ -456,7 +501,8 @@
                         </goals>
                         <configuration>
                             <sources>
-                                <source>${project.build.directory}/generated-sources/graphql</source>
+                                <source>${project.build.directory}/generated-sources/graphql-github</source>
+                                <source>${project.build.directory}/generated-sources/graphql-gitlab</source>
                             </sources>
                         </configuration>
                     </execution>
@@ -488,7 +534,7 @@
                             </graphqlSchemas>
 
                             <!-- Output configuration -->
-                            <outputDir>${project.build.directory}/generated-sources/graphql</outputDir>
+                            <outputDir>${project.build.directory}/generated-sources/graphql-github</outputDir>
                             <packageName>de.tum.in.www1.hephaestus.gitprovider.graphql.github</packageName>
                             <apiPackageName>de.tum.in.www1.hephaestus.gitprovider.graphql.github.api</apiPackageName>
                             <modelPackageName>de.tum.in.www1.hephaestus.gitprovider.graphql.github.model
@@ -555,6 +601,104 @@
                             </customTemplates>
                         </configuration>
                     </execution>
+                    <!-- GitLab GraphQL Code Generator -->
+                    <!-- Generates type-safe Java classes from GitLab GraphQL schema -->
+                    <execution>
+                        <id>generate-gitlab-graphql-client</id>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                        <configuration>
+                            <skip>${graphql.codegen.skip}</skip>
+                            <!-- GitLab schema is large, skip size limit check -->
+                            <skipSchemaSizeLimit>true</skipSchemaSizeLimit>
+
+                            <!-- Schema location -->
+                            <graphqlSchemas>
+                                <rootDir>${project.basedir}/src/main/resources/graphql/gitlab</rootDir>
+                            </graphqlSchemas>
+
+                            <!-- Output configuration (separate dir to avoid codegen cleanup conflicts) -->
+                            <outputDir>${project.build.directory}/generated-sources/graphql-gitlab</outputDir>
+                            <packageName>de.tum.in.www1.hephaestus.gitprovider.graphql.gitlab</packageName>
+                            <apiPackageName>de.tum.in.www1.hephaestus.gitprovider.graphql.gitlab.api</apiPackageName>
+                            <modelPackageName>de.tum.in.www1.hephaestus.gitprovider.graphql.gitlab.model
+                            </modelPackageName>
+                            <modelNamePrefix>GL</modelNamePrefix>
+
+                            <!-- Client-side code generation (for consuming GitLab API) -->
+                            <generateClient>true</generateClient>
+                            <generateApis>false</generateApis>
+                            <generateDataFetchingEnvironmentArgumentInApis>false
+                            </generateDataFetchingEnvironmentArgumentInApis>
+
+                            <!-- Model generation options -->
+                            <generateBuilder>true</generateBuilder>
+                            <generateEqualsAndHashCode>true</generateEqualsAndHashCode>
+                            <generateToString>true</generateToString>
+                            <generateParameterizedFieldsResolvers>false</generateParameterizedFieldsResolvers>
+                            <generateModelsForRootTypes>false</generateModelsForRootTypes>
+                            <generateAllMethodInProjection>true</generateAllMethodInProjection>
+                            <!-- GitLab schema has types with 300+ fields (e.g., Project).
+                                 All-args constructors for these exceed the JVM 255-parameter limit. -->
+                            <generateNoArgsConstructorOnly>true</generateNoArgsConstructorOnly>
+
+                            <!-- Java config -->
+                            <generatedLanguage>JAVA</generatedLanguage>
+                            <addGeneratedAnnotation>true</addGeneratedAnnotation>
+                            <generatedAnnotation>jakarta.annotation.Generated</generatedAnnotation>
+                            <modelValidationAnnotation>@jakarta.annotation.Generated("graphql-codegen")
+                            </modelValidationAnnotation>
+
+                            <!-- GitLab-specific scalar mappings -->
+                            <customTypesMapping>
+                                <Time>java.time.OffsetDateTime</Time>
+                                <ISO8601DateTime>java.time.OffsetDateTime</ISO8601DateTime>
+                                <ISO8601Date>java.time.LocalDate</ISO8601Date>
+                                <GlobalID>java.lang.String</GlobalID>
+                                <JSON>java.lang.Object</JSON>
+                                <UntrustedRegexp>java.lang.String</UntrustedRegexp>
+                                <Duration>java.lang.String</Duration>
+                                <BigInt>java.math.BigInteger</BigInt>
+                                <TodoableID>java.lang.String</TodoableID>
+                                <UserID>java.lang.String</UserID>
+                                <IterationID>java.lang.String</IterationID>
+                                <MilestoneID>java.lang.String</MilestoneID>
+                                <WorkItemID>java.lang.String</WorkItemID>
+                                <IssueID>java.lang.String</IssueID>
+                                <ProjectID>java.lang.String</ProjectID>
+                                <GroupID>java.lang.String</GroupID>
+                                <LabelsFilterType>java.lang.String</LabelsFilterType>
+                                <NegatedIterationWildcardId>java.lang.String</NegatedIterationWildcardId>
+                                <Upload>java.lang.String</Upload>
+                                <Color>java.lang.String</Color>
+                                <PaymentMethodID>java.lang.String</PaymentMethodID>
+                                <NamespaceID>java.lang.String</NamespaceID>
+                                <AuditEventsStreamingHeadersID>java.lang.String</AuditEventsStreamingHeadersID>
+                                <AuditEventsExternalAuditEventDestinationID>java.lang.String</AuditEventsExternalAuditEventDestinationID>
+                                <GoogleCloudLoggingConfigurationID>java.lang.String</GoogleCloudLoggingConfigurationID>
+                                <AmazonS3ConfigurationID>java.lang.String</AmazonS3ConfigurationID>
+                                <InstanceAuditEventsStreamingHeadersID>java.lang.String</InstanceAuditEventsStreamingHeadersID>
+                                <InstanceExternalAuditEventDestinationID>java.lang.String</InstanceExternalAuditEventDestinationID>
+                                <InstanceGoogleCloudLoggingConfigurationID>java.lang.String</InstanceGoogleCloudLoggingConfigurationID>
+                                <InstanceAmazonS3ConfigurationID>java.lang.String</InstanceAmazonS3ConfigurationID>
+                                <JsonString>java.lang.String</JsonString>
+                            </customTypesMapping>
+
+                            <!-- Naming conventions -->
+                            <modelNameSuffix></modelNameSuffix>
+                            <requestSuffix>Request</requestSuffix>
+                            <responseSuffix>Response</responseSuffix>
+                            <responseProjectionSuffix>ResponseProjection</responseProjectionSuffix>
+
+                            <!-- Use same custom template as GitHub for @SuppressWarnings -->
+                            <customTemplatesRoot>${project.basedir}/src/main/resources/graphql/templates
+                            </customTemplatesRoot>
+                            <customTemplates>
+                                <RESPONSE_PROJECTION>response_projection.ftl</RESPONSE_PROJECTION>
+                            </customTemplates>
+                        </configuration>
+                    </execution>
                 </executions>
             </plugin>
             <!-- Post-processing for GraphQL generated code (cross-platform) -->
@@ -577,7 +721,7 @@
                                 <!-- Delete Relay files that depend on missing Query root type -->
                                 <delete failonerror="false">
                                     <fileset
-                                            dir="${project.build.directory}/generated-sources/graphql/de/tum/in/www1/hephaestus/gitprovider/graphql/github/model">
+                                            dir="${project.build.directory}/generated-sources/graphql-github/de/tum/in/www1/hephaestus/gitprovider/graphql/github/model">
                                         <include name="RelayQueryRequest.java"/>
                                         <include name="RelayQueryResponse.java"/>
                                     </fileset>
@@ -589,7 +733,7 @@
                                     <substitution
                                             expression="@SuppressWarnings(&quot;deprecation&quot;)${line.separator}\1"/>
                                     <fileset
-                                            dir="${project.build.directory}/generated-sources/graphql/de/tum/in/www1/hephaestus/gitprovider/graphql/github/model">
+                                            dir="${project.build.directory}/generated-sources/graphql-github/de/tum/in/www1/hephaestus/gitprovider/graphql/github/model">
                                         <include name="ProjectPendingCardsParametrizedInput.java"/>
                                         <include name="IssueProjectCardsParametrizedInput.java"/>
                                         <include name="PullRequestProjectCardsParametrizedInput.java"/>
@@ -670,6 +814,9 @@
                     <!-- Forked JVM timeout settings to prevent hanging -->
                     <forkedProcessTimeoutInSeconds>${hephaestus.surefire.timeout}</forkedProcessTimeoutInSeconds>
                     <forkedProcessExitTimeoutInSeconds>60</forkedProcessExitTimeoutInSeconds>
+                    <!-- Enable process checker so forkedProcessTimeoutInSeconds actually works.
+                         Without this, Surefire 3.x ignores the timeout and hung forks run forever. -->
+                    <enableProcessChecker>ping</enableProcessChecker>
                     <!-- Tag filtering: run unit tests, exclude live tests -->
                     <groups>${surefire.includedGroups}</groups>
                     <excludedGroups>${surefire.excludedGroups}</excludedGroups>
@@ -777,7 +924,8 @@
                     <failOnViolation>false</failOnViolation>
                     <!-- Exclude generated code -->
                     <excludeRoots>
-                        <excludeRoot>${project.build.directory}/generated-sources/graphql</excludeRoot>
+                        <excludeRoot>${project.build.directory}/generated-sources/graphql-github</excludeRoot>
+                        <excludeRoot>${project.build.directory}/generated-sources/graphql-gitlab</excludeRoot>
                     </excludeRoots>
                 </configuration>
             </plugin>
@@ -791,7 +939,7 @@
                     <diffChangeLogFile>src/main/resources/db/changelog_new.xml</diffChangeLogFile>
                     <searchPath>${project.basedir}/src/main/resources</searchPath>
                     <driver>org.postgresql.Driver</driver>
-                    <url>jdbc:postgresql://localhost:5432/hephaestus</url>
+                    <url>jdbc:postgresql://localhost:${postgres.port}/hephaestus</url>
                     <username>root</username>
                     <password>root</password>
                     <!-- Hibernate URL for reference schema using the Hibernate 6 dialect -->
@@ -835,7 +983,7 @@
                 </property>
             </activation>
             <properties>
-                <hephaestus.surefire.timeout>180</hephaestus.surefire.timeout>
+                <hephaestus.surefire.timeout>300</hephaestus.surefire.timeout>
             </properties>
         </profile>
 

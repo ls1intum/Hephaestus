@@ -24,9 +24,13 @@ public record EmbeddedReviewThreadsDTO(
      * Creates an EmbeddedReviewThreadsDTO from a GraphQL GHPullRequestReviewThreadConnection.
      *
      * @param connection the GraphQL connection (may be null)
+     * @param context    contextual description for overflow logging (e.g. "PR #42 in owner/repo")
      * @return EmbeddedReviewThreadsDTO or empty DTO if connection is null
      */
-    public static EmbeddedReviewThreadsDTO fromConnection(@Nullable GHPullRequestReviewThreadConnection connection) {
+    public static EmbeddedReviewThreadsDTO fromConnection(
+        @Nullable GHPullRequestReviewThreadConnection connection,
+        String context
+    ) {
         if (connection == null) {
             return empty();
         }

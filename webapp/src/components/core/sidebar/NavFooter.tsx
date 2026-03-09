@@ -29,7 +29,7 @@ export function NavFooter() {
 			<SidebarMenuItem>
 				<SidebarMenuButton
 					tooltip="Request a feature"
-					className="text-github-upsell-foreground hover:text-github-upsell-foreground hover:bg-github-upsell-foreground/10 dark:hover:bg-github-upsell-foreground/10"
+					className="text-provider-upsell-foreground hover:text-provider-upsell-foreground hover:bg-provider-upsell-foreground/10 dark:hover:bg-provider-upsell-foreground/10"
 					render={<a href="https://github.com/ls1intum/Hephaestus/discussions/new/choose" />}
 				>
 					<Sparkles />

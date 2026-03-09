@@ -7,7 +7,7 @@ export function AboutHeroSection() {
 				<MentorIcon size={48} pad={4} />
 			</div>
 			<h1 className="text-4xl font-bold">
-				About <span className="text-github-done-foreground">Heph</span>aestus
+				About <span className="text-provider-done-foreground">Heph</span>aestus
 			</h1>
 			<p className="text-xl text-muted-foreground max-w-2xl mx-auto">
 				Process-aware mentoring for agile software teams. Heph grounds guidance in your repository

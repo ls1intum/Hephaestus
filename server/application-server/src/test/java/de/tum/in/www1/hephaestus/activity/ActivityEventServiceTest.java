@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 import de.tum.in.www1.hephaestus.activity.scoring.ExperiencePointProperties;
+import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -12,9 +13,7 @@ import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
@@ -22,9 +21,7 @@ import org.springframework.context.ApplicationEventPublisher;
 /**
  * Unit tests for ActivityEventService.
  */
-@Tag("unit")
-@ExtendWith(MockitoExtension.class)
-class ActivityEventServiceTest {
+class ActivityEventServiceTest extends BaseUnitTest {
 
     @Mock
     private ActivityEventRepository eventRepository;

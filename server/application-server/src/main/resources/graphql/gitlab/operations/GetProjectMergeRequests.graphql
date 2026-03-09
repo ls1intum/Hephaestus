@@ -1,0 +1,93 @@
+query GetProjectMergeRequests($fullPath: ID!, $first: Int!, $after: String, $updatedAfter: Time) {
+    project(fullPath: $fullPath) {
+        mergeRequests(first: $first, after: $after, updatedAfter: $updatedAfter, sort: UPDATED_DESC) {
+            count
+            pageInfo {
+                hasNextPage
+                endCursor
+            }
+            nodes {
+                id
+                iid
+                title
+                description
+                state
+                webUrl
+                createdAt
+                updatedAt
+                closedAt
+                mergedAt
+                draft
+                mergeable
+                detailedMergeStatus
+                approved
+                commitCount
+                diffStatsSummary {
+                    additions
+                    deletions
+                    fileCount
+                }
+                sourceBranch
+                targetBranch
+                diffHeadSha
+                diffRefs {
+                    baseSha
+                }
+                discussionLocked
+                milestone {
+                    id
+                    iid
+                }
+                userNotesCount
+                author {
+                    ...GitLabUserFields
+                }
+                mergeUser {
+                    ...GitLabUserFields
+                }
+                labels(first: 100) {
+                    count
+                    pageInfo {
+                        hasNextPage
+                        endCursor
+                    }
+                    nodes {
+                        id
+                        title
+                        color
+                    }
+                }
+                assignees(first: 20) {
+                    count
+                    pageInfo {
+                        hasNextPage
+                        endCursor
+                    }
+                    nodes {
+                        ...GitLabUserFields
+                    }
+                }
+                reviewers(first: 20) {
+                    count
+                    pageInfo {
+                        hasNextPage
+                        endCursor
+                    }
+                    nodes {
+                        ...GitLabUserFields
+                    }
+                }
+                approvedBy(first: 20) {
+                    count
+                    pageInfo {
+                        hasNextPage
+                        endCursor
+                    }
+                    nodes {
+                        ...GitLabUserFields
+                    }
+                }
+            }
+        }
+    }
+}

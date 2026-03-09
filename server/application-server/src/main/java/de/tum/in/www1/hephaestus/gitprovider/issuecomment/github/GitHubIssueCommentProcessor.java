@@ -22,9 +22,11 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
 import java.time.Instant;
 import java.util.HashSet;
+import java.util.Optional;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,9 +67,10 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
         UserRepository userRepository,
         LabelRepository labelRepository,
         MilestoneRepository milestoneRepository,
+        GitHubUserProcessor gitHubUserProcessor,
         ApplicationEventPublisher eventPublisher
     ) {
-        super(userRepository, labelRepository, milestoneRepository);
+        super(userRepository, labelRepository, milestoneRepository, gitHubUserProcessor);
         this.commentRepository = commentRepository;
         this.issueRepository = issueRepository;
         this.pullRequestRepository = pullRequestRepository;
@@ -98,9 +101,16 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
             return null;
         }
 
+        // Look up parent: try Issue first, then PullRequest (needed because
+        // IssueRepository filters by TYPE = Issue, excluding PullRequest rows)
         Issue issue = issueRepository
             .findByRepositoryIdAndNumber(context.repository().getId(), issueNumber)
             .orElse(null);
+        if (issue == null) {
+            issue = pullRequestRepository
+                .findByRepositoryIdAndNumber(context.repository().getId(), issueNumber)
+                .orElse(null);
+        }
         if (issue == null) {
             log.warn(
                 "Skipped comment processing: reason=parentNotFound, repoId={}, issueNumber={}, commentId={}",
@@ -161,11 +171,15 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
             return null;
         }
 
-        // Try to find existing parent entity using natural key (repository + number)
-        // This is consistent across both GraphQL sync and webhook events
+        // Try to find existing parent entity: Issue first, then PullRequest
         Issue issue = issueRepository
             .findByRepositoryIdAndNumber(context.repository().getId(), issueDto.number())
             .orElse(null);
+        if (issue == null) {
+            issue = pullRequestRepository
+                .findByRepositoryIdAndNumber(context.repository().getId(), issueDto.number())
+                .orElse(null);
+        }
 
         // If parent doesn't exist, create a minimal entity from webhook data
         if (issue == null) {
@@ -189,14 +203,19 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
      */
     private IssueComment processCommentInternal(GitHubCommentDTO dto, Issue issue, ProcessingContext context) {
         Long issueId = issue.getId();
-        boolean isNew = !commentRepository.existsById(dto.id());
+        Optional<IssueComment> existingOpt = commentRepository.findByNativeIdAndProviderId(
+            dto.id(),
+            context.providerId()
+        );
+        boolean isNew = existingOpt.isEmpty();
 
-        IssueComment comment = commentRepository.findById(dto.id()).orElseGet(IssueComment::new);
+        IssueComment comment = existingOpt.orElseGet(IssueComment::new);
         Set<String> changedFields = new HashSet<>();
 
-        // Set ID for new comments
+        // Set nativeId and provider for new comments
         if (isNew) {
-            comment.setId(dto.id());
+            comment.setNativeId(dto.id());
+            comment.setProvider(context.provider());
         }
 
         // Update body if changed
@@ -231,7 +250,7 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
 
         // Link author if present and not already set
         if (dto.author() != null && comment.getAuthor() == null) {
-            User author = findOrCreateUser(dto.author());
+            User author = findOrCreateUser(dto.author(), context.providerId());
             if (author != null) {
                 comment.setAuthor(author);
                 changedFields.add("author");
@@ -283,7 +302,7 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
         }
 
         commentRepository
-            .findById(commentId)
+            .findByNativeIdAndProviderId(commentId, context.providerId())
             .ifPresent(comment -> {
                 Long issueId = comment.getIssue() != null ? comment.getIssue().getId() : null;
 
@@ -309,7 +328,7 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
      * <p>
      * This method handles the race condition where multiple threads might try to create
      * the same parent entity concurrently. The database has a unique constraint on
-     * (repository_id, number), so if another thread wins the race, our insert will fail
+     * (repository_id, issue_type, number), so if another thread wins the race, our insert will fail
      * with a constraint violation. In that case, we simply look up the entity that was
      * created by the other thread.
      *
@@ -329,7 +348,12 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
                 context.repository().getId(),
                 issueDto.number()
             );
-            return issueRepository
+            // Try Issue first, then PullRequest (IssueRepository filters by TYPE = Issue)
+            Issue found = issueRepository
+                .findByRepositoryIdAndNumber(context.repository().getId(), issueDto.number())
+                .orElse(null);
+            if (found != null) return found;
+            return pullRequestRepository
                 .findByRepositoryIdAndNumber(context.repository().getId(), issueDto.number())
                 .orElse(null);
         }
@@ -371,9 +395,9 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
 
         // Determine if this is a PR or Issue based on the webhook payload
         if (issueDto.isPullRequest()) {
-            return createMinimalPullRequest(issueDto, repository);
+            return createMinimalPullRequest(issueDto, repository, context);
         } else {
-            return createMinimalIssue(issueDto, repository);
+            return createMinimalIssue(issueDto, repository, context);
         }
     }
 
@@ -386,9 +410,9 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
      *   <li>The scheduled GraphQL sync (safety net for missed webhooks)</li>
      * </ol>
      */
-    private Issue createMinimalIssue(GitHubIssueDTO dto, Repository repository) {
+    private Issue createMinimalIssue(GitHubIssueDTO dto, Repository repository, ProcessingContext context) {
         Issue issue = new Issue();
-        populateBaseIssueFields(issue, dto, repository);
+        populateBaseIssueFields(issue, dto, repository, context);
         Issue saved = issueRepository.save(issue);
         log.info(
             "Created stub Issue from comment webhook (will be hydrated by issue webhook or sync): " +
@@ -417,9 +441,9 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
      * This avoids complexity (async tasks, rate limit management, scope resolution)
      * for marginal benefit since PR webhooks usually follow comment webhooks quickly.
      */
-    private PullRequest createMinimalPullRequest(GitHubIssueDTO dto, Repository repository) {
+    private PullRequest createMinimalPullRequest(GitHubIssueDTO dto, Repository repository, ProcessingContext context) {
         PullRequest pr = new PullRequest();
-        populateBaseIssueFields(pr, dto, repository);
+        populateBaseIssueFields(pr, dto, repository, context);
 
         // PR-specific fields from webhook (limited data available)
         // Most PR fields will be set to defaults and updated later
@@ -444,8 +468,14 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
     /**
      * Populates base Issue fields common to both Issue and PullRequest entities.
      */
-    private void populateBaseIssueFields(Issue issue, GitHubIssueDTO dto, Repository repository) {
-        issue.setId(dto.getDatabaseId());
+    private void populateBaseIssueFields(
+        Issue issue,
+        GitHubIssueDTO dto,
+        Repository repository,
+        ProcessingContext context
+    ) {
+        issue.setNativeId(dto.getDatabaseId());
+        issue.setProvider(context.provider());
         issue.setNumber(dto.number());
         issue.setTitle(sanitize(dto.title()));
         issue.setBody(sanitize(dto.body()));
@@ -461,14 +491,14 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
 
         // Author
         if (dto.author() != null) {
-            User author = findOrCreateUser(dto.author());
+            User author = findOrCreateUser(dto.author(), context.providerId());
             issue.setAuthor(author);
         }
 
         // Assignees
         if (dto.assignees() != null) {
             for (GitHubUserDTO assigneeDto : dto.assignees()) {
-                User assignee = findOrCreateUser(assigneeDto);
+                User assignee = findOrCreateUser(assigneeDto, context.providerId());
                 if (assignee != null) {
                     issue.getAssignees().add(assignee);
                 }

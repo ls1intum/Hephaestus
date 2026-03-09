@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.workspace;
 
+import de.tum.in.www1.hephaestus.SecurityUtils;
 import de.tum.in.www1.hephaestus.core.exception.AccessForbiddenException;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
@@ -38,16 +39,25 @@ public class WorkspaceMembershipController {
 
     /**
      * Get the current user's membership in this workspace.
+     * Super admins (Keycloak admin realm role) have their effective role elevated to ADMIN
+     * if their database role is lower, matching the runtime authorization behaviour in
+     * {@link WorkspaceAccessService}.
      *
      * @param context the workspace context
-     * @return the current user's membership details
+     * @return the current user's membership details with effective role
      */
     @GetMapping("/me")
     @SecurityRequirements
     public ResponseEntity<WorkspaceMembershipDTO> getCurrentUserMembership(WorkspaceContext context) {
         User currentUser = requireCurrentUser();
         WorkspaceMembership membership = workspaceMembershipService.getMembership(context.id(), currentUser.getId());
-        return ResponseEntity.ok(WorkspaceMembershipDTO.from(membership));
+        WorkspaceRole effectiveRole = membership.getRole();
+        if (
+            effectiveRole != WorkspaceRole.OWNER && effectiveRole != WorkspaceRole.ADMIN && SecurityUtils.isSuperAdmin()
+        ) {
+            effectiveRole = WorkspaceRole.ADMIN;
+        }
+        return ResponseEntity.ok(WorkspaceMembershipDTO.from(membership, effectiveRole));
     }
 
     /**

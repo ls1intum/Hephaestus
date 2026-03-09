@@ -18,6 +18,8 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Repository
 public interface MilestoneRepository extends JpaRepository<Milestone, Long> {
+    Optional<Milestone> findByNativeIdAndProviderId(Long nativeId, Long providerId);
+
     List<Milestone> findAllByRepository_Id(Long repositoryId);
 
     @Query(
@@ -47,11 +49,11 @@ public interface MilestoneRepository extends JpaRepository<Milestone, Long> {
     @Query(
         value = """
         INSERT INTO milestone (
-            id, number, title, description, state, html_url, due_on,
+            native_id, provider_id, number, title, description, state, html_url, due_on,
             open_issues_count, closed_issues_count, repository_id, created_at, updated_at
         )
         VALUES (
-            :id, :number, :title, :description, :state, :htmlUrl, :dueOn,
+            :nativeId, :providerId, :number, :title, :description, :state, :htmlUrl, :dueOn,
             :openIssuesCount, :closedIssuesCount, :repositoryId, :createdAt, :updatedAt
         )
         ON CONFLICT (number, repository_id) DO NOTHING
@@ -59,7 +61,8 @@ public interface MilestoneRepository extends JpaRepository<Milestone, Long> {
         nativeQuery = true
     )
     int insertIfAbsent(
-        @Param("id") Long id,
+        @Param("nativeId") Long nativeId,
+        @Param("providerId") Long providerId,
         @Param("number") int number,
         @Param("title") String title,
         @Param("description") String description,

@@ -1,0 +1,26 @@
+query GetProjectMilestones($fullPath: ID!, $first: Int!, $after: String) {
+  project(fullPath: $fullPath) {
+    milestones(first: $first, after: $after, includeAncestors: true) {
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+      nodes {
+        id
+        iid
+        title
+        description
+        state
+        dueDate
+        webPath
+        createdAt
+        updatedAt
+        groupMilestone
+        stats {
+          closedIssuesCount
+          totalIssuesCount
+        }
+      }
+    }
+  }
+}

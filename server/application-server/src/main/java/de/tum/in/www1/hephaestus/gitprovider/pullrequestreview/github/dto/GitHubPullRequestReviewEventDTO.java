@@ -48,7 +48,10 @@ public record GitHubPullRequestReviewEventDTO(
         @JsonProperty("html_url") String htmlUrl,
         @JsonProperty("user") GitHubUserDTO author,
         @JsonProperty("submitted_at") Instant submittedAt,
-        @JsonProperty("commit_id") String commitId
+        @JsonProperty("commit_id") String commitId,
+        @Nullable Instant createdAt,
+        @Nullable Instant updatedAt,
+        @Nullable Boolean authorCanPushToRepository
     ) {
         // ========== STATIC FACTORY METHODS FOR GRAPHQL RESPONSES ==========
 
@@ -69,7 +72,10 @@ public record GitHubPullRequestReviewEventDTO(
                 uriToString(review.getUrl()),
                 GitHubUserDTO.fromActor(review.getAuthor()),
                 toInstant(review.getSubmittedAt()),
-                review.getCommit() != null ? review.getCommit().getOid() : null
+                review.getCommit() != null ? review.getCommit().getOid() : null,
+                toInstant(review.getCreatedAt()),
+                toInstant(review.getUpdatedAt()),
+                review.getAuthorCanPushToRepository()
             );
         }
     }

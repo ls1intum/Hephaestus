@@ -8,7 +8,13 @@
 # 3. Clear progress: highWaterMark = highest number, checkpoint counts down to #1
 # 4. Incremental sync handles new items: Items created during backfill are caught by regular sync
 
-query GetRepositoryIssuesHistorical($owner: String!, $name: String!, $first: Int!, $after: String, $states: [IssueState!]) {
+query GetRepositoryIssuesHistorical(
+    $owner: String!
+    $name: String!
+    $first: Int!
+    $after: String
+    $states: [IssueState!]
+) {
     rateLimit {
         cost
         limit
@@ -23,6 +29,7 @@ query GetRepositoryIssuesHistorical($owner: String!, $name: String!, $first: Int
             }
             totalCount
             nodes {
+                __typename
                 id
                 fullDatabaseId
                 number
@@ -53,35 +60,7 @@ query GetRepositoryIssuesHistorical($owner: String!, $name: String!, $first: Int
 
                         # Author
                         author {
-                            __typename
-                            ... on User {
-                                id
-                                databaseId
-                                login
-                                avatarUrl
-                                name
-                                email
-                                createdAt
-                                updatedAt
-                            }
-                            ... on Bot {
-                                id
-                                databaseId
-                                login
-                                avatarUrl
-                            }
-                            ... on Mannequin {
-                                id
-                                databaseId
-                                login
-                                avatarUrl
-                            }
-                            ... on Organization {
-                                id
-                                databaseId
-                                login
-                                avatarUrl
-                            }
+                            ...ActorFields
                         }
 
                         authorAssociation
@@ -99,39 +78,12 @@ query GetRepositoryIssuesHistorical($owner: String!, $name: String!, $first: Int
 
                 # Author
                 author {
-                    __typename
-                    ... on User {
-                        id
-                        databaseId
-                        login
-                        avatarUrl
-                        name
-                        email
-                        createdAt
-                        updatedAt
-                    }
-                    ... on Bot {
-                        id
-                        databaseId
-                        login
-                        avatarUrl
-                    }
-                    ... on Mannequin {
-                        id
-                        databaseId
-                        login
-                        avatarUrl
-                    }
-                    ... on Organization {
-                        id
-                        databaseId
-                        login
-                        avatarUrl
-                    }
+                    ...ActorFields
                 }
 
                 # Labels
-                labels(first: 20) {
+                labels(first: 50) {
+                    totalCount
                     nodes {
                         id
                         name
@@ -148,19 +100,14 @@ query GetRepositoryIssuesHistorical($owner: String!, $name: String!, $first: Int
                     description
                     state
                     dueOn
+                    url
                 }
 
                 # Assignees
-                assignees(first: 10) {
+                assignees(first: 20) {
+                    totalCount
                     nodes {
-                        id
-                        databaseId
-                        login
-                        avatarUrl
-                        name
-                        email
-                        createdAt
-                        updatedAt
+                        ...UserFields
                     }
                 }
             }

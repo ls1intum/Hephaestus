@@ -23,9 +23,10 @@ public record EmbeddedCommentsDTO(
      * Creates an EmbeddedCommentsDTO from a GraphQL GHIssueCommentConnection.
      *
      * @param connection the GraphQL connection (may be null)
+     * @param context    contextual description for overflow logging (e.g. "Issue #42 in owner/repo")
      * @return EmbeddedCommentsDTO or empty DTO if connection is null
      */
-    public static EmbeddedCommentsDTO fromConnection(@Nullable GHIssueCommentConnection connection) {
+    public static EmbeddedCommentsDTO fromConnection(@Nullable GHIssueCommentConnection connection, String context) {
         if (connection == null) {
             return empty();
         }

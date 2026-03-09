@@ -53,7 +53,13 @@ import org.springframework.lang.NonNull;
 @Entity
 @Table(
     name = "repository",
-    uniqueConstraints = { @UniqueConstraint(name = "uq_repository_name_with_owner", columnNames = "name_with_owner") }
+    uniqueConstraints = {
+        @UniqueConstraint(
+            name = "uq_repository_provider_name_with_owner",
+            columnNames = { "provider_id", "name_with_owner" }
+        ),
+        @UniqueConstraint(name = "uq_repository_provider_native_id", columnNames = { "provider_id", "native_id" }),
+    }
 )
 @Getter
 @Setter
@@ -94,6 +100,8 @@ public class Repository extends BaseGitServiceEntity {
 
     @NonNull
     private String defaultBranch;
+
+    private boolean hasDiscussionsEnabled;
 
     /**
      * Timestamp of the last successful sync for this repository from the Git provider.
@@ -143,12 +151,13 @@ public class Repository extends BaseGitServiceEntity {
      * Supported fields synced from GitHub GraphQL API:
      * - id/databaseId, name, nameWithOwner, url, description
      * - pushedAt, defaultBranchRef, visibility, isArchived, isDisabled, isPrivate
+     * - hasDiscussionsEnabled
      * - owner (Organization or User) → linked via organization relation
      *
      * Fields available in GraphQL but intentionally NOT synced:
      * - homepageUrl, stargazerCount, forkCount, watchers
      * - hasIssuesEnabled, hasProjectsEnabled, hasWikiEnabled
-     * - hasDiscussionsEnabled, hasSponsorshipsEnabled
+     * - hasSponsorshipsEnabled
      * - hasVulnerabilityAlertsEnabled (requires admin access)
      * - isFork, isTemplate, isMirror (not needed for ETL consumers)
      * - licenseInfo, primaryLanguage (out of scope for current use cases)

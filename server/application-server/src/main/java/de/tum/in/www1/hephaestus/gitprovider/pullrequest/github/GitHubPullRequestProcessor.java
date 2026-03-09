@@ -1,11 +1,14 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequest.github;
 
+import de.tum.in.www1.hephaestus.gitprovider.commit.CommitAuthorResolver;
+import de.tum.in.www1.hephaestus.gitprovider.commit.CommitRepository;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.EventContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.EventPayload;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.BaseGitHubProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
+import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.label.LabelRepository;
 import de.tum.in.www1.hephaestus.gitprovider.label.github.dto.GitHubLabelDTO;
@@ -17,9 +20,11 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.github.dto.GitHubPullRe
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
 import java.time.Instant;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -51,17 +56,27 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
     private static final Logger log = LoggerFactory.getLogger(GitHubPullRequestProcessor.class);
 
     private final PullRequestRepository pullRequestRepository;
+    private final IssueRepository issueRepository;
+    private final CommitRepository commitRepository;
+    private final CommitAuthorResolver commitAuthorResolver;
     private final ApplicationEventPublisher eventPublisher;
 
     public GitHubPullRequestProcessor(
         PullRequestRepository pullRequestRepository,
+        IssueRepository issueRepository,
+        CommitRepository commitRepository,
+        CommitAuthorResolver commitAuthorResolver,
         LabelRepository labelRepository,
         MilestoneRepository milestoneRepository,
         UserRepository userRepository,
+        GitHubUserProcessor gitHubUserProcessor,
         ApplicationEventPublisher eventPublisher
     ) {
-        super(userRepository, labelRepository, milestoneRepository);
+        super(userRepository, labelRepository, milestoneRepository, gitHubUserProcessor);
         this.pullRequestRepository = pullRequestRepository;
+        this.issueRepository = issueRepository;
+        this.commitRepository = commitRepository;
+        this.commitAuthorResolver = commitAuthorResolver;
         this.eventPublisher = eventPublisher;
     }
 
@@ -72,8 +87,8 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
      * Uses atomic upsert to prevent race conditions when concurrent threads
      * (e.g., multiple NATS consumers or webhook handlers) process the same PR.
      * <p>
-     * Uses (repository_id, number) as the canonical lookup key to ensure idempotency
-     * across both GraphQL sync and webhook events, which use different ID formats.
+     * Uses (repository_id, issue_type, number) as the canonical uniqueness constraint.
+     * Lookup is by (repository_id, number) via the PullRequest typed query.
      *
      * @return the processed PullRequest, or null if the repository context is missing
      */
@@ -85,7 +100,7 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
             return null;
         }
 
-        // Check for valid database ID - required for assigned ID strategy
+        // Check for valid native ID - required for provider-scoped upsert
         Long dbId = dto.getDatabaseId();
         if (dbId == null) {
             log.warn("Skipped pull request processing: reason=missingDatabaseId, prNumber={}", dto.number());
@@ -99,8 +114,35 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         );
         boolean isNew = existingOpt.isEmpty();
 
-        // Skip update if existing data is newer (prevents stale webhooks from overwriting)
-        if (!isNew) {
+        // Detect issue_type mismatch: entity exists as ISSUE but we're processing it as a PR.
+        // This happens when a comment webhook creates a stub ISSUE before the PR webhook arrives.
+        // Must correct the discriminator BEFORE the upsert, because ON CONFLICT matches on
+        // (repository_id, issue_type, number) — a mismatched issue_type would cause an INSERT
+        // instead of an UPDATE, violating the (provider_id, native_id) constraint.
+        boolean promotedFromIssue = false;
+        if (isNew) {
+            Optional<Issue> existingIssue = issueRepository.findByRepositoryIdAndNumber(
+                repository.getId(),
+                dto.number()
+            );
+            if (existingIssue.isPresent()) {
+                issueRepository.correctDiscriminator(repository.getId(), dto.number(), "ISSUE", "PULL_REQUEST");
+                // Don't re-fetch: the promoted row has NULL PR-specific columns (additions, etc.)
+                // which would crash Hibernate on primitive int fields. The upsert below will
+                // populate all fields correctly.
+                promotedFromIssue = true;
+                isNew = false;
+                log.info(
+                    "Corrected issue_type from ISSUE to PULL_REQUEST: repositoryId={}, number={}",
+                    repository.getId(),
+                    dto.number()
+                );
+            }
+        }
+
+        // Skip update if existing data is newer (prevents stale webhooks from overwriting).
+        // Skip stale check for promotions — the entity needs all PR fields populated by the upsert.
+        if (!isNew && !promotedFromIssue) {
             PullRequest existing = existingOpt.get();
             if (
                 existing.getUpdatedAt() != null &&
@@ -118,8 +160,8 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         }
 
         // Resolve related entities BEFORE the upsert
-        User author = dto.author() != null ? findOrCreateUser(dto.author()) : null;
-        User mergedBy = dto.mergedBy() != null ? findOrCreateUser(dto.mergedBy()) : null;
+        User author = dto.author() != null ? findOrCreateUser(dto.author(), context.providerId()) : null;
+        User mergedBy = dto.mergedBy() != null ? findOrCreateUser(dto.mergedBy(), context.providerId()) : null;
         Milestone milestone = dto.milestone() != null ? findOrCreateMilestone(dto.milestone(), repository) : null;
 
         // Extract branch info
@@ -132,6 +174,7 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         Instant now = Instant.now();
         pullRequestRepository.upsertCore(
             dbId,
+            context.providerId(),
             dto.number(),
             sanitize(dto.title()),
             sanitize(dto.body()),
@@ -177,15 +220,20 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
             );
 
         // Handle ManyToMany relationships (labels, assignees, requestedReviewers)
-        boolean relationshipsChanged = updateRelationships(dto, pr, repository);
+        boolean relationshipsChanged = updateRelationships(dto, pr, repository, context.providerId());
 
         // Save relationship changes
         if (relationshipsChanged) {
             pr = pullRequestRepository.save(pr);
         }
 
+        // Upsert merge commit if present (from GraphQL data — zero extra rate limit cost)
+        upsertMergeCommit(dto, repository);
+
         // Publish events
-        if (isNew) {
+        // Promotions (ISSUE→PR) are treated as new for event purposes: existingOpt is empty
+        // because the entity was an Issue, not a PullRequest, so computeChangedFields would crash.
+        if (isNew || promotedFromIssue) {
             eventPublisher.publishEvent(
                 new DomainEvent.PullRequestCreated(EventPayload.PullRequestData.from(pr), EventContext.from(context))
             );
@@ -215,15 +263,25 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
      *
      * @return true if any relationships were changed
      */
-    private boolean updateRelationships(GitHubPullRequestDTO dto, PullRequest pr, Repository repository) {
-        boolean assigneesChanged = updateAssignees(dto.assignees(), pr.getAssignees());
+    private boolean updateRelationships(
+        GitHubPullRequestDTO dto,
+        PullRequest pr,
+        Repository repository,
+        Long providerId
+    ) {
+        boolean assigneesChanged = updateAssignees(dto.assignees(), pr.getAssignees(), providerId);
         boolean labelsChanged = updateLabels(dto.labels(), pr.getLabels(), repository);
-        boolean reviewersChanged = updateRequestedReviewers(dto.requestedReviewers(), pr.getRequestedReviewers());
+        boolean reviewersChanged = updateRequestedReviewers(
+            dto.requestedReviewers(),
+            pr.getRequestedReviewers(),
+            providerId
+        );
         return assigneesChanged || labelsChanged || reviewersChanged;
     }
 
     /**
-     * Computes which fields changed between the old and new PR state.
+     * Computes which scalar fields changed between the old and new PR state.
+     * Relationship changes (labels, assignees, reviewers) are tracked separately.
      */
     private Set<String> computeChangedFields(PullRequest oldPr, PullRequest newPr) {
         Set<String> changedFields = new HashSet<>();
@@ -392,5 +450,59 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
                 yield Issue.State.OPEN;
             }
         };
+    }
+
+    /**
+     * Upserts the merge commit when GraphQL data provides full merge commit metadata.
+     * This piggybacks on data already fetched in the PR query (flat fields on Commit type)
+     * so it costs zero additional rate limit points.
+     * <p>
+     * R5: After upserting the commit, links it to the PR in the commit_pull_request join table
+     * so that the association is established immediately (not deferred to enrichment).
+     */
+    private void upsertMergeCommit(GitHubPullRequestDTO dto, Repository repository) {
+        var info = dto.mergeCommitInfo();
+        if (info == null || info.sha() == null) {
+            return;
+        }
+
+        Long providerId = repository.getProvider().getId();
+        Long authorId = commitAuthorResolver.resolveByLogin(info.authorLogin(), providerId);
+        Long committerId = commitAuthorResolver.resolveByLogin(info.committerLogin(), providerId);
+
+        String htmlUrl = "https://github.com/" + repository.getNameWithOwner() + "/commit/" + info.sha();
+
+        // Defense-in-depth: git_commit.message is NOT NULL; default to empty string
+        String message = info.message() != null ? info.message() : "";
+
+        commitRepository.upsertCommit(
+            info.sha(),
+            message,
+            info.messageBody(),
+            htmlUrl,
+            info.authoredDate(),
+            info.committedDate(),
+            info.additions(),
+            info.deletions(),
+            info.changedFiles(),
+            Instant.now(),
+            repository.getId(),
+            authorId,
+            committerId,
+            info.authorEmail(),
+            info.committerEmail()
+        );
+
+        // R5: Link the merge commit to the PR in the join table
+        var commitOpt = commitRepository.findByShaAndRepositoryId(info.sha(), repository.getId());
+        if (commitOpt.isPresent()) {
+            commitRepository.linkCommitToPullRequests(
+                commitOpt.get().getId(),
+                repository.getId(),
+                List.of(dto.number())
+            );
+        }
+
+        log.debug("Upserted merge commit: sha={}, repository={}", info.sha(), repository.getNameWithOwner());
     }
 }

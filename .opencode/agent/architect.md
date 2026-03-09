@@ -40,7 +40,6 @@ for wt in $(git worktree list | grep "${REPO}_" | awk '{print $1}'); do
     echo "MERGED: $branch → cleanup"
     git worktree remove "$wt" --force 2>/dev/null
     git branch -d "$branch" 2>/dev/null
-    bd close "$branch" --reason "Merged" 2>/dev/null
   fi
 done
 
@@ -59,7 +58,7 @@ done
 
 # Ready work
 echo -e "\n=== READY WORK ==="
-bd ready 2>/dev/null || echo "(beads not configured — discuss priorities)"
+echo "(Check GitHub Issues for priorities)"
 ```
 
 ---
@@ -114,7 +113,6 @@ cat > "../${REPO}_${SAFE_ID}/MISSION.md" << 'EOF'
 ## Context
 - Issue: <link or ID if applicable>
 - Related: <other PRs, docs, discussions>
-- Beads: `bd show <id>` for full context
 EOF
 ```
 

@@ -26,6 +26,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.springframework.lang.NonNull;
+import org.springframework.lang.Nullable;
 
 /**
  * Represents a Git provider user (GitHub user, bot, or organization).
@@ -47,7 +48,13 @@ import org.springframework.lang.NonNull;
  * @see de.tum.in.www1.hephaestus.gitprovider.repository.collaborator.RepositoryCollaborator
  */
 @Entity
-@Table(name = "\"user\"", uniqueConstraints = { @UniqueConstraint(name = "uk_user_login", columnNames = { "login" }) })
+// Unique constraint on LOWER(login) is managed by Liquibase (functional index — not expressible in JPA).
+@Table(
+    name = "\"user\"",
+    uniqueConstraints = {
+        @UniqueConstraint(name = "uq_user_provider_native_id", columnNames = { "provider_id", "native_id" }),
+    }
+)
 @Getter
 @Setter
 @NoArgsConstructor
@@ -60,8 +67,9 @@ public class User extends BaseGitServiceEntity {
     @NonNull
     private String avatarUrl;
 
-    @NonNull
-    // Equals login if not fetched / existing
+    @Nullable
+    // Display name from Git provider; null until populated by API sync.
+    // DTOs fall back to login for display when this is null.
     private String name;
 
     private String email;

@@ -33,7 +33,14 @@ public final class WorkspaceTestFixtures {
     }
 
     /**
-     * Fluent builder for test workspaces.
+     * Creates an unsaved GitLab PAT workspace with standard defaults.
+     */
+    public static GitLabWorkspaceBuilder gitLabPatWorkspace(String groupPath) {
+        return new GitLabWorkspaceBuilder(groupPath);
+    }
+
+    /**
+     * Fluent builder for GitHub App installation test workspaces.
      */
     public static class WorkspaceBuilder {
 
@@ -62,12 +69,55 @@ public final class WorkspaceTestFixtures {
         }
 
         public WorkspaceBuilder withRepositorySelection(RepositorySelection selection) {
-            workspace.setGithubRepositorySelection(selection);
+            workspace.setRepositorySelection(selection);
             return this;
         }
 
         public WorkspaceBuilder withSlug(String slug) {
             workspace.setWorkspaceSlug(slug);
+            return this;
+        }
+
+        public Workspace build() {
+            return workspace;
+        }
+    }
+
+    /**
+     * Fluent builder for GitLab PAT test workspaces.
+     */
+    public static class GitLabWorkspaceBuilder {
+
+        private final Workspace workspace;
+
+        private GitLabWorkspaceBuilder(String groupPath) {
+            workspace = new Workspace();
+            workspace.setWorkspaceSlug("ws-gitlab-" + groupPath.replace("/", "-"));
+            workspace.setDisplayName("GitLab " + groupPath);
+            workspace.setAccountLogin(groupPath);
+            workspace.setAccountType(AccountType.ORG);
+            workspace.setGitProviderMode(Workspace.GitProviderMode.GITLAB_PAT);
+            workspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
+            workspace.setIsPubliclyViewable(false);
+        }
+
+        public GitLabWorkspaceBuilder withServerUrl(String url) {
+            workspace.setServerUrl(url);
+            return this;
+        }
+
+        public GitLabWorkspaceBuilder withToken(String token) {
+            workspace.setPersonalAccessToken(token);
+            return this;
+        }
+
+        public GitLabWorkspaceBuilder withSlug(String slug) {
+            workspace.setWorkspaceSlug(slug);
+            return this;
+        }
+
+        public GitLabWorkspaceBuilder withStatus(Workspace.WorkspaceStatus status) {
+            workspace.setStatus(status);
             return this;
         }
 

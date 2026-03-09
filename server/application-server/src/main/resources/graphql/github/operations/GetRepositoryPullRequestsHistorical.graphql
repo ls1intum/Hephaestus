@@ -29,6 +29,7 @@ query GetRepositoryPullRequestsHistorical(
             }
             totalCount
             nodes {
+                __typename
                 id
                 fullDatabaseId
                 number
@@ -58,8 +59,30 @@ query GetRepositoryPullRequestsHistorical(
                 }
 
                 # Merge commit (available when PR is merged)
+                # All flat fields on the Commit type — zero additional rate limit cost
                 mergeCommit {
                     oid
+                    message
+                    messageHeadline
+                    messageBody
+                    url
+                    authoredDate
+                    committedDate
+                    additions
+                    deletions
+                    changedFilesIfAvailable
+                    author {
+                        email
+                        user {
+                            login
+                        }
+                    }
+                    committer {
+                        email
+                        user {
+                            login
+                        }
+                    }
                 }
 
                 # Head and base refs
@@ -70,66 +93,17 @@ query GetRepositoryPullRequestsHistorical(
 
                 # Author
                 author {
-                    __typename
-                    ... on User {
-                        id
-                        databaseId
-                        login
-                        avatarUrl
-                        name
-                        email
-                        createdAt
-                        updatedAt
-                    }
-                    ... on Bot {
-                        id
-                        databaseId
-                        login
-                        avatarUrl
-                    }
-                    ... on Mannequin {
-                        id
-                        databaseId
-                        login
-                        avatarUrl
-                    }
-                    ... on Organization {
-                        id
-                        databaseId
-                        login
-                        avatarUrl
-                    }
+                    ...ActorFields
                 }
 
                 # Merged by
                 mergedBy {
-                    __typename
-                    ... on User {
-                        id
-                        databaseId
-                        login
-                        avatarUrl
-                        name
-                        email
-                        createdAt
-                        updatedAt
-                    }
-                    ... on Bot {
-                        id
-                        databaseId
-                        login
-                        avatarUrl
-                    }
-                    ... on Mannequin {
-                        id
-                        databaseId
-                        login
-                        avatarUrl
-                    }
+                    ...ActorFields
                 }
 
                 # Labels
-                labels(first: 20) {
+                labels(first: 50) {
+                    totalCount
                     nodes {
                         id
                         name
@@ -146,49 +120,23 @@ query GetRepositoryPullRequestsHistorical(
                     description
                     state
                     dueOn
+                    url
                 }
 
                 # Assignees
-                assignees(first: 10) {
+                assignees(first: 20) {
+                    totalCount
                     nodes {
-                        id
-                        databaseId
-                        login
-                        avatarUrl
-                        name
-                        email
-                        createdAt
-                        updatedAt
+                        ...UserFields
                     }
                 }
 
-                # Requested reviewers (users)
-                reviewRequests(first: 10) {
+                # Requested reviewers
+                reviewRequests(first: 100) {
+                    totalCount
                     nodes {
                         requestedReviewer {
-                            __typename
-                            ... on User {
-                                id
-                                databaseId
-                                login
-                                avatarUrl
-                                name
-                                email
-                                createdAt
-                                updatedAt
-                            }
-                            ... on Team {
-                                id
-                                databaseId
-                                slug
-                                name
-                            }
-                            ... on Mannequin {
-                                id
-                                databaseId
-                                login
-                                avatarUrl
-                            }
+                            ...RequestedReviewerFields
                         }
                     }
                 }
@@ -212,29 +160,7 @@ query GetRepositoryPullRequestsHistorical(
                         authorCanPushToRepository
 
                         author {
-                            __typename
-                            ... on User {
-                                id
-                                databaseId
-                                login
-                                avatarUrl
-                                name
-                                email
-                                createdAt
-                                updatedAt
-                            }
-                            ... on Bot {
-                                id
-                                databaseId
-                                login
-                                avatarUrl
-                            }
-                            ... on Mannequin {
-                                id
-                                databaseId
-                                login
-                                avatarUrl
-                            }
+                            ...ActorFields
                         }
 
                         # Commit that was reviewed
@@ -265,14 +191,7 @@ query GetRepositoryPullRequestsHistorical(
                         originalStartLine
 
                         resolvedBy {
-                            id
-                            databaseId
-                            login
-                            avatarUrl
-                            name
-                            email
-                            createdAt
-                            updatedAt
+                            ...UserFields
                         }
 
                         # Embedded comments (first 10 per thread)
@@ -300,29 +219,7 @@ query GetRepositoryPullRequestsHistorical(
                                 authorAssociation
 
                                 author {
-                                    __typename
-                                    ... on User {
-                                        id
-                                        databaseId
-                                        login
-                                        avatarUrl
-                                        name
-                                        email
-                                        createdAt
-                                        updatedAt
-                                    }
-                                    ... on Bot {
-                                        id
-                                        databaseId
-                                        login
-                                        avatarUrl
-                                    }
-                                    ... on Mannequin {
-                                        id
-                                        databaseId
-                                        login
-                                        avatarUrl
-                                    }
+                                    ...ActorFields
                                 }
 
                                 # Reply context

@@ -18,4 +18,16 @@ public final class WorkspaceTestFactory {
         workspace.setStatus(WorkspaceStatus.ACTIVE);
         return workspace;
     }
+
+    public static Workspace activeGitLabWorkspace(String slug) {
+        Workspace workspace = new Workspace();
+        workspace.setWorkspaceSlug(slug);
+        workspace.setDisplayName("GitLab " + slug);
+        workspace.setAccountLogin(slug + "-group");
+        workspace.setAccountType(AccountType.ORG);
+        workspace.setGitProviderMode(Workspace.GitProviderMode.GITLAB_PAT);
+        workspace.setIsPubliclyViewable(false);
+        workspace.setStatus(WorkspaceStatus.ACTIVE);
+        return workspace;
+    }
 }

@@ -37,7 +37,7 @@ class WorkspaceMembershipControllerIntegrationTest extends AbstractWorkspaceInte
             owner
         );
 
-        User adminUser = TestUserFactory.ensureUser(userRepository, "admin", 3L);
+        User adminUser = TestUserFactory.ensureUser(userRepository, "admin", 3L, ensureGitHubProvider());
         workspaceMembershipService.createMembership(workspace, adminUser.getId(), WorkspaceRole.ADMIN);
 
         User member = persistUser("membership-member");
@@ -72,7 +72,7 @@ class WorkspaceMembershipControllerIntegrationTest extends AbstractWorkspaceInte
             owner
         );
 
-        User adminUser = TestUserFactory.ensureUser(userRepository, "admin", 3L);
+        User adminUser = TestUserFactory.ensureUser(userRepository, "admin", 3L, ensureGitHubProvider());
         workspaceMembershipService.createMembership(workspace, adminUser.getId(), WorkspaceRole.ADMIN);
 
         User targetUser = persistUser("target-user");

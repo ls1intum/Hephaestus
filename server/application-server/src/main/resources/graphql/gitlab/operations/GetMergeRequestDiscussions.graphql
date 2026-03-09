@@ -1,0 +1,49 @@
+query GetMergeRequestDiscussions($fullPath: ID!, $iid: String!, $first: Int!, $after: String) {
+    project(fullPath: $fullPath) {
+        mergeRequest(iid: $iid) {
+            discussions(first: $first, after: $after) {
+                pageInfo {
+                    hasNextPage
+                    endCursor
+                }
+                nodes {
+                    id
+                    resolved
+                    resolvedBy {
+                        ...GitLabUserFields
+                    }
+                    notes(first: 100) {
+                        pageInfo {
+                            hasNextPage
+                        }
+                        nodes {
+                            id
+                            body
+                            system
+                            internal
+                            url
+                            position {
+                                filePath
+                                newLine
+                                oldLine
+                                newPath
+                                oldPath
+                                positionType
+                                diffRefs {
+                                    baseSha
+                                    headSha
+                                    startSha
+                                }
+                            }
+                            author {
+                                ...GitLabUserFields
+                            }
+                            createdAt
+                            updatedAt
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

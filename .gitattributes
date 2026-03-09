@@ -16,6 +16,3 @@
 *.html text eol=lf
 *.sh text eol=lf
 *.sql text eol=lf
-
-# Use bd merge for beads JSONL files
-.beads/issues.jsonl merge=beads

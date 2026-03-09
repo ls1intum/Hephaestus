@@ -10,8 +10,7 @@ import de.tum.in.www1.hephaestus.gitprovider.graphql.github.model.GHRateLimit;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import java.util.concurrent.TimeUnit;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.HttpGraphQlClient;
@@ -58,9 +57,8 @@ import org.springframework.stereotype.Component;
  * @see GitHubClientProvider for the REST API equivalent
  */
 @Component
+@Slf4j
 public class GitHubGraphQlClientProvider {
-
-    private static final Logger log = LoggerFactory.getLogger(GitHubGraphQlClientProvider.class);
 
     private final HttpGraphQlClient baseClient;
     private final InstallationTokenProvider tokenProvider;
@@ -236,6 +234,16 @@ public class GitHubGraphQlClientProvider {
      */
     public int getRateLimitRemaining(Long scopeId) {
         return rateLimitTracker.getRemaining(scopeId);
+    }
+
+    /**
+     * Gets the time when the rate limit resets for a scope.
+     *
+     * @param scopeId the scope to check
+     * @return the reset instant, or null if unknown
+     */
+    public java.time.Instant getRateLimitResetAt(Long scopeId) {
+        return rateLimitTracker.getResetAt(scopeId);
     }
 
     private String getToken(Long scopeId) {

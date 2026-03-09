@@ -2,6 +2,8 @@ package de.tum.in.www1.hephaestus.gitprovider.organization.github;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventAction;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubEventType;
@@ -27,14 +29,18 @@ public class GitHubOrganizationMessageHandler extends GitHubMessageHandler<GitHu
 
     private static final Logger log = LoggerFactory.getLogger(GitHubOrganizationMessageHandler.class);
 
+    private static final String GITHUB_SERVER_URL = "https://github.com";
+
     private final GitHubOrganizationProcessor organizationProcessor;
     private final GitHubUserProcessor userProcessor;
+    private final GitProviderRepository gitProviderRepository;
     private final OrganizationMembershipRepository membershipRepository;
     private final OrganizationMembershipListener membershipListener;
 
     GitHubOrganizationMessageHandler(
         GitHubOrganizationProcessor organizationProcessor,
         GitHubUserProcessor userProcessor,
+        GitProviderRepository gitProviderRepository,
         OrganizationMembershipRepository membershipRepository,
         OrganizationMembershipListener membershipListener,
         NatsMessageDeserializer deserializer,
@@ -43,6 +49,7 @@ public class GitHubOrganizationMessageHandler extends GitHubMessageHandler<GitHu
         super(GitHubOrganizationEventDTO.class, deserializer, transactionTemplate);
         this.organizationProcessor = organizationProcessor;
         this.userProcessor = userProcessor;
+        this.gitProviderRepository = gitProviderRepository;
         this.membershipRepository = membershipRepository;
         this.membershipListener = membershipListener;
     }
@@ -73,11 +80,17 @@ public class GitHubOrganizationMessageHandler extends GitHubMessageHandler<GitHu
             sanitizeForLog(orgDto.login())
         );
 
+        // Resolve GitHub provider ID for user upsert
+        Long providerId = gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITHUB, GITHUB_SERVER_URL)
+            .orElseThrow(() -> new IllegalStateException("GitProvider not found for GitHub"))
+            .getId();
+
         switch (event.actionType()) {
             case GitHubEventAction.Organization.MEMBER_ADDED -> {
                 if (event.membership() != null && event.membership().user() != null) {
                     var userDto = event.membership().user();
-                    User user = userProcessor.ensureExists(userDto);
+                    User user = userProcessor.ensureExists(userDto, providerId);
                     OrganizationMemberRole role = parseRole(event.membership().role());
                     membershipRepository.upsertMembership(orgDto.id(), user.getId(), role);
                     log.info(
@@ -117,9 +130,13 @@ public class GitHubOrganizationMessageHandler extends GitHubMessageHandler<GitHu
                     );
                 }
             }
-            case GitHubEventAction.Organization.RENAMED -> organizationProcessor.rename(orgDto.id(), orgDto.login());
-            case GitHubEventAction.Organization.DELETED -> organizationProcessor.delete(orgDto.id());
-            default -> organizationProcessor.process(orgDto);
+            case GitHubEventAction.Organization.RENAMED -> organizationProcessor.rename(
+                orgDto.id(),
+                orgDto.login(),
+                providerId
+            );
+            case GitHubEventAction.Organization.DELETED -> organizationProcessor.delete(orgDto.id(), providerId);
+            default -> organizationProcessor.process(orgDto, providerId);
         }
     }
 

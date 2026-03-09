@@ -150,7 +150,10 @@ class WorkspaceSlugRenameIntegrationTest extends AbstractWorkspaceIntegrationTes
             "Beta",
             "beta-account",
             AccountType.ORG,
-            ownerB.getId()
+            ownerB.getId(),
+            null,
+            null,
+            null
         );
 
         webTestClient

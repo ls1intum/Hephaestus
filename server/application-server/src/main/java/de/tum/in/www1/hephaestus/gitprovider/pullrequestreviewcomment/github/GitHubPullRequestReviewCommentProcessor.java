@@ -95,7 +95,7 @@ public class GitHubPullRequestReviewCommentProcessor {
             return null;
         }
 
-        if (commentRepository.existsById(dto.id())) {
+        if (commentRepository.existsByNativeIdAndProviderId(dto.id(), context.providerId())) {
             log.debug("Skipped comment creation: reason=alreadyExists, commentId={}", dto.id());
             return null;
         }
@@ -147,7 +147,7 @@ public class GitHubPullRequestReviewCommentProcessor {
             return null;
         }
 
-        if (commentRepository.existsById(dto.id())) {
+        if (commentRepository.existsByNativeIdAndProviderId(dto.id(), context.providerId())) {
             log.debug("Skipped comment creation: reason=alreadyExists, commentId={}", dto.id());
             return null;
         }
@@ -204,7 +204,7 @@ public class GitHubPullRequestReviewCommentProcessor {
         @NonNull ProcessingContext context
     ) {
         return commentRepository
-            .findById(dto.id())
+            .findByNativeIdAndProviderId(dto.id(), context.providerId())
             .map(comment -> {
                 comment.setBody(dto.body());
                 comment.setUpdatedAt(dto.updatedAt());
@@ -221,7 +221,7 @@ public class GitHubPullRequestReviewCommentProcessor {
                 return saved;
             })
             .orElseGet(() -> {
-                log.warn("Skipped comment edit: reason=commentNotFound, commentId={}", dto.id());
+                log.debug("Skipped comment edit: reason=commentNotFound, commentId={}", dto.id());
                 return null;
             });
     }
@@ -229,7 +229,7 @@ public class GitHubPullRequestReviewCommentProcessor {
     @Transactional
     public void processDeleted(Long commentId, Long prId, @NonNull ProcessingContext context) {
         commentRepository
-            .findById(commentId)
+            .findByNativeIdAndProviderId(commentId, context.providerId())
             .ifPresent(comment -> {
                 // CRITICAL: For bidirectional @OneToMany with orphanRemoval=true,
                 // we MUST remove the comment from the thread's collection BEFORE deleting.
@@ -260,7 +260,8 @@ public class GitHubPullRequestReviewCommentProcessor {
         PullRequestReviewThread thread
     ) {
         PullRequestReviewComment comment = new PullRequestReviewComment();
-        comment.setId(dto.id());
+        comment.setNativeId(dto.id());
+        comment.setProvider(pr.getRepository().getProvider());
         comment.setBody(dto.body());
         comment.setDiffHunk(dto.diffHunk());
         comment.setPath(dto.path());
@@ -298,14 +299,19 @@ public class GitHubPullRequestReviewCommentProcessor {
             comment.setOriginalStartLine(dto.originalStartLine());
         }
 
-        // Link to review if present
+        // Outdated flag (whether the comment's code context has changed)
+        comment.setOutdated(dto.outdated());
+
+        // Link to review if present (reviewId is the provider's native ID, not the JPA PK)
         if (dto.reviewId() != null) {
-            reviewRepository.findById(dto.reviewId()).ifPresent(comment::setReview);
+            reviewRepository
+                .findByNativeIdAndProviderId(dto.reviewId(), pr.getRepository().getProvider().getId())
+                .ifPresent(comment::setReview);
         }
 
         // Link author if present - ensure user exists (create if needed)
         if (dto.author() != null) {
-            User author = userProcessor.ensureExists(dto.author());
+            User author = userProcessor.ensureExists(dto.author(), pr.getRepository().getProvider().getId());
             if (author != null) {
                 comment.setAuthor(author);
             }
@@ -313,7 +319,9 @@ public class GitHubPullRequestReviewCommentProcessor {
 
         // Link to parent comment if this is a reply
         if (dto.inReplyToId() != null) {
-            commentRepository.findById(dto.inReplyToId()).ifPresent(comment::setInReplyTo);
+            commentRepository
+                .findByNativeIdAndProviderId(dto.inReplyToId(), pr.getRepository().getProvider().getId())
+                .ifPresent(comment::setInReplyTo);
         }
 
         return comment;
@@ -337,8 +345,9 @@ public class GitHubPullRequestReviewCommentProcessor {
         // If this is a reply, use the parent comment's thread
         if (dto.inReplyToId() != null) {
             // First try to get the thread from the existing parent comment
+            Long providerId = pr.getRepository().getProvider().getId();
             var parentThread = commentRepository
-                .findById(dto.inReplyToId())
+                .findByNativeIdAndProviderId(dto.inReplyToId(), providerId)
                 .map(PullRequestReviewComment::getThread)
                 .orElse(null);
 
@@ -371,11 +380,13 @@ public class GitHubPullRequestReviewCommentProcessor {
         GitHubPullRequestReviewCommentEventDTO.GitHubReviewCommentDTO dto,
         PullRequest pr
     ) {
+        Long providerId = pr.getRepository().getProvider().getId();
         return threadRepository
-            .findById(parentCommentId)
+            .findByNativeIdAndProviderId(parentCommentId, providerId)
             .orElseGet(() -> {
                 PullRequestReviewThread thread = new PullRequestReviewThread();
-                thread.setId(parentCommentId); // Use parent's ID, not this comment's ID
+                thread.setNativeId(parentCommentId); // Use parent's ID, not this comment's ID
+                thread.setProvider(pr.getRepository().getProvider());
                 thread.setPullRequest(pr);
                 thread.setPath(dto.path()); // Use reply's path as best guess
                 thread.setLine(dto.line());
@@ -396,11 +407,13 @@ public class GitHubPullRequestReviewCommentProcessor {
         GitHubPullRequestReviewCommentEventDTO.GitHubReviewCommentDTO dto,
         PullRequest pr
     ) {
+        Long providerId = pr.getRepository().getProvider().getId();
         return threadRepository
-            .findById(dto.id())
+            .findByNativeIdAndProviderId(dto.id(), providerId)
             .orElseGet(() -> {
                 PullRequestReviewThread thread = new PullRequestReviewThread();
-                thread.setId(dto.id());
+                thread.setNativeId(dto.id());
+                thread.setProvider(pr.getRepository().getProvider());
                 thread.setPullRequest(pr);
                 thread.setPath(dto.path());
                 thread.setLine(dto.line());
@@ -488,7 +501,8 @@ public class GitHubPullRequestReviewCommentProcessor {
         }
 
         PullRequest pr = new PullRequest();
-        pr.setId(prId);
+        pr.setNativeId(prId);
+        pr.setProvider(context.provider());
         pr.setNumber(dto.number());
         pr.setTitle(sanitize(dto.title()));
         pr.setBody(sanitize(dto.body()));
@@ -521,7 +535,7 @@ public class GitHubPullRequestReviewCommentProcessor {
 
         // Link author
         if (dto.author() != null) {
-            User author = userProcessor.ensureExists(dto.author());
+            User author = userProcessor.ensureExists(dto.author(), repository.getProvider().getId());
             pr.setAuthor(author);
         }
 

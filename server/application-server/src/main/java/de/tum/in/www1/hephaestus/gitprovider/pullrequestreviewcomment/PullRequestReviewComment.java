@@ -10,10 +10,12 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.util.HashSet;
 import java.util.Set;
 import lombok.Getter;
@@ -23,7 +25,15 @@ import lombok.ToString;
 import org.springframework.lang.NonNull;
 
 @Entity
-@Table(name = "pull_request_review_comment")
+@Table(
+    name = "pull_request_review_comment",
+    uniqueConstraints = {
+        @UniqueConstraint(
+            name = "uq_pr_review_comment_provider_native_id",
+            columnNames = { "provider_id", "native_id" }
+        ),
+    }
+)
 @Getter
 @Setter
 @NoArgsConstructor
@@ -31,8 +41,8 @@ import org.springframework.lang.NonNull;
 public class PullRequestReviewComment extends BaseGitServiceEntity {
 
     // The diff of the line that the comment refers to.
+    // Nullable: GitLab does not expose diff hunks for inline comments.
     @Column(columnDefinition = "TEXT")
-    @NonNull
     private String diffHunk;
 
     // The relative path of the file to which the comment applies.
@@ -54,7 +64,7 @@ public class PullRequestReviewComment extends BaseGitServiceEntity {
     @NonNull
     private String htmlUrl;
 
-    @NonNull
+    // Nullable: GitLab does not have the concept of author association.
     @Enumerated(EnumType.STRING)
     private AuthorAssociation authorAssociation;
 
@@ -70,27 +80,30 @@ public class PullRequestReviewComment extends BaseGitServiceEntity {
     // The line of the blob to which the comment applies. The last line of the range for a multi-line comment
     private int originalLine;
 
-    @ManyToOne
+    // Whether the comment body content is outdated (i.e., code it refers to has changed)
+    private Boolean outdated;
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "author_id")
     @ToString.Exclude
     private User author;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "review_id")
     @ToString.Exclude
     private PullRequestReview review;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "pull_request_id")
     @ToString.Exclude
     private PullRequest pullRequest;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "thread_id", nullable = false)
     @ToString.Exclude
     private PullRequestReviewThread thread;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "in_reply_to_id")
     @ToString.Exclude
     private PullRequestReviewComment inReplyTo;

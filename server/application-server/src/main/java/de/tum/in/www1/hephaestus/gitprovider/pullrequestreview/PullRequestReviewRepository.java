@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.pullrequestreview;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -19,6 +20,16 @@ import org.springframework.stereotype.Repository;
  */
 @Repository
 public interface PullRequestReviewRepository extends JpaRepository<PullRequestReview, Long> {
+    /**
+     * Find a review by its provider-scoped native ID.
+     */
+    Optional<PullRequestReview> findByNativeIdAndProviderId(Long nativeId, Long providerId);
+
+    /**
+     * Find all reviews for a pull request from a specific provider.
+     */
+    List<PullRequestReview> findAllByPullRequestIdAndProviderId(Long pullRequestId, Long providerId);
+
     /**
      * Batch fetch reviews by IDs with all related entities eagerly loaded.
      *

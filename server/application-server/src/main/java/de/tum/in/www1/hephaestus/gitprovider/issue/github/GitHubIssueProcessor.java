@@ -20,6 +20,7 @@ import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.gitprovider.user.github.GitHubUserProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.user.github.dto.GitHubUserDTO;
 import java.time.Instant;
 import java.util.HashSet;
@@ -77,9 +78,10 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
         UserRepository userRepository,
         OrganizationRepository organizationRepository,
         GitHubIssueTypeSyncService issueTypeSyncService,
+        GitHubUserProcessor gitHubUserProcessor,
         ApplicationEventPublisher eventPublisher
     ) {
-        super(userRepository, labelRepository, milestoneRepository);
+        super(userRepository, labelRepository, milestoneRepository, gitHubUserProcessor);
         this.issueRepository = issueRepository;
         this.organizationRepository = organizationRepository;
         this.issueTypeSyncService = issueTypeSyncService;
@@ -154,7 +156,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
         boolean isNew = existingOpt.isEmpty();
 
         // Resolve related entities BEFORE the upsert
-        User author = dto.author() != null ? findOrCreateUser(dto.author()) : null;
+        User author = dto.author() != null ? findOrCreateUser(dto.author(), context.providerId()) : null;
         Milestone milestone = dto.milestone() != null ? findOrCreateMilestone(dto.milestone(), repository) : null;
         IssueType issueType = null;
         if (dto.issueType() != null && repository.getOrganization() != null) {
@@ -162,10 +164,11 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
         }
 
         // Use atomic upsert to handle concurrent inserts
-        // This uses ON CONFLICT (repository_id, number) DO UPDATE
+        // This uses ON CONFLICT (repository_id, issue_type, number) DO UPDATE
         Instant now = Instant.now();
         issueRepository.upsertCore(
             dbId,
+            context.providerId(),
             dto.number(),
             sanitize(dto.title()),
             sanitize(dto.body()),
@@ -198,7 +201,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
             );
 
         // Handle ManyToMany relationships (labels, assignees) - these can't be done in the upsert
-        boolean relationshipsChanged = updateRelationships(dto, issue, repository);
+        boolean relationshipsChanged = updateRelationships(dto, issue, repository, context.providerId());
 
         // Save relationship changes
         if (relationshipsChanged) {
@@ -241,8 +244,8 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
      *
      * @return true if any relationships were changed
      */
-    private boolean updateRelationships(GitHubIssueDTO dto, Issue issue, Repository repository) {
-        boolean assigneesChanged = updateAssignees(dto.assignees(), issue.getAssignees());
+    private boolean updateRelationships(GitHubIssueDTO dto, Issue issue, Repository repository, Long providerId) {
+        boolean assigneesChanged = updateAssignees(dto.assignees(), issue.getAssignees(), providerId);
         boolean labelsChanged = updateLabels(dto.labels(), issue.getLabels(), repository);
         return assigneesChanged || labelsChanged;
     }
@@ -412,12 +415,16 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public void processDeleted(GitHubIssueDTO issueDto, ProcessingContext context) {
-        Long dbId = issueDto.getDatabaseId();
-        if (dbId != null) {
-            issueRepository.deleteById(dbId);
-            eventPublisher.publishEvent(new DomainEvent.IssueDeleted(dbId, EventContext.from(context)));
-            log.info("Deleted issue: issueId={}", dbId);
-        }
+        // With synthetic PKs, we cannot use deleteById(nativeId) because the PK is
+        // auto-generated and differs from the native provider ID. Look up by natural key instead.
+        issueRepository
+            .findByRepositoryIdAndNumber(context.repository().getId(), issueDto.number())
+            .ifPresent(issue -> {
+                Long syntheticId = issue.getId();
+                issueRepository.delete(issue);
+                eventPublisher.publishEvent(new DomainEvent.IssueDeleted(syntheticId, EventContext.from(context)));
+                log.info("Deleted issue: issueId={}, number={}", syntheticId, issueDto.number());
+            });
     }
 
     /**
