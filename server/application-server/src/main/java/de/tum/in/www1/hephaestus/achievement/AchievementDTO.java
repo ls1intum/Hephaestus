@@ -52,7 +52,8 @@ public record AchievementDTO(
     AchievementProgress progressData,
     @NonNull
     @Schema(description = "Optional of when the achievement was unlocked, empty() if not unlocked")
-    Optional<Instant> unlockedAt
+    Optional<Instant> unlockedAt,
+    @Schema(description = "Whether the achievement should be hidden until unlocked") boolean isHidden
 ) {
     /**
      * Creates an AchievementDTO from an AchievementDefinition with progress information.
@@ -76,7 +77,8 @@ public record AchievementDTO(
             definition.parent(),
             status,
             progressData,
-            unlockedAt
+            unlockedAt,
+            definition.isHidden()
         );
     }
 }

@@ -6,15 +6,15 @@ achievements:
 
     # --- Main Line Pull Requests ---
     - id: "pr.merged.common.1"
-      category: pull_requests
       rarity: common
       isHidden: false
-      requirements:
-          type: LinearAchievementProgress
-          target: 1
+      category: pull_requests
       triggerEvents:
           - PULL_REQUEST_MERGED
       evaluatorClass: StandardCountEvaluator
+      requirements:
+          type: LinearAchievementProgress
+          target: 1
 
     - id: "pr.merged.common.2"
       parent: "pr.merged.common.1"
@@ -29,65 +29,65 @@ achievements:
           target: 3
 
     - id: "pr.merged.uncommon"
-      category: pull_requests
+      parent: "pr.merged.common.2"
       rarity: uncommon
       isHidden: false
+      category: pull_requests
+      triggerEvents:
+          - PULL_REQUEST_MERGED
+      evaluatorClass: StandardCountEvaluator
       requirements:
           type: LinearAchievementProgress
           target: 7
-      parent: "pr.merged.common.2"
+
+    - id: "pr.merged.rare"
+      parent: "pr.merged.uncommon"
+      rarity: rare
+      isHidden: false
+      category: pull_requests
       triggerEvents:
           - PULL_REQUEST_MERGED
       evaluatorClass: StandardCountEvaluator
-
-    - id: "pr.merged.rare"
-      category: pull_requests
-      rarity: rare
-      isHidden: false
       requirements:
           type: LinearAchievementProgress
           target: 15
-      parent: "pr.merged.uncommon"
+
+    - id: "pr.merged.epic"
+      parent: "pr.merged.rare"
+      rarity: epic
+      isHidden: false
+      category: pull_requests
       triggerEvents:
           - PULL_REQUEST_MERGED
       evaluatorClass: StandardCountEvaluator
-
-    - id: "pr.merged.epic"
-      category: pull_requests
-      rarity: epic
-      isHidden: false
       requirements:
           type: LinearAchievementProgress
           target: 30
-      parent: "pr.merged.rare"
+
+    - id: "pr.merged.legendary"
+      parent: "pr.merged.epic"
+      rarity: legendary
+      isHidden: false
+      category: pull_requests
       triggerEvents:
           - PULL_REQUEST_MERGED
       evaluatorClass: StandardCountEvaluator
-
-    - id: "pr.merged.legendary"
-      category: pull_requests
-      rarity: legendary
-      isHidden: false
       requirements:
           type: LinearAchievementProgress
           target: 50
-      parent: "pr.merged.epic"
-      triggerEvents:
-          - PULL_REQUEST_MERGED
-      evaluatorClass: StandardCountEvaluator
 
     # --- Pull Request Specials ---
     - id: "pr.special.speedster"
       parent: "pr.merged.uncommon"
-      category: pull_requests
       rarity: epic
       isHidden: true
-      requirements:
-          type: LinearAchievementProgress
-          target: 1
+      category: pull_requests
       triggerEvents:
           - PULL_REQUEST_MERGED
       evaluatorClass: DummyEvaluator
+      requirements:
+          type: LinearAchievementProgress
+          target: 1
 
     # ========================================================================
     # Commit Achievements
@@ -95,132 +95,132 @@ achievements:
 
     # --- Main Line Commits ---
     - id: "commit.common.1"
-      category: commits
       rarity: common
       isHidden: false
+      category: commits
+      triggerEvents: []
+      evaluatorClass: StandardCountEvaluator
       requirements:
           type: LinearAchievementProgress
           target: 1
-      triggerEvents: []
-      evaluatorClass: StandardCountEvaluator
 
     - id: "commit.common.2"
-      category: commits
+      parent: "commit.common.1"
       rarity: common
       isHidden: false
+      category: commits
+      triggerEvents: []
+      evaluatorClass: StandardCountEvaluator
       requirements:
           type: LinearAchievementProgress
           target: 10
-      parent: "commit.common.1"
-      triggerEvents: []
-      evaluatorClass: StandardCountEvaluator
 
     - id: "commit.uncommon.1"
-      category: commits
+      parent: "commit.common.2"
       rarity: uncommon
       isHidden: false
+      category: commits
+      triggerEvents: []
+      evaluatorClass: StandardCountEvaluator
       requirements:
           type: LinearAchievementProgress
           target: 50
-      parent: "commit.common.2"
-      triggerEvents: []
-      evaluatorClass: StandardCountEvaluator
 
     - id: "commit.uncommon.2"
-      category: commits
+      parent: "commit.uncommon.1"
       rarity: uncommon
       isHidden: false
+      category: commits
+      triggerEvents: []
+      evaluatorClass: StandardCountEvaluator
       requirements:
           type: LinearAchievementProgress
           target: 100
-      parent: "commit.uncommon.1"
-      triggerEvents: []
-      evaluatorClass: StandardCountEvaluator
 
     - id: "commit.rare"
-      category: commits
+      parent: "commit.uncommon.2"
       rarity: rare
       isHidden: false
+      category: commits
+      triggerEvents: []
+      evaluatorClass: StandardCountEvaluator
       requirements:
           type: LinearAchievementProgress
           target: 250
-      parent: "commit.uncommon.2"
-      triggerEvents: []
-      evaluatorClass: StandardCountEvaluator
 
     - id: "commit.epic"
-      category: commits
+      parent: "commit.rare"
       rarity: epic
       isHidden: false
+      category: commits
+      triggerEvents: []
+      evaluatorClass: StandardCountEvaluator
       requirements:
           type: LinearAchievementProgress
           target: 500
-      parent: "commit.rare"
-      triggerEvents: []
-      evaluatorClass: StandardCountEvaluator
 
     - id: "commit.legendary"
-      category: commits
+      parent: "commit.epic"
       rarity: legendary
       isHidden: false
+      category: commits
+      triggerEvents: []
+      evaluatorClass: StandardCountEvaluator
       requirements:
           type: LinearAchievementProgress
           target: 1000
-      parent: "commit.epic"
-      triggerEvents: []
-      evaluatorClass: StandardCountEvaluator
 
     - id: "commit.mythic"
-      category: commits
+      parent: "commit.legendary"
       rarity: mythic
       isHidden: false
+      category: commits
+      triggerEvents: []
+      evaluatorClass: StandardCountEvaluator
       requirements:
           type: LinearAchievementProgress
           target: 2000
-      parent: "commit.legendary"
-      triggerEvents: []
-      evaluatorClass: StandardCountEvaluator
 
     # --- Commit Special Achievements ---
     - id: "commit.special.itsy_bitsy"
-      category: commits
+      parent: "commit.common.2"
       rarity: uncommon
       isHidden: true
-      parent: "commit.common.2"
-      requirements:
-          type: BinaryAchievementProgress
+      category: commits
       triggerEvents: []
       evaluatorClass: DummyEvaluator
+      requirements:
+          type: BinaryAchievementProgress
 
     - id: "commit.special.atomic_changes"
       parent: "commit.special.brute_force"
-      category: commits
       rarity: rare
       isHidden: true
-      requirements:
-          type: BinaryAchievementProgress
+      category: commits
       triggerEvents: []
       evaluatorClass: DummyEvaluator
+      requirements:
+          type: BinaryAchievementProgress
 
     - id: "commit.special.brute_force"
       parent: "commit.uncommon.2"
-      category: commits
       rarity: uncommon
       isHidden: true
-      requirements:
-          type: BinaryAchievementProgress
+      category: commits
       triggerEvents: []
       evaluatorClass: DummyEvaluator
+      requirements:
+          type: BinaryAchievementProgress
 
     - id: "commit.special.cross_boundary"
       parent: "commit.uncommon.1"
-      category: commits
       rarity: rare
       isHidden: false
-      requirements:
-          type: BinaryAchievementProgress
+      category: commits
       triggerEvents: []
       evaluatorClass: DummyEvaluator
+      requirements:
+          type: BinaryAchievementProgress
 
     # ========================================================================
     # Review Achievements
@@ -228,115 +228,115 @@ achievements:
 
     # --- Main Line ---
     - id: "review.common.1"
-      category: communication
       rarity: common
       isHidden: false
+      category: communication
+      triggerEvents:
+          - REVIEW_APPROVED
+          - REVIEW_CHANGES_REQUESTED
+          - REVIEW_COMMENTED
+      evaluatorClass: ReviewCountEvaluator
       requirements:
           type: LinearAchievementProgress
           target: 1
+
+    - id: "review.common.2"
+      parent: "review.common.1"
+      rarity: common
+      isHidden: false
+      category: communication
       triggerEvents:
           - REVIEW_APPROVED
           - REVIEW_CHANGES_REQUESTED
           - REVIEW_COMMENTED
       evaluatorClass: ReviewCountEvaluator
-
-    - id: "review.common.2"
-      category: communication
-      rarity: common
-      isHidden: false
       requirements:
           type: LinearAchievementProgress
           target: 10
-      parent: "review.common.1"
+
+    - id: "review.uncommon.1"
+      parent: "review.common.2"
+      rarity: uncommon
+      isHidden: false
+      category: communication
       triggerEvents:
           - REVIEW_APPROVED
           - REVIEW_CHANGES_REQUESTED
           - REVIEW_COMMENTED
       evaluatorClass: ReviewCountEvaluator
-
-    - id: "review.uncommon.1"
-      category: communication
-      rarity: uncommon
-      isHidden: false
       requirements:
           type: LinearAchievementProgress
           target: 25
-      parent: "review.common.2"
+
+    - id: "review.uncommon.2"
+      parent: "review.uncommon.1"
+      rarity: uncommon
+      isHidden: false
+      category: communication
       triggerEvents:
           - REVIEW_APPROVED
           - REVIEW_CHANGES_REQUESTED
           - REVIEW_COMMENTED
       evaluatorClass: ReviewCountEvaluator
-
-    - id: "review.uncommon.2"
-      category: communication
-      rarity: uncommon
-      isHidden: false
       requirements:
           type: LinearAchievementProgress
           target: 50
-      parent: "review.uncommon.1"
+
+    - id: "review.rare"
+      parent: "review.uncommon.2"
+      rarity: rare
+      isHidden: false
+      category: communication
       triggerEvents:
           - REVIEW_APPROVED
           - REVIEW_CHANGES_REQUESTED
           - REVIEW_COMMENTED
       evaluatorClass: ReviewCountEvaluator
-
-    - id: "review.rare"
-      category: communication
-      rarity: rare
-      isHidden: false
       requirements:
           type: LinearAchievementProgress
           target: 100
-      parent: "review.uncommon.2"
+
+    - id: "review.epic"
+      parent: "review.rare"
+      rarity: epic
+      isHidden: false
+      category: communication
       triggerEvents:
           - REVIEW_APPROVED
           - REVIEW_CHANGES_REQUESTED
           - REVIEW_COMMENTED
       evaluatorClass: ReviewCountEvaluator
-
-    - id: "review.epic"
-      category: communication
-      rarity: epic
-      isHidden: false
       requirements:
           type: LinearAchievementProgress
           target: 200
-      parent: "review.rare"
+
+    - id: "review.legendary"
+      parent: "review.epic"
+      rarity: legendary
+      isHidden: false
+      category: communication
       triggerEvents:
           - REVIEW_APPROVED
           - REVIEW_CHANGES_REQUESTED
           - REVIEW_COMMENTED
       evaluatorClass: ReviewCountEvaluator
-
-    - id: "review.legendary"
-      category: communication
-      rarity: legendary
-      isHidden: false
       requirements:
           type: LinearAchievementProgress
           target: 500
-      parent: "review.epic"
+
+    - id: "review.mythic"
+      parent: "review.legendary"
+      rarity: mythic
+      isHidden: true
+      category: communication
       triggerEvents:
           - REVIEW_APPROVED
           - REVIEW_CHANGES_REQUESTED
           - REVIEW_COMMENTED
       evaluatorClass: ReviewCountEvaluator
-
-    - id: "review.mythic"
-      category: communication
-      rarity: mythic
-      isHidden: true
       requirements:
           type: LinearAchievementProgress
           target: 1000
-      parent: "review.legendary"
-      triggerEvents:
-          - REVIEW_APPROVED
-          - REVIEW_CHANGES_REQUESTED
-          - REVIEW_COMMENTED
-      evaluatorClass: ReviewCountEvaluator
 
     # ========================================================================
     # Issue Achievements
@@ -344,190 +344,187 @@ achievements:
 
     # --- Main Line / Issue Open ---
     - id: "issue.open.common.1"
-      category: issues
       rarity: common
       isHidden: false
+      category: issues
+      triggerEvents:
+          - ISSUE_CREATED
+      evaluatorClass: StandardCountEvaluator
       requirements:
           type: LinearAchievementProgress
           target: 1
+
+    - id: "issue.open.common.2"
+      parent: "issue.open.common.1"
+      rarity: common
+      isHidden: false
+      category: issues
       triggerEvents:
           - ISSUE_CREATED
       evaluatorClass: StandardCountEvaluator
-
-    - id: "issue.open.common.2"
-      category: issues
-      rarity: common
-      isHidden: false
       requirements:
           type: LinearAchievementProgress
           target: 5
-      parent: "issue.open.common.1"
+
+    - id: "issue.open.uncommon"
+      parent: "issue.open.common.2"
+      rarity: uncommon
+      isHidden: false
+      category: issues
       triggerEvents:
           - ISSUE_CREATED
       evaluatorClass: StandardCountEvaluator
-
-    - id: "issue.open.uncommon"
-      category: issues
-      rarity: uncommon
-      isHidden: false
       requirements:
           type: LinearAchievementProgress
           target: 10
-      parent: "issue.open.common.2"
+
+    - id: "issue.open.rare"
+      parent: "issue.open.uncommon"
+      rarity: rare
+      isHidden: false
+      category: issues
       triggerEvents:
           - ISSUE_CREATED
       evaluatorClass: StandardCountEvaluator
-
-    - id: "issue.open.rare"
-      category: issues
-      rarity: rare
-      isHidden: false
       requirements:
           type: LinearAchievementProgress
           target: 15
-      parent: "issue.open.uncommon"
+
+    - id: "issue.open.epic"
+      parent: "issue.open.rare"
+      rarity: epic
+      isHidden: false
+      category: issues
       triggerEvents:
           - ISSUE_CREATED
       evaluatorClass: StandardCountEvaluator
-
-    - id: "issue.open.epic"
-      category: issues
-      rarity: epic
-      isHidden: false
       requirements:
           type: LinearAchievementProgress
           target: 30
-      parent: "issue.open.rare"
+
+    - id: "issue.open.legendary"
+      parent: "issue.open.epic"
+      rarity: legendary
+      isHidden: false
+      category: issues
       triggerEvents:
           - ISSUE_CREATED
       evaluatorClass: StandardCountEvaluator
-
-    - id: "issue.open.legendary"
-      category: issues
-      rarity: legendary
-      isHidden: false
       requirements:
           type: LinearAchievementProgress
           target: 50
-      parent: "issue.open.epic"
-      triggerEvents:
-          - ISSUE_CREATED
-      evaluatorClass: StandardCountEvaluator
 
     # --- Main Line / Issue Close ---
     - id: "issue.close.common.1"
-      category: issues
       rarity: common
       isHidden: false
+      category: issues
+      triggerEvents:
+          - ISSUE_CLOSED
+      evaluatorClass: StandardCountEvaluator
       requirements:
           type: LinearAchievementProgress
           target: 1
+
+    - id: "issue.close.common.2"
+      parent: "issue.close.common.1"
+      rarity: common
+      isHidden: false
+      category: issues
       triggerEvents:
           - ISSUE_CLOSED
       evaluatorClass: StandardCountEvaluator
-
-    - id: "issue.close.common.2"
-      category: issues
-      rarity: common
-      isHidden: false
       requirements:
           type: LinearAchievementProgress
           target: 5
-      parent: "issue.close.common.1"
+
+    - id: "issue.close.uncommon"
+      parent: "issue.close.common.2"
+      rarity: uncommon
+      isHidden: false
+      category: issues
       triggerEvents:
           - ISSUE_CLOSED
       evaluatorClass: StandardCountEvaluator
-
-    - id: "issue.close.uncommon"
-      category: issues
-      rarity: uncommon
-      isHidden: false
       requirements:
           type: LinearAchievementProgress
           target: 10
-      parent: "issue.close.common.2"
+
+    - id: "issue.close.rare"
+      parent: "issue.close.uncommon"
+      rarity: rare
+      isHidden: false
+      category: issues
       triggerEvents:
           - ISSUE_CLOSED
       evaluatorClass: StandardCountEvaluator
-
-    - id: "issue.close.rare"
-      category: issues
-      rarity: rare
-      isHidden: false
       requirements:
           type: LinearAchievementProgress
           target: 15
-      parent: "issue.close.uncommon"
+
+    - id: "issue.close.epic"
+      parent: "issue.close.rare"
+      rarity: epic
+      isHidden: false
+      category: issues
       triggerEvents:
           - ISSUE_CLOSED
       evaluatorClass: StandardCountEvaluator
-
-    - id: "issue.close.epic"
-      category: issues
-      rarity: epic
-      isHidden: false
       requirements:
           type: LinearAchievementProgress
           target: 30
-      parent: "issue.close.rare"
+
+    - id: "issue.close.legendary"
+      parent: "issue.close.epic"
+      rarity: legendary
+      isHidden: false
+      category: issues
       triggerEvents:
           - ISSUE_CLOSED
       evaluatorClass: StandardCountEvaluator
-
-    - id: "issue.close.legendary"
-      category: issues
-      rarity: legendary
-      isHidden: false
       requirements:
           type: LinearAchievementProgress
           target: 50
-      parent: "issue.close.epic"
-      triggerEvents:
-          - ISSUE_CLOSED
-      evaluatorClass: StandardCountEvaluator
 
     # --- Issue Special Achievements ---
     - id: "issue.special.hive_mind"
       parent: "issue.close.common.2"
-      category: issues
       rarity: rare
       isHidden: false
-      requirements:
-          type: BinaryAchievementProgress
+      category: issues
       triggerEvents:
           - ISSUE_CLOSED
       evaluatorClass: DummyEvaluator
+      requirements:
+          type: BinaryAchievementProgress
 
     - id: "issue.special.oracle"
       parent: "issue.close.common.2"
-      category: issues
       rarity: epic
       isHidden: true
-      requirements:
-          type: BinaryAchievementProgress
+      category: issues
       triggerEvents:
           - ISSUE_CLOSED
       evaluatorClass: DummyEvaluator
+      requirements:
+          type: BinaryAchievementProgress
 
     - id: "issue.special.necromancer"
       parent: "issue.special.necromancer"
-      category: issues
       rarity: epic
       isHidden: true
-      requirements:
-          type: BinaryAchievementProgress
+      category: issues
       triggerEvents:
           - ISSUE_CLOSED
       evaluatorClass: DummyEvaluator
+      requirements:
+          type: BinaryAchievementProgress
 
     # --- Milestones ---
     - id: "milestone.first_action"
-      category: milestones
       rarity: common
       isHidden: false
-      requirements:
-          type: LinearAchievementProgress
-          target: 1
+      category: milestones
       triggerEvents:
           - PULL_REQUEST_OPENED
           - PULL_REQUEST_CLOSED
@@ -537,63 +534,66 @@ achievements:
           - REVIEW_CHANGES_REQUESTED
           - REVIEW_COMMENTED
       evaluatorClass: StandardCountEvaluator
+      requirements:
+          type: LinearAchievementProgress
+          target: 1
 
     - id: "milestone.polyglot"
-      category: milestones
+      parent: "milestone.first_action"
       rarity: uncommon
       isHidden: false
-      requirements:
-          type: BinaryAchievementProgress
-      parent: "milestone.first_action"
+      category: milestones
       triggerEvents: []
       evaluatorClass: DummyEvaluator
+      requirements:
+          type: BinaryAchievementProgress
 
     - id: "milestone.night_owl"
-      category: milestones
+      parent: "milestone.first_action"
       rarity: epic
       isHidden: true
-      requirements:
-          type: BinaryAchievementProgress
-      parent: "milestone.first_action"
+      category: milestones
       triggerEvents: []
       evaluatorClass: DummyEvaluator
+      requirements:
+          type: BinaryAchievementProgress
 
     - id: "milestone.long_time_return"
       parent: "milestone.long_time_return"
-      category: milestones
       rarity: epic
       isHidden: true
-      requirements:
-          type: BinaryAchievementProgress
+      category: milestones
       triggerEvents: []
       evaluatorClass: DummyEvaluator
+      requirements:
+          type: BinaryAchievementProgress
 
     - id: "milestone.all_rare"
       parent: "milestone.all_rare"
-      category: milestones
       rarity: epic
       isHidden: true
-      requirements:
-          type: BinaryAchievementProgress
+      category: milestones
       triggerEvents: []
       evaluatorClass: DummyEvaluator
+      requirements:
+          type: BinaryAchievementProgress
 
     - id: "milestone.all_epic"
-      category: milestones
+      parent: "milestone.all_rare"
       rarity: legendary
       isHidden: true
-      requirements:
-          type: BinaryAchievementProgress
-      parent: "milestone.all_rare"
+      category: milestones
       triggerEvents: []
       evaluatorClass: DummyEvaluator
+      requirements:
+          type: BinaryAchievementProgress
 
     - id: "milestone.all_legendary"
-      category: milestones
+      parent: "milestone.all_epic"
       rarity: mythic
       isHidden: true
-      requirements:
-          type: BinaryAchievementProgress
-      parent: "milestone.all_epic"
+      category: milestones
       triggerEvents: []
       evaluatorClass: DummyEvaluator
+      requirements:
+          type: BinaryAchievementProgress

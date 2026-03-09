@@ -98,8 +98,13 @@ public class AchievementService {
      * @throws IllegalStateException if no evaluator bean is registered for the definition's evaluatorClass
      */
     private AchievementEvaluator resolveEvaluator(AchievementDefinition definition) {
+        String className = definition.evaluatorClass();
+        if (!className.contains(".")) {
+            className = "de.tum.in.www1.hephaestus.achievement.evaluator." + className;
+        }
+
         try {
-            Class<?> clazz = Class.forName(definition.evaluatorClass());
+            Class<?> clazz = Class.forName(className);
             if (!AchievementEvaluator.class.isAssignableFrom(clazz)) {
                 throw new IllegalStateException(
                     "Evaluator class does not implement AchievementEvaluator: " + definition.evaluatorClass()
@@ -270,7 +275,12 @@ public class AchievementService {
         for (AchievementDefinition achievement : achievementRegistry.values()) {
             UserAchievement progress = progressMap.get(achievement.id());
             if (progress == null) continue;
+
             AchievementStatus status = computeStatus(achievement, progressMap);
+            if (status == AchievementStatus.HIDDEN) {
+                continue;
+            }
+
             AchievementProgress progressData = progress.getProgressData();
             Optional<Instant> unlockedAt = Optional.ofNullable(progress.getUnlockedAt());
             result.add(AchievementDTO.fromDefinition(achievement, status, progressData, unlockedAt));
@@ -296,6 +306,11 @@ public class AchievementService {
         UserAchievement progress = progressMap.get(achievement.id());
         if (progress != null && progress.getUnlockedAt() != null) {
             return AchievementStatus.UNLOCKED;
+        }
+
+        // If not unlocked, check if it's hidden
+        if (achievement.isHidden()) {
+            return AchievementStatus.HIDDEN;
         }
 
         // Check parent

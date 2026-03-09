@@ -109,12 +109,12 @@ export const rarityAccentBackgrounds = {
 } as const satisfies Record<AchievementRarity, string>;
 
 export const rarityIconSizes = {
-	common: 15,
-	uncommon: 15,
-	rare: 25,
-	epic: 25,
-	legendary: 35,
-	mythic: 50,
+	common: 16,
+	uncommon: 18,
+	rare: 24,
+	epic: 28,
+	legendary: 36,
+	mythic: 52,
 } as const satisfies Record<AchievementRarity, number>;
 
 /**

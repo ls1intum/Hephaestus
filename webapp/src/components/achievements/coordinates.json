@@ -188,16 +188,16 @@
     "y": 72
   },
   "milestone.first_action": {
-    "x": 192,
-    "y": -72
-  },
-  "milestone.polyglot": {
-    "x": 408,
+    "x": 168,
     "y": -120
   },
+  "milestone.polyglot": {
+    "x": 360,
+    "y": -144
+  },
   "milestone.night_owl": {
-    "x": 312,
-    "y": -240
+    "x": 336,
+    "y": -288
   },
   "milestone.long_time_return": {
     "x": -432,

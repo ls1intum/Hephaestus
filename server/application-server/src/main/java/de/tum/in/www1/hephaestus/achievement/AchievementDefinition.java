@@ -21,6 +21,7 @@ import org.springframework.lang.Nullable;
  * @param isHidden       Boolean value that denotes if the achievement should be hidden to the player when not unlocked
  * @param triggerEvents  Activity event types that contribute to unlocking this achievement.
  * @param evaluatorClass The implementation class used to evaluate progress for this achievement.
+ *                       Can be fully qualified or a short name (assumed to be in de.tum.in.www1.hephaestus.achievement.evaluator).
  *                       Resolved at runtime via the Spring-managed evaluator strategy map.
  */
 @Schema(name = "AchievementDefinition", description = "Static definition metadata for an achievement")

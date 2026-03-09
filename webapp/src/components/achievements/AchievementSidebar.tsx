@@ -1,7 +1,6 @@
 import { useReactFlow } from "@xyflow/react";
 import {
 	CircleDot,
-	Flame,
 	GitCommit,
 	GitPullRequest,
 	Layers,
@@ -224,8 +223,8 @@ function SidebarBody({
 									className="p-3 rounded-lg bg-secondary/30 border border-border/50 hover:border-border transition-colors"
 								>
 									<div className="flex items-center gap-3 mb-2">
-										<div className="w-7 h-7 rounded-full flex items-center justify-center bg-foreground/10 text-foreground">
-											<Icon className="w-3.5 h-3.5" />
+										<div className="w-8 h-8 rounded-full flex items-center justify-center bg-foreground/10 text-foreground shrink-0 overflow-hidden">
+											<Icon size={16} className="shrink-0" />
 										</div>
 										<div className="flex-1">
 											<div className="flex items-center justify-between">
@@ -260,6 +259,7 @@ function SidebarBody({
 							.map((achievement) => {
 								const rarity = achievement.rarity ?? "common";
 								const unlockedDate = achievement.unlockedAt;
+								const Icon = achievement.icon;
 								return (
 									<div
 										key={achievement.id}
@@ -267,12 +267,12 @@ function SidebarBody({
 									>
 										<div
 											className={cn(
-												"w-6 h-6 rounded-full flex items-center justify-center",
+												"w-8 h-8 rounded-full flex items-center justify-center shrink-0 overflow-hidden",
 												rarityAccentBackgrounds[rarity],
 												"text-background",
 											)}
 										>
-											<Flame className="w-3 h-3" />
+											<Icon size={18} className="shrink-0" />
 										</div>
 										<div className="flex-1 min-w-0">
 											<p className="text-sm font-medium text-sidebar-foreground truncate">

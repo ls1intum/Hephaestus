@@ -64,7 +64,7 @@ export function AchievementsView({
 		<ReactFlowProvider>
 			<div className="h-[calc(100dvh-4rem)] flex bg-background overflow-hidden">
 				{/* Main content area — fills remaining space */}
-				<div className="flex-1 relative">
+				<div className="flex-1 relative h-full flex flex-col overflow-hidden">
 					{viewMode === "tree" ? (
 						<>
 							{/* Radial gradient background */}

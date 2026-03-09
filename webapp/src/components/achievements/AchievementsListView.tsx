@@ -76,7 +76,7 @@ export function AchievementsListView({ achievements }: AchievementListViewProps)
 	};
 
 	return (
-		<div className="flex-1 overflow-auto p-6" role="region" aria-label="Achievement list">
+		<div className="flex-1 overflow-auto p-6 min-h-0 h-full" role="region" aria-label="Achievement list">
 			<div className="max-w-4xl mx-auto space-y-8">
 				{sortedCategories.map((category) => (
 					<section key={category} aria-labelledby={`category-${category}`}>
@@ -114,12 +114,12 @@ export function AchievementsListView({ achievements }: AchievementListViewProps)
 											<TableCell>
 												<div
 													className={cn(
-														"w-8 h-8 rounded-full flex items-center justify-center",
+														"w-10 h-10 rounded-full flex items-center justify-center shrink-0",
 														statusBackgrounds[status],
 														status === "unlocked" ? "text-background" : "text-foreground",
 													)}
 												>
-													<Icon className="w-4 h-4" />
+													<Icon size={20} className="shrink-0" />
 												</div>
 											</TableCell>
 											<TableCell>
