@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.28.0](https://github.com/ls1intum/Hephaestus/compare/v0.27.1...v0.28.0) (2026-03-09)
+
+### 🚀 Features
+
+* **gitprovider:** add GitLab group membership sync and fix multi-provider issues ([#818](https://github.com/ls1intum/Hephaestus/issues/818)) ([f54cb43](https://github.com/ls1intum/Hephaestus/commit/f54cb4336b5dbaf005d3dbf2579d662ed4f30246))
+
 ## [0.27.1](https://github.com/ls1intum/Hephaestus/compare/v0.27.0...v0.27.1) (2026-03-09)
 
 ### 🐛 Bug Fixes
