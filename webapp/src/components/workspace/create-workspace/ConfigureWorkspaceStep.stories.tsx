@@ -1,26 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { fn } from "storybook/test";
+import type { GitLabGroup } from "@/api/types.gen";
 import { ConfigureWorkspaceStep } from "./ConfigureWorkspaceStep";
-import { initialWizardState, WizardContext, type WizardState } from "./wizard-context";
+import { makeGroup, withWizardState } from "./stories-utils";
 
-function withWizardState(overrides: Partial<WizardState>) {
-	const state: WizardState = { ...initialWizardState, step: 3, ...overrides };
-	return function WizardDecorator(Story: React.ComponentType) {
-		return (
-			<WizardContext.Provider value={{ state, dispatch: fn() }}>
-				<Story />
-			</WizardContext.Provider>
-		);
-	};
-}
-
-const defaultGroup = {
-	id: 1,
-	name: "Hephaestus",
-	fullPath: "ls1intum/hephaestus",
+const defaultGroup: GitLabGroup = makeGroup(1, "Hephaestus", "ls1intum/hephaestus", {
 	visibility: "public",
-	avatarUrl: "https://gitlab.com/uploads/-/system/group/avatar/1/avatar.png",
-};
+});
 
 /**
  * Final configuration step of the GitLab workspace creation wizard.
@@ -40,8 +25,9 @@ const meta = {
 	},
 	decorators: [
 		withWizardState({
+			step: 3,
 			selectedGroup: defaultGroup,
-			preflightResult: { valid: true, username: "admin-user", scopes: ["api", "read_user"] },
+			preflightResult: { valid: true, username: "admin-user" },
 			serverUrl: "",
 		}),
 		(Story) => (
@@ -67,11 +53,12 @@ export const Default: Story = {};
 export const PreFilled: Story = {
 	decorators: [
 		withWizardState({
+			step: 3,
 			selectedGroup: defaultGroup,
 			displayName: "My Custom Workspace",
 			workspaceSlug: "my-custom-workspace",
 			slugManuallyEdited: true,
-			preflightResult: { valid: true, username: "admin-user", scopes: ["api", "read_user"] },
+			preflightResult: { valid: true, username: "admin-user" },
 		}),
 	],
 };
@@ -82,9 +69,10 @@ export const PreFilled: Story = {
 export const SelfHosted: Story = {
 	decorators: [
 		withWizardState({
+			step: 3,
 			selectedGroup: defaultGroup,
 			serverUrl: "https://gitlab.example.com",
-			preflightResult: { valid: true, username: "devops-lead", scopes: ["api", "read_user"] },
+			preflightResult: { valid: true, username: "devops-lead" },
 		}),
 	],
 };
@@ -95,12 +83,13 @@ export const SelfHosted: Story = {
 export const LongGroupName: Story = {
 	decorators: [
 		withWizardState({
+			step: 3,
 			selectedGroup: {
 				...defaultGroup,
 				name: "Very Long Department Name That Should Truncate",
 				fullPath: "org/department/sub-team/very-long-group-path-name",
 			},
-			preflightResult: { valid: true, username: "admin-user", scopes: ["api", "read_user"] },
+			preflightResult: { valid: true, username: "admin-user" },
 		}),
 	],
 };

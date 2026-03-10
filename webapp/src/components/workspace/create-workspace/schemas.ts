@@ -24,8 +24,8 @@ export const workspaceDetailsSchema = z.object({
 	workspaceSlug: z
 		.string()
 		.regex(
-			/^[a-z0-9][a-z0-9-]{2,50}$/,
-			"Slug must be 3–51 characters, start with a lowercase letter or digit, and contain only lowercase letters, digits, or hyphens",
+			/^[a-z0-9][a-z0-9-]{1,49}[a-z0-9]$/,
+			"Slug must be 3–51 characters, start and end with a lowercase letter or digit, and contain only lowercase letters, digits, or hyphens",
 		),
 });
 export type WorkspaceDetailsData = z.infer<typeof workspaceDetailsSchema>;

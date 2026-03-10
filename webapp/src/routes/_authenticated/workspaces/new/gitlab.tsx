@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeftIcon, OctagonXIcon } from "lucide-react";
-import { useReducer } from "react";
+import { useReducer, useRef } from "react";
 import { toast } from "sonner";
 import {
 	createWorkspaceMutation,
@@ -42,12 +42,12 @@ function GitLabWizardPage() {
 	const navigate = useNavigate();
 	const { setSelectedSlug } = useWorkspaceStore();
 
+	const submittingRef = useRef(false);
 	const listGroups = useMutation({ ...listGitLabGroupsMutation() });
 
 	const createWorkspace = useMutation({
 		...createWorkspaceMutation(),
 		onSuccess: (data) => {
-			queryClient.invalidateQueries({ queryKey: listWorkspacesQueryKey() });
 			setSelectedSlug(data.workspaceSlug);
 			toast.success(`Workspace "${data.displayName}" created`);
 			navigate({
@@ -56,12 +56,16 @@ function GitLabWizardPage() {
 			});
 		},
 		onError: (error) => {
-			const message = error instanceof Error ? error.message : String(error);
-			if (message.includes("409") || message.toLowerCase().includes("conflict")) {
-				toast.error("A workspace with this slug already exists. Choose a different slug.");
-			} else {
-				toast.error(`Failed to create workspace: ${message}`);
-			}
+			console.error("Failed to create workspace:", error);
+			const message =
+				typeof error === "object" && error !== null && "error" in error
+					? (error as { error: string }).error
+					: "Failed to create workspace. Please try again.";
+			toast.error(message);
+		},
+		onSettled: () => {
+			submittingRef.current = false;
+			queryClient.invalidateQueries({ queryKey: listWorkspacesQueryKey() });
 		},
 	});
 
@@ -76,7 +80,7 @@ function GitLabWizardPage() {
 
 	const handleNext = () => {
 		if (state.step === 1 && canAdvanceFromStep1) {
-			listGroups.reset();
+			if (listGroups.isPending) return;
 			listGroups.mutate(
 				{
 					body: {
@@ -96,7 +100,8 @@ function GitLabWizardPage() {
 	};
 
 	const handleSubmit = () => {
-		if (!canSubmit || !state.selectedGroup) return;
+		if (!canSubmit || !state.selectedGroup || submittingRef.current) return;
+		submittingRef.current = true;
 		createWorkspace.mutate({
 			body: {
 				workspaceSlug: state.workspaceSlug,
