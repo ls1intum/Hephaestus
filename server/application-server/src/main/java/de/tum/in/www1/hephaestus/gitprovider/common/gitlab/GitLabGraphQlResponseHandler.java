@@ -4,6 +4,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabExceptionClassi
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabExceptionClassifier.ClassificationResult;
 import org.slf4j.Logger;
 import org.springframework.graphql.client.ClientGraphQlResponse;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Component;
  * treated every failure as an opaque error.
  */
 @Component
+@ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
 public class GitLabGraphQlResponseHandler {
 
     private static final long MAX_RATE_LIMIT_WAIT_MS = 120_000;
