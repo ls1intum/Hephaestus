@@ -316,7 +316,9 @@ public class GitLabTeamSyncService {
                 );
                 break;
             }
-            if (responseHandler.isPaginationLoop(cursor, previousCursor, "descendant groups for " + groupFullPath, log)) {
+            if (
+                responseHandler.isPaginationLoop(cursor, previousCursor, "descendant groups for " + groupFullPath, log)
+            ) {
                 return false;
             }
             previousCursor = cursor;

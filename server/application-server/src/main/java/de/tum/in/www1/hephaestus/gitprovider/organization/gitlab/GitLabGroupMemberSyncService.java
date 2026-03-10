@@ -206,7 +206,9 @@ public class GitLabGroupMemberSyncService {
                     );
                     break;
                 }
-                if (responseHandler.isPaginationLoop(cursor, previousCursor, "group members for " + safeGroupPath, log)) {
+                if (
+                    responseHandler.isPaginationLoop(cursor, previousCursor, "group members for " + safeGroupPath, log)
+                ) {
                     break;
                 }
                 previousCursor = cursor;

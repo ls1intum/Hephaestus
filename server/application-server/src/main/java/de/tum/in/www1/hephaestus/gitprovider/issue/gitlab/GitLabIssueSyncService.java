@@ -345,7 +345,14 @@ public class GitLabIssueSyncService {
                 if (pageInfo == null || !pageInfo.hasNextPage()) break;
 
                 currentCursor = pageInfo.endCursor();
-                if (responseHandler.isPaginationLoop(currentCursor, previousBackfillCursor, "historical issues for " + safeProjectPath, log)) {
+                if (
+                    responseHandler.isPaginationLoop(
+                        currentCursor,
+                        previousBackfillCursor,
+                        "historical issues for " + safeProjectPath,
+                        log
+                    )
+                ) {
                     return BackfillBatchResult.abortedWithError();
                 }
                 previousBackfillCursor = currentCursor;
@@ -703,7 +710,14 @@ public class GitLabIssueSyncService {
                     break;
                 }
                 cursor = (String) pageInfo.get("endCursor");
-                if (responseHandler.isPaginationLoop(cursor, previousLabelCursor, "remaining labels for " + context, log)) {
+                if (
+                    responseHandler.isPaginationLoop(
+                        cursor,
+                        previousLabelCursor,
+                        "remaining labels for " + context,
+                        log
+                    )
+                ) {
                     break;
                 }
                 previousLabelCursor = cursor;
@@ -817,7 +831,14 @@ public class GitLabIssueSyncService {
                     break;
                 }
                 cursor = (String) pageInfo.get("endCursor");
-                if (responseHandler.isPaginationLoop(cursor, previousAssigneeCursor, "remaining assignees for " + context, log)) {
+                if (
+                    responseHandler.isPaginationLoop(
+                        cursor,
+                        previousAssigneeCursor,
+                        "remaining assignees for " + context,
+                        log
+                    )
+                ) {
                     break;
                 }
                 previousAssigneeCursor = cursor;

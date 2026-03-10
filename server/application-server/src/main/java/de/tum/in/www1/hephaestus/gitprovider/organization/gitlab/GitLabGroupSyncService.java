@@ -333,7 +333,9 @@ public class GitLabGroupSyncService {
                     );
                     break;
                 }
-                if (responseHandler.isPaginationLoop(cursor, previousCursor, "group projects for " + safeGroupPath, log)) {
+                if (
+                    responseHandler.isPaginationLoop(cursor, previousCursor, "group projects for " + safeGroupPath, log)
+                ) {
                     hadApiFailure = true;
                     break;
                 }
@@ -583,7 +585,14 @@ public class GitLabGroupSyncService {
                     );
                     break;
                 }
-                if (responseHandler.isPaginationLoop(reconCursor, previousReconCursor, "reconciliation for " + safeGroupPath, log)) {
+                if (
+                    responseHandler.isPaginationLoop(
+                        reconCursor,
+                        previousReconCursor,
+                        "reconciliation for " + safeGroupPath,
+                        log
+                    )
+                ) {
                     break;
                 }
                 previousReconCursor = reconCursor;

@@ -136,7 +136,14 @@ public class GitLabCollaboratorSyncService {
                     .field("project.projectMembers.pageInfo")
                     .toEntity(GitLabPageInfo.class);
                 cursor = pageInfo != null ? pageInfo.endCursor() : null;
-                if (responseHandler.isPaginationLoop(cursor, previousCursor, "collaborators for " + safeProjectPath, log)) {
+                if (
+                    responseHandler.isPaginationLoop(
+                        cursor,
+                        previousCursor,
+                        "collaborators for " + safeProjectPath,
+                        log
+                    )
+                ) {
                     errorAborted = true;
                     break;
                 }

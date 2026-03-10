@@ -189,7 +189,14 @@ public class GitLabMergeRequestSyncService {
                     );
                     break;
                 }
-                if (responseHandler.isPaginationLoop(cursor, previousCursor, "merge requests for " + safeProjectPath, log)) {
+                if (
+                    responseHandler.isPaginationLoop(
+                        cursor,
+                        previousCursor,
+                        "merge requests for " + safeProjectPath,
+                        log
+                    )
+                ) {
                     errorAborted = true;
                     break;
                 }
@@ -381,7 +388,14 @@ public class GitLabMergeRequestSyncService {
                 if (pageInfo == null || !pageInfo.hasNextPage()) break;
 
                 currentCursor = pageInfo.endCursor();
-                if (responseHandler.isPaginationLoop(currentCursor, previousBackfillCursor, "historical MRs for " + safeProjectPath, log)) {
+                if (
+                    responseHandler.isPaginationLoop(
+                        currentCursor,
+                        previousBackfillCursor,
+                        "historical MRs for " + safeProjectPath,
+                        log
+                    )
+                ) {
                     return BackfillBatchResult.abortedWithError();
                 }
                 previousBackfillCursor = currentCursor;
@@ -950,7 +964,14 @@ public class GitLabMergeRequestSyncService {
                 Map<String, Object> pageInfo = (Map<String, Object>) labelsMap.get("pageInfo");
                 if (pageInfo == null || !Boolean.TRUE.equals(pageInfo.get("hasNextPage"))) break;
                 cursor = (String) pageInfo.get("endCursor");
-                if (responseHandler.isPaginationLoop(cursor, previousLabelCursor, "remaining MR labels for " + context, log)) {
+                if (
+                    responseHandler.isPaginationLoop(
+                        cursor,
+                        previousLabelCursor,
+                        "remaining MR labels for " + context,
+                        log
+                    )
+                ) {
                     break;
                 }
                 previousLabelCursor = cursor;
@@ -1045,7 +1066,14 @@ public class GitLabMergeRequestSyncService {
                 Map<String, Object> pageInfo = (Map<String, Object>) assigneesMap.get("pageInfo");
                 if (pageInfo == null || !Boolean.TRUE.equals(pageInfo.get("hasNextPage"))) break;
                 cursor = (String) pageInfo.get("endCursor");
-                if (responseHandler.isPaginationLoop(cursor, previousAssigneeCursor, "remaining MR assignees for " + context, log)) {
+                if (
+                    responseHandler.isPaginationLoop(
+                        cursor,
+                        previousAssigneeCursor,
+                        "remaining MR assignees for " + context,
+                        log
+                    )
+                ) {
                     break;
                 }
                 previousAssigneeCursor = cursor;
@@ -1144,7 +1172,14 @@ public class GitLabMergeRequestSyncService {
                 Map<String, Object> pageInfo = (Map<String, Object>) reviewersMap.get("pageInfo");
                 if (pageInfo == null || !Boolean.TRUE.equals(pageInfo.get("hasNextPage"))) break;
                 cursor = (String) pageInfo.get("endCursor");
-                if (responseHandler.isPaginationLoop(cursor, previousReviewerCursor, "remaining MR reviewers for " + context, log)) {
+                if (
+                    responseHandler.isPaginationLoop(
+                        cursor,
+                        previousReviewerCursor,
+                        "remaining MR reviewers for " + context,
+                        log
+                    )
+                ) {
                     break;
                 }
                 previousReviewerCursor = cursor;
@@ -1243,7 +1278,14 @@ public class GitLabMergeRequestSyncService {
                 Map<String, Object> pageInfo = (Map<String, Object>) approvedByMap.get("pageInfo");
                 if (pageInfo == null || !Boolean.TRUE.equals(pageInfo.get("hasNextPage"))) break;
                 cursor = (String) pageInfo.get("endCursor");
-                if (responseHandler.isPaginationLoop(cursor, previousApproverCursor, "remaining MR approvers for " + context, log)) {
+                if (
+                    responseHandler.isPaginationLoop(
+                        cursor,
+                        previousApproverCursor,
+                        "remaining MR approvers for " + context,
+                        log
+                    )
+                ) {
                     break;
                 }
                 previousApproverCursor = cursor;

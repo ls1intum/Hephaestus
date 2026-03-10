@@ -154,7 +154,9 @@ public class GitLabMilestoneSyncService {
                 if (pageInfo == null || !pageInfo.hasNextPage()) {
                     break;
                 }
-                if (responseHandler.isPaginationLoop(cursor, previousCursor, "milestones for " + safeProjectPath, log)) {
+                if (
+                    responseHandler.isPaginationLoop(cursor, previousCursor, "milestones for " + safeProjectPath, log)
+                ) {
                     errorAborted = true;
                     break;
                 }

@@ -142,7 +142,9 @@ public class GitLabSubIssueSyncService {
                 GitLabPageInfo pageInfo = response.field("project.workItems.pageInfo").toEntity(GitLabPageInfo.class);
                 if (pageInfo == null || !pageInfo.hasNextPage()) break;
                 cursor = pageInfo.endCursor();
-                if (responseHandler.isPaginationLoop(cursor, previousCursor, "sub-issues for " + safeProjectPath, log)) {
+                if (
+                    responseHandler.isPaginationLoop(cursor, previousCursor, "sub-issues for " + safeProjectPath, log)
+                ) {
                     errorAborted = true;
                     break;
                 }
