@@ -8,6 +8,7 @@ import de.tum.in.www1.hephaestus.gitprovider.commit.CommitFileChange;
 import de.tum.in.www1.hephaestus.gitprovider.commit.CommitRepository;
 import de.tum.in.www1.hephaestus.gitprovider.commit.util.CommitUtils;
 import de.tum.in.www1.hephaestus.gitprovider.common.DataSource;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.EventContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.EventPayload;
@@ -320,7 +321,8 @@ public class GitHubCommitBackfillService {
             RepositoryRef.from(repository),
             DataSource.GRAPHQL_SYNC,
             null,
-            UUID.randomUUID().toString()
+            UUID.randomUUID().toString(),
+            GitProviderType.GITHUB
         );
 
         eventPublisher.publishEvent(new DomainEvent.CommitCreated(commitData, context));

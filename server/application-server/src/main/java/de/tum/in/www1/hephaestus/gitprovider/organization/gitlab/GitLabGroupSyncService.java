@@ -10,6 +10,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlResponseHandler;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncException;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabGroupResponse;
@@ -55,6 +56,7 @@ public class GitLabGroupSyncService {
     private static final String GET_GROUP_PROJECTS_DOCUMENT = "GetGroupProjects";
 
     private final GitLabGraphQlClientProvider graphQlClientProvider;
+    private final GitLabGraphQlResponseHandler responseHandler;
     private final GitLabGroupProcessor groupProcessor;
     private final GitLabProjectProcessor projectProcessor;
     private final GitLabProperties gitLabProperties;
@@ -62,12 +64,14 @@ public class GitLabGroupSyncService {
 
     public GitLabGroupSyncService(
         GitLabGraphQlClientProvider graphQlClientProvider,
+        GitLabGraphQlResponseHandler responseHandler,
         GitLabGroupProcessor groupProcessor,
         GitLabProjectProcessor projectProcessor,
         GitLabProperties gitLabProperties,
         GitProviderRepository gitProviderRepository
     ) {
         this.graphQlClientProvider = graphQlClientProvider;
+        this.responseHandler = responseHandler;
         this.groupProcessor = groupProcessor;
         this.projectProcessor = projectProcessor;
         this.gitLabProperties = gitLabProperties;
@@ -117,25 +121,16 @@ public class GitLabGroupSyncService {
                 .execute()
                 .block(gitLabProperties.graphqlTimeout());
 
-            if (response == null || !response.isValid()) {
-                log.warn(
-                    "Failed to fetch group: scopeId={}, groupPath={}, errors={}",
-                    scopeId,
-                    safeGroupPath,
-                    response != null ? response.getErrors() : "null response"
-                );
+            var handleResult = responseHandler.handle(response, "group " + safeGroupPath, log);
+            if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.ABORT) {
                 graphQlClientProvider.recordFailure(new GitLabSyncException("Invalid GraphQL response"));
                 return Optional.empty();
             }
-
-            // Check for partial errors (GraphQL can return data + errors simultaneously)
-            if (response.getErrors() != null && !response.getErrors().isEmpty()) {
-                log.warn(
-                    "Partial GraphQL errors in group response: scopeId={}, groupPath={}, errors={}",
-                    scopeId,
-                    safeGroupPath,
-                    response.getErrors()
-                );
+            // RETRY is not applicable for single requests, treat as success if CONTINUE
+            if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.RETRY) {
+                // For a single non-paginated request, a rate-limit retry is best handled
+                // by returning empty and letting the caller reschedule.
+                return Optional.empty();
             }
 
             graphQlClientProvider.recordSuccess();
@@ -198,6 +193,7 @@ public class GitLabGroupSyncService {
 
         List<Repository> syncedRepositories = new ArrayList<>();
         String cursor = null;
+        String previousCursor = null;
         int pageCount = 0;
         int projectsSkipped = 0;
         int projectsRedacted = 0;
@@ -242,28 +238,14 @@ public class GitLabGroupSyncService {
                     .execute()
                     .block(gitLabProperties.extendedGraphqlTimeout());
 
-                if (response == null || !response.isValid()) {
-                    log.warn(
-                        "Failed to fetch group projects page: scopeId={}, groupPath={}, page={}, errors={}",
-                        scopeId,
-                        safeGroupPath,
-                        pageCount,
-                        response != null ? response.getErrors() : "null response"
-                    );
+                var handleResult = responseHandler.handle(response, "group projects for " + safeGroupPath, log);
+                if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.RETRY) {
+                    continue;
+                }
+                if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.ABORT) {
                     graphQlClientProvider.recordFailure(new GitLabSyncException("Invalid GraphQL response"));
                     hadApiFailure = true;
                     break;
-                }
-
-                // Check for partial errors (GraphQL can return data + errors simultaneously)
-                if (response.getErrors() != null && !response.getErrors().isEmpty()) {
-                    log.warn(
-                        "Partial GraphQL errors in group projects response: scopeId={}, groupPath={}, page={}, errors={}",
-                        scopeId,
-                        safeGroupPath,
-                        pageCount,
-                        response.getErrors()
-                    );
                 }
 
                 graphQlClientProvider.recordSuccess();
@@ -351,6 +333,13 @@ public class GitLabGroupSyncService {
                     );
                     break;
                 }
+                if (
+                    responseHandler.isPaginationLoop(cursor, previousCursor, "group projects for " + safeGroupPath, log)
+                ) {
+                    hadApiFailure = true;
+                    break;
+                }
+                previousCursor = cursor;
                 pageCount++;
 
                 // Throttle between pages to respect rate limits
@@ -507,6 +496,7 @@ public class GitLabGroupSyncService {
 
         try {
             String reconCursor = null;
+            String previousReconCursor = null;
             int reconPageCount = 0;
 
             do {
@@ -537,13 +527,11 @@ public class GitLabGroupSyncService {
                     .execute()
                     .block(gitLabProperties.extendedGraphqlTimeout());
 
-                if (response == null || !response.isValid()) {
-                    log.warn(
-                        "Reconciliation query failed: groupPath={}, page={}, errors={}",
-                        safeGroupPath,
-                        reconPageCount,
-                        response != null ? response.getErrors() : "null response"
-                    );
+                var handleResult = responseHandler.handle(response, "reconciliation for " + safeGroupPath, log);
+                if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.RETRY) {
+                    continue;
+                }
+                if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.ABORT) {
                     graphQlClientProvider.recordFailure(new GitLabSyncException("Invalid GraphQL response"));
                     break;
                 }
@@ -597,6 +585,17 @@ public class GitLabGroupSyncService {
                     );
                     break;
                 }
+                if (
+                    responseHandler.isPaginationLoop(
+                        reconCursor,
+                        previousReconCursor,
+                        "reconciliation for " + safeGroupPath,
+                        log
+                    )
+                ) {
+                    break;
+                }
+                previousReconCursor = reconCursor;
                 reconPageCount++;
 
                 Thread.sleep(gitLabProperties.paginationThrottle().toMillis());

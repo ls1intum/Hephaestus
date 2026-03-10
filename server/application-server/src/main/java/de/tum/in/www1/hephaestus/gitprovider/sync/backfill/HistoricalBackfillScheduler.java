@@ -5,6 +5,7 @@ import de.tum.in.www1.hephaestus.gitprovider.sync.SyncSchedulerProperties;
 import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -50,6 +51,7 @@ public class HistoricalBackfillScheduler {
 
     private final HistoricalBackfillService backfillService;
     private final SyncSchedulerProperties syncSchedulerProperties;
+    private final ObjectProvider<GitLabHistoricalBackfillService> gitLabBackfillServiceProvider;
 
     // Injected to satisfy architecture test: signals this scheduler iterates workspaces via the service
     @SuppressWarnings("unused")
@@ -93,6 +95,19 @@ public class HistoricalBackfillScheduler {
             // If pendingRepositories == 0, all backfill is complete - stay silent (TRACE only)
         } catch (Exception e) {
             log.error("Backfill cycle failed", e);
+        }
+
+        // GitLab backfill (runs alongside GitHub backfill)
+        try {
+            GitLabHistoricalBackfillService gitLabBackfill = gitLabBackfillServiceProvider.getIfAvailable();
+            if (gitLabBackfill != null) {
+                int gitLabProcessed = gitLabBackfill.runBackfillCycle();
+                if (gitLabProcessed > 0) {
+                    log.info("GitLab backfill cycle complete: repositoriesProcessed={}", gitLabProcessed);
+                }
+            }
+        } catch (Exception e) {
+            log.error("GitLab backfill cycle failed", e);
         }
     }
 }

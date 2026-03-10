@@ -40,6 +40,11 @@ public class CommitEnrichmentEventListener {
             return;
         }
 
+        // Only enrich GitHub commits — this service uses the GitHub GraphQL API
+        if (context.providerType() != null && !context.isGitHub()) {
+            return;
+        }
+
         RepositoryRef repoRef = context.repository();
         if (repoRef == null) {
             log.warn("Skipping commit enrichment: no repository in event context, commitId={}", event.commit().id());
