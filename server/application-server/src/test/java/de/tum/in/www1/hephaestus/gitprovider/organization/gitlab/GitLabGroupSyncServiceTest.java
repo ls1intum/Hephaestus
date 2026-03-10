@@ -16,6 +16,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlResponseHandler;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabGroupResponse;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabPageInfo;
@@ -48,6 +49,9 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
     private GitLabGraphQlClientProvider graphQlClientProvider;
 
     @Mock
+    private GitLabGraphQlResponseHandler responseHandler;
+
+    @Mock
     private GitLabGroupProcessor groupProcessor;
 
     @Mock
@@ -76,6 +80,7 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
 
         service = new GitLabGroupSyncService(
             graphQlClientProvider,
+            responseHandler,
             groupProcessor,
             projectProcessor,
             gitLabProperties,

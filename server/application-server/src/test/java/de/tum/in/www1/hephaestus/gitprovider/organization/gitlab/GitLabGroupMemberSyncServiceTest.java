@@ -20,6 +20,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlResponseHandler;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabGroupMemberResponse;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabGroupMemberResponse.GitLabAccessLevel;
@@ -62,6 +63,9 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
     private GitLabGraphQlClientProvider graphQlClientProvider;
 
     @Mock
+    private GitLabGraphQlResponseHandler responseHandler;
+
+    @Mock
     private OrganizationMembershipRepository organizationMembershipRepository;
 
     @Mock
@@ -102,6 +106,7 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
 
         service = new GitLabGroupMemberSyncService(
             graphQlClientProvider,
+            responseHandler,
             organizationMembershipRepository,
             userRepository,
             gitProviderRepository,
@@ -518,6 +523,7 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
 
             var serviceNoListener = new GitLabGroupMemberSyncService(
                 graphQlClientProvider,
+                responseHandler,
                 organizationMembershipRepository,
                 userRepository,
                 gitProviderRepository,
