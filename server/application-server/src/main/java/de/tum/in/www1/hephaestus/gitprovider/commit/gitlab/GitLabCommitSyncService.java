@@ -10,6 +10,8 @@ import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabTokenService;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.sync.SyncResult;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -149,12 +151,12 @@ public class GitLabCommitSyncService {
             projectId +
             "/repository/commits" +
             "?ref_name=" +
-            branch +
+            URLEncoder.encode(branch, StandardCharsets.UTF_8) +
             "&per_page=" +
             PER_PAGE +
             "&page=" +
             page +
-            (since != null ? "&since=" + since.toString() : "");
+            (since != null ? "&since=" + URLEncoder.encode(since.toString(), StandardCharsets.UTF_8) : "");
 
         var request = webClient.get().uri(commitUrl).header(HttpHeaders.AUTHORIZATION, "Bearer " + token);
 

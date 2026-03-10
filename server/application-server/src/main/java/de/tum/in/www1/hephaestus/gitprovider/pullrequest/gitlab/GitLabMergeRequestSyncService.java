@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.pullrequest.gitlab;
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlResponseHandler;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncException;
@@ -47,17 +48,20 @@ public class GitLabMergeRequestSyncService {
     private static final String GET_MR_ASSIGNEES_DOCUMENT = "GetMergeRequestAssignees";
 
     private final GitLabGraphQlClientProvider graphQlClientProvider;
+    private final GitLabGraphQlResponseHandler responseHandler;
     private final GitLabMergeRequestProcessor mergeRequestProcessor;
     private final GitLabDiscussionSyncService discussionSyncService;
     private final GitLabProperties gitLabProperties;
 
     public GitLabMergeRequestSyncService(
         GitLabGraphQlClientProvider graphQlClientProvider,
+        GitLabGraphQlResponseHandler responseHandler,
         GitLabMergeRequestProcessor mergeRequestProcessor,
         GitLabDiscussionSyncService discussionSyncService,
         GitLabProperties gitLabProperties
     ) {
         this.graphQlClientProvider = graphQlClientProvider;
+        this.responseHandler = responseHandler;
         this.mergeRequestProcessor = mergeRequestProcessor;
         this.discussionSyncService = discussionSyncService;
         this.gitLabProperties = gitLabProperties;
@@ -77,6 +81,7 @@ public class GitLabMergeRequestSyncService {
         int totalSynced = 0;
         int totalSkipped = 0;
         String cursor = null;
+        String previousCursor = null;
         int page = 0;
         boolean rateLimitAborted = false;
         boolean errorAborted = false;
@@ -117,25 +122,14 @@ public class GitLabMergeRequestSyncService {
                     .execute()
                     .block(gitLabProperties.extendedGraphqlTimeout());
 
-                if (response == null || !response.isValid()) {
-                    log.warn(
-                        "Failed to fetch merge requests: scopeId={}, projectPath={}, errors={}",
-                        scopeId,
-                        safeProjectPath,
-                        response != null ? response.getErrors() : "null response"
-                    );
+                var handleResult = responseHandler.handle(response, "merge requests for " + safeProjectPath, log);
+                if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.RETRY) {
+                    continue;
+                }
+                if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.ABORT) {
                     graphQlClientProvider.recordFailure(new GitLabSyncException("Invalid GraphQL response"));
                     errorAborted = true;
                     break;
-                }
-
-                if (response.getErrors() != null && !response.getErrors().isEmpty()) {
-                    log.warn(
-                        "Partial GraphQL errors in MR response: scopeId={}, projectPath={}, errors={}",
-                        scopeId,
-                        safeProjectPath,
-                        response.getErrors()
-                    );
                 }
 
                 graphQlClientProvider.recordSuccess();
@@ -195,6 +189,11 @@ public class GitLabMergeRequestSyncService {
                     );
                     break;
                 }
+                if (responseHandler.isPaginationLoop(cursor, previousCursor, "merge requests for " + safeProjectPath, log)) {
+                    errorAborted = true;
+                    break;
+                }
+                previousCursor = cursor;
                 page++;
 
                 try {
@@ -311,6 +310,7 @@ public class GitLabMergeRequestSyncService {
         int maxIid = -1;
         boolean hasMore = false;
         String currentCursor = cursor;
+        String previousBackfillCursor = null;
 
         try {
             int remaining = maxItems;
@@ -334,7 +334,11 @@ public class GitLabMergeRequestSyncService {
                     .execute()
                     .block(gitLabProperties.extendedGraphqlTimeout());
 
-                if (response == null || !response.isValid()) {
+                var handleResult = responseHandler.handle(response, "historical MRs for " + safeProjectPath, log);
+                if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.RETRY) {
+                    continue;
+                }
+                if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.ABORT) {
                     graphQlClientProvider.recordFailure(new GitLabSyncException("Invalid response for historical MRs"));
                     return BackfillBatchResult.abortedWithError();
                 }
@@ -377,6 +381,10 @@ public class GitLabMergeRequestSyncService {
                 if (pageInfo == null || !pageInfo.hasNextPage()) break;
 
                 currentCursor = pageInfo.endCursor();
+                if (responseHandler.isPaginationLoop(currentCursor, previousBackfillCursor, "historical MRs for " + safeProjectPath, log)) {
+                    return BackfillBatchResult.abortedWithError();
+                }
+                previousBackfillCursor = currentCursor;
                 hasMore = true;
 
                 Thread.sleep(gitLabProperties.paginationThrottle().toMillis());
@@ -887,6 +895,7 @@ public class GitLabMergeRequestSyncService {
 
         List<GitLabMergeRequestProcessor.SyncLabelData> allRemaining = new ArrayList<>();
         String cursor = afterCursor;
+        String previousLabelCursor = null;
         int followUpPages = 0;
 
         try {
@@ -905,17 +914,13 @@ public class GitLabMergeRequestSyncService {
                     .execute()
                     .block(gitLabProperties.graphqlTimeout());
 
-                if (response == null || !response.isValid()) {
+                var handleResult = responseHandler.handle(response, "remaining MR labels for " + context, log);
+                if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.RETRY) {
+                    continue;
+                }
+                if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.ABORT) {
                     graphQlClientProvider.recordFailure(new GitLabSyncException("Invalid GraphQL response"));
                     break;
-                }
-
-                if (response.getErrors() != null && !response.getErrors().isEmpty()) {
-                    log.warn(
-                        "Partial errors fetching remaining MR labels: context={}, errors={}",
-                        context,
-                        response.getErrors()
-                    );
                 }
 
                 graphQlClientProvider.recordSuccess();
@@ -945,6 +950,10 @@ public class GitLabMergeRequestSyncService {
                 Map<String, Object> pageInfo = (Map<String, Object>) labelsMap.get("pageInfo");
                 if (pageInfo == null || !Boolean.TRUE.equals(pageInfo.get("hasNextPage"))) break;
                 cursor = (String) pageInfo.get("endCursor");
+                if (responseHandler.isPaginationLoop(cursor, previousLabelCursor, "remaining MR labels for " + context, log)) {
+                    break;
+                }
+                previousLabelCursor = cursor;
                 followUpPages++;
             }
         } catch (InterruptedException e) {
@@ -979,6 +988,7 @@ public class GitLabMergeRequestSyncService {
 
         List<GitLabMergeRequestProcessor.SyncUserData> allRemaining = new ArrayList<>();
         String cursor = afterCursor;
+        String previousAssigneeCursor = null;
         int followUpPages = 0;
 
         try {
@@ -997,17 +1007,13 @@ public class GitLabMergeRequestSyncService {
                     .execute()
                     .block(gitLabProperties.graphqlTimeout());
 
-                if (response == null || !response.isValid()) {
+                var handleResult = responseHandler.handle(response, "remaining MR assignees for " + context, log);
+                if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.RETRY) {
+                    continue;
+                }
+                if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.ABORT) {
                     graphQlClientProvider.recordFailure(new GitLabSyncException("Invalid GraphQL response"));
                     break;
-                }
-
-                if (response.getErrors() != null && !response.getErrors().isEmpty()) {
-                    log.warn(
-                        "Partial errors fetching remaining MR assignees: context={}, errors={}",
-                        context,
-                        response.getErrors()
-                    );
                 }
 
                 graphQlClientProvider.recordSuccess();
@@ -1039,6 +1045,10 @@ public class GitLabMergeRequestSyncService {
                 Map<String, Object> pageInfo = (Map<String, Object>) assigneesMap.get("pageInfo");
                 if (pageInfo == null || !Boolean.TRUE.equals(pageInfo.get("hasNextPage"))) break;
                 cursor = (String) pageInfo.get("endCursor");
+                if (responseHandler.isPaginationLoop(cursor, previousAssigneeCursor, "remaining MR assignees for " + context, log)) {
+                    break;
+                }
+                previousAssigneeCursor = cursor;
                 followUpPages++;
             }
         } catch (InterruptedException e) {
@@ -1077,6 +1087,7 @@ public class GitLabMergeRequestSyncService {
 
         List<GitLabMergeRequestProcessor.SyncUserData> allRemaining = new ArrayList<>();
         String cursor = afterCursor;
+        String previousReviewerCursor = null;
         int followUpPages = 0;
 
         try {
@@ -1095,21 +1106,13 @@ public class GitLabMergeRequestSyncService {
                     .execute()
                     .block(gitLabProperties.graphqlTimeout());
 
-                if (response == null || !response.isValid()) {
-                    graphQlClientProvider.recordFailure(new GitLabSyncException("Invalid GraphQL response"));
-                    log.warn(
-                        "Invalid response fetching remaining MR reviewers, aborting to prevent data loss: context={}",
-                        context
-                    );
-                    return null;
+                var handleResult = responseHandler.handle(response, "remaining MR reviewers for " + context, log);
+                if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.RETRY) {
+                    continue;
                 }
-
-                if (response.getErrors() != null && !response.getErrors().isEmpty()) {
-                    log.warn(
-                        "Partial errors fetching remaining MR reviewers: context={}, errors={}",
-                        context,
-                        response.getErrors()
-                    );
+                if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.ABORT) {
+                    graphQlClientProvider.recordFailure(new GitLabSyncException("Invalid GraphQL response"));
+                    return null;
                 }
 
                 graphQlClientProvider.recordSuccess();
@@ -1141,6 +1144,10 @@ public class GitLabMergeRequestSyncService {
                 Map<String, Object> pageInfo = (Map<String, Object>) reviewersMap.get("pageInfo");
                 if (pageInfo == null || !Boolean.TRUE.equals(pageInfo.get("hasNextPage"))) break;
                 cursor = (String) pageInfo.get("endCursor");
+                if (responseHandler.isPaginationLoop(cursor, previousReviewerCursor, "remaining MR reviewers for " + context, log)) {
+                    break;
+                }
+                previousReviewerCursor = cursor;
                 followUpPages++;
             }
         } catch (InterruptedException e) {
@@ -1179,6 +1186,7 @@ public class GitLabMergeRequestSyncService {
 
         List<GitLabMergeRequestProcessor.SyncUserData> allRemaining = new ArrayList<>();
         String cursor = afterCursor;
+        String previousApproverCursor = null;
         int followUpPages = 0;
 
         try {
@@ -1197,21 +1205,13 @@ public class GitLabMergeRequestSyncService {
                     .execute()
                     .block(gitLabProperties.graphqlTimeout());
 
-                if (response == null || !response.isValid()) {
-                    graphQlClientProvider.recordFailure(new GitLabSyncException("Invalid GraphQL response"));
-                    log.warn(
-                        "Invalid response fetching remaining MR approvers, aborting to prevent data loss: context={}",
-                        context
-                    );
-                    return null;
+                var handleResult = responseHandler.handle(response, "remaining MR approvers for " + context, log);
+                if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.RETRY) {
+                    continue;
                 }
-
-                if (response.getErrors() != null && !response.getErrors().isEmpty()) {
-                    log.warn(
-                        "Partial errors fetching remaining MR approvers: context={}, errors={}",
-                        context,
-                        response.getErrors()
-                    );
+                if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.ABORT) {
+                    graphQlClientProvider.recordFailure(new GitLabSyncException("Invalid GraphQL response"));
+                    return null;
                 }
 
                 graphQlClientProvider.recordSuccess();
@@ -1243,6 +1243,10 @@ public class GitLabMergeRequestSyncService {
                 Map<String, Object> pageInfo = (Map<String, Object>) approvedByMap.get("pageInfo");
                 if (pageInfo == null || !Boolean.TRUE.equals(pageInfo.get("hasNextPage"))) break;
                 cursor = (String) pageInfo.get("endCursor");
+                if (responseHandler.isPaginationLoop(cursor, previousApproverCursor, "remaining MR approvers for " + context, log)) {
+                    break;
+                }
+                previousApproverCursor = cursor;
                 followUpPages++;
             }
         } catch (InterruptedException e) {

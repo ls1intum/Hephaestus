@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.issuetype.gitlab;
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlResponseHandler;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncException;
@@ -41,17 +42,20 @@ public class GitLabIssueTypeSyncService {
     private final IssueTypeRepository issueTypeRepository;
     private final OrganizationRepository organizationRepository;
     private final GitLabGraphQlClientProvider graphQlClientProvider;
+    private final GitLabGraphQlResponseHandler responseHandler;
     private final GitLabProperties gitLabProperties;
 
     public GitLabIssueTypeSyncService(
         IssueTypeRepository issueTypeRepository,
         OrganizationRepository organizationRepository,
         GitLabGraphQlClientProvider graphQlClientProvider,
+        GitLabGraphQlResponseHandler responseHandler,
         GitLabProperties gitLabProperties
     ) {
         this.issueTypeRepository = issueTypeRepository;
         this.organizationRepository = organizationRepository;
         this.graphQlClientProvider = graphQlClientProvider;
+        this.responseHandler = responseHandler;
         this.gitLabProperties = gitLabProperties;
     }
 
@@ -83,7 +87,8 @@ public class GitLabIssueTypeSyncService {
                 .execute()
                 .block(gitLabProperties.graphqlTimeout());
 
-            if (response == null || !response.isValid()) {
+            var handleResult = responseHandler.handle(response, "issue types for " + safeGroupPath, log);
+            if (handleResult.action() != GitLabGraphQlResponseHandler.HandleResult.Action.CONTINUE) {
                 graphQlClientProvider.recordFailure(new GitLabSyncException("Invalid response for work item types"));
                 return 0;
             }

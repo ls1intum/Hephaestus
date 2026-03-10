@@ -5,6 +5,7 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncCons
 import static de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants.adaptPageSize;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlResponseHandler;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncException;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabPageInfo;
@@ -46,6 +47,7 @@ public class GitLabCollaboratorSyncService {
     private final RepositoryRepository repositoryRepository;
     private final RepositoryCollaboratorRepository collaboratorRepository;
     private final GitLabGraphQlClientProvider graphQlClientProvider;
+    private final GitLabGraphQlResponseHandler responseHandler;
     private final GitLabUserService userService;
     private final GitLabProperties gitLabProperties;
 
@@ -53,12 +55,14 @@ public class GitLabCollaboratorSyncService {
         RepositoryRepository repositoryRepository,
         RepositoryCollaboratorRepository collaboratorRepository,
         GitLabGraphQlClientProvider graphQlClientProvider,
+        GitLabGraphQlResponseHandler responseHandler,
         GitLabUserService userService,
         GitLabProperties gitLabProperties
     ) {
         this.repositoryRepository = repositoryRepository;
         this.collaboratorRepository = collaboratorRepository;
         this.graphQlClientProvider = graphQlClientProvider;
+        this.responseHandler = responseHandler;
         this.userService = userService;
         this.gitLabProperties = gitLabProperties;
     }
@@ -78,6 +82,7 @@ public class GitLabCollaboratorSyncService {
         int totalSynced = 0;
         Set<Long> syncedUserIds = new HashSet<>();
         String cursor = null;
+        String previousCursor = null;
         int page = 0;
         boolean errorAborted = false;
 
@@ -100,7 +105,11 @@ public class GitLabCollaboratorSyncService {
                     .execute()
                     .block(gitLabProperties.graphqlTimeout());
 
-                if (response == null || !response.isValid()) {
+                var handleResult = responseHandler.handle(response, "collaborators for " + safeProjectPath, log);
+                if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.RETRY) {
+                    continue;
+                }
+                if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.ABORT) {
                     graphQlClientProvider.recordFailure(
                         new GitLabSyncException("Invalid response for project members")
                     );
@@ -127,6 +136,11 @@ public class GitLabCollaboratorSyncService {
                     .field("project.projectMembers.pageInfo")
                     .toEntity(GitLabPageInfo.class);
                 cursor = pageInfo != null ? pageInfo.endCursor() : null;
+                if (responseHandler.isPaginationLoop(cursor, previousCursor, "collaborators for " + safeProjectPath, log)) {
+                    errorAborted = true;
+                    break;
+                }
+                previousCursor = cursor;
                 page++;
                 if (pageInfo == null || !pageInfo.hasNextPage()) break;
             } while (true);

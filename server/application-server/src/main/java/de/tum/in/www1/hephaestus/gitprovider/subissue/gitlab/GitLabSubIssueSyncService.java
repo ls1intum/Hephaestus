@@ -3,7 +3,9 @@ package de.tum.in.www1.hephaestus.gitprovider.subissue.gitlab;
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlResponseHandler;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncException;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabPageInfo;
 import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
@@ -50,15 +52,18 @@ public class GitLabSubIssueSyncService {
     private final IssueRepository issueRepository;
     private final RepositoryRepository repositoryRepository;
     private final GitLabGraphQlClientProvider graphQlClientProvider;
+    private final GitLabGraphQlResponseHandler responseHandler;
 
     public GitLabSubIssueSyncService(
         IssueRepository issueRepository,
         RepositoryRepository repositoryRepository,
-        GitLabGraphQlClientProvider graphQlClientProvider
+        GitLabGraphQlClientProvider graphQlClientProvider,
+        GitLabGraphQlResponseHandler responseHandler
     ) {
         this.issueRepository = issueRepository;
         this.repositoryRepository = repositoryRepository;
         this.graphQlClientProvider = graphQlClientProvider;
+        this.responseHandler = responseHandler;
     }
 
     /**
@@ -91,7 +96,9 @@ public class GitLabSubIssueSyncService {
 
         HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
         String cursor = null;
+        String previousCursor = null;
         int page = 0;
+        boolean errorAborted = false;
 
         try {
             do {
@@ -110,8 +117,13 @@ public class GitLabSubIssueSyncService {
                     .execute()
                     .block(java.time.Duration.ofSeconds(30));
 
-                if (response == null) {
-                    log.warn("Null GraphQL response: project={}, page={}", safeProjectPath, page);
+                var handleResult = responseHandler.handle(response, "sub-issues for " + safeProjectPath, log);
+                if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.RETRY) {
+                    continue;
+                }
+                if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.ABORT) {
+                    graphQlClientProvider.recordFailure(new GitLabSyncException("Invalid GraphQL response"));
+                    errorAborted = true;
                     break;
                 }
 
@@ -130,6 +142,11 @@ public class GitLabSubIssueSyncService {
                 GitLabPageInfo pageInfo = response.field("project.workItems.pageInfo").toEntity(GitLabPageInfo.class);
                 if (pageInfo == null || !pageInfo.hasNextPage()) break;
                 cursor = pageInfo.endCursor();
+                if (responseHandler.isPaginationLoop(cursor, previousCursor, "sub-issues for " + safeProjectPath, log)) {
+                    errorAborted = true;
+                    break;
+                }
+                previousCursor = cursor;
                 page++;
             } while (cursor != null);
 

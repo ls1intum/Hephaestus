@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.issue.gitlab;
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlResponseHandler;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncException;
@@ -46,17 +47,20 @@ public class GitLabIssueSyncService {
     private static final String GET_ISSUE_ASSIGNEES_DOCUMENT = "GetIssueAssignees";
 
     private final GitLabGraphQlClientProvider graphQlClientProvider;
+    private final GitLabGraphQlResponseHandler responseHandler;
     private final GitLabIssueProcessor issueProcessor;
     private final GitLabNoteSyncService noteSyncService;
     private final GitLabProperties gitLabProperties;
 
     public GitLabIssueSyncService(
         GitLabGraphQlClientProvider graphQlClientProvider,
+        GitLabGraphQlResponseHandler responseHandler,
         GitLabIssueProcessor issueProcessor,
         GitLabNoteSyncService noteSyncService,
         GitLabProperties gitLabProperties
     ) {
         this.graphQlClientProvider = graphQlClientProvider;
+        this.responseHandler = responseHandler;
         this.issueProcessor = issueProcessor;
         this.noteSyncService = noteSyncService;
         this.gitLabProperties = gitLabProperties;
@@ -84,6 +88,7 @@ public class GitLabIssueSyncService {
         int totalSynced = 0;
         int totalSkipped = 0;
         String cursor = null;
+        String previousCursor = null;
         int page = 0;
         boolean rateLimitAborted = false;
         boolean errorAborted = false;
@@ -122,26 +127,14 @@ public class GitLabIssueSyncService {
                     .execute()
                     .block(gitLabProperties.extendedGraphqlTimeout());
 
-                if (response == null || !response.isValid()) {
-                    log.warn(
-                        "Failed to fetch issues: scopeId={}, projectPath={}, errors={}",
-                        scopeId,
-                        safeProjectPath,
-                        response != null ? response.getErrors() : "null response"
-                    );
+                var handleResult = responseHandler.handle(response, "issues for " + safeProjectPath, log);
+                if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.RETRY) {
+                    continue;
+                }
+                if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.ABORT) {
                     graphQlClientProvider.recordFailure(new GitLabSyncException("Invalid GraphQL response"));
                     errorAborted = true;
                     break;
-                }
-
-                // Check for partial errors (GraphQL can return data + errors simultaneously)
-                if (response.getErrors() != null && !response.getErrors().isEmpty()) {
-                    log.warn(
-                        "Partial GraphQL errors in issue response: scopeId={}, projectPath={}, errors={}",
-                        scopeId,
-                        safeProjectPath,
-                        response.getErrors()
-                    );
                 }
 
                 graphQlClientProvider.recordSuccess();
@@ -203,6 +196,11 @@ public class GitLabIssueSyncService {
                     );
                     break;
                 }
+                if (responseHandler.isPaginationLoop(cursor, previousCursor, "issues for " + safeProjectPath, log)) {
+                    errorAborted = true;
+                    break;
+                }
+                previousCursor = cursor;
                 page++;
 
                 // Throttle between pages
@@ -281,6 +279,7 @@ public class GitLabIssueSyncService {
         try {
             int remaining = maxItems;
             String currentCursor = cursor;
+            String previousBackfillCursor = null;
 
             while (remaining > 0) {
                 graphQlClientProvider.acquirePermission();
@@ -301,7 +300,11 @@ public class GitLabIssueSyncService {
                     .execute()
                     .block(gitLabProperties.extendedGraphqlTimeout());
 
-                if (response == null || !response.isValid()) {
+                var handleResult = responseHandler.handle(response, "historical issues for " + safeProjectPath, log);
+                if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.RETRY) {
+                    continue;
+                }
+                if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.ABORT) {
                     graphQlClientProvider.recordFailure(
                         new GitLabSyncException("Invalid response for historical issues")
                     );
@@ -342,6 +345,10 @@ public class GitLabIssueSyncService {
                 if (pageInfo == null || !pageInfo.hasNextPage()) break;
 
                 currentCursor = pageInfo.endCursor();
+                if (responseHandler.isPaginationLoop(currentCursor, previousBackfillCursor, "historical issues for " + safeProjectPath, log)) {
+                    return BackfillBatchResult.abortedWithError();
+                }
+                previousBackfillCursor = currentCursor;
                 hasMore = true;
 
                 Thread.sleep(gitLabProperties.paginationThrottle().toMillis());
@@ -630,6 +637,7 @@ public class GitLabIssueSyncService {
 
         List<GitLabIssueProcessor.SyncLabelData> allRemaining = new ArrayList<>();
         String cursor = afterCursor;
+        String previousLabelCursor = null;
         int followUpPages = 0;
 
         try {
@@ -648,22 +656,13 @@ public class GitLabIssueSyncService {
                     .execute()
                     .block(gitLabProperties.graphqlTimeout());
 
-                if (response == null || !response.isValid()) {
-                    log.warn(
-                        "Failed to fetch remaining labels: context={}, errors={}",
-                        context,
-                        response != null ? response.getErrors() : "null"
-                    );
+                var handleResult = responseHandler.handle(response, "remaining labels for " + context, log);
+                if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.RETRY) {
+                    continue;
+                }
+                if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.ABORT) {
                     graphQlClientProvider.recordFailure(new GitLabSyncException("Invalid GraphQL response"));
                     break;
-                }
-
-                if (response.getErrors() != null && !response.getErrors().isEmpty()) {
-                    log.warn(
-                        "Partial errors fetching remaining labels: context={}, errors={}",
-                        context,
-                        response.getErrors()
-                    );
                 }
 
                 graphQlClientProvider.recordSuccess();
@@ -704,6 +703,10 @@ public class GitLabIssueSyncService {
                     break;
                 }
                 cursor = (String) pageInfo.get("endCursor");
+                if (responseHandler.isPaginationLoop(cursor, previousLabelCursor, "remaining labels for " + context, log)) {
+                    break;
+                }
+                previousLabelCursor = cursor;
                 followUpPages++;
             }
         } catch (InterruptedException e) {
@@ -746,6 +749,7 @@ public class GitLabIssueSyncService {
 
         List<GitLabIssueProcessor.SyncAssigneeData> allRemaining = new ArrayList<>();
         String cursor = afterCursor;
+        String previousAssigneeCursor = null;
         int followUpPages = 0;
 
         try {
@@ -764,22 +768,13 @@ public class GitLabIssueSyncService {
                     .execute()
                     .block(gitLabProperties.graphqlTimeout());
 
-                if (response == null || !response.isValid()) {
-                    log.warn(
-                        "Failed to fetch remaining assignees: context={}, errors={}",
-                        context,
-                        response != null ? response.getErrors() : "null"
-                    );
+                var handleResult = responseHandler.handle(response, "remaining assignees for " + context, log);
+                if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.RETRY) {
+                    continue;
+                }
+                if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.ABORT) {
                     graphQlClientProvider.recordFailure(new GitLabSyncException("Invalid GraphQL response"));
                     break;
-                }
-
-                if (response.getErrors() != null && !response.getErrors().isEmpty()) {
-                    log.warn(
-                        "Partial errors fetching remaining assignees: context={}, errors={}",
-                        context,
-                        response.getErrors()
-                    );
                 }
 
                 graphQlClientProvider.recordSuccess();
@@ -822,6 +817,10 @@ public class GitLabIssueSyncService {
                     break;
                 }
                 cursor = (String) pageInfo.get("endCursor");
+                if (responseHandler.isPaginationLoop(cursor, previousAssigneeCursor, "remaining assignees for " + context, log)) {
+                    break;
+                }
+                previousAssigneeCursor = cursor;
                 followUpPages++;
             }
         } catch (InterruptedException e) {

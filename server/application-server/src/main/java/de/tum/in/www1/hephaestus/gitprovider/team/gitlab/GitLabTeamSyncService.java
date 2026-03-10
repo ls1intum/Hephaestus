@@ -8,6 +8,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlResponseHandler;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncException;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabDescendantGroupResponse;
@@ -70,6 +71,7 @@ public class GitLabTeamSyncService {
     private final TeamMembershipRepository teamMembershipRepository;
     private final RepositoryRepository repositoryRepository;
     private final GitLabGraphQlClientProvider graphQlClientProvider;
+    private final GitLabGraphQlResponseHandler responseHandler;
     private final GitLabTeamProcessor teamProcessor;
     private final GitLabUserService gitLabUserService;
     private final GitProviderRepository gitProviderRepository;
@@ -81,6 +83,7 @@ public class GitLabTeamSyncService {
         TeamMembershipRepository teamMembershipRepository,
         RepositoryRepository repositoryRepository,
         GitLabGraphQlClientProvider graphQlClientProvider,
+        GitLabGraphQlResponseHandler responseHandler,
         GitLabTeamProcessor teamProcessor,
         GitLabUserService gitLabUserService,
         GitProviderRepository gitProviderRepository,
@@ -91,6 +94,7 @@ public class GitLabTeamSyncService {
         this.teamMembershipRepository = teamMembershipRepository;
         this.repositoryRepository = repositoryRepository;
         this.graphQlClientProvider = graphQlClientProvider;
+        this.responseHandler = responseHandler;
         this.teamProcessor = teamProcessor;
         this.gitLabUserService = gitLabUserService;
         this.gitProviderRepository = gitProviderRepository;
@@ -220,6 +224,7 @@ public class GitLabTeamSyncService {
         Set<Long> syncedNativeIds
     ) {
         String cursor = null;
+        String previousCursor = null;
         int pageCount = 0;
 
         while (true) {
@@ -248,13 +253,11 @@ public class GitLabTeamSyncService {
                 .execute()
                 .block(gitLabProperties.graphqlTimeout());
 
-            if (response == null || !response.isValid()) {
-                log.warn(
-                    "Failed to fetch descendant groups: groupPath={}, page={}, errors={}",
-                    groupFullPath,
-                    pageCount,
-                    response != null ? response.getErrors() : "null"
-                );
+            var handleResult = responseHandler.handle(response, "descendant groups for " + groupFullPath, log);
+            if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.RETRY) {
+                continue;
+            }
+            if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.ABORT) {
                 graphQlClientProvider.recordFailure(
                     new GitLabSyncException("Invalid GraphQL response for descendant groups")
                 );
@@ -313,6 +316,10 @@ public class GitLabTeamSyncService {
                 );
                 break;
             }
+            if (responseHandler.isPaginationLoop(cursor, previousCursor, "descendant groups for " + groupFullPath, log)) {
+                return false;
+            }
+            previousCursor = cursor;
 
             throttle();
         }
@@ -420,6 +427,7 @@ public class GitLabTeamSyncService {
         List<GitLabGroupMemberResponse> allMembers
     ) {
         String cursor = null;
+        String previousCursor = null;
         int pageCount = 0;
 
         while (true) {
@@ -447,8 +455,11 @@ public class GitLabTeamSyncService {
                 .execute()
                 .block(gitLabProperties.graphqlTimeout());
 
-            if (response == null || !response.isValid()) {
-                log.warn("Failed to fetch group members: groupPath={}, page={}", groupFullPath, pageCount);
+            var handleResult = responseHandler.handle(response, "team members for " + groupFullPath, log);
+            if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.RETRY) {
+                continue;
+            }
+            if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.ABORT) {
                 graphQlClientProvider.recordFailure(
                     new GitLabSyncException("Invalid GraphQL response for group members")
                 );
@@ -481,6 +492,10 @@ public class GitLabTeamSyncService {
                 );
                 return false;
             }
+            if (responseHandler.isPaginationLoop(cursor, previousCursor, "team members for " + groupFullPath, log)) {
+                return false;
+            }
+            previousCursor = cursor;
 
             throttle();
         }
