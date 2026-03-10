@@ -52,30 +52,40 @@ export function ConfigureWorkspaceStep() {
 
 	return (
 		<div className="flex flex-col gap-4">
-			<Field>
+			<Field data-invalid={fieldErrors.displayName ? "true" : undefined}>
 				<FieldLabel htmlFor="workspace-display-name">Display Name</FieldLabel>
 				<Input
 					id="workspace-display-name"
 					placeholder="My Workspace"
 					value={state.displayName}
 					onChange={(e) => handleDisplayNameChange(e.target.value)}
+					aria-invalid={!!fieldErrors.displayName}
+					aria-describedby={fieldErrors.displayName ? "workspace-display-name-error" : undefined}
 					autoFocus
 				/>
-				{fieldErrors.displayName && <FieldError>{fieldErrors.displayName}</FieldError>}
+				{fieldErrors.displayName && (
+					<FieldError id="workspace-display-name-error">{fieldErrors.displayName}</FieldError>
+				)}
 			</Field>
 
-			<Field>
+			<Field data-invalid={fieldErrors.workspaceSlug ? "true" : undefined}>
 				<FieldLabel htmlFor="workspace-slug">URL Slug</FieldLabel>
 				<Input
 					id="workspace-slug"
 					placeholder="my-workspace"
 					value={state.workspaceSlug}
 					onChange={(e) => handleSlugChange(e.target.value)}
+					aria-invalid={!!fieldErrors.workspaceSlug}
+					aria-describedby={
+						fieldErrors.workspaceSlug ? "workspace-slug-error" : "workspace-slug-description"
+					}
 				/>
-				<FieldDescription>
+				<FieldDescription id="workspace-slug-description">
 					Used in URLs: /w/<strong>{state.workspaceSlug || "my-workspace"}</strong>
 				</FieldDescription>
-				{fieldErrors.workspaceSlug && <FieldError>{fieldErrors.workspaceSlug}</FieldError>}
+				{fieldErrors.workspaceSlug && (
+					<FieldError id="workspace-slug-error">{fieldErrors.workspaceSlug}</FieldError>
+				)}
 			</Field>
 
 			{/* Summary */}

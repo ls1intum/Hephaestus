@@ -116,6 +116,14 @@ describe("workspaceDetailsSchema", () => {
 		expect(result.success).toBe(false);
 	});
 
+	it("rejects slug ending with hyphen", () => {
+		const result = workspaceDetailsSchema.safeParse({
+			displayName: "Test",
+			workspaceSlug: "invalid-",
+		});
+		expect(result.success).toBe(false);
+	});
+
 	it("accepts slug starting with digit", () => {
 		const result = workspaceDetailsSchema.safeParse({
 			displayName: "Test",
