@@ -1,9 +1,10 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "description": "Renovate config - trust CI, review what matters",
+  "description": "Renovate config - dashboard only, manual updates",
   "extends": [
     "config:best-practices",
-    ":semanticCommitTypeAll(chore)"
+    ":semanticCommitTypeAll(chore)",
+    ":dependencyDashboardApproval"
   ],
   "labels": ["dependencies"],
   "assigneesFromCodeOwners": true,
@@ -12,45 +13,18 @@
   "schedule": ["before 7am on monday"],
   "minimumReleaseAge": "3 days",
 
-  "prHourlyLimit": 4,
-  "prConcurrentLimit": 5,
-  "branchConcurrentLimit": 10,
-
-  "rebaseWhen": "conflicted",
   "platformAutomerge": true,
   "automergeStrategy": "squash",
   "semanticCommitScope": "deps",
 
   "dependencyDashboard": true,
   "dependencyDashboardTitle": "Dependency Dashboard",
-  "dependencyDashboardApproval": false,
 
   "postUpdateOptions": ["npmDedupe"],
 
   "packageRules": [
     {
-      "description": "Auto-merge patches - trust your CI",
-      "matchUpdateTypes": ["patch", "pin", "digest"],
-      "automerge": true,
-      "automergeType": "pr",
-      "minimumReleaseAge": "3 days"
-    },
-    {
-      "description": "Auto-merge minor updates for stable deps",
-      "matchUpdateTypes": ["minor"],
-      "excludePackageNames": [
-        "typescript",
-        "react",
-        "react-dom",
-        "/^@tanstack/",
-        "/^org\\.springframework/"
-      ],
-      "automerge": true,
-      "automergeType": "pr",
-      "minimumReleaseAge": "5 days"
-    },
-    {
-      "description": "Group Java/Spring - review together",
+      "description": "Group Java/Spring",
       "matchManagers": ["maven"],
       "groupName": "Java dependencies",
       "labels": ["dependencies", "java"]
@@ -73,24 +47,19 @@
       "labels": ["dependencies", "services"]
     },
     {
-      "description": "Docs site - low risk, auto-merge aggressively",
+      "description": "Group documentation deps",
       "matchFileNames": ["docs/package.json"],
-      "automerge": true,
-      "automergeType": "pr",
       "groupName": "Documentation dependencies",
       "labels": ["dependencies", "docs"]
     },
     {
-      "description": "Major updates require dashboard approval",
+      "description": "Major updates",
       "matchUpdateTypes": ["major"],
-      "automerge": false,
-      "dependencyDashboardApproval": true,
       "minimumReleaseAge": "7 days",
-      "labels": ["dependencies", "breaking"],
-      "prPriority": -1
+      "labels": ["dependencies", "breaking"]
     },
     {
-      "description": "Core frameworks - always review minors too",
+      "description": "Core frameworks",
       "matchPackageNames": [
         "typescript",
         "react",
@@ -99,14 +68,11 @@
         "/^org\\.springframework/"
       ],
       "matchUpdateTypes": ["minor"],
-      "automerge": false,
       "groupName": "Core frameworks"
     },
     {
-      "description": "GitHub Actions - auto-merge",
+      "description": "GitHub Actions",
       "matchManagers": ["github-actions"],
-      "automerge": true,
-      "automergeType": "pr",
       "groupName": "GitHub Actions",
       "labels": ["dependencies", "ci"]
     },
@@ -115,13 +81,6 @@
       "matchManagers": ["dockerfile", "docker-compose"],
       "groupName": "Docker images",
       "labels": ["dependencies", "infrastructure"]
-    },
-    {
-      "description": "Node.js runtime - manual review",
-      "matchDepNames": ["node"],
-      "matchManagers": ["nodenv", "nvm"],
-      "automerge": false,
-      "dependencyDashboardApproval": true
     }
   ],
 
@@ -129,16 +88,10 @@
     "labels": ["security", "dependencies"],
     "schedule": ["at any time"],
     "minimumReleaseAge": null,
+    "dependencyDashboardApproval": false,
     "prPriority": 10,
     "automerge": true,
     "groupName": null
-  },
-
-  "lockFileMaintenance": {
-    "enabled": true,
-    "schedule": ["before 7am on monday"],
-    "automerge": true,
-    "automergeType": "pr"
   },
 
   "ignorePaths": [
