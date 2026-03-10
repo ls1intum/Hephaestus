@@ -1,4 +1,5 @@
 import { Handle, type Node, type NodeProps, Position } from "@xyflow/react";
+import { CENTERED_HANDLE_STYLE } from "@/components/achievements/skill-tree-shared";
 import { getLeagueColor, getLeagueTier } from "@/components/leaderboard/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -31,7 +32,7 @@ export function AvatarNode({ data }: NodeProps<AvatarNode>) {
 				<Avatar className="size-24 border-4 border-background shadow-[0_0_30px_rgba(var(--shadow-rgb),0.3)]">
 					<AvatarImage src={data.avatarUrl} alt={`${data.name}'s avatar`} />
 					<AvatarFallback className="text-2xl font-bold bg-secondary/50">
-						{data.name?.slice(0, 2)?.toUpperCase() ?? "HP"}
+						{data.name?.slice(0, 2)?.toUpperCase() || "HP"}
 					</AvatarFallback>
 				</Avatar>
 
@@ -41,7 +42,7 @@ export function AvatarNode({ data }: NodeProps<AvatarNode>) {
 						render={
 							<div
 								className={cn(
-									"absolute -bottom-1 -right-1 flex size-9 items-center justify-center rounded-full border-4 border-background text-primary-foreground font-bold text-sm cursor-help z-100",
+									"absolute -bottom-1 -right-1 flex size-9 items-center justify-center rounded-full border-4 border-background text-primary-foreground font-bold text-sm cursor-help z-[100]",
 									getLeagueColor(leagueTier),
 								)}
 							/>
@@ -60,7 +61,7 @@ export function AvatarNode({ data }: NodeProps<AvatarNode>) {
 				type="source"
 				position={Position.Bottom}
 				className="bg-transparent! border-0! w-0! h-0! min-w-0! min-h-0!"
-				style={{ top: "50%", bottom: "auto", left: "50%", transform: "translate(-50%, -50%)" }}
+				style={CENTERED_HANDLE_STYLE}
 			/>
 		</div>
 	);

@@ -897,7 +897,7 @@ export type Profile = {
  * Linear progress with current and target counts
  */
 export type LinearAchievementProgress = Omit<AchievementProgress, 'type'> & {
-    current?: number;
+    current: number;
     target: number;
     type: 'LinearAchievementProgress';
 };
@@ -1164,7 +1164,7 @@ export type ChatMessageVote = {
  * Binary progress indicating unlocked state
  */
 export type BinaryAchievementProgress = Omit<AchievementProgress, 'type'> & {
-    unlocked?: boolean;
+    unlocked: boolean;
     type: 'BinaryAchievementProgress';
 };
 
@@ -1227,9 +1227,13 @@ export type Achievement = {
      */
     status: 'locked' | 'available' | 'unlocked' | 'hidden';
     /**
+     * Whether this achievement is hidden until unlocked
+     */
+    isHidden: boolean;
+    /**
      * Optional of when the achievement was unlocked, empty() if not unlocked
      */
-    unlockedAt: Date;
+    unlockedAt?: Date;
 };
 
 export type ListGlobalContributorsData = {
@@ -2871,6 +2875,9 @@ export type GetAllAchievementDefinitionsData = {
          * Workspace slug
          */
         workspaceSlug: string;
+        /**
+         * the user's GitHub login
+         */
         login: string;
     };
     query?: never;
@@ -2916,6 +2923,9 @@ export type ReloadAchievementsData = {
          * Workspace slug
          */
         workspaceSlug: string;
+        /**
+         * the user's GitHub login
+         */
         login: string;
     };
     query?: never;

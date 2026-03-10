@@ -3,18 +3,20 @@ package de.tum.in.www1.hephaestus.achievement;
 import de.tum.in.www1.hephaestus.activity.ActivityEvent;
 import de.tum.in.www1.hephaestus.activity.ActivityEventRepository;
 import de.tum.in.www1.hephaestus.activity.ActivityTargetType;
+import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.Optional;
 
 /**
  * Service dedicated strictly to recalculating achievement progress from scratch.
@@ -27,6 +29,8 @@ import java.util.Optional;
 @Service
 @RequiredArgsConstructor
 public class AchievementRecalculationService {
+
+    private static final ConcurrentHashMap<Long, Boolean> ACTIVE_RECALCULATIONS = new ConcurrentHashMap<>();
 
     private final UserAchievementRepository userAchievementRepository;
     private final ActivityEventRepository activityEventRepository;
@@ -43,13 +47,30 @@ public class AchievementRecalculationService {
      * @param user the user to recalculate achievements for
      */
     @Async
-    @Transactional
     @CacheEvict(value = AchievementService.ACHIEVEMENT_PROGRESS_CACHE, key = "#user.id", condition = "#user != null")
     public void recalculateUser(User user) {
+        if (ACTIVE_RECALCULATIONS.putIfAbsent(user.getId(), Boolean.TRUE) != null) {
+            log.warn(
+                "Recalculation already in progress for user: userId={}, login={}. Skipping.",
+                user.getId(),
+                LoggingUtils.sanitizeForLog(user.getLogin())
+            );
+            return;
+        }
+
+        try {
+            recalculateUserInternal(user);
+        } finally {
+            ACTIVE_RECALCULATIONS.remove(user.getId());
+        }
+    }
+
+    @Transactional
+    private void recalculateUserInternal(User user) {
         log.info(
             "Starting complete achievement recalculation for user: userId={}, login={}",
             user.getId(),
-            user.getLogin()
+            LoggingUtils.sanitizeForLog(user.getLogin())
         );
 
         // 1. Wipe existing state
@@ -65,19 +86,37 @@ public class AchievementRecalculationService {
                 pageable
             );
             for (ActivityEvent event : slice.getContent()) {
+                var workspace = event.getWorkspace();
+                if (workspace == null) {
+                    log.warn("Skipping activity event with null workspace: eventId={}", event.getId());
+                    continue;
+                }
                 ActivitySavedEvent savedEvent = new ActivitySavedEvent(
                     Optional.ofNullable(event.getActor()),
                     event.getEventType(),
                     event.getOccurredAt(),
-                    event.getWorkspace().getId(),
+                    workspace.getId(),
                     ActivityTargetType.fromValue(event.getTargetType()),
                     event.getTargetId()
                 );
-                achievementService.checkAndUnlock(savedEvent);
+                try {
+                    achievementService.checkAndUnlock(savedEvent);
+                } catch (ObjectOptimisticLockingFailureException e) {
+                    log.warn(
+                        "Optimistic locking conflict during recalculation for user {}, eventId={}: {}",
+                        LoggingUtils.sanitizeForLog(user.getLogin()),
+                        event.getId(),
+                        e.getMessage()
+                    );
+                }
                 count++;
 
                 if (count % 1000 == 0) {
-                    log.debug("Recalculation progress for user {}: processed {} events", user.getLogin(), count);
+                    log.debug(
+                        "Recalculation progress for user {}: processed {} events",
+                        LoggingUtils.sanitizeForLog(user.getLogin()),
+                        count
+                    );
                 }
             }
             if (!slice.hasNext()) {
@@ -86,6 +125,10 @@ public class AchievementRecalculationService {
             pageable = slice.nextPageable();
         }
 
-        log.info("Completed achievement recalculation for user: login={}, eventsProcessed={}", user.getLogin(), count);
+        log.info(
+            "Completed achievement recalculation for user: login={}, eventsProcessed={}",
+            LoggingUtils.sanitizeForLog(user.getLogin()),
+            count
+        );
     }
 }

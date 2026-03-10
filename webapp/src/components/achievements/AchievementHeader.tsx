@@ -1,10 +1,20 @@
 import { useReactFlow } from "@xyflow/react";
-import { List, Loader2, Map as MapIcon, Maximize2, RefreshCw, Sparkles, ZoomIn, ZoomOut } from "lucide-react";
+import {
+	List,
+	Loader2,
+	Map as MapIcon,
+	Maximize2,
+	RefreshCw,
+	Sparkles,
+	ZoomIn,
+	ZoomOut,
+} from "lucide-react";
 import type { ViewMode } from "@/components/achievements/types";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { cn } from "@/lib/utils";
 
-interface HeaderProps {
+export interface AchievementHeaderProps {
 	viewMode?: ViewMode;
 	onViewModeChange?: (mode: ViewMode) => void;
 	showZoomControls?: boolean;
@@ -22,7 +32,7 @@ export function AchievementHeader({
 	isLoading = false,
 	onReload,
 	isReloading = false,
-}: HeaderProps) {
+}: AchievementHeaderProps) {
 	const reactFlow = useReactFlow();
 
 	const handleZoomIn = () => {
@@ -46,7 +56,9 @@ export function AchievementHeader({
 				<div>
 					<h1 className="text-lg font-bold text-foreground">Contributor Journey</h1>
 					<p className="text-xs text-muted-foreground">
-						{onReload ? "Designer Mode — Configure achievement layouts" : "Track your own contributions"}
+						{onReload
+							? "Designer Mode — Configure achievement layouts"
+							: "Track your own contributions"}
 					</p>
 				</div>
 			</div>
@@ -97,13 +109,31 @@ export function AchievementHeader({
 				{/* Zoom Controls - only show for tree view */}
 				{showZoomControls && viewMode === "tree" && (
 					<div className="flex items-center gap-1 bg-secondary/50 rounded-lg p-1">
-						<Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleZoomIn}>
+						<Button
+							variant="ghost"
+							size="icon"
+							className="h-8 w-8"
+							onClick={handleZoomIn}
+							aria-label="Zoom in"
+						>
 							<ZoomIn className="w-4 h-4" />
 						</Button>
-						<Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleZoomOut}>
+						<Button
+							variant="ghost"
+							size="icon"
+							className="h-8 w-8"
+							onClick={handleZoomOut}
+							aria-label="Zoom out"
+						>
 							<ZoomOut className="w-4 h-4" />
 						</Button>
-						<Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleFitView}>
+						<Button
+							variant="ghost"
+							size="icon"
+							className="h-8 w-8"
+							onClick={handleFitView}
+							aria-label="Fit view"
+						>
 							<Maximize2 className="w-4 h-4" />
 						</Button>
 					</div>
@@ -117,7 +147,7 @@ export function AchievementHeader({
 						disabled={isReloading}
 						className="gap-2 bg-background/50 backdrop-blur-sm border-primary/20 hover:border-primary/50 text-xs h-9"
 					>
-						<RefreshCw className={`w-3.5 h-3.5 ${isReloading ? "animate-spin" : ""}`} />
+						<RefreshCw className={cn("w-3.5 h-3.5", isReloading && "animate-spin")} />
 						Reload Definitions
 					</Button>
 				)}

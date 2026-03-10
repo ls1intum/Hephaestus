@@ -1,5 +1,33 @@
-import { useEffect, useRef, useState } from "react";
 import type { UIAchievement } from "@/components/achievements/types";
+import { useAnimationTime } from "@/hooks/use-animation-time";
+
+/**
+ * Generate a circular wave path with multiple harmonics for an organic effect.
+ * Pure function — hoisted to module level to avoid recreation on every render frame.
+ */
+function getWavePath(
+	radius: number,
+	amplitude: number,
+	frequency: number,
+	phase: number,
+	steps = 72,
+): string {
+	const points: string[] = [];
+
+	for (let i = 0; i <= steps; i++) {
+		const angle = (i / steps) * Math.PI * 2;
+		const wave =
+			Math.sin(angle * frequency + phase) * amplitude +
+			Math.sin(angle * frequency * 1.5 - phase * 0.7) * (amplitude * 0.4);
+
+		const r = radius + wave;
+		const x = Math.cos(angle) * r;
+		const y = Math.sin(angle) * r;
+
+		points.push(`${i === 0 ? "M" : "L"} ${x} ${y}`);
+	}
+	return `${points.join(" ")} Z`;
+}
 
 interface StandaloneAuraProps {
 	achievement: UIAchievement;
@@ -12,45 +40,7 @@ interface StandaloneAuraProps {
  * mystic effect similar to the equalizer edges.
  */
 export function StandaloneAura({ achievement, size }: StandaloneAuraProps) {
-	const [time, setTime] = useState(0);
-	const rafRef = useRef<number>(0);
-
-	useEffect(() => {
-		const animate = (now: number) => {
-			setTime(now * 0.001);
-			rafRef.current = requestAnimationFrame(animate);
-		};
-		rafRef.current = requestAnimationFrame(animate);
-		return () => cancelAnimationFrame(rafRef.current);
-	}, []);
-
-	// Generate a circular wave path
-	const getWavePath = (
-		radius: number,
-		amplitude: number,
-		frequency: number,
-		phase: number,
-		steps = 72,
-	) => {
-		const points: string[] = [];
-		const centerX = 0;
-		const centerY = 0;
-
-		for (let i = 0; i <= steps; i++) {
-			const angle = (i / steps) * Math.PI * 2;
-			// Use multiple harmonics for an organic "equalizer" feel
-			const wave =
-				Math.sin(angle * frequency + phase) * amplitude +
-				Math.sin(angle * frequency * 1.5 - phase * 0.7) * (amplitude * 0.4);
-
-			const r = radius + wave;
-			const x = centerX + Math.cos(angle) * r;
-			const y = centerY + Math.sin(angle) * r;
-
-			points.push(`${i === 0 ? "M" : "L"} ${x} ${y}`);
-		}
-		return `${points.join(" ")} Z`;
-	};
+	const time = useAnimationTime();
 
 	const baseRadius = size / 2;
 	const isUnlocked = achievement.status === "unlocked";

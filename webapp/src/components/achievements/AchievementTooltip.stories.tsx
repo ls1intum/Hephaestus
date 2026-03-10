@@ -1,14 +1,17 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { ReactFlowProvider } from "@xyflow/react";
-import { Button } from "@/components/ui/button";
-import { AchievementTooltip } from "./AchievementTooltip";
+import { AchievementTooltip } from "@/components/achievements/AchievementTooltip";
 import {
 	apolloClarity,
 	aresConflict,
+	asUI,
+	hadesSecret,
 	hephaestusInit,
 	poseidonTrident,
+	prometheusLongName,
 	zeusThunderbolt,
-} from "./storyMockData";
+} from "@/components/achievements/storyMockData";
+import { Button } from "@/components/ui/button";
 
 /**
  * Component for displaying achievement tooltips with detailed information.
@@ -34,15 +37,7 @@ const meta = {
 	decorators: [
 		(Story) => (
 			<ReactFlowProvider>
-				<div
-					className="bg-background p-32"
-					style={{
-						paddingTop: "160px",
-						paddingBottom: "160px",
-						display: "flex",
-						justifyContent: "center",
-					}}
-				>
+				<div className="bg-background px-32 pt-40 pb-40 flex justify-center">
 					<Story />
 				</div>
 			</ReactFlowProvider>
@@ -64,7 +59,7 @@ const Trigger = (
  */
 export const CommonUnlocked: Story = {
 	args: {
-		achievement: hephaestusInit,
+		achievement: asUI(hephaestusInit),
 		open: true,
 		children: Trigger,
 	},
@@ -76,7 +71,7 @@ export const CommonUnlocked: Story = {
  */
 export const RareLocked: Story = {
 	args: {
-		achievement: { ...aresConflict, status: "locked" },
+		achievement: asUI({ ...aresConflict, status: "locked" }),
 		open: true,
 		children: Trigger,
 	},
@@ -87,7 +82,7 @@ export const RareLocked: Story = {
  */
 export const EpicAvailable: Story = {
 	args: {
-		achievement: apolloClarity,
+		achievement: asUI(apolloClarity),
 		open: true,
 		children: Trigger,
 	},
@@ -98,7 +93,7 @@ export const EpicAvailable: Story = {
  */
 export const LegendaryUnlocked: Story = {
 	args: {
-		achievement: poseidonTrident,
+		achievement: asUI(poseidonTrident),
 		open: true,
 		children: Trigger,
 	},
@@ -109,7 +104,23 @@ export const LegendaryUnlocked: Story = {
  */
 export const MythicAvailable: Story = {
 	args: {
-		achievement: zeusThunderbolt,
+		achievement: asUI(zeusThunderbolt),
+		open: true,
+		children: Trigger,
+	},
+};
+
+export const HiddenAchievement: Story = {
+	args: {
+		achievement: asUI(hadesSecret),
+		open: true,
+		children: Trigger,
+	},
+};
+
+export const LongTextOverflow: Story = {
+	args: {
+		achievement: asUI(prometheusLongName),
 		open: true,
 		children: Trigger,
 	},

@@ -1,9 +1,9 @@
 import type { Node, NodeProps } from "@xyflow/react";
 import { Handle, Position } from "@xyflow/react";
 import { useState } from "react";
-import type { UIAchievement } from "@/components/achievements/types.ts";
-import { cn } from "@/lib/utils";
-import { AchievementTooltip } from "./AchievementTooltip.tsx";
+import { AchievementTooltip } from "@/components/achievements/AchievementTooltip";
+import { StandaloneAura } from "@/components/achievements/StandaloneAura";
+import { CENTERED_HANDLE_STYLE } from "@/components/achievements/skill-tree-shared";
 import {
 	mythicBackgroundVars,
 	rarityIconSizes,
@@ -11,8 +11,9 @@ import {
 	raritySizes,
 	rarityStylingClasses,
 	statusBackgrounds,
-} from "./styles.ts";
-import { StandaloneAura } from "./StandaloneAura.tsx";
+} from "@/components/achievements/styles";
+import type { UIAchievement } from "@/components/achievements/types";
+import { cn } from "@/lib/utils";
 
 export type AchievementNode = Node<
 	{ achievement: UIAchievement; showTooltips?: boolean; className?: string; forceAura?: boolean },
@@ -45,7 +46,7 @@ export function AchievementNode({ data }: NodeProps<AchievementNode>) {
 				type="target"
 				position={Position.Bottom}
 				className="bg-transparent! border-0! w-0! h-0! min-w-0! min-h-0!"
-				style={{ top: "50%", bottom: "auto", left: "50%", transform: "translate(-50%, -50%)" }}
+				style={CENTERED_HANDLE_STYLE}
 			/>
 			<AchievementTooltip achievement={achievement} open={isHovered && data.showTooltips !== false}>
 				<div className="relative flex items-center justify-center">
@@ -76,7 +77,10 @@ export function AchievementNode({ data }: NodeProps<AchievementNode>) {
 						}
 						onMouseEnter={() => setIsHovered(true)}
 						onMouseLeave={() => setIsHovered(false)}
+						onFocus={() => setIsHovered(true)}
+						onBlur={() => setIsHovered(false)}
 						aria-label={`Achievement: ${achievement.name}`}
+						aria-describedby={`tooltip-${achievement.id}`}
 					>
 						<Icon
 							size={rarityIconSizes[achievement.rarity]}
@@ -107,7 +111,7 @@ export function AchievementNode({ data }: NodeProps<AchievementNode>) {
 												fill="none"
 												stroke="currentColor"
 												strokeWidth="4"
-												strokeDasharray={`${((achievement.progressData.current ?? 0) / achievement.progressData.target) * 240} 240`}
+												strokeDasharray={`${achievement.progressData.target > 0 ? ((achievement.progressData.current ?? 0) / achievement.progressData.target) * 240 : 0} 240`}
 												className="text-foreground/70"
 												strokeLinecap="round"
 											/>
@@ -132,7 +136,7 @@ export function AchievementNode({ data }: NodeProps<AchievementNode>) {
 												fill="none"
 												stroke="currentColor"
 												strokeWidth="4"
-												strokeDasharray={`${((achievement.progressData.current ?? 0) / achievement.progressData.target) * 289} 289`}
+												strokeDasharray={`${achievement.progressData.target > 0 ? ((achievement.progressData.current ?? 0) / achievement.progressData.target) * 289 : 0} 289`}
 												className="text-foreground/70"
 												strokeLinecap="round"
 											/>
@@ -147,7 +151,7 @@ export function AchievementNode({ data }: NodeProps<AchievementNode>) {
 				type="source"
 				position={Position.Bottom}
 				className="bg-transparent! border-0! w-0! h-0! min-w-0! min-h-0!"
-				style={{ top: "50%", bottom: "auto", left: "50%", transform: "translate(-50%, -50%)" }}
+				style={CENTERED_HANDLE_STYLE}
 			/>
 		</div>
 	);

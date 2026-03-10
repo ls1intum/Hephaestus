@@ -2222,7 +2222,8 @@ paths:
         schema:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
+      - description: the user's GitHub login
+        in: path
         name: login
         required: true
         schema:
@@ -2278,7 +2279,8 @@ paths:
         schema:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
+      - description: the user's GitHub login
+        in: path
         name: login
         required: true
         schema:
@@ -2339,18 +2341,23 @@ components:
           - unlocked
           - hidden
           example: unlocked
+        isHidden:
+          type: boolean
+          description: Whether this achievement is hidden until unlocked
+          example: false
         unlockedAt:
           type: string
           format: date-time
+          nullable: true
           description: "Optional of when the achievement was unlocked, empty() if\
             \ not unlocked"
       required:
       - category
       - id
+      - isHidden
       - progressData
       - rarity
       - status
-      - unlockedAt
     AchievementId:
       type: string
       enum:
@@ -2407,6 +2414,9 @@ components:
       description: Polymorphic progress data
       discriminator:
         propertyName: type
+        mapping:
+          BinaryAchievementProgress: '#/components/schemas/BinaryAchievementProgress'
+          LinearAchievementProgress: '#/components/schemas/LinearAchievementProgress'
       properties:
         type:
           type: string
@@ -2456,6 +2466,8 @@ components:
         properties:
           unlocked:
             type: boolean
+        required:
+        - unlocked
       description: Binary progress indicating unlocked state
     ChatMessageVote:
       type: object
@@ -2865,9 +2877,10 @@ components:
           target:
             type: integer
             format: int32
+        required:
+        - current
+        - target
       description: Linear progress with current and target counts
-      required:
-      - target
     Profile:
       type: object
       description: Complete user profile including contribution history and activity

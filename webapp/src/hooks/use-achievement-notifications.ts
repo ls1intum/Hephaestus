@@ -21,9 +21,8 @@ export function useAchievementNotifications(achievements: UIAchievement[], enabl
 		}
 
 		// Get currently unlocked achievements
-		const unlockedAchievements = achievements.filter(
-			(a) => a.status === ("unlocked" as AchievementStatus),
-		);
+		const UNLOCKED = "unlocked" satisfies AchievementStatus;
+		const unlockedAchievements = achievements.filter((a) => a.status === UNLOCKED);
 
 		if (isInitialLoadRef.current) {
 			// On initial load, just record all currently unlocked achievements
@@ -55,12 +54,4 @@ export function useAchievementNotifications(achievements: UIAchievement[], enabl
 			});
 		}
 	}, [achievements, enabled]);
-
-	// Reset the notification state (useful for testing)
-	const resetNotifications = () => {
-		notifiedIdsRef.current.clear();
-		isInitialLoadRef.current = true;
-	};
-
-	return { resetNotifications };
 }

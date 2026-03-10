@@ -1,6 +1,6 @@
 import { useViewport } from "@xyflow/react";
 
-interface SkillTreeGraphBackgroundProps {
+export interface SkillTreeGraphBackgroundProps {
 	/** If true, renders designer-mode axis lines through the origin. */
 	showAxes?: boolean;
 }
@@ -60,14 +60,38 @@ export function SkillTreeGraphBackground({ showAxes = false }: SkillTreeGraphBac
 				{/* Decorative rings scaling outwardly from origin (only in non-designer / regular view) */}
 				{!showAxes && (
 					<>
-						<div className="w-20 h-20 rounded-full border border-primary/20 absolute" />
-						<div className="w-40 h-40 rounded-full border border-primary/20 absolute" />
-						<div className="w-60 h-60 rounded-full border border-primary/20 absolute" />
-						<div className="w-80 h-80 rounded-full border border-primary/10 absolute" />
-						<div className="w-100 h-100 rounded-full border border-primary/10 absolute" />
-						<div className="w-120 h-120 rounded-full border border-primary/10 absolute" />
-						<div className="w-140 h-140 rounded-full border border-primary/5 absolute" />
-						<div className="w-160 h-160 rounded-full border border-primary/5 absolute" />
+						<div
+							className="w-20 h-20 rounded-full border border-primary/20 absolute"
+							aria-hidden="true"
+						/>
+						<div
+							className="w-40 h-40 rounded-full border border-primary/20 absolute"
+							aria-hidden="true"
+						/>
+						<div
+							className="w-60 h-60 rounded-full border border-primary/20 absolute"
+							aria-hidden="true"
+						/>
+						<div
+							className="w-80 h-80 rounded-full border border-primary/10 absolute"
+							aria-hidden="true"
+						/>
+						<div
+							className="w-100 h-100 rounded-full border border-primary/10 absolute"
+							aria-hidden="true"
+						/>
+						<div
+							className="w-120 h-120 rounded-full border border-primary/10 absolute"
+							aria-hidden="true"
+						/>
+						<div
+							className="w-140 h-140 rounded-full border border-primary/5 absolute"
+							aria-hidden="true"
+						/>
+						<div
+							className="w-160 h-160 rounded-full border border-primary/5 absolute"
+							aria-hidden="true"
+						/>
 					</>
 				)}
 			</div>

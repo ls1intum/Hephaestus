@@ -321,7 +321,9 @@ export const updateTokenResponseTransformer = async (data: any): Promise<UpdateT
 };
 
 const achievementSchemaResponseTransformer = (data: any) => {
-    data.unlockedAt = new Date(data.unlockedAt);
+    if (data.unlockedAt) {
+        data.unlockedAt = new Date(data.unlockedAt);
+    }
     return data;
 };
 

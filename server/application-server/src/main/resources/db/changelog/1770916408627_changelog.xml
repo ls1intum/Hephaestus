@@ -36,26 +36,10 @@
   </changeSet>
 
   <!--
-  Backfill current_value from existing activity events.
-  This ensures existing achievementDefinition records have accurate progress counts.
+  Note: The backfill-current-value changeset was removed because the current_value
+  column is dropped in changeset 1770916408627-4. The backfill was never implemented
+  and is no longer needed.
   -->
-  <changeSet id="1770916408627-backfill-current-value" author="Hephaestus">
-    <preConditions onFail="MARK_RAN">
-      <columnExists tableName="user_achievement" columnName="current_value"/>
-    </preConditions>
-    <comment>
-      Backfill current_value based on the required count from the achievementDefinition definition.
-      For unlocked achievements, set current_value to match the threshold at unlock time.
-    </comment>
-    <!--
-    Note: We cannot easily backfill from ActivityEvent without knowing the exact
-    achievementDefinition -> event type mapping at database level. For unlocked achievements,
-    we set current_value to the required count (since threshold was met to unlock).
-    New achievements going forward will use incremental counting.
-
-    This is handled in application code via AchievementService initialization.
-    -->
-  </changeSet>
 
   <changeSet id="1770916408627-1" author="Max Achterberg">
     <preConditions onFail="MARK_RAN">
@@ -77,6 +61,23 @@
               type="jsonb"/>
     </addColumn>
   </changeSet>
+
+  <changeSet id="1770916408627-backfill-progress-data" author="Max Achterberg">
+    <preConditions onFail="MARK_RAN">
+      <columnExists tableName="user_achievement" columnName="progress_data"/>
+    </preConditions>
+    <comment>
+      Backfill progress_data for existing rows before adding NOT NULL constraint.
+      Sets a default BinaryAchievementProgress (unlocked=false) for any rows
+      that were created before the progress_data column existed.
+    </comment>
+    <sql>
+      UPDATE user_achievement
+      SET progress_data = '{"type":"BinaryAchievementProgress","unlocked":false}'
+      WHERE progress_data IS NULL;
+    </sql>
+  </changeSet>
+
   <changeSet id="1770916408627-3" author="Max Achterberg">
     <preConditions onFail="MARK_RAN">
       <columnExists tableName="user_achievement" columnName="progress_data"/>
@@ -90,6 +91,24 @@
     </preConditions>
     <dropColumn columnName="current_value"
                 tableName="user_achievement"/>
+  </changeSet>
+
+  <changeSet id="1770916408627-5-add-version" author="Hephaestus">
+    <preConditions onFail="MARK_RAN">
+      <tableExists tableName="user_achievement"/>
+      <not>
+        <columnExists tableName="user_achievement" columnName="version"/>
+      </not>
+    </preConditions>
+    <comment>
+      Add optimistic locking version column to user_achievement.
+      Used by JPA @Version to prevent lost updates on concurrent progress increments.
+    </comment>
+    <addColumn tableName="user_achievement">
+      <column name="version" type="BIGINT" defaultValueNumeric="0">
+        <constraints nullable="false"/>
+      </column>
+    </addColumn>
   </changeSet>
 
 </databaseChangeLog>

@@ -14,8 +14,8 @@
 body {
   @apply m-0;
   font-family:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu",
-    "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
+    Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -41,7 +41,7 @@ code {
   --accent: oklch(0.967 0.001 286.375);
   --accent-foreground: oklch(0.21 0.006 285.885);
   --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.985 0 0);
   --border: oklch(0.92 0.004 286.32);
   --input: oklch(0.92 0.004 286.32);
   --ring: oklch(0.871 0.006 286.286);
@@ -157,82 +157,82 @@ code {
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
+	--color-background: var(--background);
+	--color-foreground: var(--foreground);
+	--color-card: var(--card);
+	--color-card-foreground: var(--card-foreground);
+	--color-popover: var(--popover);
+	--color-popover-foreground: var(--popover-foreground);
+	--color-primary: var(--primary);
+	--color-primary-foreground: var(--primary-foreground);
+	--color-secondary: var(--secondary);
+	--color-secondary-foreground: var(--secondary-foreground);
+	--color-muted: var(--muted);
+	--color-muted-foreground: var(--muted-foreground);
+	--color-accent: var(--accent);
+	--color-accent-foreground: var(--accent-foreground);
+	--color-destructive: var(--destructive);
+	--color-destructive-foreground: var(--destructive-foreground);
+	--color-border: var(--border);
+	--color-input: var(--input);
+	--color-ring: var(--ring);
+	--color-chart-1: var(--chart-1);
+	--color-chart-2: var(--chart-2);
+	--color-chart-3: var(--chart-3);
+	--color-chart-4: var(--chart-4);
+	--color-chart-5: var(--chart-5);
+	--radius-sm: calc(var(--radius) - 4px);
+	--radius-md: calc(var(--radius) - 2px);
+	--radius-lg: var(--radius);
+	--radius-xl: calc(var(--radius) + 4px);
+	--color-sidebar: var(--sidebar);
+	--color-sidebar-foreground: var(--sidebar-foreground);
+	--color-sidebar-primary: var(--sidebar-primary);
+	--color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+	--color-sidebar-accent: var(--sidebar-accent);
+	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+	--color-sidebar-border: var(--sidebar-border);
+	--color-sidebar-ring: var(--sidebar-ring);
 
-  /* * Provider-aware semantic colors.
-  * Default values use @primer/primitives (GitHub) which handles light/dark via data-color-mode.
+	/* * Provider-aware semantic colors.
+	* Default values use @primer/primitives (GitHub) which handles light/dark via data-color-mode.
 	 * GitLab overrides are defined below via [data-provider="gitlab"] selectors.
 	 * Brand-only tokens (github-white, github-black) remain for GitHubSignInButton.
 	 */
 	--color-provider-foreground: var(--fgColor-default);
-  --color-provider-background: var(--bgColor-default);
-  --color-provider-muted: var(--bgColor-muted);
-  --color-provider-muted-foreground: var(--fgColor-muted);
-  --color-provider-onemphasis: var(--bgColor-emphasis);
-  --color-provider-onemphasis-foreground: var(--fgColor-onEmphasis);
-  --color-provider-oninverse: var(--bgColor-inverse);
-  --color-provider-oninverse-foreground: var(--fgColor-onInverse);
-  --color-provider-disabled: var(--bgColor-disabled);
-  --color-provider-disabled-foreground: var(--fgColor-disabled);
-  --color-provider-link: var(--bgColor-link);
-  --color-provider-link-foreground: var(--fgColor-link);
-  --color-provider-neutral: var(--bgColor-neutral);
-  --color-provider-neutral-foreground: var(--fgColor-neutral);
-  --color-provider-accent: var(--bgColor-accent);
-  --color-provider-accent-foreground: var(--fgColor-accent);
-  --color-provider-success: var(--bgColor-success);
-  --color-provider-success-foreground: var(--fgColor-success);
-  --color-provider-open: var(--bgColor-open);
-  --color-provider-open-foreground: var(--fgColor-open);
-  --color-provider-attention: var(--bgColor-attention);
-  --color-provider-attention-foreground: var(--fgColor-attention);
-  --color-provider-severe: var(--bgColor-severe);
-  --color-provider-severe-foreground: var(--fgColor-severe);
-  --color-provider-danger: var(--bgColor-danger);
-  --color-provider-danger-foreground: var(--fgColor-danger);
-  --color-provider-closed: var(--bgColor-closed);
-  --color-provider-closed-foreground: var(--fgColor-closed);
-  --color-provider-done: var(--bgColor-done);
-  --color-provider-done-foreground: var(--fgColor-done);
-  --color-provider-upsell: var(--bgColor-upsell);
-  --color-provider-upsell-foreground: var(--fgColor-upsell);
-  --color-provider-sponsors: var(--bgColor-sponsors);
-  --color-provider-sponsors-foreground: var(--fgColor-sponsors);
+	--color-provider-background: var(--bgColor-default);
+	--color-provider-muted: var(--bgColor-muted);
+	--color-provider-muted-foreground: var(--fgColor-muted);
+	--color-provider-onemphasis: var(--bgColor-emphasis);
+	--color-provider-onemphasis-foreground: var(--fgColor-onEmphasis);
+	--color-provider-oninverse: var(--bgColor-inverse);
+	--color-provider-oninverse-foreground: var(--fgColor-onInverse);
+	--color-provider-disabled: var(--bgColor-disabled);
+	--color-provider-disabled-foreground: var(--fgColor-disabled);
+	--color-provider-link: var(--bgColor-link);
+	--color-provider-link-foreground: var(--fgColor-link);
+	--color-provider-neutral: var(--bgColor-neutral);
+	--color-provider-neutral-foreground: var(--fgColor-neutral);
+	--color-provider-accent: var(--bgColor-accent);
+	--color-provider-accent-foreground: var(--fgColor-accent);
+	--color-provider-success: var(--bgColor-success);
+	--color-provider-success-foreground: var(--fgColor-success);
+	--color-provider-open: var(--bgColor-open);
+	--color-provider-open-foreground: var(--fgColor-open);
+	--color-provider-attention: var(--bgColor-attention);
+	--color-provider-attention-foreground: var(--fgColor-attention);
+	--color-provider-severe: var(--bgColor-severe);
+	--color-provider-severe-foreground: var(--fgColor-severe);
+	--color-provider-danger: var(--bgColor-danger);
+	--color-provider-danger-foreground: var(--fgColor-danger);
+	--color-provider-closed: var(--bgColor-closed);
+	--color-provider-closed-foreground: var(--fgColor-closed);
+	--color-provider-done: var(--bgColor-done);
+	--color-provider-done-foreground: var(--fgColor-done);
+	--color-provider-upsell: var(--bgColor-upsell);
+	--color-provider-upsell-foreground: var(--fgColor-upsell);
+	--color-provider-sponsors: var(--bgColor-sponsors);
+	--color-provider-sponsors-foreground: var(--fgColor-sponsors);
 
 	/* GitHub brand-only tokens (used by GitHubSignInButton) */
 	--color-github-white: var(--bgColor-white);
@@ -240,33 +240,33 @@ code {
 	--color-github-black: var(--bgColor-black);
 	--color-github-black-foreground: var(--fgColor-black);
 
-  /* League colors */
-  --color-league-bronze: var(--league-bronze);
-  --color-league-silver: var(--league-silver);
-  --color-league-gold: var(--league-gold);
-  --color-league-diamond: var(--league-diamond);
-  --color-league-master: var(--league-master);
+	/* League colors */
+	--color-league-bronze: var(--league-bronze);
+	--color-league-silver: var(--league-silver);
+	--color-league-gold: var(--league-gold);
+	--color-league-diamond: var(--league-diamond);
+	--color-league-master: var(--league-master);
 
-  --color-mentor: var(--mentor);
-  --color-mentor-foreground: var(--mentor-foreground);
+	--color-mentor: var(--mentor);
+	--color-mentor-foreground: var(--mentor-foreground);
 
-  /* Achievement skill tree colors */
-  --color-node-locked: var(--node-locked);
-  --color-node-available: var(--node-available);
-  --color-node-unlocked: var(--node-unlocked);
-  --color-edge-inactive: var(--edge-inactive);
-  --color-edge-active: var(--edge-active);
+	/* Achievement skill tree colors */
+	--color-node-locked: var(--node-locked);
+	--color-node-available: var(--node-available);
+	--color-node-unlocked: var(--node-unlocked);
+	--color-edge-inactive: var(--edge-inactive);
+	--color-edge-active: var(--edge-active);
 
-  /* Rarity border colors */
-  --color-rarity-common: var(--rarity-common);
-  --color-rarity-uncommon: var(--rarity-uncommon);
-  --color-rarity-rare: var(--rarity-rare);
-  --color-rarity-epic: var(--rarity-epic);
-  --color-rarity-legendary: var(--rarity-legendary);
-  --color-rarity-legendary-from: var(--rarity-legendary-from);
-  --color-rarity-legendary-to: var(--rarity-legendary-to);
-  --color-rarity-mythic-from: var(--rarity-mythic-from);
-  --color-rarity-mythic-to: var(--rarity-mythic-to);
+	/* Rarity border colors */
+	--color-rarity-common: var(--rarity-common);
+	--color-rarity-uncommon: var(--rarity-uncommon);
+	--color-rarity-rare: var(--rarity-rare);
+	--color-rarity-epic: var(--rarity-epic);
+	--color-rarity-legendary: var(--rarity-legendary);
+	--color-rarity-legendary-from: var(--rarity-legendary-from);
+	--color-rarity-legendary-to: var(--rarity-legendary-to);
+	--color-rarity-mythic-from: var(--rarity-mythic-from);
+	--color-rarity-mythic-to: var(--rarity-mythic-to);
 }
 
 @utility text-rarity-mythic {
@@ -458,9 +458,10 @@ code {
 .pm-stream-ghost {
   opacity: 0.6;
   white-space: pre-wrap;
-  animation: pmGhostBlink 1.2s steps(1) infinite;
+  animation: pm-ghost-blink 1.2s steps(1) infinite;
 }
-@keyframes pmGhostBlink {
+
+@keyframes pm-ghost-blink {
   60% {
     opacity: 0.45;
   }
@@ -564,4 +565,15 @@ code {
   /* Clip the inner background to perfectly match the outer geometry */
   clip-path: polygon(50% 0%, 93.301% 25%, 93.301% 75%, 50% 100%, 6.699% 75%, 6.699% 25%);
   z-index: -1;
+}
+
+/* Respect reduced-motion preference for all achievement animations */
+@media (prefers-reduced-motion: reduce) {
+  .legendary-pulse-anim {
+    animation: none !important;
+  }
+
+  .achievement-mythic-hexagon::before {
+    animation: none !important;
+  }
 }

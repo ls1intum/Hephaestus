@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { ReactFlowProvider } from "@xyflow/react";
-import { EqualizerEdge } from "./EqualizerEdge";
+import { Position, ReactFlowProvider } from "@xyflow/react";
+import type { ComponentProps } from "react";
+import { EqualizerEdge, type EqualizerVariant } from "@/components/achievements/EqualizerEdge";
 
 /**
  * Storybook stories for EqualizerEdge.
@@ -9,7 +10,7 @@ import { EqualizerEdge } from "./EqualizerEdge";
  * audio-mixer equalizer wave traveling across it.
  */
 
-const meta: Meta<typeof EqualizerEdge> = {
+const meta = {
 	component: EqualizerEdge,
 	parameters: {
 		layout: "centered",
@@ -25,10 +26,7 @@ const meta: Meta<typeof EqualizerEdge> = {
 	decorators: [
 		(Story) => (
 			<ReactFlowProvider>
-				<div
-					className="bg-background"
-					style={{ width: 520, padding: 48, display: "flex", justifyContent: "center" }}
-				>
+				<div className="bg-background w-[520px] p-12 flex justify-center">
 					<svg
 						width={440}
 						height={200}
@@ -43,25 +41,37 @@ const meta: Meta<typeof EqualizerEdge> = {
 			</ReactFlowProvider>
 		),
 	],
-};
+} as Meta<typeof EqualizerEdge>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-// Mock edge props generator
-const createEdgeProps = (id: string, y: number, data: any = {}) => ({
+type EqualizerData = {
+	isEnabled: boolean;
+	variant?: EqualizerVariant;
+	depth?: number;
+	maxDepth?: number;
+};
+
+const createEdgeProps = (
+	id: string,
+	y: number,
+	data: EqualizerData = { isEnabled: false },
+): ComponentProps<typeof EqualizerEdge> => ({
 	id,
+	source: "source-node",
+	target: "target-node",
 	sourceX: 40,
 	sourceY: y,
 	targetX: 400,
 	targetY: y,
 	data,
-	sourcePosition: "right" as const,
-	targetPosition: "left" as const,
+	sourcePosition: Position.Right,
+	targetPosition: Position.Left,
 });
 
 export const Default: Story = {
-	args: createEdgeProps("default", 100, { isEnabled: true }) as any,
+	args: createEdgeProps("default", 100, { isEnabled: true }),
 };
 
 /**
@@ -71,23 +81,23 @@ export const States: Story = {
 	render: () => (
 		<>
 			{/* Disabled State */}
-			<EqualizerEdge {...(createEdgeProps("disabled", 20, { isEnabled: false }) as any)} />
+			<EqualizerEdge {...createEdgeProps("disabled", 20, { isEnabled: false })} />
 			<text x="40" y="10" className="fill-muted-foreground text-[10px] uppercase font-mono">
 				Disabled
 			</text>
 
 			{/* Enabled State (Traveling) */}
-			<EqualizerEdge {...(createEdgeProps("enabled", 100, { isEnabled: true }) as any)} />
+			<EqualizerEdge {...createEdgeProps("enabled", 100, { isEnabled: true })} />
 			<text x="40" y="90" className="fill-muted-foreground text-[10px] uppercase font-mono">
 				Enabled (Traveling)
 			</text>
 
 			{/* Static Variant */}
 			<EqualizerEdge
-				{...(createEdgeProps("static", 180, {
+				{...createEdgeProps("static", 180, {
 					isEnabled: true,
 					variant: "static",
-				}) as any)}
+				})}
 			/>
 			<text x="40" y="170" className="fill-muted-foreground text-[10px] uppercase font-mono">
 				Static Variant
