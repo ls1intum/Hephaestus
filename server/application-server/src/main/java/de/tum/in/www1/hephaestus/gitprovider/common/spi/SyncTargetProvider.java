@@ -113,6 +113,16 @@ public interface SyncTargetProvider extends SyncTimestampProvider, BackfillState
     }
 
     /**
+     * Gets sync sessions for GitLab batch synchronization.
+     * Each session contains all sync targets for a GitLab scope with its sync context.
+     *
+     * @return list of GitLab sync sessions
+     */
+    default List<SyncSession> getGitLabSyncSessions() {
+        return List.of();
+    }
+
+    /**
      * Gets statistics about sync target filtering.
      *
      * @return sync statistics

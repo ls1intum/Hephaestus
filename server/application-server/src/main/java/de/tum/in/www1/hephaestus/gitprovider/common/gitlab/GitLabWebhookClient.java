@@ -255,10 +255,16 @@ public class GitLabWebhookClient {
         String token,
         boolean mergeRequestsEvents,
         boolean issuesEvents,
+        boolean confidentialIssuesEvents,
         boolean noteEvents,
+        boolean confidentialNoteEvents,
         boolean pushEvents,
+        boolean tagPushEvents,
         boolean pipelineEvents,
         boolean milestoneEvents,
+        boolean memberEvents,
+        boolean subgroupEvents,
+        boolean projectEvents,
         boolean enableSslVerification
     ) {
         public Map<String, Object> toPayload() {
@@ -268,10 +274,16 @@ public class GitLabWebhookClient {
                 Map.entry("token", token),
                 Map.entry("merge_requests_events", mergeRequestsEvents),
                 Map.entry("issues_events", issuesEvents),
+                Map.entry("confidential_issues_events", confidentialIssuesEvents),
                 Map.entry("note_events", noteEvents),
+                Map.entry("confidential_note_events", confidentialNoteEvents),
                 Map.entry("push_events", pushEvents),
+                Map.entry("tag_push_events", tagPushEvents),
                 Map.entry("pipeline_events", pipelineEvents),
                 Map.entry("milestone_events", milestoneEvents),
+                Map.entry("member_events", memberEvents),
+                Map.entry("subgroup_events", subgroupEvents),
+                Map.entry("project_events", projectEvents),
                 Map.entry("enable_ssl_verification", enableSslVerification)
             );
         }

@@ -4,6 +4,7 @@ import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlResponseHandler;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncException;
@@ -40,17 +41,20 @@ public class GitLabMilestoneSyncService {
     private static final String GET_PROJECT_MILESTONES_DOCUMENT = "GetProjectMilestones";
 
     private final GitLabGraphQlClientProvider graphQlClientProvider;
+    private final GitLabGraphQlResponseHandler responseHandler;
     private final GitLabMilestoneProcessor milestoneProcessor;
     private final MilestoneRepository milestoneRepository;
     private final GitLabProperties gitLabProperties;
 
     public GitLabMilestoneSyncService(
         GitLabGraphQlClientProvider graphQlClientProvider,
+        GitLabGraphQlResponseHandler responseHandler,
         GitLabMilestoneProcessor milestoneProcessor,
         MilestoneRepository milestoneRepository,
         GitLabProperties gitLabProperties
     ) {
         this.graphQlClientProvider = graphQlClientProvider;
+        this.responseHandler = responseHandler;
         this.milestoneProcessor = milestoneProcessor;
         this.milestoneRepository = milestoneRepository;
         this.gitLabProperties = gitLabProperties;
@@ -72,6 +76,7 @@ public class GitLabMilestoneSyncService {
         int totalSynced = 0;
         Set<Integer> syncedNumbers = new HashSet<>();
         String cursor = null;
+        String previousCursor = null;
         int page = 0;
         boolean rateLimitAborted = false;
         boolean errorAborted = false;
@@ -107,13 +112,11 @@ public class GitLabMilestoneSyncService {
                     .execute()
                     .block(gitLabProperties.graphqlTimeout());
 
-                if (response == null || !response.isValid()) {
-                    log.warn(
-                        "Failed to fetch milestones: scopeId={}, projectPath={}, errors={}",
-                        scopeId,
-                        safeProjectPath,
-                        response != null ? response.getErrors() : "null response"
-                    );
+                var handleResult = responseHandler.handle(response, "milestones for " + safeProjectPath, log);
+                if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.RETRY) {
+                    continue;
+                }
+                if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.ABORT) {
                     graphQlClientProvider.recordFailure(new GitLabSyncException("Invalid GraphQL response"));
                     errorAborted = true;
                     break;
@@ -151,6 +154,13 @@ public class GitLabMilestoneSyncService {
                 if (pageInfo == null || !pageInfo.hasNextPage()) {
                     break;
                 }
+                if (
+                    responseHandler.isPaginationLoop(cursor, previousCursor, "milestones for " + safeProjectPath, log)
+                ) {
+                    errorAborted = true;
+                    break;
+                }
+                previousCursor = cursor;
             } while (true);
         } catch (Exception e) {
             log.error("Error during milestone sync: scopeId={}, projectPath={}", scopeId, safeProjectPath, e);

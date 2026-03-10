@@ -1,0 +1,53 @@
+query GetProjectIssuesHistorical($fullPath: ID!, $first: Int!, $after: String) {
+    project(fullPath: $fullPath) {
+        issues(first: $first, after: $after, sort: CREATED_DESC) {
+            count
+            pageInfo {
+                hasNextPage
+                endCursor
+            }
+            nodes {
+                id
+                iid
+                title
+                description
+                state
+                confidential
+                webUrl
+                createdAt
+                updatedAt
+                closedAt
+                milestone {
+                    id
+                    iid
+                }
+                author {
+                    ...GitLabUserFields
+                }
+                labels(first: 100) {
+                    count
+                    pageInfo {
+                        hasNextPage
+                        endCursor
+                    }
+                    nodes {
+                        id
+                        title
+                        color
+                    }
+                }
+                assignees(first: 20) {
+                    count
+                    pageInfo {
+                        hasNextPage
+                        endCursor
+                    }
+                    nodes {
+                        ...GitLabUserFields
+                    }
+                }
+                userNotesCount
+            }
+        }
+    }
+}

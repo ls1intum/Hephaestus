@@ -9,12 +9,18 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.in.www1.hephaestus.gitprovider.commit.CommitAuthorResolver;
+import de.tum.in.www1.hephaestus.gitprovider.commit.CommitRepository;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabEventType;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabTokenService;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.ScopeIdResolver;
+import de.tum.in.www1.hephaestus.gitprovider.common.spi.SyncTargetProvider;
+import de.tum.in.www1.hephaestus.gitprovider.git.GitRepositoryManager;
 import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import de.tum.in.www1.hephaestus.gitprovider.organization.OrganizationRepository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
@@ -32,6 +38,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -52,7 +59,28 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
     private RepositoryRepository repositoryRepository;
 
     @Mock
+    private CommitRepository commitRepository;
+
+    @Mock
     private GitProviderRepository gitProviderRepository;
+
+    @Mock
+    private GitRepositoryManager gitRepositoryManager;
+
+    @Mock
+    private GitLabTokenService tokenService;
+
+    @Mock
+    private CommitAuthorResolver authorResolver;
+
+    @Mock
+    private ScopeIdResolver scopeIdResolver;
+
+    @Mock
+    private SyncTargetProvider syncTargetProvider;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @Mock
     private NatsMessageDeserializer deserializer;
@@ -97,8 +125,15 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
             projectProcessor,
             organizationRepository,
             repositoryRepository,
+            commitRepository,
             gitProviderRepository,
             properties,
+            gitRepositoryManager,
+            tokenService,
+            authorResolver,
+            scopeIdResolver,
+            syncTargetProvider,
+            eventPublisher,
             deserializer,
             transactionTemplate
         );
@@ -131,7 +166,8 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
             "a4bf10d93a2d136f1db911b6f1c03d26d835a44f",
             246765L,
             projectInfo,
-            3
+            3,
+            null
         );
 
         Repository repo = new Repository();
@@ -175,7 +211,8 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
             null,
             1L,
             projectInfo,
-            0
+            0,
+            null
         );
 
         Message msg = mockMessage("gitlab.org.proj.push", pushEvent);
@@ -195,7 +232,8 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
             "after",
             null,
             null, // null project
-            0
+            0,
+            null
         );
 
         Message msg = mockMessage("gitlab.org.proj.push", pushEvent);
@@ -225,7 +263,8 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
             "after",
             1L,
             projectInfo,
-            1
+            1,
+            null
         );
 
         when(projectProcessor.processPushEvent(projectInfo, gitLabProvider)).thenReturn(null);
@@ -437,7 +476,8 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
             "after",
             projectInfo.id(),
             projectInfo,
-            1
+            1,
+            null
         );
     }
 

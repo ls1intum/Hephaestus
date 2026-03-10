@@ -5,6 +5,7 @@ import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabFieldUtils;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlResponseHandler;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncException;
@@ -56,6 +57,7 @@ public class GitLabDiscussionSyncService {
     private static final int DISCUSSION_SYNC_PAGE_SIZE = 50;
 
     private final GitLabGraphQlClientProvider graphQlClientProvider;
+    private final GitLabGraphQlResponseHandler responseHandler;
     private final GitLabPullRequestReviewThreadProcessor threadProcessor;
     private final GitLabPullRequestReviewCommentProcessor reviewCommentProcessor;
     private final GitLabIssueCommentProcessor issueCommentProcessor;
@@ -63,12 +65,14 @@ public class GitLabDiscussionSyncService {
 
     public GitLabDiscussionSyncService(
         GitLabGraphQlClientProvider graphQlClientProvider,
+        GitLabGraphQlResponseHandler responseHandler,
         GitLabPullRequestReviewThreadProcessor threadProcessor,
         GitLabPullRequestReviewCommentProcessor reviewCommentProcessor,
         GitLabIssueCommentProcessor issueCommentProcessor,
         GitLabProperties gitLabProperties
     ) {
         this.graphQlClientProvider = graphQlClientProvider;
+        this.responseHandler = responseHandler;
         this.threadProcessor = threadProcessor;
         this.reviewCommentProcessor = reviewCommentProcessor;
         this.issueCommentProcessor = issueCommentProcessor;
@@ -100,6 +104,7 @@ public class GitLabDiscussionSyncService {
         int totalGeneralNotes = 0;
         int totalSkipped = 0;
         String cursor = null;
+        String previousCursor = null;
         int page = 0;
 
         try {
@@ -133,24 +138,15 @@ public class GitLabDiscussionSyncService {
                     .execute()
                     .block(gitLabProperties.graphqlTimeout());
 
-                if (response == null || !response.isValid()) {
-                    log.warn(
-                        "Failed to fetch discussions: context={}, errors={}",
-                        safeContext,
-                        response != null ? response.getErrors() : "null response"
-                    );
+                var handleResult = responseHandler.handle(response, "discussions for " + safeContext, log);
+                if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.RETRY) {
+                    continue;
+                }
+                if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.ABORT) {
                     graphQlClientProvider.recordFailure(
                         new GitLabSyncException("Invalid GraphQL response: context=" + safeContext)
                     );
                     break;
-                }
-
-                if (response.getErrors() != null && !response.getErrors().isEmpty()) {
-                    log.warn(
-                        "Partial errors in discussion response: context={}, errors={}",
-                        safeContext,
-                        response.getErrors()
-                    );
                 }
 
                 graphQlClientProvider.recordSuccess();
@@ -193,6 +189,10 @@ public class GitLabDiscussionSyncService {
                     log.warn("Discussion pagination cursor null despite hasNextPage=true: context={}", safeContext);
                     break;
                 }
+                if (responseHandler.isPaginationLoop(cursor, previousCursor, "discussions for " + safeContext, log)) {
+                    break;
+                }
+                previousCursor = cursor;
                 page++;
 
                 try {
