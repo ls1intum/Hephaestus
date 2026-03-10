@@ -53,7 +53,7 @@ export function ConnectGitLabStep() {
 
 	return (
 		<div className="flex flex-col gap-4">
-			<Field>
+			<Field data-invalid={fieldErrors.serverUrl ? "true" : undefined}>
 				<FieldLabel htmlFor="gitlab-server-url">GitLab Instance URL</FieldLabel>
 				<Input
 					id="gitlab-server-url"
@@ -61,15 +61,21 @@ export function ConnectGitLabStep() {
 					value={state.serverUrl}
 					onChange={(e) => dispatch({ type: "SET_SERVER_URL", value: e.target.value })}
 					autoComplete="url"
+					aria-invalid={!!fieldErrors.serverUrl}
+					aria-describedby={
+						fieldErrors.serverUrl ? "gitlab-server-url-error" : "gitlab-server-url-description"
+					}
 					autoFocus
 				/>
-				<FieldDescription>
+				<FieldDescription id="gitlab-server-url-description">
 					Leave empty for gitlab.com. Enter a custom URL for self-hosted instances.
 				</FieldDescription>
-				{fieldErrors.serverUrl && <FieldError>{fieldErrors.serverUrl}</FieldError>}
+				{fieldErrors.serverUrl && (
+					<FieldError id="gitlab-server-url-error">{fieldErrors.serverUrl}</FieldError>
+				)}
 			</Field>
 
-			<Field>
+			<Field data-invalid={fieldErrors.personalAccessToken ? "true" : undefined}>
 				<FieldLabel htmlFor="gitlab-pat">Personal Access Token</FieldLabel>
 				<div className="relative">
 					<Input
@@ -80,6 +86,10 @@ export function ConnectGitLabStep() {
 						onChange={(e) => dispatch({ type: "SET_PAT", value: e.target.value })}
 						autoComplete="off"
 						className="pr-9"
+						aria-invalid={!!fieldErrors.personalAccessToken}
+						aria-describedby={
+							fieldErrors.personalAccessToken ? "gitlab-pat-error" : "gitlab-pat-description"
+						}
 						onKeyDown={(e) => {
 							if (e.key === "Enter") {
 								e.preventDefault();
@@ -98,7 +108,7 @@ export function ConnectGitLabStep() {
 						{showToken ? <EyeOffIcon className="size-3.5" /> : <EyeIcon className="size-3.5" />}
 					</Button>
 				</div>
-				<FieldDescription>
+				<FieldDescription id="gitlab-pat-description">
 					Create a token with <code className="text-xs">api</code> scope at your{" "}
 					<a
 						href={`${settingsBaseUrl}/-/user_settings/personal_access_tokens`}
@@ -110,7 +120,7 @@ export function ConnectGitLabStep() {
 					.
 				</FieldDescription>
 				{fieldErrors.personalAccessToken && (
-					<FieldError>{fieldErrors.personalAccessToken}</FieldError>
+					<FieldError id="gitlab-pat-error">{fieldErrors.personalAccessToken}</FieldError>
 				)}
 			</Field>
 

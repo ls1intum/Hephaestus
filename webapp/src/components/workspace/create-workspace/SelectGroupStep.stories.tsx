@@ -1,35 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { fn } from "storybook/test";
-import type { GitLabGroup } from "@/api/types.gen";
 import { SelectGroupStep } from "./SelectGroupStep";
-import { initialWizardState, WizardContext, type WizardState } from "./wizard-context";
+import { makeGroup, withWizardState } from "./stories-utils";
 
-function withWizardState(overrides: Partial<WizardState>) {
-	const state: WizardState = { ...initialWizardState, step: 2, ...overrides };
-	return function WizardDecorator(Story: React.ComponentType) {
-		return (
-			<WizardContext.Provider value={{ state, dispatch: fn() }}>
-				<Story />
-			</WizardContext.Provider>
-		);
-	};
-}
-
-const makeGroup = (
-	id: number,
-	name: string,
-	fullPath: string,
-	opts: Partial<GitLabGroup> = {},
-): GitLabGroup => ({
-	id,
-	name,
-	fullPath,
-	avatarUrl: `https://gitlab.com/uploads/-/system/group/avatar/${id}/avatar.png`,
-	visibility: "private",
-	...opts,
-});
-
-const sampleGroups: GitLabGroup[] = [
+const sampleGroups = [
 	makeGroup(1, "Hephaestus", "ls1intum/hephaestus", { visibility: "public" }),
 	makeGroup(2, "Artemis", "ls1intum/artemis", { visibility: "internal" }),
 	makeGroup(3, "Athena", "ls1intum/athena"),
@@ -54,7 +27,7 @@ const meta = {
 		},
 	},
 	decorators: [
-		withWizardState({ groups: sampleGroups }),
+		withWizardState({ step: 2, groups: sampleGroups }),
 		(Story) => (
 			<div className="w-96">
 				<Story />
@@ -76,21 +49,21 @@ export const Default: Story = {};
  * A group is pre-selected (highlighted row).
  */
 export const WithSelection: Story = {
-	decorators: [withWizardState({ groups: sampleGroups, selectedGroup: sampleGroups[0] })],
+	decorators: [withWizardState({ step: 2, groups: sampleGroups, selectedGroup: sampleGroups[0] })],
 };
 
 /**
  * Empty groups list — shows the "no groups found" message.
  */
 export const EmptyGroups: Story = {
-	decorators: [withWizardState({ groups: [] })],
+	decorators: [withWizardState({ step: 2, groups: [] })],
 };
 
 /**
  * Single group available.
  */
 export const SingleGroup: Story = {
-	decorators: [withWizardState({ groups: [sampleGroups[0]] })],
+	decorators: [withWizardState({ step: 2, groups: [sampleGroups[0]] })],
 };
 
 /**
@@ -99,6 +72,7 @@ export const SingleGroup: Story = {
 export const ManyGroups: Story = {
 	decorators: [
 		withWizardState({
+			step: 2,
 			groups: Array.from({ length: 20 }, (_, i) =>
 				makeGroup(i + 100, `Group ${i + 1}`, `org/group-${i + 1}`, {
 					visibility: i % 3 === 0 ? "public" : i % 3 === 1 ? "internal" : "private",
@@ -114,6 +88,7 @@ export const ManyGroups: Story = {
 export const NoAvatars: Story = {
 	decorators: [
 		withWizardState({
+			step: 2,
 			groups: sampleGroups.map((g) => ({ ...g, avatarUrl: undefined })),
 		}),
 	],
