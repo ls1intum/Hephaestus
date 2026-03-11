@@ -594,6 +594,7 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                                 "Comment", // Through PR -> repository.organization.workspaceId
                                 "Commit", // Through repository.organization.workspaceId
                                 "Project", // Through organization.workspaceId
+                                "ActivitySavedEvent", // Carries user context for achievement evaluation
                                 "ApplicationReadyEvent", // Spring lifecycle, no workspace needed
                                 "ContextRefreshedEvent", // Spring lifecycle, no workspace needed
                                 "WorkspacesInitializedEvent" // Startup lifecycle, signals all workspaces ready
@@ -641,7 +642,9 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
             // ActivityEventListener handles CommentCreated, ReviewSubmitted events which carry full entity graphs
             "ActivityEventListener",
             // BadPracticeEventListener handles PullRequestUpdated events which carry full entity graphs
-            "BadPracticeEventListener"
+            "BadPracticeEventListener",
+            // AchievementEventListener handles ActivitySavedEvent which carries workspaceId context
+            "AchievementEventListener"
         );
 
         /**

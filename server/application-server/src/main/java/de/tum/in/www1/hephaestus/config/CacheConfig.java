@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.config;
 
 import com.github.benmanes.caffeine.cache.Caffeine;
+import de.tum.in.www1.hephaestus.achievement.AchievementService;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.binder.cache.CaffeineCacheMetrics;
 import java.time.Duration;
@@ -51,7 +52,14 @@ public class CacheConfig {
             meterRegistry
         );
 
-        cacheManager.setCaches(Arrays.asList(contributorsCache, pullRequestTemplatesCache));
+        // Achievement progress cache: 1 hour TTL
+        CaffeineCache achievementProgressCache = buildCache(
+            AchievementService.ACHIEVEMENT_PROGRESS_CACHE,
+            LONG_CACHE_TTL_SECONDS,
+            meterRegistry
+        );
+
+        cacheManager.setCaches(Arrays.asList(contributorsCache, pullRequestTemplatesCache, achievementProgressCache));
 
         return cacheManager;
     }

@@ -1,0 +1,114 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                   http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+  <!--
+  =======================================================================================
+  Achievement Performance Optimization Migration
+  =======================================================================================
+
+  This changelog adds the current_value column to user_achievement table to support
+  incremental achievementDefinition progress tracking. This avoids expensive COUNT(*) queries
+  on the ActivityEvent table when checking achievementDefinition progress.
+
+  See: plans.md item #2 (Performance Optimization)
+  =======================================================================================
+  -->
+
+  <changeSet id="1770916408627-add-current-value-to-user-achievementDefinition" author="Hephaestus">
+    <preConditions onFail="MARK_RAN">
+      <tableExists tableName="user_achievement"/>
+      <not>
+        <columnExists tableName="user_achievement" columnName="current_value"/>
+      </not>
+    </preConditions>
+    <comment>
+      Add current_value column to user_achievement for incremental progress tracking.
+      This optimization avoids COUNT(*) queries on ActivityEvent table for every event.
+    </comment>
+    <addColumn tableName="user_achievement">
+      <column name="current_value" type="BIGINT" defaultValueNumeric="0">
+        <constraints nullable="false"/>
+      </column>
+    </addColumn>
+  </changeSet>
+
+  <!--
+  Note: The backfill-current-value changeset was removed because the current_value
+  column is dropped in changeset 1770916408627-4. The backfill was never implemented
+  and is no longer needed.
+  -->
+
+  <changeSet id="1770916408627-1" author="Max Achterberg">
+    <preConditions onFail="MARK_RAN">
+      <columnExists tableName="user_achievement" columnName="unlocked_at"/>
+    </preConditions>
+    <dropNotNullConstraint columnDataType="datetime"
+                           columnName="unlocked_at"
+                           tableName="user_achievement"/>
+  </changeSet>
+
+  <changeSet id="1770916408627-2" author="Max Achterberg">
+    <preConditions onFail="MARK_RAN">
+      <not>
+        <columnExists tableName="user_achievement" columnName="progress_data"/>
+      </not>
+    </preConditions>
+    <addColumn tableName="user_achievement">
+      <column name="progress_data"
+              type="jsonb"/>
+    </addColumn>
+  </changeSet>
+
+  <changeSet id="1770916408627-backfill-progress-data" author="Max Achterberg">
+    <preConditions onFail="MARK_RAN">
+      <columnExists tableName="user_achievement" columnName="progress_data"/>
+    </preConditions>
+    <comment>
+      Backfill progress_data for existing rows before adding NOT NULL constraint.
+      Sets a default BinaryAchievementProgress (unlocked=false) for any rows
+      that were created before the progress_data column existed.
+    </comment>
+    <sql>
+      UPDATE user_achievement
+      SET progress_data = '{"type":"BinaryAchievementProgress","unlocked":false}'
+      WHERE progress_data IS NULL;
+    </sql>
+  </changeSet>
+
+  <changeSet id="1770916408627-3" author="Max Achterberg">
+    <preConditions onFail="MARK_RAN">
+      <columnExists tableName="user_achievement" columnName="progress_data"/>
+    </preConditions>
+    <addNotNullConstraint columnName="progress_data"
+                          tableName="user_achievement"/>
+  </changeSet>
+  <changeSet id="1770916408627-4" author="Max Achterberg">
+    <preConditions onFail="MARK_RAN">
+      <columnExists tableName="user_achievement" columnName="current_value"/>
+    </preConditions>
+    <dropColumn columnName="current_value"
+                tableName="user_achievement"/>
+  </changeSet>
+
+  <changeSet id="1770916408627-5-add-version" author="Hephaestus">
+    <preConditions onFail="MARK_RAN">
+      <tableExists tableName="user_achievement"/>
+      <not>
+        <columnExists tableName="user_achievement" columnName="version"/>
+      </not>
+    </preConditions>
+    <comment>
+      Add optimistic locking version column to user_achievement.
+      Used by JPA @Version to prevent lost updates on concurrent progress increments.
+    </comment>
+    <addColumn tableName="user_achievement">
+      <column name="version" type="BIGINT" defaultValueNumeric="0">
+        <constraints nullable="false"/>
+      </column>
+    </addColumn>
+  </changeSet>
+
+</databaseChangeLog>
