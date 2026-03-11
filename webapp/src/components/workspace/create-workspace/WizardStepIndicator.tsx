@@ -30,10 +30,18 @@ export function WizardStepIndicator({ currentStep }: { currentStep: WizardStep }
 							{isCompleted ? (
 								<>
 									<CheckIcon className="size-3.5" aria-hidden="true" />
-									<span className="sr-only">Step {stepNumber} completed</span>
+									<span className="sr-only">
+										Step {stepNumber}: {step.label}, completed
+									</span>
 								</>
 							) : (
-								stepNumber
+								<>
+									<span aria-hidden="true">{stepNumber}</span>
+									<span className="sr-only">
+										Step {stepNumber}: {step.label}
+										{isCurrent ? ", current" : ""}
+									</span>
+								</>
 							)}
 						</span>
 						<span
