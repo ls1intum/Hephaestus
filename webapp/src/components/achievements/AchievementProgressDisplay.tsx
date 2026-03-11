@@ -17,23 +17,16 @@ export function AchievementProgressDisplay({
 	switch (progressData.type) {
 		case "LinearAchievementProgress": {
 			// Logic for Counter Achievements (e.g., 5/10 PRs)
-			const current = progressData.current ?? 0;
-			const percentage =
-				progressData.target > 0
-					? Math.min(Math.round((current / progressData.target) * 100), 100)
-					: 0;
+			const { current, target } = progressData;
+			const percentage = target > 0 ? Math.min(Math.round((current / target) * 100), 100) : 0;
 
 			return (
 				<div className={cn("space-y-1 min-w-30", className)}>
-					<Progress
-						value={percentage}
-						className="h-2"
-						aria-label={`${current} of ${progressData.target}`}
-					/>
+					<Progress value={percentage} className="h-2" aria-label={`${current} of ${target}`} />
 					<div className="text-xs text-muted-foreground flex justify-between">
 						<span>{percentage}%</span>
 						<span>
-							{current} / {progressData.target}
+							{current} / {target}
 						</span>
 					</div>
 				</div>

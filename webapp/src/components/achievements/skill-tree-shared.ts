@@ -1,4 +1,5 @@
 import type { EdgeTypes, NodeTypes } from "@xyflow/react";
+import type React from "react";
 import { AchievementEdge } from "@/components/achievements/AchievementEdge";
 import { AchievementNode } from "@/components/achievements/AchievementNode";
 import { AvatarNode } from "@/components/achievements/AvatarNode";

@@ -25,7 +25,7 @@ const meta = {
 	decorators: [
 		(Story) => (
 			<ReactFlowProvider>
-				<div className="bg-background w-[520px] p-12 flex justify-center">
+				<div className="bg-background w-130 p-12 flex justify-center">
 					{/* Provide an SVG viewport so <path>, <circle> and <animateMotion> render correctly */}
 					<svg
 						width={440}

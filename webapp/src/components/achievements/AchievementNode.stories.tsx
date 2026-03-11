@@ -33,7 +33,7 @@ const meta = {
 	decorators: [
 		(Story) => (
 			<ReactFlowProvider>
-				<div className="bg-background px-12 pt-60 pb-[120px] flex justify-center">
+				<div className="bg-background px-12 pt-60 pb-30 flex justify-center">
 					<Story />
 				</div>
 			</ReactFlowProvider>
