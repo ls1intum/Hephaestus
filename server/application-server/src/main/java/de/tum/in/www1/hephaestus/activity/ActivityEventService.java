@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.activity;
 
-import de.tum.in.www1.hephaestus.achievement.ActivitySavedEvent;
 import de.tum.in.www1.hephaestus.activity.scoring.ExperiencePointProperties;
 import de.tum.in.www1.hephaestus.activity.scoring.XpPrecision;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;

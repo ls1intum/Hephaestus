@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.achievement;
 import de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator;
 import de.tum.in.www1.hephaestus.achievement.progress.AchievementProgress;
 import de.tum.in.www1.hephaestus.activity.ActivityEventType;
+import de.tum.in.www1.hephaestus.activity.ActivitySavedEvent;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import jakarta.annotation.PostConstruct;
 import java.time.Instant;

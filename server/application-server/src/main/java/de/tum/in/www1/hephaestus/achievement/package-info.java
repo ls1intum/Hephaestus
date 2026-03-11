@@ -2,7 +2,8 @@
  * Achievement system for tracking and rewarding user milestones.
  *
  * <h2>Architecture</h2>
- * <p>The achievement system is event-driven: it listens for {@link ActivitySavedEvent}
+ * <p>The achievement system is event-driven: it listens for
+ * {@link de.tum.in.www1.hephaestus.activity.ActivitySavedEvent ActivitySavedEvent}
  * published by the activity module and incrementally updates progress toward achievements.
  *
  * <h3>Core Components</h3>

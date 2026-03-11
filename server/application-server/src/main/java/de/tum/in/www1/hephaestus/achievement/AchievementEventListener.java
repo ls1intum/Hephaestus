@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.achievement;
 
+import de.tum.in.www1.hephaestus.activity.ActivitySavedEvent;
 import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import java.util.List;
 import lombok.RequiredArgsConstructor;

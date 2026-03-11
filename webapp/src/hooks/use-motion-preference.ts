@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
-import { useAccessibilityStore } from "@/stores/accessibility-store";
 import environment from "@/environment";
+import { useAccessibilityStore } from "@/stores/accessibility-store";
 
 const reducedMotionQuery =
 	typeof window !== "undefined" ? window.matchMedia("(prefers-reduced-motion: reduce)") : null;

@@ -1,7 +1,7 @@
 package de.tum.in.www1.hephaestus.achievement.evaluator;
 
-import de.tum.in.www1.hephaestus.achievement.ActivitySavedEvent;
 import de.tum.in.www1.hephaestus.achievement.UserAchievement;
+import de.tum.in.www1.hephaestus.activity.ActivitySavedEvent;
 import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

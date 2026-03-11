@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.achievement;
 
 import de.tum.in.www1.hephaestus.activity.ActivityEvent;
 import de.tum.in.www1.hephaestus.activity.ActivityEventRepository;
+import de.tum.in.www1.hephaestus.activity.ActivitySavedEvent;
 import de.tum.in.www1.hephaestus.activity.ActivityTargetType;
 import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;

@@ -1213,7 +1213,7 @@ export type Achievement = {
     /**
      * Whether the achievement should be hidden until unlocked
      */
-    isHidden: boolean;
+    isHidden?: boolean;
     /**
      * Parent achievement in progression chain
      */
@@ -1233,7 +1233,7 @@ export type Achievement = {
     /**
      * Optional of when the achievement was unlocked, empty() if not unlocked
      */
-    unlockedAt?: Date;
+    unlockedAt: Date;
 };
 
 export type ListGlobalContributorsData = {
@@ -2875,9 +2875,6 @@ export type GetAllAchievementDefinitionsData = {
          * Workspace slug
          */
         workspaceSlug: string;
-        /**
-         * the user's GitHub login
-         */
         login: string;
     };
     query?: never;
@@ -2923,9 +2920,6 @@ export type ReloadAchievementsData = {
          * Workspace slug
          */
         workspaceSlug: string;
-        /**
-         * the user's GitHub login
-         */
         login: string;
     };
     query?: never;

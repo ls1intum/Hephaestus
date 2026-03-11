@@ -7,8 +7,9 @@ import {
 	useNavigate,
 	useRouter,
 } from "@tanstack/react-router";
+import type React from "react";
+import { useEffect } from "react";
 import { Toaster } from "sonner";
-
 import { getGroupedThreadsOptions, getUserSettingsOptions } from "@/api/@tanstack/react-query.gen";
 import Footer from "@/components/core/Footer";
 import Header from "@/components/core/Header";
@@ -21,6 +22,7 @@ import { PostHogSurveyWidget } from "@/components/surveys/posthog-survey-widget"
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import environment from "@/environment";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
+import { useMotionPreference } from "@/hooks/use-motion-preference";
 import { useWorkspaceAccess } from "@/hooks/use-workspace-access";
 import { useMentorChat } from "@/hooks/useMentorChat";
 import { type AuthContextType, useAuth } from "@/integrations/auth/AuthContext";
@@ -28,8 +30,6 @@ import { isPosthogEnabled } from "@/integrations/posthog/config";
 import { useTheme } from "@/integrations/theme";
 import { getProviderSlug } from "@/lib/provider";
 import type { ChatMessage } from "@/lib/types";
-import { useMotionPreference } from "@/hooks/use-motion-preference";
-import React, { useEffect } from "react";
 
 interface MyRouterContext {
 	queryClient: QueryClient;

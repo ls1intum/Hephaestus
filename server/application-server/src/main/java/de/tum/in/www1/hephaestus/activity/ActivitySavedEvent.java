@@ -1,8 +1,5 @@
-package de.tum.in.www1.hephaestus.achievement;
+package de.tum.in.www1.hephaestus.activity;
 
-import de.tum.in.www1.hephaestus.activity.ActivityEventService;
-import de.tum.in.www1.hephaestus.activity.ActivityEventType;
-import de.tum.in.www1.hephaestus.activity.ActivityTargetType;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import java.time.Instant;
 import java.util.Optional;
@@ -21,7 +18,6 @@ import java.util.Optional;
  * @param targetType the type of the target entity
  * @param targetId the ID of the target entity
  *
- * @see AchievementEventListener
  * @see ActivityEventService
  */
 public record ActivitySavedEvent(
