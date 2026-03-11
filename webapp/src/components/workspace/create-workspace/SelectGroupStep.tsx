@@ -20,7 +20,7 @@ export function SelectGroupStep() {
 
 	if (state.groups.length === 0) {
 		return (
-			<p className="text-sm text-muted-foreground text-center py-4">
+			<p role="status" className="text-sm text-muted-foreground text-center py-4">
 				No groups found. Your token may lack the required scopes, or you are not a member of any
 				group.
 			</p>
@@ -57,7 +57,7 @@ export function SelectGroupStep() {
 					/>
 				))}
 				{filteredGroups.length === 0 && (
-					<p className="text-sm text-muted-foreground p-4 text-center">
+					<p role="status" className="text-sm text-muted-foreground p-4 text-center">
 						No groups match &ldquo;{search}&rdquo;
 					</p>
 				)}
@@ -76,7 +76,7 @@ function GroupItem({ group, isSelected }: { group: GitLabGroup; isSelected: bool
 				isSelected && "bg-muted",
 			)}
 		>
-			<RadioGroupItem id={inputId} value={group.fullPath} aria-label={group.name} />
+			<RadioGroupItem id={inputId} value={group.fullPath} />
 			<Avatar className="size-7 rounded-md">
 				{group.avatarUrl && <AvatarImage src={group.avatarUrl} alt={group.name} />}
 				<AvatarFallback className="rounded-md text-xs bg-muted">
