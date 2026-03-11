@@ -157,6 +157,7 @@ function GitLabWizardPage() {
 
 			<div className="space-y-1.5 mb-6">
 				<h1
+					id="wizard-heading"
 					ref={headingRef}
 					tabIndex={-1}
 					className="text-2xl font-semibold tracking-tight outline-none"

@@ -66,7 +66,6 @@ export function ConnectGitLabStep() {
 					aria-describedby={
 						fieldErrors.serverUrl ? "gitlab-server-url-error" : "gitlab-server-url-description"
 					}
-					autoFocus
 				/>
 				<FieldDescription id="gitlab-server-url-description">
 					Leave empty for gitlab.com. Enter a custom URL for self-hosted instances.
