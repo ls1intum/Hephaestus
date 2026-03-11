@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.30.0](https://github.com/ls1intum/Hephaestus/compare/v0.29.0...v0.30.0) (2026-03-11)
+
+### 🚀 Features
+
+* achievement system ([#762](https://github.com/ls1intum/Hephaestus/issues/762)) ([39dcf1d](https://github.com/ls1intum/Hephaestus/commit/39dcf1d36ae927ddcd5d7ccea0c3a22d1c1d1a5d))
+
 ## [0.29.0](https://github.com/ls1intum/Hephaestus/compare/v0.28.0...v0.29.0) (2026-03-10)
 
 ### 🚀 Features
