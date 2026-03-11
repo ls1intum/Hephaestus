@@ -20,7 +20,7 @@ public class DummyEvaluator implements AchievementEvaluator {
         log.debug(
             "Evaluation of achievement: {} for user: {} for event: {} skipped by DummyEvaluator! No corresponding Evaluator available yet!",
             userAchievement.getAchievementId(),
-            user != null ? LoggingUtils.sanitizeForLog(user.getLogin()) : "unknown",
+            LoggingUtils.sanitizeForLog(user.getLogin()),
             event.eventType()
         );
         return false;

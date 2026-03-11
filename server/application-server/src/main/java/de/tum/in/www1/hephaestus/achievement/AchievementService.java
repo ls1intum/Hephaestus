@@ -242,14 +242,9 @@ public class AchievementService {
      * @param user the user to get achievements for
      * @return list of all achievement DTOs with progress, ordered by category and level
      */
-    @Cacheable(value = ACHIEVEMENT_PROGRESS_CACHE, key = "#user.id", condition = "#user != null")
+    @Cacheable(value = ACHIEVEMENT_PROGRESS_CACHE, key = "#user.id")
     @Transactional(readOnly = true)
     public List<AchievementDTO> getAllAchievementsWithProgress(User user) {
-        if (user == null) {
-            log.debug("Returning empty achievements: user is null");
-            return List.of();
-        }
-
         Long userId = user.getId();
 
         // Fetch all progress records for this user (both in-progress and unlocked)

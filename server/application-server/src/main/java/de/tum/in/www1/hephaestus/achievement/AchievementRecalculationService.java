@@ -47,7 +47,7 @@ public class AchievementRecalculationService {
      * @param user the user to recalculate achievements for
      */
     @Async
-    @CacheEvict(value = AchievementService.ACHIEVEMENT_PROGRESS_CACHE, key = "#user.id", condition = "#user != null")
+    @CacheEvict(value = AchievementService.ACHIEVEMENT_PROGRESS_CACHE, key = "#user.id")
     public void recalculateUser(User user) {
         if (ACTIVE_RECALCULATIONS.putIfAbsent(user.getId(), Boolean.TRUE) != null) {
             log.warn(
@@ -86,16 +86,11 @@ public class AchievementRecalculationService {
                 pageable
             );
             for (ActivityEvent event : slice.getContent()) {
-                var workspace = event.getWorkspace();
-                if (workspace == null) {
-                    log.warn("Skipping activity event with null workspace: eventId={}", event.getId());
-                    continue;
-                }
                 ActivitySavedEvent savedEvent = new ActivitySavedEvent(
                     Optional.ofNullable(event.getActor()),
                     event.getEventType(),
                     event.getOccurredAt(),
-                    workspace.getId(),
+                    event.getWorkspace().getId(),
                     ActivityTargetType.fromValue(event.getTargetType()),
                     event.getTargetId()
                 );
