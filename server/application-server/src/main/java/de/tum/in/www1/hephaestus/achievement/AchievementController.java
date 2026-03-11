@@ -154,10 +154,7 @@ public class AchievementController {
         description = "Hot reloads the achievements.yml configuration without requiring a restart. Admin only."
     )
     @RequireAtLeastWorkspaceAdmin
-    public ResponseEntity<Void> reloadAchievements(
-        WorkspaceContext workspaceContext,
-        @PathVariable String login
-    ) {
+    public ResponseEntity<Void> reloadAchievements(WorkspaceContext workspaceContext, @PathVariable String login) {
         log.info("Admin requested achievement configuration reload in workspace: {}", workspaceContext.slug());
         achievementRegistry.reload();
 
