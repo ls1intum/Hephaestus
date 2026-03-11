@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { workspaceDetailsSchema } from "./schemas";
@@ -9,8 +9,6 @@ export function ConfigureWorkspaceStep() {
 	const { state, dispatch } = useWizard();
 	const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 	const [touched, setTouched] = useState<Record<string, boolean>>({});
-	const displayNameRef = useRef<HTMLInputElement>(null);
-
 	// Auto-populate display name from group name on first entry.
 	// Component remounts via key={stepKey} in parent, so deps are safe.
 	useEffect(() => {
@@ -21,10 +19,7 @@ export function ConfigureWorkspaceStep() {
 		}
 	}, [state.displayName, state.selectedGroup, dispatch]);
 
-	// Expose ref for parent focus management
-	useEffect(() => {
-		displayNameRef.current?.focus();
-	}, []);
+	// Focus is managed by the parent page via headingRef on step change.
 
 	const validate = (overrides: Partial<{ displayName: string; workspaceSlug: string }> = {}) => {
 		const result = workspaceDetailsSchema.safeParse({
@@ -72,7 +67,6 @@ export function ConfigureWorkspaceStep() {
 			<Field data-invalid={fieldErrors.displayName && touched.displayName ? "true" : undefined}>
 				<FieldLabel htmlFor="workspace-display-name">Display Name</FieldLabel>
 				<Input
-					ref={displayNameRef}
 					id="workspace-display-name"
 					placeholder="My Workspace"
 					value={state.displayName}
@@ -96,6 +90,7 @@ export function ConfigureWorkspaceStep() {
 				<Input
 					id="workspace-slug"
 					placeholder="my-workspace"
+					aria-required="true"
 					value={state.workspaceSlug}
 					onChange={(e) => handleSlugChange(e.target.value)}
 					onBlur={() => handleBlur("workspaceSlug")}
