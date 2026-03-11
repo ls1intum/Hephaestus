@@ -17,9 +17,10 @@ import {
 	SquaresIntersectIcon,
 	UsersIcon,
 } from "lucide-react";
+import type { AchievementId } from "@/api";
 import { SingularityIcon } from "@/components/achievements/singularity-icon";
 import { defaultCategoryIcons } from "@/components/achievements/styles";
-import type { AchievementDisplay, AchievementId } from "@/components/achievements/types";
+import type { AchievementDisplay } from "@/components/achievements/types";
 
 type PartialAchievementRegistry = Partial<Record<AchievementId, AchievementDisplay>>;
 

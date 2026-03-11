@@ -17,6 +17,7 @@ import io.swagger.v3.oas.models.parameters.Parameter;
 import io.swagger.v3.parser.OpenAPIV3Parser;
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -81,8 +82,17 @@ public class OpenAPIConfiguration {
 
             // Inject AchievementId enum based on registry keys
             if (openApi.getComponents() != null) {
-                Schema<String> idSchema = new StringSchema();
-                idSchema.setEnum(new ArrayList<>(registry.getAchievementIds()));
+                // Collect and sort IDs for deterministic output
+                List<String> achievementIds = new ArrayList<>(registry.getAchievementIds());
+                Collections.sort(achievementIds);
+
+                log.info("Injected {} achievement IDs into OpenAPI", achievementIds.size());
+                if (achievementIds.isEmpty()) {
+                    log.error("Achievement registry is empty during OpenAPI generation! This will cause frontend type errors.");
+                }
+
+                StringSchema idSchema = new StringSchema();
+                idSchema.setEnum(achievementIds);
                 openApi.getComponents().addSchemas("AchievementId", idSchema);
             }
         };

@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import viteReact from "@vitejs/plugin-react";
-import { defineConfig, type ViteDevServer } from "vite";
+import { defineConfig, type PluginOption, type ViteDevServer } from "vite";
 import Terminal from "vite-plugin-terminal";
 import * as fs from "node:fs";
 
@@ -14,7 +14,7 @@ export default defineConfig(({ command }) => {
 	const isDevelopment = command !== "build";
 
 	return {
-		plugins: [
+		plugins: ([
 			tanstackRouter({ autoCodeSplitting: true }),
 			viteReact({
 				babel: {
@@ -61,7 +61,7 @@ export default defineConfig(({ command }) => {
 					});
 				},
 			}),
-		].filter(Boolean), // Filter out falsy values
+		].filter(Boolean) as unknown as PluginOption[]),
 		build: {
 			sourcemap: false, // Disable sourcemaps for now to reduce build memory usage
 		},

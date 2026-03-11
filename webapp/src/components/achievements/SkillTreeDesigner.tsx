@@ -25,7 +25,8 @@ import {
 	nodeTypes,
 	subscribeToTheme,
 } from "@/components/achievements/skill-tree-shared";
-import type { AchievementId, UIAchievement } from "@/components/achievements/types";
+import type { AchievementId } from "@/api";
+import type { UIAchievement } from "@/components/achievements/types";
 import {
 	type AnyAchievementEdge,
 	type EdgeDisplayMode,
