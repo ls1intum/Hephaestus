@@ -37,7 +37,6 @@ export function SelectGroupStep() {
 					onChange={(e) => setSearch(e.target.value)}
 					className="pl-8"
 					aria-label="Search groups"
-					autoFocus
 				/>
 			</div>
 
