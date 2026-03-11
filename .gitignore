@@ -208,6 +208,7 @@ MISSION.md
 **/.idea/**/usage.statistics.xml
 **/.idea/**/dictionaries
 **/.idea/**/shelf
+**/.idea/**/sqldialects.xml
 
 # Generated files
 **/.idea/**/contentModel.xml

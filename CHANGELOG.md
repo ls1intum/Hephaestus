@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.29.0](https://github.com/ls1intum/Hephaestus/compare/v0.28.0...v0.29.0) (2026-03-10)
+
+### 🚀 Features
+
+* **gitprovider:** GitLab sync parity — local git enrichment, cross-repo resolution ([#823](https://github.com/ls1intum/Hephaestus/issues/823)) ([5ce3798](https://github.com/ls1intum/Hephaestus/commit/5ce379859b163d65ed1cc165d278f1481f5feab5))
+
 ## [0.28.0](https://github.com/ls1intum/Hephaestus/compare/v0.27.1...v0.28.0) (2026-03-09)
 
 ### 🚀 Features

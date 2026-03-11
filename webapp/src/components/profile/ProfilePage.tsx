@@ -55,6 +55,7 @@ export function ProfilePage({
 				leaguePoints={profileData?.userInfo?.leaguePoints}
 				userXpRecord={profileData?.xpRecord}
 				isLoading={isLoading}
+				workspaceSlug={workspaceSlug}
 			/>
 			<ProfileContent
 				providerType={providerType}

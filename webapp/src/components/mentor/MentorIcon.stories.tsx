@@ -84,7 +84,7 @@ export const AccessibilityPreference: Story = {
 			</div>
 			<div className="flex items-center gap-2">
 				<MentorIcon size={24} animated={false} />
-				<span>Without animations (respects prefers-reduced-motion)</span>
+				<span>Without animations (manual override)</span>
 			</div>
 		</div>
 	),

@@ -1832,6 +1832,30 @@ export const user = pgTable(
 	],
 );
 
+export const userAchievement = pgTable(
+	"user_achievement",
+	{
+		id: uuid().primaryKey().notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		userId: bigint("user_id", { mode: "number" }).notNull(),
+		achievementId: varchar("achievement_id", { length: 64 }).notNull(),
+		unlockedAt: timestamp("unlocked_at", { withTimezone: true, mode: "string" }),
+		progressData: jsonb("progress_data").notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		version: bigint({ mode: "number" }).default(0).notNull(),
+	},
+	(table) => [
+		index("idx_user_achievement_achievement").using("btree", table.achievementId.asc().nullsLast()),
+		index("idx_user_achievement_user").using("btree", table.userId.asc().nullsLast()),
+		foreignKey({
+			columns: [table.userId],
+			foreignColumns: [user.id],
+			name: "fk_user_achievement_user",
+		}),
+		unique("uk_user_achievement_user_achievement").on(table.userId, table.achievementId),
+	],
+);
+
 export const userPreferences = pgTable(
 	"user_preferences",
 	{

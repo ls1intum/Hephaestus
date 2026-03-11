@@ -594,6 +594,15 @@ erDiagram
         BIGINT provider_id FK,UK "NOT NULL"
     }
 
+    UserAchievement {
+        UUID id PK
+        BIGINT user_id FK,UK "NOT NULL"
+        VARCHAR(64) achievement_id UK "NOT NULL"
+        TIMESTAMPTZ unlocked_at
+        JSONB progress_data "NOT NULL"
+        BIGINT version "NOT NULL"
+    }
+
     UserPreference {
         BIGINT id PK
         BIGINT user_id FK,UK "NOT NULL"
@@ -705,6 +714,7 @@ erDiagram
     GitProvider ||--|| Repository : references
     GitProvider ||--|| Team : references
     GitProvider ||--|| User : references
+    User ||--|| UserAchievement : has
     User ||--|| UserPreference : has
     Organization ||--|| Workspace : has
     User ||--|| WorkspaceMembership : belongs_to

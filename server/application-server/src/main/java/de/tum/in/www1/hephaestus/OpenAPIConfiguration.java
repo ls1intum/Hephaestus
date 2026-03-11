@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus;
 
+import de.tum.in.www1.hephaestus.achievement.AchievementRegistry;
 import io.swagger.v3.oas.annotations.OpenAPIDefinition;
 import io.swagger.v3.oas.annotations.enums.SecuritySchemeType;
 import io.swagger.v3.oas.annotations.info.Contact;
@@ -16,6 +17,7 @@ import io.swagger.v3.oas.models.parameters.Parameter;
 import io.swagger.v3.parser.OpenAPIV3Parser;
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -32,17 +34,17 @@ import org.springframework.context.annotation.Configuration;
  * OpenAPI configuration that:
  * 1. Processes application-server DTOs (removes "DTO" suffix)
  * 2. Imports tagged schemas and paths from intelligence-service
- *
+ * <p>
  * Intelligence-service schemas/paths are included if they have:
- *   x-hephaestus:
- *     export: true
+ * x-hephaestus:
+ * export: true
  */
 @Configuration
 @OpenAPIDefinition(
     info = @Info(
         title = "Hephaestus API",
         description = "API documentation for the Hephaestus application server.",
-        version = "0.28.0",
+        version = "0.29.0",
         contact = @Contact(name = "Felix T.J. Dietrich", email = "felixtj.dietrich@tum.de"),
         license = @License(name = "MIT License", url = "https://github.com/ls1intum/Hephaestus/blob/develop/LICENSE")
     ),
@@ -62,15 +64,39 @@ public class OpenAPIConfiguration {
     private static final String INTELLIGENCE_SERVICE_SPEC = "../intelligence-service/openapi.yaml";
     private static final String WORKSPACE_PATH_PREFIX = "/workspaces/{workspaceSlug}";
 
-    /** Domain objects to include even without DTO suffix */
+    /**
+     * Domain objects to include even without DTO suffix
+     */
     private static final List<String> ALLOWED_DOMAIN_OBJECTS = List.of("PageableObject", "SortObject");
+    /**
+     * Domain objects to include by specific suffix (like AchievementProgress records)
+     */
+    private static final List<String> SAFE_DOMAIN_SUFFIXES = List.of("AchievementProgress");
 
     @Bean
-    public OpenApiCustomizer schemaCustomizer() {
+    public OpenApiCustomizer schemaCustomizer(AchievementRegistry registry) {
         return openApi -> {
             processApplicationServerSchemas(openApi);
             importIntelligenceServiceSpec(openApi);
             processAllPaths(openApi);
+
+            // Inject AchievementId enum based on registry keys
+            if (openApi.getComponents() != null) {
+                // Collect and sort IDs for deterministic output
+                List<String> achievementIds = new ArrayList<>(registry.getAchievementIds());
+                Collections.sort(achievementIds);
+
+                log.info("Injected {} achievement IDs into OpenAPI", achievementIds.size());
+                if (achievementIds.isEmpty()) {
+                    log.error(
+                        "Achievement registry is empty during OpenAPI generation! This will cause frontend type errors."
+                    );
+                }
+
+                StringSchema idSchema = new StringSchema();
+                idSchema.setEnum(achievementIds);
+                openApi.getComponents().addSchemas("AchievementId", idSchema);
+            }
         };
     }
 
@@ -104,7 +130,11 @@ public class OpenAPIConfiguration {
             .getSchemas()
             .entrySet()
             .stream()
-            .filter(e -> ALLOWED_DOMAIN_OBJECTS.contains(e.getKey()))
+            .filter(
+                e ->
+                    ALLOWED_DOMAIN_OBJECTS.contains(e.getKey()) ||
+                    SAFE_DOMAIN_SUFFIXES.stream().anyMatch(s -> e.getKey().endsWith(s))
+            )
             .forEach(e -> filteredSchemas.put(e.getKey(), e.getValue()));
 
         // Update $ref to remove DTO suffix

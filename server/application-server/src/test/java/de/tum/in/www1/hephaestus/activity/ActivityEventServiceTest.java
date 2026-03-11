@@ -15,6 +15,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 /**
  * Unit tests for ActivityEventService.
@@ -30,6 +32,9 @@ class ActivityEventServiceTest extends BaseUnitTest {
     @Mock
     private ExperiencePointProperties xpProperties;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private MeterRegistry meterRegistry;
     private ActivityEventService service;
 
@@ -38,7 +43,13 @@ class ActivityEventServiceTest extends BaseUnitTest {
         meterRegistry = new SimpleMeterRegistry();
         // Use lenient stubbing since not all tests exercise XP clamping path
         lenient().when(xpProperties.maxXpPerEvent()).thenReturn(1000.0);
-        service = new ActivityEventService(eventRepository, workspaceRepository, xpProperties, meterRegistry);
+        service = new ActivityEventService(
+            eventRepository,
+            workspaceRepository,
+            xpProperties,
+            meterRegistry,
+            eventPublisher
+        );
     }
 
     @Test

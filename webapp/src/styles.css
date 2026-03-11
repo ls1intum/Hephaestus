@@ -12,107 +12,148 @@
 @custom-variant dark (&:is(.dark *));
 
 body {
-	@apply m-0;
-	font-family:
-		-apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell",
-		"Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
-	-webkit-font-smoothing: antialiased;
-	-moz-osx-font-smoothing: grayscale;
+  @apply m-0;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
+    Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 code {
-	font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New", monospace;
+  font-family:
+    source-code-pro, Menlo, Monaco, Consolas, "Courier New", monospace;
 }
 
 :root {
-	--background: oklch(1 0 0);
-	--foreground: oklch(0.141 0.005 285.823);
-	--card: oklch(1 0 0);
-	--card-foreground: oklch(0.141 0.005 285.823);
-	--popover: oklch(1 0 0);
-	--popover-foreground: oklch(0.141 0.005 285.823);
-	--primary: oklch(0.21 0.006 285.885);
-	--primary-foreground: oklch(0.985 0 0);
-	--secondary: oklch(0.967 0.001 286.375);
-	--secondary-foreground: oklch(0.21 0.006 285.885);
-	--muted: oklch(0.967 0.001 286.375);
-	--muted-foreground: oklch(0.552 0.016 285.938);
-	--accent: oklch(0.967 0.001 286.375);
-	--accent-foreground: oklch(0.21 0.006 285.885);
-	--destructive: oklch(0.577 0.245 27.325);
-	--destructive-foreground: oklch(0.577 0.245 27.325);
-	--border: oklch(0.92 0.004 286.32);
-	--input: oklch(0.92 0.004 286.32);
-	--ring: oklch(0.871 0.006 286.286);
-	--chart-1: oklch(0.646 0.222 41.116);
-	--chart-2: oklch(0.6 0.118 184.704);
-	--chart-3: oklch(0.398 0.07 227.392);
-	--chart-4: oklch(0.828 0.189 84.429);
-	--chart-5: oklch(0.769 0.188 70.08);
-	--radius: 0.625rem;
-	--sidebar: oklch(0.985 0 0);
-	--sidebar-foreground: oklch(0.141 0.005 285.823);
-	--sidebar-primary: oklch(0.21 0.006 285.885);
-	--sidebar-primary-foreground: oklch(0.985 0 0);
-	--sidebar-accent: oklch(0.967 0.001 286.375);
-	--sidebar-accent-foreground: oklch(0.21 0.006 285.885);
-	--sidebar-border: oklch(0.92 0.004 286.32);
-	--sidebar-ring: oklch(0.871 0.006 286.286);
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.141 0.005 285.823);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.141 0.005 285.823);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.141 0.005 285.823);
+  --primary: oklch(0.21 0.006 285.885);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.967 0.001 286.375);
+  --secondary-foreground: oklch(0.21 0.006 285.885);
+  --muted: oklch(0.967 0.001 286.375);
+  --muted-foreground: oklch(0.552 0.016 285.938);
+  --accent: oklch(0.967 0.001 286.375);
+  --accent-foreground: oklch(0.21 0.006 285.885);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(0.92 0.004 286.32);
+  --input: oklch(0.92 0.004 286.32);
+  --ring: oklch(0.871 0.006 286.286);
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.141 0.005 285.823);
+  --sidebar-primary: oklch(0.21 0.006 285.885);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.967 0.001 286.375);
+  --sidebar-accent-foreground: oklch(0.21 0.006 285.885);
+  --sidebar-border: oklch(0.92 0.004 286.32);
+  --sidebar-ring: oklch(0.871 0.006 286.286);
 
-	/* League colors */
-	--league-bronze: oklch(0.69 0.1181 63.51);
-	--league-silver: oklch(0.81 0 0);
-	--league-gold: oklch(0.83 0.1694 90.75);
-	--league-diamond: oklch(0.52 0.206 265.51);
-	--league-master: oklch(0.73 0.1946 351.86);
+  /* League colors */
+  --league-bronze: oklch(0.69 0.1181 63.51);
+  --league-silver: oklch(0.81 0 0);
+  --league-gold: oklch(0.83 0.1694 90.75);
+  --league-diamond: oklch(0.52 0.206 265.51);
+  --league-master: oklch(0.73 0.1946 351.86);
 
-	--mentor: oklch(0.623 0.214 259.815);
-	--mentor-foreground: oklch(0.97 0.014 254.604);
+  --mentor: oklch(0.623 0.214 259.815);
+  --mentor-foreground: oklch(0.97 0.014 254.604);
+
+  /* Achievement skill tree node states (Light Mode) */
+  --node-locked: oklch(0.9 0 0);
+  --node-available: oklch(0.6 0 0);
+  --node-unlocked: oklch(0.2 0 0);
+  --edge-inactive: oklch(0.75 0 0);
+  --edge-active: oklch(0.4 0 0);
+  --edge-glow: oklch(0 0 0 / 0.1);
+  --shadow-rgb: 0 0 0;
+
+  /* Rarity border colors (Light Mode) — monochromatic low tiers, chromatic high tiers */
+  --rarity-common: oklch(0.75 0 0);
+  --rarity-uncommon: oklch(0.55 0.12 145);
+  --rarity-rare: oklch(0.55 0.1 250);
+  --rarity-epic: oklch(0.5 0.18 300);
+  --rarity-legendary: oklch(0.65 0.2 80);
+  --rarity-legendary-from: var(--rarity-legendary);
+  --rarity-legendary-to: oklch(0.9 0.1 95);
+  --rarity-mythic-from: oklch(0.55 0.22 290);
+  --rarity-mythic-to: oklch(0.55 0.18 250);
 }
 
 .dark {
-	--background: oklch(0.141 0.005 285.823);
-	--foreground: oklch(0.985 0 0);
-	--card: oklch(0.141 0.005 285.823);
-	--card-foreground: oklch(0.985 0 0);
-	--popover: oklch(0.141 0.005 285.823);
-	--popover-foreground: oklch(0.985 0 0);
-	--primary: oklch(0.985 0 0);
-	--primary-foreground: oklch(0.21 0.006 285.885);
-	--secondary: oklch(0.274 0.006 286.033);
-	--secondary-foreground: oklch(0.985 0 0);
-	--muted: oklch(0.274 0.006 286.033);
-	--muted-foreground: oklch(0.705 0.015 286.067);
-	--accent: oklch(0.274 0.006 286.033);
-	--accent-foreground: oklch(0.985 0 0);
-	--destructive: oklch(0.396 0.141 25.723);
-	--destructive-foreground: oklch(0.637 0.237 25.331);
-	--border: oklch(0.274 0.006 286.033);
-	--input: oklch(0.274 0.006 286.033);
-	--ring: oklch(0.442 0.017 285.786);
-	--chart-1: oklch(0.488 0.243 264.376);
-	--chart-2: oklch(0.696 0.17 162.48);
-	--chart-3: oklch(0.769 0.188 70.08);
-	--chart-4: oklch(0.627 0.265 303.9);
-	--chart-5: oklch(0.645 0.246 16.439);
-	--sidebar: oklch(0.21 0.006 285.885);
-	--sidebar-foreground: oklch(0.985 0 0);
-	--sidebar-primary: oklch(0.488 0.243 264.376);
-	--sidebar-primary-foreground: oklch(0.985 0 0);
-	--sidebar-accent: oklch(0.274 0.006 286.033);
-	--sidebar-accent-foreground: oklch(0.985 0 0);
-	--sidebar-border: oklch(0.274 0.006 286.033);
-	--sidebar-ring: oklch(0.442 0.017 285.786);
+  --background: oklch(0.141 0.005 285.823);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.141 0.005 285.823);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.141 0.005 285.823);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.985 0 0);
+  --primary-foreground: oklch(0.21 0.006 285.885);
+  --secondary: oklch(0.274 0.006 286.033);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.274 0.006 286.033);
+  --muted-foreground: oklch(0.705 0.015 286.067);
+  --accent: oklch(0.274 0.006 286.033);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.396 0.141 25.723);
+  --destructive-foreground: oklch(0.637 0.237 25.331);
+  --border: oklch(0.274 0.006 286.033);
+  --input: oklch(0.274 0.006 286.033);
+  --ring: oklch(0.442 0.017 285.786);
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.21 0.006 285.885);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.274 0.006 286.033);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(0.274 0.006 286.033);
+  --sidebar-ring: oklch(0.442 0.017 285.786);
 
-	/* League colors */
-	--league-bronze: oklch(0.69 0.1181 63.52);
-	--league-silver: oklch(0.81 0 0);
-	--league-gold: oklch(0.83 0.1694 90.75);
-	--league-diamond: oklch(0.52 0.206 265.51);
-	--league-master: oklch(0.73 0.1946 351.86);
+  /* League colors */
+  --league-bronze: oklch(0.69 0.1181 63.52);
+  --league-silver: oklch(0.81 0 0);
+  --league-gold: oklch(0.83 0.1694 90.75);
+  --league-diamond: oklch(0.52 0.206 265.51);
+  --league-master: oklch(0.73 0.1946 351.86);
 
-	--mentor: oklch(0.546 0.245 262.881);
-	--mentor-foreground: oklch(0.379 0.146 265.522);
+  --mentor: oklch(0.546 0.245 262.881);
+  --mentor-foreground: oklch(0.379 0.146 265.522);
+
+  /* Achievement skill tree node states (Dark Mode) */
+  --node-locked: oklch(0.18 0 0);
+  --node-available: oklch(0.35 0 0);
+  --node-unlocked: oklch(0.95 0 0);
+  --edge-inactive: oklch(0.25 0 0);
+  --edge-active: oklch(0.85 0 0);
+  --edge-glow: oklch(1 0 0 / 0.3);
+  --shadow-rgb: 255 255 255;
+
+  /* Rarity border colors (Dark Mode) — brighter to pop on dark backgrounds */
+  --rarity-common: oklch(0.4 0 0);
+  --rarity-uncommon: oklch(0.65 0.14 145);
+  --rarity-rare: oklch(0.7 0.12 250);
+  --rarity-epic: oklch(0.72 0.18 300);
+  --rarity-legendary: oklch(0.82 0.18 80);
+  --rarity-legendary-from: var(--rarity-legendary);
+  --rarity-legendary-to: oklch(0.95 0.08 95);
+  --rarity-mythic-from: oklch(0.75 0.22 290);
+  --rarity-mythic-to: oklch(0.7 0.18 250);
 }
 
 @theme inline {
@@ -153,9 +194,8 @@ code {
 	--color-sidebar-border: var(--sidebar-border);
 	--color-sidebar-ring: var(--sidebar-ring);
 
-	/*
-	 * Provider-aware semantic colors.
-	 * Default values use @primer/primitives (GitHub) which handles light/dark via data-color-mode.
+	/* * Provider-aware semantic colors.
+	* Default values use @primer/primitives (GitHub) which handles light/dark via data-color-mode.
 	 * GitLab overrides are defined below via [data-provider="gitlab"] selectors.
 	 * Brand-only tokens (github-white, github-black) remain for GitHubSignInButton.
 	 */
@@ -209,6 +249,31 @@ code {
 
 	--color-mentor: var(--mentor);
 	--color-mentor-foreground: var(--mentor-foreground);
+
+	/* Achievement skill tree colors */
+	--color-node-locked: var(--node-locked);
+	--color-node-available: var(--node-available);
+	--color-node-unlocked: var(--node-unlocked);
+	--color-edge-inactive: var(--edge-inactive);
+	--color-edge-active: var(--edge-active);
+
+	/* Rarity border colors */
+	--color-rarity-common: var(--rarity-common);
+	--color-rarity-uncommon: var(--rarity-uncommon);
+	--color-rarity-rare: var(--rarity-rare);
+	--color-rarity-epic: var(--rarity-epic);
+	--color-rarity-legendary: var(--rarity-legendary);
+	--color-rarity-legendary-from: var(--rarity-legendary-from);
+	--color-rarity-legendary-to: var(--rarity-legendary-to);
+	--color-rarity-mythic-from: var(--rarity-mythic-from);
+	--color-rarity-mythic-to: var(--rarity-mythic-to);
+}
+
+@utility text-rarity-mythic {
+  background: linear-gradient(to right, var(--rarity-mythic-from), var(--rarity-mythic-to));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 /*
@@ -294,132 +359,217 @@ code {
 }
 
 @layer base {
-	* {
-		@apply border-border outline-ring/50;
-	}
-	body {
-		@apply bg-background text-foreground;
-	}
-	code.textCode {
-		@apply bg-provider-muted tracking-tight rounded px-1 py-0.5;
-	}
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  code.textCode {
+    @apply bg-provider-muted tracking-tight rounded px-1 py-0.5;
+  }
 }
 
 @utility container {
-	margin-inline: auto;
-	@apply p-8;
+  margin-inline: auto;
+  @apply p-8;
 
-	@variant 2xl {
-		max-width: 1400px;
-	}
+  @variant 2xl {
+    max-width: 1400px;
+  }
 }
 
 .shiki {
-	@apply text-sm bg-card text-card-foreground rounded-xl border p-4;
+  @apply text-sm bg-card text-card-foreground rounded-xl border p-4;
 }
 
 .shiki code {
-	@apply whitespace-pre-wrap break-words;
-	background: transparent !important;
+  @apply whitespace-pre-wrap wrap-break-word;
+  background: transparent !important;
 }
 
 /* Override any theme background for consistency */
 .shiki pre {
-	background: transparent !important;
-	margin: 0;
-	padding: 0;
+  background: transparent !important;
+  margin: 0;
+  padding: 0;
 }
 
 /* Animation classes */
 .accordion-down {
-	animation: accordion-down 0.2s ease-out;
+  animation: accordion-down 0.2s ease-out;
 }
 
 .accordion-up {
-	animation: accordion-up 0.2s ease-out;
+  animation: accordion-up 0.2s ease-out;
 }
 
 @keyframes accordion-down {
-	from {
-		height: 0;
-	}
-	to {
-		height: var(--collapsible-panel-height);
-	}
+  from {
+    height: 0;
+  }
+  to {
+    height: var(--collapsible-panel-height);
+  }
 }
 
 @keyframes accordion-up {
-	from {
-		height: var(--collapsible-panel-height);
-	}
-	to {
-		height: 0;
-	}
+  from {
+    height: var(--collapsible-panel-height);
+  }
+  to {
+    height: 0;
+  }
 }
 
 /* Leaderboard fade out effect */
 .leaderboard-fade-out {
-	position: relative;
-	mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 60%, rgba(0, 0, 0, 0));
-	-webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 60%, rgba(0, 0, 0, 0));
+  position: relative;
+  mask-image: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 1) 60%,
+    rgba(0, 0, 0, 0)
+  );
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 1) 60%,
+    rgba(0, 0, 0, 0)
+  );
 }
 
 /* ProseMirror editor styles */
 .ProseMirror {
-	outline: none !important;
-	border: none !important;
-	box-shadow: none !important;
-	padding: 1.5rem;
-	width: 100%;
-	height: 100%;
-	min-height: 100%;
+  outline: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 1.5rem;
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
 }
 
 .ProseMirror:focus {
-	outline: none !important;
-	border: none !important;
-	box-shadow: none !important;
+  outline: none !important;
+  border: none !important;
+  box-shadow: none !important;
 }
 
 /* Ghost streaming widget styling */
 .pm-stream-ghost {
-	opacity: 0.6;
-	white-space: pre-wrap;
-	animation: pmGhostBlink 1.2s steps(1) infinite;
+  opacity: 0.6;
+  white-space: pre-wrap;
+  animation: pm-ghost-blink 1.2s steps(1) infinite;
 }
-@keyframes pmGhostBlink {
-	60% {
-		opacity: 0.45;
-	}
+
+@keyframes pm-ghost-blink {
+  60% {
+    opacity: 0.45;
+  }
 }
 
 /* Shimmer overlay utilities */
 @keyframes shimmer-glide {
-	from {
-		background-position-x: -200%;
-	}
-	to {
-		background-position-x: 200%;
-	}
+  from {
+    background-position-x: -200%;
+  }
+  to {
+    background-position-x: 200%;
+  }
 }
 
 .shimmer-overlay {
-	position: relative;
+  position: relative;
 }
 
 .shimmer-overlay::after {
-	content: "";
-	position: absolute;
-	inset: 0;
-	background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
-	background-size: 200% 100%;
-	animation: shimmer-glide 1.4s linear infinite;
-	pointer-events: none;
-	border-radius: 0.25rem;
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.5),
+    transparent
+  );
+  background-size: 200% 100%;
+  animation: shimmer-glide 1.4s linear infinite;
+  pointer-events: none;
+  border-radius: 0.25rem;
 }
 
-@media (prefers-reduced-motion: reduce) {
-	.shimmer-overlay::after {
-		animation: none !important;
-	}
+[data-motion="reduced"] .shimmer-overlay::after {
+  animation: none !important;
+}
+
+/* ===== Achievement Rarity Animations ===== */
+
+/* Legendary: color pulse (glow-free and flat) */
+@keyframes legendary-color-pulse {
+  0%,
+  100% {
+     outline-color: var(--rarity-legendary-to);
+  }
+  50% {
+    outline-color: var(--rarity-legendary-from);
+  }
+}
+
+.legendary-pulse-anim {
+  animation: legendary-color-pulse 3s ease-in-out infinite;
+}
+
+/* Mythic: shadow-free rotating conic-gradient via clip-path for Hexagon shape */
+@property --mythic-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes mythic-rotate {
+  to {
+    --mythic-angle: 360deg;
+  }
+}
+
+.achievement-mythic-hexagon {
+  position: relative;
+  /* Clip the entire outer button into a perfect mathematical hexagon */
+  clip-path: polygon(50% 0%, 93.301% 25%, 93.301% 75%, 50% 100%, 6.699% 75%, 6.699% 25%);
+  background-color: transparent !important; /* handled by inner pseudo-element */
+  border: none !important;
+}
+
+/* The spinning border (full size) */
+.achievement-mythic-hexagon::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: conic-gradient(
+    from var(--mythic-angle),
+    var(--rarity-mythic-from),
+    var(--rarity-mythic-to),
+    var(--rarity-mythic-from)
+  );
+  animation: mythic-rotate 3s linear infinite;
+  z-index: -2;
+}
+
+/* The inner solid fill (smaller size, inset 6px creates the border track) */
+.achievement-mythic-hexagon::after {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  background-color: var(--mythic-bg);
+  /* Clip the inner background to perfectly match the outer geometry */
+  clip-path: polygon(50% 0%, 93.301% 25%, 93.301% 75%, 50% 100%, 6.699% 75%, 6.699% 25%);
+  z-index: -1;
+}
+
+/* Respect reduced-motion preference for all achievement animations */
+[data-motion="reduced"] .legendary-pulse-anim {
+  animation: none !important;
+}
+
+[data-motion="reduced"] .achievement-mythic-hexagon::before {
+  animation: none !important;
 }

@@ -7,8 +7,9 @@ import {
 	useNavigate,
 	useRouter,
 } from "@tanstack/react-router";
+import type React from "react";
+import { useEffect } from "react";
 import { Toaster } from "sonner";
-
 import { getGroupedThreadsOptions, getUserSettingsOptions } from "@/api/@tanstack/react-query.gen";
 import Footer from "@/components/core/Footer";
 import Header from "@/components/core/Header";
@@ -21,6 +22,7 @@ import { PostHogSurveyWidget } from "@/components/surveys/posthog-survey-widget"
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import environment from "@/environment";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
+import { useMotionPreference } from "@/hooks/use-motion-preference";
 import { useWorkspaceAccess } from "@/hooks/use-workspace-access";
 import { useMentorChat } from "@/hooks/useMentorChat";
 import { type AuthContextType, useAuth } from "@/integrations/auth/AuthContext";
@@ -39,6 +41,12 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 		const { theme } = useTheme();
 		const { pathname } = useLocation();
 		const { isAuthenticated, hasRole, isLoading } = useAuth();
+		const reducedMotion = useMotionPreference();
+
+		useEffect(() => {
+			document.documentElement.setAttribute("data-motion", reducedMotion ? "reduced" : "full");
+		}, [reducedMotion]);
+
 		const { data: userSettings, isError: userSettingsError } = useQuery({
 			...getUserSettingsOptions({}),
 			enabled: isAuthenticated && isPosthogEnabled,
@@ -47,6 +55,11 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 		const allowSurveys =
 			isPosthogEnabled && !userSettingsError && (userSettings?.participateInResearch ?? true);
 		const isMentorRoute = pathname === "/mentor" || /^\/w\/[^/]+\/mentor/.test(pathname);
+		const isAchievementsRoute =
+			/^\/w\/[^/]+\/achievements/.test(pathname) ||
+			/^\/w\/[^/]+\/user\/[^/]+\/achievements/.test(pathname);
+		// Routes that use full-height layouts without padding or footer
+		const isFullscreenRoute = isMentorRoute || isAchievementsRoute;
 
 		// Exclude routes where Copilot should not appear
 		const isExcludedRoute =
@@ -65,13 +78,13 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 				<ProviderColorScope>
 					<SidebarProvider>
 						<AppSidebarContainer />
-						<SidebarInset>
+						<SidebarInset style={{ marginRight: "var(--right-sidebar-width, 0)" }}>
 							<HeaderContainer />
 							<div className="min-h-[calc(100dvh-4rem)] flex flex-col">
-								<main className={`${isMentorRoute ? "" : "p-4"}`}>
+								<main className={`${isFullscreenRoute ? "" : "p-4"}`}>
 									<Outlet />
 								</main>
-								{!isMentorRoute && (
+								{!isFullscreenRoute && (
 									<div className="flex justify-end flex-col h-full">
 										<Footer buildInfo={environment.buildInfo} />
 									</div>

@@ -44,6 +44,9 @@ const meta = {
 		},
 	},
 	tags: ["autodocs"],
+	args: {
+		workspaceSlug: "example-workspace",
+	},
 } satisfies Meta<typeof ProfileHeader>;
 
 export default meta;

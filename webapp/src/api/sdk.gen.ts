@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddLabelFilterData, AddLabelFilterErrors, AddLabelFilterResponses, AddLabelToTeamData, AddLabelToTeamResponses, AddRepositoryToMonitorData, AddRepositoryToMonitorResponses, AssignRoleData, AssignRoleResponses, ComputeUserLeagueStatsData, ComputeUserLeagueStatsResponses, CreateDocumentData, CreateDocumentErrors, CreateDocumentResponses, CreateWorkspaceData, CreateWorkspaceResponses, DeleteDocumentData, DeleteDocumentErrors, DeleteDocumentResponses, DeleteDocumentVersionsAfterData, DeleteDocumentVersionsAfterErrors, DeleteDocumentVersionsAfterResponses, DeleteUserData, DeleteUserResponses, DetectForPullRequestData, DetectForPullRequestErrors, DetectForPullRequestResponses, DetectForUserData, DetectForUserErrors, DetectForUserResponses, GetAllTeamsData, GetAllTeamsResponses, GetBadPracticeData, GetBadPracticeResponses, GetBadPracticesForPullRequestData, GetBadPracticesForPullRequestResponses, GetBadPracticesForUserData, GetBadPracticesForUserResponses, GetCurrentUserMembershipData, GetCurrentUserMembershipResponses, GetDocumentData, GetDocumentErrors, GetDocumentResponses, GetGroupedThreadsData, GetGroupedThreadsErrors, GetGroupedThreadsResponses, GetLabelFiltersData, GetLabelFiltersResponses, GetLeaderboardData, GetLeaderboardResponses, GetMemberData, GetMemberResponses, GetRepositoriesToMonitorData, GetRepositoriesToMonitorResponses, GetRepositorySettingsData, GetRepositorySettingsResponses, GetTeamSettingsData, GetTeamSettingsResponses, GetThreadData, GetThreadErrors, GetThreadResponses, GetUserProfileData, GetUserProfileResponses, GetUserSettingsData, GetUserSettingsResponses, GetUsersWithTeamsData, GetUsersWithTeamsResponses, GetVersionData, GetVersionErrors, GetVersionResponses, GetWorkspaceData, GetWorkspaceResponses, GitLabPreflightData, GitLabPreflightResponses, ListDocumentsData, ListDocumentsErrors, ListDocumentsResponses, ListGitLabGroupsData, ListGitLabGroupsResponses, ListGlobalContributorsData, ListGlobalContributorsResponses, ListMembersData, ListMembersResponses, ListVersionsData, ListVersionsErrors, ListVersionsResponses, ListWorkspacesData, ListWorkspacesResponses, ProvideFeedbackData, ProvideFeedbackErrors, ProvideFeedbackResponses, PurgeWorkspaceData, PurgeWorkspaceResponses, RemoveLabelFilterData, RemoveLabelFilterErrors, RemoveLabelFilterResponses, RemoveLabelFromTeamData, RemoveLabelFromTeamResponses, RemoveMemberData, RemoveMemberResponses, RemoveRepositoryToMonitorData, RemoveRepositoryToMonitorResponses, RenameSlugData, RenameSlugResponses, ResetAndRecalculateLeaguesData, ResetAndRecalculateLeaguesResponses, ResolveData, ResolveResponses, UpdateDocumentData, UpdateDocumentErrors, UpdateDocumentResponses, UpdateNotificationsData, UpdateNotificationsResponses, UpdatePublicVisibilityData, UpdatePublicVisibilityResponses, UpdateRepositorySettingsData, UpdateRepositorySettingsErrors, UpdateRepositorySettingsResponses, UpdateRepositoryVisibilityData, UpdateRepositoryVisibilityResponses, UpdateScheduleData, UpdateScheduleResponses, UpdateSlackCredentialsData, UpdateSlackCredentialsResponses, UpdateStatusData, UpdateStatusResponses, UpdateTeamSettingsData, UpdateTeamSettingsErrors, UpdateTeamSettingsResponses, UpdateTeamVisibilityData, UpdateTeamVisibilityResponses, UpdateTokenData, UpdateTokenResponses, UpdateUserSettingsData, UpdateUserSettingsResponses, VoteMessageData, VoteMessageErrors, VoteMessageResponses } from './types.gen';
+import type { AddLabelFilterData, AddLabelFilterErrors, AddLabelFilterResponses, AddLabelToTeamData, AddLabelToTeamResponses, AddRepositoryToMonitorData, AddRepositoryToMonitorResponses, AssignRoleData, AssignRoleResponses, ComputeUserLeagueStatsData, ComputeUserLeagueStatsResponses, CreateDocumentData, CreateDocumentErrors, CreateDocumentResponses, CreateWorkspaceData, CreateWorkspaceResponses, DeleteDocumentData, DeleteDocumentErrors, DeleteDocumentResponses, DeleteDocumentVersionsAfterData, DeleteDocumentVersionsAfterErrors, DeleteDocumentVersionsAfterResponses, DeleteUserData, DeleteUserResponses, DetectForPullRequestData, DetectForPullRequestErrors, DetectForPullRequestResponses, DetectForUserData, DetectForUserErrors, DetectForUserResponses, GetAllAchievementDefinitionsData, GetAllAchievementDefinitionsResponses, GetAllTeamsData, GetAllTeamsResponses, GetBadPracticeData, GetBadPracticeResponses, GetBadPracticesForPullRequestData, GetBadPracticesForPullRequestResponses, GetBadPracticesForUserData, GetBadPracticesForUserResponses, GetCurrentUserMembershipData, GetCurrentUserMembershipResponses, GetDocumentData, GetDocumentErrors, GetDocumentResponses, GetGroupedThreadsData, GetGroupedThreadsErrors, GetGroupedThreadsResponses, GetLabelFiltersData, GetLabelFiltersResponses, GetLeaderboardData, GetLeaderboardResponses, GetMemberData, GetMemberResponses, GetRepositoriesToMonitorData, GetRepositoriesToMonitorResponses, GetRepositorySettingsData, GetRepositorySettingsResponses, GetTeamSettingsData, GetTeamSettingsResponses, GetThreadData, GetThreadErrors, GetThreadResponses, GetUserAchievementsData, GetUserAchievementsResponses, GetUserProfileData, GetUserProfileResponses, GetUserSettingsData, GetUserSettingsResponses, GetUsersWithTeamsData, GetUsersWithTeamsResponses, GetVersionData, GetVersionErrors, GetVersionResponses, GetWorkspaceData, GetWorkspaceResponses, GitLabPreflightData, GitLabPreflightResponses, ListDocumentsData, ListDocumentsErrors, ListDocumentsResponses, ListGitLabGroupsData, ListGitLabGroupsResponses, ListGlobalContributorsData, ListGlobalContributorsResponses, ListMembersData, ListMembersResponses, ListVersionsData, ListVersionsErrors, ListVersionsResponses, ListWorkspacesData, ListWorkspacesResponses, ProvideFeedbackData, ProvideFeedbackErrors, ProvideFeedbackResponses, PurgeWorkspaceData, PurgeWorkspaceResponses, RecalculateUserAchievementsData, RecalculateUserAchievementsResponses, ReloadAchievementsData, ReloadAchievementsResponses, RemoveLabelFilterData, RemoveLabelFilterErrors, RemoveLabelFilterResponses, RemoveLabelFromTeamData, RemoveLabelFromTeamResponses, RemoveMemberData, RemoveMemberResponses, RemoveRepositoryToMonitorData, RemoveRepositoryToMonitorResponses, RenameSlugData, RenameSlugResponses, ResetAndRecalculateLeaguesData, ResetAndRecalculateLeaguesResponses, ResolveData, ResolveResponses, UpdateDocumentData, UpdateDocumentErrors, UpdateDocumentResponses, UpdateNotificationsData, UpdateNotificationsResponses, UpdatePublicVisibilityData, UpdatePublicVisibilityResponses, UpdateRepositorySettingsData, UpdateRepositorySettingsErrors, UpdateRepositorySettingsResponses, UpdateRepositoryVisibilityData, UpdateRepositoryVisibilityResponses, UpdateScheduleData, UpdateScheduleResponses, UpdateSlackCredentialsData, UpdateSlackCredentialsResponses, UpdateStatusData, UpdateStatusResponses, UpdateTeamSettingsData, UpdateTeamSettingsErrors, UpdateTeamSettingsResponses, UpdateTeamVisibilityData, UpdateTeamVisibilityResponses, UpdateTokenData, UpdateTokenResponses, UpdateUserSettingsData, UpdateUserSettingsResponses, VoteMessageData, VoteMessageErrors, VoteMessageResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean> = Options2<TData, ThrowOnError> & {
     /**
@@ -630,3 +630,39 @@ export const updateToken = <ThrowOnError extends boolean = false>(options: Optio
  * List workspace users and the teams they belong to
  */
 export const getUsersWithTeams = <ThrowOnError extends boolean = false>(options: Options<GetUsersWithTeamsData, ThrowOnError>) => (options.client ?? client).get<GetUsersWithTeamsResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/users', ...options });
+
+/**
+ * Get user achievements
+ *
+ * Returns all achievements with progress information for the specified user
+ */
+export const getUserAchievements = <ThrowOnError extends boolean = false>(options: Options<GetUserAchievementsData, ThrowOnError>) => (options.client ?? client).get<GetUserAchievementsResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/users/{login}/achievements', ...options });
+
+/**
+ * Get all achievement definitions
+ *
+ * Returns the master list of all available achievements. Restricted to non-prod environments.
+ */
+export const getAllAchievementDefinitions = <ThrowOnError extends boolean = false>(options: Options<GetAllAchievementDefinitionsData, ThrowOnError>) => (options.client ?? client).get<GetAllAchievementDefinitionsResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/users/{login}/achievements/definitions', ...options });
+
+/**
+ * Recalculate user achievements
+ *
+ * Wipes and historically recalculates a user's achievement timeline. Admin only.
+ */
+export const recalculateUserAchievements = <ThrowOnError extends boolean = false>(options: Options<RecalculateUserAchievementsData, ThrowOnError>) => (options.client ?? client).post<RecalculateUserAchievementsResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/users/{login}/achievements/recalculate',
+    ...options
+});
+
+/**
+ * Reload achievements configuration
+ *
+ * Hot reloads the achievements.yml configuration without requiring a restart. Admin only.
+ */
+export const reloadAchievements = <ThrowOnError extends boolean = false>(options: Options<ReloadAchievementsData, ThrowOnError>) => (options.client ?? client).post<ReloadAchievementsResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/users/{login}/achievements/reload',
+    ...options
+});

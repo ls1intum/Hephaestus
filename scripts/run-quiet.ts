@@ -212,7 +212,7 @@ async function run(tool: string, args: string[]): Promise<number> {
   return new Promise((resolve) => {
     const proc = spawn(command, commandArgs, {
       stdio: ["inherit", "pipe", "pipe"],
-      shell: false,
+      shell: process.platform === 'win32',
     });
 
     const allLines: string[] = [];

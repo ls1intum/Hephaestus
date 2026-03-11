@@ -1,10 +1,13 @@
 package de.tum.in.www1.hephaestus.activity;
 
+import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -472,4 +475,53 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         @Param("since") Instant since,
         @Param("until") Instant until
     );
+
+    // ========================================================================
+    // Achievement Progress Queries
+    // ========================================================================
+
+    /**
+     * Count activity events of specific types for a user across all workspaces.
+     *
+     * <p>Used by the achievement system to evaluate progress toward achievements.
+     * Counts are not workspace-scoped because achievements represent cumulative
+     * lifetime accomplishments.
+     *
+     * @param actorId the user's ID
+     * @param eventTypes set of event type names (enum names as strings)
+     * @return total count of matching events
+     */
+    @WorkspaceAgnostic("Achievements are per-user lifetime accomplishments across all workspaces")
+    @Query(
+        value = """
+        SELECT COUNT(*)
+        FROM activity_event e
+        WHERE e.actor_id = :actorId
+        AND e.event_type IN :eventTypes
+        """,
+        nativeQuery = true
+    )
+    long countByActorIdAndEventTypes(@Param("actorId") Long actorId, @Param("eventTypes") Set<String> eventTypes);
+
+    /**
+     * Slice all activity events for a specific actor in chronological order.
+     *
+     * <p>Used for recalculating achievements correctly after historical data syncs.
+     * Uses Slice instead of Stream to prevent open-cursor issues when interleaving
+     * nested database queries during processing.
+     *
+     * @param actorId the user's ID
+     * @param pageable the pagination information
+     * @return slice of activity events ordered by occurred_at ASC
+     */
+    @WorkspaceAgnostic("Achievement recalculation replays all user events across workspaces")
+    @Query(
+        """
+        SELECT e
+        FROM ActivityEvent e
+        WHERE e.actor.id = :actorId
+        ORDER BY e.occurredAt ASC
+        """
+    )
+    Slice<ActivityEvent> findSliceByActorIdOrderByOccurredAtAsc(@Param("actorId") Long actorId, Pageable pageable);
 }
