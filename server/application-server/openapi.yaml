@@ -2344,10 +2344,6 @@ components:
           - unlocked
           - hidden
           example: unlocked
-        isHidden:
-          type: boolean
-          description: Whether this achievement is hidden until unlocked
-          example: false
         unlockedAt:
           type: string
           format: date-time

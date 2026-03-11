@@ -2,8 +2,8 @@ import type { Node, NodeProps } from "@xyflow/react";
 import { Handle, Position } from "@xyflow/react";
 import { useState } from "react";
 import { AchievementTooltip } from "@/components/achievements/AchievementTooltip";
-import { CENTERED_HANDLE_STYLE } from "@/components/achievements/skill-tree-shared";
 import { StandaloneAura } from "@/components/achievements/StandaloneAura";
+import { CENTERED_HANDLE_STYLE } from "@/components/achievements/skill-tree-shared";
 import {
 	mythicBackgroundVars,
 	rarityIconSizes,

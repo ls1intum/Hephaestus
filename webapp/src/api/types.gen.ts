@@ -1211,6 +1211,10 @@ export type Achievement = {
      */
     id: AchievementId;
     /**
+     * Whether the achievement should be hidden until unlocked
+     */
+    isHidden: boolean;
+    /**
      * Parent achievement in progression chain
      */
     parent?: string;
@@ -1226,10 +1230,6 @@ export type Achievement = {
      * Current status of the achievement for this user
      */
     status: 'locked' | 'available' | 'unlocked' | 'hidden';
-    /**
-     * Whether this achievement is hidden until unlocked
-     */
-    isHidden: boolean;
     /**
      * Optional of when the achievement was unlocked, empty() if not unlocked
      */
