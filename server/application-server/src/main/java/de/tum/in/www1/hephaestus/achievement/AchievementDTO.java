@@ -3,7 +3,6 @@ package de.tum.in.www1.hephaestus.achievement;
 import de.tum.in.www1.hephaestus.achievement.progress.AchievementProgress;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
-import java.util.Optional;
 import org.springframework.lang.NonNull;
 import org.springframework.lang.Nullable;
 
@@ -42,25 +41,25 @@ public record AchievementDTO(
     @NonNull
     @Schema(description = "The structured progress data based on the achievements evaluator")
     AchievementProgress progressData,
-    @NonNull
-    @Schema(description = "Optional of when the achievement was unlocked, empty() if not unlocked")
-    Optional<Instant> unlockedAt,
+    @Nullable
+    @Schema(description = "When the achievement was unlocked, null if not unlocked", nullable = true)
+    Instant unlockedAt,
     @Schema(description = "Whether the achievement should be hidden until unlocked") boolean isHidden
 ) {
     /**
      * Creates an AchievementDTO from an AchievementDefinition with progress information.
      *
      * @param definition   the achievement definition
-     * @param progressData the data associated with this achievements progress
      * @param status       the computed status for this user
-     * @param unlockedAt   Optional of when the achievement was unlocked, or {@link Optional#empty()} if not unlocked
+     * @param progressData the data associated with this achievements progress
+     * @param unlockedAt   when the achievement was unlocked, or {@code null} if not unlocked
      * @return populated DTO
      */
     public static AchievementDTO fromDefinition(
         AchievementDefinition definition,
         AchievementStatus status,
         AchievementProgress progressData,
-        Optional<Instant> unlockedAt
+        @Nullable Instant unlockedAt
     ) {
         return new AchievementDTO(
             definition.id(),

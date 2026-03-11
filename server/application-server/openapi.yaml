@@ -2345,15 +2345,13 @@ components:
         unlockedAt:
           type: string
           format: date-time
-          description: "Optional of when the achievement was unlocked, empty() if\
-            \ not unlocked"
+          description: "When the achievement was unlocked, null if not unlocked"
       required:
       - category
       - id
       - progressData
       - rarity
       - status
-      - unlockedAt
     AchievementId:
       type: string
       enum:

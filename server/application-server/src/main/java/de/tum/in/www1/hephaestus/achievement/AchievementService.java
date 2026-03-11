@@ -9,7 +9,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -265,8 +264,7 @@ public class AchievementService {
 
             AchievementProgress progressData =
                 progress != null ? progress.getProgressData() : achievement.requirements();
-            Optional<Instant> unlockedAt =
-                progress != null ? Optional.ofNullable(progress.getUnlockedAt()) : Optional.empty();
+            Instant unlockedAt = progress != null ? progress.getUnlockedAt() : null;
             result.add(AchievementDTO.fromDefinition(achievement, status, progressData, unlockedAt));
         }
 
@@ -327,7 +325,7 @@ public class AchievementService {
             .values()
             .stream()
             .map(def ->
-                AchievementDTO.fromDefinition(def, AchievementStatus.LOCKED, def.requirements(), Optional.empty())
+                AchievementDTO.fromDefinition(def, AchievementStatus.LOCKED, def.requirements(), null)
             )
             .toList();
     }
