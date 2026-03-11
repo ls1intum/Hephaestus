@@ -66,7 +66,7 @@ public class AchievementRecalculationService {
     }
 
     @Transactional
-    private void recalculateUserInternal(User user) {
+    protected void recalculateUserInternal(User user) {
         log.info(
             "Starting complete achievement recalculation for user: userId={}, login={}",
             user.getId(),

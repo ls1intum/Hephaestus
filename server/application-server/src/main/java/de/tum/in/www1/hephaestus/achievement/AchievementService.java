@@ -157,7 +157,7 @@ public class AchievementService {
     )
     @CacheEvict(
         value = ACHIEVEMENT_PROGRESS_CACHE,
-        key = "#event.user().isPresent() ? #event.user().get().getId() : 0",
+        key = "#event.user().get().getId()",
         condition = "#event.user().isPresent()"
     )
     @Transactional

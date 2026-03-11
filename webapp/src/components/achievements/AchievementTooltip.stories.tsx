@@ -21,7 +21,6 @@ import { Button } from "@/components/ui/button";
  */
 const meta = {
 	component: AchievementTooltip,
-	title: "Achievements/AchievementTooltip",
 	parameters: {
 		layout: "centered",
 		docs: {
