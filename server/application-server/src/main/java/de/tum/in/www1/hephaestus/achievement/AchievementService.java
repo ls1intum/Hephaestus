@@ -324,9 +324,7 @@ public class AchievementService {
         return achievementRegistry
             .values()
             .stream()
-            .map(def ->
-                AchievementDTO.fromDefinition(def, AchievementStatus.LOCKED, def.requirements(), null)
-            )
+            .map(def -> AchievementDTO.fromDefinition(def, AchievementStatus.LOCKED, def.requirements(), null))
             .toList();
     }
 }
