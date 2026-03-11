@@ -12,7 +12,6 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.constraints.NotBlank;
 import java.util.Arrays;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +19,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.CacheManager;
 import org.springframework.core.env.Environment;
 import org.springframework.http.ResponseEntity;
-import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -34,7 +32,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
  * respects workspace membership for access control.
  */
 @Slf4j
-@Validated
 @WorkspaceScopedController
 @RequestMapping("/users/{login}/achievements")
 @Tag(name = "Achievements", description = "User achievement progress and unlocks")
@@ -75,7 +72,7 @@ public class AchievementController {
     @SecurityRequirements
     public ResponseEntity<List<AchievementDTO>> getUserAchievements(
         WorkspaceContext workspaceContext,
-        @PathVariable @NotBlank String login
+        @PathVariable String login
     ) {
         log.debug(
             "Getting achievements for user: {} in workspace: {}",
@@ -99,7 +96,10 @@ public class AchievementController {
         description = "Returns the master list of all available achievements. Restricted to non-prod environments."
     )
     @SecurityRequirements
-    public ResponseEntity<List<AchievementDTO>> getAllAchievementDefinitions(WorkspaceContext workspaceContext) {
+    public ResponseEntity<List<AchievementDTO>> getAllAchievementDefinitions(
+        WorkspaceContext workspaceContext,
+        @PathVariable String login
+    ) {
         boolean isProd = Arrays.asList(env.getActiveProfiles()).contains("prod");
         if (isProd) {
             throw new AccessForbiddenException("Designer mode endpoints are restricted to development environments.");
@@ -132,7 +132,7 @@ public class AchievementController {
     @RequireAtLeastWorkspaceAdmin
     public ResponseEntity<Void> recalculateUserAchievements(
         WorkspaceContext workspaceContext,
-        @PathVariable @NotBlank String login
+        @PathVariable String login
     ) {
         log.info(
             "Admin requested achievement recalculation for user: {} in workspace: {}",
@@ -154,7 +154,7 @@ public class AchievementController {
         description = "Hot reloads the achievements.yml configuration without requiring a restart. Admin only."
     )
     @RequireAtLeastWorkspaceAdmin
-    public ResponseEntity<Void> reloadAchievements(WorkspaceContext workspaceContext) {
+    public ResponseEntity<Void> reloadAchievements(WorkspaceContext workspaceContext, @PathVariable String login) {
         log.info("Admin requested achievement configuration reload in workspace: {}", workspaceContext.slug());
         achievementRegistry.reload();
 
