@@ -497,10 +497,8 @@ code {
   border-radius: 0.25rem;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .shimmer-overlay::after {
-    animation: none !important;
-  }
+[data-motion="reduced"] .shimmer-overlay::after {
+  animation: none !important;
 }
 
 /* ===== Achievement Rarity Animations ===== */
@@ -568,12 +566,10 @@ code {
 }
 
 /* Respect reduced-motion preference for all achievement animations */
-@media (prefers-reduced-motion: reduce) {
-  .legendary-pulse-anim {
-    animation: none !important;
-  }
+[data-motion="reduced"] .legendary-pulse-anim {
+  animation: none !important;
+}
 
-  .achievement-mythic-hexagon::before {
-    animation: none !important;
-  }
+[data-motion="reduced"] .achievement-mythic-hexagon::before {
+  animation: none !important;
 }
