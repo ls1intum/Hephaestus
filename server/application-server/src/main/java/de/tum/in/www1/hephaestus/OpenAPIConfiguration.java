@@ -88,7 +88,9 @@ public class OpenAPIConfiguration {
 
                 log.info("Injected {} achievement IDs into OpenAPI", achievementIds.size());
                 if (achievementIds.isEmpty()) {
-                    log.error("Achievement registry is empty during OpenAPI generation! This will cause frontend type errors.");
+                    log.error(
+                        "Achievement registry is empty during OpenAPI generation! This will cause frontend type errors."
+                    );
                 }
 
                 StringSchema idSchema = new StringSchema();

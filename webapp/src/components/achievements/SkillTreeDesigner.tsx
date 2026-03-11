@@ -11,6 +11,7 @@ import {
 import "@xyflow/react/dist/style.css";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
+import type { AchievementId } from "@/api";
 import type { Achievement } from "@/api/types.gen";
 import type { AchievementNode } from "@/components/achievements/AchievementNode";
 import type { AvatarNode } from "@/components/achievements/AvatarNode";
@@ -25,7 +26,6 @@ import {
 	nodeTypes,
 	subscribeToTheme,
 } from "@/components/achievements/skill-tree-shared";
-import type { AchievementId } from "@/api";
 import type { UIAchievement } from "@/components/achievements/types";
 import {
 	type AnyAchievementEdge,
