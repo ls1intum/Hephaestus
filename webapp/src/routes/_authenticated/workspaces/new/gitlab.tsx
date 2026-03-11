@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeftIcon, OctagonXIcon } from "lucide-react";
-import { useReducer, useRef } from "react";
+import { useReducer, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
 	createWorkspaceMutation,
@@ -41,6 +41,10 @@ function GitLabWizardPage() {
 	const queryClient = useQueryClient();
 	const navigate = useNavigate();
 	const { setSelectedSlug } = useWorkspaceStore();
+	const headingRef = useRef<HTMLHeadingElement>(null);
+
+	// Visually hidden live region for step change announcements
+	const [announcement, setAnnouncement] = useState("");
 
 	const submittingRef = useRef(false);
 	const listGroups = useMutation({ ...listGitLabGroupsMutation() });
@@ -78,6 +82,13 @@ function GitLabWizardPage() {
 			workspaceSlug: state.workspaceSlug,
 		}).success;
 
+	const announceStep = (step: number) => {
+		const stepMeta = STEP_META[step - 1];
+		setAnnouncement(`Step ${step} of 3: ${stepMeta.title}`);
+		// Focus the heading after step change
+		requestAnimationFrame(() => headingRef.current?.focus());
+	};
+
 	const handleNext = () => {
 		if (state.step === 1 && canAdvanceFromStep1) {
 			if (listGroups.isPending) return;
@@ -91,12 +102,20 @@ function GitLabWizardPage() {
 				{
 					onSuccess: (data) => {
 						dispatch({ type: "ADVANCE_TO_GROUPS", groups: data });
+						announceStep(2);
 					},
 				},
 			);
 		} else if (state.step === 2 && canAdvanceFromStep2) {
 			dispatch({ type: "ADVANCE_TO_CONFIGURE" });
+			announceStep(3);
 		}
+	};
+
+	const handleBack = () => {
+		const prevStep = state.step - 1;
+		dispatch({ type: "GO_BACK" });
+		if (prevStep >= 1) announceStep(prevStep);
 	};
 
 	const handleSubmit = () => {
@@ -121,23 +140,35 @@ function GitLabWizardPage() {
 	const stepKey = `step-${state.step}`;
 
 	return (
-		<div className="mx-auto max-w-lg py-8">
+		<div className="mx-auto max-w-lg px-4 py-8">
+			{/* Visually hidden live region for screen reader step announcements */}
+			<div aria-live="polite" aria-atomic="true" className="sr-only">
+				{announcement}
+			</div>
+
 			<Link
 				to="/workspaces/new"
 				className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-6"
+				aria-label="Back to provider selection"
 			>
 				<ArrowLeftIcon className="size-3.5" />
 				Back
 			</Link>
 
 			<div className="space-y-1.5 mb-6">
-				<h1 className="text-2xl font-semibold tracking-tight">{meta.title}</h1>
+				<h1
+					ref={headingRef}
+					tabIndex={-1}
+					className="text-2xl font-semibold tracking-tight outline-none"
+				>
+					{meta.title}
+				</h1>
 				<p className="text-muted-foreground">{meta.description}</p>
 			</div>
 
 			<WizardStepIndicator currentStep={state.step} />
 
-			<div className="mt-6">
+			<div className="mt-6" role="region" aria-labelledby="wizard-heading">
 				<WizardContext.Provider value={{ state, dispatch }}>
 					{state.step === 1 && <ConnectGitLabStep key={stepKey} />}
 					{state.step === 2 && <SelectGroupStep key={stepKey} />}
@@ -159,8 +190,9 @@ function GitLabWizardPage() {
 				{state.step > 1 && (
 					<Button
 						variant="outline"
-						onClick={() => dispatch({ type: "GO_BACK" })}
+						onClick={handleBack}
 						disabled={isCreating}
+						aria-label="Back to previous step"
 					>
 						Back
 					</Button>

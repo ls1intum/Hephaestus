@@ -56,10 +56,12 @@ export function wizardReducer(state: WizardState, action: WizardAction): WizardS
 		case "CLEAR_PREFLIGHT":
 			return { ...state, preflightResult: null };
 		case "ADVANCE_TO_GROUPS":
+			if (state.step !== 1) return state;
 			return { ...state, step: 2, groups: action.groups };
 		case "SELECT_GROUP":
 			return { ...state, selectedGroup: action.group };
 		case "ADVANCE_TO_CONFIGURE":
+			if (state.step !== 2 || !state.selectedGroup) return state;
 			return { ...state, step: 3 };
 		case "SET_DISPLAY_NAME":
 			return { ...state, displayName: action.value };
@@ -70,7 +72,8 @@ export function wizardReducer(state: WizardState, action: WizardAction): WizardS
 				slugManuallyEdited: action.manual,
 			};
 		case "GO_BACK": {
-			const prevStep = Math.max(1, state.step - 1) as WizardStep;
+			if (state.step === 1) return state;
+			const prevStep = (state.step - 1) as WizardStep;
 			// Clear downstream state so stale values don't persist when user changes selection
 			if (prevStep === 1) {
 				return {
