@@ -23,6 +23,7 @@ export function ConnectGitLabStep() {
 	});
 
 	const handleValidate = () => {
+		if (preflight.isPending) return;
 		const result = connectionSchema.safeParse({
 			serverUrl: state.serverUrl,
 			personalAccessToken: state.personalAccessToken,
@@ -86,6 +87,7 @@ export function ConnectGitLabStep() {
 						onChange={(e) => dispatch({ type: "SET_PAT", value: e.target.value })}
 						autoComplete="off"
 						className="pr-9"
+						aria-required="true"
 						aria-invalid={!!fieldErrors.personalAccessToken}
 						aria-describedby={
 							fieldErrors.personalAccessToken ? "gitlab-pat-error" : "gitlab-pat-description"

@@ -124,6 +124,14 @@ describe("workspaceDetailsSchema", () => {
 		expect(result.success).toBe(false);
 	});
 
+	it("rejects slug with consecutive hyphens", () => {
+		const result = workspaceDetailsSchema.safeParse({
+			displayName: "Test",
+			workspaceSlug: "my--workspace",
+		});
+		expect(result.success).toBe(false);
+	});
+
 	it("accepts slug starting with digit", () => {
 		const result = workspaceDetailsSchema.safeParse({
 			displayName: "Test",
