@@ -594,6 +594,15 @@ erDiagram
         BIGINT provider_id FK,UK "NOT NULL"
     }
 
+    UserAchievement {
+        UUID id PK
+        BIGINT user_id FK,UK "NOT NULL"
+        VARCHAR(64) achievement_id UK "NOT NULL"
+        TIMESTAMPTZ unlocked_at
+        JSONB progress_data "NOT NULL"
+        BIGINT version "NOT NULL"
+    }
+
     UserPreference {
         BIGINT id PK
         BIGINT user_id FK,UK "NOT NULL"
@@ -718,6 +727,7 @@ erDiagram
     ChatMessage ||--o{ ChatMessage : references
     ChatThread ||--o{ ChatMessage : has
     User ||--o{ ChatThread : has
+    User ||--o{ UserAchievement : has
     Workspace ||--o{ ChatThread : has
     User ||--o{ CommitContributor : has
     GitCommit ||--o{ CommitFileChange : has

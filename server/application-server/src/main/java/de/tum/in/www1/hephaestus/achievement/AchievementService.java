@@ -4,6 +4,7 @@ import de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator;
 import de.tum.in.www1.hephaestus.achievement.progress.AchievementProgress;
 import de.tum.in.www1.hephaestus.activity.ActivityEventType;
 import de.tum.in.www1.hephaestus.activity.ActivitySavedEvent;
+import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import jakarta.annotation.PostConstruct;
 import java.time.Instant;
@@ -66,6 +67,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@WorkspaceAgnostic("Achievements are per-user lifetime accomplishments, not workspace-scoped")
 public class AchievementService {
 
     /**

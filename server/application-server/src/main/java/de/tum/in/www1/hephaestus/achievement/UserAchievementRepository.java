@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.achievement;
 
+import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -18,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
  * progress, and supporting achievement leaderboards.
  */
 @Repository
+@WorkspaceAgnostic("Achievements are per-user lifetime accomplishments, not workspace-scoped")
 public interface UserAchievementRepository extends JpaRepository<UserAchievement, UUID> {
     /**
      * Find all achievement progress records for a specific user.

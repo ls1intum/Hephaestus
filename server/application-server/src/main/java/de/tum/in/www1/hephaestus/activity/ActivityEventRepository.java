@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.activity;
 
+import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -490,6 +491,7 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
      * @param eventTypes set of event type names (enum names as strings)
      * @return total count of matching events
      */
+    @WorkspaceAgnostic("Achievements are per-user lifetime accomplishments across all workspaces")
     @Query(
         value = """
         SELECT COUNT(*)
@@ -512,6 +514,7 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
      * @param pageable the pagination information
      * @return slice of activity events ordered by occurred_at ASC
      */
+    @WorkspaceAgnostic("Achievement recalculation replays all user events across workspaces")
     @Query(
         """
         SELECT e

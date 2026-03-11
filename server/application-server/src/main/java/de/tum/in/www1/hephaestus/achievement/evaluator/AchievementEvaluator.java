@@ -2,9 +2,9 @@ package de.tum.in.www1.hephaestus.achievement.evaluator;
 
 import de.tum.in.www1.hephaestus.achievement.AchievementService;
 import de.tum.in.www1.hephaestus.achievement.UserAchievement;
-import de.tum.in.www1.hephaestus.activity.ActivitySavedEvent;
 import de.tum.in.www1.hephaestus.achievement.progress.AchievementProgress;
 import de.tum.in.www1.hephaestus.achievement.progress.LinearAchievementProgress;
+import de.tum.in.www1.hephaestus.activity.ActivitySavedEvent;
 
 /**
  * Strategy interface for updating achievement progress.

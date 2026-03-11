@@ -641,7 +641,9 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
             // ActivityEventListener handles CommentCreated, ReviewSubmitted events which carry full entity graphs
             "ActivityEventListener",
             // BadPracticeEventListener handles PullRequestUpdated events which carry full entity graphs
-            "BadPracticeEventListener"
+            "BadPracticeEventListener",
+            // AchievementEventListener handles ActivitySavedEvent which carries workspaceId context
+            "AchievementEventListener"
         );
 
         /**
