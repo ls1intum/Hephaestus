@@ -173,7 +173,7 @@ achievements:
     - id: "commit.mythic"
       parent: "commit.legendary"
       rarity: mythic
-      isHidden: false
+      isHidden: true
       category: commits
       triggerEvents: []
       evaluatorClass: StandardCountEvaluator
