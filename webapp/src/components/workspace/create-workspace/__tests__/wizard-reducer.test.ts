@@ -117,6 +117,12 @@ describe("wizardReducer", () => {
 			const result = wizardReducer(state, { type: "ADVANCE_TO_CONFIGURE" });
 			expect(result).toBe(state);
 		});
+
+		it("rejects advancement from step 3 (guard)", () => {
+			const state = stateAt(3);
+			const result = wizardReducer(state, { type: "ADVANCE_TO_CONFIGURE" });
+			expect(result).toBe(state);
+		});
 	});
 
 	describe("SET_DISPLAY_NAME", () => {
