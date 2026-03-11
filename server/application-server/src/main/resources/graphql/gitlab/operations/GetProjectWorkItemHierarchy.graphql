@@ -1,0 +1,27 @@
+query GetProjectWorkItemHierarchy($fullPath: ID!, $first: Int!, $after: String) {
+    project(fullPath: $fullPath) {
+        workItems(first: $first, after: $after, types: [ISSUE, TASK, EPIC, INCIDENT]) {
+            pageInfo {
+                hasNextPage
+                endCursor
+            }
+            count
+            nodes {
+                iid
+                widgets {
+                    type
+                    ... on WorkItemWidgetHierarchy {
+                        hasParent
+                        parent {
+                            iid
+                            namespace {
+                                fullPath
+                            }
+                        }
+                        hasChildren
+                    }
+                }
+            }
+        }
+    }
+}

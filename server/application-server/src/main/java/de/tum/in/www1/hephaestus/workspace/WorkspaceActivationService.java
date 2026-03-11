@@ -300,6 +300,24 @@ public class WorkspaceActivationService {
                                     });
                             }
 
+                            // Sync issue types (org-level, lightweight)
+                            var issueTypeSyncService = gitLabServices.getIssueTypeSyncService();
+                            if (issueTypeSyncService != null) {
+                                try {
+                                    int issueTypes = issueTypeSyncService.syncIssueTypesForGroup(
+                                        workspace.getId(),
+                                        workspace.getAccountLogin()
+                                    );
+                                    log.info(
+                                        "GitLab issue type sync: workspaceId={}, types={}",
+                                        workspace.getId(),
+                                        issueTypes
+                                    );
+                                } catch (Exception e) {
+                                    log.warn("Failed issue type sync: workspaceId={}", workspace.getId(), e);
+                                }
+                            }
+
                             // Register synced repositories as monitored for this workspace.
                             // This is analogous to ensureRepositoryMonitorForInstallation() for GitHub.
                             ensureRepositoryMonitorsForGitLab(workspace, result.synced());
@@ -313,6 +331,8 @@ public class WorkspaceActivationService {
                             var milestoneSyncService = gitLabServices.getMilestoneSyncService();
                             var issueSyncService = gitLabServices.getIssueSyncService();
                             var mrSyncService = gitLabServices.getMergeRequestSyncService();
+                            var collaboratorSyncService = gitLabServices.getCollaboratorSyncService();
+                            var commitSyncService = gitLabServices.getCommitSyncService();
 
                             if (!result.synced().isEmpty()) {
                                 int totalLabels = 0;
@@ -321,6 +341,8 @@ public class WorkspaceActivationService {
                                 int issueCompletedRepos = 0;
                                 int totalMRs = 0;
                                 int mrCompletedRepos = 0;
+                                int totalCollaborators = 0;
+                                int totalCommits = 0;
 
                                 for (Repository repo : result.synced()) {
                                     // Capture updatedAfter ONCE per repo before any sync phase.
@@ -410,6 +432,44 @@ public class WorkspaceActivationService {
                                         }
                                     }
 
+                                    // Phase 3: Sync collaborators
+                                    if (collaboratorSyncService != null) {
+                                        try {
+                                            SyncResult collabResult =
+                                                collaboratorSyncService.syncCollaboratorsForRepository(
+                                                    workspace.getId(),
+                                                    repo
+                                                );
+                                            totalCollaborators += collabResult.count();
+                                        } catch (Exception e) {
+                                            log.warn(
+                                                "Failed to sync collaborators for project: workspaceId={}, repoName={}",
+                                                workspace.getId(),
+                                                repo.getNameWithOwner(),
+                                                e
+                                            );
+                                        }
+                                    }
+
+                                    // Phase 4: Sync commits (REST API)
+                                    if (commitSyncService != null) {
+                                        try {
+                                            SyncResult commitResult = commitSyncService.syncCommitsForRepository(
+                                                workspace.getId(),
+                                                repo,
+                                                updatedAfter
+                                            );
+                                            totalCommits += commitResult.count();
+                                        } catch (Exception e) {
+                                            log.warn(
+                                                "Failed to sync commits for project: workspaceId={}, repoName={}",
+                                                workspace.getId(),
+                                                repo.getNameWithOwner(),
+                                                e
+                                            );
+                                        }
+                                    }
+
                                     // Update lastSyncAt only when every enabled sync phase completed for this repo
                                     boolean allEnabledPhasesCompleted =
                                         (issueSyncService == null || issuesDone) && (mrSyncService == null || mrsDone);
@@ -418,6 +478,22 @@ public class WorkspaceActivationService {
                                     }
                                 }
 
+                                if (commitSyncService != null) {
+                                    log.info(
+                                        "GitLab commit sync complete: workspaceId={}, projects={}, totalCommits={}",
+                                        workspace.getId(),
+                                        result.synced().size(),
+                                        totalCommits
+                                    );
+                                }
+                                if (collaboratorSyncService != null) {
+                                    log.info(
+                                        "GitLab collaborator sync complete: workspaceId={}, projects={}, totalCollaborators={}",
+                                        workspace.getId(),
+                                        result.synced().size(),
+                                        totalCollaborators
+                                    );
+                                }
                                 if (labelSyncService != null || milestoneSyncService != null) {
                                     log.info(
                                         "GitLab label/milestone sync complete: workspaceId={}, projects={}, totalLabels={}, totalMilestones={}",
@@ -447,7 +523,57 @@ public class WorkspaceActivationService {
                                 }
                             }
 
-                            // Phase 3: Sync teams (subgroups → Team entities with members and repo permissions)
+                            // Phase 5: Post-repo sync (sub-issues, dependencies)
+                            var subIssueSyncService = gitLabServices.getSubIssueSyncService();
+                            var depSyncService = gitLabServices.getIssueDependencySyncService();
+                            if ((subIssueSyncService != null || depSyncService != null) && !result.synced().isEmpty()) {
+                                int totalSubIssues = 0,
+                                    totalDeps = 0;
+                                for (Repository repo : result.synced()) {
+                                    if (subIssueSyncService != null) {
+                                        try {
+                                            SyncResult r = subIssueSyncService.syncSubIssuesForRepository(
+                                                workspace.getId(),
+                                                repo
+                                            );
+                                            totalSubIssues += r.count();
+                                        } catch (Exception e) {
+                                            log.warn(
+                                                "Failed sub-issue sync: workspaceId={}, repoName={}",
+                                                workspace.getId(),
+                                                repo.getNameWithOwner(),
+                                                e
+                                            );
+                                        }
+                                    }
+                                    if (depSyncService != null) {
+                                        try {
+                                            SyncResult r = depSyncService.syncDependenciesForRepository(
+                                                workspace.getId(),
+                                                repo
+                                            );
+                                            totalDeps += r.count();
+                                        } catch (Exception e) {
+                                            log.warn(
+                                                "Failed dependency sync: workspaceId={}, repoName={}",
+                                                workspace.getId(),
+                                                repo.getNameWithOwner(),
+                                                e
+                                            );
+                                        }
+                                    }
+                                }
+                                if (totalSubIssues > 0 || totalDeps > 0) {
+                                    log.info(
+                                        "GitLab post-repo sync: workspaceId={}, subIssues={}, deps={}",
+                                        workspace.getId(),
+                                        totalSubIssues,
+                                        totalDeps
+                                    );
+                                }
+                            }
+
+                            // Phase 6: Sync teams (subgroups → Team entities with members and repo permissions)
                             var teamSyncService = gitLabServices.getTeamSyncService();
                             if (teamSyncService != null) {
                                 try {

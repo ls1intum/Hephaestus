@@ -16,6 +16,8 @@ import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlResponseHandler;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlResponseHandler.HandleResult;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabGroupResponse;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabPageInfo;
@@ -48,6 +50,9 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
     private GitLabGraphQlClientProvider graphQlClientProvider;
 
     @Mock
+    private GitLabGraphQlResponseHandler responseHandler;
+
+    @Mock
     private GitLabGroupProcessor groupProcessor;
 
     @Mock
@@ -74,8 +79,14 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
             .when(gitProviderRepository.findByTypeAndServerUrl(GitProviderType.GITLAB, "https://gitlab.com"))
             .thenReturn(Optional.of(gitLabProvider));
 
+        // Default: responseHandler.handle() returns CONTINUE (valid response)
+        lenient()
+            .when(responseHandler.handle(any(), anyString(), any()))
+            .thenReturn(new HandleResult(HandleResult.Action.CONTINUE, null));
+
         service = new GitLabGroupSyncService(
             graphQlClientProvider,
+            responseHandler,
             groupProcessor,
             projectProcessor,
             gitLabProperties,
@@ -147,8 +158,13 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
         void invalidResponse_returnsEmptyAndRecordsFailure() {
             HttpGraphQlClient client = mockClient();
             ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
-            when(response.isValid()).thenReturn(false);
-            when(response.getErrors()).thenReturn(List.of());
+            lenient().when(response.isValid()).thenReturn(false);
+            lenient().when(response.getErrors()).thenReturn(List.of());
+
+            // Invalid response → handler returns ABORT
+            when(responseHandler.handle(eq(response), anyString(), any())).thenReturn(
+                new HandleResult(HandleResult.Action.ABORT, null)
+            );
 
             mockRequestSpec(client, response);
 
@@ -439,8 +455,13 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
         void invalidFirstPage_returnsEmptyList() {
             HttpGraphQlClient client = mockClient();
             ClientGraphQlResponse invalidResp = mock(ClientGraphQlResponse.class);
-            when(invalidResp.isValid()).thenReturn(false);
-            when(invalidResp.getErrors()).thenReturn(List.of());
+            lenient().when(invalidResp.isValid()).thenReturn(false);
+            lenient().when(invalidResp.getErrors()).thenReturn(List.of());
+
+            // Invalid response → handler returns ABORT
+            when(responseHandler.handle(eq(invalidResp), anyString(), any())).thenReturn(
+                new HandleResult(HandleResult.Action.ABORT, null)
+            );
 
             HttpGraphQlClient.RequestSpec requestSpec = mock(HttpGraphQlClient.RequestSpec.class);
             when(client.documentName(anyString())).thenReturn(requestSpec);
@@ -524,8 +545,13 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
             ClientGraphQlResponse mainPage = mockProjectsPageWithGroup(List.of(projA), null);
             // Phase 2: invalid response
             ClientGraphQlResponse reconPage = mock(ClientGraphQlResponse.class);
-            when(reconPage.isValid()).thenReturn(false);
-            when(reconPage.getErrors()).thenReturn(List.of());
+            lenient().when(reconPage.isValid()).thenReturn(false);
+            lenient().when(reconPage.getErrors()).thenReturn(List.of());
+
+            // Invalid reconciliation response → handler returns ABORT
+            when(responseHandler.handle(eq(reconPage), anyString(), any())).thenReturn(
+                new HandleResult(HandleResult.Action.ABORT, null)
+            );
 
             HttpGraphQlClient client = mockClient();
             mockSequentialExecute(client, mainPage, reconPage);
@@ -610,8 +636,13 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
         void reconciliationSkipped_whenPrimarySyncHadApiFailure() {
             HttpGraphQlClient client = mockClient();
             ClientGraphQlResponse invalidResp = mock(ClientGraphQlResponse.class);
-            when(invalidResp.isValid()).thenReturn(false);
-            when(invalidResp.getErrors()).thenReturn(List.of());
+            lenient().when(invalidResp.isValid()).thenReturn(false);
+            lenient().when(invalidResp.getErrors()).thenReturn(List.of());
+
+            // Invalid response → handler returns ABORT
+            when(responseHandler.handle(eq(invalidResp), anyString(), any())).thenReturn(
+                new HandleResult(HandleResult.Action.ABORT, null)
+            );
 
             HttpGraphQlClient.RequestSpec requestSpec = mock(HttpGraphQlClient.RequestSpec.class);
             when(client.documentName(anyString())).thenReturn(requestSpec);
@@ -730,7 +761,7 @@ class GitLabGroupSyncServiceTest extends BaseUnitTest {
     private void mockGraphQlGroupResponse(GitLabGroupResponse groupResponse) {
         HttpGraphQlClient client = mockClient();
         ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
-        when(response.isValid()).thenReturn(true);
+        lenient().when(response.isValid()).thenReturn(true);
 
         ClientResponseField groupField = mock(ClientResponseField.class);
         when(groupField.toEntity(GitLabGroupResponse.class)).thenReturn(groupResponse);

@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.issuecomment.gitlab;
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlResponseHandler;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncException;
@@ -30,15 +31,18 @@ public class GitLabNoteSyncService {
     private static final int NOTE_SYNC_PAGE_SIZE = 100;
 
     private final GitLabGraphQlClientProvider graphQlClientProvider;
+    private final GitLabGraphQlResponseHandler responseHandler;
     private final GitLabIssueCommentProcessor issueCommentProcessor;
     private final GitLabProperties gitLabProperties;
 
     public GitLabNoteSyncService(
         GitLabGraphQlClientProvider graphQlClientProvider,
+        GitLabGraphQlResponseHandler responseHandler,
         GitLabIssueCommentProcessor issueCommentProcessor,
         GitLabProperties gitLabProperties
     ) {
         this.graphQlClientProvider = graphQlClientProvider;
+        this.responseHandler = responseHandler;
         this.issueCommentProcessor = issueCommentProcessor;
         this.gitLabProperties = gitLabProperties;
     }
@@ -77,6 +81,7 @@ public class GitLabNoteSyncService {
         int totalSynced = 0;
         int totalSkipped = 0;
         String cursor = null;
+        String previousCursor = null;
         int page = 0;
         int reportedTotalCount = -1;
 
@@ -111,27 +116,15 @@ public class GitLabNoteSyncService {
                     .execute()
                     .block(gitLabProperties.graphqlTimeout());
 
-                if (response == null || !response.isValid()) {
-                    log.warn(
-                        "Failed to fetch notes: context={}, errors={}",
-                        safeContext,
-                        response != null ? response.getErrors() : "null response"
-                    );
-                    String errorDetail = response != null ? String.valueOf(response.getErrors()) : "null response";
+                var handleResult = responseHandler.handle(response, "notes for " + safeContext, log);
+                if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.RETRY) {
+                    continue;
+                }
+                if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.ABORT) {
                     graphQlClientProvider.recordFailure(
-                        new GitLabSyncException(
-                            "Invalid GraphQL response: context=" + safeContext + ", errors=" + errorDetail
-                        )
+                        new GitLabSyncException("Invalid GraphQL response: context=" + safeContext)
                     );
                     break;
-                }
-
-                if (response.getErrors() != null && !response.getErrors().isEmpty()) {
-                    log.warn(
-                        "Partial errors in note response: context={}, errors={}",
-                        safeContext,
-                        response.getErrors()
-                    );
                 }
 
                 graphQlClientProvider.recordSuccess();
@@ -179,6 +172,10 @@ public class GitLabNoteSyncService {
                     log.warn("Note pagination cursor null despite hasNextPage=true: context={}", safeContext);
                     break;
                 }
+                if (responseHandler.isPaginationLoop(cursor, previousCursor, "notes for " + safeContext, log)) {
+                    break;
+                }
+                previousCursor = cursor;
                 page++;
 
                 try {

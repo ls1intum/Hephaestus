@@ -1,11 +1,16 @@
 package de.tum.in.www1.hephaestus.gitprovider.common.gitlab;
 
+import de.tum.in.www1.hephaestus.gitprovider.commit.gitlab.GitLabCommitSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.issue.gitlab.GitLabIssueSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.issuedependency.gitlab.GitLabIssueDependencySyncService;
+import de.tum.in.www1.hephaestus.gitprovider.issuetype.gitlab.GitLabIssueTypeSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.label.gitlab.GitLabLabelSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.milestone.gitlab.GitLabMilestoneSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.organization.gitlab.GitLabGroupMemberSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.organization.gitlab.GitLabGroupSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.gitlab.GitLabMergeRequestSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.repository.collaborator.gitlab.GitLabCollaboratorSyncService;
+import de.tum.in.www1.hephaestus.gitprovider.subissue.gitlab.GitLabSubIssueSyncService;
 import de.tum.in.www1.hephaestus.gitprovider.team.gitlab.GitLabTeamSyncService;
 import jakarta.annotation.Nullable;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -28,6 +33,11 @@ public class GitLabSyncServiceHolder {
     private final GitLabIssueSyncService issueSyncService;
     private final GitLabMergeRequestSyncService mergeRequestSyncService;
     private final GitLabTeamSyncService teamSyncService;
+    private final GitLabCollaboratorSyncService collaboratorSyncService;
+    private final GitLabIssueTypeSyncService issueTypeSyncService;
+    private final GitLabCommitSyncService commitSyncService;
+    private final GitLabSubIssueSyncService subIssueSyncService;
+    private final GitLabIssueDependencySyncService issueDependencySyncService;
 
     public GitLabSyncServiceHolder(
         @Nullable GitLabGroupSyncService groupSyncService,
@@ -36,7 +46,12 @@ public class GitLabSyncServiceHolder {
         @Nullable GitLabMilestoneSyncService milestoneSyncService,
         @Nullable GitLabIssueSyncService issueSyncService,
         @Nullable GitLabMergeRequestSyncService mergeRequestSyncService,
-        @Nullable GitLabTeamSyncService teamSyncService
+        @Nullable GitLabTeamSyncService teamSyncService,
+        @Nullable GitLabCollaboratorSyncService collaboratorSyncService,
+        @Nullable GitLabIssueTypeSyncService issueTypeSyncService,
+        @Nullable GitLabCommitSyncService commitSyncService,
+        @Nullable GitLabSubIssueSyncService subIssueSyncService,
+        @Nullable GitLabIssueDependencySyncService issueDependencySyncService
     ) {
         this.groupSyncService = groupSyncService;
         this.groupMemberSyncService = groupMemberSyncService;
@@ -45,6 +60,11 @@ public class GitLabSyncServiceHolder {
         this.issueSyncService = issueSyncService;
         this.mergeRequestSyncService = mergeRequestSyncService;
         this.teamSyncService = teamSyncService;
+        this.collaboratorSyncService = collaboratorSyncService;
+        this.issueTypeSyncService = issueTypeSyncService;
+        this.commitSyncService = commitSyncService;
+        this.subIssueSyncService = subIssueSyncService;
+        this.issueDependencySyncService = issueDependencySyncService;
     }
 
     @Nullable
@@ -80,5 +100,30 @@ public class GitLabSyncServiceHolder {
     @Nullable
     public GitLabTeamSyncService getTeamSyncService() {
         return teamSyncService;
+    }
+
+    @Nullable
+    public GitLabCollaboratorSyncService getCollaboratorSyncService() {
+        return collaboratorSyncService;
+    }
+
+    @Nullable
+    public GitLabIssueTypeSyncService getIssueTypeSyncService() {
+        return issueTypeSyncService;
+    }
+
+    @Nullable
+    public GitLabCommitSyncService getCommitSyncService() {
+        return commitSyncService;
+    }
+
+    @Nullable
+    public GitLabSubIssueSyncService getSubIssueSyncService() {
+        return subIssueSyncService;
+    }
+
+    @Nullable
+    public GitLabIssueDependencySyncService getIssueDependencySyncService() {
+        return issueDependencySyncService;
     }
 }

@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.gitlab;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.PostgresStringUtils;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.EventContext;
@@ -197,6 +198,6 @@ public class GitLabPullRequestReviewCommentProcessor {
 
     private static EventContext createSyncContext(PullRequest pr, Long scopeId) {
         RepositoryRef repoRef = pr.getRepository() != null ? RepositoryRef.from(pr.getRepository()) : null;
-        return EventContext.forSync(scopeId, repoRef);
+        return EventContext.forSync(scopeId, repoRef, GitProviderType.GITLAB);
     }
 }

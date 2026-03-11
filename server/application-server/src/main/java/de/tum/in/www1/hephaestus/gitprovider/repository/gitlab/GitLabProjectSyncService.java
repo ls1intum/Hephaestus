@@ -6,6 +6,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlResponseHandler;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncException;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabGroupResponse;
@@ -37,6 +38,7 @@ public class GitLabProjectSyncService {
     private static final String GET_PROJECT_DOCUMENT = "GetProject";
 
     private final GitLabGraphQlClientProvider graphQlClientProvider;
+    private final GitLabGraphQlResponseHandler responseHandler;
     private final GitLabProjectProcessor projectProcessor;
     private final GitLabGroupProcessor groupProcessor;
     private final GitLabProperties gitLabProperties;
@@ -44,12 +46,14 @@ public class GitLabProjectSyncService {
 
     public GitLabProjectSyncService(
         GitLabGraphQlClientProvider graphQlClientProvider,
+        GitLabGraphQlResponseHandler responseHandler,
         GitLabProjectProcessor projectProcessor,
         GitLabGroupProcessor groupProcessor,
         GitLabProperties gitLabProperties,
         GitProviderRepository gitProviderRepository
     ) {
         this.graphQlClientProvider = graphQlClientProvider;
+        this.responseHandler = responseHandler;
         this.projectProcessor = projectProcessor;
         this.groupProcessor = groupProcessor;
         this.gitLabProperties = gitLabProperties;
@@ -101,25 +105,10 @@ public class GitLabProjectSyncService {
                 .execute()
                 .block(gitLabProperties.graphqlTimeout());
 
-            if (response == null || !response.isValid()) {
-                log.warn(
-                    "Failed to fetch project: scopeId={}, projectPath={}, errors={}",
-                    scopeId,
-                    safeProjectPath,
-                    response != null ? response.getErrors() : "null response"
-                );
+            var handleResult = responseHandler.handle(response, "project " + safeProjectPath, log);
+            if (handleResult.action() != GitLabGraphQlResponseHandler.HandleResult.Action.CONTINUE) {
                 graphQlClientProvider.recordFailure(new GitLabSyncException("Invalid GraphQL response"));
                 return Optional.empty();
-            }
-
-            // Check for partial errors (GraphQL can return data + errors simultaneously)
-            if (response.getErrors() != null && !response.getErrors().isEmpty()) {
-                log.warn(
-                    "Partial GraphQL errors in project response: scopeId={}, projectPath={}, errors={}",
-                    scopeId,
-                    safeProjectPath,
-                    response.getErrors()
-                );
             }
 
             graphQlClientProvider.recordSuccess();

@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.issuecomment.gitlab;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.AuthorAssociation;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.EventContext;
@@ -212,13 +213,21 @@ public class GitLabIssueCommentProcessor extends BaseGitLabProcessor {
         Long issueId = parent.getId();
 
         if (isNew) {
-            EventContext eventCtx = EventContext.forSync(scopeId, RepositoryRef.from(parent.getRepository()));
+            EventContext eventCtx = EventContext.forSync(
+                scopeId,
+                RepositoryRef.from(parent.getRepository()),
+                GitProviderType.GITLAB
+            );
             eventPublisher.publishEvent(
                 new DomainEvent.CommentCreated(EventPayload.CommentData.from(saved), issueId, eventCtx)
             );
             log.debug("Created comment from sync: commentId={}, parentId={}", saved.getId(), issueId);
         } else if (!changedFields.isEmpty()) {
-            EventContext eventCtx = EventContext.forSync(scopeId, RepositoryRef.from(parent.getRepository()));
+            EventContext eventCtx = EventContext.forSync(
+                scopeId,
+                RepositoryRef.from(parent.getRepository()),
+                GitProviderType.GITLAB
+            );
             eventPublisher.publishEvent(
                 new DomainEvent.CommentUpdated(EventPayload.CommentData.from(saved), issueId, changedFields, eventCtx)
             );

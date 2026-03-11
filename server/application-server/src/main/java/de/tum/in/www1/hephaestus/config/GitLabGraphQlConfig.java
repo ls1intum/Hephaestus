@@ -77,12 +77,15 @@ public class GitLabGraphQlConfig {
             .build();
 
         // GitLab rate limit is 100 points/min — 10 connections is generous
+        // Use LIFO to prefer fresh connections, mitigating PrematureCloseException
+        // from stale keep-alive connections (matches GitHub config)
         ConnectionProvider connectionProvider = ConnectionProvider.builder("gitlab-graphql")
             .maxConnections(10)
             .maxIdleTime(Duration.ofSeconds(20))
             .maxLifeTime(Duration.ofMinutes(3))
             .pendingAcquireTimeout(Duration.ofSeconds(60))
             .evictInBackground(Duration.ofSeconds(60))
+            .lifo()
             .build();
 
         // 75s response timeout covers the extended GraphQL timeout (60s) with margin

@@ -516,7 +516,8 @@ class ActivityEventListenerTest extends BaseUnitTest {
                 repoRef,
                 DataSource.WEBHOOK,
                 null,
-                UUID.randomUUID().toString()
+                UUID.randomUUID().toString(),
+                null
             );
             var event = new DomainEvent.CommitCreated(createCommitData(commit), contextWithNullScope);
 
@@ -824,7 +825,8 @@ class ActivityEventListenerTest extends BaseUnitTest {
             repoRef,
             DataSource.WEBHOOK,
             null,
-            UUID.randomUUID().toString()
+            UUID.randomUUID().toString(),
+            null
         );
     }
 

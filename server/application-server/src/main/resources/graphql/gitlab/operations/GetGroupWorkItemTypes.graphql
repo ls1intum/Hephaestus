@@ -1,0 +1,11 @@
+query GetGroupWorkItemTypes($fullPath: ID!) {
+    group(fullPath: $fullPath) {
+        workItemTypes {
+            nodes {
+                id
+                name
+                iconName
+            }
+        }
+    }
+}

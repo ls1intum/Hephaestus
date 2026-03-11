@@ -10,6 +10,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlResponseHandler;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncException;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabGroupMemberResponse;
@@ -66,6 +67,7 @@ public class GitLabGroupMemberSyncService {
     private static final int ADMIN_ACCESS_LEVEL_THRESHOLD = 40;
 
     private final GitLabGraphQlClientProvider graphQlClientProvider;
+    private final GitLabGraphQlResponseHandler responseHandler;
     private final OrganizationMembershipRepository organizationMembershipRepository;
     private final UserRepository userRepository;
     private final GitProviderRepository gitProviderRepository;
@@ -75,6 +77,7 @@ public class GitLabGroupMemberSyncService {
 
     public GitLabGroupMemberSyncService(
         GitLabGraphQlClientProvider graphQlClientProvider,
+        GitLabGraphQlResponseHandler responseHandler,
         OrganizationMembershipRepository organizationMembershipRepository,
         UserRepository userRepository,
         GitProviderRepository gitProviderRepository,
@@ -83,6 +86,7 @@ public class GitLabGroupMemberSyncService {
         TransactionTemplate transactionTemplate
     ) {
         this.graphQlClientProvider = graphQlClientProvider;
+        this.responseHandler = responseHandler;
         this.organizationMembershipRepository = organizationMembershipRepository;
         this.userRepository = userRepository;
         this.gitProviderRepository = gitProviderRepository;
@@ -124,6 +128,7 @@ public class GitLabGroupMemberSyncService {
 
         Set<Long> syncedUserIds = new HashSet<>();
         String cursor = null;
+        String previousCursor = null;
         int pageCount = 0;
         boolean syncCompletedNormally = false;
 
@@ -154,27 +159,13 @@ public class GitLabGroupMemberSyncService {
                     .execute()
                     .block(gitLabProperties.graphqlTimeout());
 
-                if (response == null || !response.isValid()) {
-                    log.warn(
-                        "Failed to fetch group members: scopeId={}, groupPath={}, page={}, errors={}",
-                        scopeId,
-                        safeGroupPath,
-                        pageCount,
-                        response != null ? response.getErrors() : "null response"
-                    );
+                var handleResult = responseHandler.handle(response, "group members for " + safeGroupPath, log);
+                if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.RETRY) {
+                    continue;
+                }
+                if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.ABORT) {
                     graphQlClientProvider.recordFailure(new GitLabSyncException("Invalid GraphQL response"));
                     break;
-                }
-
-                // Check for partial errors (GraphQL can return data + errors simultaneously)
-                if (response.getErrors() != null && !response.getErrors().isEmpty()) {
-                    log.warn(
-                        "Partial GraphQL errors in group members response: scopeId={}, groupPath={}, page={}, errors={}",
-                        scopeId,
-                        safeGroupPath,
-                        pageCount,
-                        response.getErrors()
-                    );
                 }
 
                 graphQlClientProvider.recordSuccess();
@@ -215,6 +206,12 @@ public class GitLabGroupMemberSyncService {
                     );
                     break;
                 }
+                if (
+                    responseHandler.isPaginationLoop(cursor, previousCursor, "group members for " + safeGroupPath, log)
+                ) {
+                    break;
+                }
+                previousCursor = cursor;
 
                 pageCount++;
                 Thread.sleep(gitLabProperties.paginationThrottle().toMillis());
