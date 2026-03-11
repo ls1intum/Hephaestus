@@ -2,61 +2,41 @@ import {
 	Background,
 	BackgroundVariant,
 	Controls,
-	type EdgeTypes,
 	MiniMap,
-	type NodeTypes,
+	type NodeChange,
 	ReactFlow,
 	useEdgesState,
 	useNodesState,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { toast } from "sonner";
+import type { AchievementId } from "@/api";
 import type { Achievement } from "@/api/types.gen";
-import { ACHIEVEMENT_REGISTRY } from "@/components/achievements/definitions.ts";
+import type { AchievementNode } from "@/components/achievements/AchievementNode";
+import type { AvatarNode } from "@/components/achievements/AvatarNode";
+import type { CategoryLabelNode } from "@/components/achievements/CategoryLabels";
+import { DesignerToolbar, type SnapGridSize } from "@/components/achievements/DesignerToolbar";
+import { ACHIEVEMENT_REGISTRY } from "@/components/achievements/definitions";
+import { SkillTreeGraphBackground } from "@/components/achievements/SkillTreeGraphBackground";
+import {
+	edgeTypes,
+	getIsDarkMode,
+	NODE_ORIGIN,
+	nodeTypes,
+	subscribeToTheme,
+} from "@/components/achievements/skill-tree-shared";
 import type { UIAchievement } from "@/components/achievements/types";
 import {
 	type AnyAchievementEdge,
 	type EdgeDisplayMode,
+	enhanceAchievements,
 	generateSkillTreeData,
+	getMiniMapNodeColor,
 } from "@/components/achievements/utils";
-import { AchievementEdge } from "./AchievementEdge.tsx";
-import { AchievementNode } from "./AchievementNode.tsx";
-import { AvatarNode } from "./AvatarNode.tsx";
-import { CategoryLabelNode } from "./CategoryLabels.tsx";
-import { DesignerToolbar, type SnapGridSize } from "./DesignerToolbar.tsx";
-import { EqualizerEdge } from "./EqualizerEdge.tsx";
-import { SkillTreeGraphBackground } from "./SkillTreeGraphBackground.tsx";
-import { SynthwaveEdge } from "./SynthwaveEdge.tsx";
 
-const nodeTypes: NodeTypes = {
-	achievement: AchievementNode,
-	avatar: AvatarNode,
-	categoryLabel: CategoryLabelNode,
-};
-
-const edgeTypes: EdgeTypes = {
-	achievement: AchievementEdge,
-	synthwave: SynthwaveEdge,
-	equalizer: EqualizerEdge,
-};
-
-function subscribeToTheme(callback: () => void) {
-	const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-	const observer = new MutationObserver(callback);
-	observer.observe(document.documentElement, {
-		attributes: true,
-		attributeFilter: ["class"],
-	});
-	mediaQuery.addEventListener("change", callback);
-	return () => {
-		mediaQuery.removeEventListener("change", callback);
-		observer.disconnect();
-	};
-}
-
-function getIsDarkMode() {
-	return document.documentElement.classList.contains("dark");
-}
+const FIT_VIEW_OPTIONS = { padding: 0.15 } as const;
+const PRO_OPTIONS = { hideAttribution: true } as const;
 
 export interface SkillTreeDesignerProps {
 	user: {
@@ -69,7 +49,10 @@ export interface SkillTreeDesignerProps {
 }
 
 export function SkillTreeDesigner({ user, allDefinitions }: SkillTreeDesignerProps) {
-	const [nodes, setNodes, onNodesChangeRef] = useNodesState<AchievementNode | AvatarNode | CategoryLabelNode>([]);
+	const { name, avatarUrl, level, leaguePoints } = user;
+	const [nodes, setNodes, onNodesChangeRef] = useNodesState<
+		AchievementNode | AvatarNode | CategoryLabelNode
+	>([]);
 	const [edges, setEdges, onEdgesChange] = useEdgesState<AnyAchievementEdge>([]);
 	const [isDraggable, setIsDraggable] = useState(true);
 	const [isSnapping, setIsSnapping] = useState(true);
@@ -78,93 +61,93 @@ export function SkillTreeDesigner({ user, allDefinitions }: SkillTreeDesignerPro
 
 	const [snapSize, setSnapSize] = useState<SnapGridSize>(24);
 
-	const handleNodesChange = useCallback(
-		(changes: any[]) => {
-			if (isSnapping) {
-				const snappedChanges = changes.map((change) => {
-					if (change.type === "position" && change.position) {
-						// Custom Snapping: Since nodeOrigin=[0.5, 0.5], the position reflects the center of the node!
-						// By snapping this center directly here, we guarantee absolute perfect alignment
-						// regardless of node width/height.
-						return {
-							...change,
-							position: {
-								x: Math.round(change.position.x / snapSize) * snapSize,
-								y: Math.round(change.position.y / snapSize) * snapSize,
-							},
-						};
-					}
-					return change;
-				});
-				onNodesChangeRef(snappedChanges);
-			} else {
-				onNodesChangeRef(changes);
+	function handleNodesChange(
+		changes: NodeChange<AchievementNode | AvatarNode | CategoryLabelNode>[],
+	) {
+		if (isSnapping) {
+			const snappedChanges = changes.map((change) => {
+				if (change.type === "position" && change.position) {
+					// Custom Snapping: Since nodeOrigin=[0.5, 0.5], the position reflects the center of the node!
+					// By snapping this center directly here, we guarantee absolute perfect alignment
+					// regardless of node width/height.
+					return {
+						...change,
+						position: {
+							x: Math.round(change.position.x / snapSize) * snapSize,
+							y: Math.round(change.position.y / snapSize) * snapSize,
+						},
+					};
+				}
+				return change;
+			});
+			onNodesChangeRef(snappedChanges);
+		} else {
+			onNodesChangeRef(changes);
+		}
+	}
+
+	async function saveLayout() {
+		const layoutMap = nodes.reduce<Record<string, { x: number; y: number }>>((coords, node) => {
+			if (node.type === "avatar") coords.avatar = { x: 0, y: 0 };
+			if (node.type === "categoryLabel") {
+				coords[node.id] = {
+					x: Math.round(node.position.x),
+					y: Math.round(node.position.y),
+				};
 			}
-		},
-		[isSnapping, snapSize, onNodesChangeRef],
-	);
+			if (node.type === "achievement") {
+				const rawId = node.data.achievement.id;
+				coords[rawId] = {
+					x: Math.round(node.position.x),
+					y: Math.round(node.position.y),
+				};
+			}
+			return coords;
+		}, {});
 
-	const saveLayout = useCallback(async () => {
-		const layoutMap = nodes.reduce(
-			(coords, node) => {
-				if (node.type === "avatar") coords.avatar = { x: 0, y: 0 };
-				if (node.type === "categoryLabel") {
-					coords[node.id] = {
-						x: Math.round(node.position.x),
-						y: Math.round(node.position.y),
-					};
-				}
-				if (node.type === "achievement") {
-					const rawId = node.data.achievement.id;
-					coords[rawId] = {
-						x: Math.round(node.position.x),
-						y: Math.round(node.position.y),
-					};
-				}
-				return coords;
-			},
-			{} as Record<string, { x: number; y: number }>,
-		);
-
-		await fetch("/__save-coordinates", {
-			method: "POST",
-			body: JSON.stringify(layoutMap, null, 2),
-		});
-		alert("Layout saved to coordinates.json!");
-	}, [nodes]);
+		// Dev-only: saves layout to coordinates.json via Vite dev server plugin
+		if (import.meta.env.DEV) {
+			await fetch("/__save-coordinates", {
+				method: "POST",
+				body: JSON.stringify(layoutMap, null, 2),
+			});
+			toast.success("Layout saved to coordinates.json!");
+		}
+	}
 
 	useEffect(() => {
-		let displayAchievements: UIAchievement[] = [];
+		let displayAchievements: UIAchievement[];
 
 		if (allDefinitions && allDefinitions.length > 0) {
-			displayAchievements = allDefinitions.map((def) => {
-				const registryItem = ACHIEVEMENT_REGISTRY[def.id as keyof typeof ACHIEVEMENT_REGISTRY];
-				return {
-					...def,
-					status: "unlocked" as const,
-					...registryItem,
-				} as unknown as UIAchievement;
-			});
+			displayAchievements = enhanceAchievements(allDefinitions).map((a) => ({
+				...a,
+				status: "unlocked" as const,
+			}));
 		} else {
 			displayAchievements = Object.entries(ACHIEVEMENT_REGISTRY).map(
 				([id, def]) =>
 					({
 						...def,
-						id,
-						status: "unlocked",
-					}) as unknown as UIAchievement,
+						id: id as AchievementId,
+						status: "unlocked" as const,
+						category: "milestones" as const,
+						rarity: "common" as const,
+						isHidden: false,
+						progressData: { type: "BinaryAchievementProgress" as const, unlocked: true },
+						unlockedAt: new Date(),
+					}) satisfies UIAchievement,
 			);
 		}
 
 		const { nodes: newNodes, edges: newEdges } = generateSkillTreeData(
-			user,
+			{ name, avatarUrl, level, leaguePoints },
 			displayAchievements,
 			edgeDisplayMode,
 		);
 
 		setNodes(newNodes);
 		setEdges(newEdges);
-	}, [user, allDefinitions, setNodes, setEdges, edgeDisplayMode]);
+	}, [name, avatarUrl, level, leaguePoints, allDefinitions, setNodes, setEdges, edgeDisplayMode]);
 
 	const isDark = useSyncExternalStore(subscribeToTheme, getIsDarkMode, () => true);
 
@@ -186,27 +169,25 @@ export function SkillTreeDesigner({ user, allDefinitions }: SkillTreeDesignerPro
 			/>
 
 			<ReactFlow
-				nodes={nodes.map(
-					(n) => {
-						if (n.type === 'categoryLabel') return n;
-						return {
-							...n,
-							data: { ...n.data, showTooltips },
-						} as AchievementNode | AvatarNode;
-					}
-				)}
+				nodes={nodes.map((n) => {
+					if (n.type === "categoryLabel") return n;
+					return {
+						...n,
+						data: { ...n.data, showTooltips },
+					} as AchievementNode | AvatarNode;
+				})}
 				edges={edges}
 				onNodesChange={handleNodesChange}
 				onEdgesChange={onEdgesChange}
 				nodeTypes={nodeTypes}
 				edgeTypes={edgeTypes}
-				onInit={(instance) => instance.fitView({ padding: 0.15 })}
+				onInit={(instance) => instance.fitView(FIT_VIEW_OPTIONS)}
 				fitView={true}
-				fitViewOptions={{ padding: 0.15 }}
+				fitViewOptions={FIT_VIEW_OPTIONS}
 				minZoom={0.15}
 				maxZoom={2.5}
-				nodeOrigin={[0.5, 0.5]}
-				proOptions={{ hideAttribution: true }}
+				nodeOrigin={NODE_ORIGIN}
+				proOptions={PRO_OPTIONS}
 				className="bg-background"
 				elementsSelectable={true}
 				nodesDraggable={isDraggable}
@@ -218,7 +199,6 @@ export function SkillTreeDesigner({ user, allDefinitions }: SkillTreeDesignerPro
 				multiSelectionKeyCode={null}
 				zoomActivationKeyCode={null}
 				panActivationKeyCode={null}
-				disableKeyboardA11y={true}
 			>
 				{/* Custom origin-synchronized background (axes + category labels) */}
 				<SkillTreeGraphBackground showAxes={true} />
@@ -246,40 +226,7 @@ export function SkillTreeDesigner({ user, allDefinitions }: SkillTreeDesignerPro
 					showInteractive={false}
 				/>
 				<MiniMap
-					nodeColor={(node: AchievementNode | AvatarNode | CategoryLabelNode) => {
-						if (node.type === "categoryLabel") {
-							return "rgba(0,0,0,0)";
-						}
-						if (node.type === "achievement") {
-							const status = node.data.achievement.status;
-							if (isDark) {
-								switch (status) {
-									case "unlocked":
-										return "rgba(255, 255, 255, 0.9)";
-									case "available":
-										return "rgba(255, 255, 255, 0.4)";
-									case "locked":
-										return "rgba(255, 255, 255, 0.15)";
-									case "hidden":
-										return "rgba(0, 0, 0, 0)";
-								}
-							}
-							switch (status) {
-								case "unlocked":
-									return "rgba(0, 0, 0, 0.85)";
-								case "available":
-									return "rgba(0, 0, 0, 0.5)";
-								case "locked":
-									return "rgba(0, 0, 0, 0.15)";
-								case "hidden":
-									return "rgba(0, 0, 0, 0)";
-							}
-						}
-						if (node.type === "avatar") {
-							return isDark ? "rgba(187,247,208,0.85)" : "rgba(21,128,61,0.85)";
-						}
-						return isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.12)";
-					}}
+					nodeColor={(node) => getMiniMapNodeColor(node, isDark)}
 					maskColor={isDark ? "rgba(0, 0, 0, 0.85)" : "rgba(255, 255, 255, 0.85)"}
 					className="bg-card/80! border-border! rounded-lg!"
 					pannable={true}

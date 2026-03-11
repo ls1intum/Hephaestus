@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.achievement;
 
+import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import de.tum.in.www1.hephaestus.core.exception.AccessForbiddenException;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
@@ -73,7 +74,11 @@ public class AchievementController {
         WorkspaceContext workspaceContext,
         @PathVariable String login
     ) {
-        log.debug("Getting achievements for user: {} in workspace: {}", login, workspaceContext.slug());
+        log.debug(
+            "Getting achievements for user: {} in workspace: {}",
+            LoggingUtils.sanitizeForLog(login),
+            workspaceContext.slug()
+        );
 
         User user = userRepository.findByLogin(login).orElseThrow(() -> new EntityNotFoundException("User", login));
 
@@ -131,7 +136,7 @@ public class AchievementController {
     ) {
         log.info(
             "Admin requested achievement recalculation for user: {} in workspace: {}",
-            login,
+            LoggingUtils.sanitizeForLog(login),
             workspaceContext.slug()
         );
 

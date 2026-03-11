@@ -1,13 +1,13 @@
 import { Tooltip as TooltipPrimitive } from "@base-ui/react/tooltip";
 import type { ReactElement, ReactNode } from "react";
-import { AchievementProgressDisplay } from "@/components/achievements/AchievementProgressDisplay.tsx";
+import { AchievementProgressDisplay } from "@/components/achievements/AchievementProgressDisplay";
 import {
 	rarityBorderColors,
 	rarityLabels,
 	rarityTitleColors,
 	statusIcons,
 } from "@/components/achievements/styles";
-import type { UIAchievement } from "@/components/achievements/types.ts";
+import type { UIAchievement } from "@/components/achievements/types";
 import { cn } from "@/lib/utils";
 
 export interface AchievementTooltipProps {
@@ -30,8 +30,15 @@ export function AchievementTooltip(props: AchievementTooltipProps) {
 			<TooltipPrimitive.Root open={open}>
 				<TooltipPrimitive.Trigger render={children as ReactElement} />
 				<TooltipPrimitive.Portal>
-					<TooltipPrimitive.Positioner side="top" sideOffset={12} align="center" className="z-100">
+					<TooltipPrimitive.Positioner
+						side="top"
+						sideOffset={12}
+						align="center"
+						className="z-[100]"
+					>
 						<TooltipPrimitive.Popup
+							role="tooltip"
+							id={`tooltip-${achievement.id}`}
 							className={cn(
 								"w-64 bg-popover border-2 shadow-2xl text-foreground rounded-lg overflow-hidden",
 								"animate-in fade-in-0 zoom-in-95", // Basic animation

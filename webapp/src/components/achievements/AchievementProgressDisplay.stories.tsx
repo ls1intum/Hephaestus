@@ -1,6 +1,14 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { AchievementProgressDisplay } from "./AchievementProgressDisplay";
-import { apolloClarity, athenaReview, dionysusDeploy, hermesSprint } from "./storyMockData";
+import { AchievementProgressDisplay } from "@/components/achievements/AchievementProgressDisplay";
+import {
+	apolloClarity,
+	artemisHunt,
+	asUI,
+	athenaReview,
+	dionysusDeploy,
+	hermesSprint,
+	prometheusLongName,
+} from "@/components/achievements/storyMockData";
 
 /**
  * Component for showcasing achievement progress indicators.
@@ -36,7 +44,7 @@ type Story = StoryObj<typeof meta>;
  */
 export const LinearPartialProgress: Story = {
 	args: {
-		achievement: apolloClarity,
+		achievement: asUI(apolloClarity),
 	},
 };
 
@@ -45,7 +53,7 @@ export const LinearPartialProgress: Story = {
  */
 export const LinearCompleted: Story = {
 	args: {
-		achievement: athenaReview,
+		achievement: asUI(athenaReview),
 	},
 };
 
@@ -54,15 +62,27 @@ export const LinearCompleted: Story = {
  */
 export const BinaryLockedMilestone: Story = {
 	args: {
-		achievement: dionysusDeploy,
+		achievement: asUI(dionysusDeploy),
 	},
 };
 
 /**
  * Binary achievement that has been unlocked through divine intervention.
  */
-export const BinaryUnlockedmilestone: Story = {
+export const BinaryUnlockedMilestone: Story = {
 	args: {
-		achievement: hermesSprint,
+		achievement: asUI(hermesSprint),
+	},
+};
+
+export const ZeroProgress: Story = {
+	args: {
+		achievement: asUI(artemisHunt),
+	},
+};
+
+export const LongTextOverflow: Story = {
+	args: {
+		achievement: asUI(prometheusLongName),
 	},
 };

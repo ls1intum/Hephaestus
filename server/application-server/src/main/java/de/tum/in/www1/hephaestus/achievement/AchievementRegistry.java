@@ -10,7 +10,11 @@ import de.tum.in.www1.hephaestus.activity.ActivityEventType;
 import jakarta.annotation.PostConstruct;
 import java.io.File;
 import java.io.InputStream;
-import java.util.*;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ClassPathResource;
@@ -33,8 +37,8 @@ public class AchievementRegistry {
     private final ObjectMapper yamlMapper;
 
     // We use ConcurrentHashMap to allow thread-safe reads even while replacing the data
-    private Map<String, AchievementDefinition> achievementsById = new ConcurrentHashMap<>();
-    private List<AchievementDefinition> allAchievements = new ArrayList<>();
+    private volatile Map<String, AchievementDefinition> achievementsById = new ConcurrentHashMap<>();
+    private volatile List<AchievementDefinition> allAchievements = List.of();
 
     public AchievementRegistry() {
         this.yamlMapper = new ObjectMapper(new YAMLFactory())
@@ -110,7 +114,7 @@ public class AchievementRegistry {
 
                 // Swap maps atomically-ish (we are in synchronized block)
                 this.achievementsById = new ConcurrentHashMap<>(tempIdMap);
-                this.allAchievements = new ArrayList<>(records);
+                this.allAchievements = List.copyOf(tempIdMap.values());
 
                 log.info("Successfully loaded {} achievements into the registry.", achievementsById.size());
             }
@@ -132,30 +136,6 @@ public class AchievementRegistry {
             throw new IllegalArgumentException("Unknown achievement ID: " + id);
         }
         return record;
-    }
-
-    /**
-     * Look up an achievement by ID safely.
-     *
-     * @param id the achievement ID
-     * @return an Optional containing the definition record if found
-     */
-    public Optional<AchievementDefinition> findById(String id) {
-        return Optional.ofNullable(achievementsById.get(id));
-    }
-
-    /**
-     * Get all achievements matching a given category.
-     *
-     * @param category the category to filter by
-     * @return a list of achievements in the category, ordered by rarity
-     */
-    public List<AchievementDefinition> getByCategory(AchievementCategory category) {
-        return allAchievements
-            .stream()
-            .filter(a -> a.category() == category)
-            .sorted(Comparator.comparing(AchievementDefinition::rarity, AchievementRarity.RARITY_COMPARATOR))
-            .toList();
     }
 
     /**
@@ -186,6 +166,6 @@ public class AchievementRegistry {
      * @return an unmodifiable list of all achievements
      */
     public List<AchievementDefinition> values() {
-        return Collections.unmodifiableList(allAchievements);
+        return allAchievements;
     }
 }

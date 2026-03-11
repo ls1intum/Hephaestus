@@ -1,56 +1,33 @@
 import {
 	Background,
 	Controls,
-	type EdgeTypes,
 	MiniMap,
-	type NodeTypes,
 	ReactFlow,
 	useEdgesState,
 	useNodesState,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { useEffect, useRef, useSyncExternalStore } from "react";
+import { useEffect, useSyncExternalStore } from "react";
+import type { AchievementNode } from "@/components/achievements/AchievementNode";
+import type { AvatarNode } from "@/components/achievements/AvatarNode";
+import type { CategoryLabelNode } from "@/components/achievements/CategoryLabels";
+import { SkillTreeGraphBackground } from "@/components/achievements/SkillTreeGraphBackground";
+import {
+	edgeTypes,
+	getIsDarkMode,
+	NODE_ORIGIN,
+	nodeTypes,
+	subscribeToTheme,
+} from "@/components/achievements/skill-tree-shared";
 import type { UIAchievement } from "@/components/achievements/types";
-import { type AnyAchievementEdge, generateSkillTreeData } from "@/components/achievements/utils";
-import { AchievementEdge } from "./AchievementEdge.tsx";
-import { AchievementNode } from "./AchievementNode.tsx";
-import { AvatarNode } from "./AvatarNode.tsx";
-import { CategoryLabelNode } from "./CategoryLabels.tsx";
-import { EqualizerEdge } from "./EqualizerEdge.tsx";
-import { SkillTreeGraphBackground } from "./SkillTreeGraphBackground.tsx";
-import { SynthwaveEdge } from "./SynthwaveEdge.tsx";
+import {
+	type AnyAchievementEdge,
+	generateSkillTreeData,
+	getMiniMapNodeColor,
+} from "@/components/achievements/utils";
 
-const nodeTypes: NodeTypes = {
-	achievement: AchievementNode,
-	avatar: AvatarNode,
-	categoryLabel: CategoryLabelNode,
-};
-
-const edgeTypes: EdgeTypes = {
-	achievement: AchievementEdge,
-	synthwave: SynthwaveEdge,
-	equalizer: EqualizerEdge,
-};
-
-// Theme detection for MiniMap colors (React Flow requires computed color strings)
-function subscribeToTheme(callback: () => void) {
-	const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-	// Also observe class changes on document.documentElement for manual theme toggle
-	const observer = new MutationObserver(callback);
-	observer.observe(document.documentElement, {
-		attributes: true,
-		attributeFilter: ["class"],
-	});
-	mediaQuery.addEventListener("change", callback);
-	return () => {
-		mediaQuery.removeEventListener("change", callback);
-		observer.disconnect();
-	};
-}
-
-function getIsDarkMode() {
-	return document.documentElement.classList.contains("dark");
-}
+const FIT_VIEW_OPTIONS = { padding: 0.15 } as const;
+const PRO_OPTIONS = { hideAttribution: true } as const;
 
 export interface SkillTreeProps {
 	user: {
@@ -63,21 +40,25 @@ export interface SkillTreeProps {
 }
 
 export function SkillTree({ user, achievements }: SkillTreeProps) {
-	const { nodes: initialNodes, edges: initialEdges } = generateSkillTreeData(user, achievements);
+	const { name, avatarUrl, level, leaguePoints } = user;
 
-	const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-	const [edges, setEdges, onEdgesChange] = useEdgesState<AnyAchievementEdge>(initialEdges);
+	const [nodes, setNodes, onNodesChange] = useNodesState<
+		AchievementNode | AvatarNode | CategoryLabelNode
+	>([]);
+	const [edges, setEdges, onEdgesChange] = useEdgesState<AnyAchievementEdge>([]);
 
-	// Node origin: [0.5, 0.5] treats position as node center, matching the designer.
-	const nodeOrigin = useRef<[number, number]>([0.5, 0.5]).current;
-
-	// Update nodes when user or achievements props change
+	// Generate nodes/edges when user or achievements props change.
+	// Depend on individual primitive fields instead of the `user` object reference
+	// to avoid infinite re-renders when the parent creates a new object each render.
 	useEffect(() => {
-		const { nodes: newNodes, edges: newEdges } = generateSkillTreeData(user, achievements);
+		const { nodes: newNodes, edges: newEdges } = generateSkillTreeData(
+			{ name, avatarUrl, level, leaguePoints },
+			achievements,
+		);
 
 		setNodes(newNodes);
 		setEdges(newEdges);
-	}, [user, achievements, setNodes, setEdges]);
+	}, [name, avatarUrl, level, leaguePoints, achievements, setNodes, setEdges]);
 
 	const isDark = useSyncExternalStore(subscribeToTheme, getIsDarkMode, () => true);
 
@@ -90,14 +71,14 @@ export function SkillTree({ user, achievements }: SkillTreeProps) {
 				onEdgesChange={onEdgesChange}
 				nodeTypes={nodeTypes}
 				edgeTypes={edgeTypes}
-				onInit={(instance) => instance.fitView({ padding: 0.15 })}
 				fitView={true}
-				fitViewOptions={{ padding: 0.15 }}
+				fitViewOptions={FIT_VIEW_OPTIONS}
 				minZoom={0.15}
 				maxZoom={2.5}
-				nodeOrigin={nodeOrigin}
-				proOptions={{ hideAttribution: true }}
+				nodeOrigin={NODE_ORIGIN}
+				proOptions={PRO_OPTIONS}
 				className="bg-background"
+				aria-label="Achievement skill tree"
 				// Nodes should be not accessible besides selection for tooltip
 				elementsSelectable={true}
 				nodesDraggable={false}
@@ -108,7 +89,6 @@ export function SkillTree({ user, achievements }: SkillTreeProps) {
 				multiSelectionKeyCode={null}
 				zoomActivationKeyCode={null}
 				panActivationKeyCode={null}
-				disableKeyboardA11y={true}
 			>
 				<SkillTreeGraphBackground />
 				{/* Subtle dot grid background */}
@@ -122,44 +102,7 @@ export function SkillTree({ user, achievements }: SkillTreeProps) {
 
 				{/* Mini map */}
 				<MiniMap
-					nodeColor={(node: NonNullable<Parameters<typeof MiniMap>[0]>["nodeColor"] extends ((n: infer T) => any) | undefined | string ? (T extends { type: string } ? T : (AchievementNode | AvatarNode | CategoryLabelNode)) : (AchievementNode | AvatarNode | CategoryLabelNode)) => {
-						if (node.type === "categoryLabel") {
-							return "rgba(0,0,0,0)";
-						}
-						if (node.type === "achievement") {
-							const status = node.data.achievement.status;
-							if (isDark) {
-								// Dark mode: white nodes on dark bg
-								switch (status) {
-									case "unlocked":
-										return "rgba(255, 255, 255, 0.9)";
-									case "available":
-										return "rgba(255, 255, 255, 0.4)";
-									case "locked":
-										return "rgba(255, 255, 255, 0.15)";
-									case "hidden":
-										return "rgba(0, 0, 0, 0)";
-								}
-							}
-
-							// Light mode: dark nodes on light bg
-							switch (status) {
-								case "unlocked":
-									return "rgba(0, 0, 0, 0.85)";
-								case "available":
-									return "rgba(0, 0, 0, 0.5)";
-								case "locked":
-									return "rgba(0, 0, 0, 0.15)";
-								case "hidden":
-									return "rgba(0, 0, 0, 0)";
-							}
-						}
-						if (node.type === "avatar") {
-							return isDark ? "rgba(187,247,208,0.85)" : "rgba(21,128,61,0.85)";
-						}
-						// fallback
-						return isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.12)";
-					}}
+					nodeColor={(node) => getMiniMapNodeColor(node, isDark)}
 					maskColor={isDark ? "rgba(0, 0, 0, 0.85)" : "rgba(255, 255, 255, 0.85)"}
 					className="bg-card/80! border-border! rounded-lg!"
 					pannable={true}

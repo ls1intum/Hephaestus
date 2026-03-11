@@ -29,11 +29,6 @@ public record AchievementDTO(
         ref = "AchievementId"
     )
     String id,
-    //    @NonNull @Schema(description = "Human-readable name", example = "First Merge") String name,
-    //    @NonNull
-    //    @Schema(description = "Description of how to earn the achievement", example = "Merge your first pull request")
-    //    String description,
-    //    @NonNull @Schema(description = "Icon identifier for UI", example = "git-merge") String icon,
     @NonNull
     @Schema(description = "Category for grouping achievements", example = "pull_requests")
     AchievementCategory category,
@@ -44,8 +39,6 @@ public record AchievementDTO(
     @NonNull
     @Schema(description = "Current status of the achievement for this user", example = "unlocked")
     AchievementStatus status,
-    //    @NonNull @Schema(description = "Current progress count (e.g., 4 PRs merged)", example = "4") long progress,
-    //    @NonNull @Schema(description = "Required count to unlock (e.g., 5 PRs)", example = "5") long maxProgress,
     @NonNull
     @Schema(description = "The structured progress data based on the achievements evaluator")
     AchievementProgress progressData,

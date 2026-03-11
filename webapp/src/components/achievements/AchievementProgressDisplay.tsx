@@ -1,9 +1,9 @@
 import { CheckCircleIcon, XCircleIcon } from "@primer/octicons-react";
-import type { UIAchievement } from "@/components/achievements/types.ts";
+import type { UIAchievement } from "@/components/achievements/types";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 
-interface AchievementProgressDisplayProps {
+export interface AchievementProgressDisplayProps {
 	achievement: UIAchievement;
 	className?: string;
 }
@@ -14,27 +14,19 @@ export function AchievementProgressDisplay({
 }: AchievementProgressDisplayProps) {
 	const { progressData } = achievement;
 
-	console.debug(progressData.type);
-
 	switch (progressData.type) {
 		case "LinearAchievementProgress": {
 			// Logic for Counter Achievements (e.g., 5/10 PRs)
-			const percentage =
-				progressData.current > 0
-					? Math.round((progressData.current / progressData.target) * 100)
-					: 0;
+			const { current, target } = progressData;
+			const percentage = target > 0 ? Math.min(Math.round((current / target) * 100), 100) : 0;
 
 			return (
 				<div className={cn("space-y-1 min-w-30", className)}>
-					<Progress
-						value={percentage}
-						className="h-2"
-						aria-label={`${progressData.current} of ${progressData.target}`}
-					/>
+					<Progress value={percentage} className="h-2" aria-label={`${current} of ${target}`} />
 					<div className="text-xs text-muted-foreground flex justify-between">
 						<span>{percentage}%</span>
 						<span>
-							{progressData.current} / {progressData.target}
+							{current} / {target}
 						</span>
 					</div>
 				</div>
@@ -47,7 +39,7 @@ export function AchievementProgressDisplay({
 			if (progressData.unlocked) {
 				return (
 					<div
-						className={cn("flex items-center gap-1.5 text-github-success-foreground", className)}
+						className={cn("flex items-center gap-1.5 text-provider-success-foreground", className)}
 					>
 						<CheckCircleIcon className="h-4 w-4" />
 						<span className="text-xs font-medium">Unlocked</span>
@@ -56,11 +48,14 @@ export function AchievementProgressDisplay({
 			}
 
 			return (
-				<div className={cn("flex items-center gap-1.5 text-github-danger-foreground", className)}>
+				<div className={cn("flex items-center gap-1.5 text-provider-danger-foreground", className)}>
 					<XCircleIcon className="h-4 w-4" />
 					<span className="text-xs">Locked</span>
 				</div>
 			);
 		}
+
+		default:
+			return null;
 	}
 }

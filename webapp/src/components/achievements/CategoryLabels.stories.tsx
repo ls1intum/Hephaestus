@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { ReactFlowProvider } from "@xyflow/react";
-import { CategoryLabelNode } from "./CategoryLabels";
+import { CategoryLabelNode } from "@/components/achievements/CategoryLabels";
 
 const meta = {
 	component: CategoryLabelNode,
@@ -42,7 +42,10 @@ export const PullRequests: Story = {
 		positionAbsoluteX: 0,
 		positionAbsoluteY: 0,
 		isConnectable: false,
-	} as any,
+		draggable: false,
+		selectable: false,
+		deletable: false,
+	},
 };
 
 export const Commits: Story = {
@@ -59,5 +62,8 @@ export const Commits: Story = {
 		positionAbsoluteX: 0,
 		positionAbsoluteY: 0,
 		isConnectable: false,
-	} as any,
+		draggable: false,
+		selectable: false,
+		deletable: false,
+	},
 };

@@ -28,6 +28,8 @@ import { isPosthogEnabled } from "@/integrations/posthog/config";
 import { useTheme } from "@/integrations/theme";
 import { getProviderSlug } from "@/lib/provider";
 import type { ChatMessage } from "@/lib/types";
+import { useMotionPreference } from "@/hooks/use-motion-preference";
+import React, { useEffect } from "react";
 
 interface MyRouterContext {
 	queryClient: QueryClient;
@@ -39,6 +41,12 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 		const { theme } = useTheme();
 		const { pathname } = useLocation();
 		const { isAuthenticated, hasRole, isLoading } = useAuth();
+		const reducedMotion = useMotionPreference();
+
+		useEffect(() => {
+			document.documentElement.setAttribute("data-motion", reducedMotion ? "reduced" : "full");
+		}, [reducedMotion]);
+
 		const { data: userSettings, isError: userSettingsError } = useQuery({
 			...getUserSettingsOptions({}),
 			enabled: isAuthenticated && isPosthogEnabled,

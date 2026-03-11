@@ -2,9 +2,9 @@ package de.tum.in.www1.hephaestus.achievement.evaluator;
 
 import de.tum.in.www1.hephaestus.achievement.ActivitySavedEvent;
 import de.tum.in.www1.hephaestus.achievement.UserAchievement;
+import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-
 
 /**
  * This evaluator is intended to use in all achievement definitions that do not have a correct evaluator yet.
@@ -13,12 +13,16 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 public class DummyEvaluator implements AchievementEvaluator {
+
     @Override
     public boolean updateProgress(UserAchievement userAchievement, ActivitySavedEvent event) {
-        log.debug("Evaluation of achievement: {} for user: {} for event: {} skipped by DummyEvaluator! No corresponding Evaluator available yet!",
+        var user = userAchievement.getUser();
+        log.debug(
+            "Evaluation of achievement: {} for user: {} for event: {} skipped by DummyEvaluator! No corresponding Evaluator available yet!",
             userAchievement.getAchievementId(),
-            userAchievement.getUser().getLogin(),
-            event.eventType());
+            LoggingUtils.sanitizeForLog(user.getLogin()),
+            event.eventType()
+        );
         return false;
     }
 }

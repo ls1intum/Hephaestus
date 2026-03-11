@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { ReactFlowProvider } from "@xyflow/react";
-import { AchievementEdge } from "./AchievementEdge";
+import { Position, ReactFlowProvider } from "@xyflow/react";
+import type { ComponentProps } from "react";
+import { AchievementEdge } from "@/components/achievements/AchievementEdge";
 
 /**
  * Storybook stories for AchievementEdge.
@@ -8,7 +9,7 @@ import { AchievementEdge } from "./AchievementEdge";
  * Mock data follows the project's playful digital-Greek-mythology theme.
  */
 
-const meta: Meta<typeof AchievementEdge> = {
+const meta = {
 	component: AchievementEdge,
 	parameters: {
 		layout: "centered",
@@ -24,10 +25,7 @@ const meta: Meta<typeof AchievementEdge> = {
 	decorators: [
 		(Story) => (
 			<ReactFlowProvider>
-				<div
-					className="bg-background"
-					style={{ width: 520, padding: 48, display: "flex", justifyContent: "center" }}
-				>
+				<div className="bg-background w-130 p-12 flex justify-center">
 					{/* Provide an SVG viewport so <path>, <circle> and <animateMotion> render correctly */}
 					<svg
 						width={440}
@@ -43,35 +41,39 @@ const meta: Meta<typeof AchievementEdge> = {
 			</ReactFlowProvider>
 		),
 	],
-};
+} as Meta<typeof AchievementEdge>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-const zeusEdgeDisabled = {
+const createEdgeProps = (
+	id: string,
+	y: number,
+	data: { isEnabled: boolean },
+): ComponentProps<typeof AchievementEdge> => ({
+	id,
+	source: "source-node",
+	target: "target-node",
 	sourceX: 40,
-	sourceY: 40,
+	sourceY: y,
 	targetX: 400,
-	targetY: 40,
-	data: { isEnabled: false },
-};
+	targetY: y,
+	data,
+	sourcePosition: Position.Right,
+	targetPosition: Position.Left,
+});
 
-const hermesEdgeAnimated = {
-	sourceX: 40,
-	sourceY: 140,
-	targetX: 400,
-	targetY: 140,
-	data: { isEnabled: true },
-};
+const zeusEdgeDisabled = createEdgeProps("zeus-disabled", 40, { isEnabled: false });
+const hermesEdgeAnimated = createEdgeProps("hermes-animated", 140, { isEnabled: true });
 
 /** Active - animated edge to demonstrate particle motion */
 export const Active: Story = {
-	render: () => <AchievementEdge {...(hermesEdgeAnimated as any)} />,
+	render: () => <AchievementEdge {...hermesEdgeAnimated} />,
 	name: "Active",
 };
 
 /** Disabled (Default state) - inactive edge (no glow or particle) */
 export const Disabled: Story = {
-	render: () => <AchievementEdge {...(zeusEdgeDisabled as any)} />,
+	render: () => <AchievementEdge {...zeusEdgeDisabled} />,
 	name: "Disabled",
 };

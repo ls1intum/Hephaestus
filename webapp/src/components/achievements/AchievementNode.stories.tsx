@@ -4,12 +4,13 @@ import { AchievementNode } from "@/components/achievements/AchievementNode";
 import {
 	apolloClarity,
 	aresConflict,
+	asUI,
 	hephaestusInit,
 	hermesSprint,
 	poseidonTrident,
 	zeusThunderbolt,
-} from "./storyMockData";
-import type { UIAchievement } from "./types";
+} from "@/components/achievements/storyMockData";
+import type { UIAchievement } from "@/components/achievements/types";
 
 /**
  * AchievementNode component for displaying achievements in the skill tree visualization.
@@ -32,15 +33,7 @@ const meta = {
 	decorators: [
 		(Story) => (
 			<ReactFlowProvider>
-				<div
-					className="bg-background p-12"
-					style={{
-						paddingTop: "240px",
-						paddingBottom: "120px",
-						display: "flex",
-						justifyContent: "center",
-					}}
-				>
+				<div className="bg-background px-12 pt-60 pb-30 flex justify-center">
 					<Story />
 				</div>
 			</ReactFlowProvider>
@@ -72,12 +65,12 @@ const sharedNodeProps = {
 const rarities = ["common", "uncommon", "rare", "epic", "legendary", "mythic"] as const;
 
 const rarityMocks: Record<(typeof rarities)[number], UIAchievement> = {
-	common: hephaestusInit,
-	uncommon: hermesSprint,
-	rare: aresConflict,
-	epic: apolloClarity,
-	legendary: poseidonTrident,
-	mythic: zeusThunderbolt,
+	common: asUI(hephaestusInit),
+	uncommon: asUI(hermesSprint),
+	rare: asUI(aresConflict),
+	epic: asUI(apolloClarity),
+	legendary: asUI(poseidonTrident),
+	mythic: asUI(zeusThunderbolt),
 };
 
 /**

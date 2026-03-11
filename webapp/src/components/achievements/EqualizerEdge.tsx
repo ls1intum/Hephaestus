@@ -1,5 +1,6 @@
 import type { Edge, EdgeProps } from "@xyflow/react";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
+import { useAnimationTime } from "@/hooks/use-animation-time";
 
 export type EqualizerVariant = "traveling" | "static";
 
@@ -170,35 +171,17 @@ export function EqualizerEdge(props: EdgeProps<EqualizerEdge>) {
 	const isEnabled = data?.isEnabled ?? false;
 	const variant: EqualizerVariant = data?.variant ?? "traveling";
 
-	const seedRef = useRef<number>(0);
-	if (seedRef.current === 0) {
+	const [seed] = useState(() => {
 		let hash = 0;
 		for (let i = 0; i < id.length; i++) {
 			hash = (hash << 5) - hash + id.charCodeAt(i);
 			hash |= 0;
 		}
-		seedRef.current = Math.abs(hash) % 1000;
-	}
+		return Math.abs(hash) % 1000;
+	});
 
-	const [time, setTime] = useState(0);
-	const rafRef = useRef<number>(0);
-
-	useEffect(() => {
-		if (!isEnabled) return;
-
-		const animate = (now: number) => {
-			// Using absolute time (now * 0.001) ensures all edges share the same global clock cycle!
-			// This prevents them from drifting out of sync even if they mount at different times.
-			setTime(now * 0.001 * ANIMATION_SPEED_FACTOR);
-			rafRef.current = requestAnimationFrame(animate);
-		};
-
-		rafRef.current = requestAnimationFrame(animate);
-
-		return () => {
-			cancelAnimationFrame(rafRef.current);
-		};
-	}, [isEnabled]);
+	const rawTime = useAnimationTime();
+	const time = isEnabled ? rawTime * ANIMATION_SPEED_FACTOR : 0;
 
 	if (!isEnabled) {
 		return (
@@ -252,7 +235,7 @@ export function EqualizerEdge(props: EdgeProps<EqualizerEdge>) {
 		// Static variant: Burst for duration, then wait for cooldown.
 		// Shift by seed so everything isn't pulsating at once.
 		const cycle = STATIC_BURST_DURATION + STATIC_BURST_COOLDOWN;
-		const localTime = (time + seedRef.current * 0.77) % cycle;
+		const localTime = (time + seed * 0.77) % cycle;
 
 		if (localTime < STATIC_BURST_DURATION) {
 			const progress = localTime / STATIC_BURST_DURATION;
@@ -289,7 +272,7 @@ export function EqualizerEdge(props: EdgeProps<EqualizerEdge>) {
 								targetY,
 								pulsePosition,
 								time,
-								seedRef.current + 1,
+								seed + 1,
 								chainEnvelope,
 							)
 						: getStaticWavePath(
@@ -298,7 +281,7 @@ export function EqualizerEdge(props: EdgeProps<EqualizerEdge>) {
 								targetX,
 								targetY,
 								time,
-								seedRef.current + 1,
+								seed + 1,
 								chainEnvelope,
 								100,
 								data?.depth !== undefined ? 0.4 : 0,
@@ -321,7 +304,7 @@ export function EqualizerEdge(props: EdgeProps<EqualizerEdge>) {
 								targetY,
 								pulsePosition,
 								time,
-								seedRef.current + 2,
+								seed + 2,
 								chainEnvelope * 0.65,
 							)
 						: getStaticWavePath(
@@ -330,7 +313,7 @@ export function EqualizerEdge(props: EdgeProps<EqualizerEdge>) {
 								targetX,
 								targetY,
 								time,
-								seedRef.current + 2,
+								seed + 2,
 								chainEnvelope * 0.65,
 								100,
 								data?.depth !== undefined ? 0.4 : 0,

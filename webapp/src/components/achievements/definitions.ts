@@ -18,9 +18,9 @@ import {
 	UsersIcon,
 } from "lucide-react";
 import type { AchievementId } from "@/api";
-import { SingularityIcon } from "@/components/achievements/singularity-icon.tsx";
-import { defaultCategoryIcons } from "@/components/achievements/styles.ts";
-import type { AchievementDisplay } from "@/components/achievements/types.ts";
+import { SingularityIcon } from "@/components/achievements/singularity-icon";
+import { defaultCategoryIcons } from "@/components/achievements/styles";
+import type { AchievementDisplay } from "@/components/achievements/types";
 
 type PartialAchievementRegistry = Partial<Record<AchievementId, AchievementDisplay>>;
 

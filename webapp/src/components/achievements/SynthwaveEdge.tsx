@@ -1,5 +1,5 @@
 import type { Edge, EdgeProps } from "@xyflow/react";
-import { useEffect, useRef, useState } from "react";
+import { useAnimationTime } from "@/hooks/use-animation-time";
 
 export type SynthwaveEdge = Edge<{ isEnabled: boolean }, "synthwave">;
 
@@ -96,34 +96,11 @@ export function SynthwaveEdge(props: EdgeProps<SynthwaveEdge>) {
 	const { sourceX, sourceY, targetX, targetY, data } = props;
 	const isEnabled = data?.isEnabled ?? false;
 
-	const [phases, setPhases] = useState(() => WAVE_SHAPES.map(() => 0));
-	const rafRef = useRef<number>(0);
-	const prevTimeRef = useRef<number>(0);
+	const rawTime = useAnimationTime();
+	const time = isEnabled ? rawTime : 0;
 
-	useEffect(() => {
-		if (!isEnabled) return;
-
-		const animate = (time: number) => {
-			if (prevTimeRef.current === 0) {
-				prevTimeRef.current = time;
-			}
-			const delta = (time - prevTimeRef.current) * 0.001;
-			prevTimeRef.current = time;
-
-			setPhases((prev) =>
-				prev.map((p, i) => p - delta * BASE_SPEED * WAVE_SHAPES[i].speedMultiplier),
-			);
-
-			rafRef.current = requestAnimationFrame(animate);
-		};
-
-		rafRef.current = requestAnimationFrame(animate);
-
-		return () => {
-			cancelAnimationFrame(rafRef.current);
-			prevTimeRef.current = 0;
-		};
-	}, [isEnabled]);
+	// Derive phases deterministically from the shared clock instead of accumulating deltas
+	const phases = WAVE_SHAPES.map((layer) => -(time * BASE_SPEED * layer.speedMultiplier));
 
 	if (!isEnabled) {
 		return (

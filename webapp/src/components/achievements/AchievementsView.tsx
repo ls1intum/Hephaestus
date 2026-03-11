@@ -54,8 +54,8 @@ export function AchievementsView({
 
 	// Derived user data for the skill tree
 	const user = {
-		name: profileQuery.data?.userInfo?.name || fallbackName || targetUsername,
-		avatarUrl: profileQuery.data?.userInfo?.avatarUrl || fallbackAvatarUrl || "",
+		name: profileQuery.data?.userInfo?.name ?? fallbackName ?? targetUsername,
+		avatarUrl: profileQuery.data?.userInfo?.avatarUrl ?? fallbackAvatarUrl ?? "",
 		level: profileQuery.data?.xpRecord?.currentLevel ?? 1,
 		leaguePoints: profileQuery.data?.userInfo?.leaguePoints ?? 0,
 	};
@@ -69,6 +69,11 @@ export function AchievementsView({
 						<>
 							{/* Radial gradient background */}
 							<div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,var(--tw-gradient-stops))] from-primary/5 via-background to-background" />
+
+							{/* Accessibility hint for screen reader users */}
+							<div className="sr-only" role="status">
+								Skill tree visualization. Use the sidebar to switch to the accessible list view.
+							</div>
 
 							{/* Skill tree */}
 							<SkillTree user={user} achievements={uiAchievements} />

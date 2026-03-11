@@ -23,7 +23,7 @@ export const SingularityIcon = ({
 		<path
 			id="Selection"
 			fill="none"
-			stroke-width="1"
+			strokeWidth="1"
 			d="M 10.38,21.53
            C 10.12,21.85 9.12,22.48 8.73,22.73
              7.71,23.40 6.54,24.06 5.41,24.51

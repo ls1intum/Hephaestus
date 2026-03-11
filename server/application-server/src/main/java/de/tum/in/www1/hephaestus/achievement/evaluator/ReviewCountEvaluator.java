@@ -6,6 +6,7 @@ import de.tum.in.www1.hephaestus.achievement.progress.LinearAchievementProgress;
 import de.tum.in.www1.hephaestus.activity.ActivityTargetType;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewCommentRepository;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -15,18 +16,11 @@ import org.springframework.stereotype.Component;
  */
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class ReviewCountEvaluator implements AchievementEvaluator {
 
     private final PullRequestReviewRepository reviewRepository;
     private final PullRequestReviewCommentRepository reviewCommentRepository;
-
-    public ReviewCountEvaluator(
-        PullRequestReviewRepository reviewRepository,
-        PullRequestReviewCommentRepository reviewCommentRepository
-    ) {
-        this.reviewRepository = reviewRepository;
-        this.reviewCommentRepository = reviewCommentRepository;
-    }
 
     @Override
     public boolean updateProgress(UserAchievement userAchievement, ActivitySavedEvent event) {
@@ -43,36 +37,30 @@ public class ReviewCountEvaluator implements AchievementEvaluator {
 
         if (event.targetType() == ActivityTargetType.REVIEW) {
             isNotAuthoredByOneself = reviewRepository
-                .findById(event.targetId())
+                .findByIdWithPullRequestAuthor(event.targetId())
                 .map(review -> {
-                    if (review.getPullRequest() == null || review.getPullRequest().getAuthor() == null)
-                        return true;
-                    if (event.user().isEmpty())
-                        return false;
+                    if (review.getPullRequest() == null || review.getPullRequest().getAuthor() == null) return false;
+                    if (event.user().isEmpty()) return false;
                     return !review.getPullRequest().getAuthor().getId().equals(event.user().get().getId());
                 })
                 .orElse(false);
         } else if (event.targetType() == ActivityTargetType.REVIEW_COMMENT) {
             isNotAuthoredByOneself = reviewCommentRepository
-                .findById(event.targetId())
+                .findByIdWithPullRequestAuthor(event.targetId())
                 .map(comment -> {
-                    if (comment.getPullRequest() == null || comment.getPullRequest().getAuthor() == null)
-                        return true;
-                    if (event.user().isEmpty())
-                        return false;
+                    if (comment.getPullRequest() == null || comment.getPullRequest().getAuthor() == null) return false;
+                    if (event.user().isEmpty()) return false;
                     return !comment.getPullRequest().getAuthor().getId().equals(event.user().get().getId());
                 })
                 .orElse(false);
         }
 
-        if (isNotAuthoredByOneself) {
-            if (current < target) {
-                current++;
-            }
+        if (isNotAuthoredByOneself && current < target) {
+            current++;
+            userAchievement.setProgressData(new LinearAchievementProgress(current, target));
+            return current == target;
         }
 
-        boolean wasUnlocked = current == target;
-        userAchievement.setProgressData(new LinearAchievementProgress(current, target));
-        return wasUnlocked;
+        return false;
     }
 }
