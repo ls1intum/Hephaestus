@@ -1,15 +1,14 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { ReactFlowProvider } from "@xyflow/react";
-import { StatsPanel } from "@/components/achievements/StatsPanel.tsx";
-import { SkillTree } from "./SkillTree";
-import { mockUser, mythicAchievements } from "./storyMockData";
-import { generateSkillTreeData } from "./utils";
+import { SkillTree } from "@/components/achievements/SkillTree";
+import { mockUser, mythicAchievementsUI } from "@/components/achievements/storyMockData";
+import { generateSkillTreeData } from "@/components/achievements/utils";
 
 /**
  * The full interactive Skill Tree visualization for Hephaestus achievements.
  * Maps divine achievements to a radial/compass-style layout.
  */
-const meta: Meta<typeof SkillTree> = {
+const meta = {
 	component: SkillTree,
 	parameters: {
 		layout: "fullscreen",
@@ -21,14 +20,14 @@ const meta: Meta<typeof SkillTree> = {
 			<ReactFlowProvider>
 				<div className="h-screen w-full bg-background text-foreground">
 					{/* Add top padding so node tooltips aren't clipped in docs. */}
-					<div style={{ paddingTop: 160, height: "calc(100vh - 160px)" }}>
+					<div className="pt-40 h-[calc(100vh-160px)]">
 						<Story />
 					</div>
 				</div>
 			</ReactFlowProvider>
 		),
 	],
-};
+} as Meta<typeof SkillTree>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -39,7 +38,7 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
 	args: {
 		user: mockUser,
-		achievements: mythicAchievements,
+		achievements: mythicAchievementsUI,
 	},
 };
 
@@ -59,7 +58,7 @@ export const EmptyForge: Story = {
 export const CoreCategoriesOnly: Story = {
 	args: {
 		user: mockUser,
-		achievements: mythicAchievements.filter((a) =>
+		achievements: mythicAchievementsUI.filter((a) =>
 			["commits", "pull_requests"].includes(a.category),
 		),
 	},
@@ -71,21 +70,7 @@ export const CoreCategoriesOnly: Story = {
 export const FullSkillTree: Story = {
 	args: {
 		user: mockUser,
-		achievements: mythicAchievements,
-	},
-};
-
-/**
- * Standalone statistics display showing progression breakdown.
- */
-export const StatsPanelDisplay: StoryObj<typeof StatsPanel> = {
-	render: () => (
-		<div className="bg-background p-8 max-w-sm border rounded-xl">
-			<StatsPanel achievements={mythicAchievements} />
-		</div>
-	),
-	parameters: {
-		layout: "centered",
+		achievements: mythicAchievementsUI,
 	},
 };
 
@@ -94,10 +79,12 @@ export const StatsPanelDisplay: StoryObj<typeof StatsPanel> = {
  */
 export const GeneratedDataPreview: Story = {
 	render: () => (
-		<div className="p-8 font-mono bg-slate-900 text-slate-300 min-h-screen overflow-auto">
-			<h4 className="text-xl font-bold mb-4 text-white">Skill Tree Generation Data (Raw Output)</h4>
+		<div className="p-8 font-mono bg-background text-muted-foreground min-h-screen overflow-auto">
+			<h4 className="text-xl font-bold mb-4 text-foreground">
+				Skill Tree Generation Data (Raw Output)
+			</h4>
 			<pre className="text-xs">
-				{JSON.stringify(generateSkillTreeData(mockUser, mythicAchievements), null, 2)}
+				{JSON.stringify(generateSkillTreeData(mockUser, mythicAchievementsUI), null, 2)}
 			</pre>
 		</div>
 	),

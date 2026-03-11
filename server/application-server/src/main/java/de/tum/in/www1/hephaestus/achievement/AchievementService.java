@@ -4,15 +4,22 @@ import de.tum.in.www1.hephaestus.achievement.evaluator.AchievementEvaluator;
 import de.tum.in.www1.hephaestus.achievement.progress.AchievementProgress;
 import de.tum.in.www1.hephaestus.activity.ActivityEventType;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import jakarta.annotation.PostConstruct;
 import java.time.Instant;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -57,6 +64,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class AchievementService {
 
     /**
@@ -67,19 +75,20 @@ public class AchievementService {
     private final UserAchievementRepository userAchievementRepository;
 
     /**
-     * Strategy map: maps each evaluator's concrete class to its Spring-managed bean instance.
-     * Built once at construction from all {@link AchievementEvaluator} beans in the context.
+     * All evaluator beans injected by Spring; used to build the strategy map at startup.
      */
-    private final Map<Class<? extends AchievementEvaluator>, AchievementEvaluator> evaluatorMap;
+    private final List<AchievementEvaluator> evaluators;
+
     private final AchievementRegistry achievementRegistry;
 
-    public AchievementService(
-        UserAchievementRepository userAchievementRepository,
-        List<AchievementEvaluator> evaluators,
-        AchievementRegistry achievementRegistry
-    ) {
-        this.userAchievementRepository = userAchievementRepository;
-        this.achievementRegistry = achievementRegistry;
+    /**
+     * Strategy map: maps each evaluator's concrete class to its Spring-managed bean instance.
+     * Built once at startup from all {@link AchievementEvaluator} beans in the context.
+     */
+    private volatile Map<Class<? extends AchievementEvaluator>, AchievementEvaluator> evaluatorMap;
+
+    @PostConstruct
+    void initEvaluatorMap() {
         this.evaluatorMap = evaluators
             .stream()
             .collect(Collectors.toMap(AchievementEvaluator::getClass, Function.identity()));
@@ -141,7 +150,16 @@ public class AchievementService {
      * @param event the activity saved event containing user, type, and timestamp
      * @return list of newly unlocked achievement types (empty if none)
      */
-    @CacheEvict(value = ACHIEVEMENT_PROGRESS_CACHE, key = "#event.user().get().getId()", condition = "#event.user().isPresent()")
+    @Retryable(
+        retryFor = ObjectOptimisticLockingFailureException.class,
+        maxAttempts = 3,
+        backoff = @Backoff(delay = 100)
+    )
+    @CacheEvict(
+        value = ACHIEVEMENT_PROGRESS_CACHE,
+        key = "#event.user().get().getId()",
+        condition = "#event.user().isPresent()"
+    )
     @Transactional
     public List<AchievementDefinition> checkAndUnlock(ActivitySavedEvent event) {
         if (event.user().isEmpty()) {
@@ -209,36 +227,6 @@ public class AchievementService {
     }
 
     /**
-     * Get all unlocked achievements for a user.
-     *
-     * @param userId the user's ID
-     * @return list of unlocked achievements with metadata
-     */
-    @Transactional(readOnly = true)
-    public List<UserAchievement> getUnlockedAchievements(Long userId) {
-        return userAchievementRepository
-            .findByUserId(userId)
-            .stream()
-            .filter(ua -> ua.getUnlockedAt() != null)
-            .toList();
-    }
-
-    /**
-     * Check if a specific achievement is unlocked for a user.
-     *
-     * @param userId      the user's ID
-     * @param achievement the achievement to check
-     * @return true if the achievement is unlocked
-     */
-    @Transactional(readOnly = true)
-    public boolean isUnlocked(Long userId, AchievementDefinition achievement) {
-        return userAchievementRepository
-            .findByUserIdAndAchievementId(userId, achievement.id())
-            .map(ua -> ua.getUnlockedAt() != null)
-            .orElse(false);
-    }
-
-    /**
      * Get all achievements with progress information for a user.
      *
      * <p>This method reads progress directly from {@link UserAchievement} records
@@ -254,14 +242,9 @@ public class AchievementService {
      * @param user the user to get achievements for
      * @return list of all achievement DTOs with progress, ordered by category and level
      */
-    @Cacheable(value = ACHIEVEMENT_PROGRESS_CACHE, key = "#user.id", condition = "#user != null")
+    @Cacheable(value = ACHIEVEMENT_PROGRESS_CACHE, key = "#user.id")
     @Transactional(readOnly = true)
     public List<AchievementDTO> getAllAchievementsWithProgress(User user) {
-        if (user == null) {
-            log.debug("Returning empty achievements: user is null");
-            return List.of();
-        }
-
         Long userId = user.getId();
 
         // Fetch all progress records for this user (both in-progress and unlocked)
@@ -274,15 +257,16 @@ public class AchievementService {
         List<AchievementDTO> result = new ArrayList<>();
         for (AchievementDefinition achievement : achievementRegistry.values()) {
             UserAchievement progress = progressMap.get(achievement.id());
-            if (progress == null) continue;
 
             AchievementStatus status = computeStatus(achievement, progressMap);
             if (status == AchievementStatus.HIDDEN) {
                 continue;
             }
 
-            AchievementProgress progressData = progress.getProgressData();
-            Optional<Instant> unlockedAt = Optional.ofNullable(progress.getUnlockedAt());
+            AchievementProgress progressData =
+                progress != null ? progress.getProgressData() : achievement.requirements();
+            Optional<Instant> unlockedAt =
+                progress != null ? Optional.ofNullable(progress.getUnlockedAt()) : Optional.empty();
             result.add(AchievementDTO.fromDefinition(achievement, status, progressData, unlockedAt));
         }
 
@@ -329,6 +313,7 @@ public class AchievementService {
         return AchievementStatus.LOCKED;
     }
 
+    @Transactional(readOnly = true)
     public List<String> getAllAchievementDefinitionIds() {
         return achievementRegistry.values().stream().map(AchievementDefinition::id).toList();
     }
@@ -336,6 +321,7 @@ public class AchievementService {
     /**
      * Return all definitions as LOCKED with 0 progress
      */
+    @Transactional(readOnly = true)
     public List<AchievementDTO> getAllAchievementDefinitions() {
         return achievementRegistry
             .values()

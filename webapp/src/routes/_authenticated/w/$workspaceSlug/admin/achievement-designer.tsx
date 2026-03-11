@@ -29,7 +29,7 @@ function AchievementDesignerPage() {
 					// Invalidate both definitions and user progress queries
 					queryClient.invalidateQueries({
 						predicate: (query) => {
-							const id = (query.queryKey[0] as any)?._id;
+							const id = (query.queryKey[0] as { _id?: string } | undefined)?._id;
 							return id === "getUserAchievements" || id === "getAllAchievementDefinitions";
 						},
 					});

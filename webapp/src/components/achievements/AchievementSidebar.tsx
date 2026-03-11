@@ -161,13 +161,31 @@ function SidebarBody({
 						{/* Zoom controls – only in tree mode */}
 						{viewMode === "tree" && (
 							<div className="flex items-center gap-1 mt-2 bg-secondary/50 rounded-lg p-1">
-								<Button variant="ghost" size="icon" className="h-8 w-8 flex-1" onClick={onZoomIn}>
+								<Button
+									variant="ghost"
+									size="icon"
+									className="h-8 w-8 flex-1"
+									onClick={onZoomIn}
+									aria-label="Zoom in"
+								>
 									<ZoomIn className="w-4 h-4" />
 								</Button>
-								<Button variant="ghost" size="icon" className="h-8 w-8 flex-1" onClick={onZoomOut}>
+								<Button
+									variant="ghost"
+									size="icon"
+									className="h-8 w-8 flex-1"
+									onClick={onZoomOut}
+									aria-label="Zoom out"
+								>
 									<ZoomOut className="w-4 h-4" />
 								</Button>
-								<Button variant="ghost" size="icon" className="h-8 w-8 flex-1" onClick={onFitView}>
+								<Button
+									variant="ghost"
+									size="icon"
+									className="h-8 w-8 flex-1"
+									onClick={onFitView}
+									aria-label="Fit view"
+								>
 									<Maximize2 className="w-4 h-4" />
 								</Button>
 							</div>
@@ -191,7 +209,10 @@ function SidebarBody({
 									{stats.percentage}%
 								</span>
 							</div>
-							<Progress value={stats.percentage}>
+							<Progress
+								value={stats.percentage}
+								aria-label={`Total achievement progress: ${stats.percentage}%`}
+							>
 								<ProgressTrack className="h-3 [&>div]:bg-foreground">
 									<ProgressIndicator />
 								</ProgressTrack>
@@ -237,7 +258,7 @@ function SidebarBody({
 											</div>
 										</div>
 									</div>
-									<Progress value={percentage}>
+									<Progress value={percentage} aria-label={`${meta.name} progress: ${percentage}%`}>
 										<ProgressTrack className="h-1.5 [&>div]:bg-foreground/70">
 											<ProgressIndicator />
 										</ProgressTrack>
@@ -252,8 +273,11 @@ function SidebarBody({
 				<SidebarGroup>
 					<SidebarGroupLabel>Recent Unlocks</SidebarGroupLabel>
 					<SidebarGroupContent className="space-y-1.5">
-						{achievements
-							.filter((a) => a.status === "unlocked" && a.unlockedAt)
+						{[...achievements]
+							.filter(
+								(a): a is typeof a & { unlockedAt: Date } =>
+									a.status === "unlocked" && !!a.unlockedAt,
+							)
 							.sort((a, b) => new Date(b.unlockedAt).getTime() - new Date(a.unlockedAt).getTime())
 							.slice(0, 5)
 							.map((achievement) => {
@@ -396,6 +420,8 @@ export function AchievementSidebar(props: AchievementSidebarProps) {
 			className="fixed top-0 right-0 h-dvh bg-sidebar text-sidebar-foreground border-l border-sidebar-border flex flex-col overflow-y-auto z-10"
 			style={{ width: SIDEBAR_WIDTH }}
 			data-slot="achievement-sidebar"
+			role="complementary"
+			aria-label="Achievement sidebar"
 		>
 			<SidebarBody {...bodyProps} />
 		</div>

@@ -1,42 +1,24 @@
 import type { Achievement } from "@/api";
-import type { AchievementEdge } from "@/components/achievements/AchievementEdge.tsx";
-import type { AchievementNode } from "@/components/achievements/AchievementNode.tsx";
-import type { AvatarNode } from "@/components/achievements/AvatarNode.tsx";
-import type { CategoryLabelNode } from "@/components/achievements/CategoryLabels.tsx";
-import { ACHIEVEMENT_REGISTRY } from "@/components/achievements/definitions.ts";
-import type { EqualizerEdge } from "@/components/achievements/EqualizerEdge.tsx";
-import type { SynthwaveEdge } from "@/components/achievements/SynthwaveEdge.tsx";
-import { categoryMeta } from "@/components/achievements/styles.ts";
+import type { AchievementEdge } from "@/components/achievements/AchievementEdge";
+import type { AchievementNode } from "@/components/achievements/AchievementNode";
+import type { AvatarNode } from "@/components/achievements/AvatarNode";
+import type { CategoryLabelNode } from "@/components/achievements/CategoryLabels";
+import rawCoordinatesData from "@/components/achievements/coordinates.json";
+import { ACHIEVEMENT_REGISTRY } from "@/components/achievements/definitions";
+import type { EqualizerEdge } from "@/components/achievements/EqualizerEdge";
+import type { SynthwaveEdge } from "@/components/achievements/SynthwaveEdge";
+import { categoryMeta } from "@/components/achievements/styles";
 import {
 	type AchievementCategory,
-	type AchievementRarity,
 	rarityWeights,
 	type UIAchievement,
-} from "@/components/achievements/types.ts";
-import coordinatesData from "./coordinates.json";
+} from "@/components/achievements/types";
 
-export function sortByRarity<T extends { rarity: AchievementRarity }>(achievements: T[]): T[] {
-	return [...achievements].sort((a, b) => rarityWeights[a.rarity] - rarityWeights[b.rarity]);
-}
+const coordinatesData: Record<string, { x: number; y: number }> = rawCoordinatesData;
 
 export const compareByRarity = (a: Achievement, b: Achievement) => {
 	return rarityWeights[a.rarity] - rarityWeights[b.rarity];
 };
-
-export function resolveProgress(achievement: Achievement): number {
-	const progressData = achievement.progressData;
-
-	switch (progressData.type) {
-		case "BinaryAchievementProgress":
-			return progressData.unlocked ? 1 : 0;
-
-		case "LinearAchievementProgress":
-			// const percentage = (progressData.current / progressData.target) * 100;
-			return progressData.current > 0
-				? Math.round((progressData.current / progressData.target) * 100)
-				: 0;
-	}
-}
 
 // Sort categories in a logical order
 export const ACHIEVEMENT_CATEGORIES: readonly AchievementCategory[] = [
@@ -93,7 +75,7 @@ export function generateSkillTreeData(
 	const nodes: (AchievementNode | AvatarNode | CategoryLabelNode)[] = [];
 
 	// Build lookup map for achievements by ID
-	const achievementMap = new Map(achievements.map((a) => [a.id, a]));
+	const achievementMap = new Map<string, UIAchievement>(achievements.map((a) => [a.id, a]));
 
 	const avatarNode = {
 		id: "avatar-node",
@@ -124,14 +106,15 @@ export function generateSkillTreeData(
 	let maxTreeDepth = 0;
 
 	const getNodeDepth = (id: string, visiting = new Set<string>()): number => {
-		if (nodeDepths.has(id)) return nodeDepths.get(id)!;
+		const cached = nodeDepths.get(id);
+		if (cached !== undefined) return cached;
 		if (visiting.has(id)) {
 			nodeDepths.set(id, 0);
 			return 0;
 		}
 		visiting.add(id);
-		const ach = achievementMap.get(id as any);
-		const parentId = (ach as any)?.parentId ?? ach?.parent;
+		const ach = achievementMap.get(id);
+		const parentId = ach?.parent;
 		if (!ach || parentId === undefined || parentId === id) {
 			nodeDepths.set(id, 0);
 			visiting.delete(id);
@@ -146,30 +129,32 @@ export function generateSkillTreeData(
 
 	achievements.forEach((a) => getNodeDepth(a.id));
 
-	// Helper to generate edge props with explicit type verification
-	const getEdgeConfig = (
+	// Helper to build a fully-typed edge with routing and data properties.
+	const buildEdge = (
+		id: string,
+		source: string,
+		target: string,
 		isEnabled: boolean,
 		mode: EdgeDisplayMode,
 		depth: number,
 		maxDepth: number,
-	): Pick<AnyAchievementEdge, "type" | "data"> => {
+	): AnyAchievementEdge => {
+		const base = { id, source, target };
+
 		if (mode === "synthwave") {
-			return {
-				type: "synthwave",
-				data: { isEnabled },
-			};
+			return { ...base, type: "synthwave", data: { isEnabled } } satisfies SynthwaveEdge;
 		}
 
 		if (mode.startsWith("equalizer")) {
-			// Extract variant from mode
 			let variant: "traveling" | "static" = "traveling";
 			if (mode === "equalizer-static") {
 				variant = "static";
 			} else if (mode === "equalizer-chain") {
-				variant = "static"; // Chain now uses the static outbursts but with depth-based timing
+				variant = "static";
 			}
 
 			return {
+				...base,
 				type: "equalizer",
 				data: {
 					isEnabled,
@@ -177,14 +162,10 @@ export function generateSkillTreeData(
 					depth: mode === "equalizer-chain" ? depth : undefined,
 					maxDepth: mode === "equalizer-chain" ? maxDepth : undefined,
 				},
-			};
+			} satisfies EqualizerEdge;
 		}
 
-		// Default to standard achievement
-		return {
-			type: "achievement",
-			data: { isEnabled },
-		};
+		return { ...base, type: "achievement", data: { isEnabled } } satisfies AchievementEdge;
 	};
 
 	for (const category of ACHIEVEMENT_CATEGORIES) {
@@ -195,9 +176,7 @@ export function generateSkillTreeData(
 		if (category !== "milestones") {
 			const labelNodeId = `label-${category}`;
 			const meta = categoryMeta[category];
-			const labelSavedCoords = (coordinatesData as Record<string, { x: number; y: number }>)[
-				labelNodeId
-			];
+			const labelSavedCoords = coordinatesData[labelNodeId];
 			const labelRadius = 900;
 			let x = labelSavedCoords?.x;
 			let y = labelSavedCoords?.y;
@@ -224,16 +203,12 @@ export function generateSkillTreeData(
 		}
 
 		for (const achievement of categoryAchievements) {
-			const savedCoords = (coordinatesData as Record<string, { x: number; y: number }>)[
-				achievement.id
-			];
+			const savedCoords = coordinatesData[achievement.id];
 
 			// Support for mocked positions in Storybook (MockUIAchievement)
-			const mockX = (achievement as { x?: number }).x;
-			const mockY = (achievement as { y?: number }).y;
-
-			const x = mockX ?? savedCoords?.x ?? 0;
-			const y = mockY ?? savedCoords?.y ?? 0;
+			const mockPos = achievement as UIAchievement & { x?: number; y?: number };
+			const x = mockPos.x ?? savedCoords?.x ?? 0;
+			const y = mockPos.y ?? savedCoords?.y ?? 0;
 
 			nodes.push({
 				id: `${achievement.id}-node`,
@@ -250,7 +225,7 @@ export function generateSkillTreeData(
 			} satisfies AchievementNode);
 
 			// Create edge based on parent relationship
-			const parentId = (achievement as any).parentId ?? achievement.parent;
+			const parentId = achievement.parent;
 
 			if (parentId === achievement.id) {
 				// Standalone achievement: No edges at all (not even to avatar)
@@ -260,33 +235,78 @@ export function generateSkillTreeData(
 					// Active only when both parent and child are unlocked
 					const isActive = parent.status === "unlocked" && achievement.status === "unlocked";
 					const edgeDepth = getNodeDepth(parentId) + 1;
-					const config = getEdgeConfig(isActive, edgeDisplayMode, edgeDepth, maxTreeDepth);
-					processedEdges.push({
-						id: `${parentId}-${achievement.id}-edge`,
-						source: `${parentId}-node`,
-						target: `${achievement.id}-node`,
-						...config,
-					} as AnyAchievementEdge);
+					processedEdges.push(
+						buildEdge(
+							`${parentId}-${achievement.id}-edge`,
+							`${parentId}-node`,
+							`${achievement.id}-node`,
+							isActive,
+							edgeDisplayMode,
+							edgeDepth,
+							maxTreeDepth,
+						),
+					);
 				}
 			} else {
 				// Root-level achievements connect to the central avatar
-				const config = getEdgeConfig(
-					achievement.status === "unlocked",
-					edgeDisplayMode,
-					0,
-					maxTreeDepth,
+				processedEdges.push(
+					buildEdge(
+						`avatar-${achievement.id}-edge`,
+						avatarNode.id,
+						`${achievement.id}-node`,
+						achievement.status === "unlocked",
+						edgeDisplayMode,
+						0,
+						maxTreeDepth,
+					),
 				);
-				processedEdges.push({
-					id: `avatar-${achievement.id}-edge`,
-					source: avatarNode.id,
-					target: `${achievement.id}-node`,
-					...config,
-				} as AnyAchievementEdge);
 			}
 		}
 	}
 
 	return { nodes, edges: processedEdges };
+}
+
+/**
+ * Shared nodeColor callback for React Flow MiniMap.
+ * Both SkillTree and SkillTreeDesigner use identical logic.
+ */
+export function getMiniMapNodeColor(
+	node: { type?: string; data?: { achievement?: { status?: string } } },
+	isDark: boolean,
+): string {
+	if (node.type === "categoryLabel") {
+		return "rgba(0,0,0,0)";
+	}
+	if (node.type === "achievement") {
+		const status = node.data?.achievement?.status;
+		if (isDark) {
+			switch (status) {
+				case "unlocked":
+					return "rgba(255, 255, 255, 0.9)";
+				case "available":
+					return "rgba(255, 255, 255, 0.4)";
+				case "locked":
+					return "rgba(255, 255, 255, 0.15)";
+				default:
+					return "rgba(0, 0, 0, 0)";
+			}
+		}
+		switch (status) {
+			case "unlocked":
+				return "rgba(0, 0, 0, 0.85)";
+			case "available":
+				return "rgba(0, 0, 0, 0.5)";
+			case "locked":
+				return "rgba(0, 0, 0, 0.15)";
+			default:
+				return "rgba(0, 0, 0, 0)";
+		}
+	}
+	if (node.type === "avatar") {
+		return isDark ? "rgba(187,247,208,0.85)" : "rgba(21,128,61,0.85)";
+	}
+	return isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.12)";
 }
 
 /**
@@ -297,20 +317,30 @@ export function generateSkillTreeData(
  */
 export function calculateStats(achievementList: Achievement[]) {
 	const total = achievementList.length;
-	const unlocked = achievementList.filter((a) => a.status === "unlocked").length;
-	const available = achievementList.filter((a) => a.status === "available").length;
+	let unlocked = 0;
+	let available = 0;
 
-	const byCategory = ACHIEVEMENT_CATEGORIES.reduce(
-		(acc, cat) => {
-			const catAchievements = achievementList.filter((a) => (a.category ?? "milestones") === cat);
-			acc[cat] = {
-				total: catAchievements.length,
-				unlocked: catAchievements.filter((a) => a.status === "unlocked").length,
-			};
-			return acc;
-		},
-		{} as Record<AchievementCategory, { total: number; unlocked: number }>,
-	);
+	// Initialize per-category counters
+	const byCategory: Record<AchievementCategory, { total: number; unlocked: number }> = {
+		pull_requests: { total: 0, unlocked: 0 },
+		commits: { total: 0, unlocked: 0 },
+		communication: { total: 0, unlocked: 0 },
+		issues: { total: 0, unlocked: 0 },
+		milestones: { total: 0, unlocked: 0 },
+	};
+
+	// Single pass over the array
+	for (const a of achievementList) {
+		if (a.status === "unlocked") unlocked++;
+		else if (a.status === "available") available++;
+
+		const cat = a.category ?? "milestones";
+		const entry = byCategory[cat];
+		if (entry) {
+			entry.total++;
+			if (a.status === "unlocked") entry.unlocked++;
+		}
+	}
 
 	return {
 		total,

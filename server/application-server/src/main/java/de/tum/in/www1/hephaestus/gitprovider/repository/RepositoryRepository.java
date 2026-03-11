@@ -38,7 +38,7 @@ public interface RepositoryRepository extends JpaRepository<Repository, Long> {
      * @param id the repository ID
      * @return the repository with organization loaded, or empty if not found
      */
-    @Query("SELECT r FROM Repository r LEFT JOIN FETCH r.organization WHERE r.id = :id")
+    @Query("SELECT r FROM Repository r LEFT JOIN FETCH r.organization LEFT JOIN FETCH r.provider WHERE r.id = :id")
     Optional<Repository> findByIdWithOrganization(@Param("id") Long id);
 
     /**
@@ -50,7 +50,9 @@ public interface RepositoryRepository extends JpaRepository<Repository, Long> {
     /**
      * Finds a repository by its full name with the organization eagerly fetched.
      */
-    @Query("SELECT r FROM Repository r LEFT JOIN FETCH r.organization WHERE r.nameWithOwner = :nameWithOwner")
+    @Query(
+        "SELECT r FROM Repository r LEFT JOIN FETCH r.organization LEFT JOIN FETCH r.provider WHERE r.nameWithOwner = :nameWithOwner"
+    )
     Optional<Repository> findByNameWithOwnerWithOrganization(@Param("nameWithOwner") String nameWithOwner);
 
     /**

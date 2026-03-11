@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { ReactFlowProvider } from "@xyflow/react";
-import { SynthwaveEdge } from "./SynthwaveEdge";
+import { Position, ReactFlowProvider } from "@xyflow/react";
+import type { ComponentProps } from "react";
+import { SynthwaveEdge } from "@/components/achievements/SynthwaveEdge";
 
 /**
  * Storybook stories for SynthwaveEdge.
@@ -10,7 +11,7 @@ import { SynthwaveEdge } from "./SynthwaveEdge";
  * Uses an inline SVG host so `<path>` and `<filter>` elements render correctly.
  */
 
-const meta: Meta<typeof SynthwaveEdge> = {
+const meta = {
 	component: SynthwaveEdge,
 	parameters: {
 		layout: "centered",
@@ -28,10 +29,7 @@ const meta: Meta<typeof SynthwaveEdge> = {
 	decorators: [
 		(Story) => (
 			<ReactFlowProvider>
-				<div
-					className="dark bg-background"
-					style={{ width: 520, padding: 48, display: "flex", justifyContent: "center" }}
-				>
+				<div className="dark bg-background w-[520px] p-12 flex justify-center">
 					<svg
 						width={440}
 						height={200}
@@ -46,25 +44,30 @@ const meta: Meta<typeof SynthwaveEdge> = {
 			</ReactFlowProvider>
 		),
 	],
-};
+} as Meta<typeof SynthwaveEdge>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-// Mock edge props generator
-const createEdgeProps = (id: string, y: number, data: any = {}) => ({
+const createEdgeProps = (
+	id: string,
+	y: number,
+	data: { isEnabled: boolean } = { isEnabled: false },
+): ComponentProps<typeof SynthwaveEdge> => ({
 	id,
+	source: "source-node",
+	target: "target-node",
 	sourceX: 40,
 	sourceY: y,
 	targetX: 400,
 	targetY: y,
 	data,
-	sourcePosition: "right" as const,
-	targetPosition: "left" as const,
+	sourcePosition: Position.Right,
+	targetPosition: Position.Left,
 });
 
 export const Default: Story = {
-	args: createEdgeProps("default", 100, { isEnabled: true }) as any,
+	args: createEdgeProps("default", 100, { isEnabled: true }),
 };
 
 /**
@@ -74,7 +77,7 @@ export const States: Story = {
 	render: () => (
 		<>
 			{/* Disabled State */}
-			<SynthwaveEdge {...(createEdgeProps("disabled", 20, { isEnabled: false }) as any)} />
+			<SynthwaveEdge {...createEdgeProps("disabled", 20, { isEnabled: false })} />
 			<text
 				x="40"
 				y="10"
@@ -84,7 +87,7 @@ export const States: Story = {
 			</text>
 
 			{/* Default Flowing State */}
-			<SynthwaveEdge {...(createEdgeProps("default", 100, { isEnabled: true }) as any)} />
+			<SynthwaveEdge {...createEdgeProps("default", 100, { isEnabled: true })} />
 			<text
 				x="40"
 				y="90"
@@ -94,9 +97,7 @@ export const States: Story = {
 			</text>
 
 			{/* Rarity Variant */}
-			<SynthwaveEdge
-				{...(createEdgeProps("rarity", 180, { isEnabled: true, variant: "rarity" }) as any)}
-			/>
+			<SynthwaveEdge {...createEdgeProps("rarity", 180, { isEnabled: true })} />
 			<text
 				x="40"
 				y="170"

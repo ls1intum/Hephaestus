@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.gitprovider.common.events;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.DataSource;
+import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import java.time.Instant;
 import java.util.UUID;
@@ -17,7 +18,8 @@ public record EventContext(
     @Nullable RepositoryRef repository,
     @NonNull DataSource source,
     @Nullable String webhookAction,
-    @NonNull String correlationId
+    @NonNull String correlationId,
+    @Nullable GitProviderType providerType
 ) {
     /**
      * Creates an EventContext from a ProcessingContext.
@@ -30,7 +32,8 @@ public record EventContext(
             ctx.repository() != null ? RepositoryRef.from(ctx.repository()) : null,
             ctx.source(),
             ctx.webhookAction(),
-            ctx.correlationId()
+            ctx.correlationId(),
+            ctx.provider() != null ? ctx.provider().getType() : null
         );
     }
 
@@ -45,7 +48,24 @@ public record EventContext(
             repository,
             DataSource.GRAPHQL_SYNC,
             null,
-            UUID.randomUUID().toString()
+            UUID.randomUUID().toString(),
+            null
+        );
+    }
+
+    /**
+     * Creates an EventContext for sync operations with a known provider type.
+     */
+    public static EventContext forSync(Long scopeId, RepositoryRef repository, GitProviderType providerType) {
+        return new EventContext(
+            UUID.randomUUID(),
+            Instant.now(),
+            scopeId,
+            repository,
+            DataSource.GRAPHQL_SYNC,
+            null,
+            UUID.randomUUID().toString(),
+            providerType
         );
     }
 
@@ -55,5 +75,13 @@ public record EventContext(
 
     public boolean isSync() {
         return source == DataSource.GRAPHQL_SYNC;
+    }
+
+    public boolean isGitHub() {
+        return providerType == GitProviderType.GITHUB;
+    }
+
+    public boolean isGitLab() {
+        return providerType == GitProviderType.GITLAB;
     }
 }

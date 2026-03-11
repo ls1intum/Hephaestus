@@ -4,6 +4,7 @@ import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlResponseHandler;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncConstants;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabSyncException;
@@ -40,17 +41,20 @@ public class GitLabLabelSyncService {
     private static final String GET_PROJECT_LABELS_DOCUMENT = "GetProjectLabels";
 
     private final GitLabGraphQlClientProvider graphQlClientProvider;
+    private final GitLabGraphQlResponseHandler responseHandler;
     private final GitLabLabelProcessor labelProcessor;
     private final LabelRepository labelRepository;
     private final GitLabProperties gitLabProperties;
 
     public GitLabLabelSyncService(
         GitLabGraphQlClientProvider graphQlClientProvider,
+        GitLabGraphQlResponseHandler responseHandler,
         GitLabLabelProcessor labelProcessor,
         LabelRepository labelRepository,
         GitLabProperties gitLabProperties
     ) {
         this.graphQlClientProvider = graphQlClientProvider;
+        this.responseHandler = responseHandler;
         this.labelProcessor = labelProcessor;
         this.labelRepository = labelRepository;
         this.gitLabProperties = gitLabProperties;
@@ -72,6 +76,7 @@ public class GitLabLabelSyncService {
         int totalSynced = 0;
         Set<String> syncedNames = new HashSet<>();
         String cursor = null;
+        String previousCursor = null;
         int page = 0;
         boolean rateLimitAborted = false;
         boolean errorAborted = false;
@@ -107,13 +112,11 @@ public class GitLabLabelSyncService {
                     .execute()
                     .block(gitLabProperties.graphqlTimeout());
 
-                if (response == null || !response.isValid()) {
-                    log.warn(
-                        "Failed to fetch labels: scopeId={}, projectPath={}, errors={}",
-                        scopeId,
-                        safeProjectPath,
-                        response != null ? response.getErrors() : "null response"
-                    );
+                var handleResult = responseHandler.handle(response, "labels for " + safeProjectPath, log);
+                if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.RETRY) {
+                    continue;
+                }
+                if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.ABORT) {
                     graphQlClientProvider.recordFailure(new GitLabSyncException("Invalid GraphQL response"));
                     errorAborted = true;
                     break;
@@ -149,6 +152,11 @@ public class GitLabLabelSyncService {
                 if (pageInfo == null || !pageInfo.hasNextPage()) {
                     break;
                 }
+                if (responseHandler.isPaginationLoop(cursor, previousCursor, "labels for " + safeProjectPath, log)) {
+                    errorAborted = true;
+                    break;
+                }
+                previousCursor = cursor;
             } while (true);
         } catch (Exception e) {
             log.error("Error during label sync: scopeId={}, projectPath={}", scopeId, safeProjectPath, e);

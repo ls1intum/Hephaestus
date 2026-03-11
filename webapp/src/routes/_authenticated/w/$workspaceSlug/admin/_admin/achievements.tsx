@@ -48,7 +48,7 @@ function AdminAchievementsContainer() {
 		<AdminAchievementsPage
 			users={users}
 			isLoading={isLoading || !workspaceSlug}
-			workspaceSlug={workspaceSlug!}
+			workspaceSlug={workspaceSlug ?? ""}
 		/>
 	);
 }

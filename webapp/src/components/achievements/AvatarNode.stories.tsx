@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { ReactFlowProvider } from "@xyflow/react";
-import { AvatarNode } from "./AvatarNode";
+import { AvatarNode } from "@/components/achievements/AvatarNode";
 
 const meta = {
 	component: AvatarNode,
@@ -12,7 +12,7 @@ const meta = {
 	decorators: [
 		(Story) => (
 			<ReactFlowProvider>
-				<div className="p-12" style={{ display: "flex", justifyContent: "center" }}>
+				<div className="p-12 flex justify-center">
 					<Story />
 				</div>
 			</ReactFlowProvider>
@@ -31,8 +31,9 @@ const defaultArgs = {
 		name: "Zeus",
 	},
 	id: "root-avatar",
-	type: "avatar",
-	position: { x: 0, y: 0 },
+	type: "avatar" as const,
+	positionAbsoluteX: 0,
+	positionAbsoluteY: 0,
 	dragging: false,
 	zIndex: 10,
 	isConnectable: false,
@@ -43,19 +44,19 @@ const defaultArgs = {
 };
 
 export const Default: Story = {
-	args: defaultArgs as any,
+	args: defaultArgs,
 };
 
 export const HighLevel: Story = {
 	args: {
 		...defaultArgs,
 		data: { ...defaultArgs.data, level: 99, leaguePoints: 4200, name: "Athena" },
-	} as any,
+	},
 };
 
 export const FallbackAvatar: Story = {
 	args: {
 		...defaultArgs,
 		data: { ...defaultArgs.data, avatarUrl: "", name: "HP" },
-	} as any,
+	},
 };

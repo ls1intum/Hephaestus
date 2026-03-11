@@ -1,12 +1,16 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { AchievementsListView } from "./AchievementsListView";
-import { mythicAchievements, zeusThunderbolt } from "./storyMockData";
+import { AchievementsListView } from "@/components/achievements/AchievementsListView";
+import {
+	asUI,
+	mythicAchievementsUI,
+	zeusThunderbolt,
+} from "@/components/achievements/storyMockData";
 
 /**
  * Tabular view for displaying achievement progression in an accessible format.
  * Groups achievements by their divine category and shows status and progress bars.
  */
-const meta: Meta<typeof AchievementsListView> = {
+const meta = {
 	component: AchievementsListView,
 	parameters: {
 		layout: "fullscreen",
@@ -35,7 +39,7 @@ type Story = StoryObj<typeof meta>;
  */
 export const CompleteList: Story = {
 	args: {
-		achievements: mythicAchievements,
+		achievements: mythicAchievementsUI,
 	},
 };
 
@@ -44,7 +48,7 @@ export const CompleteList: Story = {
  */
 export const UnlockedOnly: Story = {
 	args: {
-		achievements: mythicAchievements.filter((a) => a.status === "unlocked"),
+		achievements: mythicAchievementsUI.filter((a) => a.status === "unlocked"),
 	},
 };
 
@@ -53,7 +57,7 @@ export const UnlockedOnly: Story = {
  */
 export const CategorySpecific: Story = {
 	args: {
-		achievements: mythicAchievements.filter((a) => a.category === "pull_requests"),
+		achievements: mythicAchievementsUI.filter((a) => a.category === "pull_requests"),
 	},
 };
 
@@ -71,6 +75,6 @@ export const EmptyListState: Story = {
  */
 export const SingleRowExample: Story = {
 	args: {
-		achievements: [zeusThunderbolt],
+		achievements: [asUI(zeusThunderbolt)],
 	},
 };

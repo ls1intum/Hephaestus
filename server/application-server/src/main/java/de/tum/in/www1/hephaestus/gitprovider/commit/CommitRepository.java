@@ -216,7 +216,8 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
             additions, deletions, changed_files, last_sync_at, created_at, updated_at,
             repository_id, author_id, committer_id, author_email, committer_email)
         VALUES (:sha, :message, :messageBody, :htmlUrl, :authoredAt, :committedAt,
-            :additions, :deletions, :changedFiles, :lastSyncAt, NOW(), NOW(),
+            COALESCE(:additions, 0), COALESCE(:deletions, 0), COALESCE(:changedFiles, 0),
+            :lastSyncAt, NOW(), NOW(),
             :repositoryId, :authorId, :committerId, :authorEmail, :committerEmail)
         ON CONFLICT (sha, repository_id) DO UPDATE SET
             message = EXCLUDED.message,

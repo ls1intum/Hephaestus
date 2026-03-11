@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.gitprovider.repository.gitlab.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.List;
 import org.springframework.lang.Nullable;
 
 /**
@@ -9,6 +10,7 @@ import org.springframework.lang.Nullable;
  * <p>
  * Contains the project metadata embedded in every push event, which is used
  * to upsert the repository entity when a push arrives for an unknown project.
+ * Also contains commit data for creating Commit entities from webhook payloads.
  *
  * @see <a href="https://docs.gitlab.com/ee/user/project/integrations/webhook_events.html#push-events">
  *      GitLab Push Events</a>
@@ -22,8 +24,45 @@ public record GitLabPushEventDTO(
     @JsonProperty("checkout_sha") @Nullable String checkoutSha,
     @JsonProperty("project_id") Long projectId,
     @JsonProperty("project") ProjectInfo project,
-    @JsonProperty("total_commits_count") int totalCommitsCount
+    @JsonProperty("total_commits_count") int totalCommitsCount,
+    @JsonProperty("commits") @Nullable List<CommitInfo> commits
 ) {
+    /**
+     * Commit data embedded in the push event payload.
+     */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record CommitInfo(
+        @JsonProperty("id") String id,
+        @JsonProperty("message") @Nullable String message,
+        @JsonProperty("title") @Nullable String title,
+        @JsonProperty("timestamp") @Nullable String timestamp,
+        @JsonProperty("url") @Nullable String url,
+        @JsonProperty("author") @Nullable AuthorInfo author,
+        @JsonProperty("added") @Nullable List<String> added,
+        @JsonProperty("modified") @Nullable List<String> modified,
+        @JsonProperty("removed") @Nullable List<String> removed
+    ) {
+        /**
+         * Returns the total number of changed files.
+         */
+        public int changedFilesCount() {
+            int count = 0;
+            if (added != null) count += added.size();
+            if (modified != null) count += modified.size();
+            if (removed != null) count += removed.size();
+            return count;
+        }
+    }
+
+    /**
+     * Author data embedded in each commit.
+     */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record AuthorInfo(
+        @JsonProperty("name") @Nullable String name,
+        @JsonProperty("email") @Nullable String email
+    ) {}
+
     /**
      * Embedded project metadata from the push event payload.
      * <p>

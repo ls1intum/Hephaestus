@@ -1,0 +1,23 @@
+query GetProjectMembers($fullPath: ID!, $first: Int!, $after: String) {
+    project(fullPath: $fullPath) {
+        projectMembers(first: $first, after: $after) {
+            pageInfo {
+                hasNextPage
+                endCursor
+            }
+            nodes {
+                user {
+                    id
+                    username
+                    name
+                    avatarUrl
+                    webUrl
+                }
+                accessLevel {
+                    stringValue
+                    integerValue
+                }
+            }
+        }
+    }
+}

@@ -394,6 +394,20 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
 
     @Override
     @Transactional(readOnly = true)
+    public List<SyncSession> getGitLabSyncSessions() {
+        List<Workspace> allWorkspaces = workspaceRepository.findAll();
+
+        return allWorkspaces
+            .stream()
+            .filter(ws -> ws.getStatus() == WorkspaceStatus.ACTIVE)
+            .filter(ws -> ws.getProviderType() == GitProviderType.GITLAB)
+            .filter(workspaceScopeFilter::isWorkspaceAllowed)
+            .map(this::toSyncSession)
+            .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public SyncStatistics getSyncStatistics() {
         List<Workspace> allWorkspaces = workspaceRepository.findAll();
 

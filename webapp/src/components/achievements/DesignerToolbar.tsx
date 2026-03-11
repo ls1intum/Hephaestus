@@ -1,16 +1,28 @@
 import { Grid3x3, Magnet, MessageSquareOff, Move, Save } from "lucide-react";
-import { Button } from "@/components/ui/button.tsx";
-import { Label } from "@/components/ui/label.tsx";
+import type { EdgeDisplayMode } from "@/components/achievements/utils";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import {
 	Select,
 	SelectContent,
 	SelectItem,
 	SelectTrigger,
 	SelectValue,
-} from "@/components/ui/select.tsx";
-import { Separator } from "@/components/ui/separator.tsx";
-import { Switch } from "@/components/ui/switch.tsx";
-import type { EdgeDisplayMode } from "./utils.ts";
+} from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
+
+const EDGE_DISPLAY_MODES: readonly EdgeDisplayMode[] = [
+	"achievement",
+	"synthwave",
+	"equalizer-traveling",
+	"equalizer-static",
+	"equalizer-chain",
+] as const;
+
+function isEdgeDisplayMode(value: string): value is EdgeDisplayMode {
+	return (EDGE_DISPLAY_MODES as readonly string[]).includes(value);
+}
 
 const SNAP_GRID_OPTIONS = [24, 48, 96] as const;
 export type SnapGridSize = (typeof SNAP_GRID_OPTIONS)[number];
@@ -49,10 +61,14 @@ export function DesignerToolbar({
 	onEdgeDisplayModeChange,
 }: DesignerToolbarProps) {
 	return (
-		<div className="absolute top-4 right-4 z-50 flex items-center gap-3 bg-background/95 backdrop-blur-sm p-2.5 rounded-xl shadow-lg border border-border">
+		<div
+			role="toolbar"
+			aria-label="Designer tools"
+			className="absolute top-4 right-4 z-50 flex items-center gap-3 bg-background/95 backdrop-blur-sm p-2.5 rounded-xl shadow-lg border border-border"
+		>
 			{/* Drag mode toggle */}
 			<div className="flex items-center gap-2">
-				<Move className="w-4 h-4 text-muted-foreground" />
+				<Move className="w-4 h-4 text-muted-foreground" aria-hidden="true" />
 				<Switch id="designer-drag-mode" checked={isDraggable} onCheckedChange={onDraggableChange} />
 				<Label htmlFor="designer-drag-mode" className="cursor-pointer text-sm">
 					Drag
@@ -63,7 +79,7 @@ export function DesignerToolbar({
 
 			{/* Tooltip toggle */}
 			<div className="flex items-center gap-2">
-				<MessageSquareOff className="w-4 h-4 text-muted-foreground" />
+				<MessageSquareOff className="w-4 h-4 text-muted-foreground" aria-hidden="true" />
 				<Switch
 					id="designer-tooltip-mode"
 					checked={!showTooltips}
@@ -78,7 +94,7 @@ export function DesignerToolbar({
 
 			{/* Snap toggle */}
 			<div className="flex items-center gap-2">
-				<Magnet className="w-4 h-4 text-muted-foreground" />
+				<Magnet className="w-4 h-4 text-muted-foreground" aria-hidden="true" />
 				<Switch id="designer-snap-mode" checked={isSnapping} onCheckedChange={onSnappingChange} />
 				<Label htmlFor="designer-snap-mode" className="cursor-pointer text-sm">
 					Snap
@@ -94,6 +110,8 @@ export function DesignerToolbar({
 							variant={snapSize === size ? "default" : "outline"}
 							size="xs"
 							onClick={() => onSnapSizeChange(size)}
+							aria-label={`Set snap grid to ${size}px`}
+							aria-pressed={snapSize === size}
 						>
 							{size}px
 						</Button>
@@ -104,8 +122,11 @@ export function DesignerToolbar({
 			<Separator orientation="vertical" className="h-6" />
 
 			{/* Grid indicator */}
-			<div className="flex items-center gap-1.5 text-muted-foreground">
-				<Grid3x3 className="w-4 h-4" />
+			<div
+				className="flex items-center gap-1.5 text-muted-foreground"
+				title={`Grid size: ${isSnapping ? `${snapSize}px` : "free"}`}
+			>
+				<Grid3x3 className="w-4 h-4" aria-hidden="true" />
 				<span className="text-xs font-medium tabular-nums">
 					{isSnapping ? `${snapSize}px` : "free"}
 				</span>
@@ -116,7 +137,9 @@ export function DesignerToolbar({
 				<Label className="text-xs text-muted-foreground mr-1 whitespace-nowrap">Edge Style:</Label>
 				<Select
 					value={edgeDisplayMode}
-					onValueChange={(val) => onEdgeDisplayModeChange(val as EdgeDisplayMode)}
+					onValueChange={(val) => {
+						if (val && isEdgeDisplayMode(val)) onEdgeDisplayModeChange(val);
+					}}
 				>
 					<SelectTrigger className="w-45 h-8 text-xs">
 						<SelectValue placeholder="Select Edge Style" />
@@ -135,7 +158,7 @@ export function DesignerToolbar({
 
 			{/* Save button */}
 			<Button variant="default" size="sm" onClick={onSave} className="gap-1.5">
-				<Save className="w-3.5 h-3.5" data-icon="inline-start" />
+				<Save className="w-3.5 h-3.5" aria-hidden="true" data-icon="inline-start" />
 				Save Layout
 			</Button>
 		</div>

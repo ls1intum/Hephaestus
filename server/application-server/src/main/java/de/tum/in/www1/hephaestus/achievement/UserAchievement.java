@@ -12,6 +12,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import jakarta.persistence.Version;
 import jakarta.validation.constraints.NotNull;
 import java.time.Instant;
 import java.util.UUID;
@@ -117,12 +118,13 @@ public class UserAchievement {
     @Column(name = "progress_data", columnDefinition = "jsonb", nullable = false)
     private AchievementProgress progressData;
 
+    @Version
+    private Long version;
+
     @PrePersist
     protected void onCreate() {
         if (id == null) {
             id = UUID.randomUUID();
         }
     }
-
-    // Removed direct getAchievementDefinition to avoid Entity-Service coupling
 }

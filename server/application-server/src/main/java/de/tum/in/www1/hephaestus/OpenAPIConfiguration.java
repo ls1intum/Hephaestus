@@ -16,7 +16,13 @@ import io.swagger.v3.oas.models.media.StringSchema;
 import io.swagger.v3.oas.models.parameters.Parameter;
 import io.swagger.v3.parser.OpenAPIV3Parser;
 import java.io.File;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,7 +44,7 @@ import org.springframework.context.annotation.Configuration;
     info = @Info(
         title = "Hephaestus API",
         description = "API documentation for the Hephaestus application server.",
-        version = "0.28.0",
+        version = "0.29.0",
         contact = @Contact(name = "Felix T.J. Dietrich", email = "felixtj.dietrich@tum.de"),
         license = @License(name = "MIT License", url = "https://github.com/ls1intum/Hephaestus/blob/develop/LICENSE")
     ),
@@ -82,7 +88,9 @@ public class OpenAPIConfiguration {
 
                 log.info("Injected {} achievement IDs into OpenAPI", achievementIds.size());
                 if (achievementIds.isEmpty()) {
-                    log.error("Achievement registry is empty during OpenAPI generation! This will cause frontend type errors.");
+                    log.error(
+                        "Achievement registry is empty during OpenAPI generation! This will cause frontend type errors."
+                    );
                 }
 
                 StringSchema idSchema = new StringSchema();

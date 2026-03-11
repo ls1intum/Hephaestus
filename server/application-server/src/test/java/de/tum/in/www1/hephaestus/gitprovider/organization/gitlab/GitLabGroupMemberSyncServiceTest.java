@@ -20,6 +20,8 @@ import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlResponseHandler;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlResponseHandler.HandleResult;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabGroupMemberResponse;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabGroupMemberResponse.GitLabAccessLevel;
@@ -62,6 +64,9 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
     private GitLabGraphQlClientProvider graphQlClientProvider;
 
     @Mock
+    private GitLabGraphQlResponseHandler responseHandler;
+
+    @Mock
     private OrganizationMembershipRepository organizationMembershipRepository;
 
     @Mock
@@ -100,8 +105,14 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
         // Default: advisory lock always succeeds
         lenient().when(userRepository.tryAcquireLoginLock(anyString(), anyLong())).thenReturn(true);
 
+        // Default: responseHandler.handle() returns CONTINUE (valid response)
+        lenient()
+            .when(responseHandler.handle(any(), anyString(), any()))
+            .thenReturn(new HandleResult(HandleResult.Action.CONTINUE, null));
+
         service = new GitLabGroupMemberSyncService(
             graphQlClientProvider,
+            responseHandler,
             organizationMembershipRepository,
             userRepository,
             gitProviderRepository,
@@ -344,8 +355,13 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
         void staleRemovalSkipped_whenIncomplete() {
             HttpGraphQlClient client = mockClient();
             ClientGraphQlResponse invalidResp = mock(ClientGraphQlResponse.class);
-            when(invalidResp.isValid()).thenReturn(false);
-            when(invalidResp.getErrors()).thenReturn(List.of());
+            lenient().when(invalidResp.isValid()).thenReturn(false);
+            lenient().when(invalidResp.getErrors()).thenReturn(List.of());
+
+            // Invalid response → handler returns ABORT
+            when(responseHandler.handle(eq(invalidResp), anyString(), any())).thenReturn(
+                new HandleResult(HandleResult.Action.ABORT, null)
+            );
 
             HttpGraphQlClient.RequestSpec requestSpec = mock(HttpGraphQlClient.RequestSpec.class);
             when(client.documentName(anyString())).thenReturn(requestSpec);
@@ -518,6 +534,7 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
 
             var serviceNoListener = new GitLabGroupMemberSyncService(
                 graphQlClientProvider,
+                responseHandler,
                 organizationMembershipRepository,
                 userRepository,
                 gitProviderRepository,
@@ -812,7 +829,7 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
     @SuppressWarnings("unchecked")
     private ClientGraphQlResponse mockMembersPage(List<GitLabGroupMemberResponse> members, GitLabPageInfo pageInfo) {
         ClientGraphQlResponse resp = mock(ClientGraphQlResponse.class);
-        when(resp.isValid()).thenReturn(true);
+        lenient().when(resp.isValid()).thenReturn(true);
 
         ClientResponseField nodesField = mock(ClientResponseField.class);
         when(nodesField.<GitLabGroupMemberResponse>toEntityList(any(Class.class))).thenReturn(members);

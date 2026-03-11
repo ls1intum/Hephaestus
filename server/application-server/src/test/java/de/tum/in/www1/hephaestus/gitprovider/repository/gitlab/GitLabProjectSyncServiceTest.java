@@ -15,6 +15,8 @@ import de.tum.in.www1.hephaestus.gitprovider.common.GitProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlResponseHandler;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlResponseHandler.HandleResult;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabGroupResponse;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabProjectResponse;
@@ -46,6 +48,9 @@ class GitLabProjectSyncServiceTest extends BaseUnitTest {
     private GitLabGraphQlClientProvider graphQlClientProvider;
 
     @Mock
+    private GitLabGraphQlResponseHandler responseHandler;
+
+    @Mock
     private GitLabProjectProcessor projectProcessor;
 
     @Mock
@@ -72,8 +77,14 @@ class GitLabProjectSyncServiceTest extends BaseUnitTest {
             .when(gitProviderRepository.findByTypeAndServerUrl(GitProviderType.GITLAB, "https://gitlab.com"))
             .thenReturn(Optional.of(gitLabProvider));
 
+        // Default: responseHandler.handle() returns CONTINUE (valid response)
+        lenient()
+            .when(responseHandler.handle(any(), anyString(), any()))
+            .thenReturn(new HandleResult(HandleResult.Action.CONTINUE, null));
+
         service = new GitLabProjectSyncService(
             graphQlClientProvider,
+            responseHandler,
             projectProcessor,
             groupProcessor,
             gitLabProperties,
@@ -196,14 +207,19 @@ class GitLabProjectSyncServiceTest extends BaseUnitTest {
             HttpGraphQlClient client = mock(HttpGraphQlClient.class);
             when(graphQlClientProvider.forScope(any())).thenReturn(client);
 
-            ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
-            when(response.isValid()).thenReturn(false);
-            when(response.getErrors()).thenReturn(List.of());
+            ClientGraphQlResponse invalidResponse = mock(ClientGraphQlResponse.class);
+            lenient().when(invalidResponse.isValid()).thenReturn(false);
+            lenient().when(invalidResponse.getErrors()).thenReturn(List.of());
+
+            // Override the default CONTINUE with ABORT for this invalid response
+            when(responseHandler.handle(eq(invalidResponse), anyString(), any())).thenReturn(
+                new HandleResult(HandleResult.Action.ABORT, null)
+            );
 
             HttpGraphQlClient.RequestSpec requestSpec = mock(HttpGraphQlClient.RequestSpec.class);
             when(client.documentName(anyString())).thenReturn(requestSpec);
             when(requestSpec.variable(anyString(), any())).thenReturn(requestSpec);
-            when(requestSpec.execute()).thenReturn(Mono.just(response));
+            when(requestSpec.execute()).thenReturn(Mono.just(invalidResponse));
 
             Optional<Repository> result = service.syncProject(1L, "my-org/my-project");
 
@@ -267,7 +283,7 @@ class GitLabProjectSyncServiceTest extends BaseUnitTest {
         when(graphQlClientProvider.forScope(any())).thenReturn(client);
 
         ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
-        when(response.isValid()).thenReturn(true);
+        lenient().when(response.isValid()).thenReturn(true);
 
         ClientResponseField projectField = mock(ClientResponseField.class);
         when(projectField.toEntity(GitLabProjectResponse.class)).thenReturn(projectResponse);

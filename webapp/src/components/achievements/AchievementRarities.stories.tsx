@@ -1,15 +1,15 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { ReactFlowProvider } from "@xyflow/react";
 import { AchievementNode } from "@/components/achievements/AchievementNode";
-import type { UIAchievement } from "@/components/achievements/types";
 import {
 	apolloClarity,
 	aresConflict,
+	asUI,
 	hephaestusInit,
 	hermesSprint,
 	poseidonTrident,
 	zeusThunderbolt,
-} from "./storyMockData";
+} from "@/components/achievements/storyMockData";
 
 /**
  * Showcases all six achievement rarity tiers side by side using mythic-themed artifacts.
@@ -43,7 +43,6 @@ const sharedNodeProps = {
 
 const meta = {
 	component: AchievementNode,
-	// title: "Achievements/Rarity Showcase",
 	parameters: {
 		layout: "centered",
 		docs: {
@@ -77,7 +76,7 @@ type Story = StoryObj<typeof meta>;
 export const Common: Story = {
 	args: {
 		id: "rarity-common",
-		data: { achievement: { ...hephaestusInit, status: "unlocked" } as UIAchievement },
+		data: { achievement: asUI({ ...hephaestusInit, status: "unlocked" }) },
 		...sharedNodeProps,
 	},
 };
@@ -88,7 +87,7 @@ export const Common: Story = {
 export const Uncommon: Story = {
 	args: {
 		id: "rarity-uncommon",
-		data: { achievement: { ...hermesSprint, status: "unlocked" } as UIAchievement },
+		data: { achievement: asUI({ ...hermesSprint, status: "unlocked" }) },
 		...sharedNodeProps,
 	},
 };
@@ -99,7 +98,7 @@ export const Uncommon: Story = {
 export const Rare: Story = {
 	args: {
 		id: "rarity-rare",
-		data: { achievement: { ...aresConflict, status: "unlocked" } as UIAchievement },
+		data: { achievement: asUI({ ...aresConflict, status: "unlocked" }) },
 		...sharedNodeProps,
 	},
 };
@@ -110,7 +109,7 @@ export const Rare: Story = {
 export const Epic: Story = {
 	args: {
 		id: "rarity-epic",
-		data: { achievement: { ...apolloClarity, status: "unlocked" } as UIAchievement },
+		data: { achievement: asUI({ ...apolloClarity, status: "unlocked" }) },
 		...sharedNodeProps,
 	},
 };
@@ -121,7 +120,7 @@ export const Epic: Story = {
 export const Legendary: Story = {
 	args: {
 		id: "rarity-legendary",
-		data: { achievement: { ...poseidonTrident, status: "unlocked" } as UIAchievement },
+		data: { achievement: asUI({ ...poseidonTrident, status: "unlocked" }) },
 		...sharedNodeProps,
 	},
 };
@@ -132,7 +131,7 @@ export const Legendary: Story = {
 export const Mythic: Story = {
 	args: {
 		id: "rarity-mythic",
-		data: { achievement: { ...zeusThunderbolt, status: "unlocked" } as UIAchievement },
+		data: { achievement: asUI({ ...zeusThunderbolt, status: "unlocked" }) },
 		...sharedNodeProps,
 	},
 };

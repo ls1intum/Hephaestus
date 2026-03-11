@@ -1,13 +1,13 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { ReactFlowProvider } from "@xyflow/react";
-import { AchievementSidebar } from "./AchievementSidebar";
-import { mockUser, mythicAchievements } from "./storyMockData";
+import { AchievementSidebar } from "@/components/achievements/AchievementSidebar";
+import { mockUser, mythicAchievementsUI } from "@/components/achievements/storyMockData";
 
 /**
  * The consolidated achievements sidebar showing stats, progress, recent unlocks,
  * and navigation controls. Used as a persistent right-hand companion on the skill tree page.
  */
-const meta: Meta<typeof AchievementSidebar> = {
+const meta = {
 	component: AchievementSidebar,
 	parameters: {
 		layout: "fullscreen",
@@ -30,7 +30,7 @@ const meta: Meta<typeof AchievementSidebar> = {
 			</ReactFlowProvider>
 		),
 	],
-};
+} satisfies Meta<typeof AchievementSidebar>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -44,7 +44,7 @@ export const Default: Story = {
 		onViewModeChange: () => {},
 		isLoading: false,
 		isError: false,
-		achievements: mythicAchievements,
+		achievements: mythicAchievementsUI,
 		isOwnProfile: true,
 		targetUsername: mockUser.name,
 	},
@@ -59,7 +59,7 @@ export const ViewingOthersProfile: Story = {
 		onViewModeChange: () => {},
 		isLoading: false,
 		isError: false,
-		achievements: mythicAchievements,
+		achievements: mythicAchievementsUI,
 		isOwnProfile: false,
 		targetUsername: "Hercules_Coder",
 	},
@@ -74,7 +74,7 @@ export const ListViewMode: Story = {
 		onViewModeChange: () => {},
 		isLoading: false,
 		isError: false,
-		achievements: mythicAchievements,
+		achievements: mythicAchievementsUI,
 		isOwnProfile: true,
 		targetUsername: mockUser.name,
 	},
