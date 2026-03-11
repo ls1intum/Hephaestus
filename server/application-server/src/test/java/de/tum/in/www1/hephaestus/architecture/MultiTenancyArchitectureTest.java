@@ -594,6 +594,7 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                                 "Comment", // Through PR -> repository.organization.workspaceId
                                 "Commit", // Through repository.organization.workspaceId
                                 "Project", // Through organization.workspaceId
+                                "ActivitySavedEvent", // Carries user context for achievement evaluation
                                 "ApplicationReadyEvent", // Spring lifecycle, no workspace needed
                                 "ContextRefreshedEvent", // Spring lifecycle, no workspace needed
                                 "WorkspacesInitializedEvent" // Startup lifecycle, signals all workspaces ready
