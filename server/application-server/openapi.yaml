@@ -2236,7 +2236,6 @@ paths:
                 items:
                   $ref: "#/components/schemas/Achievement"
           description: OK
-      security: []
       summary: Get all achievement definitions
       tags:
       - Achievements

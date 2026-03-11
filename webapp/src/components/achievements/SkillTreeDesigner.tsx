@@ -107,11 +107,21 @@ export function SkillTreeDesigner({ user, allDefinitions }: SkillTreeDesignerPro
 
 		// Dev-only: saves layout to coordinates.json via Vite dev server plugin
 		if (import.meta.env.DEV) {
-			await fetch("/__save-coordinates", {
-				method: "POST",
-				body: JSON.stringify(layoutMap, null, 2),
-			});
-			toast.success("Layout saved to coordinates.json!");
+			try {
+				const res = await fetch("/__save-coordinates", {
+					method: "POST",
+					body: JSON.stringify(layoutMap, null, 2),
+				});
+				if (!res.ok) {
+					toast.error(`Failed to save layout: ${res.status} ${res.statusText}`);
+					return;
+				}
+				toast.success("Layout saved to coordinates.json!");
+			} catch (err) {
+				toast.error(
+					`Failed to save layout: ${err instanceof Error ? err.message : "Network error"}`,
+				);
+			}
 		}
 	}
 

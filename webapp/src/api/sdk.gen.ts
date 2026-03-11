@@ -643,7 +643,11 @@ export const getUserAchievements = <ThrowOnError extends boolean = false>(option
  *
  * Returns the master list of all available achievements. Restricted to non-prod environments.
  */
-export const getAllAchievementDefinitions = <ThrowOnError extends boolean = false>(options: Options<GetAllAchievementDefinitionsData, ThrowOnError>) => (options.client ?? client).get<GetAllAchievementDefinitionsResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/users/{login}/achievements/definitions', ...options });
+export const getAllAchievementDefinitions = <ThrowOnError extends boolean = false>(options: Options<GetAllAchievementDefinitionsData, ThrowOnError>) => (options.client ?? client).get<GetAllAchievementDefinitionsResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/users/{login}/achievements/definitions',
+    ...options
+});
 
 /**
  * Recalculate user achievements

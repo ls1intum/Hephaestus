@@ -95,7 +95,7 @@ public class AchievementController {
         summary = "Get all achievement definitions",
         description = "Returns the master list of all available achievements. Restricted to non-prod environments."
     )
-    @SecurityRequirements
+    @RequireAtLeastWorkspaceAdmin
     public ResponseEntity<List<AchievementDTO>> getAllAchievementDefinitions(
         WorkspaceContext workspaceContext,
         @PathVariable String login
