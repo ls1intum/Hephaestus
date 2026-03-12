@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddLabelFilterData, AddLabelFilterErrors, AddLabelFilterResponses, AddLabelToTeamData, AddLabelToTeamResponses, AddRepositoryToMonitorData, AddRepositoryToMonitorResponses, AssignRoleData, AssignRoleResponses, ComputeUserLeagueStatsData, ComputeUserLeagueStatsResponses, CreateDocumentData, CreateDocumentErrors, CreateDocumentResponses, CreateWorkspaceData, CreateWorkspaceResponses, DeleteDocumentData, DeleteDocumentErrors, DeleteDocumentResponses, DeleteDocumentVersionsAfterData, DeleteDocumentVersionsAfterErrors, DeleteDocumentVersionsAfterResponses, DeleteUserData, DeleteUserResponses, DetectForPullRequestData, DetectForPullRequestErrors, DetectForPullRequestResponses, DetectForUserData, DetectForUserErrors, DetectForUserResponses, GetAllTeamsData, GetAllTeamsResponses, GetBadPracticeData, GetBadPracticeResponses, GetBadPracticesForPullRequestData, GetBadPracticesForPullRequestResponses, GetBadPracticesForUserData, GetBadPracticesForUserResponses, GetCurrentUserMembershipData, GetCurrentUserMembershipResponses, GetDocumentData, GetDocumentErrors, GetDocumentResponses, GetGroupedThreadsData, GetGroupedThreadsErrors, GetGroupedThreadsResponses, GetLabelFiltersData, GetLabelFiltersResponses, GetLeaderboardData, GetLeaderboardResponses, GetMemberData, GetMemberResponses, GetRepositoriesToMonitorData, GetRepositoriesToMonitorResponses, GetRepositorySettingsData, GetRepositorySettingsResponses, GetTeamSettingsData, GetTeamSettingsResponses, GetThreadData, GetThreadErrors, GetThreadResponses, GetUserProfileData, GetUserProfileResponses, GetUserSettingsData, GetUserSettingsResponses, GetUsersWithTeamsData, GetUsersWithTeamsResponses, GetVersionData, GetVersionErrors, GetVersionResponses, GetWorkspaceData, GetWorkspaceResponses, GitLabPreflightData, GitLabPreflightResponses, ListDocumentsData, ListDocumentsErrors, ListDocumentsResponses, ListGitLabGroupsData, ListGitLabGroupsResponses, ListGlobalContributorsData, ListGlobalContributorsResponses, ListMembersData, ListMembersResponses, ListVersionsData, ListVersionsErrors, ListVersionsResponses, ListWorkspacesData, ListWorkspacesResponses, ProvideFeedbackData, ProvideFeedbackErrors, ProvideFeedbackResponses, PurgeWorkspaceData, PurgeWorkspaceResponses, RemoveLabelFilterData, RemoveLabelFilterErrors, RemoveLabelFilterResponses, RemoveLabelFromTeamData, RemoveLabelFromTeamResponses, RemoveMemberData, RemoveMemberResponses, RemoveRepositoryToMonitorData, RemoveRepositoryToMonitorResponses, RenameSlugData, RenameSlugResponses, ResetAndRecalculateLeaguesData, ResetAndRecalculateLeaguesResponses, ResolveData, ResolveResponses, UpdateDocumentData, UpdateDocumentErrors, UpdateDocumentResponses, UpdateNotificationsData, UpdateNotificationsResponses, UpdatePublicVisibilityData, UpdatePublicVisibilityResponses, UpdateRepositorySettingsData, UpdateRepositorySettingsErrors, UpdateRepositorySettingsResponses, UpdateRepositoryVisibilityData, UpdateRepositoryVisibilityResponses, UpdateScheduleData, UpdateScheduleResponses, UpdateSlackCredentialsData, UpdateSlackCredentialsResponses, UpdateStatusData, UpdateStatusResponses, UpdateTeamSettingsData, UpdateTeamSettingsErrors, UpdateTeamSettingsResponses, UpdateTeamVisibilityData, UpdateTeamVisibilityResponses, UpdateTokenData, UpdateTokenResponses, UpdateUserSettingsData, UpdateUserSettingsResponses, VoteMessageData, VoteMessageErrors, VoteMessageResponses } from './types.gen';
+import type { AddLabelFilterData, AddLabelFilterErrors, AddLabelFilterResponses, AddLabelToTeamData, AddLabelToTeamResponses, AddRepositoryToMonitorData, AddRepositoryToMonitorResponses, AssignRoleData, AssignRoleResponses, ComputeUserLeagueStatsData, ComputeUserLeagueStatsResponses, CreateDocumentData, CreateDocumentErrors, CreateDocumentResponses, CreateOrUpdateConfigData, CreateOrUpdateConfigResponses, CreateWorkspaceData, CreateWorkspaceResponses, DeleteConfigData, DeleteConfigErrors, DeleteConfigResponses, DeleteDocumentData, DeleteDocumentErrors, DeleteDocumentResponses, DeleteDocumentVersionsAfterData, DeleteDocumentVersionsAfterErrors, DeleteDocumentVersionsAfterResponses, DeleteUserData, DeleteUserResponses, DetectForPullRequestData, DetectForPullRequestErrors, DetectForPullRequestResponses, DetectForUserData, DetectForUserErrors, DetectForUserResponses, GetAllTeamsData, GetAllTeamsResponses, GetBadPracticeData, GetBadPracticeResponses, GetBadPracticesForPullRequestData, GetBadPracticesForPullRequestResponses, GetBadPracticesForUserData, GetBadPracticesForUserResponses, GetConfigData, GetConfigErrors, GetConfigResponses, GetCurrentUserMembershipData, GetCurrentUserMembershipResponses, GetDocumentData, GetDocumentErrors, GetDocumentResponses, GetGroupedThreadsData, GetGroupedThreadsErrors, GetGroupedThreadsResponses, GetJobData, GetJobErrors, GetJobResponses, GetLabelFiltersData, GetLabelFiltersResponses, GetLeaderboardData, GetLeaderboardResponses, GetMemberData, GetMemberResponses, GetRepositoriesToMonitorData, GetRepositoriesToMonitorResponses, GetRepositorySettingsData, GetRepositorySettingsResponses, GetTeamSettingsData, GetTeamSettingsResponses, GetThreadData, GetThreadErrors, GetThreadResponses, GetUserProfileData, GetUserProfileResponses, GetUserSettingsData, GetUserSettingsResponses, GetUsersWithTeamsData, GetUsersWithTeamsResponses, GetVersionData, GetVersionErrors, GetVersionResponses, GetWorkspaceData, GetWorkspaceResponses, GitLabPreflightData, GitLabPreflightResponses, ListDocumentsData, ListDocumentsErrors, ListDocumentsResponses, ListGitLabGroupsData, ListGitLabGroupsResponses, ListGlobalContributorsData, ListGlobalContributorsResponses, ListJobsData, ListJobsResponses, ListMembersData, ListMembersResponses, ListVersionsData, ListVersionsErrors, ListVersionsResponses, ListWorkspacesData, ListWorkspacesResponses, ProvideFeedbackData, ProvideFeedbackErrors, ProvideFeedbackResponses, PurgeWorkspaceData, PurgeWorkspaceResponses, RemoveLabelFilterData, RemoveLabelFilterErrors, RemoveLabelFilterResponses, RemoveLabelFromTeamData, RemoveLabelFromTeamResponses, RemoveMemberData, RemoveMemberResponses, RemoveRepositoryToMonitorData, RemoveRepositoryToMonitorResponses, RenameSlugData, RenameSlugResponses, ResetAndRecalculateLeaguesData, ResetAndRecalculateLeaguesResponses, ResolveData, ResolveResponses, UpdateDocumentData, UpdateDocumentErrors, UpdateDocumentResponses, UpdateNotificationsData, UpdateNotificationsResponses, UpdatePublicVisibilityData, UpdatePublicVisibilityResponses, UpdateRepositorySettingsData, UpdateRepositorySettingsErrors, UpdateRepositorySettingsResponses, UpdateRepositoryVisibilityData, UpdateRepositoryVisibilityResponses, UpdateScheduleData, UpdateScheduleResponses, UpdateSlackCredentialsData, UpdateSlackCredentialsResponses, UpdateStatusData, UpdateStatusResponses, UpdateTeamSettingsData, UpdateTeamSettingsErrors, UpdateTeamSettingsResponses, UpdateTeamVisibilityData, UpdateTeamVisibilityResponses, UpdateTokenData, UpdateTokenResponses, UpdateUserSettingsData, UpdateUserSettingsResponses, VoteMessageData, VoteMessageErrors, VoteMessageResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean> = Options2<TData, ThrowOnError> & {
     /**
@@ -123,6 +123,55 @@ export const purgeWorkspace = <ThrowOnError extends boolean = false>(options: Op
  * Fetch a workspace by slug
  */
 export const getWorkspace = <ThrowOnError extends boolean = false>(options: Options<GetWorkspaceData, ThrowOnError>) => (options.client ?? client).get<GetWorkspaceResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}', ...options });
+
+/**
+ * Delete agent configuration for a workspace
+ */
+export const deleteConfig = <ThrowOnError extends boolean = false>(options: Options<DeleteConfigData, ThrowOnError>) => (options.client ?? client).delete<DeleteConfigResponses, DeleteConfigErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/agent-config',
+    ...options
+});
+
+/**
+ * Get agent configuration for a workspace
+ */
+export const getConfig = <ThrowOnError extends boolean = false>(options: Options<GetConfigData, ThrowOnError>) => (options.client ?? client).get<GetConfigResponses, GetConfigErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/agent-config',
+    ...options
+});
+
+/**
+ * Create or update agent configuration for a workspace
+ */
+export const createOrUpdateConfig = <ThrowOnError extends boolean = false>(options: Options<CreateOrUpdateConfigData, ThrowOnError>) => (options.client ?? client).put<CreateOrUpdateConfigResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/agent-config',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * List agent jobs for a workspace
+ */
+export const listJobs = <ThrowOnError extends boolean = false>(options: Options<ListJobsData, ThrowOnError>) => (options.client ?? client).get<ListJobsResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/agent-jobs',
+    ...options
+});
+
+/**
+ * Get agent job details
+ */
+export const getJob = <ThrowOnError extends boolean = false>(options: Options<GetJobData, ThrowOnError>) => (options.client ?? client).get<GetJobResponses, GetJobErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/agent-jobs/{id}',
+    ...options
+});
 
 /**
  * Generate leaderboard
