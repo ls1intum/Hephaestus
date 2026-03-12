@@ -145,7 +145,7 @@ export function MessageReasoning({
 					{/* Embed keyframes locally so Storybook always has them */}
 					<style>{`
 						@keyframes message-reasoning-shimmer { from { background-position-x: -200%; } to { background-position-x: 200%; } }
-						[data-motion="reduced"] .mr-shimmer { animation: none !important; }
+						@media (prefers-reduced-motion: reduce) { .mr-shimmer { animation: none !important; } }
 					`}</style>
 					<div className="font-medium text-muted-foreground relative inline-block align-middle">
 						<span>{"Thinking"}</span>
@@ -178,7 +178,7 @@ export function MessageReasoning({
 						{/* Embed keyframes locally so Storybook always has them */}
 						<style>{`
 							@keyframes message-reasoning-shimmer { from { background-position-x: -200%; } to { background-position-x: 200%; } }
-							[data-motion="reduced"] .mr-shimmer { animation: none !important; }
+							@media (prefers-reduced-motion: reduce) { .mr-shimmer { animation: none !important; } }
 						`}</style>
 						<span>{headerText}</span>
 						{isLoading && (

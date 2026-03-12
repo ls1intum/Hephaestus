@@ -3,7 +3,6 @@ import { Link } from "@tanstack/react-router";
 import { Hammer, LogOut, Settings, User } from "lucide-react";
 import { GitHubSignInButton } from "@/components/auth/GitHubSignInButton";
 import { ModeToggle } from "@/components/core/ModeToggle";
-import { MotionToggle } from "@/components/core/MotionToggle";
 import { SurveyNotificationButton } from "@/components/surveys/survey-notification-button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -103,7 +102,6 @@ export default function Header({
 			</div>
 			<div className="flex gap-2 px-4">
 				<SurveyNotificationButton />
-				<MotionToggle />
 				<ModeToggle />
 				<div className="flex items-center gap-2">
 					{!isAuthenticated ? (

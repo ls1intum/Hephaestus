@@ -108,12 +108,14 @@ export function MentorIcon({
 							50% { transform: scaleX(0.85); opacity: calc(var(--mentor-shadow-opacity, 0.08) * 0.6); } 
 						}
 
-						[data-motion="reduced"] .mentor-float-${uniqueId}, 
-						[data-motion="reduced"] .mentor-wobble-${uniqueId}, 
-						[data-motion="reduced"] .mentor-ping-${uniqueId}, 
-						[data-motion="reduced"] .mentor-eyes-${uniqueId}, 
-						[data-motion="reduced"] .mentor-shadow-${uniqueId} { 
-							animation: none !important; 
+						@media (prefers-reduced-motion: reduce) {
+							.mentor-float-${uniqueId},
+							.mentor-wobble-${uniqueId},
+							.mentor-ping-${uniqueId},
+							.mentor-eyes-${uniqueId},
+							.mentor-shadow-${uniqueId} {
+								animation: none !important;
+							}
 						}
 
 						/* Dark mode adaptations */
