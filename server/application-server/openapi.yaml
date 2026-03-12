@@ -8,15 +8,13 @@ info:
     name: MIT License
     url: https://github.com/ls1intum/Hephaestus/blob/develop/LICENSE
   title: Hephaestus API
-  version: 0.30.0
+  version: 0.29.0
 servers:
 - description: Default Server URL
   url: /
 security:
 - bearerAuth: []
 tags:
-- description: User achievement progress and unlocks
-  name: Achievements
 - description: Global contributor information
   name: Contributors
 - description: |-
@@ -28,6 +26,8 @@ tags:
   name: Team Settings
 - description: Team management within workspace
   name: Teams
+- description: Workspace-scoped agent configuration management
+  name: Agent Config
 - description: Bad practice detection and resolution
   name: Code Practices
 - description: User profile and activity data
@@ -36,6 +36,8 @@ tags:
     Controller for managing workspace memberships and roles.
      Handles CRUD operations for workspace members and role assignments.
   name: workspace-membership-controller
+- description: Workspace-scoped agent job monitoring
+  name: Agent Jobs
 - description: Contributor rankings and league statistics
   name: Leaderboard
 - description: "User account management (settings, deletion)"
@@ -215,6 +217,152 @@ paths:
       summary: Fetch a workspace by slug
       tags:
       - workspace
+  /workspaces/{workspaceSlug}/agent-config:
+    delete:
+      operationId: deleteConfig
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "204":
+          description: Agent config deleted
+        "404":
+          description: No agent config exists for this workspace
+        "409":
+          description: Cannot delete config with active jobs
+      summary: Delete agent configuration for a workspace
+      tags:
+      - Agent Config
+    get:
+      operationId: getConfig
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentConfig"
+          description: Agent config returned
+        "404":
+          description: No agent config exists for this workspace
+      summary: Get agent configuration for a workspace
+      tags:
+      - Agent Config
+    put:
+      operationId: createOrUpdateConfig
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAgentConfigRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentConfig"
+          description: Agent config created or updated
+      summary: Create or update agent configuration for a workspace
+      tags:
+      - Agent Config
+  /workspaces/{workspaceSlug}/agent-jobs:
+    get:
+      operationId: listJobs
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - description: Filter by job status
+        in: query
+        name: status
+        required: false
+        schema:
+          type: string
+          enum:
+          - QUEUED
+          - RUNNING
+          - COMPLETED
+          - FAILED
+          - TIMED_OUT
+          - CANCELLED
+      - in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageAgentJob"
+          description: Paginated job list
+      summary: List agent jobs for a workspace
+      tags:
+      - Agent Jobs
+  /workspaces/{workspaceSlug}/agent-jobs/{id}:
+    get:
+      operationId: getJob
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentJob"
+          description: Job detail returned
+        "404":
+          description: Job not found in this workspace
+      summary: Get agent job details
+      tags:
+      - Agent Jobs
   /workspaces/{workspaceSlug}/leaderboard:
     get:
       description: Creates a ranked contributor list for the specified time range
@@ -2177,244 +2325,130 @@ paths:
       summary: List workspace users and the teams they belong to
       tags:
       - workspace
-  /workspaces/{workspaceSlug}/users/{login}/achievements:
-    get:
-      description: Returns all achievements with progress information for the specified
-        user
-      operationId: getUserAchievements
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - description: the user's GitHub login
-        in: path
-        name: login
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Achievement"
-          description: list of all achievements with user-specific progress
-      security: []
-      summary: Get user achievements
-      tags:
-      - Achievements
-  /workspaces/{workspaceSlug}/users/{login}/achievements/definitions:
-    get:
-      description: Returns the master list of all available achievements. Restricted
-        to non-prod environments.
-      operationId: getAllAchievementDefinitions
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: login
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Achievement"
-          description: OK
-      security: []
-      summary: Get all achievement definitions
-      tags:
-      - Achievements
-  /workspaces/{workspaceSlug}/users/{login}/achievements/recalculate:
-    post:
-      description: Wipes and historically recalculates a user's achievement timeline.
-        Admin only.
-      operationId: recalculateUserAchievements
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - description: the user's GitHub login
-        in: path
-        name: login
-        required: true
-        schema:
-          type: string
-      responses:
-        "202":
-          description: Recalculation task started successfully
-      summary: Recalculate user achievements
-      tags:
-      - Achievements
-  /workspaces/{workspaceSlug}/users/{login}/achievements/reload:
-    post:
-      description: Hot reloads the achievements.yml configuration without requiring
-        a restart. Admin only.
-      operationId: reloadAchievements
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: login
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          description: OK
-      summary: Reload achievements configuration
-      tags:
-      - Achievements
 components:
   schemas:
-    Achievement:
+    AgentConfig:
       type: object
-      description: Achievement with user-specific progress information
+      description: Agent configuration for a workspace (API key redacted)
       properties:
-        category:
+        agentType:
           type: string
-          description: Category for grouping achievements
+          description: Type of coding agent
           enum:
-          - pull_requests
-          - commits
-          - communication
-          - issues
-          - milestones
-          example: pull_requests
-        id:
-          type: string
-          $ref: "#/components/schemas/AchievementId"
-          description: Unique identifier for the achievement
-          example: pr.merged.common.1
-        isHidden:
+          - CLAUDE_CODE
+          - CODEX
+          - OPENCODE
+        allowInternet:
           type: boolean
-          description: Whether the achievement should be hidden until unlocked
-        parent:
-          type: string
-          description: Parent achievement in progression chain
-          example: first_pull
-        progressData:
-          description: The structured progress data based on the achievements evaluator
-          oneOf:
-          - $ref: "#/components/schemas/BinaryAchievementProgress"
-          - $ref: "#/components/schemas/LinearAchievementProgress"
-        rarity:
-          type: string
-          description: Visual level tier/rarity for badge styling
-          enum:
-          - common
-          - uncommon
-          - rare
-          - epic
-          - legendary
-          - mythic
-          example: common
-        status:
-          type: string
-          description: Current status of the achievement for this user
-          enum:
-          - locked
-          - available
-          - unlocked
-          - hidden
-          example: unlocked
-        unlockedAt:
+          description: Whether agent containers have internet access
+        createdAt:
           type: string
           format: date-time
-          description: "Optional of when the achievement was unlocked, empty() if\
-            \ not unlocked"
-      required:
-      - category
-      - id
-      - progressData
-      - rarity
-      - status
-      - unlockedAt
-    AchievementId:
-      type: string
-      enum:
-      - commit.common.1
-      - commit.common.2
-      - commit.epic
-      - commit.legendary
-      - commit.mythic
-      - commit.rare
-      - commit.special.atomic_changes
-      - commit.special.brute_force
-      - commit.special.cross_boundary
-      - commit.special.itsy_bitsy
-      - commit.uncommon.1
-      - commit.uncommon.2
-      - issue.close.common.1
-      - issue.close.common.2
-      - issue.close.epic
-      - issue.close.legendary
-      - issue.close.rare
-      - issue.close.uncommon
-      - issue.open.common.1
-      - issue.open.common.2
-      - issue.open.epic
-      - issue.open.legendary
-      - issue.open.rare
-      - issue.open.uncommon
-      - issue.special.hive_mind
-      - issue.special.necromancer
-      - issue.special.oracle
-      - milestone.all_epic
-      - milestone.all_legendary
-      - milestone.all_rare
-      - milestone.first_action
-      - milestone.long_time_return
-      - milestone.night_owl
-      - milestone.polyglot
-      - pr.merged.common.1
-      - pr.merged.common.2
-      - pr.merged.epic
-      - pr.merged.legendary
-      - pr.merged.rare
-      - pr.merged.uncommon
-      - pr.special.speedster
-      - review.common.1
-      - review.common.2
-      - review.epic
-      - review.legendary
-      - review.mythic
-      - review.rare
-      - review.uncommon.1
-      - review.uncommon.2
-    AchievementProgress:
-      description: Polymorphic progress data
-      discriminator:
-        propertyName: type
-      properties:
-        type:
+          description: Timestamp when the config was created
+        enabled:
+          type: boolean
+          description: Whether the agent is enabled
+        hasLlmApiKey:
+          type: boolean
+          description: Whether an LLM API key is configured
+        id:
+          type: integer
+          format: int64
+          description: Configuration ID
+        llmProvider:
           type: string
+          description: LLM provider
+          enum:
+          - ANTHROPIC
+          - OPENAI
+        maxConcurrentJobs:
+          type: integer
+          format: int32
+          description: Maximum concurrent jobs
+        modelName:
+          type: string
+          description: LLM model name
+          example: claude-sonnet-4-20250514
+        timeoutSeconds:
+          type: integer
+          format: int32
+          description: Job timeout in seconds
+        updatedAt:
+          type: string
+          format: date-time
+          description: Timestamp when the config was last updated
       required:
-      - type
+      - agentType
+      - allowInternet
+      - createdAt
+      - enabled
+      - hasLlmApiKey
+      - id
+      - llmProvider
+      - maxConcurrentJobs
+      - timeoutSeconds
+    AgentJob:
+      type: object
+      description: Agent job execution record (job_token intentionally omitted)
+      properties:
+        completedAt:
+          type: string
+          format: date-time
+          description: Timestamp when the job completed
+        configSnapshot:
+          description: Frozen agent config at submit time
+        containerId:
+          type: string
+          description: Docker container ID
+        createdAt:
+          type: string
+          format: date-time
+          description: Timestamp when the job was created
+        errorMessage:
+          type: string
+          description: Human-readable error message
+        exitCode:
+          type: integer
+          format: int32
+          description: Container exit code
+        id:
+          type: string
+          format: uuid
+          description: Job ID
+        jobType:
+          type: string
+          description: Job type
+          enum:
+          - PULL_REQUEST_REVIEW
+        metadata:
+          description: Job metadata (routing/display info)
+        output:
+          description: Job output (agent results)
+        retryCount:
+          type: integer
+          format: int32
+          description: Number of retry attempts
+        startedAt:
+          type: string
+          format: date-time
+          description: Timestamp when the job started running
+        status:
+          type: string
+          description: Current job status
+          enum:
+          - QUEUED
+          - RUNNING
+          - COMPLETED
+          - FAILED
+          - TIMED_OUT
+          - CANCELLED
+      required:
+      - configSnapshot
+      - createdAt
+      - id
+      - jobType
+      - retryCount
+      - status
     AssignRoleRequest:
       type: object
       description: Request to assign or update a user's role in a workspace
@@ -2452,16 +2486,6 @@ components:
       required:
       - explanation
       - type
-    BinaryAchievementProgress:
-      allOf:
-      - $ref: "#/components/schemas/AchievementProgress"
-      - type: object
-        properties:
-          unlocked:
-            type: boolean
-      description: Binary progress indicating unlocked state
-      required:
-      - unlocked
     ChatMessageVote:
       type: object
       properties:
@@ -2859,21 +2883,56 @@ components:
       required:
       - leaguePointsChange
       - login
-    LinearAchievementProgress:
-      allOf:
-      - $ref: "#/components/schemas/AchievementProgress"
-      - type: object
-        properties:
-          current:
-            type: integer
-            format: int32
-          target:
-            type: integer
-            format: int32
-      description: Linear progress with current and target counts
-      required:
-      - current
-      - target
+    PageAgentJob:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgentJob"
+        empty:
+          type: boolean
+        first:
+          type: boolean
+        last:
+          type: boolean
+        number:
+          type: integer
+          format: int32
+        numberOfElements:
+          type: integer
+          format: int32
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
+        size:
+          type: integer
+          format: int32
+        sort:
+          $ref: "#/components/schemas/SortObject"
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+    PageableObject:
+      type: object
+      properties:
+        offset:
+          type: integer
+          format: int64
+        pageNumber:
+          type: integer
+          format: int32
+        pageSize:
+          type: integer
+          format: int32
+        paged:
+          type: boolean
+        sort:
+          $ref: "#/components/schemas/SortObject"
+        unpaged:
+          type: boolean
     Profile:
       type: object
       description: Complete user profile including contribution history and activity
@@ -3337,6 +3396,15 @@ components:
       - id
       - name
       - nameWithOwner
+    SortObject:
+      type: object
+      properties:
+        empty:
+          type: boolean
+        sorted:
+          type: boolean
+        unsorted:
+          type: boolean
     StreamPart:
       type: object
       additionalProperties: {}
@@ -3506,6 +3574,53 @@ components:
       - messages
       x-hephaestus:
         export: true
+    UpdateAgentConfigRequest:
+      type: object
+      description: Request to create or update the agent configuration for a workspace
+      properties:
+        agentType:
+          type: string
+          description: Type of coding agent
+          enum:
+          - CLAUDE_CODE
+          - CODEX
+          - OPENCODE
+        allowInternet:
+          type: boolean
+          description: Whether agent containers have internet access
+        enabled:
+          type: boolean
+          description: Whether the agent is enabled
+        llmApiKey:
+          type: string
+          description: LLM API key (omit or null to keep existing key)
+        llmProvider:
+          type: string
+          description: LLM provider
+          enum:
+          - ANTHROPIC
+          - OPENAI
+        maxConcurrentJobs:
+          type: integer
+          format: int32
+          description: Maximum concurrent jobs
+          example: 3
+          maximum: 10
+          minimum: 1
+        modelName:
+          type: string
+          description: LLM model name
+          example: claude-sonnet-4-20250514
+        timeoutSeconds:
+          type: integer
+          format: int32
+          description: Job timeout in seconds
+          example: 600
+          maximum: 3600
+          minimum: 30
+      required:
+      - agentType
+      - llmProvider
     UpdateRepositorySettingsRequest:
       type: object
       description: Request to update repository contribution visibility settings in

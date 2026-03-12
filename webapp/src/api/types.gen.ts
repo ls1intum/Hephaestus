@@ -553,6 +553,44 @@ export type UpdateRepositorySettingsRequest = {
     hiddenFromContributions: boolean;
 };
 
+/**
+ * Request to create or update the agent configuration for a workspace
+ */
+export type UpdateAgentConfigRequest = {
+    /**
+     * Type of coding agent
+     */
+    agentType: 'CLAUDE_CODE' | 'CODEX' | 'OPENCODE';
+    /**
+     * Whether agent containers have internet access
+     */
+    allowInternet?: boolean;
+    /**
+     * Whether the agent is enabled
+     */
+    enabled?: boolean;
+    /**
+     * LLM API key (omit or null to keep existing key)
+     */
+    llmApiKey?: string;
+    /**
+     * LLM provider
+     */
+    llmProvider: 'ANTHROPIC' | 'OPENAI';
+    /**
+     * Maximum concurrent jobs
+     */
+    maxConcurrentJobs?: number;
+    /**
+     * LLM model name
+     */
+    modelName?: string;
+    /**
+     * Job timeout in seconds
+     */
+    timeoutSeconds?: number;
+};
+
 export type ThreadDetail = {
     id: string;
     messages: Array<{
@@ -625,6 +663,12 @@ export type TeamInfo = {
      * Repositories the team has access to
      */
     repositories: Array<RepositoryInfo>;
+};
+
+export type SortObject = {
+    empty?: boolean;
+    sorted?: boolean;
+    unsorted?: boolean;
 };
 
 /**
@@ -893,20 +937,85 @@ export type Profile = {
     xpRecord: ProfileXpRecord;
 };
 
-/**
- * Linear progress with current and target counts
- */
-export type LinearAchievementProgress = Omit<AchievementProgress, 'type'> & {
-    current: number;
-    target: number;
-    type: 'LinearAchievementProgress';
+export type PageableObject = {
+    offset?: number;
+    pageNumber?: number;
+    pageSize?: number;
+    paged?: boolean;
+    sort?: SortObject;
+    unpaged?: boolean;
+};
+
+export type PageAgentJob = {
+    content?: Array<AgentJob>;
+    empty?: boolean;
+    first?: boolean;
+    last?: boolean;
+    number?: number;
+    numberOfElements?: number;
+    pageable?: PageableObject;
+    size?: number;
+    sort?: SortObject;
+    totalElements?: number;
+    totalPages?: number;
 };
 
 /**
- * Polymorphic progress data
+ * Agent job execution record (job_token intentionally omitted)
  */
-export type AchievementProgress = {
-    type: string;
+export type AgentJob = {
+    /**
+     * Timestamp when the job completed
+     */
+    completedAt?: Date;
+    /**
+     * Frozen agent config at submit time
+     */
+    configSnapshot: unknown;
+    /**
+     * Docker container ID
+     */
+    containerId?: string;
+    /**
+     * Timestamp when the job was created
+     */
+    createdAt: Date;
+    /**
+     * Human-readable error message
+     */
+    errorMessage?: string;
+    /**
+     * Container exit code
+     */
+    exitCode?: number;
+    /**
+     * Job ID
+     */
+    id: string;
+    /**
+     * Job type
+     */
+    jobType: 'PULL_REQUEST_REVIEW';
+    /**
+     * Job metadata (routing/display info)
+     */
+    metadata?: unknown;
+    /**
+     * Job output (agent results)
+     */
+    output?: unknown;
+    /**
+     * Number of retry attempts
+     */
+    retryCount: number;
+    /**
+     * Timestamp when the job started running
+     */
+    startedAt?: Date;
+    /**
+     * Current job status
+     */
+    status: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'TIMED_OUT' | 'CANCELLED';
 };
 
 export type LeagueChange = {
@@ -1161,14 +1270,6 @@ export type ChatMessageVote = {
 };
 
 /**
- * Binary progress indicating unlocked state
- */
-export type BinaryAchievementProgress = Omit<AchievementProgress, 'type'> & {
-    unlocked: boolean;
-    type: 'BinaryAchievementProgress';
-};
-
-/**
  * User feedback on a detected bad practice
  */
 export type BadPracticeFeedback = {
@@ -1196,44 +1297,54 @@ export type AssignRoleRequest = {
     userId: number;
 };
 
-export type AchievementId = 'commit.common.1' | 'commit.common.2' | 'commit.epic' | 'commit.legendary' | 'commit.mythic' | 'commit.rare' | 'commit.special.atomic_changes' | 'commit.special.brute_force' | 'commit.special.cross_boundary' | 'commit.special.itsy_bitsy' | 'commit.uncommon.1' | 'commit.uncommon.2' | 'issue.close.common.1' | 'issue.close.common.2' | 'issue.close.epic' | 'issue.close.legendary' | 'issue.close.rare' | 'issue.close.uncommon' | 'issue.open.common.1' | 'issue.open.common.2' | 'issue.open.epic' | 'issue.open.legendary' | 'issue.open.rare' | 'issue.open.uncommon' | 'issue.special.hive_mind' | 'issue.special.necromancer' | 'issue.special.oracle' | 'milestone.all_epic' | 'milestone.all_legendary' | 'milestone.all_rare' | 'milestone.first_action' | 'milestone.long_time_return' | 'milestone.night_owl' | 'milestone.polyglot' | 'pr.merged.common.1' | 'pr.merged.common.2' | 'pr.merged.epic' | 'pr.merged.legendary' | 'pr.merged.rare' | 'pr.merged.uncommon' | 'pr.special.speedster' | 'review.common.1' | 'review.common.2' | 'review.epic' | 'review.legendary' | 'review.mythic' | 'review.rare' | 'review.uncommon.1' | 'review.uncommon.2';
-
 /**
- * Achievement with user-specific progress information
+ * Agent configuration for a workspace (API key redacted)
  */
-export type Achievement = {
+export type AgentConfig = {
     /**
-     * Category for grouping achievements
+     * Type of coding agent
      */
-    category: 'pull_requests' | 'commits' | 'communication' | 'issues' | 'milestones';
+    agentType: 'CLAUDE_CODE' | 'CODEX' | 'OPENCODE';
     /**
-     * Unique identifier for the achievement
+     * Whether agent containers have internet access
      */
-    id: AchievementId;
+    allowInternet: boolean;
     /**
-     * Whether the achievement should be hidden until unlocked
+     * Timestamp when the config was created
      */
-    isHidden?: boolean;
+    createdAt: Date;
     /**
-     * Parent achievement in progression chain
+     * Whether the agent is enabled
      */
-    parent?: string;
+    enabled: boolean;
     /**
-     * The structured progress data based on the achievements evaluator
+     * Whether an LLM API key is configured
      */
-    progressData: BinaryAchievementProgress | LinearAchievementProgress;
+    hasLlmApiKey: boolean;
     /**
-     * Visual level tier/rarity for badge styling
+     * Configuration ID
      */
-    rarity: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'mythic';
+    id: number;
     /**
-     * Current status of the achievement for this user
+     * LLM provider
      */
-    status: 'locked' | 'available' | 'unlocked' | 'hidden';
+    llmProvider: 'ANTHROPIC' | 'OPENAI';
     /**
-     * Optional of when the achievement was unlocked, empty() if not unlocked
+     * Maximum concurrent jobs
      */
-    unlockedAt: Date;
+    maxConcurrentJobs: number;
+    /**
+     * LLM model name
+     */
+    modelName?: string;
+    /**
+     * Job timeout in seconds
+     */
+    timeoutSeconds: number;
+    /**
+     * Timestamp when the config was last updated
+     */
+    updatedAt?: Date;
 };
 
 export type ListGlobalContributorsData = {
@@ -1403,6 +1514,144 @@ export type GetWorkspaceResponses = {
 };
 
 export type GetWorkspaceResponse = GetWorkspaceResponses[keyof GetWorkspaceResponses];
+
+export type DeleteConfigData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/agent-config';
+};
+
+export type DeleteConfigErrors = {
+    /**
+     * No agent config exists for this workspace
+     */
+    404: unknown;
+    /**
+     * Cannot delete config with active jobs
+     */
+    409: unknown;
+};
+
+export type DeleteConfigResponses = {
+    /**
+     * Agent config deleted
+     */
+    204: void;
+};
+
+export type DeleteConfigResponse = DeleteConfigResponses[keyof DeleteConfigResponses];
+
+export type GetConfigData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/agent-config';
+};
+
+export type GetConfigErrors = {
+    /**
+     * No agent config exists for this workspace
+     */
+    404: unknown;
+};
+
+export type GetConfigResponses = {
+    /**
+     * Agent config returned
+     */
+    200: AgentConfig;
+};
+
+export type GetConfigResponse = GetConfigResponses[keyof GetConfigResponses];
+
+export type CreateOrUpdateConfigData = {
+    body: UpdateAgentConfigRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/agent-config';
+};
+
+export type CreateOrUpdateConfigResponses = {
+    /**
+     * Agent config created or updated
+     */
+    200: AgentConfig;
+};
+
+export type CreateOrUpdateConfigResponse = CreateOrUpdateConfigResponses[keyof CreateOrUpdateConfigResponses];
+
+export type ListJobsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: {
+        /**
+         * Filter by job status
+         */
+        status?: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'TIMED_OUT' | 'CANCELLED';
+        page?: number;
+        size?: number;
+    };
+    url: '/workspaces/{workspaceSlug}/agent-jobs';
+};
+
+export type ListJobsResponses = {
+    /**
+     * Paginated job list
+     */
+    200: PageAgentJob;
+};
+
+export type ListJobsResponse = ListJobsResponses[keyof ListJobsResponses];
+
+export type GetJobData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        id: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/agent-jobs/{id}';
+};
+
+export type GetJobErrors = {
+    /**
+     * Job not found in this workspace
+     */
+    404: unknown;
+};
+
+export type GetJobResponses = {
+    /**
+     * Job detail returned
+     */
+    200: AgentJob;
+};
+
+export type GetJobResponse = GetJobResponses[keyof GetJobResponses];
 
 export type GetLeaderboardData = {
     body?: never;
@@ -2842,93 +3091,3 @@ export type GetUsersWithTeamsResponses = {
 };
 
 export type GetUsersWithTeamsResponse = GetUsersWithTeamsResponses[keyof GetUsersWithTeamsResponses];
-
-export type GetUserAchievementsData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        /**
-         * the user's GitHub login
-         */
-        login: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/users/{login}/achievements';
-};
-
-export type GetUserAchievementsResponses = {
-    /**
-     * list of all achievements with user-specific progress
-     */
-    200: Array<Achievement>;
-};
-
-export type GetUserAchievementsResponse = GetUserAchievementsResponses[keyof GetUserAchievementsResponses];
-
-export type GetAllAchievementDefinitionsData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        login: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/users/{login}/achievements/definitions';
-};
-
-export type GetAllAchievementDefinitionsResponses = {
-    /**
-     * OK
-     */
-    200: Array<Achievement>;
-};
-
-export type GetAllAchievementDefinitionsResponse = GetAllAchievementDefinitionsResponses[keyof GetAllAchievementDefinitionsResponses];
-
-export type RecalculateUserAchievementsData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        /**
-         * the user's GitHub login
-         */
-        login: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/users/{login}/achievements/recalculate';
-};
-
-export type RecalculateUserAchievementsResponses = {
-    /**
-     * Recalculation task started successfully
-     */
-    202: unknown;
-};
-
-export type ReloadAchievementsData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        login: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/users/{login}/achievements/reload';
-};
-
-export type ReloadAchievementsResponses = {
-    /**
-     * OK
-     */
-    200: unknown;
-};
