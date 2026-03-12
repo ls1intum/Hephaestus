@@ -1,12 +1,8 @@
 import { useSyncExternalStore } from "react";
-import { useMotionPreference } from "./use-motion-preference";
 
 /**
  * Shared animation clock that consolidates all requestAnimationFrame loops
  * into a single global loop. Returns time in seconds (performance.now() * 0.001).
- *
- * Respects `useMotionPreference()`: returns a static `0` when reduced motion
- * is preferred, and the rAF loop is not started at all.
  *
  * Uses `useSyncExternalStore` for tear-free reads across concurrent renders.
  */
@@ -67,17 +63,12 @@ const ZERO_SNAPSHOT = () => 0;
  * Returns the current animation time in seconds, synchronized across all consumers.
  *
  * A single shared `requestAnimationFrame` loop drives all subscribed components.
- * When `useMotionPreference()` returns true or `enabled` is false,
- * returns `0` and no loop runs.
+ * When `enabled` is false, returns `0` and no loop runs.
  */
 export function useAnimationTime(enabled = true): number {
-	const reducedMotion = useMotionPreference();
-
-	const shouldAnimate = enabled && !reducedMotion;
-
 	return useSyncExternalStore(
-		shouldAnimate ? subscribe : ZERO_SUBSCRIBE,
-		shouldAnimate ? getSnapshot : ZERO_SNAPSHOT,
+		enabled ? subscribe : ZERO_SUBSCRIBE,
+		enabled ? getSnapshot : ZERO_SNAPSHOT,
 		getServerSnapshot,
 	);
 }

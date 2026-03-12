@@ -8,7 +8,6 @@ import {
 	useRouter,
 } from "@tanstack/react-router";
 import type React from "react";
-import { useEffect } from "react";
 import { Toaster } from "sonner";
 import { getGroupedThreadsOptions, getUserSettingsOptions } from "@/api/@tanstack/react-query.gen";
 import Footer from "@/components/core/Footer";
@@ -22,7 +21,6 @@ import { PostHogSurveyWidget } from "@/components/surveys/posthog-survey-widget"
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import environment from "@/environment";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
-import { useMotionPreference } from "@/hooks/use-motion-preference";
 import { useWorkspaceAccess } from "@/hooks/use-workspace-access";
 import { useMentorChat } from "@/hooks/useMentorChat";
 import { type AuthContextType, useAuth } from "@/integrations/auth/AuthContext";
@@ -41,12 +39,6 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 		const { theme } = useTheme();
 		const { pathname } = useLocation();
 		const { isAuthenticated, hasRole, isLoading } = useAuth();
-		const reducedMotion = useMotionPreference();
-
-		useEffect(() => {
-			document.documentElement.setAttribute("data-motion", reducedMotion ? "reduced" : "full");
-		}, [reducedMotion]);
-
 		const { data: userSettings, isError: userSettingsError } = useQuery({
 			...getUserSettingsOptions({}),
 			enabled: isAuthenticated && isPosthogEnabled,
