@@ -82,12 +82,10 @@ achievements:
       rarity: epic
       isHidden: true
       category: pull_requests
-      triggerEvents:
-          - PULL_REQUEST_MERGED
+      triggerEvents: []
       evaluatorClass: DummyEvaluator
       requirements:
-          type: LinearAchievementProgress
-          target: 1
+          type: BinaryAchievementProgress
 
     # ========================================================================
     # Commit Achievements
@@ -98,7 +96,8 @@ achievements:
       rarity: common
       isHidden: false
       category: commits
-      triggerEvents: []
+      triggerEvents:
+          - COMMIT_CREATED
       evaluatorClass: StandardCountEvaluator
       requirements:
           type: LinearAchievementProgress
@@ -109,7 +108,8 @@ achievements:
       rarity: common
       isHidden: false
       category: commits
-      triggerEvents: []
+      triggerEvents:
+          - COMMIT_CREATED
       evaluatorClass: StandardCountEvaluator
       requirements:
           type: LinearAchievementProgress
@@ -120,7 +120,8 @@ achievements:
       rarity: uncommon
       isHidden: false
       category: commits
-      triggerEvents: []
+      triggerEvents:
+          - COMMIT_CREATED
       evaluatorClass: StandardCountEvaluator
       requirements:
           type: LinearAchievementProgress
@@ -131,7 +132,8 @@ achievements:
       rarity: uncommon
       isHidden: false
       category: commits
-      triggerEvents: []
+      triggerEvents:
+          - COMMIT_CREATED
       evaluatorClass: StandardCountEvaluator
       requirements:
           type: LinearAchievementProgress
@@ -142,7 +144,8 @@ achievements:
       rarity: rare
       isHidden: false
       category: commits
-      triggerEvents: []
+      triggerEvents:
+          - COMMIT_CREATED
       evaluatorClass: StandardCountEvaluator
       requirements:
           type: LinearAchievementProgress
@@ -153,7 +156,8 @@ achievements:
       rarity: epic
       isHidden: false
       category: commits
-      triggerEvents: []
+      triggerEvents:
+          - COMMIT_CREATED
       evaluatorClass: StandardCountEvaluator
       requirements:
           type: LinearAchievementProgress
@@ -164,7 +168,8 @@ achievements:
       rarity: legendary
       isHidden: false
       category: commits
-      triggerEvents: []
+      triggerEvents:
+          - COMMIT_CREATED
       evaluatorClass: StandardCountEvaluator
       requirements:
           type: LinearAchievementProgress
@@ -175,7 +180,8 @@ achievements:
       rarity: mythic
       isHidden: true
       category: commits
-      triggerEvents: []
+      triggerEvents:
+          - COMMIT_CREATED
       evaluatorClass: StandardCountEvaluator
       requirements:
           type: LinearAchievementProgress
@@ -492,8 +498,7 @@ achievements:
       rarity: rare
       isHidden: false
       category: issues
-      triggerEvents:
-          - ISSUE_CLOSED
+      triggerEvents: []
       evaluatorClass: DummyEvaluator
       requirements:
           type: BinaryAchievementProgress
@@ -503,19 +508,17 @@ achievements:
       rarity: epic
       isHidden: true
       category: issues
-      triggerEvents:
-          - ISSUE_CLOSED
+      triggerEvents: []
       evaluatorClass: DummyEvaluator
       requirements:
           type: BinaryAchievementProgress
 
     - id: "issue.special.necromancer"
-      parent: "issue.special.necromancer"
+      parent: "issue.close.common.2"
       rarity: epic
       isHidden: true
       category: issues
-      triggerEvents:
-          - ISSUE_CLOSED
+      triggerEvents: []
       evaluatorClass: DummyEvaluator
       requirements:
           type: BinaryAchievementProgress
@@ -527,7 +530,9 @@ achievements:
       category: milestones
       triggerEvents:
           - PULL_REQUEST_OPENED
+          - PULL_REQUEST_MERGED
           - PULL_REQUEST_CLOSED
+          - COMMIT_CREATED
           - ISSUE_CREATED
           - ISSUE_CLOSED
           - REVIEW_APPROVED
@@ -559,7 +564,7 @@ achievements:
           type: BinaryAchievementProgress
 
     - id: "milestone.long_time_return"
-      parent: "milestone.long_time_return"
+      parent: "milestone.first_action"
       rarity: epic
       isHidden: true
       category: milestones
@@ -569,7 +574,7 @@ achievements:
           type: BinaryAchievementProgress
 
     - id: "milestone.all_rare"
-      parent: "milestone.all_rare"
+      parent: "milestone.first_action"
       rarity: epic
       isHidden: true
       category: milestones

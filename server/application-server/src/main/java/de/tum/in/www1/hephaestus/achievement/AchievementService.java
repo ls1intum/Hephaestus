@@ -17,7 +17,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.retry.annotation.Backoff;
@@ -83,6 +84,7 @@ public class AchievementService {
     private final List<AchievementEvaluator> evaluators;
 
     private final AchievementRegistry achievementRegistry;
+    private final CacheManager cacheManager;
 
     /**
      * Strategy map: maps each evaluator's concrete class to its Spring-managed bean instance.
@@ -158,11 +160,6 @@ public class AchievementService {
         maxAttempts = 3,
         backoff = @Backoff(delay = 100)
     )
-    @CacheEvict(
-        value = ACHIEVEMENT_PROGRESS_CACHE,
-        key = "#event.user().get().getId()",
-        condition = "#event.user().isPresent()"
-    )
     @Transactional
     public List<AchievementDefinition> checkAndUnlock(ActivitySavedEvent event) {
         if (event.user().isEmpty()) {
@@ -194,7 +191,8 @@ public class AchievementService {
         for (AchievementDefinition achievementDefinition : candidates) {
             // Get existing progress or create a new record
             UserAchievement uaProgress = existingMap.get(achievementDefinition.id());
-            if (uaProgress == null) {
+            boolean isNew = uaProgress == null;
+            if (isNew) {
                 uaProgress = UserAchievement.builder()
                     .user(user)
                     .achievementId(achievementDefinition.id())
@@ -206,6 +204,9 @@ public class AchievementService {
             if (uaProgress.getUnlockedAt() != null) {
                 continue;
             }
+
+            // Snapshot progress before evaluation for dirty-checking
+            AchievementProgress progressBefore = uaProgress.getProgressData();
 
             // Resolve evaluator and increment progress
             AchievementEvaluator evaluator = resolveEvaluator(achievementDefinition);
@@ -223,7 +224,12 @@ public class AchievementService {
                 );
             }
 
-            userAchievementRepository.save(uaProgress);
+            // Only persist if entity is new or progress actually changed
+            boolean progressChanged = !uaProgress.getProgressData().equals(progressBefore);
+            if (isNew || progressChanged || wasUnlocked) {
+                userAchievementRepository.save(uaProgress);
+                evictAchievementCache(user.getId());
+            }
         }
 
         return newlyUnlocked;
@@ -314,6 +320,17 @@ public class AchievementService {
         }
 
         return AchievementStatus.LOCKED;
+    }
+
+    /**
+     * Evict the achievement progress cache for a specific user.
+     * Called only when progress actually changes, avoiding unnecessary cache invalidation.
+     */
+    void evictAchievementCache(Long userId) {
+        Cache cache = cacheManager.getCache(ACHIEVEMENT_PROGRESS_CACHE);
+        if (cache != null) {
+            cache.evict(userId);
+        }
     }
 
     @Transactional(readOnly = true)

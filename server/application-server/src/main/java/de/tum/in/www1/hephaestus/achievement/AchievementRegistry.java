@@ -12,6 +12,7 @@ import java.io.File;
 import java.io.InputStream;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -96,20 +97,92 @@ public class AchievementRegistry {
                     tempIdMap.put(record.id(), record);
                 }
 
-                // Verify parent references
+                // Validate deduplicated achievement definitions
                 boolean hasErrors = false;
-                for (AchievementDefinition record : records) {
-                    if (record.parent() != null && !record.parent().isEmpty()) {
-                        if (!tempIdMap.containsKey(record.parent())) {
-                            log.error("Achievement '{}' references unknown parent: '{}'", record.id(), record.parent());
+                for (AchievementDefinition record : tempIdMap.values()) {
+                    String parentId = record.parent();
+                    if (parentId != null && !parentId.isEmpty()) {
+                        // Self-reference check
+                        if (parentId.equals(record.id())) {
+                            log.error(
+                                "Achievement '{}' references ITSELF as parent — it will be permanently locked",
+                                record.id()
+                            );
                             hasErrors = true;
                         }
+                        // Unknown parent check
+                        if (!tempIdMap.containsKey(parentId)) {
+                            log.error("Achievement '{}' references unknown parent: '{}'", record.id(), parentId);
+                            hasErrors = true;
+                        }
+                    }
+
+                    // Cycle detection (walk the parent chain, max depth = total achievements)
+                    if (parentId != null && !parentId.isEmpty() && !parentId.equals(record.id())) {
+                        Set<String> visited = new HashSet<>();
+                        visited.add(record.id());
+                        String current = parentId;
+                        while (current != null && !current.isEmpty()) {
+                            if (!visited.add(current)) {
+                                log.error(
+                                    "Achievement '{}' has parent chain that reaches a cycle: {}",
+                                    record.id(),
+                                    visited
+                                );
+                                hasErrors = true;
+                                break;
+                            }
+                            AchievementDefinition parentDef = tempIdMap.get(current);
+                            current = parentDef != null ? parentDef.parent() : null;
+                        }
+                    }
+
+                    // Validate evaluatorClass resolves to a real class
+                    String evalClass = record.evaluatorClass();
+                    if (evalClass != null && !evalClass.isEmpty()) {
+                        String fqn = evalClass.contains(".")
+                            ? evalClass
+                            : "de.tum.in.www1.hephaestus.achievement.evaluator." + evalClass;
+                        try {
+                            Class.forName(fqn);
+                        } catch (ClassNotFoundException e) {
+                            log.error(
+                                "Achievement '{}' references unknown evaluator class: '{}'",
+                                record.id(),
+                                evalClass
+                            );
+                            hasErrors = true;
+                        }
+                    }
+
+                    // Normalize evaluator class name for DummyEvaluator check
+                    boolean isDummy = isDummyEvaluator(record.evaluatorClass());
+                    boolean hasTriggers = record.triggerEvents() != null && !record.triggerEvents().isEmpty();
+
+                    // Non-DummyEvaluator with empty triggerEvents = achievement can never be evaluated
+                    if (!isDummy && !hasTriggers) {
+                        log.error(
+                            "Achievement '{}' uses evaluator {} but has no triggerEvents — " +
+                                "it will never be evaluated",
+                            record.id(),
+                            record.evaluatorClass()
+                        );
+                        hasErrors = true;
+                    }
+
+                    // DummyEvaluator with non-empty triggerEvents = wasted work on every event
+                    if (isDummy && hasTriggers) {
+                        log.warn(
+                            "Achievement '{}' uses DummyEvaluator but has active triggerEvents {} — " +
+                                "this causes wasted DB work on every qualifying event",
+                            record.id(),
+                            record.triggerEvents()
+                        );
                     }
                 }
 
                 if (hasErrors) {
                     log.error("Achievements configuration contains errors. Please check the logs above.");
-                    // We still proceed with what we have, or could decide to not update if we want "all or nothing"
                 }
 
                 // Swap maps atomically-ish (we are in synchronized block)
@@ -167,5 +240,16 @@ public class AchievementRegistry {
      */
     public List<AchievementDefinition> values() {
         return allAchievements;
+    }
+
+    /**
+     * Checks whether the given evaluator class name refers to DummyEvaluator,
+     * handling both short names and fully-qualified class names.
+     */
+    private static boolean isDummyEvaluator(String evaluatorClass) {
+        if (evaluatorClass == null) {
+            return false;
+        }
+        return "DummyEvaluator".equals(evaluatorClass) || evaluatorClass.endsWith(".DummyEvaluator");
     }
 }
