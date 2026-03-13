@@ -5,6 +5,7 @@ import de.tum.in.www1.hephaestus.agent.LlmProvider;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Size;
 
 @Schema(
     description = "Request to update an existing agent configuration (all fields optional — null fields are not changed)"
@@ -12,7 +13,9 @@ import jakarta.validation.constraints.Min;
 public record UpdateAgentConfigRequestDTO(
     @Schema(description = "Whether the agent is enabled") Boolean enabled,
     @Schema(description = "Type of coding agent") AgentType agentType,
-    @Schema(description = "LLM model name", example = "claude-sonnet-4-20250514") String modelName,
+    @Size(max = 128, message = "Model name must not exceed 128 characters")
+    @Schema(description = "LLM model name", example = "claude-sonnet-4-20250514")
+    String modelName,
     @Schema(description = "LLM API key (omit or null to keep existing key)") String llmApiKey,
     @Schema(description = "LLM provider") LlmProvider llmProvider,
     @Min(value = 30, message = "Timeout must be at least 30 seconds")

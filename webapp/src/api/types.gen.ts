@@ -1740,10 +1740,10 @@ export type GetJobData = {
          * Workspace slug
          */
         workspaceSlug: string;
-        id: string;
+        jobId: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/agent-jobs/{id}';
+    url: '/workspaces/{workspaceSlug}/agent-jobs/{jobId}';
 };
 
 export type GetJobErrors = {

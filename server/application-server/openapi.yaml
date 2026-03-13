@@ -323,7 +323,7 @@ paths:
       summary: Get a specific agent configuration
       tags:
       - Agent Config
-    put:
+    patch:
       operationId: updateConfig
       parameters:
       - description: Workspace slug
@@ -412,7 +412,7 @@ paths:
       summary: List agent jobs for a workspace
       tags:
       - Agent Jobs
-  /workspaces/{workspaceSlug}/agent-jobs/{id}:
+  /workspaces/{workspaceSlug}/agent-jobs/{jobId}:
     get:
       operationId: getJob
       parameters:
@@ -424,7 +424,7 @@ paths:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       - in: path
-        name: id
+        name: jobId
         required: true
         schema:
           type: string
@@ -2687,6 +2687,8 @@ components:
           type: string
           description: LLM model name
           example: claude-sonnet-4-20250514
+          maxLength: 128
+          minLength: 0
         name:
           type: string
           description: Unique name within the workspace
@@ -3748,6 +3750,8 @@ components:
           type: string
           description: LLM model name
           example: claude-sonnet-4-20250514
+          maxLength: 128
+          minLength: 0
         timeoutSeconds:
           type: integer
           format: int32

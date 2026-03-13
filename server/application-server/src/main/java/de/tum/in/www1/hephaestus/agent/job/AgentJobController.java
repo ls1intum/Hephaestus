@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.agent.job;
 
-import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceScopedController;
@@ -51,7 +50,7 @@ public class AgentJobController {
         return ResponseEntity.ok(jobs);
     }
 
-    @GetMapping("/{id}")
+    @GetMapping("/{jobId}")
     @Operation(summary = "Get agent job details")
     @ApiResponse(
         responseCode = "200",
@@ -64,11 +63,8 @@ public class AgentJobController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
-    public ResponseEntity<AgentJobDTO> getJob(WorkspaceContext workspaceContext, @PathVariable UUID id) {
-        return agentJobService
-            .getJob(workspaceContext.id(), id)
-            .map(AgentJobDTO::from)
-            .map(ResponseEntity::ok)
-            .orElseThrow(() -> new EntityNotFoundException("AgentJob", id.toString()));
+    public ResponseEntity<AgentJobDTO> getJob(WorkspaceContext workspaceContext, @PathVariable UUID jobId) {
+        AgentJob job = agentJobService.getJob(workspaceContext.id(), jobId);
+        return ResponseEntity.ok(AgentJobDTO.from(job));
     }
 }

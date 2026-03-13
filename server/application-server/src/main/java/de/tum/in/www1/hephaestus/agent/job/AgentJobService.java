@@ -1,7 +1,7 @@
 package de.tum.in.www1.hephaestus.agent.job;
 
-import java.util.Optional;
 import java.util.UUID;
+import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -29,7 +29,9 @@ public class AgentJobService {
     }
 
     @Transactional(readOnly = true)
-    public Optional<AgentJob> getJob(Long workspaceId, UUID jobId) {
-        return agentJobRepository.findByIdAndWorkspaceId(jobId, workspaceId);
+    public AgentJob getJob(Long workspaceId, UUID jobId) {
+        return agentJobRepository
+            .findByIdAndWorkspaceId(jobId, workspaceId)
+            .orElseThrow(() -> new EntityNotFoundException("AgentJob", jobId.toString()));
     }
 }

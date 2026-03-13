@@ -167,7 +167,7 @@ export const getConfig = <ThrowOnError extends boolean = false>(options: Options
 /**
  * Update an existing agent configuration
  */
-export const updateConfig = <ThrowOnError extends boolean = false>(options: Options<UpdateConfigData, ThrowOnError>) => (options.client ?? client).put<UpdateConfigResponses, UpdateConfigErrors, ThrowOnError>({
+export const updateConfig = <ThrowOnError extends boolean = false>(options: Options<UpdateConfigData, ThrowOnError>) => (options.client ?? client).patch<UpdateConfigResponses, UpdateConfigErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workspaces/{workspaceSlug}/agent-configs/{configId}',
     ...options,
@@ -191,7 +191,7 @@ export const listJobs = <ThrowOnError extends boolean = false>(options: Options<
  */
 export const getJob = <ThrowOnError extends boolean = false>(options: Options<GetJobData, ThrowOnError>) => (options.client ?? client).get<GetJobResponses, GetJobErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/workspaces/{workspaceSlug}/agent-jobs/{id}',
+    url: '/workspaces/{workspaceSlug}/agent-jobs/{jobId}',
     ...options
 });
 

@@ -188,7 +188,7 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
 
     @Test
     @WithAdminUser
-    void putUpdatesExistingConfigAndPreservesApiKey() {
+    void patchUpdatesExistingConfigAndPreservesApiKey() {
         Workspace workspace = setupWorkspace();
         AgentConfigDTO created = createConfig(workspace, "update-test");
 
@@ -205,7 +205,7 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         );
 
         AgentConfigDTO updated = webTestClient
-            .put()
+            .patch()
             .uri("/workspaces/{slug}/agent-configs/{id}", workspace.getWorkspaceSlug(), created.id())
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
@@ -320,6 +320,131 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
 
         assertThat(problem).isNotNull();
         assertThat(problem.getDetail()).contains("active job(s)");
+    }
+
+    @Test
+    @WithAdminUser
+    void getConfigReturns404ForConfigInDifferentWorkspace() {
+        Workspace workspaceA = setupWorkspace();
+        AgentConfigDTO configInA = createConfig(workspaceA, "idor-test");
+
+        User ownerB = persistUser("idor-owner-b");
+        Workspace workspaceB = createWorkspace("idor-ws-b", "IDOR B", "idor-org-b", AccountType.ORG, ownerB);
+        ensureAdminMembership(workspaceB);
+
+        // Try to access workspace A's config via workspace B — should be 404 (IDOR protection)
+        webTestClient
+            .get()
+            .uri("/workspaces/{slug}/agent-configs/{id}", workspaceB.getWorkspaceSlug(), configInA.id())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isNotFound();
+    }
+
+    @Test
+    @WithAdminUser
+    void postWithMissingRequiredFieldsReturns400() {
+        Workspace workspace = setupWorkspace();
+
+        // Missing agentType and llmProvider (both @NotNull)
+        var request = Map.of("name", "incomplete-config");
+
+        webTestClient
+            .post()
+            .uri("/workspaces/{slug}/agent-configs", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(request)
+            .exchange()
+            .expectStatus()
+            .isBadRequest();
+    }
+
+    @Test
+    @WithAdminUser
+    void postWithBlankNameReturns400() {
+        Workspace workspace = setupWorkspace();
+
+        var request = new CreateAgentConfigRequestDTO(
+            "",
+            true,
+            AgentType.CLAUDE_CODE,
+            null,
+            null,
+            LlmProvider.ANTHROPIC,
+            null,
+            null,
+            null
+        );
+
+        webTestClient
+            .post()
+            .uri("/workspaces/{slug}/agent-configs", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(request)
+            .exchange()
+            .expectStatus()
+            .isBadRequest();
+    }
+
+    @Test
+    @WithAdminUser
+    void postWithTimeoutOutOfRangeReturns400() {
+        Workspace workspace = setupWorkspace();
+
+        var request = new CreateAgentConfigRequestDTO(
+            "bad-timeout",
+            true,
+            AgentType.CLAUDE_CODE,
+            null,
+            null,
+            LlmProvider.ANTHROPIC,
+            5, // below minimum of 30
+            null,
+            null
+        );
+
+        webTestClient
+            .post()
+            .uri("/workspaces/{slug}/agent-configs", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(request)
+            .exchange()
+            .expectStatus()
+            .isBadRequest();
+    }
+
+    @Test
+    @WithAdminUser
+    void postReturnsLocationHeader() {
+        Workspace workspace = setupWorkspace();
+
+        var request = new CreateAgentConfigRequestDTO(
+            "location-test",
+            true,
+            AgentType.CLAUDE_CODE,
+            null,
+            null,
+            LlmProvider.ANTHROPIC,
+            null,
+            null,
+            null
+        );
+
+        webTestClient
+            .post()
+            .uri("/workspaces/{slug}/agent-configs", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(request)
+            .exchange()
+            .expectStatus()
+            .isCreated()
+            .expectHeader()
+            .exists("Location");
     }
 
     @Test

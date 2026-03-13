@@ -143,19 +143,18 @@ public class AgentConfigService {
         switch (agentType) {
             case CLAUDE_CODE -> {
                 if (provider != LlmProvider.ANTHROPIC) {
-                    throw new IllegalArgumentException(
-                        "CLAUDE_CODE agent requires ANTHROPIC provider, got: " + provider
-                    );
+                    throw new AgentConfigProviderMismatchException(agentType, LlmProvider.ANTHROPIC, provider);
                 }
             }
             case CODEX -> {
                 if (provider != LlmProvider.OPENAI) {
-                    throw new IllegalArgumentException("CODEX agent requires OPENAI provider, got: " + provider);
+                    throw new AgentConfigProviderMismatchException(agentType, LlmProvider.OPENAI, provider);
                 }
             }
             case OPENCODE -> {
                 /* any provider is valid */
             }
+            default -> throw new IllegalArgumentException("Unknown agent type: " + agentType);
         }
     }
 }

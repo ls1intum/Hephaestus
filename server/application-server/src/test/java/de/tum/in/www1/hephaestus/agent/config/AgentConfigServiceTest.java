@@ -103,7 +103,7 @@ class AgentConfigServiceTest extends BaseUnitTest {
             );
 
             assertThatThrownBy(() -> agentConfigService.createConfig(workspaceContext, request))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(AgentConfigProviderMismatchException.class)
                 .hasMessageContaining("CLAUDE_CODE")
                 .hasMessageContaining("ANTHROPIC");
         }
@@ -145,7 +145,7 @@ class AgentConfigServiceTest extends BaseUnitTest {
             );
 
             assertThatThrownBy(() -> agentConfigService.createConfig(workspaceContext, request))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(AgentConfigProviderMismatchException.class)
                 .hasMessageContaining("CODEX")
                 .hasMessageContaining("OPENAI");
         }
@@ -189,7 +189,7 @@ class AgentConfigServiceTest extends BaseUnitTest {
             var request = new UpdateAgentConfigRequestDTO(null, null, null, null, LlmProvider.OPENAI, null, null, null);
 
             assertThatThrownBy(() -> agentConfigService.updateConfig(workspaceContext, 10L, request))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(AgentConfigProviderMismatchException.class)
                 .hasMessageContaining("CLAUDE_CODE")
                 .hasMessageContaining("ANTHROPIC");
         }

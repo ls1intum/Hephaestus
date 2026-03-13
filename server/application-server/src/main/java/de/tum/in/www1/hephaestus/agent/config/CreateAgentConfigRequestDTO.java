@@ -23,7 +23,9 @@ public record CreateAgentConfigRequestDTO(
     @NotNull(message = "Agent type is required")
     @Schema(description = "Type of coding agent", requiredMode = Schema.RequiredMode.REQUIRED)
     AgentType agentType,
-    @Schema(description = "LLM model name", example = "claude-sonnet-4-20250514") String modelName,
+    @Size(max = 128, message = "Model name must not exceed 128 characters")
+    @Schema(description = "LLM model name", example = "claude-sonnet-4-20250514")
+    String modelName,
     @Schema(description = "LLM API key") String llmApiKey,
     @NotNull(message = "LLM provider is required")
     @Schema(description = "LLM provider", requiredMode = Schema.RequiredMode.REQUIRED)

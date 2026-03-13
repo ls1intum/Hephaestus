@@ -125,8 +125,16 @@
         </createIndex>
     </changeSet>
 
-    <!-- Step 8: Partial index on running jobs for timeout monitoring -->
+    <!-- Step 8: Index on (workspace_id, config_id) for filtering jobs by config -->
     <changeSet author="agent-orchestration" id="1773354889621-8">
+        <createIndex indexName="idx_agent_job_workspace_config" tableName="agent_job">
+            <column name="workspace_id"/>
+            <column name="config_id"/>
+        </createIndex>
+    </changeSet>
+
+    <!-- Step 9: Partial index on running jobs for timeout monitoring -->
+    <changeSet author="agent-orchestration" id="1773354889621-9">
         <sql>
             CREATE INDEX idx_agent_job_status_started
                 ON agent_job(status, started_at)
@@ -134,14 +142,14 @@
         </sql>
     </changeSet>
 
-    <!-- Step 9: Unique index on job_token (encrypted, used for LLM proxy auth) -->
-    <changeSet author="agent-orchestration" id="1773354889621-9">
+    <!-- Step 10: Unique index on job_token (encrypted, used for LLM proxy auth) -->
+    <changeSet author="agent-orchestration" id="1773354889621-10">
         <addUniqueConstraint columnNames="job_token"
             constraintName="uk_agent_job_token" tableName="agent_job"/>
     </changeSet>
 
-    <!-- Step 10: Partial unique index for idempotency on active jobs -->
-    <changeSet author="agent-orchestration" id="1773354889621-10">
+    <!-- Step 11: Partial unique index for idempotency on active jobs -->
+    <changeSet author="agent-orchestration" id="1773354889621-11">
         <sql>
             CREATE UNIQUE INDEX uk_agent_job_idempotency
                 ON agent_job(workspace_id, idempotency_key)
