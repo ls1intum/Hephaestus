@@ -12,13 +12,16 @@
     - agent_job: execution records with UUID PK, JSONB metadata/output, job_token auth
     -->
 
-    <!-- Step 1: Create agent_config table (one per workspace) -->
+    <!-- Step 1: Create agent_config table (multiple per workspace, distinguished by name) -->
     <changeSet author="agent-orchestration" id="1773354889621-1">
         <createTable tableName="agent_config">
             <column name="id" type="BIGINT" autoIncrement="true">
                 <constraints nullable="false" primaryKey="true" primaryKeyName="agent_config_pkey"/>
             </column>
             <column name="workspace_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="name" type="VARCHAR(100)">
                 <constraints nullable="false"/>
             </column>
             <column name="enabled" type="BOOLEAN" defaultValueBoolean="false">
@@ -48,10 +51,10 @@
         </createTable>
     </changeSet>
 
-    <!-- Step 2: Unique constraint — one config per workspace -->
+    <!-- Step 2: Unique constraint — one config per (workspace, name) -->
     <changeSet author="agent-orchestration" id="1773354889621-2">
-        <addUniqueConstraint columnNames="workspace_id"
-            constraintName="uk_agent_config_workspace" tableName="agent_config"/>
+        <addUniqueConstraint columnNames="workspace_id, name"
+            constraintName="uk_agent_config_workspace_name" tableName="agent_config"/>
     </changeSet>
 
     <!-- Step 3: FK agent_config.workspace_id → workspace.id -->

@@ -44,9 +44,23 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         return workspace;
     }
 
+    private AgentConfig createConfig(Workspace workspace, String name) {
+        AgentConfig config = new AgentConfig();
+        config.setWorkspace(workspace);
+        config.setName(name);
+        config.setAgentType(AgentType.CLAUDE_CODE);
+        config.setLlmProvider(LlmProvider.ANTHROPIC);
+        return agentConfigRepository.save(config);
+    }
+
     private AgentJob createJob(Workspace workspace, AgentJobStatus status) {
+        return createJob(workspace, status, null);
+    }
+
+    private AgentJob createJob(Workspace workspace, AgentJobStatus status, AgentConfig config) {
         AgentJob job = new AgentJob();
         job.setWorkspace(workspace);
+        job.setConfig(config);
         job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
         job.setStatus(status);
         job.setConfigSnapshot(
@@ -122,6 +136,40 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
             .isEqualTo(1)
             .jsonPath("$.content[0].status")
             .isEqualTo("RUNNING");
+    }
+
+    @Test
+    @WithAdminUser
+    void listJobsFiltersByConfigId() {
+        Workspace workspace = setupWorkspace();
+        AgentConfig configA = createConfig(workspace, "config-a");
+        AgentConfig configB = createConfig(workspace, "config-b");
+
+        createJob(workspace, AgentJobStatus.COMPLETED, configA);
+        createJob(workspace, AgentJobStatus.RUNNING, configA);
+        createJob(workspace, AgentJobStatus.QUEUED, configB);
+
+        webTestClient
+            .get()
+            .uri("/workspaces/{slug}/agent-jobs?configId={configId}", workspace.getWorkspaceSlug(), configA.getId())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody()
+            .jsonPath("$.totalElements")
+            .isEqualTo(2);
+
+        webTestClient
+            .get()
+            .uri("/workspaces/{slug}/agent-jobs?configId={configId}", workspace.getWorkspaceSlug(), configB.getId())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody()
+            .jsonPath("$.totalElements")
+            .isEqualTo(1);
     }
 
     @Test

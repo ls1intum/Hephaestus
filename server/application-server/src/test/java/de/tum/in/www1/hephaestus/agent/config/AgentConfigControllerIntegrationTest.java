@@ -15,11 +15,13 @@ import de.tum.in.www1.hephaestus.testconfig.WithAdminUser;
 import de.tum.in.www1.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.in.www1.hephaestus.workspace.AccountType;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
@@ -45,26 +47,9 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         return workspace;
     }
 
-    @Test
-    @WithAdminUser
-    void getConfigReturns404WhenNoneExists() {
-        Workspace workspace = setupWorkspace();
-
-        webTestClient
-            .get()
-            .uri("/workspaces/{slug}/agent-config", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isNotFound();
-    }
-
-    @Test
-    @WithAdminUser
-    void putCreatesConfigAndGetReturnsIt() {
-        Workspace workspace = setupWorkspace();
-
-        var request = new UpdateAgentConfigRequestDTO(
+    private AgentConfigDTO createConfig(Workspace workspace, String name) {
+        var request = new CreateAgentConfigRequestDTO(
+            name,
             true,
             AgentType.CLAUDE_CODE,
             "claude-sonnet-4-20250514",
@@ -75,20 +60,46 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
             false
         );
 
-        AgentConfigDTO created = webTestClient
-            .put()
-            .uri("/workspaces/{slug}/agent-config", workspace.getWorkspaceSlug())
+        return webTestClient
+            .post()
+            .uri("/workspaces/{slug}/agent-configs", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(request)
             .exchange()
             .expectStatus()
-            .isOk()
+            .isCreated()
             .expectBody(AgentConfigDTO.class)
             .returnResult()
             .getResponseBody();
+    }
+
+    @Test
+    @WithAdminUser
+    void listConfigsReturnsEmptyListWhenNoneExist() {
+        Workspace workspace = setupWorkspace();
+
+        webTestClient
+            .get()
+            .uri("/workspaces/{slug}/agent-configs", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody()
+            .jsonPath("$.length()")
+            .isEqualTo(0);
+    }
+
+    @Test
+    @WithAdminUser
+    void postCreatesConfigAndGetReturnsIt() {
+        Workspace workspace = setupWorkspace();
+
+        AgentConfigDTO created = createConfig(workspace, "my-agent");
 
         assertThat(created).isNotNull();
+        assertThat(created.name()).isEqualTo("my-agent");
         assertThat(created.agentType()).isEqualTo(AgentType.CLAUDE_CODE);
         assertThat(created.llmProvider()).isEqualTo(LlmProvider.ANTHROPIC);
         assertThat(created.modelName()).isEqualTo("claude-sonnet-4-20250514");
@@ -98,10 +109,10 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         assertThat(created.allowInternet()).isFalse();
         assertThat(created.enabled()).isTrue();
 
-        // GET should return the same config
+        // GET by ID should return the same config
         AgentConfigDTO fetched = webTestClient
             .get()
-            .uri("/workspaces/{slug}/agent-config", workspace.getWorkspaceSlug())
+            .uri("/workspaces/{slug}/agent-configs/{id}", workspace.getWorkspaceSlug(), created.id())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
@@ -112,35 +123,74 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
 
         assertThat(fetched).isNotNull();
         assertThat(fetched.id()).isEqualTo(created.id());
+        assertThat(fetched.name()).isEqualTo("my-agent");
         assertThat(fetched.agentType()).isEqualTo(AgentType.CLAUDE_CODE);
+    }
+
+    @Test
+    @WithAdminUser
+    void listConfigsReturnsMultiple() {
+        Workspace workspace = setupWorkspace();
+
+        createConfig(workspace, "agent-one");
+        createConfig(workspace, "agent-two");
+
+        List<AgentConfigDTO> configs = webTestClient
+            .get()
+            .uri("/workspaces/{slug}/agent-configs", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody(new ParameterizedTypeReference<List<AgentConfigDTO>>() {})
+            .returnResult()
+            .getResponseBody();
+
+        assertThat(configs).hasSize(2);
+        assertThat(configs).extracting(AgentConfigDTO::name).containsExactlyInAnyOrder("agent-one", "agent-two");
+    }
+
+    @Test
+    @WithAdminUser
+    void postWithDuplicateNameReturns409() {
+        Workspace workspace = setupWorkspace();
+
+        createConfig(workspace, "duplicate-name");
+
+        var duplicateRequest = new CreateAgentConfigRequestDTO(
+            "duplicate-name",
+            true,
+            AgentType.OPENCODE,
+            null,
+            null,
+            LlmProvider.OPENAI,
+            null,
+            null,
+            null
+        );
+
+        ProblemDetail problem = webTestClient
+            .post()
+            .uri("/workspaces/{slug}/agent-configs", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(duplicateRequest)
+            .exchange()
+            .expectStatus()
+            .isEqualTo(HttpStatus.CONFLICT)
+            .expectBody(ProblemDetail.class)
+            .returnResult()
+            .getResponseBody();
+
+        assertThat(problem).isNotNull();
+        assertThat(problem.getDetail()).contains("duplicate-name");
     }
 
     @Test
     @WithAdminUser
     void putUpdatesExistingConfigAndPreservesApiKey() {
         Workspace workspace = setupWorkspace();
-
-        // Create initial config
-        var createRequest = new UpdateAgentConfigRequestDTO(
-            true,
-            AgentType.CLAUDE_CODE,
-            "claude-sonnet-4-20250514",
-            "sk-original-secret",
-            LlmProvider.ANTHROPIC,
-            600,
-            3,
-            false
-        );
-
-        webTestClient
-            .put()
-            .uri("/workspaces/{slug}/agent-config", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(createRequest)
-            .exchange()
-            .expectStatus()
-            .isOk();
+        AgentConfigDTO created = createConfig(workspace, "update-test");
 
         // Update — omit llmApiKey (null = keep existing)
         var updateRequest = new UpdateAgentConfigRequestDTO(
@@ -156,7 +206,7 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
 
         AgentConfigDTO updated = webTestClient
             .put()
-            .uri("/workspaces/{slug}/agent-config", workspace.getWorkspaceSlug())
+            .uri("/workspaces/{slug}/agent-configs/{id}", workspace.getWorkspaceSlug(), created.id())
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(updateRequest)
@@ -168,6 +218,7 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
             .getResponseBody();
 
         assertThat(updated).isNotNull();
+        assertThat(updated.name()).isEqualTo("update-test"); // name unchanged
         assertThat(updated.agentType()).isEqualTo(AgentType.OPENCODE);
         assertThat(updated.llmProvider()).isEqualTo(LlmProvider.OPENAI);
         assertThat(updated.modelName()).isEqualTo("gpt-4o");
@@ -179,10 +230,11 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
 
     @Test
     @WithAdminUser
-    void putWithInvalidProviderReturns400() {
+    void postWithInvalidProviderReturns400() {
         Workspace workspace = setupWorkspace();
 
-        var request = new UpdateAgentConfigRequestDTO(
+        var request = new CreateAgentConfigRequestDTO(
+            "bad-provider",
             true,
             AgentType.CLAUDE_CODE,
             null,
@@ -194,8 +246,8 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         );
 
         ProblemDetail problem = webTestClient
-            .put()
-            .uri("/workspaces/{slug}/agent-config", workspace.getWorkspaceSlug())
+            .post()
+            .uri("/workspaces/{slug}/agent-configs", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(request)
@@ -215,33 +267,12 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
     @WithAdminUser
     void deleteRemovesConfigAndSubsequentGetReturns404() {
         Workspace workspace = setupWorkspace();
-
-        // Create config first
-        var request = new UpdateAgentConfigRequestDTO(
-            true,
-            AgentType.OPENCODE,
-            null,
-            "sk-key",
-            LlmProvider.OPENAI,
-            null,
-            null,
-            null
-        );
-
-        webTestClient
-            .put()
-            .uri("/workspaces/{slug}/agent-config", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(request)
-            .exchange()
-            .expectStatus()
-            .isOk();
+        AgentConfigDTO created = createConfig(workspace, "delete-test");
 
         // Delete
         webTestClient
             .delete()
-            .uri("/workspaces/{slug}/agent-config", workspace.getWorkspaceSlug())
+            .uri("/workspaces/{slug}/agent-configs/{id}", workspace.getWorkspaceSlug(), created.id())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
@@ -250,7 +281,7 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         // GET should return 404
         webTestClient
             .get()
-            .uri("/workspaces/{slug}/agent-config", workspace.getWorkspaceSlug())
+            .uri("/workspaces/{slug}/agent-configs/{id}", workspace.getWorkspaceSlug(), created.id())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
@@ -261,31 +292,12 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
     @WithAdminUser
     void deleteWithActiveJobsReturns409() {
         Workspace workspace = setupWorkspace();
-
-        // Create config
-        var request = new UpdateAgentConfigRequestDTO(
-            true,
-            AgentType.CLAUDE_CODE,
-            null,
-            "sk-key",
-            LlmProvider.ANTHROPIC,
-            null,
-            null,
-            null
-        );
-
-        webTestClient
-            .put()
-            .uri("/workspaces/{slug}/agent-config", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(request)
-            .exchange()
-            .expectStatus()
-            .isOk();
+        AgentConfigDTO created = createConfig(workspace, "active-jobs-test");
 
         // Create an active job linked to this config
-        AgentConfig config = agentConfigRepository.findByWorkspaceId(workspace.getId()).orElseThrow();
+        AgentConfig config = agentConfigRepository
+            .findByIdAndWorkspaceId(created.id(), workspace.getId())
+            .orElseThrow();
         AgentJob job = new AgentJob();
         job.setWorkspace(workspace);
         job.setConfig(config);
@@ -297,7 +309,7 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         // Delete should fail with 409
         ProblemDetail problem = webTestClient
             .delete()
-            .uri("/workspaces/{slug}/agent-config", workspace.getWorkspaceSlug())
+            .uri("/workspaces/{slug}/agent-configs/{id}", workspace.getWorkspaceSlug(), created.id())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
@@ -311,13 +323,13 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
     }
 
     @Test
-    void getConfigRequiresAuthentication() {
+    void getConfigsRequiresAuthentication() {
         User owner = persistUser("unauth-owner");
         Workspace workspace = createWorkspace("unauth-ws", "Unauth", "unauth", AccountType.ORG, owner);
 
         webTestClient
             .get()
-            .uri("/workspaces/{slug}/agent-config", workspace.getWorkspaceSlug())
+            .uri("/workspaces/{slug}/agent-configs", workspace.getWorkspaceSlug())
             .exchange()
             .expectStatus()
             .isUnauthorized();
@@ -328,7 +340,8 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
     void apiKeyNeverExposedInResponse() {
         Workspace workspace = setupWorkspace();
 
-        var request = new UpdateAgentConfigRequestDTO(
+        var request = new CreateAgentConfigRequestDTO(
+            "secret-test",
             true,
             AgentType.CLAUDE_CODE,
             null,
@@ -340,14 +353,14 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         );
 
         String responseBody = webTestClient
-            .put()
-            .uri("/workspaces/{slug}/agent-config", workspace.getWorkspaceSlug())
+            .post()
+            .uri("/workspaces/{slug}/agent-configs", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
             .bodyValue(request)
             .exchange()
             .expectStatus()
-            .isOk()
+            .isCreated()
             .expectBody(String.class)
             .returnResult()
             .getResponseBody();

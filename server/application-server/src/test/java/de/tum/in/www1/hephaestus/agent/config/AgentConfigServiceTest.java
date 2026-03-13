@@ -67,11 +67,12 @@ class AgentConfigServiceTest extends BaseUnitTest {
 
         @Test
         void shouldAcceptClaudeCodeWithAnthropic() {
-            when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(Optional.empty());
+            when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "test-config")).thenReturn(false);
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
             when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-            var request = new UpdateAgentConfigRequestDTO(
+            var request = new CreateAgentConfigRequestDTO(
+                "test-config",
                 true,
                 AgentType.CLAUDE_CODE,
                 "claude-sonnet-4-20250514",
@@ -82,14 +83,15 @@ class AgentConfigServiceTest extends BaseUnitTest {
                 null
             );
 
-            AgentConfig result = agentConfigService.createOrUpdateConfig(workspaceContext, request);
+            AgentConfig result = agentConfigService.createConfig(workspaceContext, request);
             assertThat(result.getAgentType()).isEqualTo(AgentType.CLAUDE_CODE);
             assertThat(result.getLlmProvider()).isEqualTo(LlmProvider.ANTHROPIC);
         }
 
         @Test
         void shouldRejectClaudeCodeWithOpenai() {
-            var request = new UpdateAgentConfigRequestDTO(
+            var request = new CreateAgentConfigRequestDTO(
+                "test-config",
                 true,
                 AgentType.CLAUDE_CODE,
                 null,
@@ -100,7 +102,7 @@ class AgentConfigServiceTest extends BaseUnitTest {
                 null
             );
 
-            assertThatThrownBy(() -> agentConfigService.createOrUpdateConfig(workspaceContext, request))
+            assertThatThrownBy(() -> agentConfigService.createConfig(workspaceContext, request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("CLAUDE_CODE")
                 .hasMessageContaining("ANTHROPIC");
@@ -108,11 +110,12 @@ class AgentConfigServiceTest extends BaseUnitTest {
 
         @Test
         void shouldAcceptCodexWithOpenai() {
-            when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(Optional.empty());
+            when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "codex-config")).thenReturn(false);
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
             when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-            var request = new UpdateAgentConfigRequestDTO(
+            var request = new CreateAgentConfigRequestDTO(
+                "codex-config",
                 true,
                 AgentType.CODEX,
                 "o3",
@@ -123,13 +126,14 @@ class AgentConfigServiceTest extends BaseUnitTest {
                 null
             );
 
-            AgentConfig result = agentConfigService.createOrUpdateConfig(workspaceContext, request);
+            AgentConfig result = agentConfigService.createConfig(workspaceContext, request);
             assertThat(result.getAgentType()).isEqualTo(AgentType.CODEX);
         }
 
         @Test
         void shouldRejectCodexWithAnthropic() {
-            var request = new UpdateAgentConfigRequestDTO(
+            var request = new CreateAgentConfigRequestDTO(
+                "codex-config",
                 true,
                 AgentType.CODEX,
                 null,
@@ -140,7 +144,7 @@ class AgentConfigServiceTest extends BaseUnitTest {
                 null
             );
 
-            assertThatThrownBy(() -> agentConfigService.createOrUpdateConfig(workspaceContext, request))
+            assertThatThrownBy(() -> agentConfigService.createConfig(workspaceContext, request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("CODEX")
                 .hasMessageContaining("OPENAI");
@@ -148,12 +152,15 @@ class AgentConfigServiceTest extends BaseUnitTest {
 
         @Test
         void shouldAcceptOpencodeWithAnyProvider() {
-            when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(Optional.empty());
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
             when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             for (LlmProvider provider : LlmProvider.values()) {
-                var request = new UpdateAgentConfigRequestDTO(
+                String name = "opencode-" + provider.name().toLowerCase();
+                when(agentConfigRepository.existsByWorkspaceIdAndName(1L, name)).thenReturn(false);
+
+                var request = new CreateAgentConfigRequestDTO(
+                    name,
                     true,
                     AgentType.OPENCODE,
                     null,
@@ -163,23 +170,43 @@ class AgentConfigServiceTest extends BaseUnitTest {
                     null,
                     null
                 );
-                AgentConfig result = agentConfigService.createOrUpdateConfig(workspaceContext, request);
+                AgentConfig result = agentConfigService.createConfig(workspaceContext, request);
                 assertThat(result.getLlmProvider()).isEqualTo(provider);
             }
+        }
+
+        @Test
+        void shouldValidateProviderOnUpdate() {
+            AgentConfig existing = new AgentConfig();
+            existing.setId(10L);
+            existing.setWorkspace(workspace);
+            existing.setAgentType(AgentType.CLAUDE_CODE);
+            existing.setLlmProvider(LlmProvider.ANTHROPIC);
+
+            when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.of(existing));
+
+            // Try to change only provider to OPENAI — should fail because CLAUDE_CODE requires ANTHROPIC
+            var request = new UpdateAgentConfigRequestDTO(null, null, null, null, LlmProvider.OPENAI, null, null, null);
+
+            assertThatThrownBy(() -> agentConfigService.updateConfig(workspaceContext, 10L, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("CLAUDE_CODE")
+                .hasMessageContaining("ANTHROPIC");
         }
     }
 
     @Nested
-    @DisplayName("Create or update")
-    class CreateOrUpdate {
+    @DisplayName("Create")
+    class Create {
 
         @Test
-        void shouldCreateNewConfigWhenNoneExists() {
-            when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(Optional.empty());
+        void shouldCreateNewConfig() {
+            when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "my-agent")).thenReturn(false);
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
             when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-            var request = new UpdateAgentConfigRequestDTO(
+            var request = new CreateAgentConfigRequestDTO(
+                "my-agent",
                 true,
                 AgentType.CLAUDE_CODE,
                 "claude-sonnet-4-20250514",
@@ -190,9 +217,10 @@ class AgentConfigServiceTest extends BaseUnitTest {
                 true
             );
 
-            AgentConfig result = agentConfigService.createOrUpdateConfig(workspaceContext, request);
+            AgentConfig result = agentConfigService.createConfig(workspaceContext, request);
 
             assertThat(result.getWorkspace()).isEqualTo(workspace);
+            assertThat(result.getName()).isEqualTo("my-agent");
             assertThat(result.isEnabled()).isTrue();
             assertThat(result.getModelName()).isEqualTo("claude-sonnet-4-20250514");
             assertThat(result.getLlmApiKey()).isEqualTo("sk-abc");
@@ -200,6 +228,32 @@ class AgentConfigServiceTest extends BaseUnitTest {
             assertThat(result.getMaxConcurrentJobs()).isEqualTo(2);
             assertThat(result.isAllowInternet()).isTrue();
         }
+
+        @Test
+        void shouldRejectDuplicateName() {
+            when(agentConfigRepository.existsByWorkspaceIdAndName(1L, "my-agent")).thenReturn(true);
+
+            var request = new CreateAgentConfigRequestDTO(
+                "my-agent",
+                true,
+                AgentType.CLAUDE_CODE,
+                null,
+                null,
+                LlmProvider.ANTHROPIC,
+                null,
+                null,
+                null
+            );
+
+            assertThatThrownBy(() -> agentConfigService.createConfig(workspaceContext, request))
+                .isInstanceOf(AgentConfigNameConflictException.class)
+                .hasMessageContaining("my-agent");
+        }
+    }
+
+    @Nested
+    @DisplayName("Update")
+    class Update {
 
         @Test
         void shouldUpdateExistingConfigAndPreserveApiKeyWhenNull() {
@@ -210,7 +264,7 @@ class AgentConfigServiceTest extends BaseUnitTest {
             existing.setLlmProvider(LlmProvider.ANTHROPIC);
             existing.setLlmApiKey("sk-existing-secret");
 
-            when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(Optional.of(existing));
+            when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.of(existing));
             when(agentConfigRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             var request = new UpdateAgentConfigRequestDTO(
@@ -224,12 +278,23 @@ class AgentConfigServiceTest extends BaseUnitTest {
                 null
             );
 
-            AgentConfig result = agentConfigService.createOrUpdateConfig(workspaceContext, request);
+            AgentConfig result = agentConfigService.updateConfig(workspaceContext, 10L, request);
 
             assertThat(result.getId()).isEqualTo(10L);
             assertThat(result.getAgentType()).isEqualTo(AgentType.OPENCODE);
             assertThat(result.getLlmApiKey()).isEqualTo("sk-existing-secret");
             assertThat(result.getTimeoutSeconds()).isEqualTo(120);
+        }
+
+        @Test
+        void shouldThrowNotFoundWhenUpdatingNonExistentConfig() {
+            when(agentConfigRepository.findByIdAndWorkspaceId(999L, 1L)).thenReturn(Optional.empty());
+
+            var request = new UpdateAgentConfigRequestDTO(null, null, null, null, null, null, null, null);
+
+            assertThatThrownBy(() -> agentConfigService.updateConfig(workspaceContext, 999L, request)).isInstanceOf(
+                EntityNotFoundException.class
+            );
         }
     }
 
@@ -243,7 +308,7 @@ class AgentConfigServiceTest extends BaseUnitTest {
             config.setId(10L);
             config.setWorkspace(workspace);
 
-            when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(Optional.of(config));
+            when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.of(config));
             when(
                 agentJobRepository.countByConfigIdAndStatusIn(
                     eq(10L),
@@ -251,7 +316,7 @@ class AgentConfigServiceTest extends BaseUnitTest {
                 )
             ).thenReturn(0L);
 
-            agentConfigService.deleteConfig(workspaceContext);
+            agentConfigService.deleteConfig(workspaceContext, 10L);
 
             verify(agentConfigRepository).delete(config);
         }
@@ -262,7 +327,7 @@ class AgentConfigServiceTest extends BaseUnitTest {
             config.setId(10L);
             config.setWorkspace(workspace);
 
-            when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(Optional.of(config));
+            when(agentConfigRepository.findByIdAndWorkspaceId(10L, 1L)).thenReturn(Optional.of(config));
             when(
                 agentJobRepository.countByConfigIdAndStatusIn(
                     eq(10L),
@@ -270,7 +335,7 @@ class AgentConfigServiceTest extends BaseUnitTest {
                 )
             ).thenReturn(2L);
 
-            assertThatThrownBy(() -> agentConfigService.deleteConfig(workspaceContext))
+            assertThatThrownBy(() -> agentConfigService.deleteConfig(workspaceContext, 10L))
                 .isInstanceOf(AgentConfigHasActiveJobsException.class)
                 .hasMessageContaining("2 active job(s)");
 
@@ -279,9 +344,9 @@ class AgentConfigServiceTest extends BaseUnitTest {
 
         @Test
         void shouldThrowNotFoundWhenDeletingNonExistentConfig() {
-            when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(Optional.empty());
+            when(agentConfigRepository.findByIdAndWorkspaceId(999L, 1L)).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> agentConfigService.deleteConfig(workspaceContext)).isInstanceOf(
+            assertThatThrownBy(() -> agentConfigService.deleteConfig(workspaceContext, 999L)).isInstanceOf(
                 EntityNotFoundException.class
             );
         }

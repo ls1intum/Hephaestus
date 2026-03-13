@@ -16,5 +16,14 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
 
     Optional<AgentJob> findByIdAndWorkspaceId(UUID id, Long workspaceId);
 
+    Page<AgentJob> findByWorkspaceIdAndConfigId(Long workspaceId, Long configId, Pageable pageable);
+
+    Page<AgentJob> findByWorkspaceIdAndStatusAndConfigId(
+        Long workspaceId,
+        AgentJobStatus status,
+        Long configId,
+        Pageable pageable
+    );
+
     long countByConfigIdAndStatusIn(Long configId, Collection<AgentJobStatus> statuses);
 }

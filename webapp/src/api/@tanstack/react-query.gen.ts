@@ -3,8 +3,8 @@
 import { type DefaultError, type InfiniteData, infiniteQueryOptions, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { addLabelFilter, addLabelToTeam, addRepositoryToMonitor, assignRole, computeUserLeagueStats, createDocument, createOrUpdateConfig, createWorkspace, deleteConfig, deleteDocument, deleteDocumentVersionsAfter, deleteUser, detectForPullRequest, detectForUser, getAllTeams, getBadPractice, getBadPracticesForPullRequest, getBadPracticesForUser, getConfig, getCurrentUserMembership, getDocument, getGroupedThreads, getJob, getLabelFilters, getLeaderboard, getMember, getRepositoriesToMonitor, getRepositorySettings, getTeamSettings, getThread, getUserProfile, getUserSettings, getUsersWithTeams, getVersion, getWorkspace, gitLabPreflight, listDocuments, listGitLabGroups, listGlobalContributors, listJobs, listMembers, listVersions, listWorkspaces, type Options, provideFeedback, purgeWorkspace, removeLabelFilter, removeLabelFromTeam, removeMember, removeRepositoryToMonitor, renameSlug, resetAndRecalculateLeagues, resolve, updateDocument, updateNotifications, updatePublicVisibility, updateRepositorySettings, updateRepositoryVisibility, updateSchedule, updateSlackCredentials, updateStatus, updateTeamSettings, updateTeamVisibility, updateToken, updateUserSettings, voteMessage } from '../sdk.gen';
-import type { AddLabelFilterData, AddLabelToTeamData, AddLabelToTeamResponse, AddRepositoryToMonitorData, AssignRoleData, AssignRoleResponse, ComputeUserLeagueStatsData, ComputeUserLeagueStatsResponse, CreateDocumentData, CreateDocumentError, CreateDocumentResponse, CreateOrUpdateConfigData, CreateOrUpdateConfigResponse, CreateWorkspaceData, CreateWorkspaceResponse, DeleteConfigData, DeleteConfigResponse, DeleteDocumentData, DeleteDocumentError, DeleteDocumentResponse, DeleteDocumentVersionsAfterData, DeleteDocumentVersionsAfterError, DeleteDocumentVersionsAfterResponse, DeleteUserData, DetectForPullRequestData, DetectForPullRequestError, DetectForPullRequestResponse, DetectForUserData, DetectForUserError, DetectForUserResponse, GetAllTeamsData, GetAllTeamsResponse, GetBadPracticeData, GetBadPracticeResponse, GetBadPracticesForPullRequestData, GetBadPracticesForPullRequestResponse, GetBadPracticesForUserData, GetBadPracticesForUserResponse, GetConfigData, GetConfigResponse, GetCurrentUserMembershipData, GetCurrentUserMembershipResponse, GetDocumentData, GetDocumentError, GetDocumentResponse, GetGroupedThreadsData, GetGroupedThreadsError, GetGroupedThreadsResponse, GetJobData, GetJobResponse, GetLabelFiltersData, GetLabelFiltersResponse, GetLeaderboardData, GetLeaderboardResponse, GetMemberData, GetMemberResponse, GetRepositoriesToMonitorData, GetRepositoriesToMonitorResponse, GetRepositorySettingsData, GetRepositorySettingsResponse, GetTeamSettingsData, GetTeamSettingsResponse, GetThreadData, GetThreadError, GetThreadResponse, GetUserProfileData, GetUserProfileResponse, GetUserSettingsData, GetUserSettingsResponse, GetUsersWithTeamsData, GetUsersWithTeamsResponse, GetVersionData, GetVersionError, GetVersionResponse, GetWorkspaceData, GetWorkspaceResponse, GitLabPreflightData, GitLabPreflightResponse2, ListDocumentsData, ListDocumentsError, ListDocumentsResponse, ListGitLabGroupsData, ListGitLabGroupsResponse, ListGlobalContributorsData, ListGlobalContributorsResponse, ListJobsData, ListJobsResponse, ListMembersData, ListMembersResponse, ListVersionsData, ListVersionsError, ListVersionsResponse, ListWorkspacesData, ListWorkspacesResponse, ProvideFeedbackData, PurgeWorkspaceData, PurgeWorkspaceResponse, RemoveLabelFilterData, RemoveLabelFilterResponse, RemoveLabelFromTeamData, RemoveLabelFromTeamResponse, RemoveMemberData, RemoveRepositoryToMonitorData, RenameSlugData, RenameSlugResponse, ResetAndRecalculateLeaguesData, ResolveData, UpdateDocumentData, UpdateDocumentError, UpdateDocumentResponse, UpdateNotificationsData, UpdateNotificationsResponse, UpdatePublicVisibilityData, UpdatePublicVisibilityResponse, UpdateRepositorySettingsData, UpdateRepositorySettingsError, UpdateRepositorySettingsResponse, UpdateRepositoryVisibilityData, UpdateScheduleData, UpdateScheduleResponse, UpdateSlackCredentialsData, UpdateSlackCredentialsResponse, UpdateStatusData, UpdateStatusResponse, UpdateTeamSettingsData, UpdateTeamSettingsError, UpdateTeamSettingsResponse, UpdateTeamVisibilityData, UpdateTokenData, UpdateTokenResponse, UpdateUserSettingsData, UpdateUserSettingsResponse, VoteMessageData, VoteMessageError, VoteMessageResponse } from '../types.gen';
+import { addLabelFilter, addLabelToTeam, addRepositoryToMonitor, assignRole, computeUserLeagueStats, createConfig, createDocument, createWorkspace, deleteConfig, deleteDocument, deleteDocumentVersionsAfter, deleteUser, detectForPullRequest, detectForUser, getAllTeams, getBadPractice, getBadPracticesForPullRequest, getBadPracticesForUser, getConfig, getConfigs, getCurrentUserMembership, getDocument, getGroupedThreads, getJob, getLabelFilters, getLeaderboard, getMember, getRepositoriesToMonitor, getRepositorySettings, getTeamSettings, getThread, getUserProfile, getUserSettings, getUsersWithTeams, getVersion, getWorkspace, gitLabPreflight, listDocuments, listGitLabGroups, listGlobalContributors, listJobs, listMembers, listVersions, listWorkspaces, type Options, provideFeedback, purgeWorkspace, removeLabelFilter, removeLabelFromTeam, removeMember, removeRepositoryToMonitor, renameSlug, resetAndRecalculateLeagues, resolve, updateConfig, updateDocument, updateNotifications, updatePublicVisibility, updateRepositorySettings, updateRepositoryVisibility, updateSchedule, updateSlackCredentials, updateStatus, updateTeamSettings, updateTeamVisibility, updateToken, updateUserSettings, voteMessage } from '../sdk.gen';
+import type { AddLabelFilterData, AddLabelToTeamData, AddLabelToTeamResponse, AddRepositoryToMonitorData, AssignRoleData, AssignRoleResponse, ComputeUserLeagueStatsData, ComputeUserLeagueStatsResponse, CreateConfigData, CreateConfigResponse, CreateDocumentData, CreateDocumentError, CreateDocumentResponse, CreateWorkspaceData, CreateWorkspaceResponse, DeleteConfigData, DeleteConfigResponse, DeleteDocumentData, DeleteDocumentError, DeleteDocumentResponse, DeleteDocumentVersionsAfterData, DeleteDocumentVersionsAfterError, DeleteDocumentVersionsAfterResponse, DeleteUserData, DetectForPullRequestData, DetectForPullRequestError, DetectForPullRequestResponse, DetectForUserData, DetectForUserError, DetectForUserResponse, GetAllTeamsData, GetAllTeamsResponse, GetBadPracticeData, GetBadPracticeResponse, GetBadPracticesForPullRequestData, GetBadPracticesForPullRequestResponse, GetBadPracticesForUserData, GetBadPracticesForUserResponse, GetConfigData, GetConfigResponse, GetConfigsData, GetConfigsResponse, GetCurrentUserMembershipData, GetCurrentUserMembershipResponse, GetDocumentData, GetDocumentError, GetDocumentResponse, GetGroupedThreadsData, GetGroupedThreadsError, GetGroupedThreadsResponse, GetJobData, GetJobResponse, GetLabelFiltersData, GetLabelFiltersResponse, GetLeaderboardData, GetLeaderboardResponse, GetMemberData, GetMemberResponse, GetRepositoriesToMonitorData, GetRepositoriesToMonitorResponse, GetRepositorySettingsData, GetRepositorySettingsResponse, GetTeamSettingsData, GetTeamSettingsResponse, GetThreadData, GetThreadError, GetThreadResponse, GetUserProfileData, GetUserProfileResponse, GetUserSettingsData, GetUserSettingsResponse, GetUsersWithTeamsData, GetUsersWithTeamsResponse, GetVersionData, GetVersionError, GetVersionResponse, GetWorkspaceData, GetWorkspaceResponse, GitLabPreflightData, GitLabPreflightResponse2, ListDocumentsData, ListDocumentsError, ListDocumentsResponse, ListGitLabGroupsData, ListGitLabGroupsResponse, ListGlobalContributorsData, ListGlobalContributorsResponse, ListJobsData, ListJobsResponse, ListMembersData, ListMembersResponse, ListVersionsData, ListVersionsError, ListVersionsResponse, ListWorkspacesData, ListWorkspacesResponse, ProvideFeedbackData, PurgeWorkspaceData, PurgeWorkspaceResponse, RemoveLabelFilterData, RemoveLabelFilterResponse, RemoveLabelFromTeamData, RemoveLabelFromTeamResponse, RemoveMemberData, RemoveRepositoryToMonitorData, RenameSlugData, RenameSlugResponse, ResetAndRecalculateLeaguesData, ResolveData, UpdateConfigData, UpdateConfigResponse, UpdateDocumentData, UpdateDocumentError, UpdateDocumentResponse, UpdateNotificationsData, UpdateNotificationsResponse, UpdatePublicVisibilityData, UpdatePublicVisibilityResponse, UpdateRepositorySettingsData, UpdateRepositorySettingsError, UpdateRepositorySettingsResponse, UpdateRepositoryVisibilityData, UpdateScheduleData, UpdateScheduleResponse, UpdateSlackCredentialsData, UpdateSlackCredentialsResponse, UpdateStatusData, UpdateStatusResponse, UpdateTeamSettingsData, UpdateTeamSettingsError, UpdateTeamSettingsResponse, UpdateTeamVisibilityData, UpdateTokenData, UpdateTokenResponse, UpdateUserSettingsData, UpdateUserSettingsResponse, VoteMessageData, VoteMessageError, VoteMessageResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -221,8 +221,43 @@ export const getWorkspaceOptions = (options: Options<GetWorkspaceData>) => query
     queryKey: getWorkspaceQueryKey(options)
 });
 
+export const getConfigsQueryKey = (options: Options<GetConfigsData>) => createQueryKey('getConfigs', options);
+
 /**
- * Delete agent configuration for a workspace
+ * List agent configurations for a workspace
+ */
+export const getConfigsOptions = (options: Options<GetConfigsData>) => queryOptions<GetConfigsResponse, DefaultError, GetConfigsResponse, ReturnType<typeof getConfigsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getConfigs({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getConfigsQueryKey(options)
+});
+
+/**
+ * Create a new agent configuration
+ */
+export const createConfigMutation = (options?: Partial<Options<CreateConfigData>>): UseMutationOptions<CreateConfigResponse, DefaultError, Options<CreateConfigData>> => {
+    const mutationOptions: UseMutationOptions<CreateConfigResponse, DefaultError, Options<CreateConfigData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await createConfig({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Delete an agent configuration
  */
 export const deleteConfigMutation = (options?: Partial<Options<DeleteConfigData>>): UseMutationOptions<DeleteConfigResponse, DefaultError, Options<DeleteConfigData>> => {
     const mutationOptions: UseMutationOptions<DeleteConfigResponse, DefaultError, Options<DeleteConfigData>> = {
@@ -241,7 +276,7 @@ export const deleteConfigMutation = (options?: Partial<Options<DeleteConfigData>
 export const getConfigQueryKey = (options: Options<GetConfigData>) => createQueryKey('getConfig', options);
 
 /**
- * Get agent configuration for a workspace
+ * Get a specific agent configuration
  */
 export const getConfigOptions = (options: Options<GetConfigData>) => queryOptions<GetConfigResponse, DefaultError, GetConfigResponse, ReturnType<typeof getConfigQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
@@ -257,12 +292,12 @@ export const getConfigOptions = (options: Options<GetConfigData>) => queryOption
 });
 
 /**
- * Create or update agent configuration for a workspace
+ * Update an existing agent configuration
  */
-export const createOrUpdateConfigMutation = (options?: Partial<Options<CreateOrUpdateConfigData>>): UseMutationOptions<CreateOrUpdateConfigResponse, DefaultError, Options<CreateOrUpdateConfigData>> => {
-    const mutationOptions: UseMutationOptions<CreateOrUpdateConfigResponse, DefaultError, Options<CreateOrUpdateConfigData>> = {
+export const updateConfigMutation = (options?: Partial<Options<UpdateConfigData>>): UseMutationOptions<UpdateConfigResponse, DefaultError, Options<UpdateConfigData>> => {
+    const mutationOptions: UseMutationOptions<UpdateConfigResponse, DefaultError, Options<UpdateConfigData>> = {
         mutationFn: async (fnOptions) => {
-            const { data } = await createOrUpdateConfig({
+            const { data } = await updateConfig({
                 ...options,
                 ...fnOptions,
                 throwOnError: true

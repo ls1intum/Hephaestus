@@ -9,6 +9,7 @@ import org.springframework.lang.NonNull;
 @Schema(description = "Agent configuration for a workspace (API key redacted)")
 public record AgentConfigDTO(
     @NonNull @Schema(description = "Configuration ID") Long id,
+    @NonNull @Schema(description = "Unique name within the workspace") String name,
     @NonNull @Schema(description = "Whether the agent is enabled") Boolean enabled,
     @NonNull @Schema(description = "Type of coding agent") AgentType agentType,
     @Schema(description = "LLM model name", example = "claude-sonnet-4-20250514") String modelName,
@@ -23,6 +24,7 @@ public record AgentConfigDTO(
     public static AgentConfigDTO from(AgentConfig config) {
         return new AgentConfigDTO(
             config.getId(),
+            config.getName(),
             config.isEnabled(),
             config.getAgentType(),
             config.getModelName(),

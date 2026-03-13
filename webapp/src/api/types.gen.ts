@@ -554,13 +554,13 @@ export type UpdateRepositorySettingsRequest = {
 };
 
 /**
- * Request to create or update the agent configuration for a workspace
+ * Request to update an existing agent configuration (all fields optional — null fields are not changed)
  */
 export type UpdateAgentConfigRequest = {
     /**
      * Type of coding agent
      */
-    agentType: 'CLAUDE_CODE' | 'CODEX' | 'OPENCODE';
+    agentType?: 'CLAUDE_CODE' | 'CODEX' | 'OPENCODE';
     /**
      * Whether agent containers have internet access
      */
@@ -576,7 +576,7 @@ export type UpdateAgentConfigRequest = {
     /**
      * LLM provider
      */
-    llmProvider: 'ANTHROPIC' | 'OPENAI';
+    llmProvider?: 'ANTHROPIC' | 'OPENAI';
     /**
      * Maximum concurrent jobs
      */
@@ -1222,6 +1222,48 @@ export type CreateDocumentRequest = {
 };
 
 /**
+ * Request to create a new agent configuration for a workspace
+ */
+export type CreateAgentConfigRequest = {
+    /**
+     * Type of coding agent
+     */
+    agentType: 'CLAUDE_CODE' | 'CODEX' | 'OPENCODE';
+    /**
+     * Whether agent containers have internet access
+     */
+    allowInternet?: boolean;
+    /**
+     * Whether the agent is enabled
+     */
+    enabled?: boolean;
+    /**
+     * LLM API key
+     */
+    llmApiKey?: string;
+    /**
+     * LLM provider
+     */
+    llmProvider: 'ANTHROPIC' | 'OPENAI';
+    /**
+     * Maximum concurrent jobs
+     */
+    maxConcurrentJobs?: number;
+    /**
+     * LLM model name
+     */
+    modelName?: string;
+    /**
+     * Unique name within the workspace
+     */
+    name: string;
+    /**
+     * Job timeout in seconds
+     */
+    timeoutSeconds?: number;
+};
+
+/**
  * Information about a contributor to the Hephaestus project
  */
 export type Contributor = {
@@ -1337,6 +1379,10 @@ export type AgentConfig = {
      * LLM model name
      */
     modelName?: string;
+    /**
+     * Unique name within the workspace
+     */
+    name: string;
     /**
      * Job timeout in seconds
      */
@@ -1515,7 +1561,7 @@ export type GetWorkspaceResponses = {
 
 export type GetWorkspaceResponse = GetWorkspaceResponses[keyof GetWorkspaceResponses];
 
-export type DeleteConfigData = {
+export type GetConfigsData = {
     body?: never;
     path: {
         /**
@@ -1524,12 +1570,62 @@ export type DeleteConfigData = {
         workspaceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/agent-config';
+    url: '/workspaces/{workspaceSlug}/agent-configs';
+};
+
+export type GetConfigsResponses = {
+    /**
+     * Agent configs returned
+     */
+    200: Array<AgentConfig>;
+};
+
+export type GetConfigsResponse = GetConfigsResponses[keyof GetConfigsResponses];
+
+export type CreateConfigData = {
+    body: CreateAgentConfigRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/agent-configs';
+};
+
+export type CreateConfigErrors = {
+    /**
+     * Config name already exists in this workspace
+     */
+    409: unknown;
+};
+
+export type CreateConfigResponses = {
+    /**
+     * Agent config created
+     */
+    201: AgentConfig;
+};
+
+export type CreateConfigResponse = CreateConfigResponses[keyof CreateConfigResponses];
+
+export type DeleteConfigData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        configId: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/agent-configs/{configId}';
 };
 
 export type DeleteConfigErrors = {
     /**
-     * No agent config exists for this workspace
+     * Agent config not found
      */
     404: unknown;
     /**
@@ -1554,14 +1650,15 @@ export type GetConfigData = {
          * Workspace slug
          */
         workspaceSlug: string;
+        configId: number;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/agent-config';
+    url: '/workspaces/{workspaceSlug}/agent-configs/{configId}';
 };
 
 export type GetConfigErrors = {
     /**
-     * No agent config exists for this workspace
+     * Agent config not found
      */
     404: unknown;
 };
@@ -1575,26 +1672,34 @@ export type GetConfigResponses = {
 
 export type GetConfigResponse = GetConfigResponses[keyof GetConfigResponses];
 
-export type CreateOrUpdateConfigData = {
+export type UpdateConfigData = {
     body: UpdateAgentConfigRequest;
     path: {
         /**
          * Workspace slug
          */
         workspaceSlug: string;
+        configId: number;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/agent-config';
+    url: '/workspaces/{workspaceSlug}/agent-configs/{configId}';
 };
 
-export type CreateOrUpdateConfigResponses = {
+export type UpdateConfigErrors = {
     /**
-     * Agent config created or updated
+     * Agent config not found
+     */
+    404: unknown;
+};
+
+export type UpdateConfigResponses = {
+    /**
+     * Agent config updated
      */
     200: AgentConfig;
 };
 
-export type CreateOrUpdateConfigResponse = CreateOrUpdateConfigResponses[keyof CreateOrUpdateConfigResponses];
+export type UpdateConfigResponse = UpdateConfigResponses[keyof UpdateConfigResponses];
 
 export type ListJobsData = {
     body?: never;
@@ -1609,6 +1714,10 @@ export type ListJobsData = {
          * Filter by job status
          */
         status?: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'TIMED_OUT' | 'CANCELLED';
+        /**
+         * Filter by config ID
+         */
+        configId?: number;
         page?: number;
         size?: number;
     };

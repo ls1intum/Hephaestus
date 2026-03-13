@@ -39,13 +39,14 @@ public class AgentJobController {
     public ResponseEntity<Page<AgentJobDTO>> listJobs(
         WorkspaceContext workspaceContext,
         @Parameter(description = "Filter by job status") @RequestParam(required = false) AgentJobStatus status,
+        @Parameter(description = "Filter by config ID") @RequestParam(required = false) Long configId,
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "20") int size
     ) {
         int pageSize = Math.min(size, 100);
         Pageable pageable = PageRequest.of(page, pageSize, Sort.by("createdAt").descending());
         Page<AgentJobDTO> jobs = agentJobService
-            .getJobs(workspaceContext.id(), status, pageable)
+            .getJobs(workspaceContext.id(), status, configId, pageable)
             .map(AgentJobDTO::from);
         return ResponseEntity.ok(jobs);
     }

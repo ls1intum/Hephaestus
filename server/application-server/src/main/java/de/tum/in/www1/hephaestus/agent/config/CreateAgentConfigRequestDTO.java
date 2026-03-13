@@ -5,16 +5,29 @@ import de.tum.in.www1.hephaestus.agent.LlmProvider;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
-@Schema(
-    description = "Request to update an existing agent configuration (all fields optional — null fields are not changed)"
-)
-public record UpdateAgentConfigRequestDTO(
+@Schema(description = "Request to create a new agent configuration for a workspace")
+public record CreateAgentConfigRequestDTO(
+    @NotBlank(message = "Name is required")
+    @Size(max = 100, message = "Name must not exceed 100 characters")
+    @Schema(
+        description = "Unique name within the workspace",
+        example = "claude-pr-reviewer",
+        requiredMode = Schema.RequiredMode.REQUIRED
+    )
+    String name,
     @Schema(description = "Whether the agent is enabled") Boolean enabled,
-    @Schema(description = "Type of coding agent") AgentType agentType,
+    @NotNull(message = "Agent type is required")
+    @Schema(description = "Type of coding agent", requiredMode = Schema.RequiredMode.REQUIRED)
+    AgentType agentType,
     @Schema(description = "LLM model name", example = "claude-sonnet-4-20250514") String modelName,
-    @Schema(description = "LLM API key (omit or null to keep existing key)") String llmApiKey,
-    @Schema(description = "LLM provider") LlmProvider llmProvider,
+    @Schema(description = "LLM API key") String llmApiKey,
+    @NotNull(message = "LLM provider is required")
+    @Schema(description = "LLM provider", requiredMode = Schema.RequiredMode.REQUIRED)
+    LlmProvider llmProvider,
     @Min(value = 30, message = "Timeout must be at least 30 seconds")
     @Max(value = 3600, message = "Timeout must not exceed 3600 seconds")
     @Schema(description = "Job timeout in seconds", example = "600", minimum = "30", maximum = "3600")

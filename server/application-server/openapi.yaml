@@ -217,29 +217,9 @@ paths:
       summary: Fetch a workspace by slug
       tags:
       - workspace
-  /workspaces/{workspaceSlug}/agent-config:
-    delete:
-      operationId: deleteConfig
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      responses:
-        "204":
-          description: Agent config deleted
-        "404":
-          description: No agent config exists for this workspace
-        "409":
-          description: Cannot delete config with active jobs
-      summary: Delete agent configuration for a workspace
-      tags:
-      - Agent Config
+  /workspaces/{workspaceSlug}/agent-configs:
     get:
-      operationId: getConfig
+      operationId: getConfigs
       parameters:
       - description: Workspace slug
         in: path
@@ -253,15 +233,15 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AgentConfig"
-          description: Agent config returned
-        "404":
-          description: No agent config exists for this workspace
-      summary: Get agent configuration for a workspace
+                type: array
+                items:
+                  $ref: "#/components/schemas/AgentConfig"
+          description: Agent configs returned
+      summary: List agent configurations for a workspace
       tags:
       - Agent Config
-    put:
-      operationId: createOrUpdateConfig
+    post:
+      operationId: createConfig
       parameters:
       - description: Workspace slug
         in: path
@@ -274,6 +254,95 @@ paths:
         content:
           application/json:
             schema:
+              $ref: "#/components/schemas/CreateAgentConfigRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentConfig"
+          description: Agent config created
+        "409":
+          description: Config name already exists in this workspace
+      summary: Create a new agent configuration
+      tags:
+      - Agent Config
+  /workspaces/{workspaceSlug}/agent-configs/{configId}:
+    delete:
+      operationId: deleteConfig
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: configId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "204":
+          description: Agent config deleted
+        "404":
+          description: Agent config not found
+        "409":
+          description: Cannot delete config with active jobs
+      summary: Delete an agent configuration
+      tags:
+      - Agent Config
+    get:
+      operationId: getConfig
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: configId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentConfig"
+          description: Agent config returned
+        "404":
+          description: Agent config not found
+      summary: Get a specific agent configuration
+      tags:
+      - Agent Config
+    put:
+      operationId: updateConfig
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: configId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
               $ref: "#/components/schemas/UpdateAgentConfigRequest"
         required: true
       responses:
@@ -282,8 +351,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AgentConfig"
-          description: Agent config created or updated
-      summary: Create or update agent configuration for a workspace
+          description: Agent config updated
+        "404":
+          description: Agent config not found
+      summary: Update an existing agent configuration
       tags:
       - Agent Config
   /workspaces/{workspaceSlug}/agent-jobs:
@@ -310,6 +381,13 @@ paths:
           - FAILED
           - TIMED_OUT
           - CANCELLED
+      - description: Filter by config ID
+        in: query
+        name: configId
+        required: false
+        schema:
+          type: integer
+          format: int64
       - in: query
         name: page
         required: false
@@ -2369,6 +2447,9 @@ components:
           type: string
           description: LLM model name
           example: claude-sonnet-4-20250514
+        name:
+          type: string
+          description: Unique name within the workspace
         timeoutSeconds:
           type: integer
           format: int32
@@ -2386,6 +2467,7 @@ components:
       - id
       - llmProvider
       - maxConcurrentJobs
+      - name
       - timeoutSeconds
     AgentJob:
       type: object
@@ -2567,6 +2649,60 @@ components:
       - htmlUrl
       - id
       - login
+      - name
+    CreateAgentConfigRequest:
+      type: object
+      description: Request to create a new agent configuration for a workspace
+      properties:
+        agentType:
+          type: string
+          description: Type of coding agent
+          enum:
+          - CLAUDE_CODE
+          - CODEX
+          - OPENCODE
+        allowInternet:
+          type: boolean
+          description: Whether agent containers have internet access
+        enabled:
+          type: boolean
+          description: Whether the agent is enabled
+        llmApiKey:
+          type: string
+          description: LLM API key
+        llmProvider:
+          type: string
+          description: LLM provider
+          enum:
+          - ANTHROPIC
+          - OPENAI
+        maxConcurrentJobs:
+          type: integer
+          format: int32
+          description: Maximum concurrent jobs
+          example: 3
+          maximum: 10
+          minimum: 1
+        modelName:
+          type: string
+          description: LLM model name
+          example: claude-sonnet-4-20250514
+        name:
+          type: string
+          description: Unique name within the workspace
+          example: claude-pr-reviewer
+          maxLength: 100
+          minLength: 0
+        timeoutSeconds:
+          type: integer
+          format: int32
+          description: Job timeout in seconds
+          example: 600
+          maximum: 3600
+          minimum: 30
+      required:
+      - agentType
+      - llmProvider
       - name
     CreateDocumentRequest:
       type: object
@@ -3576,7 +3712,8 @@ components:
         export: true
     UpdateAgentConfigRequest:
       type: object
-      description: Request to create or update the agent configuration for a workspace
+      description: Request to update an existing agent configuration (all fields optional
+        — null fields are not changed)
       properties:
         agentType:
           type: string
@@ -3618,9 +3755,6 @@ components:
           example: 600
           maximum: 3600
           minimum: 30
-      required:
-      - agentType
-      - llmProvider
     UpdateRepositorySettingsRequest:
       type: object
       description: Request to update repository contribution visibility settings in

@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.agent.config;
 
-import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceScopedController;
@@ -10,17 +9,21 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 @WorkspaceScopedController
-@RequestMapping("/agent-config")
+@RequestMapping("/agent-configs")
 @Tag(name = "Agent Config", description = "Workspace-scoped agent configuration management")
 @RequiredArgsConstructor
 @Validated
@@ -29,7 +32,20 @@ public class AgentConfigController {
     private final AgentConfigService agentConfigService;
 
     @GetMapping
-    @Operation(summary = "Get agent configuration for a workspace")
+    @Operation(summary = "List agent configurations for a workspace")
+    @ApiResponse(responseCode = "200", description = "Agent configs returned")
+    @RequireAtLeastWorkspaceAdmin
+    public ResponseEntity<List<AgentConfigDTO>> getConfigs(WorkspaceContext workspaceContext) {
+        List<AgentConfigDTO> configs = agentConfigService
+            .getConfigs(workspaceContext)
+            .stream()
+            .map(AgentConfigDTO::from)
+            .toList();
+        return ResponseEntity.ok(configs);
+    }
+
+    @GetMapping("/{configId}")
+    @Operation(summary = "Get a specific agent configuration")
     @ApiResponse(
         responseCode = "200",
         description = "Agent config returned",
@@ -37,40 +53,64 @@ public class AgentConfigController {
     )
     @ApiResponse(
         responseCode = "404",
-        description = "No agent config exists for this workspace",
+        description = "Agent config not found",
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
-    public ResponseEntity<AgentConfigDTO> getConfig(WorkspaceContext workspaceContext) {
-        return agentConfigService
-            .getConfig(workspaceContext)
-            .map(AgentConfigDTO::from)
-            .map(ResponseEntity::ok)
-            .orElseThrow(() -> new EntityNotFoundException("AgentConfig", workspaceContext.slug()));
-    }
-
-    @PutMapping
-    @Operation(summary = "Create or update agent configuration for a workspace")
-    @ApiResponse(
-        responseCode = "200",
-        description = "Agent config created or updated",
-        content = @Content(schema = @Schema(implementation = AgentConfigDTO.class))
-    )
-    @RequireAtLeastWorkspaceAdmin
-    public ResponseEntity<AgentConfigDTO> createOrUpdateConfig(
-        WorkspaceContext workspaceContext,
-        @Valid @RequestBody UpdateAgentConfigRequestDTO request
-    ) {
-        AgentConfig config = agentConfigService.createOrUpdateConfig(workspaceContext, request);
+    public ResponseEntity<AgentConfigDTO> getConfig(WorkspaceContext workspaceContext, @PathVariable Long configId) {
+        AgentConfig config = agentConfigService.getConfig(workspaceContext, configId);
         return ResponseEntity.ok(AgentConfigDTO.from(config));
     }
 
-    @DeleteMapping
-    @Operation(summary = "Delete agent configuration for a workspace")
+    @PostMapping
+    @Operation(summary = "Create a new agent configuration")
+    @ApiResponse(
+        responseCode = "201",
+        description = "Agent config created",
+        content = @Content(schema = @Schema(implementation = AgentConfigDTO.class))
+    )
+    @ApiResponse(
+        responseCode = "409",
+        description = "Config name already exists in this workspace",
+        content = @Content(schema = @Schema(hidden = true))
+    )
+    @RequireAtLeastWorkspaceAdmin
+    public ResponseEntity<AgentConfigDTO> createConfig(
+        WorkspaceContext workspaceContext,
+        @Valid @RequestBody CreateAgentConfigRequestDTO request
+    ) {
+        AgentConfig config = agentConfigService.createConfig(workspaceContext, request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(AgentConfigDTO.from(config));
+    }
+
+    @PutMapping("/{configId}")
+    @Operation(summary = "Update an existing agent configuration")
+    @ApiResponse(
+        responseCode = "200",
+        description = "Agent config updated",
+        content = @Content(schema = @Schema(implementation = AgentConfigDTO.class))
+    )
+    @ApiResponse(
+        responseCode = "404",
+        description = "Agent config not found",
+        content = @Content(schema = @Schema(hidden = true))
+    )
+    @RequireAtLeastWorkspaceAdmin
+    public ResponseEntity<AgentConfigDTO> updateConfig(
+        WorkspaceContext workspaceContext,
+        @PathVariable Long configId,
+        @Valid @RequestBody UpdateAgentConfigRequestDTO request
+    ) {
+        AgentConfig config = agentConfigService.updateConfig(workspaceContext, configId, request);
+        return ResponseEntity.ok(AgentConfigDTO.from(config));
+    }
+
+    @DeleteMapping("/{configId}")
+    @Operation(summary = "Delete an agent configuration")
     @ApiResponse(responseCode = "204", description = "Agent config deleted")
     @ApiResponse(
         responseCode = "404",
-        description = "No agent config exists for this workspace",
+        description = "Agent config not found",
         content = @Content(schema = @Schema(hidden = true))
     )
     @ApiResponse(
@@ -79,8 +119,8 @@ public class AgentConfigController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @RequireAtLeastWorkspaceAdmin
-    public ResponseEntity<Void> deleteConfig(WorkspaceContext workspaceContext) {
-        agentConfigService.deleteConfig(workspaceContext);
+    public ResponseEntity<Void> deleteConfig(WorkspaceContext workspaceContext, @PathVariable Long configId) {
+        agentConfigService.deleteConfig(workspaceContext, configId);
         return ResponseEntity.noContent().build();
     }
 }

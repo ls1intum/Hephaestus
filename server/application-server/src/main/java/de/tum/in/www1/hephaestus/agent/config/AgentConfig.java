@@ -29,8 +29,8 @@ import lombok.ToString;
 /**
  * Workspace-scoped configuration for the coding agent orchestration system.
  *
- * <p>Each workspace may have at most one {@code AgentConfig} (enforced by a unique constraint
- * on {@code workspace_id}). This entity stores the agent runtime type, LLM credentials
+ * <p>A workspace may have multiple {@code AgentConfig} instances, each identified by a unique
+ * {@code name} within the workspace. This entity stores the agent runtime type, LLM credentials
  * (encrypted at rest), and resource limits for container execution.
  *
  * <h2>Provider Compatibility</h2>
@@ -60,6 +60,9 @@ public class AgentConfig {
     @JoinColumn(name = "workspace_id", nullable = false, foreignKey = @ForeignKey(name = "fk_agent_config_workspace"))
     @ToString.Exclude
     private Workspace workspace;
+
+    @Column(name = "name", nullable = false, length = 100)
+    private String name;
 
     @Column(name = "enabled", nullable = false)
     private boolean enabled = false;
