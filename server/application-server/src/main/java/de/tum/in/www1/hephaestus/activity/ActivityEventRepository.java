@@ -4,6 +4,7 @@ import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.domain.Pageable;
@@ -524,4 +525,43 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         """
     )
     Slice<ActivityEvent> findSliceByActorIdOrderByOccurredAtAsc(@Param("actorId") Long actorId, Pageable pageable);
+
+    /**
+     * Count events of a specific type by actor within a time window.
+     * Used by achievement evaluators (BruteForce, NightOwl).
+     */
+    @WorkspaceAgnostic("Achievements are per-user lifetime accomplishments across all workspaces")
+    @Query(
+        value = """
+        SELECT COUNT(*)
+        FROM activity_event e
+        WHERE e.actor_id = :actorId
+        AND e.event_type = :eventType
+        AND e.occurred_at >= :start
+        AND e.occurred_at < :end
+        """,
+        nativeQuery = true
+    )
+    long countByActorIdAndEventTypeInWindow(
+        @Param("actorId") Long actorId,
+        @Param("eventType") String eventType,
+        @Param("start") Instant start,
+        @Param("end") Instant end
+    );
+
+    /**
+     * Find the most recent event timestamp for an actor before a given time.
+     * Used by LongTimeReturn achievement evaluator.
+     */
+    @WorkspaceAgnostic("Achievements are per-user lifetime accomplishments across all workspaces")
+    @Query(
+        value = """
+        SELECT MAX(e.occurred_at)
+        FROM activity_event e
+        WHERE e.actor_id = :actorId
+        AND e.occurred_at < :before
+        """,
+        nativeQuery = true
+    )
+    Optional<Instant> findMaxOccurredAtByActorIdBefore(@Param("actorId") Long actorId, @Param("before") Instant before);
 }

@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.gitprovider.commit;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -351,4 +352,52 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
         @Param("statusCheckRollupState") String statusCheckRollupState,
         @Param("onBehalfOfLogin") String onBehalfOfLogin
     );
+
+    /**
+     * Find the N most recent commits by a specific author, ordered by authored date descending.
+     * Used by AtomicChanges achievement evaluator.
+     */
+    @Query(
+        """
+        SELECT c FROM Commit c
+        WHERE c.author.id = :authorId
+        ORDER BY c.authoredAt DESC
+        """
+    )
+    List<Commit> findTopNByAuthorIdOrderByAuthoredAtDesc(@Param("authorId") Long authorId, Pageable pageable);
+
+    /**
+     * Find a commit by ID with file changes eagerly loaded.
+     * Used by CrossBoundary achievement evaluator.
+     */
+    @Query(
+        """
+        SELECT c FROM Commit c
+        LEFT JOIN FETCH c.fileChanges
+        WHERE c.id = :id
+        """
+    )
+    Optional<Commit> findByIdWithFileChanges(@Param("id") Long id);
+
+    /**
+     * Find distinct file extensions across all commits by a specific author.
+     * Used by Polyglot achievement evaluator.
+     */
+    @Query(
+        value = """
+        SELECT DISTINCT LOWER(
+            CASE
+                WHEN cf.filename LIKE '%/.%' THEN SUBSTRING(cf.filename FROM '[^/]+$')
+                WHEN cf.filename LIKE '%.%' THEN SUBSTRING(cf.filename FROM '\\.([^.]+)$')
+                ELSE NULL
+            END
+        )
+        FROM commit_file_change cf
+        JOIN git_commit gc ON cf.commit_id = gc.id
+        WHERE gc.author_id = :authorId
+        AND cf.filename LIKE '%.%'
+        """,
+        nativeQuery = true
+    )
+    List<String> findDistinctFileExtensionsByAuthorId(@Param("authorId") Long authorId);
 }

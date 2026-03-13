@@ -215,6 +215,20 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
                     new DomainEvent.IssueCreated(EventPayload.IssueData.from(issue), EventContext.from(context))
                 );
                 log.debug("Created issue: issueId={}, issueNumber={}", dbId, dto.number());
+
+                // Emit lifecycle events for issues that arrived already closed during sync.
+                // The ActivityEvent dedup (ON CONFLICT DO NOTHING) makes duplicate emissions harmless.
+                if (issue.getState() == Issue.State.CLOSED) {
+                    String stateReason = dto.stateReason() != null ? dto.stateReason() : "completed";
+                    eventPublisher.publishEvent(
+                        new DomainEvent.IssueClosed(
+                            EventPayload.IssueData.from(issue),
+                            stateReason,
+                            EventContext.from(context)
+                        )
+                    );
+                    log.debug("Emitted IssueClosed for already-closed issue: issueId={}", dbId);
+                }
             } else {
                 // For updates, we compute changed fields by comparing with what we know changed
                 Set<String> changedFields = computeChangedFields(existingOpt.get(), issue);

@@ -74,4 +74,31 @@ public interface IssueCommentRepository extends JpaRepository<IssueComment, Long
         @Param("onlyFromPullRequests") boolean onlyFromPullRequests,
         @Param("workspaceId") Long workspaceId
     );
+
+    /**
+     * Count distinct comment authors on an issue.
+     * Used by HiveMind achievement evaluator.
+     */
+    @Query(
+        """
+        SELECT COUNT(DISTINCT ic.author.id)
+        FROM IssueComment ic
+        WHERE ic.issue.id = :issueId
+        """
+    )
+    long countDistinctAuthorIdsByIssueId(@Param("issueId") Long issueId);
+
+    /**
+     * Count comments on an issue NOT authored by a specific user.
+     * Used by Necromancer achievement evaluator.
+     */
+    @Query(
+        """
+        SELECT COUNT(ic)
+        FROM IssueComment ic
+        WHERE ic.issue.id = :issueId
+        AND ic.author.id <> :authorId
+        """
+    )
+    long countByIssueIdAndAuthorIdNot(@Param("issueId") Long issueId, @Param("authorId") Long authorId);
 }

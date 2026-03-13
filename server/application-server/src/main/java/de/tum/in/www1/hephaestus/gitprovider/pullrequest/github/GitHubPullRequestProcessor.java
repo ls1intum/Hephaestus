@@ -238,6 +238,22 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
                 new DomainEvent.PullRequestCreated(EventPayload.PullRequestData.from(pr), EventContext.from(context))
             );
             log.debug("Created pull request: prId={}, prNumber={}", pr.getId(), dto.number());
+
+            // Emit lifecycle events for PRs that arrived already in a terminal state during sync.
+            // The ActivityEvent dedup (ON CONFLICT DO NOTHING) makes duplicate emissions harmless.
+            if (pr.getState() == Issue.State.CLOSED || pr.getState() == Issue.State.MERGED) {
+                EventPayload.PullRequestData prData = EventPayload.PullRequestData.from(pr);
+                EventContext eventContext = EventContext.from(context);
+                eventPublisher.publishEvent(new DomainEvent.PullRequestClosed(prData, pr.isMerged(), eventContext));
+                if (pr.isMerged()) {
+                    eventPublisher.publishEvent(new DomainEvent.PullRequestMerged(prData, eventContext));
+                }
+                log.debug(
+                    "Emitted lifecycle events for already-terminal PR: prId={}, merged={}",
+                    pr.getId(),
+                    pr.isMerged()
+                );
+            }
         } else {
             Set<String> changedFields = computeChangedFields(existingOpt.get(), pr);
             if (!changedFields.isEmpty() || relationshipsChanged) {
