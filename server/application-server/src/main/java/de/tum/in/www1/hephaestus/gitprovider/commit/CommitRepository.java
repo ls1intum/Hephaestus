@@ -405,8 +405,5 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
         """,
         nativeQuery = true
     )
-    List<String> findDistinctFileExtensionsByAuthorId(
-        @Param("authorId") Long authorId,
-        @Param("asOf") Instant asOf
-    );
+    List<String> findDistinctFileExtensionsByAuthorId(@Param("authorId") Long authorId, @Param("asOf") Instant asOf);
 }

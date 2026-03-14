@@ -1,9 +1,11 @@
 package de.tum.in.www1.hephaestus.achievement.evaluator;
 
+import de.tum.in.www1.hephaestus.achievement.AchievementRegistry;
 import de.tum.in.www1.hephaestus.achievement.UserAchievement;
 import de.tum.in.www1.hephaestus.achievement.UserAchievementRepository;
 import de.tum.in.www1.hephaestus.achievement.progress.BinaryAchievementProgress;
 import de.tum.in.www1.hephaestus.activity.ActivitySavedEvent;
+import jakarta.annotation.PostConstruct;
 import java.util.Map;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
@@ -42,6 +44,27 @@ public class AllRarityEvaluator implements AchievementEvaluator {
     );
 
     private final UserAchievementRepository userAchievementRepository;
+    private final AchievementRegistry achievementRegistry;
+
+    @PostConstruct
+    void validatePrerequisites() {
+        for (var entry : PREREQUISITES.entrySet()) {
+            for (String prereqId : entry.getValue()) {
+                try {
+                    achievementRegistry.getById(prereqId);
+                } catch (IllegalArgumentException e) {
+                    throw new IllegalStateException(
+                        "AllRarityEvaluator prerequisite '" +
+                            prereqId +
+                            "' for '" +
+                            entry.getKey() +
+                            "' not found in registry. Did achievements.yml change?",
+                        e
+                    );
+                }
+            }
+        }
+    }
 
     @Override
     public boolean updateProgress(UserAchievement userAchievement, ActivitySavedEvent event) {
