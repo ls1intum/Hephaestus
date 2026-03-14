@@ -28,6 +28,8 @@ tags:
   name: Team Settings
 - description: Team management within workspace
   name: Teams
+- description: Workspace-scoped agent configuration management
+  name: Agent Config
 - description: Bad practice detection and resolution
   name: Code Practices
 - description: User profile and activity data
@@ -36,6 +38,8 @@ tags:
     Controller for managing workspace memberships and roles.
      Handles CRUD operations for workspace members and role assignments.
   name: workspace-membership-controller
+- description: Workspace-scoped agent job monitoring
+  name: Agent Jobs
 - description: Contributor rankings and league statistics
   name: Leaderboard
 - description: "User account management (settings, deletion)"
@@ -215,6 +219,230 @@ paths:
       summary: Fetch a workspace by slug
       tags:
       - workspace
+  /workspaces/{workspaceSlug}/agent-configs:
+    get:
+      operationId: getConfigs
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AgentConfig"
+          description: Agent configs returned
+      summary: List agent configurations for a workspace
+      tags:
+      - Agent Config
+    post:
+      operationId: createConfig
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAgentConfigRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentConfig"
+          description: Agent config created
+        "409":
+          description: Config name already exists in this workspace
+      summary: Create a new agent configuration
+      tags:
+      - Agent Config
+  /workspaces/{workspaceSlug}/agent-configs/{configId}:
+    delete:
+      operationId: deleteConfig
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: configId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "204":
+          description: Agent config deleted
+        "404":
+          description: Agent config not found
+        "409":
+          description: Cannot delete config with active jobs
+      summary: Delete an agent configuration
+      tags:
+      - Agent Config
+    get:
+      operationId: getConfig
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: configId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentConfig"
+          description: Agent config returned
+        "404":
+          description: Agent config not found
+      summary: Get a specific agent configuration
+      tags:
+      - Agent Config
+    patch:
+      operationId: updateConfig
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: configId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAgentConfigRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentConfig"
+          description: Agent config updated
+        "404":
+          description: Agent config not found
+      summary: Update an existing agent configuration
+      tags:
+      - Agent Config
+  /workspaces/{workspaceSlug}/agent-jobs:
+    get:
+      operationId: listJobs
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - description: Filter by job status
+        in: query
+        name: status
+        required: false
+        schema:
+          type: string
+          enum:
+          - QUEUED
+          - RUNNING
+          - COMPLETED
+          - FAILED
+          - TIMED_OUT
+          - CANCELLED
+      - description: Filter by config ID
+        in: query
+        name: configId
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageAgentJob"
+          description: Paginated job list
+      summary: List agent jobs for a workspace
+      tags:
+      - Agent Jobs
+  /workspaces/{workspaceSlug}/agent-jobs/{jobId}:
+    get:
+      operationId: getJob
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: jobId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentJob"
+          description: Job detail returned
+        "404":
+          description: Job not found in this workspace
+      summary: Get agent job details
+      tags:
+      - Agent Jobs
   /workspaces/{workspaceSlug}/leaderboard:
     get:
       description: Creates a ranked contributor list for the specified time range
@@ -2415,6 +2643,132 @@ components:
           type: string
       required:
       - type
+    AgentConfig:
+      type: object
+      description: Agent configuration for a workspace (API key redacted)
+      properties:
+        agentType:
+          type: string
+          description: Type of coding agent
+          enum:
+          - CLAUDE_CODE
+          - CODEX
+          - OPENCODE
+        allowInternet:
+          type: boolean
+          description: Whether agent containers have internet access
+        createdAt:
+          type: string
+          format: date-time
+          description: Timestamp when the config was created
+        enabled:
+          type: boolean
+          description: Whether the agent is enabled
+        hasLlmApiKey:
+          type: boolean
+          description: Whether an LLM API key is configured
+        id:
+          type: integer
+          format: int64
+          description: Configuration ID
+        llmProvider:
+          type: string
+          description: LLM provider
+          enum:
+          - ANTHROPIC
+          - OPENAI
+        maxConcurrentJobs:
+          type: integer
+          format: int32
+          description: Maximum concurrent jobs
+        modelName:
+          type: string
+          description: LLM model name
+          example: claude-sonnet-4-20250514
+        name:
+          type: string
+          description: Unique name within the workspace
+        timeoutSeconds:
+          type: integer
+          format: int32
+          description: Job timeout in seconds
+        updatedAt:
+          type: string
+          format: date-time
+          description: Timestamp when the config was last updated
+      required:
+      - agentType
+      - allowInternet
+      - createdAt
+      - enabled
+      - hasLlmApiKey
+      - id
+      - llmProvider
+      - maxConcurrentJobs
+      - name
+      - timeoutSeconds
+    AgentJob:
+      type: object
+      description: Agent job execution record (job_token intentionally omitted)
+      properties:
+        completedAt:
+          type: string
+          format: date-time
+          description: Timestamp when the job completed
+        configSnapshot:
+          description: Frozen agent config at submit time
+        containerId:
+          type: string
+          description: Docker container ID
+        createdAt:
+          type: string
+          format: date-time
+          description: Timestamp when the job was created
+        errorMessage:
+          type: string
+          description: Human-readable error message
+        exitCode:
+          type: integer
+          format: int32
+          description: Container exit code
+        id:
+          type: string
+          format: uuid
+          description: Job ID
+        jobType:
+          type: string
+          description: Job type
+          enum:
+          - PULL_REQUEST_REVIEW
+        metadata:
+          description: Job metadata (routing/display info)
+        output:
+          description: Job output (agent results)
+        retryCount:
+          type: integer
+          format: int32
+          description: Number of retry attempts
+        startedAt:
+          type: string
+          format: date-time
+          description: Timestamp when the job started running
+        status:
+          type: string
+          description: Current job status
+          enum:
+          - QUEUED
+          - RUNNING
+          - COMPLETED
+          - FAILED
+          - TIMED_OUT
+          - CANCELLED
+      required:
+      - configSnapshot
+      - createdAt
+      - id
+      - jobType
+      - retryCount
+      - status
     AssignRoleRequest:
       type: object
       description: Request to assign or update a user's role in a workspace
@@ -2543,6 +2897,62 @@ components:
       - htmlUrl
       - id
       - login
+      - name
+    CreateAgentConfigRequest:
+      type: object
+      description: Request to create a new agent configuration for a workspace
+      properties:
+        agentType:
+          type: string
+          description: Type of coding agent
+          enum:
+          - CLAUDE_CODE
+          - CODEX
+          - OPENCODE
+        allowInternet:
+          type: boolean
+          description: Whether agent containers have internet access
+        enabled:
+          type: boolean
+          description: Whether the agent is enabled
+        llmApiKey:
+          type: string
+          description: LLM API key
+        llmProvider:
+          type: string
+          description: LLM provider
+          enum:
+          - ANTHROPIC
+          - OPENAI
+        maxConcurrentJobs:
+          type: integer
+          format: int32
+          description: Maximum concurrent jobs
+          example: 3
+          maximum: 10
+          minimum: 1
+        modelName:
+          type: string
+          description: LLM model name
+          example: claude-sonnet-4-20250514
+          maxLength: 128
+          minLength: 0
+        name:
+          type: string
+          description: Unique name within the workspace
+          example: claude-pr-reviewer
+          maxLength: 100
+          minLength: 0
+        timeoutSeconds:
+          type: integer
+          format: int32
+          description: Job timeout in seconds
+          example: 600
+          maximum: 3600
+          minimum: 30
+      required:
+      - agentType
+      - llmProvider
       - name
     CreateDocumentRequest:
       type: object
@@ -2874,6 +3284,56 @@ components:
       required:
       - current
       - target
+    PageAgentJob:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgentJob"
+        empty:
+          type: boolean
+        first:
+          type: boolean
+        last:
+          type: boolean
+        number:
+          type: integer
+          format: int32
+        numberOfElements:
+          type: integer
+          format: int32
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
+        size:
+          type: integer
+          format: int32
+        sort:
+          $ref: "#/components/schemas/SortObject"
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+    PageableObject:
+      type: object
+      properties:
+        offset:
+          type: integer
+          format: int64
+        pageNumber:
+          type: integer
+          format: int32
+        pageSize:
+          type: integer
+          format: int32
+        paged:
+          type: boolean
+        sort:
+          $ref: "#/components/schemas/SortObject"
+        unpaged:
+          type: boolean
     Profile:
       type: object
       description: Complete user profile including contribution history and activity
@@ -3337,6 +3797,15 @@ components:
       - id
       - name
       - nameWithOwner
+    SortObject:
+      type: object
+      properties:
+        empty:
+          type: boolean
+        sorted:
+          type: boolean
+        unsorted:
+          type: boolean
     StreamPart:
       type: object
       additionalProperties: {}
@@ -3506,6 +3975,53 @@ components:
       - messages
       x-hephaestus:
         export: true
+    UpdateAgentConfigRequest:
+      type: object
+      description: Request to update an existing agent configuration (all fields optional
+        — null fields are not changed)
+      properties:
+        agentType:
+          type: string
+          description: Type of coding agent
+          enum:
+          - CLAUDE_CODE
+          - CODEX
+          - OPENCODE
+        allowInternet:
+          type: boolean
+          description: Whether agent containers have internet access
+        enabled:
+          type: boolean
+          description: Whether the agent is enabled
+        llmApiKey:
+          type: string
+          description: LLM API key (omit or null to keep existing key)
+        llmProvider:
+          type: string
+          description: LLM provider
+          enum:
+          - ANTHROPIC
+          - OPENAI
+        maxConcurrentJobs:
+          type: integer
+          format: int32
+          description: Maximum concurrent jobs
+          example: 3
+          maximum: 10
+          minimum: 1
+        modelName:
+          type: string
+          description: LLM model name
+          example: claude-sonnet-4-20250514
+          maxLength: 128
+          minLength: 0
+        timeoutSeconds:
+          type: integer
+          format: int32
+          description: Job timeout in seconds
+          example: 600
+          maximum: 3600
+          minimum: 30
     UpdateRepositorySettingsRequest:
       type: object
       description: Request to update repository contribution visibility settings in

@@ -553,6 +553,44 @@ export type UpdateRepositorySettingsRequest = {
     hiddenFromContributions: boolean;
 };
 
+/**
+ * Request to update an existing agent configuration (all fields optional — null fields are not changed)
+ */
+export type UpdateAgentConfigRequest = {
+    /**
+     * Type of coding agent
+     */
+    agentType?: 'CLAUDE_CODE' | 'CODEX' | 'OPENCODE';
+    /**
+     * Whether agent containers have internet access
+     */
+    allowInternet?: boolean;
+    /**
+     * Whether the agent is enabled
+     */
+    enabled?: boolean;
+    /**
+     * LLM API key (omit or null to keep existing key)
+     */
+    llmApiKey?: string;
+    /**
+     * LLM provider
+     */
+    llmProvider?: 'ANTHROPIC' | 'OPENAI';
+    /**
+     * Maximum concurrent jobs
+     */
+    maxConcurrentJobs?: number;
+    /**
+     * LLM model name
+     */
+    modelName?: string;
+    /**
+     * Job timeout in seconds
+     */
+    timeoutSeconds?: number;
+};
+
 export type ThreadDetail = {
     id: string;
     messages: Array<{
@@ -625,6 +663,12 @@ export type TeamInfo = {
      * Repositories the team has access to
      */
     repositories: Array<RepositoryInfo>;
+};
+
+export type SortObject = {
+    empty?: boolean;
+    sorted?: boolean;
+    unsorted?: boolean;
 };
 
 /**
@@ -893,6 +937,87 @@ export type Profile = {
     xpRecord: ProfileXpRecord;
 };
 
+export type PageableObject = {
+    offset?: number;
+    pageNumber?: number;
+    pageSize?: number;
+    paged?: boolean;
+    sort?: SortObject;
+    unpaged?: boolean;
+};
+
+export type PageAgentJob = {
+    content?: Array<AgentJob>;
+    empty?: boolean;
+    first?: boolean;
+    last?: boolean;
+    number?: number;
+    numberOfElements?: number;
+    pageable?: PageableObject;
+    size?: number;
+    sort?: SortObject;
+    totalElements?: number;
+    totalPages?: number;
+};
+
+/**
+ * Agent job execution record (job_token intentionally omitted)
+ */
+export type AgentJob = {
+    /**
+     * Timestamp when the job completed
+     */
+    completedAt?: Date;
+    /**
+     * Frozen agent config at submit time
+     */
+    configSnapshot: unknown;
+    /**
+     * Docker container ID
+     */
+    containerId?: string;
+    /**
+     * Timestamp when the job was created
+     */
+    createdAt: Date;
+    /**
+     * Human-readable error message
+     */
+    errorMessage?: string;
+    /**
+     * Container exit code
+     */
+    exitCode?: number;
+    /**
+     * Job ID
+     */
+    id: string;
+    /**
+     * Job type
+     */
+    jobType: 'PULL_REQUEST_REVIEW';
+    /**
+     * Job metadata (routing/display info)
+     */
+    metadata?: unknown;
+    /**
+     * Job output (agent results)
+     */
+    output?: unknown;
+    /**
+     * Number of retry attempts
+     */
+    retryCount: number;
+    /**
+     * Timestamp when the job started running
+     */
+    startedAt?: Date;
+    /**
+     * Current job status
+     */
+    status: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'TIMED_OUT' | 'CANCELLED';
+};
+
 /**
  * Linear progress with current and target counts
  */
@@ -1113,6 +1238,48 @@ export type CreateDocumentRequest = {
 };
 
 /**
+ * Request to create a new agent configuration for a workspace
+ */
+export type CreateAgentConfigRequest = {
+    /**
+     * Type of coding agent
+     */
+    agentType: 'CLAUDE_CODE' | 'CODEX' | 'OPENCODE';
+    /**
+     * Whether agent containers have internet access
+     */
+    allowInternet?: boolean;
+    /**
+     * Whether the agent is enabled
+     */
+    enabled?: boolean;
+    /**
+     * LLM API key
+     */
+    llmApiKey?: string;
+    /**
+     * LLM provider
+     */
+    llmProvider: 'ANTHROPIC' | 'OPENAI';
+    /**
+     * Maximum concurrent jobs
+     */
+    maxConcurrentJobs?: number;
+    /**
+     * LLM model name
+     */
+    modelName?: string;
+    /**
+     * Unique name within the workspace
+     */
+    name: string;
+    /**
+     * Job timeout in seconds
+     */
+    timeoutSeconds?: number;
+};
+
+/**
  * Information about a contributor to the Hephaestus project
  */
 export type Contributor = {
@@ -1194,6 +1361,60 @@ export type AssignRoleRequest = {
      * User ID of the member to update
      */
     userId: number;
+};
+
+/**
+ * Agent configuration for a workspace (API key redacted)
+ */
+export type AgentConfig = {
+    /**
+     * Type of coding agent
+     */
+    agentType: 'CLAUDE_CODE' | 'CODEX' | 'OPENCODE';
+    /**
+     * Whether agent containers have internet access
+     */
+    allowInternet: boolean;
+    /**
+     * Timestamp when the config was created
+     */
+    createdAt: Date;
+    /**
+     * Whether the agent is enabled
+     */
+    enabled: boolean;
+    /**
+     * Whether an LLM API key is configured
+     */
+    hasLlmApiKey: boolean;
+    /**
+     * Configuration ID
+     */
+    id: number;
+    /**
+     * LLM provider
+     */
+    llmProvider: 'ANTHROPIC' | 'OPENAI';
+    /**
+     * Maximum concurrent jobs
+     */
+    maxConcurrentJobs: number;
+    /**
+     * LLM model name
+     */
+    modelName?: string;
+    /**
+     * Unique name within the workspace
+     */
+    name: string;
+    /**
+     * Job timeout in seconds
+     */
+    timeoutSeconds: number;
+    /**
+     * Timestamp when the config was last updated
+     */
+    updatedAt?: Date;
 };
 
 export type AchievementId = 'commit.common.1' | 'commit.common.2' | 'commit.epic' | 'commit.legendary' | 'commit.mythic' | 'commit.rare' | 'commit.special.atomic_changes' | 'commit.special.brute_force' | 'commit.special.cross_boundary' | 'commit.special.itsy_bitsy' | 'commit.uncommon.1' | 'commit.uncommon.2' | 'issue.close.common.1' | 'issue.close.common.2' | 'issue.close.epic' | 'issue.close.legendary' | 'issue.close.rare' | 'issue.close.uncommon' | 'issue.open.common.1' | 'issue.open.common.2' | 'issue.open.epic' | 'issue.open.legendary' | 'issue.open.rare' | 'issue.open.uncommon' | 'issue.special.hive_mind' | 'issue.special.necromancer' | 'issue.special.oracle' | 'milestone.all_epic' | 'milestone.all_legendary' | 'milestone.all_rare' | 'milestone.first_action' | 'milestone.long_time_return' | 'milestone.night_owl' | 'milestone.polyglot' | 'pr.merged.common.1' | 'pr.merged.common.2' | 'pr.merged.epic' | 'pr.merged.legendary' | 'pr.merged.rare' | 'pr.merged.uncommon' | 'pr.special.speedster' | 'review.common.1' | 'review.common.2' | 'review.epic' | 'review.legendary' | 'review.mythic' | 'review.rare' | 'review.uncommon.1' | 'review.uncommon.2';
@@ -1403,6 +1624,207 @@ export type GetWorkspaceResponses = {
 };
 
 export type GetWorkspaceResponse = GetWorkspaceResponses[keyof GetWorkspaceResponses];
+
+export type GetConfigsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/agent-configs';
+};
+
+export type GetConfigsResponses = {
+    /**
+     * Agent configs returned
+     */
+    200: Array<AgentConfig>;
+};
+
+export type GetConfigsResponse = GetConfigsResponses[keyof GetConfigsResponses];
+
+export type CreateConfigData = {
+    body: CreateAgentConfigRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/agent-configs';
+};
+
+export type CreateConfigErrors = {
+    /**
+     * Config name already exists in this workspace
+     */
+    409: unknown;
+};
+
+export type CreateConfigResponses = {
+    /**
+     * Agent config created
+     */
+    201: AgentConfig;
+};
+
+export type CreateConfigResponse = CreateConfigResponses[keyof CreateConfigResponses];
+
+export type DeleteConfigData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        configId: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/agent-configs/{configId}';
+};
+
+export type DeleteConfigErrors = {
+    /**
+     * Agent config not found
+     */
+    404: unknown;
+    /**
+     * Cannot delete config with active jobs
+     */
+    409: unknown;
+};
+
+export type DeleteConfigResponses = {
+    /**
+     * Agent config deleted
+     */
+    204: void;
+};
+
+export type DeleteConfigResponse = DeleteConfigResponses[keyof DeleteConfigResponses];
+
+export type GetConfigData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        configId: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/agent-configs/{configId}';
+};
+
+export type GetConfigErrors = {
+    /**
+     * Agent config not found
+     */
+    404: unknown;
+};
+
+export type GetConfigResponses = {
+    /**
+     * Agent config returned
+     */
+    200: AgentConfig;
+};
+
+export type GetConfigResponse = GetConfigResponses[keyof GetConfigResponses];
+
+export type UpdateConfigData = {
+    body: UpdateAgentConfigRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        configId: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/agent-configs/{configId}';
+};
+
+export type UpdateConfigErrors = {
+    /**
+     * Agent config not found
+     */
+    404: unknown;
+};
+
+export type UpdateConfigResponses = {
+    /**
+     * Agent config updated
+     */
+    200: AgentConfig;
+};
+
+export type UpdateConfigResponse = UpdateConfigResponses[keyof UpdateConfigResponses];
+
+export type ListJobsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: {
+        /**
+         * Filter by job status
+         */
+        status?: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'TIMED_OUT' | 'CANCELLED';
+        /**
+         * Filter by config ID
+         */
+        configId?: number;
+        page?: number;
+        size?: number;
+    };
+    url: '/workspaces/{workspaceSlug}/agent-jobs';
+};
+
+export type ListJobsResponses = {
+    /**
+     * Paginated job list
+     */
+    200: PageAgentJob;
+};
+
+export type ListJobsResponse = ListJobsResponses[keyof ListJobsResponses];
+
+export type GetJobData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        jobId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/agent-jobs/{jobId}';
+};
+
+export type GetJobErrors = {
+    /**
+     * Job not found in this workspace
+     */
+    404: unknown;
+};
+
+export type GetJobResponses = {
+    /**
+     * Job detail returned
+     */
+    200: AgentJob;
+};
+
+export type GetJobResponse = GetJobResponses[keyof GetJobResponses];
 
 export type GetLeaderboardData = {
     body?: never;
