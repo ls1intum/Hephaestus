@@ -104,8 +104,11 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
      *                              for PRs that arrive already in a terminal state. Set to false
      *                              when called from processClosed() which emits its own events.
      */
-    private PullRequest processInternal(GitHubPullRequestDTO dto, ProcessingContext context,
-            boolean emitLifecycleOnCreate) {
+    private PullRequest processInternal(
+        GitHubPullRequestDTO dto,
+        ProcessingContext context,
+        boolean emitLifecycleOnCreate
+    ) {
         Repository repository = context.repository();
         if (repository == null || repository.getId() == null) {
             log.warn("Skipped pull request processing: reason=missingRepository, prNumber={}", dto.number());
@@ -253,8 +256,7 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
 
             // Emit lifecycle events for PRs that arrived already in a terminal state during sync.
             // Skipped when called from processClosed() which emits its own events.
-            if (emitLifecycleOnCreate
-                    && (pr.getState() == Issue.State.CLOSED || pr.getState() == Issue.State.MERGED)) {
+            if (emitLifecycleOnCreate && (pr.getState() == Issue.State.CLOSED || pr.getState() == Issue.State.MERGED)) {
                 EventPayload.PullRequestData prData = EventPayload.PullRequestData.from(pr);
                 EventContext eventContext = EventContext.from(context);
                 eventPublisher.publishEvent(new DomainEvent.PullRequestClosed(prData, pr.isMerged(), eventContext));

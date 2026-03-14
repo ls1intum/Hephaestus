@@ -139,8 +139,12 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
      * @param publishEvents whether to publish domain events (false for stubs)
      * @return the created or updated Issue entity
      */
-    private Issue processInternal(GitHubIssueDTO dto, ProcessingContext context, boolean publishEvents,
-            boolean emitLifecycleOnCreate) {
+    private Issue processInternal(
+        GitHubIssueDTO dto,
+        ProcessingContext context,
+        boolean publishEvents,
+        boolean emitLifecycleOnCreate
+    ) {
         // Use getDatabaseId() which falls back to id for webhook payloads
         Long dbId = dto.getDatabaseId();
         if (dbId == null) {
