@@ -38,9 +38,9 @@ public class AtomicChangesEvaluator implements AchievementEvaluator {
             PageRequest.of(0, REQUIRED_CONSECUTIVE)
         );
 
-        List<Commit> relevantCommits = recentCommits.stream()
-            .filter(commit -> commit.getAuthoredAt() != null
-                && !commit.getAuthoredAt().isAfter(event.getOccurredAt()))
+        List<Commit> relevantCommits = recentCommits
+            .stream()
+            .filter(commit -> commit.getAuthoredAt() != null && !commit.getAuthoredAt().isAfter(event.occurredAt()))
             .limit(REQUIRED_CONSECUTIVE)
             .toList();
 

@@ -237,13 +237,13 @@ const issueAchievement = {
 	},
 	"issue.special.necromancer": {
 		name: "Necromancer",
-		description: "Open an issue and close it by yourself without anyone else interacting with it",
+		description: "Close an issue that has been open for over 6 months",
 		icon: GhostIcon,
 		forceAura: true,
 	},
 	"issue.special.oracle": {
 		name: "Oracle",
-		description: "Close an issue that has been open for over 6 month",
+		description: "Open an issue and close it by yourself without anyone else interacting with it",
 		icon: EyeIcon,
 		forceAura: true,
 	},

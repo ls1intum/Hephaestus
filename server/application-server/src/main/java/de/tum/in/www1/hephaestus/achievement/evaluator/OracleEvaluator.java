@@ -4,23 +4,22 @@ import de.tum.in.www1.hephaestus.achievement.UserAchievement;
 import de.tum.in.www1.hephaestus.achievement.progress.BinaryAchievementProgress;
 import de.tum.in.www1.hephaestus.activity.ActivitySavedEvent;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
-import java.time.Duration;
+import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueCommentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 /**
  * Evaluator for the "Oracle" achievement:
- * close an issue that was open for more than 6 months.
+ * Close your own issue that had zero interaction from others.
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class OracleEvaluator implements AchievementEvaluator {
 
-    private static final Duration MIN_OPEN_DURATION = Duration.ofDays(180);
-
     private final IssueRepository issueRepository;
+    private final IssueCommentRepository issueCommentRepository;
 
     @Override
     public boolean updateProgress(UserAchievement userAchievement, ActivitySavedEvent event) {
@@ -28,14 +27,18 @@ public class OracleEvaluator implements AchievementEvaluator {
             return false;
         }
 
+        Long userId = userAchievement.getUser().getId();
+
         return issueRepository
             .findById(event.targetId())
             .map(issue -> {
-                if (issue.getCreatedAt() == null || issue.getClosedAt() == null) {
+                // Must be the issue author
+                if (issue.getAuthor() == null || !issue.getAuthor().getId().equals(userId)) {
                     return false;
                 }
-                Duration openDuration = Duration.between(issue.getCreatedAt(), issue.getClosedAt());
-                if (openDuration.compareTo(MIN_OPEN_DURATION) > 0) {
+                // Must have zero comments from others
+                long othersComments = issueCommentRepository.countByIssueIdAndAuthorIdNot(issue.getId(), userId);
+                if (othersComments == 0) {
                     userAchievement.setProgressData(new BinaryAchievementProgress(true));
                     return true;
                 }

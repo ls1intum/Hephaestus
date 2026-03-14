@@ -27,17 +27,17 @@ public class ItsyBitsyEvaluator implements AchievementEvaluator {
         // Currently false implementation of the achievement evaluator for Itsy Bitsy that cannot be resolved due to technical limitations
         return false;
 
-//        return commitRepository
-//            .findById(event.targetId())
-//            .map(commit -> {
-//                int totalChanges = commit.getAdditions() + commit.getDeletions();
-//                if (totalChanges == 1) {
-//                    userAchievement.setProgressData(new BinaryAchievementProgress(true));
-//                    return true;
-//                }
-//                return false;
-//            })
-//            .orElse(false);
+        //        return commitRepository
+        //            .findById(event.targetId())
+        //            .map(commit -> {
+        //                int totalChanges = commit.getAdditions() + commit.getDeletions();
+        //                if (totalChanges == 1) {
+        //                    userAchievement.setProgressData(new BinaryAchievementProgress(true));
+        //                    return true;
+        //                }
+        //                return false;
+        //            })
+        //            .orElse(false);
     }
 
     /**

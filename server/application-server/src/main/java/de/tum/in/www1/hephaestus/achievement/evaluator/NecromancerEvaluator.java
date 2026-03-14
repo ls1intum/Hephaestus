@@ -4,14 +4,17 @@ import de.tum.in.www1.hephaestus.achievement.UserAchievement;
 import de.tum.in.www1.hephaestus.achievement.progress.BinaryAchievementProgress;
 import de.tum.in.www1.hephaestus.activity.ActivitySavedEvent;
 import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
-import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueCommentRepository;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 /**
  * Evaluator for the "Necromancer" achievement:
- * close your own issue that had zero interaction from others.
+ * Close an issue that has been open for over 6 months.
  */
 @Slf4j
 @Component
@@ -19,7 +22,6 @@ import org.springframework.stereotype.Component;
 public class NecromancerEvaluator implements AchievementEvaluator {
 
     private final IssueRepository issueRepository;
-    private final IssueCommentRepository issueCommentRepository;
 
     @Override
     public boolean updateProgress(UserAchievement userAchievement, ActivitySavedEvent event) {
@@ -27,18 +29,21 @@ public class NecromancerEvaluator implements AchievementEvaluator {
             return false;
         }
 
-        Long userId = userAchievement.getUser().getId();
-
         return issueRepository
             .findById(event.targetId())
             .map(issue -> {
-                // Must be the issue author
-                if (issue.getAuthor() == null || !issue.getAuthor().getId().equals(userId)) {
+                Instant createdAt = issue.getCreatedAt();
+                if (createdAt == null) {
                     return false;
                 }
-                // Must have zero comments from others
-                long othersComments = issueCommentRepository.countByIssueIdAndAuthorIdNot(issue.getId(), userId);
-                if (othersComments == 0) {
+
+                // calculate duration between creation and the event's occurrence (closure)
+                Instant closedAt = event.occurredAt();
+                ZonedDateTime created = createdAt.atZone(ZoneOffset.UTC);
+                ZonedDateTime closed = closedAt.atZone(ZoneOffset.UTC);
+
+                long months = ChronoUnit.MONTHS.between(created, closed);
+                if (months >= 6) {
                     userAchievement.setProgressData(new BinaryAchievementProgress(true));
                     return true;
                 }
