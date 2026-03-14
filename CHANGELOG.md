@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.31.0](https://github.com/ls1intum/Hephaestus/compare/v0.30.0...v0.31.0) (2026-03-14)
+
+### 🚀 Features
+
+* **server:** agent orchestration data model + multi-config workspace API ([#834](https://github.com/ls1intum/Hephaestus/issues/834)) ([d80050a](https://github.com/ls1intum/Hephaestus/commit/d80050ad569040d7fd0c8a4c753ca35c3e5a24f1))
+
+### ♻️ Code Refactoring
+
+* **webapp:** remove custom reduced motion toggle, use OS preference ([#832](https://github.com/ls1intum/Hephaestus/issues/832)) ([760f8da](https://github.com/ls1intum/Hephaestus/commit/760f8daf6e45820a1fca08b7f25a95ca535fbfe7))
+
 ## [0.30.0](https://github.com/ls1intum/Hephaestus/compare/v0.29.0...v0.30.0) (2026-03-11)
 
 ### 🚀 Features
