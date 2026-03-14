@@ -34,7 +34,7 @@ public class LongTimeReturnEvaluator implements AchievementEvaluator {
             .findMaxOccurredAtByActorIdBefore(actorId, event.occurredAt())
             .map(previousActivity -> {
                 Duration gap = Duration.between(previousActivity, event.occurredAt());
-                if (gap.compareTo(MIN_ABSENCE) > 0) {
+                if (gap.compareTo(MIN_ABSENCE) >= 0) {
                     userAchievement.setProgressData(new BinaryAchievementProgress(true));
                     return true;
                 }
