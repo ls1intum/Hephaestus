@@ -94,6 +94,18 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public PullRequest process(GitHubPullRequestDTO dto, ProcessingContext context) {
+        return processInternal(dto, context, true);
+    }
+
+    /**
+     * Internal method that handles pull request processing.
+     *
+     * @param emitLifecycleOnCreate whether to emit lifecycle events (PullRequestClosed/Merged)
+     *                              for PRs that arrive already in a terminal state. Set to false
+     *                              when called from processClosed() which emits its own events.
+     */
+    private PullRequest processInternal(GitHubPullRequestDTO dto, ProcessingContext context,
+            boolean emitLifecycleOnCreate) {
         Repository repository = context.repository();
         if (repository == null || repository.getId() == null) {
             log.warn("Skipped pull request processing: reason=missingRepository, prNumber={}", dto.number());
@@ -240,8 +252,9 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
             log.debug("Created pull request: prId={}, prNumber={}", pr.getId(), dto.number());
 
             // Emit lifecycle events for PRs that arrived already in a terminal state during sync.
-            // The ActivityEvent dedup (ON CONFLICT DO NOTHING) makes duplicate emissions harmless.
-            if (pr.getState() == Issue.State.CLOSED || pr.getState() == Issue.State.MERGED) {
+            // Skipped when called from processClosed() which emits its own events.
+            if (emitLifecycleOnCreate
+                    && (pr.getState() == Issue.State.CLOSED || pr.getState() == Issue.State.MERGED)) {
                 EventPayload.PullRequestData prData = EventPayload.PullRequestData.from(pr);
                 EventContext eventContext = EventContext.from(context);
                 eventPublisher.publishEvent(new DomainEvent.PullRequestClosed(prData, pr.isMerged(), eventContext));
@@ -341,7 +354,7 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public PullRequest processClosed(GitHubPullRequestDTO dto, ProcessingContext context) {
-        PullRequest pr = process(dto, context);
+        PullRequest pr = processInternal(dto, context, false);
         boolean wasMerged = dto.isMerged();
         EventPayload.PullRequestData prData = EventPayload.PullRequestData.from(pr);
         EventContext eventContext = EventContext.from(context);

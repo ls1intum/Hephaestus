@@ -98,7 +98,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public Issue process(GitHubIssueDTO dto, ProcessingContext context) {
-        return processInternal(dto, context, true);
+        return processInternal(dto, context, true, true);
     }
 
     /**
@@ -125,7 +125,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public Issue processStub(GitHubIssueDTO dto, ProcessingContext context) {
-        return processInternal(dto, context, false);
+        return processInternal(dto, context, false, false);
     }
 
     /**
@@ -139,7 +139,8 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
      * @param publishEvents whether to publish domain events (false for stubs)
      * @return the created or updated Issue entity
      */
-    private Issue processInternal(GitHubIssueDTO dto, ProcessingContext context, boolean publishEvents) {
+    private Issue processInternal(GitHubIssueDTO dto, ProcessingContext context, boolean publishEvents,
+            boolean emitLifecycleOnCreate) {
         // Use getDatabaseId() which falls back to id for webhook payloads
         Long dbId = dto.getDatabaseId();
         if (dbId == null) {
@@ -217,8 +218,8 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
                 log.debug("Created issue: issueId={}, issueNumber={}", dbId, dto.number());
 
                 // Emit lifecycle events for issues that arrived already closed during sync.
-                // The ActivityEvent dedup (ON CONFLICT DO NOTHING) makes duplicate emissions harmless.
-                if (issue.getState() == Issue.State.CLOSED) {
+                // Skipped when called from processClosed() which emits its own IssueClosed event.
+                if (emitLifecycleOnCreate && issue.getState() == Issue.State.CLOSED) {
                     String stateReason = dto.stateReason() != null ? dto.stateReason() : "completed";
                     eventPublisher.publishEvent(
                         new DomainEvent.IssueClosed(
@@ -361,7 +362,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public Issue processClosed(GitHubIssueDTO issueDto, ProcessingContext context) {
-        Issue issue = process(issueDto, context);
+        Issue issue = processInternal(issueDto, context, true, false);
         String stateReason = issueDto.stateReason() != null ? issueDto.stateReason() : "completed";
         eventPublisher.publishEvent(
             new DomainEvent.IssueClosed(EventPayload.IssueData.from(issue), stateReason, EventContext.from(context))
