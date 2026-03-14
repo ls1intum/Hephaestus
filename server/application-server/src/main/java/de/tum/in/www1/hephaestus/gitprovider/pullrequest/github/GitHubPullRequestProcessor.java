@@ -243,7 +243,7 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         }
 
         // Upsert merge commit if present (from GraphQL data — zero extra rate limit cost)
-        upsertMergeCommit(dto, repository);
+        upsertMergeCommit(dto, repository, context);
 
         // Publish events
         // Promotions (ISSUE→PR) are treated as new for event purposes: existingOpt is empty
@@ -491,11 +491,13 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
      * R5: After upserting the commit, links it to the PR in the commit_pull_request join table
      * so that the association is established immediately (not deferred to enrichment).
      */
-    private void upsertMergeCommit(GitHubPullRequestDTO dto, Repository repository) {
+    private void upsertMergeCommit(GitHubPullRequestDTO dto, Repository repository, ProcessingContext context) {
         var info = dto.mergeCommitInfo();
         if (info == null || info.sha() == null) {
             return;
         }
+
+        boolean isNew = !commitRepository.existsByShaAndRepositoryId(info.sha(), repository.getId());
 
         Long providerId = repository.getProvider().getId();
         Long authorId = commitAuthorResolver.resolveByLogin(info.authorLogin(), providerId);
@@ -534,6 +536,18 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
             );
         }
 
-        log.debug("Upserted merge commit: sha={}, repository={}", info.sha(), repository.getNameWithOwner());
+        // Publish CommitCreated event for newly created merge commits
+        if (isNew && commitOpt.isPresent()) {
+            eventPublisher.publishEvent(
+                new DomainEvent.CommitCreated(EventPayload.CommitData.from(commitOpt.get()), EventContext.from(context))
+            );
+        }
+
+        log.debug(
+            "Upserted merge commit: sha={}, repository={}, isNew={}",
+            info.sha(),
+            repository.getNameWithOwner(),
+            isNew
+        );
     }
 }

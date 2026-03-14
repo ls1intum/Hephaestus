@@ -20,6 +20,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
@@ -156,9 +157,9 @@ public class AchievementService {
      * @return list of newly unlocked achievement types (empty if none)
      */
     @Retryable(
-        retryFor = ObjectOptimisticLockingFailureException.class,
-        maxAttempts = 3,
-        backoff = @Backoff(delay = 100)
+        retryFor = { ObjectOptimisticLockingFailureException.class, DataIntegrityViolationException.class },
+        maxAttempts = 5,
+        backoff = @Backoff(delay = 100, multiplier = 2.0, maxDelay = 2000)
     )
     @Transactional
     public List<AchievementDefinition> checkAndUnlock(ActivitySavedEvent event) {
