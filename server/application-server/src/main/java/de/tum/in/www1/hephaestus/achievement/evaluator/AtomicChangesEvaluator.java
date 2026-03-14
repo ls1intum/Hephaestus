@@ -38,11 +38,23 @@ public class AtomicChangesEvaluator implements AchievementEvaluator {
             PageRequest.of(0, REQUIRED_CONSECUTIVE)
         );
 
-        if (recentCommits.size() < REQUIRED_CONSECUTIVE) {
+        List<Commit> relevantCommits = recentCommits.stream()
+            .filter(commit -> commit.getAuthoredAt() != null
+                && !commit.getAuthoredAt().isAfter(event.getOccurredAt()))
+            .limit(REQUIRED_CONSECUTIVE)
+            .toList();
+
+        if (relevantCommits.size() < REQUIRED_CONSECUTIVE) {
+            log.debug(
+                "Not enough relevant commits before event time for user {}: required={}, found={}",
+                authorId,
+                REQUIRED_CONSECUTIVE,
+                relevantCommits.size()
+            );
             return false;
         }
 
-        boolean allAtomic = recentCommits.stream().allMatch(this::isAtomicCommit);
+        boolean allAtomic = relevantCommits.stream().allMatch(this::isAtomicCommit);
         if (allAtomic) {
             userAchievement.setProgressData(new BinaryAchievementProgress(true));
             return true;
