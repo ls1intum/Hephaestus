@@ -521,7 +521,7 @@ achievements:
           type: BinaryAchievementProgress
 
     - id: "issue.special.necromancer"
-      parent: "issue.special.necromancer"
+      parent: "issue.close.common.2"
       rarity: epic
       isHidden: true
       category: issues
@@ -574,7 +574,7 @@ achievements:
           type: BinaryAchievementProgress
 
     - id: "milestone.long_time_return"
-      parent: "milestone.long_time_return"
+      parent: "milestone.first_action"
       rarity: epic
       isHidden: true
       category: milestones
@@ -588,7 +588,7 @@ achievements:
           type: BinaryAchievementProgress
 
     - id: "milestone.all_rare"
-      parent: "milestone.all_rare"
+      parent: "milestone.first_action"
       rarity: epic
       isHidden: true
       category: milestones
