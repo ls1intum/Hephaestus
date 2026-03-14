@@ -393,7 +393,6 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
         value = """
         SELECT DISTINCT LOWER(
             CASE
-                WHEN cf.filename LIKE '%/.%' THEN SUBSTRING(cf.filename FROM '[^/]+$')
                 WHEN cf.filename LIKE '%.%' THEN SUBSTRING(cf.filename FROM '\\.([^.]+)$')
                 ELSE NULL
             END
