@@ -63,7 +63,7 @@ public class PolyglotEvaluator implements AchievementEvaluator {
         }
 
         Long authorId = userAchievement.getUser().getId();
-        var extensions = commitRepository.findDistinctFileExtensionsByAuthorId(authorId);
+        var extensions = commitRepository.findDistinctFileExtensionsByAuthorIdAndCommittedAtBefore(authorId, event.occurredAt());
 
         Set<String> languages = extensions
             .stream()
