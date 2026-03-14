@@ -18,6 +18,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Base64;
@@ -46,7 +47,10 @@ import org.hibernate.annotations.Type;
  * </ul>
  */
 @Entity
-@Table(name = "agent_job")
+@Table(
+    name = "agent_job",
+    uniqueConstraints = @UniqueConstraint(name = "uk_agent_job_token", columnNames = { "job_token" })
+)
 @Getter
 @Setter
 @NoArgsConstructor

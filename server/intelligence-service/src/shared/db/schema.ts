@@ -119,6 +119,104 @@ export const activityEvent = pgTable(
 	],
 );
 
+export const agentConfig = pgTable(
+	"agent_config",
+	{
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({
+			name: "agent_config_id_seq",
+			startWith: 1,
+			increment: 1,
+			cache: 1,
+		}),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		workspaceId: bigint("workspace_id", { mode: "number" }).notNull(),
+		name: varchar({ length: 100 }).notNull(),
+		enabled: boolean().default(false).notNull(),
+		agentType: varchar("agent_type", { length: 32 }).notNull(),
+		modelName: varchar("model_name", { length: 128 }),
+		llmApiKey: text("llm_api_key"),
+		llmProvider: varchar("llm_provider", { length: 32 }).notNull(),
+		timeoutSeconds: integer("timeout_seconds").default(600).notNull(),
+		maxConcurrentJobs: integer("max_concurrent_jobs").default(3).notNull(),
+		allowInternet: boolean("allow_internet").default(false).notNull(),
+		createdAt: timestamp("created_at", {
+			precision: 6,
+			withTimezone: true,
+			mode: "string",
+		}).notNull(),
+		updatedAt: timestamp("updated_at", { precision: 6, withTimezone: true, mode: "string" }),
+	},
+	(table) => [
+		foreignKey({
+			columns: [table.workspaceId],
+			foreignColumns: [workspace.id],
+			name: "fk_agent_config_workspace",
+		}),
+		unique("uk_agent_config_workspace_name").on(table.workspaceId, table.name),
+	],
+);
+
+export const agentJob = pgTable(
+	"agent_job",
+	{
+		id: uuid().primaryKey().notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		workspaceId: bigint("workspace_id", { mode: "number" }).notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		configId: bigint("config_id", { mode: "number" }),
+		jobType: varchar("job_type", { length: 50 }).notNull(),
+		status: varchar({ length: 20 }).default("QUEUED").notNull(),
+		metadata: jsonb(),
+		output: jsonb(),
+		configSnapshot: jsonb("config_snapshot").notNull(),
+		jobToken: text("job_token").notNull(),
+		idempotencyKey: varchar("idempotency_key", { length: 255 }),
+		containerId: varchar("container_id", { length: 64 }),
+		exitCode: integer("exit_code"),
+		errorMessage: text("error_message"),
+		retryCount: integer("retry_count").default(0).notNull(),
+		createdAt: timestamp("created_at", {
+			precision: 6,
+			withTimezone: true,
+			mode: "string",
+		}).notNull(),
+		startedAt: timestamp("started_at", { precision: 6, withTimezone: true, mode: "string" }),
+		completedAt: timestamp("completed_at", { precision: 6, withTimezone: true, mode: "string" }),
+	},
+	(table) => [
+		index("idx_agent_job_status_started")
+			.using("btree", table.status.asc().nullsLast(), table.startedAt.asc().nullsLast())
+			.where(sql`((status)::text = 'RUNNING'::text)`),
+		index("idx_agent_job_workspace_config").using(
+			"btree",
+			table.workspaceId.asc().nullsLast(),
+			table.configId.asc().nullsLast(),
+		),
+		index("idx_agent_job_workspace_status").using(
+			"btree",
+			table.workspaceId.asc().nullsLast(),
+			table.status.asc().nullsLast(),
+		),
+		uniqueIndex("uk_agent_job_idempotency")
+			.using("btree", table.workspaceId.asc().nullsLast(), table.idempotencyKey.asc().nullsLast())
+			.where(
+				sql`(((status)::text = ANY ((ARRAY['QUEUED'::character varying, 'RUNNING'::character varying])::text[])) AND (idempotency_key IS NOT NULL))`,
+			),
+		foreignKey({
+			columns: [table.workspaceId],
+			foreignColumns: [workspace.id],
+			name: "fk_agent_job_workspace",
+		}),
+		foreignKey({
+			columns: [table.configId],
+			foreignColumns: [agentConfig.id],
+			name: "fk_agent_job_config",
+		}).onDelete("set null"),
+		unique("uk_agent_job_token").on(table.jobToken),
+	],
+);
+
 export const badPracticeDetection = pgTable(
 	"bad_practice_detection",
 	{

@@ -1,8 +1,5 @@
 package de.tum.in.www1.hephaestus.workspace;
 
-import de.tum.in.www1.hephaestus.agent.config.AgentConfigHasActiveJobsException;
-import de.tum.in.www1.hephaestus.agent.config.AgentConfigNameConflictException;
-import de.tum.in.www1.hephaestus.agent.config.AgentConfigProviderMismatchException;
 import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.workspace.exception.InvalidWorkspaceSlugException;
@@ -74,21 +71,6 @@ public class WorkspaceControllerAdvice {
     @ExceptionHandler(WorkspaceLifecycleViolationException.class)
     ProblemDetail handleLifecycleViolation(WorkspaceLifecycleViolationException exception) {
         return problem(HttpStatus.CONFLICT, "Workspace lifecycle violation", userFacingDetail(exception.getMessage()));
-    }
-
-    @ExceptionHandler(AgentConfigHasActiveJobsException.class)
-    ProblemDetail handleAgentConfigHasActiveJobs(AgentConfigHasActiveJobsException exception) {
-        return problem(HttpStatus.CONFLICT, "Agent config has active jobs", userFacingDetail(exception.getMessage()));
-    }
-
-    @ExceptionHandler(AgentConfigNameConflictException.class)
-    ProblemDetail handleAgentConfigNameConflict(AgentConfigNameConflictException exception) {
-        return problem(HttpStatus.CONFLICT, "Agent config name conflict", userFacingDetail(exception.getMessage()));
-    }
-
-    @ExceptionHandler(AgentConfigProviderMismatchException.class)
-    ProblemDetail handleAgentConfigProviderMismatch(AgentConfigProviderMismatchException exception) {
-        return problem(HttpStatus.BAD_REQUEST, "Invalid agent configuration", userFacingDetail(exception.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

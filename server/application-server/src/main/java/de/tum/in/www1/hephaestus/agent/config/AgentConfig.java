@@ -19,6 +19,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -43,7 +44,13 @@ import lombok.ToString;
  * @see AgentConfigService for CRUD operations and provider validation
  */
 @Entity
-@Table(name = "agent_config")
+@Table(
+    name = "agent_config",
+    uniqueConstraints = @UniqueConstraint(
+        name = "uk_agent_config_workspace_name",
+        columnNames = { "workspace_id", "name" }
+    )
+)
 @Getter
 @Setter
 @NoArgsConstructor
