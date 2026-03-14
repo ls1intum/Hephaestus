@@ -10,6 +10,8 @@ package de.tum.in.www1.hephaestus.gitprovider.common;
 public enum DataSource {
     /** Data from scheduled GraphQL synchronization. */
     GRAPHQL_SYNC,
+    /** Data from scheduled REST API synchronization. */
+    REST_SYNC,
     /** Data from a webhook event via NATS. */
     WEBHOOK,
 }
