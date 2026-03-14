@@ -354,17 +354,23 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
     );
 
     /**
-     * Find the N most recent commits by a specific author, ordered by authored date descending.
+     * Find the N most recent commits by a specific author as of a given timestamp,
+     * ordered by authored date descending.
      * Used by AtomicChanges achievement evaluator.
      */
     @Query(
         """
         SELECT c FROM Commit c
         WHERE c.author.id = :authorId
+        AND c.authoredAt <= :asOf
         ORDER BY c.authoredAt DESC
         """
     )
-    List<Commit> findTopNByAuthorIdOrderByAuthoredAtDesc(@Param("authorId") Long authorId, Pageable pageable);
+    List<Commit> findTopNByAuthorIdOrderByAuthoredAtDesc(
+        @Param("authorId") Long authorId,
+        @Param("asOf") Instant asOf,
+        Pageable pageable
+    );
 
     /**
      * Find a commit by ID with file changes eagerly loaded.
@@ -380,7 +386,7 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
     Optional<Commit> findByIdWithFileChanges(@Param("id") Long id);
 
     /**
-     * Find distinct file extensions across all commits by a specific author.
+     * Find distinct file extensions across all commits by a specific author as of a given time.
      * Used by Polyglot achievement evaluator.
      */
     @Query(
@@ -395,9 +401,13 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
         FROM commit_file_change cf
         JOIN git_commit gc ON cf.commit_id = gc.id
         WHERE gc.author_id = :authorId
+        AND gc.authored_at <= :asOf
         AND cf.filename LIKE '%.%'
         """,
         nativeQuery = true
     )
-    List<String> findDistinctFileExtensionsByAuthorId(@Param("authorId") Long authorId);
+    List<String> findDistinctFileExtensionsByAuthorId(
+        @Param("authorId") Long authorId,
+        @Param("asOf") Instant asOf
+    );
 }

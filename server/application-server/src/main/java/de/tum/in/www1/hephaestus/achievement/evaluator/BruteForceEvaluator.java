@@ -32,7 +32,7 @@ public class BruteForceEvaluator implements AchievementEvaluator {
 
         Long actorId = userAchievement.getUser().getId();
         Instant windowStart = event.occurredAt().minus(WINDOW);
-        Instant windowEnd = event.occurredAt().plusSeconds(1); // inclusive of current event
+        Instant windowEnd = event.occurredAt(); // inclusive of current event (handled by repository query semantics)
 
         long count = activityEventRepository.countByActorIdAndEventTypeInWindow(
             actorId,

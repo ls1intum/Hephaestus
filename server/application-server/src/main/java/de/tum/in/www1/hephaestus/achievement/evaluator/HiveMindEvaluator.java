@@ -11,7 +11,11 @@ import org.springframework.stereotype.Component;
 
 /**
  * Evaluator for the "Hive Mind" achievement:
- * close an issue that had 10 or more unique participants (commenters + author).
+ * close an issue that had 10 or more unique participants.
+ *
+ * Note: We use the number of distinct issue commenters as a conservative proxy
+ * for unique participants to avoid double-counting the issue author when they
+ * also commented on the issue.
  */
 @Slf4j
 @Component
@@ -32,10 +36,10 @@ public class HiveMindEvaluator implements AchievementEvaluator {
         return issueRepository
             .findById(event.targetId())
             .map(issue -> {
-                // Count distinct comment authors + the issue author = total unique participants
+                // Count distinct comment authors; use this as the participant count to avoid
+                // double-counting the issue author when they also commented.
                 long distinctCommenters = issueCommentRepository.countDistinctAuthorIdsByIssueId(issue.getId());
-                // Add 1 for the issue author (may overlap with commenters, but that's conservative)
-                long totalParticipants = distinctCommenters + 1;
+                long totalParticipants = distinctCommenters;
 
                 if (totalParticipants >= MIN_PARTICIPANTS) {
                     userAchievement.setProgressData(new BinaryAchievementProgress(true));

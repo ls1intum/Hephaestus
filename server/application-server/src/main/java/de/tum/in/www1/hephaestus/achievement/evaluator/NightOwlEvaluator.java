@@ -43,7 +43,7 @@ public class NightOwlEvaluator implements AchievementEvaluator {
         Long actorId = userAchievement.getUser().getId();
         LocalDate eventDate = event.occurredAt().atZone(ZoneOffset.UTC).toLocalDate();
         Instant windowStart = eventDate.atTime(NIGHT_START).toInstant(ZoneOffset.UTC);
-        Instant windowEnd = eventDate.atTime(NIGHT_END).toInstant(ZoneOffset.UTC);
+        Instant windowEnd = event.occurredAt();
 
         long count = activityEventRepository.countByActorIdAndEventTypeInWindow(
             actorId,
