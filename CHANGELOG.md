@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.32.0](https://github.com/ls1intum/Hephaestus/compare/v0.31.0...v0.32.0) (2026-03-15)
+
+### 🚀 Features
+
+* **server:** Docker sandbox manager for agent container lifecycle ([#838](https://github.com/ls1intum/Hephaestus/issues/838)) ([8b15ac1](https://github.com/ls1intum/Hephaestus/commit/8b15ac15257ed7574f1a3ec6dd7ccedc39b25a7b))
+
 ## [0.31.0](https://github.com/ls1intum/Hephaestus/compare/v0.30.0...v0.31.0) (2026-03-14)
 
 ### 🚀 Features
