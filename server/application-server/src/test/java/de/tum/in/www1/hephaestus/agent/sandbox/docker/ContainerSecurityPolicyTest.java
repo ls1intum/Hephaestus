@@ -328,4 +328,115 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
             assertThat(config.pidsLimit()).isEqualTo(512);
         }
     }
+
+    @Nested
+    @DisplayName("Security enforcement floors")
+    class EnforcementFloors {
+
+        @Test
+        @DisplayName("should enforce no-new-privileges even when profile disables it")
+        void shouldEnforceNoNewPrivileges() {
+            SecurityProfile laxProfile = new SecurityProfile(
+                null,
+                null,
+                false,
+                false,
+                false,
+                "host",
+                List.of(),
+                Map.of()
+            );
+
+            DockerOperations.HostConfigSpec config = securityPolicy.buildHostConfig(
+                laxProfile,
+                ResourceLimits.DEFAULT,
+                new NetworkPolicy(false, null, null)
+            );
+
+            assertThat(config.securityOpts()).contains("no-new-privileges");
+        }
+
+        @Test
+        @DisplayName("should enforce read-only rootfs even when profile disables it")
+        void shouldEnforceReadOnlyRootfs() {
+            SecurityProfile laxProfile = new SecurityProfile(
+                null,
+                null,
+                false,
+                false,
+                false,
+                "host",
+                List.of(),
+                Map.of()
+            );
+
+            DockerOperations.HostConfigSpec config = securityPolicy.buildHostConfig(
+                laxProfile,
+                ResourceLimits.DEFAULT,
+                new NetworkPolicy(false, null, null)
+            );
+
+            assertThat(config.readonlyRootfs()).isTrue();
+        }
+
+        @Test
+        @DisplayName("should enforce cap-drop ALL even when profile drops nothing")
+        void shouldEnforceCapDropAll() {
+            SecurityProfile laxProfile = new SecurityProfile(null, null, true, true, true, "none", List.of(), Map.of());
+
+            DockerOperations.HostConfigSpec config = securityPolicy.buildHostConfig(
+                laxProfile,
+                ResourceLimits.DEFAULT,
+                new NetworkPolicy(false, null, null)
+            );
+
+            assertThat(config.capDrop()).containsExactly("ALL");
+        }
+
+        @Test
+        @DisplayName("should enforce private cgroup namespace even when profile disables it")
+        void shouldEnforcePrivateCgroupns() {
+            SecurityProfile laxProfile = new SecurityProfile(
+                null,
+                null,
+                true,
+                true,
+                false,
+                "none",
+                List.of("ALL"),
+                Map.of()
+            );
+
+            DockerOperations.HostConfigSpec config = securityPolicy.buildHostConfig(
+                laxProfile,
+                ResourceLimits.DEFAULT,
+                new NetworkPolicy(false, null, null)
+            );
+
+            assertThat(config.cgroupnsMode()).isEqualTo("private");
+        }
+
+        @Test
+        @DisplayName("should default ipc mode to none when profile sets host")
+        void shouldDefaultIpcToNone() {
+            SecurityProfile hostIpcProfile = new SecurityProfile(
+                null,
+                null,
+                true,
+                true,
+                true,
+                null,
+                List.of("ALL"),
+                Map.of()
+            );
+
+            DockerOperations.HostConfigSpec config = securityPolicy.buildHostConfig(
+                hostIpcProfile,
+                ResourceLimits.DEFAULT,
+                new NetworkPolicy(false, null, null)
+            );
+
+            assertThat(config.ipcMode()).isEqualTo("none");
+        }
+    }
 }

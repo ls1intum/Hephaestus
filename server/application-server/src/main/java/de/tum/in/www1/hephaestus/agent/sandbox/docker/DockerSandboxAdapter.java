@@ -233,9 +233,11 @@ public class DockerSandboxAdapter implements SandboxManager {
             throw new SandboxException("Sandbox execution failed for job: " + jobId, e);
         } finally {
             // ── PHASE 4: CLEANUP ──
+            // Remove from activeContainers FIRST to prevent cancel() from calling
+            // stopContainer() on a container that cleanup is about to force-remove.
+            activeContainers.remove(jobId);
             executionDuration.record(Duration.between(startTime, Instant.now()));
             cleanup(jobId, containerId, networkId);
-            activeContainers.remove(jobId);
             cancellationFlags.remove(jobId);
             MDC.remove(MDC_JOB_ID);
             MDC.remove(MDC_CONTAINER_ID);

@@ -27,6 +27,9 @@ public class SandboxWorkspaceManager {
     /** Maximum total size of collected output files (50 MB). */
     static final long MAX_OUTPUT_BYTES = 50L * 1024 * 1024;
 
+    /** Maximum size of a single output file (10 MB). */
+    static final long MAX_SINGLE_FILE_BYTES = 10L * 1024 * 1024;
+
     /** Maximum total size of injected input files (50 MB). */
     static final long MAX_INPUT_BYTES = 50L * 1024 * 1024;
 
@@ -103,6 +106,12 @@ public class SandboxWorkspaceManager {
                         continue;
                     }
                     name = normalized.toString();
+                    // Per-file size guard: reject files with declared size > limit or negative
+                    // (a long->int cast on a crafted size > 2GB would produce a negative int).
+                    if (entry.getSize() < 0 || entry.getSize() > MAX_SINGLE_FILE_BYTES) {
+                        log.warn("Skipping oversized file in output archive: name={}, size={}", name, entry.getSize());
+                        continue;
+                    }
                     if (totalBytes + entry.getSize() > maxOutputBytes) {
                         log.warn(
                             "Output size limit exceeded ({} bytes) for container {}, skipping remaining files",

@@ -263,8 +263,8 @@ public class DockerClientOperations
         try {
             dockerClient.stopContainerCmd(containerId).withTimeout(timeoutSeconds).exec();
             log.debug("Stopped container {}: timeout={}s", containerId, timeoutSeconds);
-        } catch (NotModifiedException e) {
-            log.debug("Container {} already stopped", containerId);
+        } catch (NotFoundException | NotModifiedException e) {
+            log.debug("Container {} already stopped or removed", containerId);
         } catch (DockerException e) {
             throw new SandboxException("Failed to stop container: " + containerId, e);
         }

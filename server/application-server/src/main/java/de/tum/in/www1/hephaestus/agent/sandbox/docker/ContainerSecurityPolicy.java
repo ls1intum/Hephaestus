@@ -59,11 +59,13 @@ public class ContainerSecurityPolicy {
         ResourceLimits resources,
         NetworkPolicy networkPolicy
     ) {
-        // Security options
+        // Enforcement floors: these security invariants are always applied regardless
+        // of the caller-supplied SecurityProfile. A compromised or misconfigured caller
+        // cannot weaken the sandbox below these minimums.
+
+        // Security options — no-new-privileges is always enforced
         List<String> securityOpts = new ArrayList<>();
-        if (security.noNewPrivileges()) {
-            securityOpts.add("no-new-privileges");
-        }
+        securityOpts.add("no-new-privileges");
 
         // Apply cached seccomp profile
         if (seccompProfileJson != null) {
@@ -88,19 +90,26 @@ public class ContainerSecurityPolicy {
             runtime = properties.containerRuntime();
         }
 
+        // Enforce minimum capability dropping: caller-supplied list must include "ALL".
+        // If not, override with the safe default.
+        List<String> dropCaps = security.dropCapabilities();
+        if (dropCaps == null || !dropCaps.contains("ALL")) {
+            dropCaps = List.of("ALL");
+        }
+
         return new DockerOperations.HostConfigSpec(
             resources.memoryBytes(),
             resources.memoryBytes(), // memory-swap = memory (no swap)
             (long) (resources.cpus() * NANO_CPUS_PER_CPU), // nanoCPUs
             resources.pidsLimit(),
-            security.readOnlyRootfs(),
+            true, // read-only rootfs always enforced
             false, // never privileged
-            security.dropCapabilities(),
+            dropCaps,
             securityOpts,
             security.tmpfsMounts() != null ? new HashMap<>(security.tmpfsMounts()) : Map.of(),
             dns,
-            security.cgroupnsPrivate() ? "private" : null,
-            security.ipcMode(),
+            "private", // cgroup namespace always private
+            security.ipcMode() != null ? security.ipcMode() : "none",
             runtime,
             ulimits
         );

@@ -137,7 +137,10 @@ public class SandboxReconciler {
     }
 
     /** Periodic sweep: clean up orphaned Docker resources. */
-    @Scheduled(fixedDelayString = "${hephaestus.sandbox.reconciliation-interval-seconds}", timeUnit = TimeUnit.SECONDS)
+    @Scheduled(
+        fixedDelayString = "${hephaestus.sandbox.reconciliation-interval-seconds:60}",
+        timeUnit = TimeUnit.SECONDS
+    )
     public void periodicReconciliation() {
         if (!properties.enabled()) {
             return;

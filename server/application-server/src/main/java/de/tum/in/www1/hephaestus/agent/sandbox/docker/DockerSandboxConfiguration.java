@@ -106,7 +106,7 @@ public class DockerSandboxConfiguration {
      * <p>docker-java's Apache HttpClient5 has {@code synchronized} blocks that pin virtual threads in
      * Java 21, causing cascading failures. A dedicated bounded pool of platform threads avoids this.
      */
-    @Bean(destroyMethod = "shutdown")
+    @Bean(destroyMethod = "shutdownNow")
     public ExecutorService dockerWaitExecutor(SandboxProperties properties) {
         return Executors.newFixedThreadPool(
             properties.maxConcurrentContainers(),
