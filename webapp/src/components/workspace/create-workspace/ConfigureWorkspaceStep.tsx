@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { workspaceDetailsSchema } from "./schemas";
@@ -9,15 +9,6 @@ export function ConfigureWorkspaceStep() {
 	const { state, dispatch } = useWizard();
 	const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 	const [touched, setTouched] = useState<Record<string, boolean>>({});
-	// Auto-populate display name from group name on first entry.
-	// Component remounts via key={stepKey} in parent, so deps are safe.
-	useEffect(() => {
-		if (!state.displayName && state.selectedGroup) {
-			const name = state.selectedGroup.name;
-			dispatch({ type: "SET_DISPLAY_NAME", value: name });
-			dispatch({ type: "SET_SLUG", value: generateSlug(name), manual: false });
-		}
-	}, [state.displayName, state.selectedGroup, dispatch]);
 
 	// Focus is managed by the parent page via headingRef on step change.
 

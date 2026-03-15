@@ -26,9 +26,12 @@ export const workspaceDetailsSchema = z.object({
 		.pipe(z.string().min(1, "Display name is required").max(100, "Display name is too long")),
 	workspaceSlug: z
 		.string()
-		.regex(
-			/^(?!.*--)[a-z0-9][a-z0-9-]{1,49}[a-z0-9]$/,
-			"Slug must be 3–51 characters, start and end with a lowercase letter or digit, contain only lowercase letters, digits, or hyphens, and no consecutive hyphens",
-		),
+		.trim()
+		.min(3, "Must be at least 3 characters")
+		.max(51, "Must be at most 51 characters")
+		.regex(/^[a-z0-9]/, "Must start with a lowercase letter or digit")
+		.regex(/[a-z0-9]$/, "Must end with a lowercase letter or digit")
+		.regex(/^[a-z0-9-]+$/, "Only lowercase letters, digits, and hyphens allowed")
+		.refine((s) => !s.includes("--"), "No consecutive hyphens allowed"),
 });
 export type WorkspaceDetailsData = z.infer<typeof workspaceDetailsSchema>;

@@ -106,6 +106,24 @@ describe("wizardReducer", () => {
 			expect(result.step).toBe(3);
 		});
 
+		it("auto-populates displayName and slug from group name", () => {
+			const state = stateAt(2, { selectedGroup: sampleGroup });
+			const result = wizardReducer(state, { type: "ADVANCE_TO_CONFIGURE" });
+			expect(result.displayName).toBe("Hephaestus");
+			expect(result.workspaceSlug).toBe("hephaestus");
+		});
+
+		it("preserves existing displayName and slug (no overwrite)", () => {
+			const state = stateAt(2, {
+				selectedGroup: sampleGroup,
+				displayName: "Custom Name",
+				workspaceSlug: "custom-slug",
+			});
+			const result = wizardReducer(state, { type: "ADVANCE_TO_CONFIGURE" });
+			expect(result.displayName).toBe("Custom Name");
+			expect(result.workspaceSlug).toBe("custom-slug");
+		});
+
 		it("rejects advancement when no group is selected (guard)", () => {
 			const state = stateAt(2, { selectedGroup: null });
 			const result = wizardReducer(state, { type: "ADVANCE_TO_CONFIGURE" });
@@ -189,7 +207,7 @@ describe("wizardReducer", () => {
 	});
 
 	describe("RESET", () => {
-		it("returns to initial state", () => {
+		it("returns to initial state from step 3", () => {
 			const state = stateAt(3, {
 				serverUrl: "https://gitlab.example.com",
 				personalAccessToken: "token",
@@ -198,6 +216,74 @@ describe("wizardReducer", () => {
 			});
 			const result = wizardReducer(state, { type: "RESET" });
 			expect(result).toEqual(initialWizardState);
+		});
+
+		it("returns to initial state from step 2", () => {
+			const state = stateAt(2, { selectedGroup: sampleGroup });
+			const result = wizardReducer(state, { type: "RESET" });
+			expect(result).toEqual(initialWizardState);
+		});
+	});
+
+	describe("integration flows", () => {
+		it("full forward flow: step 1 → 2 → 3", () => {
+			let state = initialWizardState;
+			state = wizardReducer(state, { type: "SET_SERVER_URL", value: "https://gitlab.example.com" });
+			state = wizardReducer(state, { type: "SET_PAT", value: "glpat-test" });
+			state = wizardReducer(state, { type: "SET_PREFLIGHT_RESULT", result: validPreflight });
+			state = wizardReducer(state, { type: "ADVANCE_TO_GROUPS", groups: sampleGroups });
+			expect(state.step).toBe(2);
+
+			state = wizardReducer(state, { type: "SELECT_GROUP", group: sampleGroup });
+			state = wizardReducer(state, { type: "ADVANCE_TO_CONFIGURE" });
+			expect(state.step).toBe(3);
+			expect(state.displayName).toBe("Hephaestus");
+			expect(state.workspaceSlug).toBe("hephaestus");
+		});
+
+		it("round-trip: 1 → 2 → 3 → back → back → 1", () => {
+			let state = initialWizardState;
+			state = wizardReducer(state, { type: "ADVANCE_TO_GROUPS", groups: sampleGroups });
+			state = wizardReducer(state, { type: "SELECT_GROUP", group: sampleGroup });
+			state = wizardReducer(state, { type: "ADVANCE_TO_CONFIGURE" });
+			expect(state.step).toBe(3);
+
+			state = wizardReducer(state, { type: "GO_BACK" });
+			expect(state.step).toBe(2);
+			expect(state.displayName).toBe("");
+
+			state = wizardReducer(state, { type: "GO_BACK" });
+			expect(state.step).toBe(1);
+			expect(state.groups).toEqual([]);
+			expect(state.selectedGroup).toBeNull();
+		});
+
+		it("back-and-forward picks up new group name", () => {
+			const groupB: GitLabGroup = {
+				id: 99,
+				name: "New Group",
+				fullPath: "org/new-group",
+			};
+			let state = initialWizardState;
+			state = wizardReducer(state, { type: "ADVANCE_TO_GROUPS", groups: [sampleGroup, groupB] });
+			state = wizardReducer(state, { type: "SELECT_GROUP", group: sampleGroup });
+			state = wizardReducer(state, { type: "ADVANCE_TO_CONFIGURE" });
+			expect(state.displayName).toBe("Hephaestus");
+
+			// Go back, pick a different group, advance again
+			state = wizardReducer(state, { type: "GO_BACK" });
+			state = wizardReducer(state, { type: "SELECT_GROUP", group: groupB });
+			state = wizardReducer(state, { type: "ADVANCE_TO_CONFIGURE" });
+			// displayName was cleared on GO_BACK, so auto-populate uses new group
+			expect(state.displayName).toBe("New Group");
+			expect(state.workspaceSlug).toBe("new-group");
+		});
+
+		it("ADVANCE_TO_GROUPS with empty array still advances", () => {
+			const state = initialWizardState;
+			const result = wizardReducer(state, { type: "ADVANCE_TO_GROUPS", groups: [] });
+			expect(result.step).toBe(2);
+			expect(result.groups).toEqual([]);
 		});
 	});
 });
