@@ -166,9 +166,7 @@ public class WorkspaceService {
     public Workspace createWorkspace(CreateWorkspaceRequestDTO request) {
         // Always prefer the authenticated user to prevent privilege escalation.
         // Fall back to the deprecated ownerUserId only when no auth context exists (e.g. tests).
-        Long ownerUserId = userRepository.getCurrentUser()
-            .map(User::getId)
-            .orElse(request.ownerUserId());
+        Long ownerUserId = userRepository.getCurrentUser().map(User::getId).orElse(request.ownerUserId());
 
         Workspace workspace = createWorkspace(
             request.workspaceSlug(),

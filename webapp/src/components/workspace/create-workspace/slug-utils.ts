@@ -3,7 +3,9 @@
  *
  * Rules: lowercase, non-alphanumeric chars replaced with hyphens,
  * consecutive hyphens collapsed, must start with alphanumeric,
- * trimmed to 51 characters (matching backend pattern `^[a-z0-9][a-z0-9-]{2,50}$`).
+ * trimmed to 51 characters. The frontend slug regex is stricter than the
+ * backend pattern (`^[a-z0-9][a-z0-9-]{2,50}$`), additionally requiring the
+ * slug to end with an alphanumeric character and prohibiting consecutive hyphens.
  */
 export function generateSlug(displayName: string): string {
 	return (
