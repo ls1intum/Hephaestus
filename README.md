@@ -13,17 +13,19 @@ Hephaestus is an open-source platform for **formative practice analytics** in pr
 
 <img alt="Agile Hephaestus" height="200px" src="./docs/user/img/overview/agile_hephaestus.png">
 
-Hephaestus /hɪˈfɛstəs/ is the Greek god of blacksmiths, craftsmen, and artisans, symbolizing the fusion of creativity and technical skill. Currently deployed for software engineering teams using GitHub, with a domain model designed for cross-domain extension.
+Hephaestus /hɪˈfɛstəs/ is the Greek god of blacksmiths, craftsmen, and artisans, symbolizing the fusion of creativity and technical skill.
+
+> Currently deployed for software engineering teams using GitHub, with a domain model designed for cross-domain extension.
 
 ## How It Works
 
 ```
-Observe  →  Detect  →  Coach  →  Grow
+Observe  →  Detect  →  Guide  →  Grow
 ```
 
 1. **Observe**: Ingest development activity from code platforms (GitHub, GitLab) as an immutable activity event ledger
 2. **Detect**: Identify behavioral practices — both beneficial and detrimental — across four health dimensions
-3. **Coach**: Deliver formative feedback through AI mentoring, practice detection, and gamification
+3. **Guide**: Deliver formative feedback through AI mentoring, practice detection, and gamification
 4. **Grow**: Track participant trajectories to adapt coaching intensity as competence develops
 
 ### Four Health Dimensions
@@ -43,9 +45,9 @@ AI-powered analysis of pull requests that identifies anti-patterns (missing desc
 
 ### AI Mentor (Heph)
 
-A conversational AI mentor grounded in your actual project activity. Heph supports self-regulated learning through structured reflection sessions (goals → strategies → reflection), generates weekly progress summaries, and surfaces relevant pull requests and action items — all driven by real data, not guesswork.
+A conversational AI mentor grounded in your actual project activity. Heph guides structured reflection — goal-setting, progress review, and self-assessment — generates weekly progress summaries, and surfaces relevant pull requests and action items — all driven by real data, not guesswork.
 
-### Gamification
+### Code Review Gamification
 
 Transparent, multi-dimensional engagement through weekly leaderboards, an Elo-like league system for persistent ranking, and 60+ achievements across five categories with progression chains from common to mythic rarity. Automated Slack digests recognize top contributors each week.
 

@@ -108,6 +108,13 @@ classDiagram
         COGNITIVE
     }
 
+    class Valence {
+        <<enumeration>>
+        BENEFICIAL
+        DETRIMENTAL
+        NEUTRAL
+    }
+
     class CAMethod {
         <<enumeration>>
         MODELING
@@ -131,6 +138,7 @@ classDiagram
     Trajectory "*" ..> "1" Participant : belongs to
     Signal --> HealthDimension
     Practice --> HealthDimension
+    Practice --> Valence
     Guidance --> CAMethod
 ```
 
@@ -207,6 +215,7 @@ graph TB
 
     WA -->|REST API| AS
     WA -->|Mentor Chat| IS
+    AS -->|Practice Detection| IS
     AS -->|Queries| DI
     AS -->|Auth| PS
     AS -->|Notifications| PS
@@ -220,16 +229,16 @@ graph TB
 ### Data Flows
 
 1. **Observe**: Code Platform → Webhook Ingest → NATS → Application Server → PostgreSQL
-2. **Interact**: Participant → Web App → Application Server (via Keycloak auth)
-3. **Coach (AI Mentor)**: Participant → Web App → Intelligence Service → LLM Provider
-4. **Detect (Practices)**: Application Server → Intelligence Service → LLM → PostgreSQL
+2. **Detect (Practices)**: Application Server → Intelligence Service → LLM → PostgreSQL
+3. **Guide (AI Mentor)**: Participant → Web App → Intelligence Service → LLM Provider
+4. **Interact**: Participant → Web App → Application Server (via Keycloak auth)
 5. **Notify**: Application Server → Slack / Email
 
 ---
 
 ## Cognitive Apprenticeship Mapping
 
-Hephaestus operationalizes all six methods of **Cognitive Apprenticeship** (Collins, Brown & Newman, 1989). The mapping emerged organically from sound pedagogical intuition and is now made explicit:
+Hephaestus operationalizes the six methods of **Cognitive Apprenticeship** (Collins, Brown & Newman, 1989) plus **Fading** as a meta-principle. The mapping emerged organically from sound pedagogical intuition and is now made explicit:
 
 | CA Method | Definition | Hephaestus Mechanism | Status |
 |-----------|-----------|---------------------|--------|

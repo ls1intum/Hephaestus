@@ -149,16 +149,16 @@ const config: Config = {
       {
         name: 'description',
         content:
-          'Onboard faster and learn better habits with an AI mentor grounded in your repo workflow — from issues to pull requests and team rituals.',
+          'Formative practice analytics for project teams — observe collaboration, detect behavioral patterns, and guide improvement through AI mentoring and gamification.',
       },
-      {name: 'keywords', content: 'Hephaestus, AI mentor, agile coaching, code review gamification, formative assessment, software engineering education, developer onboarding, GitHub analytics, TUM'},
+      {name: 'keywords', content: 'Hephaestus, AI mentor, practice analytics, code review gamification, Cognitive Apprenticeship, formative assessment, software engineering education, practice detection, GitHub analytics, TUM'},
       {name: 'twitter:card', content: 'summary_large_image'},
       {name: 'twitter:site', content: '@ls1intum'},
       {name: 'twitter:title', content: 'Hephaestus Documentation'},
       {
         name: 'twitter:description',
         content:
-          'Onboard faster and learn better habits with an AI mentor grounded in your repo workflow — from issues to pull requests and team rituals.',
+          'Formative practice analytics for project teams — observe collaboration, detect behavioral patterns, and guide improvement through AI mentoring and gamification.',
       },
     ],
     navbar: {
