@@ -43,6 +43,7 @@ export function ConnectGitLabStep() {
 		setFieldErrors({});
 		// Persist trimmed values back to state so downstream steps use normalized data
 		dispatch({ type: "SET_SERVER_URL", value: result.data.serverUrl });
+		dispatch({ type: "SET_PAT", value: result.data.personalAccessToken });
 		// Reset any stale mutation state before firing the new request
 		preflight.reset();
 		preflight.mutate({
