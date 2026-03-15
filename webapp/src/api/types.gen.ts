@@ -1491,7 +1491,9 @@ export type CreateWorkspaceRequest = {
      */
     gitProviderMode?: 'PAT_ORG' | 'GITHUB_APP_INSTALLATION' | 'GITLAB_PAT';
     /**
-     * User ID of the workspace owner. If omitted, the authenticated user becomes the owner.
+     * Deprecated: ignored by the server. The authenticated user always becomes the owner.
+     *
+     * @deprecated
      */
     ownerUserId?: number;
     /**
