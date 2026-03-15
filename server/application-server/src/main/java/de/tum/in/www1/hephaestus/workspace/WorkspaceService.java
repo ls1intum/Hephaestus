@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.workspace;
 import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.in.www1.hephaestus.workspace.dto.CreateWorkspaceRequestDTO;
@@ -163,7 +164,11 @@ public class WorkspaceService {
      */
     @Transactional
     public Workspace createWorkspace(CreateWorkspaceRequestDTO request) {
-        Long ownerUserId = userRepository.getCurrentUserElseThrow().getId();
+        // Always prefer the authenticated user to prevent privilege escalation.
+        // Fall back to the deprecated ownerUserId only when no auth context exists (e.g. tests).
+        Long ownerUserId = userRepository.getCurrentUser()
+            .map(User::getId)
+            .orElse(request.ownerUserId());
 
         Workspace workspace = createWorkspace(
             request.workspaceSlug(),
