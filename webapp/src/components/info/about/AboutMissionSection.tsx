@@ -17,7 +17,7 @@ const FEATURES_DATA: FeatureData[] = [
 		title: "Multi-Channel Guidance",
 		description: "Coaching at the right time, through the right channel",
 		content:
-			"When a practice is detected, guidance reaches the right person through the right channel — AI mentoring, Slack notifications, or achievement unlocks. Humans and AI coding agents get the same coaching, grounded in the same data.",
+			"When a practice is detected, guidance reaches the right person through the right channel — AI mentoring, notifications, or achievement unlocks. All grounded in real project activity, not assumptions.",
 	},
 	{
 		icon: TrendingUp,

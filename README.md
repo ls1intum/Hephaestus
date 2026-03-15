@@ -35,7 +35,7 @@ Observe  →  Detect  →  Guide  →  Grow
 | **Technical** | Code and review quality | Are reviews thorough? Are bad practices declining? |
 | **Process** | Workflow effectiveness | Are PRs timely? Is work-in-progress manageable? |
 | **Social** | Collaboration patterns | Is review load shared? Do people collaborate across teams? |
-| **Cognitive** | Learning and growth | Are contributors reflecting? Are they improving over time? |
+| **Cognitive** | Understanding and growth | Are contributors building understanding — not just shipping faster? |
 
 ## Features
 
@@ -53,7 +53,7 @@ Achievements, leagues, and leaderboards make good practices visible and celebrat
 
 ### Agent Orchestration
 
-Run AI coding agents (Claude Code, Codex, OpenCode) in sandboxed containers with configurable LLM providers, resource limits, and concurrency caps. Agents participate in the same activity stream as human contributors.
+Run AI coding agents (Claude Code, Codex, OpenCode) in sandboxed containers with configurable LLM providers, resource limits, and concurrency caps. Agents participate in the same activity stream as other contributors, receiving project context to produce better artifacts.
 
 ## Domain Model
 

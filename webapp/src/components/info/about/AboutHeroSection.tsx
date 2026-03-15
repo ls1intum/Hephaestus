@@ -11,8 +11,8 @@ export function AboutHeroSection() {
 			</h1>
 			<p className="text-xl text-muted-foreground max-w-2xl mx-auto">
 				Hephaestus helps teams build better practices, not just better code. It watches how you
-				collaborate, spots what's working and what needs attention, and coaches every contributor —
-				human and AI — toward growth.
+				collaborate, spots what's working and what needs attention, and guides every contributor
+				toward growth.
 			</p>
 		</section>
 	);

@@ -30,7 +30,7 @@ const FeatureList: FeatureItem[] = [
     title: 'Multi-Channel Guidance',
     kicker: 'Coaching at the right time, through the right channel',
     description:
-      'When a practice is detected, guidance reaches the right person through the right channel — AI mentoring, Slack notifications, or achievement unlocks. Humans and AI coding agents get the same coaching, grounded in the same data.',
+      'When a practice is detected, guidance reaches the right person through the right channel — AI mentoring, notifications, or achievement unlocks. All grounded in real project activity, not assumptions.',
     bullets: [
       'AI mentor (Heph) helps you reflect on your work and plan next steps',
       'Timely notifications reach you where you work — Slack, email, or in-app',

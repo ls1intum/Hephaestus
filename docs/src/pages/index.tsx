@@ -33,7 +33,7 @@ function HomepageHeader() {
             How You Build Matters
           </Heading>
           <p className={styles.heroSubtitle}>
-            Observe how your team builds. Detect the practices that drive quality. Guide every contributor — human and AI — toward growth.
+            Observe how your team builds. Detect the practices that drive quality. Guide every contributor toward growth.
           </p>
           <div className={styles.heroActions}>
             <Link className="button button--primary button--lg" to="/user/overview">
