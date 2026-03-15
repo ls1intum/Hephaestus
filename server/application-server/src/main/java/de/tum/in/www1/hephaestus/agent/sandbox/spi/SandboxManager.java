@@ -26,39 +26,39 @@ import java.util.UUID;
  * handled by {@code SandboxReconciler}.
  */
 public interface SandboxManager {
-  /**
-   * Execute a sandboxed container and return the result.
-   *
-   * <p>Blocks the calling thread until the container exits, the timeout expires (returns with
-   * {@link SandboxResult#timedOut()} = {@code true}), or an infrastructure error occurs.
-   *
-   * <p>Cleanup runs in a {@code finally} block regardless of outcome. Partial cleanup failures are
-   * logged but do not throw — orphaned resources are handled by periodic reconciliation.
-   *
-   * @param spec the complete sandbox specification
-   * @return the execution result (exit code, output files, logs)
-   * @throws SandboxException if the sandbox infrastructure fails (Docker unreachable, container
-   *     creation error, etc.)
-   * @throws SandboxCancelledException if the job was cancelled via {@link #cancel}
-   */
-  SandboxResult execute(SandboxSpec spec) throws SandboxException;
+    /**
+     * Execute a sandboxed container and return the result.
+     *
+     * <p>Blocks the calling thread until the container exits, the timeout expires (returns with
+     * {@link SandboxResult#timedOut()} = {@code true}), or an infrastructure error occurs.
+     *
+     * <p>Cleanup runs in a {@code finally} block regardless of outcome. Partial cleanup failures are
+     * logged but do not throw — orphaned resources are handled by periodic reconciliation.
+     *
+     * @param spec the complete sandbox specification
+     * @return the execution result (exit code, output files, logs)
+     * @throws SandboxException if the sandbox infrastructure fails (Docker unreachable, container
+     *     creation error, etc.)
+     * @throws SandboxCancelledException if the job was cancelled via {@link #cancel}
+     */
+    SandboxResult execute(SandboxSpec spec) throws SandboxException;
 
-  /**
-   * Request cancellation of a running sandbox.
-   *
-   * <p>If a container for the given job is running, it will be stopped (SIGTERM → grace period →
-   * SIGKILL). The corresponding {@link #execute} call will throw {@link SandboxCancelledException}.
-   *
-   * <p>Safe to call from any thread. No-op if the job is not running.
-   *
-   * @param jobId the job identifier
-   */
-  void cancel(UUID jobId);
+    /**
+     * Request cancellation of a running sandbox.
+     *
+     * <p>If a container for the given job is running, it will be stopped (SIGTERM → grace period →
+     * SIGKILL). The corresponding {@link #execute} call will throw {@link SandboxCancelledException}.
+     *
+     * <p>Safe to call from any thread. No-op if the job is not running.
+     *
+     * @param jobId the job identifier
+     */
+    void cancel(UUID jobId);
 
-  /**
-   * Check if the sandbox infrastructure is available.
-   *
-   * @return {@code true} if the Docker daemon (or remote runner pool) is reachable
-   */
-  boolean isHealthy();
+    /**
+     * Check if the sandbox infrastructure is available.
+     *
+     * @return {@code true} if the Docker daemon (or remote runner pool) is reachable
+     */
+    boolean isHealthy();
 }

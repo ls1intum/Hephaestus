@@ -24,22 +24,24 @@ public record SecurityProfile(
     boolean cgroupnsPrivate,
     String ipcMode,
     List<String> dropCapabilities,
-    Map<String, String> tmpfsMounts) {
-  /** Production defaults: maximum hardening with standard tmpfs layout. */
-  public static final SecurityProfile DEFAULT =
-      new SecurityProfile(
-          null,
-          "sandbox/agent-seccomp-profile.json",
-          true,
-          true,
-          true,
-          "none",
-          List.of("ALL"),
-          Map.of(
-              "/tmp",
-              "rw,noexec,nosuid,nodev,size=1073741824",
-              "/run",
-              "rw,noexec,nosuid,nodev,size=67108864",
-              "/home/agent/.local",
-              "rw,noexec,nosuid,nodev,size=1073741824"));
+    Map<String, String> tmpfsMounts
+) {
+    /** Production defaults: maximum hardening with standard tmpfs layout. */
+    public static final SecurityProfile DEFAULT = new SecurityProfile(
+        null,
+        "sandbox/agent-seccomp-profile.json",
+        true,
+        true,
+        true,
+        "none",
+        List.of("ALL"),
+        Map.of(
+            "/tmp",
+            "rw,noexec,nosuid,nodev,size=1073741824",
+            "/run",
+            "rw,noexec,nosuid,nodev,size=67108864",
+            "/home/agent/.local",
+            "rw,noexec,nosuid,nodev,size=1073741824"
+        )
+    );
 }

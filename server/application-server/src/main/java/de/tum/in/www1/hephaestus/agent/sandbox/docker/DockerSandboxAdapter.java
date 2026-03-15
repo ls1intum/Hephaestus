@@ -43,329 +43,319 @@ import org.slf4j.MDC;
  */
 public class DockerSandboxAdapter implements SandboxManager {
 
-  private static final Logger log = LoggerFactory.getLogger(DockerSandboxAdapter.class);
-  private static final String CONTAINER_USER = "1000:1000";
-  private static final String CONTAINER_HOSTNAME = "agent";
-  private static final String OUTPUT_PATH_DEFAULT = "/workspace/.output";
-  private static final int LOG_TAIL_LINES = 500;
-  private static final String PROXY_URL_PLACEHOLDER = "{appServerIp}";
+    private static final Logger log = LoggerFactory.getLogger(DockerSandboxAdapter.class);
+    private static final String CONTAINER_USER = "1000:1000";
+    private static final String CONTAINER_HOSTNAME = "agent";
+    private static final String OUTPUT_PATH_DEFAULT = "/workspace/.output";
+    private static final int LOG_TAIL_LINES = 500;
+    private static final String PROXY_URL_PLACEHOLDER = "{appServerIp}";
 
-  private static final String MDC_JOB_ID = "sandbox.jobId";
-  private static final String MDC_CONTAINER_ID = "sandbox.containerId";
+    private static final String MDC_JOB_ID = "sandbox.jobId";
+    private static final String MDC_CONTAINER_ID = "sandbox.containerId";
 
-  private final SandboxNetworkManager networkManager;
-  private final SandboxWorkspaceManager workspaceManager;
-  private final SandboxContainerManager containerManager;
-  private final ContainerSecurityPolicy securityPolicy;
-  private final SandboxProperties properties;
+    private final SandboxNetworkManager networkManager;
+    private final SandboxWorkspaceManager workspaceManager;
+    private final SandboxContainerManager containerManager;
+    private final ContainerSecurityPolicy securityPolicy;
+    private final SandboxProperties properties;
 
-  // Metrics
-  private final Counter executionsSuccess;
-  private final Counter executionsFailed;
-  private final Counter executionsTimedOut;
-  private final Counter executionsCancelled;
-  private final MeterRegistry meterRegistry;
-  private final Timer executionDuration;
+    // Metrics
+    private final Counter executionsSuccess;
+    private final Counter executionsFailed;
+    private final Counter executionsTimedOut;
+    private final Counter executionsCancelled;
+    private final MeterRegistry meterRegistry;
+    private final Timer executionDuration;
 
-  /** Active cancellation flags — presence indicates a running job. */
-  private final ConcurrentHashMap<UUID, AtomicBoolean> cancellationFlags =
-      new ConcurrentHashMap<>();
+    /** Active cancellation flags — presence indicates a running job. */
+    private final ConcurrentHashMap<UUID, AtomicBoolean> cancellationFlags = new ConcurrentHashMap<>();
 
-  /** Active container IDs — allows cancel() to stop running containers. */
-  private final ConcurrentHashMap<UUID, String> activeContainers = new ConcurrentHashMap<>();
+    /** Active container IDs — allows cancel() to stop running containers. */
+    private final ConcurrentHashMap<UUID, String> activeContainers = new ConcurrentHashMap<>();
 
-  public DockerSandboxAdapter(
-      SandboxNetworkManager networkManager,
-      SandboxWorkspaceManager workspaceManager,
-      SandboxContainerManager containerManager,
-      ContainerSecurityPolicy securityPolicy,
-      SandboxProperties properties,
-      MeterRegistry meterRegistry) {
-    this.networkManager = networkManager;
-    this.workspaceManager = workspaceManager;
-    this.containerManager = containerManager;
-    this.securityPolicy = securityPolicy;
-    this.properties = properties;
+    public DockerSandboxAdapter(
+        SandboxNetworkManager networkManager,
+        SandboxWorkspaceManager workspaceManager,
+        SandboxContainerManager containerManager,
+        ContainerSecurityPolicy securityPolicy,
+        SandboxProperties properties,
+        MeterRegistry meterRegistry
+    ) {
+        this.networkManager = networkManager;
+        this.workspaceManager = workspaceManager;
+        this.containerManager = containerManager;
+        this.securityPolicy = securityPolicy;
+        this.properties = properties;
 
-    this.executionsSuccess =
-        Counter.builder("sandbox.executions")
+        this.executionsSuccess = Counter.builder("sandbox.executions")
             .tag("outcome", "success")
             .description("Successful sandbox executions")
             .register(meterRegistry);
-    this.executionsFailed =
-        Counter.builder("sandbox.executions")
+        this.executionsFailed = Counter.builder("sandbox.executions")
             .tag("outcome", "failure")
             .description("Failed sandbox executions")
             .register(meterRegistry);
-    this.executionsTimedOut =
-        Counter.builder("sandbox.executions")
+        this.executionsTimedOut = Counter.builder("sandbox.executions")
             .tag("outcome", "timeout")
             .description("Timed-out sandbox executions")
             .register(meterRegistry);
-    this.executionsCancelled =
-        Counter.builder("sandbox.executions")
+        this.executionsCancelled = Counter.builder("sandbox.executions")
             .tag("outcome", "cancelled")
             .description("Cancelled sandbox executions")
             .register(meterRegistry);
-    this.meterRegistry = meterRegistry;
-    this.executionDuration =
-        Timer.builder("sandbox.execution.duration")
+        this.meterRegistry = meterRegistry;
+        this.executionDuration = Timer.builder("sandbox.execution.duration")
             .description("Duration of sandbox executions")
             .register(meterRegistry);
 
-    // Gauge for active containers
-    meterRegistry.gaugeMapSize("sandbox.containers.active", Tags.empty(), this.activeContainers);
-  }
-
-  @Override
-  public SandboxResult execute(SandboxSpec spec) throws SandboxException {
-    UUID jobId = spec.jobId();
-    AtomicBoolean cancelled = new AtomicBoolean(false);
-    if (cancellationFlags.putIfAbsent(jobId, cancelled) != null) {
-      throw new SandboxException("Job already executing: " + jobId);
+        // Gauge for active containers
+        meterRegistry.gaugeMapSize("sandbox.containers.active", Tags.empty(), this.activeContainers);
     }
 
-    String networkId = null;
-    String containerId = null;
-    Instant startTime = Instant.now();
-
-    MDC.put(MDC_JOB_ID, jobId.toString());
-
-    log.info("Starting sandbox execution: image={}", spec.image());
-
-    try {
-      // ── PHASE 1: PREPARE ──
-      checkCancelled(cancelled, jobId);
-
-      // Create isolated network
-      boolean allowInternet = spec.networkPolicy() != null && spec.networkPolicy().internetAccess();
-      networkId = networkManager.createJobNetwork(jobId, allowInternet);
-
-      // Connect app-server to the job network (multi-homing) and get its IP
-      String appServerIp = networkManager.connectAppServer(networkId);
-
-      checkCancelled(cancelled, jobId);
-
-      // Build environment with LLM proxy URL
-      Map<String, String> environment = buildEnvironment(spec, appServerIp);
-
-      // Build container spec with security hardening
-      var secProfile =
-          spec.securityProfile() != null ? spec.securityProfile() : SecurityProfile.DEFAULT;
-      DockerOperations.HostConfigSpec hostConfig =
-          securityPolicy.buildHostConfig(secProfile, spec.resourceLimits(), spec.networkPolicy());
-      Map<String, String> labels = securityPolicy.buildLabels(jobId);
-
-      DockerOperations.ContainerSpec containerSpec =
-          new DockerOperations.ContainerSpec(
-              spec.image(),
-              spec.command(),
-              environment,
-              networkId,
-              CONTAINER_HOSTNAME,
-              CONTAINER_USER,
-              labels,
-              hostConfig);
-
-      containerId = containerManager.createContainer(containerSpec);
-      activeContainers.put(jobId, containerId);
-      MDC.put(MDC_CONTAINER_ID, containerId);
-      log.info("Container created: containerId={}", containerId);
-
-      // Check cancellation immediately after container registration —
-      // if cancel() was called during createContainer(), the flag is set
-      // but the container wasn't in activeContainers yet so cancel couldn't
-      // stop it. Now we catch it before doing unnecessary file injection.
-      checkCancelled(cancelled, jobId);
-
-      // Inject input files via docker cp
-      if (spec.inputFiles() != null && !spec.inputFiles().isEmpty()) {
-        workspaceManager.injectFiles(containerId, spec.inputFiles());
-        log.debug("Injected {} input files", spec.inputFiles().size());
-      }
-
-      // ── PHASE 2: EXECUTE ──
-      containerManager.startContainer(containerId);
-      log.info("Container started");
-
-      Duration timeout = spec.resourceLimits().maxRuntime();
-      SandboxContainerManager.WaitOutcome waitOutcome =
-          containerManager.waitForCompletion(containerId, timeout);
-
-      // Check cancellation after wait — cancel() stops the container, so
-      // waitForCompletion returns with exit code 137. Without this check,
-      // the caller would see a normal result instead of SandboxCancelledException.
-      checkCancelled(cancelled, jobId);
-
-      // ── PHASE 3: COLLECT ──
-      // Collect output regardless of exit code or timeout — agent may have written partial results
-      String outputPath = spec.outputPath() != null ? spec.outputPath() : OUTPUT_PATH_DEFAULT;
-      Map<String, byte[]> outputFiles = workspaceManager.collectOutput(containerId, outputPath);
-
-      // Capture logs before cleanup
-      String logs = containerManager.getLogs(containerId, LOG_TAIL_LINES);
-
-      if (waitOutcome.timedOut()) {
-        executionsTimedOut.increment();
-      } else {
-        executionsSuccess.increment();
-      }
-
-      Duration duration = Duration.between(startTime, Instant.now());
-      log.info(
-          "Sandbox execution complete: exitCode={}, timedOut={}, outputFiles={}, duration={}",
-          waitOutcome.exitCode(),
-          waitOutcome.timedOut(),
-          outputFiles.size(),
-          duration);
-
-      return new SandboxResult(
-          waitOutcome.exitCode(), outputFiles, logs, waitOutcome.timedOut(), duration);
-    } catch (SandboxCancelledException e) {
-      executionsCancelled.increment();
-      log.info("Sandbox execution cancelled");
-      throw e;
-    } catch (SandboxException e) {
-      executionsFailed.increment();
-      captureLogsOnError(containerId);
-      log.error("Sandbox execution failed: error={}", e.getMessage(), e);
-      throw e;
-    } catch (Exception e) {
-      executionsFailed.increment();
-      captureLogsOnError(containerId);
-      log.error("Unexpected error during sandbox execution", e);
-      throw new SandboxException("Sandbox execution failed for job: " + jobId, e);
-    } finally {
-      // ── PHASE 4: CLEANUP ──
-      executionDuration.record(Duration.between(startTime, Instant.now()));
-      cleanup(jobId, containerId, networkId);
-      activeContainers.remove(jobId);
-      cancellationFlags.remove(jobId);
-      MDC.remove(MDC_JOB_ID);
-      MDC.remove(MDC_CONTAINER_ID);
-    }
-  }
-
-  @Override
-  public void cancel(UUID jobId) {
-    AtomicBoolean flag = cancellationFlags.get(jobId);
-    if (flag != null) {
-      flag.set(true);
-      log.info("Cancellation requested: jobId={}", jobId);
-
-      // Stop the running container so waitForCompletion returns immediately.
-      // Use computeIfPresent to atomically read the containerId only if
-      // the job is still active (avoids race with cleanup removing the entry).
-      activeContainers.computeIfPresent(
-          jobId,
-          (id, containerId) -> {
-            try {
-              containerManager.stopContainer(containerId);
-            } catch (Exception e) {
-              log.warn(
-                  "Failed to stop container for cancelled job: jobId={}, error={}",
-                  jobId,
-                  e.getMessage());
-            }
-            return containerId;
-          });
-    } else {
-      log.debug("Cancel called for unknown/completed job: jobId={}", jobId);
-    }
-  }
-
-  @Override
-  public boolean isHealthy() {
-    return containerManager.ping();
-  }
-
-  // -------------------------------------------------------------------------
-  // Internal helpers
-  // -------------------------------------------------------------------------
-
-  private Map<String, String> buildEnvironment(SandboxSpec spec, String appServerIp) {
-    Map<String, String> env = new HashMap<>();
-
-    // Copy user-provided environment
-    if (spec.environment() != null) {
-      env.putAll(spec.environment());
-    }
-
-    // Inject LLM proxy configuration
-    if (spec.networkPolicy() != null) {
-      if (spec.networkPolicy().llmProxyUrl() != null) {
-        // Resolve template placeholder or use as-is
-        String proxyUrl = spec.networkPolicy().llmProxyUrl();
-        if (proxyUrl.contains(PROXY_URL_PLACEHOLDER) && appServerIp != null) {
-          proxyUrl = proxyUrl.replace(PROXY_URL_PLACEHOLDER, appServerIp);
+    @Override
+    public SandboxResult execute(SandboxSpec spec) throws SandboxException {
+        UUID jobId = spec.jobId();
+        AtomicBoolean cancelled = new AtomicBoolean(false);
+        if (cancellationFlags.putIfAbsent(jobId, cancelled) != null) {
+            throw new SandboxException("Job already executing: " + jobId);
         }
-        env.put("LLM_PROXY_URL", proxyUrl);
-      } else if (appServerIp != null) {
-        env.put("LLM_PROXY_URL", "http://" + appServerIp + ":" + properties.llmProxyPort());
-      }
 
-      if (spec.networkPolicy().llmProxyToken() != null) {
-        env.put("LLM_PROXY_TOKEN", spec.networkPolicy().llmProxyToken());
-      }
+        String networkId = null;
+        String containerId = null;
+        Instant startTime = Instant.now();
+
+        MDC.put(MDC_JOB_ID, jobId.toString());
+
+        log.info("Starting sandbox execution: image={}", spec.image());
+
+        try {
+            // ── PHASE 1: PREPARE ──
+            checkCancelled(cancelled, jobId);
+
+            // Create isolated network
+            boolean allowInternet = spec.networkPolicy() != null && spec.networkPolicy().internetAccess();
+            networkId = networkManager.createJobNetwork(jobId, allowInternet);
+
+            // Connect app-server to the job network (multi-homing) and get its IP
+            String appServerIp = networkManager.connectAppServer(networkId);
+
+            checkCancelled(cancelled, jobId);
+
+            // Build environment with LLM proxy URL
+            Map<String, String> environment = buildEnvironment(spec, appServerIp);
+
+            // Build container spec with security hardening
+            var secProfile = spec.securityProfile() != null ? spec.securityProfile() : SecurityProfile.DEFAULT;
+            DockerOperations.HostConfigSpec hostConfig = securityPolicy.buildHostConfig(
+                secProfile,
+                spec.resourceLimits(),
+                spec.networkPolicy()
+            );
+            Map<String, String> labels = securityPolicy.buildLabels(jobId);
+
+            DockerOperations.ContainerSpec containerSpec = new DockerOperations.ContainerSpec(
+                spec.image(),
+                spec.command(),
+                environment,
+                networkId,
+                CONTAINER_HOSTNAME,
+                CONTAINER_USER,
+                labels,
+                hostConfig
+            );
+
+            containerId = containerManager.createContainer(containerSpec);
+            activeContainers.put(jobId, containerId);
+            MDC.put(MDC_CONTAINER_ID, containerId);
+            log.info("Container created: containerId={}", containerId);
+
+            // Check cancellation immediately after container registration —
+            // if cancel() was called during createContainer(), the flag is set
+            // but the container wasn't in activeContainers yet so cancel couldn't
+            // stop it. Now we catch it before doing unnecessary file injection.
+            checkCancelled(cancelled, jobId);
+
+            // Inject input files via docker cp
+            if (spec.inputFiles() != null && !spec.inputFiles().isEmpty()) {
+                workspaceManager.injectFiles(containerId, spec.inputFiles());
+                log.debug("Injected {} input files", spec.inputFiles().size());
+            }
+
+            // ── PHASE 2: EXECUTE ──
+            containerManager.startContainer(containerId);
+            log.info("Container started");
+
+            Duration timeout = spec.resourceLimits().maxRuntime();
+            SandboxContainerManager.WaitOutcome waitOutcome = containerManager.waitForCompletion(containerId, timeout);
+
+            // Check cancellation after wait — cancel() stops the container, so
+            // waitForCompletion returns with exit code 137. Without this check,
+            // the caller would see a normal result instead of SandboxCancelledException.
+            checkCancelled(cancelled, jobId);
+
+            // ── PHASE 3: COLLECT ──
+            // Collect output regardless of exit code or timeout — agent may have written partial results
+            String outputPath = spec.outputPath() != null ? spec.outputPath() : OUTPUT_PATH_DEFAULT;
+            Map<String, byte[]> outputFiles = workspaceManager.collectOutput(containerId, outputPath);
+
+            // Capture logs before cleanup
+            String logs = containerManager.getLogs(containerId, LOG_TAIL_LINES);
+
+            if (waitOutcome.timedOut()) {
+                executionsTimedOut.increment();
+            } else {
+                executionsSuccess.increment();
+            }
+
+            Duration duration = Duration.between(startTime, Instant.now());
+            log.info(
+                "Sandbox execution complete: exitCode={}, timedOut={}, outputFiles={}, duration={}",
+                waitOutcome.exitCode(),
+                waitOutcome.timedOut(),
+                outputFiles.size(),
+                duration
+            );
+
+            return new SandboxResult(waitOutcome.exitCode(), outputFiles, logs, waitOutcome.timedOut(), duration);
+        } catch (SandboxCancelledException e) {
+            executionsCancelled.increment();
+            log.info("Sandbox execution cancelled");
+            throw e;
+        } catch (SandboxException e) {
+            executionsFailed.increment();
+            captureLogsOnError(containerId);
+            log.error("Sandbox execution failed: error={}", e.getMessage(), e);
+            throw e;
+        } catch (Exception e) {
+            executionsFailed.increment();
+            captureLogsOnError(containerId);
+            log.error("Unexpected error during sandbox execution", e);
+            throw new SandboxException("Sandbox execution failed for job: " + jobId, e);
+        } finally {
+            // ── PHASE 4: CLEANUP ──
+            executionDuration.record(Duration.between(startTime, Instant.now()));
+            cleanup(jobId, containerId, networkId);
+            activeContainers.remove(jobId);
+            cancellationFlags.remove(jobId);
+            MDC.remove(MDC_JOB_ID);
+            MDC.remove(MDC_CONTAINER_ID);
+        }
     }
 
-    return env;
-  }
+    @Override
+    public void cancel(UUID jobId) {
+        AtomicBoolean flag = cancellationFlags.get(jobId);
+        if (flag != null) {
+            flag.set(true);
+            log.info("Cancellation requested: jobId={}", jobId);
 
-  /**
-   * Best-effort log capture on error paths — container is about to be removed by cleanup, so grab
-   * logs while we can. Logs are emitted at WARN for post-mortem debugging.
-   */
-  private void captureLogsOnError(String containerId) {
-    if (containerId == null) {
-      return;
-    }
-    try {
-      String logs = containerManager.getLogs(containerId, LOG_TAIL_LINES);
-      if (logs != null && !logs.isEmpty()) {
-        log.warn("Container logs before cleanup:\n{}", logs);
-      }
-    } catch (Exception e) {
-      log.debug("Could not capture container logs on error path: {}", e.getMessage());
-    }
-  }
-
-  private void checkCancelled(AtomicBoolean flag, UUID jobId) {
-    if (flag.get()) {
-      throw new SandboxCancelledException("Job cancelled: " + jobId);
-    }
-  }
-
-  /**
-   * Best-effort cleanup of all resources. Each step is independent — failures are logged but don't
-   * prevent other cleanup steps.
-   */
-  private void cleanup(UUID jobId, String containerId, String networkId) {
-    // 1. Remove container
-    if (containerId != null) {
-      suppressAndLog("remove container", jobId, () -> containerManager.forceRemove(containerId));
+            // Stop the running container so waitForCompletion returns immediately.
+            // Use computeIfPresent to atomically read the containerId only if
+            // the job is still active (avoids race with cleanup removing the entry).
+            activeContainers.computeIfPresent(jobId, (id, containerId) -> {
+                try {
+                    containerManager.stopContainer(containerId);
+                } catch (Exception e) {
+                    log.warn("Failed to stop container for cancelled job: jobId={}, error={}", jobId, e.getMessage());
+                }
+                return containerId;
+            });
+        } else {
+            log.debug("Cancel called for unknown/completed job: jobId={}", jobId);
+        }
     }
 
-    // 2. Disconnect app-server from job network
-    if (networkId != null) {
-      suppressAndLog(
-          "disconnect app-server", jobId, () -> networkManager.disconnectAppServer(networkId));
+    @Override
+    public boolean isHealthy() {
+        return containerManager.ping();
     }
 
-    // 3. Remove job network
-    if (networkId != null) {
-      suppressAndLog("remove network", jobId, () -> networkManager.removeNetwork(networkId));
+    // -------------------------------------------------------------------------
+    // Internal helpers
+    // -------------------------------------------------------------------------
+
+    private Map<String, String> buildEnvironment(SandboxSpec spec, String appServerIp) {
+        Map<String, String> env = new HashMap<>();
+
+        // Copy user-provided environment
+        if (spec.environment() != null) {
+            env.putAll(spec.environment());
+        }
+
+        // Inject LLM proxy configuration
+        if (spec.networkPolicy() != null) {
+            if (spec.networkPolicy().llmProxyUrl() != null) {
+                // Resolve template placeholder or use as-is
+                String proxyUrl = spec.networkPolicy().llmProxyUrl();
+                if (proxyUrl.contains(PROXY_URL_PLACEHOLDER) && appServerIp != null) {
+                    proxyUrl = proxyUrl.replace(PROXY_URL_PLACEHOLDER, appServerIp);
+                }
+                env.put("LLM_PROXY_URL", proxyUrl);
+            } else if (appServerIp != null) {
+                env.put("LLM_PROXY_URL", "http://" + appServerIp + ":" + properties.llmProxyPort());
+            }
+
+            if (spec.networkPolicy().llmProxyToken() != null) {
+                env.put("LLM_PROXY_TOKEN", spec.networkPolicy().llmProxyToken());
+            }
+        }
+
+        return env;
     }
 
-    log.debug("Cleanup complete: jobId={}", jobId);
-  }
-
-  private void suppressAndLog(String operation, UUID jobId, Runnable action) {
-    try {
-      action.run();
-    } catch (Exception e) {
-      meterRegistry.counter("sandbox.cleanup.failures", "step", operation).increment();
-      log.warn("Cleanup failed ({}): jobId={}, error={}", operation, jobId, e.getMessage());
+    /**
+     * Best-effort log capture on error paths — container is about to be removed by cleanup, so grab
+     * logs while we can. Logs are emitted at WARN for post-mortem debugging.
+     */
+    private void captureLogsOnError(String containerId) {
+        if (containerId == null) {
+            return;
+        }
+        try {
+            String logs = containerManager.getLogs(containerId, LOG_TAIL_LINES);
+            if (logs != null && !logs.isEmpty()) {
+                log.warn("Container logs before cleanup:\n{}", logs);
+            }
+        } catch (Exception e) {
+            log.debug("Could not capture container logs on error path: {}", e.getMessage());
+        }
     }
-  }
+
+    private void checkCancelled(AtomicBoolean flag, UUID jobId) {
+        if (flag.get()) {
+            throw new SandboxCancelledException("Job cancelled: " + jobId);
+        }
+    }
+
+    /**
+     * Best-effort cleanup of all resources. Each step is independent — failures are logged but don't
+     * prevent other cleanup steps.
+     */
+    private void cleanup(UUID jobId, String containerId, String networkId) {
+        // 1. Remove container
+        if (containerId != null) {
+            suppressAndLog("remove container", jobId, () -> containerManager.forceRemove(containerId));
+        }
+
+        // 2. Disconnect app-server from job network
+        if (networkId != null) {
+            suppressAndLog("disconnect app-server", jobId, () -> networkManager.disconnectAppServer(networkId));
+        }
+
+        // 3. Remove job network
+        if (networkId != null) {
+            suppressAndLog("remove network", jobId, () -> networkManager.removeNetwork(networkId));
+        }
+
+        log.debug("Cleanup complete: jobId={}", jobId);
+    }
+
+    private void suppressAndLog(String operation, UUID jobId, Runnable action) {
+        try {
+            action.run();
+        } catch (Exception e) {
+            meterRegistry.counter("sandbox.cleanup.failures", "step", operation).increment();
+            log.warn("Cleanup failed ({}): jobId={}, error={}", operation, jobId, e.getMessage());
+        }
+    }
 }

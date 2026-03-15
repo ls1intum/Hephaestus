@@ -16,51 +16,62 @@ import org.springframework.boot.actuate.health.Status;
 @DisplayName("DockerHealthIndicator")
 class DockerHealthIndicatorTest extends BaseUnitTest {
 
-  @Mock private SandboxContainerManager containerManager;
+    @Mock
+    private SandboxContainerManager containerManager;
 
-  private DockerHealthIndicator indicator;
+    private DockerHealthIndicator indicator;
 
-  @BeforeEach
-  void setUp() {
-    SandboxProperties properties =
-        new SandboxProperties(
-            true, "unix:///var/run/docker.sock", false, null, 5, 10, 60, null, 8080, null, null);
-    indicator = new DockerHealthIndicator(containerManager, properties);
-  }
+    @BeforeEach
+    void setUp() {
+        SandboxProperties properties = new SandboxProperties(
+            true,
+            "unix:///var/run/docker.sock",
+            false,
+            null,
+            5,
+            10,
+            60,
+            null,
+            8080,
+            null,
+            null
+        );
+        indicator = new DockerHealthIndicator(containerManager, properties);
+    }
 
-  @Test
-  @DisplayName("should report UP when Docker daemon is reachable")
-  void shouldReportUpWhenReachable() {
-    when(containerManager.ping()).thenReturn(true);
-    when(containerManager.listManagedContainers()).thenReturn(List.of());
+    @Test
+    @DisplayName("should report UP when Docker daemon is reachable")
+    void shouldReportUpWhenReachable() {
+        when(containerManager.ping()).thenReturn(true);
+        when(containerManager.listManagedContainers()).thenReturn(List.of());
 
-    Health health = indicator.health();
+        Health health = indicator.health();
 
-    assertThat(health.getStatus()).isEqualTo(Status.UP);
-    assertThat(health.getDetails()).containsKey("dockerHost");
-    assertThat(health.getDetails()).containsEntry("activeContainers", 0);
-    assertThat(health.getDetails()).containsEntry("maxConcurrentContainers", 5);
-  }
+        assertThat(health.getStatus()).isEqualTo(Status.UP);
+        assertThat(health.getDetails()).containsKey("dockerHost");
+        assertThat(health.getDetails()).containsEntry("activeContainers", 0);
+        assertThat(health.getDetails()).containsEntry("maxConcurrentContainers", 5);
+    }
 
-  @Test
-  @DisplayName("should report DOWN when Docker daemon is unreachable")
-  void shouldReportDownWhenUnreachable() {
-    when(containerManager.ping()).thenReturn(false);
+    @Test
+    @DisplayName("should report DOWN when Docker daemon is unreachable")
+    void shouldReportDownWhenUnreachable() {
+        when(containerManager.ping()).thenReturn(false);
 
-    Health health = indicator.health();
+        Health health = indicator.health();
 
-    assertThat(health.getStatus()).isEqualTo(Status.DOWN);
-    assertThat(health.getDetails()).containsEntry("error", "Docker daemon not reachable");
-  }
+        assertThat(health.getStatus()).isEqualTo(Status.DOWN);
+        assertThat(health.getDetails()).containsEntry("error", "Docker daemon not reachable");
+    }
 
-  @Test
-  @DisplayName("should report DOWN with error details on exception")
-  void shouldReportDownOnException() {
-    when(containerManager.ping()).thenThrow(new RuntimeException("Connection refused"));
+    @Test
+    @DisplayName("should report DOWN with error details on exception")
+    void shouldReportDownOnException() {
+        when(containerManager.ping()).thenThrow(new RuntimeException("Connection refused"));
 
-    Health health = indicator.health();
+        Health health = indicator.health();
 
-    assertThat(health.getStatus()).isEqualTo(Status.DOWN);
-    assertThat(health.getDetails()).containsEntry("error", "Connection refused");
-  }
+        assertThat(health.getStatus()).isEqualTo(Status.DOWN);
+        assertThat(health.getDetails()).containsEntry("error", "Connection refused");
+    }
 }

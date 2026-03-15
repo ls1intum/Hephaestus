@@ -13,37 +13,36 @@ import org.springframework.boot.actuate.health.HealthIndicator;
  */
 public class DockerHealthIndicator implements HealthIndicator {
 
-  private final SandboxContainerManager containerManager;
-  private final SandboxProperties properties;
+    private final SandboxContainerManager containerManager;
+    private final SandboxProperties properties;
 
-  public DockerHealthIndicator(
-      SandboxContainerManager containerManager, SandboxProperties properties) {
-    this.containerManager = containerManager;
-    this.properties = properties;
-  }
-
-  @Override
-  public Health health() {
-    try {
-      boolean reachable = containerManager.ping();
-      if (reachable) {
-        int activeContainers = containerManager.listManagedContainers().size();
-        return Health.up()
-            .withDetail("dockerHost", properties.dockerHost())
-            .withDetail("activeContainers", activeContainers)
-            .withDetail("maxConcurrentContainers", properties.maxConcurrentContainers())
-            .build();
-      } else {
-        return Health.down()
-            .withDetail("dockerHost", properties.dockerHost())
-            .withDetail("error", "Docker daemon not reachable")
-            .build();
-      }
-    } catch (Exception e) {
-      return Health.down()
-          .withDetail("dockerHost", properties.dockerHost())
-          .withDetail("error", e.getMessage())
-          .build();
+    public DockerHealthIndicator(SandboxContainerManager containerManager, SandboxProperties properties) {
+        this.containerManager = containerManager;
+        this.properties = properties;
     }
-  }
+
+    @Override
+    public Health health() {
+        try {
+            boolean reachable = containerManager.ping();
+            if (reachable) {
+                int activeContainers = containerManager.listManagedContainers().size();
+                return Health.up()
+                    .withDetail("dockerHost", properties.dockerHost())
+                    .withDetail("activeContainers", activeContainers)
+                    .withDetail("maxConcurrentContainers", properties.maxConcurrentContainers())
+                    .build();
+            } else {
+                return Health.down()
+                    .withDetail("dockerHost", properties.dockerHost())
+                    .withDetail("error", "Docker daemon not reachable")
+                    .build();
+            }
+        } catch (Exception e) {
+            return Health.down()
+                .withDetail("dockerHost", properties.dockerHost())
+                .withDetail("error", e.getMessage())
+                .build();
+        }
+    }
 }

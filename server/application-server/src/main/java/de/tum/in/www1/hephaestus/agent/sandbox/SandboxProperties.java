@@ -55,37 +55,39 @@ public record SandboxProperties(
     @Nullable String containerRuntime,
     @DefaultValue("8080") int llmProxyPort,
     @Nullable String appServerContainerId,
-    @Valid DefaultResourceLimits defaultResourceLimits) {
-  public SandboxProperties {
-    if (defaultResourceLimits == null) {
-      defaultResourceLimits = new DefaultResourceLimits(4L * 1024 * 1024 * 1024, 2.0, 256);
+    @Valid DefaultResourceLimits defaultResourceLimits
+) {
+    public SandboxProperties {
+        if (defaultResourceLimits == null) {
+            defaultResourceLimits = new DefaultResourceLimits(4L * 1024 * 1024 * 1024, 2.0, 256);
+        }
     }
-  }
 
-  /**
-   * Returns the configured app-server container ID, or null if not explicitly set.
-   *
-   * <p>When null, the caller should fall back to the {@code HOSTNAME} environment variable, which
-   * Docker sets to the container's short ID by default.
-   *
-   * @return the container ID, or null if auto-detection is needed
-   */
-  public String resolvedAppServerContainerId() {
-    if (appServerContainerId != null && !appServerContainerId.isBlank()) {
-      return appServerContainerId;
+    /**
+     * Returns the configured app-server container ID, or null if not explicitly set.
+     *
+     * <p>When null, the caller should fall back to the {@code HOSTNAME} environment variable, which
+     * Docker sets to the container's short ID by default.
+     *
+     * @return the container ID, or null if auto-detection is needed
+     */
+    public String resolvedAppServerContainerId() {
+        if (appServerContainerId != null && !appServerContainerId.isBlank()) {
+            return appServerContainerId;
+        }
+        return null;
     }
-    return null;
-  }
 
-  /**
-   * Default resource limits for agent containers.
-   *
-   * @param memoryBytes maximum memory in bytes (includes tmpfs)
-   * @param cpus CPU limit
-   * @param pidsLimit maximum process count
-   */
-  public record DefaultResourceLimits(
-      @DefaultValue("4294967296") long memoryBytes,
-      @DefaultValue("2.0") double cpus,
-      @DefaultValue("256") int pidsLimit) {}
+    /**
+     * Default resource limits for agent containers.
+     *
+     * @param memoryBytes maximum memory in bytes (includes tmpfs)
+     * @param cpus CPU limit
+     * @param pidsLimit maximum process count
+     */
+    public record DefaultResourceLimits(
+        @DefaultValue("4294967296") long memoryBytes,
+        @DefaultValue("2.0") double cpus,
+        @DefaultValue("256") int pidsLimit
+    ) {}
 }

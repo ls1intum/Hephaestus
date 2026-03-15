@@ -35,13 +35,14 @@ public record SandboxSpec(
     ResourceLimits resourceLimits,
     SecurityProfile securityProfile,
     Map<String, byte[]> inputFiles,
-    String outputPath) {
-  public SandboxSpec {
-    Objects.requireNonNull(jobId, "jobId must not be null");
-    Objects.requireNonNull(image, "image must not be null");
-    Objects.requireNonNull(resourceLimits, "resourceLimits must not be null");
-    if (image.isBlank()) {
-      throw new IllegalArgumentException("image must not be blank");
+    String outputPath
+) {
+    public SandboxSpec {
+        Objects.requireNonNull(jobId, "jobId must not be null");
+        Objects.requireNonNull(image, "image must not be null");
+        Objects.requireNonNull(resourceLimits, "resourceLimits must not be null");
+        if (image.isBlank()) {
+            throw new IllegalArgumentException("image must not be blank");
+        }
     }
-  }
 }

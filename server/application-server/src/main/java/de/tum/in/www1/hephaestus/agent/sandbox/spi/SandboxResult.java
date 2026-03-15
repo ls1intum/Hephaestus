@@ -18,4 +18,5 @@ public record SandboxResult(
     Map<String, byte[]> outputFiles,
     String logs,
     boolean timedOut,
-    Duration duration) {}
+    Duration duration
+) {}

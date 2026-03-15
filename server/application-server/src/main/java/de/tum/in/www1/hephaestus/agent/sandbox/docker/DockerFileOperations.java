@@ -9,21 +9,21 @@ import java.io.InputStream;
  * output.
  */
 interface DockerFileOperations {
-  /**
-   * Copy a tar archive into a container.
-   *
-   * @param containerId the target container
-   * @param remotePath destination path inside the container
-   * @param tarStream the tar archive input stream (caller closes)
-   */
-  void copyArchiveToContainer(String containerId, String remotePath, InputStream tarStream);
+    /**
+     * Copy a tar archive into a container.
+     *
+     * @param containerId the target container
+     * @param remotePath destination path inside the container
+     * @param tarStream the tar archive input stream (caller closes)
+     */
+    void copyArchiveToContainer(String containerId, String remotePath, InputStream tarStream);
 
-  /**
-   * Copy files from a container as a tar archive.
-   *
-   * @param containerId the source container
-   * @param remotePath path inside the container to copy
-   * @return tar archive input stream (caller must close)
-   */
-  InputStream copyArchiveFromContainer(String containerId, String remotePath);
+    /**
+     * Copy files from a container as a tar archive.
+     *
+     * @param containerId the source container
+     * @param remotePath path inside the container to copy
+     * @return tar archive input stream (caller must close)
+     */
+    InputStream copyArchiveFromContainer(String containerId, String remotePath);
 }

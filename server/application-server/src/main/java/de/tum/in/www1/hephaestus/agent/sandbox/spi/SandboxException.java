@@ -8,11 +8,11 @@ package de.tum.in.www1.hephaestus.agent.sandbox.spi;
  */
 public class SandboxException extends RuntimeException {
 
-  public SandboxException(String message) {
-    super(message);
-  }
+    public SandboxException(String message) {
+        super(message);
+    }
 
-  public SandboxException(String message, Throwable cause) {
-    super(message, cause);
-  }
+    public SandboxException(String message, Throwable cause) {
+        super(message, cause);
+    }
 }
