@@ -85,6 +85,7 @@ function GitLabWizardPage() {
 	const canAdvanceFromStep1 = state.preflightResult?.valid === true;
 	const canAdvanceFromStep2 = state.selectedGroup !== null;
 	const canSubmit =
+		state.step === 3 &&
 		state.selectedGroup !== null &&
 		workspaceDetailsSchema.safeParse({
 			displayName: state.displayName,
@@ -123,6 +124,8 @@ function GitLabWizardPage() {
 
 	const handleBack = () => {
 		const prevStep = state.step - 1;
+		// Reset stale mutation state so old errors don't persist after back-navigation
+		if (state.step === 2) listGroups.reset();
 		dispatch({ type: "GO_BACK" });
 		if (prevStep >= 1) announceStep(prevStep);
 	};

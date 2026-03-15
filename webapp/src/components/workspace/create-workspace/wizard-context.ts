@@ -1,5 +1,6 @@
 import { createContext, useContext } from "react";
 import type { GitLabGroup, GitLabPreflightResponse } from "@/api/types.gen";
+import { generateSlug } from "./slug-utils";
 
 export type WizardStep = 1 | 2 | 3;
 
@@ -60,9 +61,17 @@ export function wizardReducer(state: WizardState, action: WizardAction): WizardS
 			return { ...state, step: 2, groups: action.groups };
 		case "SELECT_GROUP":
 			return { ...state, selectedGroup: action.group };
-		case "ADVANCE_TO_CONFIGURE":
+		case "ADVANCE_TO_CONFIGURE": {
 			if (state.step !== 2 || !state.selectedGroup) return state;
-			return { ...state, step: 3 };
+			// Auto-populate display name and slug from group name on first entry
+			const name = state.selectedGroup.name;
+			return {
+				...state,
+				step: 3,
+				displayName: state.displayName || name,
+				workspaceSlug: state.workspaceSlug || generateSlug(name),
+			};
+		}
 		case "SET_DISPLAY_NAME":
 			return { ...state, displayName: action.value };
 		case "SET_SLUG":
