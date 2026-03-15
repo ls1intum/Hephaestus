@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.agent.job;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -26,4 +27,8 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
     );
 
     long countByConfigIdAndStatusIn(Long configId, Collection<AgentJobStatus> statuses);
+
+    List<AgentJob> findByStatus(AgentJobStatus status);
+
+    List<AgentJob> findByStatusIn(Collection<AgentJobStatus> statuses);
 }
