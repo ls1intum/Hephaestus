@@ -47,7 +47,12 @@ function GitLabWizardPage() {
 	const [announcement, setAnnouncement] = useState("");
 
 	const submittingRef = useRef(false);
-	const listGroups = useMutation({ ...listGitLabGroupsMutation() });
+	const listGroups = useMutation({
+		...listGitLabGroupsMutation(),
+		onError: (error) => {
+			console.error("Failed to load GitLab groups:", { serverUrl: state.serverUrl }, error);
+		},
+	});
 
 	const createWorkspace = useMutation({
 		...createWorkspaceMutation(),
@@ -60,7 +65,11 @@ function GitLabWizardPage() {
 			});
 		},
 		onError: (error) => {
-			console.error("Failed to create workspace:", error);
+			console.error(
+				"Workspace creation failed:",
+				{ step: state.step, serverUrl: state.serverUrl },
+				error,
+			);
 			const message =
 				typeof error === "object" && error !== null && "error" in error
 					? (error as { error: string }).error
@@ -182,7 +191,7 @@ function GitLabWizardPage() {
 					<OctagonXIcon />
 					<AlertTitle>Failed to load groups</AlertTitle>
 					<AlertDescription>
-						Could not fetch accessible groups. Your token may lack the required scopes.
+						Could not load groups. Check your connection, server URL, and token permissions.
 					</AlertDescription>
 				</Alert>
 			)}
