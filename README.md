@@ -55,14 +55,16 @@ Run AI coding agents (Claude Code, Codex, OpenCode) in sandboxed containers with
 
 ## Domain Model
 
-Seven domain-independent concepts form the analytical pipeline:
+Eight domain-independent concepts form the analytical pipeline — **Observe → Detect → Guide → Grow**:
 
 ```
 Participant → performs → Activity → on → Artifact
                               ↓
-                     aggregates into → Signal → bears on → Practice
-                                                              ↓
-                                                  tracked over time → Trajectory
+                     aggregates into → Signal ← detects ← Practice
+                              ↓                               ↓
+                   triggers → Guidance → targets → Participant
+                              ↓
+                        feeds → Trajectory ← tracked over ← Practice
 
 All scoped to: Project
 ```
@@ -75,6 +77,7 @@ All scoped to: Project
 | **Activity** | Immutable record of what happened | ActivityEvent |
 | **Practice** | Named behavioral pattern | "Gives substantive reviews" |
 | **Signal** | Quantified health measure along a dimension | Review thoroughness: 0.85 |
+| **Guidance** | Coaching response grounded in a CA method | PR comment, mentor prompt |
 | **Trajectory** | Developmental arc over time | Improving social health |
 
 See the full [Conceptual Model](https://ls1intum.github.io/Hephaestus/contributor/conceptual-model) for cross-domain instantiation, architecture diagrams, and the Cognitive Apprenticeship mapping.

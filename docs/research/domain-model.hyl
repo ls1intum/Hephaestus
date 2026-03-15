@@ -1,89 +1,142 @@
-// Hephaestus Domain Model — 7 Concepts
+// Hephaestus Domain Model — 8 Concepts + 3 Enums
 // Render at https://hylimo.github.io
+// Pipeline: Observe → Detect → Guide → Grow
 classDiagram {
 
     // === Row 1: Project (top center) ===
     class("Project") {
-        public {
+        default {
             name : String
             goals : List
+            norms : NormSet
             timeline : DateRange
-            norms : PracticeNorms
         }
+        section(
+            "enroll(participant, role)",
+            "configure(dimension, thresholds)",
+            "summarize(period)"
+        )
     } layout {
-        pos = apos(350, 0)
+        pos = apos(500, 0)
     }
 
     // === Row 2: Participant + Artifact ===
     class("Participant") {
-        public {
-            identity : String
+        default {
             role : Role
-            maturity : Phase
+            maturity : MaturityLevel
             teams : List
         }
+        section(
+            "perform(activity)",
+            "reflect(period)",
+            "reviewTrajectory(dimension)"
+        )
     } layout {
-        pos = apos(0, 200)
+        pos = apos(0, 320)
     }
 
     class("Artifact") {
-        public {
-            type : ArtifactType
-            author : Participant
-            createdAt : DateTime
+        default {
+            kind : ArtifactKind
+            title : String
+            createdBy : Participant
             state : LifecycleState
         }
+        section(
+            "submit()",
+            "link(other)",
+            "assess(dimension)"
+        )
     } layout {
-        pos = apos(700, 200)
+        pos = apos(1000, 320)
     }
 
     // === Row 3: Activity (center) ===
     class("Activity") {
-        public {
+        default {
             subject : Participant
-            verb : ActionType
+            verb : ActionVerb
             object : Artifact
             occurredAt : DateTime
-            idempotencyKey : String
         }
+        section(
+            "record()",
+            "enrich(metadata)",
+            "correlate(other)"
+        )
     } layout {
-        pos = apos(350, 420)
+        pos = apos(500, 660)
     }
 
     // === Row 4: Practice + Signal ===
     class("Practice") {
-        public {
+        default {
             name : String
             dimension : HealthDimension
             valence : Valence
-            detectionCriteria : Rule
+            criteria : DetectionRule
         }
+        section(
+            "detect(activities)",
+            "define(name, criteria)",
+            "explain()"
+        )
     } layout {
-        pos = apos(0, 640)
+        pos = apos(0, 1020)
     }
 
     class("Signal") {
-        public {
+        default {
+            practice : Practice
+            participant : Participant
             dimension : HealthDimension
-            value : Double
-            confidence : Double
-            period : DateRange
+            value : Float
+            confidence : Float
         }
+        section(
+            "emit(practice, evidence)",
+            "compare(baseline)",
+            "trigger(strategy)"
+        )
     } layout {
-        pos = apos(700, 640)
+        pos = apos(1000, 1020)
     }
 
-    // === Row 5: Trajectory (bottom center) ===
+    // === Row 5: Trajectory + Guidance ===
     class("Trajectory") {
-        public {
+        default {
             participant : Participant
+            dimension : HealthDimension
             direction : TrendDirection
-            rate : Double
-            phase : DevelopmentalPhase
-            inflectionPoints : List
+            rate : Float
+            phase : GrowthPhase
         }
+        section(
+            "track(signals)",
+            "project(horizon)",
+            "milestone(phase)"
+        )
     } layout {
-        pos = apos(350, 860)
+        pos = apos(0, 1420)
+    }
+
+    class("Guidance") {
+        default {
+            signal : Signal
+            participant : Participant
+            method : CAMethod
+            channel : DeliveryChannel
+            content : String
+            status : GuidanceStatus
+        }
+        section(
+            "compose(signal, method)",
+            "deliver(channel)",
+            "evaluate(outcome)"
+        )
+    } layout {
+        pos = apos(1000, 1420)
     }
 
     // === Enumerations ===
@@ -95,7 +148,7 @@ classDiagram {
             COGNITIVE
         }
     } layout {
-        pos = apos(1050, 640)
+        pos = apos(1500, 1020)
     }
 
     enum("Valence") {
@@ -105,77 +158,106 @@ classDiagram {
             NEUTRAL
         }
     } layout {
-        pos = apos(-350, 640)
+        pos = apos(-450, 1020)
+    }
+
+    enum("CAMethod") {
+        entries {
+            MODELING
+            COACHING
+            SCAFFOLDING
+            ARTICULATION
+            REFLECTION
+            EXPLORATION
+        }
+    } layout {
+        pos = apos(1500, 1420)
     }
 
     // === Relationships ===
 
-    // Project contains Participants
+    // Project enrolls Participants
     Project -- Participant with {
         over = start(0.5).axisAligned(0, end(0.5))
-        label("contains", 0.5, -20)
+        label("enrolls", 0.7, -25)
         label("1..*", 0.9, 20)
     }
 
-    // Project scopes Artifacts
+    // Project contains Artifacts
     Project -- Artifact with {
         over = start(0.5).axisAligned(0, end(0.5))
-        label("scopes", 0.5, -20)
+        label("contains", 0.7, 25)
         label("*", 0.9, 20)
     }
 
     // Participant performs Activity
     Participant -- Activity with {
         over = start(0.5).axisAligned(0, end(0.5))
-        label("performs", 0.5, -20)
-        label("*", 0.9, 20)
+        label("performs", 0.5, -30)
+        label("*", 0.85, -20)
     }
 
     // Activity targets Artifact
     Activity -- Artifact with {
         over = start(0.5).axisAligned(0, end(0.5))
-        label("on", 0.5, -20)
+        label("on", 0.5, 30)
+    }
+
+    // Practice detects Signal
+    Practice -- Signal with {
+        over = start(0.5).line(end(0.5))
+        label("detects", 0.5, -25)
+        label("*", 0.85, -20)
     }
 
     // Activity aggregates into Signal
     Activity -- Signal with {
         over = start(0.5).axisAligned(0, end(0.5))
-        label("aggregates into", 0.5, -20)
-        label("*", 0.9, 20)
+        label("aggregates into", 0.5, 30)
     }
 
-    // Signal bears on Practice
-    Signal -- Practice with {
+    // Signal triggers Guidance
+    Signal -- Guidance with {
+        over = start(0.5).axisAligned(0, end(0.5))
+        label("triggers", 0.5, 30)
+        label("0..*", 0.85, -20)
+    }
+
+    // Signal feeds Trajectory
+    Signal -- Trajectory with {
         over = start(0.5).line(end(0.5))
-        label("bears on", 0.5, -20)
+        label("feeds", 0.5, 25)
     }
 
     // Practice tracked over time forms Trajectory
     Practice -- Trajectory with {
         over = start(0.5).axisAligned(0, end(0.5))
-        label("tracked over time", 0.4, -20)
-        label("*", 0.9, 20)
+        label("tracked over", 0.5, 30)
+        label("*", 0.85, -20)
     }
 
-    // Signal feeds Trajectory
-    Signal -- Trajectory with {
-        over = start(0.5).axisAligned(0, end(0.5))
-        label("feeds", 0.5, -20)
+    // Guidance targets Participant (closes the loop)
+    Guidance ..> Participant with {
+        over = start(0.5).axisAligned(-0.5, end(0.5))
+        label("targets", 0.5, 25)
     }
 
     // Trajectory belongs to Participant
     Trajectory ..> Participant with {
-        over = start(0.5).axisAligned(-0.5, end(0.5))
-        label("belongs to", 0.5, 20)
+        over = start(0.5).axisAligned(-0.2, end(0.5))
+        label("belongs to", 0.5, -25)
     }
 
-    // Signal uses HealthDimension
+    // Enum dependencies
     Signal --> HealthDimension with {
         over = start(0.5).line(end(0.5))
     }
 
-    // Practice uses Valence
     Practice --> Valence with {
+        over = start(0.5).line(end(0.5))
+    }
+
+    Guidance --> CAMethod with {
         over = start(0.5).line(end(0.5))
     }
 }

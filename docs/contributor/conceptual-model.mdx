@@ -11,60 +11,93 @@ Hephaestus is grounded in **Cognitive Apprenticeship** (Collins, Brown & Newman,
 
 ## Domain Model
 
-The domain model captures **what exists in the problem world** — independent of how Hephaestus implements it. Seven concepts form a pipeline from raw activity to developmental insight.
+The domain model captures **what exists in the problem world** — independent of how Hephaestus implements it. Eight concepts form a pipeline: **Observe → Detect → Guide → Grow**.
 
 ```mermaid
 classDiagram
     direction TB
 
     class Project {
-        +String name
-        +List~Goal~ goals
-        +DateRange timeline
-        +PracticeNorms norms
+        name : String
+        goals : List
+        norms : NormSet
+        timeline : DateRange
+        enroll(participant, role)
+        configure(dimension, thresholds)
+        summarize(period)
     }
 
     class Participant {
-        +String identity
-        +Role role
-        +Phase maturity
-        +List~Team~ teams
+        role : Role
+        maturity : MaturityLevel
+        teams : List
+        perform(activity)
+        reflect(period)
+        reviewTrajectory(dimension)
     }
 
     class Artifact {
-        +ArtifactType type
-        +Participant author
-        +DateTime createdAt
-        +LifecycleState state
+        kind : ArtifactKind
+        title : String
+        createdBy : Participant
+        state : LifecycleState
+        submit()
+        link(other)
+        assess(dimension)
     }
 
     class Activity {
-        +Participant subject
-        +ActionType verb
-        +Artifact object
-        +DateTime occurredAt
-        +String idempotencyKey
+        subject : Participant
+        verb : ActionVerb
+        object : Artifact
+        occurredAt : DateTime
+        record()
+        enrich(metadata)
+        correlate(other)
     }
 
     class Practice {
-        +String name
-        +HealthDimension dimension
-        +Valence valence
-        +Rule detectionCriteria
+        name : String
+        dimension : HealthDimension
+        valence : Valence
+        criteria : DetectionRule
+        detect(activities)
+        define(name, criteria)
+        explain()
     }
 
     class Signal {
-        +HealthDimension dimension
-        +Double value
-        +Double confidence
-        +DateRange period
+        practice : Practice
+        participant : Participant
+        dimension : HealthDimension
+        value : Float
+        confidence : Float
+        emit(practice, evidence)
+        compare(baseline)
+        trigger(strategy)
+    }
+
+    class Guidance {
+        signal : Signal
+        participant : Participant
+        method : CAMethod
+        channel : DeliveryChannel
+        content : String
+        status : GuidanceStatus
+        compose(signal, method)
+        deliver(channel)
+        evaluate(outcome)
     }
 
     class Trajectory {
-        +TrendDirection direction
-        +Double rate
-        +DevelopmentalPhase phase
-        +List~InflectionPoint~ inflectionPoints
+        participant : Participant
+        dimension : HealthDimension
+        direction : TrendDirection
+        rate : Float
+        phase : GrowthPhase
+        track(signals)
+        project(horizon)
+        milestone(phase)
     }
 
     class HealthDimension {
@@ -75,30 +108,44 @@ classDiagram
         COGNITIVE
     }
 
-    Project "1" --> "*" Participant : contains
-    Project "1" --> "*" Artifact : scopes
+    class CAMethod {
+        <<enumeration>>
+        MODELING
+        COACHING
+        SCAFFOLDING
+        ARTICULATION
+        REFLECTION
+        EXPLORATION
+    }
+
+    Project "1" --> "1..*" Participant : enrolls
+    Project "1" --> "*" Artifact : contains
     Participant "1" --> "*" Activity : performs
     Activity "*" --> "1" Artifact : on
     Activity "*" --> "*" Signal : aggregates into
-    Signal "*" --> "*" Practice : bears on
-    Practice "*" --> "*" Trajectory : tracked over time
+    Practice "1" --> "*" Signal : detects
+    Signal "1" --> "0..*" Guidance : triggers
+    Guidance "*" ..> "1" Participant : targets
     Signal "*" --> "*" Trajectory : feeds
-    Trajectory "*" --> "1" Participant : belongs to
+    Practice "*" --> "*" Trajectory : tracked over
+    Trajectory "*" ..> "1" Participant : belongs to
     Signal --> HealthDimension
     Practice --> HealthDimension
+    Guidance --> CAMethod
 ```
 
-### The Seven Concepts
+### The Eight Concepts
 
 | # | Concept | What it is | Key insight |
 |---|---------|-----------|-------------|
 | 1 | **Project** | Bounded endeavor with goals, timeline, and norms | The interpretive frame — norms make signals meaningful |
-| 2 | **Participant** | Person (or agent) developing professional practice | The subject of observation and coaching |
+| 2 | **Participant** | Person (or agent) developing professional practice | The subject of observation and guidance |
 | 3 | **Artifact** | Tangible work product mediating activity | What we can observe — PRs, reviews, issues, comments |
-| 4 | **Activity** | Normalized, immutable record of what happened | Subject–verb–object, platform-agnostic, idempotent |
+| 4 | **Activity** | Normalized, immutable record of what happened | Subject–verb–object, platform-agnostic |
 | 5 | **Practice** | Named behavioral pattern, beneficial or detrimental | The vocabulary for talking about *how* people work |
 | 6 | **Signal** | Quantified measure along a health dimension | Multi-dimensional to prevent Goodhart's Law |
-| 7 | **Trajectory** | Developmental arc over time | Direction, rate, phase — not just snapshots |
+| 7 | **Guidance** | Coaching response grounded in a CA method | Closes the loop: Signal → Guidance → Participant |
+| 8 | **Trajectory** | Developmental arc over time | Direction, rate, phase — not just snapshots |
 
 ### Four Health Dimensions
 
@@ -123,6 +170,7 @@ The domain model is deliberately independent of any specific project type:
 | Activity | "opened PR #42" | "uploaded mockup v3" | "submitted revision §4" | "gave peer feedback" |
 | Practice | "Gives substantive reviews" | "Tests with users" | "Pre-registers hypotheses" | "Incorporates feedback" |
 | Signal | Review substantiveness: 0.85 | Iteration velocity: 3/wk | Rigor score: 4.2 | Timeliness: 95% |
+| Guidance | PR comment: "Consider breaking this into smaller changes" | Critique prompt: "How might color-blind users experience this?" | Revision note: "Methods section lacks power analysis" | Reflection: "What did you learn from the peer feedback?" |
 | Trajectory | Isolated coder → collaborative engineer | Pixel-pusher → user-centered designer | Protocol-follower → independent investigator | Surface learner → self-regulated |
 
 ### Mapping to Codebase
@@ -135,6 +183,7 @@ The domain model is deliberately independent of any specific project type:
 | Activity | `ActivityEvent` (immutable ledger, 55+ event types) | Implemented |
 | Practice | `PullRequestBadPractice` (negative practices only) | Partial |
 | Signal | Implicit (XP scores, leaderboard metrics) | Needs explicit modeling |
+| Guidance | AI mentor messages, PR review comments (planned) | Partial |
 | Trajectory | Not modeled | Planned |
 
 ---
