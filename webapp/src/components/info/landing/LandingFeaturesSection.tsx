@@ -1,5 +1,4 @@
-import { CheckCheck, ScanSearch, Trophy } from "lucide-react";
-import { MentorIcon } from "@/components/mentor/MentorIcon";
+import { CheckCheck, MessageCircle, ScanSearch, TrendingUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -15,8 +14,8 @@ export function LandingFeaturesSection() {
 						Built for How Teams Actually Work
 					</h2>
 					<p className="text-muted-foreground text-lg">
-						Gamification drives engagement. AI coaching drives depth. Practice detection closes the
-						loop.
+						Detect practice patterns. Guide improvement through the right channel. Track growth over
+						time.
 					</p>
 				</div>
 
@@ -24,52 +23,33 @@ export function LandingFeaturesSection() {
 					<Card>
 						<CardHeader>
 							<div className="flex items-center gap-2 mb-2">
-								<Trophy className="h-5 w-5 text-yellow-500" />
+								<ScanSearch className="h-5 w-5 text-blue-500" />
 							</div>
-							<CardTitle>Code Review Gamification</CardTitle>
-							<CardDescription>Transform code reviews into learning opportunities</CardDescription>
-						</CardHeader>
-						<CardContent>
-							<ul className="space-y-2">
-								<li className="flex gap-2 items-start">
-									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>Weekly leaderboards with GitHub integration</span>
-								</li>
-								<li className="flex gap-2 items-start">
-									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>Team competitions across multiple repositories</span>
-								</li>
-								<li className="flex gap-2 items-start">
-									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>Structured league system for ongoing engagement</span>
-								</li>
-							</ul>
-						</CardContent>
-					</Card>
-
-					<Card>
-						<CardHeader>
-							<div className="flex items-center gap-2 mb-2 text-muted-foreground">
-								<MentorIcon className="-m-2" size={32} pad={4} />
-							</div>
-							<CardTitle>AI Mentor</CardTitle>
+							<CardTitle>Practice Detection</CardTitle>
 							<CardDescription>
-								Heph coaches you based on your actual project activity
+								Identify what's working and what's not — before it becomes habit
 							</CardDescription>
 						</CardHeader>
 						<CardContent>
 							<ul className="space-y-2">
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>Structured weekly reflection tied to real PRs, reviews, and issues</span>
+									<span>
+										Catches patterns like rubber-stamp reviews and missing PR descriptions
+									</span>
 								</li>
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>Contextual feedback drawn from your repository activity</span>
+									<span>
+										Adapts severity to PR lifecycle — early work is a coaching moment, not a
+										violation
+									</span>
 								</li>
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>Goal setting with progress tracking across behavioral patterns</span>
+									<span>
+										Contributors close the loop by marking findings as fixed, adjusted, or incorrect
+									</span>
 								</li>
 							</ul>
 						</CardContent>
@@ -78,26 +58,62 @@ export function LandingFeaturesSection() {
 					<Card>
 						<CardHeader>
 							<div className="flex items-center gap-2 mb-2">
-								<ScanSearch className="h-5 w-5 text-blue-500" />
+								<MessageCircle className="h-5 w-5 text-primary" />
 							</div>
-							<CardTitle>Practice Detection</CardTitle>
-							<CardDescription>Catches anti-patterns before they become habits</CardDescription>
+							<CardTitle>Multi-Channel Guidance</CardTitle>
+							<CardDescription>
+								Coaching at the right time, through the right channel
+							</CardDescription>
 						</CardHeader>
 						<CardContent>
 							<ul className="space-y-2">
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
 									<span>
-										Detects patterns like rubber-stamp reviews and missing PR descriptions
+										AI mentor (Heph) leads structured reflection tied to real PRs, reviews, and
+										issues
 									</span>
 								</li>
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>Lifecycle-aware severity — drafts get coaching, ready PRs get rigor</span>
+									<span>
+										Practice notifications reach contributors via email, Slack, and in-app alerts
+									</span>
 								</li>
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>Contributors can mark findings as fixed, won't fix, or incorrect</span>
+									<span>
+										60+ achievements with progression chains recognize sustained good practices
+									</span>
+								</li>
+							</ul>
+						</CardContent>
+					</Card>
+
+					<Card>
+						<CardHeader>
+							<div className="flex items-center gap-2 mb-2">
+								<TrendingUp className="h-5 w-5 text-green-500" />
+							</div>
+							<CardTitle>Growth Tracking</CardTitle>
+							<CardDescription>See development trajectories, not just snapshots</CardDescription>
+						</CardHeader>
+						<CardContent>
+							<ul className="space-y-2">
+								<li className="flex gap-2 items-start">
+									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
+									<span>Achievement chains from common to mythic track practice milestones</span>
+								</li>
+								<li className="flex gap-2 items-start">
+									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
+									<span>Elo-like league system provides persistent, transparent ranking</span>
+								</li>
+								<li className="flex gap-2 items-start">
+									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
+									<span>
+										Weekly Slack digests and leaderboards make good practices visible to the whole
+										team
+									</span>
 								</li>
 							</ul>
 						</CardContent>

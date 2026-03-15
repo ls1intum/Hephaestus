@@ -34,9 +34,10 @@ export function LandingWhyChooseSection({
 							Practices, Not Just Metrics
 						</h2>
 						<p className="text-lg text-muted-foreground">
-							Most engineering analytics tools give managers dashboards. Hephaestus gives individual
-							contributors actionable coaching — detecting behavioral patterns across PRs, reviews,
-							and issues, then helping you improve through AI mentoring and gamification.
+							Most engineering analytics tools produce summative dashboards for managers. Hephaestus
+							delivers formative feedback to the people doing the work — detecting practice patterns
+							across pull requests, reviews, and issues, then guiding improvement through the
+							channel that fits the moment.
 						</p>
 
 						<ul className="grid gap-4 mt-4">

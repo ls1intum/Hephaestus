@@ -33,7 +33,7 @@ function HomepageHeader() {
             How You Build Matters
           </Heading>
           <p className={styles.heroSubtitle}>
-            Observe how your team collaborates. Detect the practices that drive quality. Guide improvement through AI mentoring and gamification.
+            Observe how your team builds. Detect the practices that drive quality. Guide every contributor — human and AI — toward growth.
           </p>
           <div className={styles.heroActions}>
             <Link className="button button--primary button--lg" to="/user/overview">
@@ -81,7 +81,7 @@ export default function Home(): ReactNode {
   return (
     <Layout
       title={siteConfig.title}
-      description="How You Build Matters — formative practice analytics for project teams with AI coaching, gamified engagement, and multi-dimensional health observation.">
+      description="How You Build Matters — formative practice analytics that detects practice patterns and guides every contributor toward growth.">
       <HomepageHeader />
       <main>
         <QuickstartGuides />

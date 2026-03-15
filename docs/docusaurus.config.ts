@@ -149,7 +149,7 @@ const config: Config = {
       {
         name: 'description',
         content:
-          'Formative practice analytics for project teams — observe collaboration, detect behavioral patterns, and guide improvement through AI mentoring and gamification.',
+          'Formative practice analytics for project teams — detect practice patterns and guide every contributor toward growth through multi-channel coaching.',
       },
       {name: 'keywords', content: 'Hephaestus, AI mentor, practice analytics, code review gamification, Cognitive Apprenticeship, formative assessment, software engineering education, practice detection, GitHub analytics, TUM'},
       {name: 'twitter:card', content: 'summary_large_image'},
@@ -158,7 +158,7 @@ const config: Config = {
       {
         name: 'twitter:description',
         content:
-          'Formative practice analytics for project teams — observe collaboration, detect behavioral patterns, and guide improvement through AI mentoring and gamification.',
+          'Formative practice analytics for project teams — detect practice patterns and guide every contributor toward growth through multi-channel coaching.',
       },
     ],
     navbar: {

@@ -15,40 +15,40 @@ type FeatureItem = {
 
 const FeatureList: FeatureItem[] = [
   {
-    title: 'Code Review Gamification',
-    kicker: 'Transform code reviews into learning opportunities',
+    title: 'Practice Detection',
+    kicker: 'Identify what\'s working and what\'s not — before it becomes habit',
     description:
-      'Friendly competition keeps healthy review habits visible with leaderboards, leagues, and team-wide recognition.',
+      'AI-powered analysis surfaces anti-patterns in pull requests — missing descriptions, oversized changes, incomplete templates — with lifecycle-aware severity. Drafts get coaching. Ready-to-merge work gets rigor.',
     bullets: [
-      'Weekly leaderboards with GitHub integration',
-      'Team competitions across multiple repositories',
-      'Structured league system for ongoing engagement',
+      'Catches patterns like rubber-stamp reviews and missing context',
+      'Adapts severity to PR lifecycle — early work is a coaching moment, not a violation',
+      'Contributors close the loop by marking findings as fixed, adjusted, or incorrect',
     ],
-    cta: {label: 'See the leaderboard tour', to: '/user/leaderboard'},
+    cta: {label: 'See the conceptual model', to: '/contributor/conceptual-model'},
   },
   {
-    title: 'AI Mentor',
-    kicker: 'Heph coaches you based on your actual project activity',
+    title: 'Multi-Channel Guidance',
+    kicker: 'Coaching at the right time, through the right channel',
     description:
-      'Each session guides you through goal-setting, progress review, and reflection — grounded in real PRs, reviews, and issues, not generic advice.',
+      'Detected practices trigger targeted guidance — from structured AI mentoring sessions to Slack notifications and achievement unlocks. Humans and AI coding agents receive the same feedback grounded in the same activity stream.',
     bullets: [
-      'Structured weekly reflection tied to your repository activity',
-      'Contextual feedback drawn from issues, commits, and reviews',
-      'Goal setting with progress tracking across behavioral patterns',
+      'AI mentor (Heph) leads structured reflection tied to real PRs, reviews, and issues',
+      'Practice notifications reach contributors via email, Slack, and in-app alerts',
+      '60+ achievements with progression chains recognize sustained good practices',
     ],
     cta: {label: 'Work with the mentor', to: '/user/ai-mentor'},
   },
   {
-    title: 'Practice Detection',
-    kicker: 'AI-powered analysis that catches anti-patterns early',
+    title: 'Growth Tracking',
+    kicker: 'See development trajectories, not just snapshots',
     description:
-      'Hephaestus analyzes pull requests to detect anti-patterns — missing descriptions, oversized changes, incomplete templates — then adjusts feedback based on lifecycle stage. Drafts get supportive coaching. Ready-to-merge work gets rigorous review.',
+      'Achievement progression chains and a league system track skill development over time. As practices improve, coaching intensity fades — matching the Cognitive Apprenticeship model of guided independence.',
     bullets: [
-      'Detects patterns like rubber-stamp reviews, missing context, and ignored feedback',
-      'Lifecycle-aware severity — early work is a coaching moment, not a violation',
-      'Contributors can mark findings as fixed, won\'t fix, or incorrect',
+      'Achievement chains from common to mythic track practice milestones',
+      'Elo-like league system provides persistent, transparent ranking',
+      'Weekly Slack digests and leaderboards make good practices visible to the whole team',
     ],
-    cta: {label: 'See the conceptual model', to: '/contributor/conceptual-model'},
+    cta: {label: 'See the leaderboard', to: '/user/leaderboard'},
   },
 ];
 

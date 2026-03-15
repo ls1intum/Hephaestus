@@ -1,31 +1,31 @@
-import { Code, ScanSearch, Sparkles } from "lucide-react";
+import { MessageCircle, ScanSearch, TrendingUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { FeatureCard, type FeatureData } from "./FeatureCard";
 
 const FEATURES_DATA: FeatureData[] = [
 	{
-		icon: Code,
-		badge: "Core Feature",
-		title: "Code Review Gamification",
-		description: "Making good practices visible through recognition",
-		content:
-			"Leaderboards, team competitions, and a progression system that recognize meaningful review contributions — not just volume. Designed to sustain engagement while modeling the collaborative practices that matter most.",
-	},
-	{
-		icon: Sparkles,
-		badge: "Core Feature",
-		title: "AI Mentor",
-		description: "Personalized coaching grounded in your project activity",
-		content:
-			"Heph — our AI mentor — delivers formative feedback drawn from issues, commits, reviews, and pull requests. Each session guides you through goal-setting, progress review, and reflection — building self-regulation skills alongside technical ones.",
-	},
-	{
 		icon: ScanSearch,
-		badge: "Core Feature",
+		badge: "Detect",
 		title: "Practice Detection",
-		description: "Identifying what's working and what needs attention",
+		description: "Identify what's working and what's not — before it becomes habit",
 		content:
-			"AI-powered analysis of pull requests identifies anti-patterns like missing descriptions and oversized changes. Feedback adapts to context — draft PRs receive supportive coaching while ready-to-merge work gets rigorous review.",
+			"AI-powered analysis surfaces anti-patterns in pull requests — missing descriptions, oversized changes, incomplete templates — with lifecycle-aware severity. Drafts get coaching. Ready-to-merge work gets rigor.",
+	},
+	{
+		icon: MessageCircle,
+		badge: "Guide",
+		title: "Multi-Channel Guidance",
+		description: "Coaching at the right time, through the right channel",
+		content:
+			"Detected practices trigger targeted guidance — from structured AI mentoring sessions to Slack notifications and achievement unlocks. Humans and AI coding agents receive the same feedback grounded in the same activity stream.",
+	},
+	{
+		icon: TrendingUp,
+		badge: "Grow",
+		title: "Growth Tracking",
+		description: "See development trajectories, not just snapshots",
+		content:
+			"Achievement progression chains and a league system track skill development over time. As practices improve, coaching intensity fades — matching the Cognitive Apprenticeship model of guided independence.",
 	},
 ];
 
@@ -41,8 +41,8 @@ export function AboutMissionSection() {
 				<div className="space-y-6">
 					<p className="text-lg leading-relaxed">
 						We help teams develop professional practices by observing how they collaborate,
-						detecting what's working and what needs attention, and coaching improvement through AI
-						mentoring and gamification — all grounded in real project activity.
+						detecting what's working and what needs attention, and delivering targeted guidance
+						through multiple channels — all grounded in real project activity, not assumptions.
 					</p>
 
 					<div className="border-l-4 border-primary pl-6 py-2">
