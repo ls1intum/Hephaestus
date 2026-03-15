@@ -6,7 +6,7 @@ import type * as Preset from '@docusaurus/preset-classic';
 
 const config: Config = {
   title: 'Hephaestus Documentation',
-  tagline: 'Process-Aware Mentoring for Agile Software Teams',
+  tagline: 'How You Build Matters',
   favicon: 'img/favicon.ico',
 
   // Future flags and performance optimizations

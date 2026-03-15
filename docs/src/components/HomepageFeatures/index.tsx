@@ -27,28 +27,28 @@ const FeatureList: FeatureItem[] = [
     cta: {label: 'See the leaderboard tour', to: '/user/leaderboard'},
   },
   {
-    title: 'Process-Aware AI Mentoring',
-    kicker: 'Heph provides guidance grounded in your repository activity',
+    title: 'AI Mentor',
+    kicker: 'Heph coaches you based on your actual project activity',
     description:
-      'Mentoring sessions blend self-regulated learning prompts with real repo events so goals, reflections, and next steps stay actionable.',
+      'Each session guides you through goal-setting, progress review, and reflection — grounded in real PRs, reviews, and issues, not generic advice.',
     bullets: [
-      'SRL-guided weekly reflection',
-      'Repo activity context for objective feedback',
-      'Goal setting and progress tracking',
+      'Structured weekly reflection tied to your repository activity',
+      'Contextual feedback drawn from issues, commits, and reviews',
+      'Goal setting with progress tracking across behavioral patterns',
     ],
     cta: {label: 'Work with the mentor', to: '/user/ai-mentor'},
   },
   {
-    title: 'Build Better Team Habits',
-    kicker: 'Creativity meets technical expertise — just like on the landing page',
+    title: 'Practice Detection',
+    kicker: 'AI-powered behavioral analysis across your project lifecycle',
     description:
-      'Our approach combines craft, collaboration, and quality so teams stay aligned while the platform scales with them.',
+      'Hephaestus analyzes PRs, reviews, and issues to detect behavioral patterns — then adjusts feedback based on lifecycle stage. Drafts get supportive coaching. Ready-to-merge work gets rigorous review.',
     bullets: [
-      'Empower engineers with real-world feedback loops',
-      'Foster collaboration that strengthens engineering culture',
-      'Improve code quality through friendly competition',
+      'Detects patterns like rubber-stamp reviews, missing context, and ignored feedback',
+      'Lifecycle-aware severity — early work is a coaching moment, not a violation',
+      'Scores across four health dimensions: Technical, Process, Social, Cognitive',
     ],
-    cta: {label: 'Dive into contributor docs', to: '/contributor/overview'},
+    cta: {label: 'See the conceptual model', to: '/contributor/conceptual-model'},
   },
 ];
 

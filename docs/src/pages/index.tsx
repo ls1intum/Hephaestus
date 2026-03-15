@@ -30,10 +30,10 @@ function HomepageHeader() {
       <div className="container">
         <div className={styles.heroCopy}>
           <Heading as="h1" className={styles.heroTitle}>
-            Process-Aware Mentoring for Agile Software Teams
+            How You Build Matters
           </Heading>
           <p className={styles.heroSubtitle}>
-            Onboard faster and learn better habits with an AI mentor grounded in your repo workflow — from issues to pull requests and team rituals.
+            Observe how your team collaborates. Detect the practices that drive quality. Coach improvement through AI mentoring and gamification.
           </p>
           <div className={styles.heroActions}>
             <Link className="button button--primary button--lg" to="/user/overview">
@@ -81,7 +81,7 @@ export default function Home(): ReactNode {
   return (
     <Layout
       title={siteConfig.title}
-      description="Process-Aware Mentoring for Agile Software Teams with AI guidance, gamified reviews, and actionable analytics.">
+      description="How You Build Matters — formative practice analytics for project teams with AI coaching, gamified engagement, and multi-dimensional health observation.">
       <HomepageHeader />
       <main>
         <QuickstartGuides />

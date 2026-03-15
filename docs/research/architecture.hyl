@@ -1,0 +1,104 @@
+// Hephaestus Architecture — 7 Components
+// Render at https://hylimo.github.io
+componentDiagram {
+
+    // === Internal Platform Components ===
+    component("Hephaestus") {
+
+        component("WebApp", keywords = list("React 19")) {
+            requires("REST", 0.5)
+            requires("MentorAPI", 0.5)
+        } layout {
+            pos = apos(50, 50)
+        }
+
+        component("ApplicationServer", keywords = list("Spring Boot")) {
+            provides("REST", 0.5, dist = 60)
+            requires("DB", 0.5)
+            requires("Events", 0.5)
+            requires("Auth", 0.5)
+            requires("Notify", 0.5)
+            requires("AI", 0.5)
+        } layout {
+            pos = rpos(WebApp, 400, 0)
+        }
+
+        component("IntelligenceService", keywords = list("Hono")) {
+            provides("MentorAPI", 0.5, dist = 60)
+            requires("LLM", 0.5)
+            requires("Traces", 0.5)
+        } layout {
+            pos = rpos(WebApp, 0, 250)
+        }
+
+        component("WebhookIngest", keywords = list("Hono")) {
+            provides("Webhooks", 0.5, dist = 60)
+            requires("Publish", 0.5)
+        } layout {
+            pos = rpos(ApplicationServer, 0, 250)
+        }
+
+    } layout {
+        pos = apos(0, 0)
+    }
+
+    // === External Systems ===
+    component("CodePlatforms", keywords = list("external")) {
+        component("GitHub")
+        component("GitLab")
+    } layout {
+        pos = rpos(Hephaestus, 0, 500)
+    }
+
+    component("DataInfrastructure", keywords = list("external")) {
+        component("PostgreSQL")
+        component("NATS")
+    } layout {
+        pos = rpos(Hephaestus, 500, 500)
+    }
+
+    component("PlatformServices", keywords = list("external")) {
+        component("Keycloak")
+        component("Slack")
+        component("LLMProvider")
+        component("Langfuse")
+    } layout {
+        pos = rpos(Hephaestus, 1000, 500)
+    }
+
+    // === Dependencies ===
+
+    // WebApp -> ApplicationServer (REST API)
+    dependsOn(WebAppREST, ApplicationServerREST)
+
+    // WebApp -> IntelligenceService (Mentor Chat)
+    dependsOn(WebAppMentorAPI, IntelligenceServiceMentorAPI)
+
+    // ApplicationServer -> DataInfrastructure
+    dependsOn(ApplicationServerDB, PostgreSQL)
+    dependsOn(ApplicationServerEvents, NATS)
+
+    // ApplicationServer -> PlatformServices
+    dependsOn(ApplicationServerAuth, Keycloak)
+    dependsOn(ApplicationServerNotify, Slack)
+    dependsOn(ApplicationServerAI, IntelligenceServiceMentorAPI)
+
+    // IntelligenceService -> PlatformServices
+    dependsOn(IntelligenceServiceLLM, LLMProvider)
+    dependsOn(IntelligenceServiceTraces, Langfuse)
+
+    // WebhookIngest -> NATS
+    dependsOn(WebhookIngestPublish, NATS)
+
+    // CodePlatforms -> WebhookIngest
+    CodePlatforms --> WebhookIngest with {
+        over = start(0.5).axisAligned(0, end(0.5))
+        label("webhooks", 0.5, -20)
+    }
+
+    // ApplicationServer -> CodePlatforms (API polling)
+    ApplicationServer ..> CodePlatforms with {
+        over = start(0.5).axisAligned(0.3, end(0.5))
+        label("GraphQL/REST", 0.5, -20)
+    }
+}

@@ -1,0 +1,181 @@
+// Hephaestus Domain Model — 7 Concepts
+// Render at https://hylimo.github.io
+classDiagram {
+
+    // === Row 1: Project (top center) ===
+    class("Project") {
+        public {
+            name : String
+            goals : List
+            timeline : DateRange
+            norms : PracticeNorms
+        }
+    } layout {
+        pos = apos(350, 0)
+    }
+
+    // === Row 2: Participant + Artifact ===
+    class("Participant") {
+        public {
+            identity : String
+            role : Role
+            maturity : Phase
+            teams : List
+        }
+    } layout {
+        pos = apos(0, 200)
+    }
+
+    class("Artifact") {
+        public {
+            type : ArtifactType
+            author : Participant
+            createdAt : DateTime
+            state : LifecycleState
+        }
+    } layout {
+        pos = apos(700, 200)
+    }
+
+    // === Row 3: Activity (center) ===
+    class("Activity") {
+        public {
+            subject : Participant
+            verb : ActionType
+            object : Artifact
+            occurredAt : DateTime
+            idempotencyKey : String
+        }
+    } layout {
+        pos = apos(350, 420)
+    }
+
+    // === Row 4: Practice + Signal ===
+    class("Practice") {
+        public {
+            name : String
+            dimension : HealthDimension
+            valence : Valence
+            detectionCriteria : Rule
+        }
+    } layout {
+        pos = apos(0, 640)
+    }
+
+    class("Signal") {
+        public {
+            dimension : HealthDimension
+            value : Double
+            confidence : Double
+            period : DateRange
+        }
+    } layout {
+        pos = apos(700, 640)
+    }
+
+    // === Row 5: Trajectory (bottom center) ===
+    class("Trajectory") {
+        public {
+            participant : Participant
+            direction : TrendDirection
+            rate : Double
+            phase : DevelopmentalPhase
+            inflectionPoints : List
+        }
+    } layout {
+        pos = apos(350, 860)
+    }
+
+    // === Enumerations ===
+    enum("HealthDimension") {
+        entries {
+            TECHNICAL
+            PROCESS
+            SOCIAL
+            COGNITIVE
+        }
+    } layout {
+        pos = apos(1050, 640)
+    }
+
+    enum("Valence") {
+        entries {
+            BENEFICIAL
+            DETRIMENTAL
+            NEUTRAL
+        }
+    } layout {
+        pos = apos(-350, 640)
+    }
+
+    // === Relationships ===
+
+    // Project contains Participants
+    Project -- Participant with {
+        over = start(0.5).axisAligned(0, end(0.5))
+        label("contains", 0.5, -20)
+        label("1..*", 0.9, 20)
+    }
+
+    // Project scopes Artifacts
+    Project -- Artifact with {
+        over = start(0.5).axisAligned(0, end(0.5))
+        label("scopes", 0.5, -20)
+        label("*", 0.9, 20)
+    }
+
+    // Participant performs Activity
+    Participant -- Activity with {
+        over = start(0.5).axisAligned(0, end(0.5))
+        label("performs", 0.5, -20)
+        label("*", 0.9, 20)
+    }
+
+    // Activity targets Artifact
+    Activity -- Artifact with {
+        over = start(0.5).axisAligned(0, end(0.5))
+        label("on", 0.5, -20)
+    }
+
+    // Activity aggregates into Signal
+    Activity -- Signal with {
+        over = start(0.5).axisAligned(0, end(0.5))
+        label("aggregates into", 0.5, -20)
+        label("*", 0.9, 20)
+    }
+
+    // Signal bears on Practice
+    Signal -- Practice with {
+        over = start(0.5).line(end(0.5))
+        label("bears on", 0.5, -20)
+    }
+
+    // Practice tracked over time forms Trajectory
+    Practice -- Trajectory with {
+        over = start(0.5).axisAligned(0, end(0.5))
+        label("tracked over time", 0.4, -20)
+        label("*", 0.9, 20)
+    }
+
+    // Signal feeds Trajectory
+    Signal -- Trajectory with {
+        over = start(0.5).axisAligned(0, end(0.5))
+        label("feeds", 0.5, -20)
+    }
+
+    // Trajectory belongs to Participant
+    Trajectory ..> Participant with {
+        over = start(0.5).axisAligned(-0.5, end(0.5))
+        label("belongs to", 0.5, 20)
+    }
+
+    // Signal uses HealthDimension
+    Signal --> HealthDimension with {
+        over = start(0.5).line(end(0.5))
+    }
+
+    // Practice uses Valence
+    Practice --> Valence with {
+        over = start(0.5).line(end(0.5))
+    }
+}

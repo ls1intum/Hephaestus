@@ -1,4 +1,4 @@
-import { Code, Sparkles } from "lucide-react";
+import { Code, ScanSearch, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { FeatureCard, type FeatureData } from "./FeatureCard";
 
@@ -7,17 +7,25 @@ const FEATURES_DATA: FeatureData[] = [
 		icon: Code,
 		badge: "Core Feature",
 		title: "Code Review Gamification",
-		description: "Turning technical work into team growth",
+		description: "Making good practices visible through recognition",
 		content:
-			"Transform code reviews into engaging experiences with dynamic leaderboards, team competitions, and a structured league system that recognizes excellence and encourages participation from developers at all skill levels.",
+			"Leaderboards, team competitions, and a progression system that recognize meaningful review contributions — not just volume. Designed to sustain engagement while modeling the collaborative practices that matter most.",
 	},
 	{
 		icon: Sparkles,
 		badge: "Core Feature",
-		title: "Process-Aware AI Mentoring",
-		description: "Guidance grounded in your repo activity",
+		title: "AI Mentor",
+		description: "Personalized coaching grounded in your project activity",
 		content:
-			"Heph — our AI mentor — delivers personalized, data-informed feedback based on issues, commits, reviews, and pull requests. It supports self-regulated learning with goal setting, reflection, and practical next steps.",
+			"Heph — our AI mentor — delivers formative feedback drawn from issues, commits, reviews, and pull requests. Each session guides you through goal-setting, progress review, and reflection — building self-regulation skills alongside technical ones.",
+	},
+	{
+		icon: ScanSearch,
+		badge: "Core Feature",
+		title: "Practice Detection",
+		description: "Identifying what's working and what needs attention",
+		content:
+			"AI-powered analysis of project artifacts identifies both beneficial practices and areas for improvement. Feedback adapts to context — early-stage work receives supportive scaffolding while mature deliverables get rigorous review.",
 	},
 ];
 
@@ -32,21 +40,21 @@ export function AboutMissionSection() {
 
 				<div className="space-y-6">
 					<p className="text-lg leading-relaxed">
-						We help novice developers onboard and grow in agile software teams by combining smart
-						gamification with process-aware AI mentoring. Our guidance is grounded in your actual
-						repository activity and supports self-regulated learning.
+						We help teams develop professional practices by observing how they collaborate,
+						detecting what's working and what needs attention, and coaching improvement through AI
+						mentoring and gamification — all grounded in real project activity.
 					</p>
 
 					<div className="border-l-4 border-primary pl-6 py-2">
 						<p className="text-lg font-medium">
-							We believe the best software isn't just about code — it's about building teams that
-							practice healthy habits and continuous reflection.
+							We believe the best work isn't just about the output — it's about how people learn to
+							collaborate, reflect, and grow through the process of building together.
 						</p>
 					</div>
 				</div>
 			</div>
 
-			<div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+			<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
 				{FEATURES_DATA.map((feature) => (
 					<FeatureCard key={feature.title} feature={feature} />
 				))}

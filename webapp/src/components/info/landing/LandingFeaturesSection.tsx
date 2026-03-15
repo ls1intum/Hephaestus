@@ -1,4 +1,4 @@
-import { CheckCheck, Trophy } from "lucide-react";
+import { CheckCheck, ScanSearch, Trophy } from "lucide-react";
 import { MentorIcon } from "@/components/mentor/MentorIcon";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,14 +12,15 @@ export function LandingFeaturesSection() {
 						Key Features
 					</Badge>
 					<h2 className="text-3xl font-bold tracking-tighter sm:text-4xl mb-4">
-						Tools for Team Growth
+						Built for How Teams Actually Work
 					</h2>
 					<p className="text-muted-foreground text-lg">
-						Features designed to elevate your engineering team's collaboration and learning
+						Gamification drives engagement. AI coaching drives depth. Practice detection closes the
+						loop.
 					</p>
 				</div>
 
-				<div className="grid gap-8 md:grid-cols-2">
+				<div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
 					<Card>
 						<CardHeader>
 							<div className="flex items-center gap-2 mb-2">
@@ -51,24 +52,52 @@ export function LandingFeaturesSection() {
 							<div className="flex items-center gap-2 mb-2 text-muted-foreground">
 								<MentorIcon className="-m-2" size={32} pad={4} />
 							</div>
-							<CardTitle>Process-Aware AI Mentoring</CardTitle>
+							<CardTitle>AI Mentor</CardTitle>
 							<CardDescription>
-								Heph provides guidance grounded in your repository activity
+								Heph coaches you based on your actual project activity
 							</CardDescription>
 						</CardHeader>
 						<CardContent>
 							<ul className="space-y-2">
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>SRL-guided weekly reflection</span>
+									<span>Structured weekly reflection tied to real PRs, reviews, and issues</span>
 								</li>
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>Repo activity context for objective feedback</span>
+									<span>Contextual feedback drawn from your repository activity</span>
 								</li>
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>Goal setting and progress tracking</span>
+									<span>Goal setting with progress tracking across behavioral patterns</span>
+								</li>
+							</ul>
+						</CardContent>
+					</Card>
+
+					<Card>
+						<CardHeader>
+							<div className="flex items-center gap-2 mb-2">
+								<ScanSearch className="h-5 w-5 text-blue-500" />
+							</div>
+							<CardTitle>Practice Detection</CardTitle>
+							<CardDescription>Identifies what's working and what needs attention</CardDescription>
+						</CardHeader>
+						<CardContent>
+							<ul className="space-y-2">
+								<li className="flex gap-2 items-start">
+									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
+									<span>
+										Detects patterns like rubber-stamp reviews and missing PR descriptions
+									</span>
+								</li>
+								<li className="flex gap-2 items-start">
+									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
+									<span>Lifecycle-aware severity — drafts get coaching, ready PRs get rigor</span>
+								</li>
+								<li className="flex gap-2 items-start">
+									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
+									<span>Scores across Technical, Process, Social, and Cognitive dimensions</span>
 								</li>
 							</ul>
 						</CardContent>
