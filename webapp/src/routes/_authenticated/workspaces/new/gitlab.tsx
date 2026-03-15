@@ -188,7 +188,7 @@ function GitLabWizardPage() {
 
 			{listGroups.isError && state.step === 1 && (
 				<Alert variant="destructive" className="mt-4">
-					<OctagonXIcon />
+					<OctagonXIcon aria-hidden="true" />
 					<AlertTitle>Failed to load groups</AlertTitle>
 					<AlertDescription>
 						Could not load groups. Check your connection, server URL, and token permissions.

@@ -47,6 +47,7 @@ export function SelectGroupStep() {
 					if (group) dispatch({ type: "SELECT_GROUP", group });
 				}}
 				className="max-h-64 overflow-y-auto rounded-lg border divide-y"
+				aria-label="Available GitLab groups"
 			>
 				{filteredGroups.map((group) => (
 					<GroupItem
