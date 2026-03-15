@@ -163,10 +163,7 @@ public class WorkspaceService {
      */
     @Transactional
     public Workspace createWorkspace(CreateWorkspaceRequestDTO request) {
-        Long ownerUserId = request.ownerUserId();
-        if (ownerUserId == null) {
-            ownerUserId = userRepository.getCurrentUserElseThrow().getId();
-        }
+        Long ownerUserId = userRepository.getCurrentUserElseThrow().getId();
 
         Workspace workspace = createWorkspace(
             request.workspaceSlug(),

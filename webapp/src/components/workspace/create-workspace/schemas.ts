@@ -11,7 +11,10 @@ export const connectionSchema = z.object({
 				z.string().url("Must be a valid URL").startsWith("https://", "Must use HTTPS"),
 			]),
 		),
-	personalAccessToken: z.string().min(1, "Personal access token is required"),
+	personalAccessToken: z
+		.string()
+		.transform((v) => v.trim())
+		.pipe(z.string().min(1, "Personal access token is required")),
 });
 export type ConnectionFormData = z.infer<typeof connectionSchema>;
 

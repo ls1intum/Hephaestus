@@ -50,8 +50,9 @@ public record CreateWorkspaceRequestDTO(
     @Schema(description = "Type of account (USER or ORG)", requiredMode = Schema.RequiredMode.REQUIRED)
     AccountType accountType,
 
+    @Deprecated(forRemoval = true)
     @Schema(
-        description = "User ID of the workspace owner. If omitted, the authenticated user becomes the owner.",
+        description = "Deprecated: ignored by the server. The authenticated user always becomes the owner.",
         requiredMode = Schema.RequiredMode.NOT_REQUIRED
     )
     Long ownerUserId,
