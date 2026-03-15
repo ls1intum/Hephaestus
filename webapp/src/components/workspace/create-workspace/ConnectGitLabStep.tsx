@@ -141,7 +141,7 @@ export function ConnectGitLabStep() {
 
 			{state.preflightResult?.valid && (
 				<Alert>
-					<CircleCheckIcon className="text-green-600 dark:text-green-400" />
+					<CircleCheckIcon aria-hidden="true" className="text-green-600 dark:text-green-400" />
 					<AlertTitle>Token valid</AlertTitle>
 					<AlertDescription>
 						Authenticated as <strong>{state.preflightResult.username}</strong>
@@ -151,7 +151,7 @@ export function ConnectGitLabStep() {
 
 			{state.preflightResult && !state.preflightResult.valid && (
 				<Alert variant="destructive">
-					<OctagonXIcon />
+					<OctagonXIcon aria-hidden="true" />
 					<AlertTitle>Validation failed</AlertTitle>
 					<AlertDescription>
 						{state.preflightResult.error ||
@@ -162,7 +162,7 @@ export function ConnectGitLabStep() {
 
 			{preflight.isError && !state.preflightResult && (
 				<Alert variant="destructive">
-					<OctagonXIcon />
+					<OctagonXIcon aria-hidden="true" />
 					<AlertTitle>Connection error</AlertTitle>
 					<AlertDescription>
 						Could not reach the GitLab instance. Check the URL and try again.

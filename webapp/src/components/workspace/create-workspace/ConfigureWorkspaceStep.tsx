@@ -77,9 +77,12 @@ export function ConfigureWorkspaceStep() {
 					aria-describedby={
 						fieldErrors.displayName && touched.displayName
 							? "workspace-display-name-error"
-							: undefined
+							: "workspace-display-name-description"
 					}
 				/>
+				<FieldDescription id="workspace-display-name-description">
+					The name shown in navigation and headers.
+				</FieldDescription>
 				{fieldErrors.displayName && touched.displayName && (
 					<FieldError id="workspace-display-name-error">{fieldErrors.displayName}</FieldError>
 				)}
