@@ -2652,7 +2652,6 @@ components:
           description: Type of coding agent
           enum:
           - CLAUDE_CODE
-          - CODEX
           - OPENCODE
         allowInternet:
           type: boolean
@@ -2907,7 +2906,6 @@ components:
           description: Type of coding agent
           enum:
           - CLAUDE_CODE
-          - CODEX
           - OPENCODE
         allowInternet:
           type: boolean
@@ -3985,7 +3983,6 @@ components:
           description: Type of coding agent
           enum:
           - CLAUDE_CODE
-          - CODEX
           - OPENCODE
         allowInternet:
           type: boolean

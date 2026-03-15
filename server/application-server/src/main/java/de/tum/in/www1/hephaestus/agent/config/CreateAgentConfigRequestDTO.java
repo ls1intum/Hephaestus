@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.agent.config;
 
 import de.tum.in.www1.hephaestus.agent.AgentType;
+import de.tum.in.www1.hephaestus.agent.CredentialMode;
 import de.tum.in.www1.hephaestus.agent.LlmProvider;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Max;
@@ -38,5 +39,10 @@ public record CreateAgentConfigRequestDTO(
     @Max(value = 10, message = "Max concurrent jobs must not exceed 10")
     @Schema(description = "Maximum concurrent jobs", example = "3", minimum = "1", maximum = "10")
     Integer maxConcurrentJobs,
-    @Schema(description = "Whether agent containers have internet access") Boolean allowInternet
+    @Schema(description = "Whether agent containers have internet access") Boolean allowInternet,
+    @Schema(
+        description = "Authentication mode: PROXY (internal proxy), API_KEY (direct), or OAUTH (direct OAuth)",
+        defaultValue = "PROXY"
+    )
+    CredentialMode credentialMode
 ) {}

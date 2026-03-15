@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.agent.config;
 
 import de.tum.in.www1.hephaestus.agent.AgentType;
+import de.tum.in.www1.hephaestus.agent.CredentialMode;
 import de.tum.in.www1.hephaestus.agent.LlmProvider;
 import de.tum.in.www1.hephaestus.core.security.EncryptedStringConverter;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
@@ -37,7 +38,6 @@ import lombok.ToString;
  * <h2>Provider Compatibility</h2>
  * <ul>
  *   <li>{@link AgentType#CLAUDE_CODE} requires {@link LlmProvider#ANTHROPIC}</li>
- *   <li>{@link AgentType#CODEX} requires {@link LlmProvider#OPENAI}</li>
  *   <li>{@link AgentType#OPENCODE} accepts any provider</li>
  * </ul>
  *
@@ -89,6 +89,10 @@ public class AgentConfig {
     @Enumerated(EnumType.STRING)
     @Column(name = "llm_provider", nullable = false, length = 32)
     private LlmProvider llmProvider;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "credential_mode", nullable = false, length = 16)
+    private CredentialMode credentialMode = CredentialMode.PROXY;
 
     @Column(name = "timeout_seconds", nullable = false)
     private int timeoutSeconds = 600;

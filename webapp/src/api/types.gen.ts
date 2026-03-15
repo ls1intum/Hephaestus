@@ -560,7 +560,7 @@ export type UpdateAgentConfigRequest = {
     /**
      * Type of coding agent
      */
-    agentType?: 'CLAUDE_CODE' | 'CODEX' | 'OPENCODE';
+    agentType?: 'CLAUDE_CODE' | 'OPENCODE';
     /**
      * Whether agent containers have internet access
      */
@@ -1244,7 +1244,7 @@ export type CreateAgentConfigRequest = {
     /**
      * Type of coding agent
      */
-    agentType: 'CLAUDE_CODE' | 'CODEX' | 'OPENCODE';
+    agentType: 'CLAUDE_CODE' | 'OPENCODE';
     /**
      * Whether agent containers have internet access
      */
@@ -1370,7 +1370,7 @@ export type AgentConfig = {
     /**
      * Type of coding agent
      */
-    agentType: 'CLAUDE_CODE' | 'CODEX' | 'OPENCODE';
+    agentType: 'CLAUDE_CODE' | 'OPENCODE';
     /**
      * Whether agent containers have internet access
      */

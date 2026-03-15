@@ -57,7 +57,8 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
             LlmProvider.ANTHROPIC,
             300,
             2,
-            false
+            false,
+            null
         );
 
         return webTestClient
@@ -166,6 +167,7 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
             LlmProvider.OPENAI,
             null,
             null,
+            null,
             null
         );
 
@@ -201,7 +203,8 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
             LlmProvider.OPENAI,
             120,
             1,
-            true
+            true,
+            null
         );
 
         AgentConfigDTO updated = webTestClient
@@ -240,6 +243,7 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
             null,
             null,
             LlmProvider.OPENAI,
+            null,
             null,
             null,
             null
@@ -375,6 +379,7 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
             LlmProvider.ANTHROPIC,
             null,
             null,
+            null,
             null
         );
 
@@ -403,6 +408,7 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
             LlmProvider.ANTHROPIC,
             5, // below minimum of 30
             null,
+            null,
             null
         );
 
@@ -429,6 +435,7 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
             null,
             null,
             LlmProvider.ANTHROPIC,
+            null,
             null,
             null,
             null
@@ -472,6 +479,7 @@ class AgentConfigControllerIntegrationTest extends AbstractWorkspaceIntegrationT
             null,
             "sk-super-secret-key",
             LlmProvider.ANTHROPIC,
+            null,
             null,
             null,
             null
