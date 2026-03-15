@@ -151,7 +151,7 @@ const config: Config = {
         content:
           'Onboard faster and learn better habits with an AI mentor grounded in your repo workflow — from issues to pull requests and team rituals.',
       },
-      {name: 'keywords', content: 'Hephaestus, AI mentor, agile coaching, code review gamification, TUM'},
+      {name: 'keywords', content: 'Hephaestus, AI mentor, agile coaching, code review gamification, formative assessment, software engineering education, developer onboarding, GitHub analytics, TUM'},
       {name: 'twitter:card', content: 'summary_large_image'},
       {name: 'twitter:site', content: '@ls1intum'},
       {name: 'twitter:title', content: 'Hephaestus Documentation'},

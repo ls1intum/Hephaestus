@@ -9,11 +9,11 @@
 
 # Hephaestus — How You Build Matters
 
-Hephaestus is an open-source platform for **formative practice analytics** in project-based work. It observes how participants collaborate — from issues to pull requests to code reviews — detects behavioral practices, and coaches improvement through AI-guided mentoring and gamification. Grounded in Cognitive Apprenticeship theory (Collins et al., 1989), Hephaestus bridges the gap between summative engineering metrics (built for managers) and formative feedback (built for the people doing the work).
+Hephaestus is an open-source platform for **formative practice analytics** in project-based work. It observes how participants collaborate — from issues to pull requests to code reviews — detects behavioral practices, and coaches improvement through AI-guided mentoring and gamification. Grounded in Cognitive Apprenticeship theory (Collins et al., 1989), Hephaestus bridges the gap between summative project metrics (built for managers) and formative feedback (built for the people doing the work).
 
 <img alt="Agile Hephaestus" height="200px" src="./docs/user/img/overview/agile_hephaestus.png">
 
-Hephaestus /hɪˈfɛstəs/ is the Greek god of blacksmiths, craftsmen, and artisans, symbolizing the fusion of creativity and technical skill.
+Hephaestus /hɪˈfɛstəs/ is the Greek god of blacksmiths, craftsmen, and artisans, symbolizing the fusion of creativity and technical skill. Currently deployed for software engineering teams using GitHub, with a domain model designed for cross-domain extension.
 
 ## How It Works
 
@@ -43,7 +43,7 @@ AI-powered analysis of pull requests that identifies anti-patterns (missing desc
 
 ### AI Mentor (Heph)
 
-A conversational AI mentor grounded in your actual project activity. Heph supports self-regulated learning through structured reflection sessions (goals → strategies → reflection), generates weekly standup summaries, and surfaces relevant pull requests and action items — all driven by real data, not guesswork.
+A conversational AI mentor grounded in your actual project activity. Heph supports self-regulated learning through structured reflection sessions (goals → strategies → reflection), generates weekly progress summaries, and surfaces relevant pull requests and action items — all driven by real data, not guesswork.
 
 ### Gamification
 
