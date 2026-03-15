@@ -20,6 +20,9 @@ export function ConnectGitLabStep() {
 		onSuccess: (data) => {
 			dispatch({ type: "SET_PREFLIGHT_RESULT", result: data });
 		},
+		onError: (error) => {
+			console.error("GitLab preflight failed:", { serverUrl: state.serverUrl }, error);
+		},
 	});
 
 	const handleValidate = () => {
@@ -38,6 +41,8 @@ export function ConnectGitLabStep() {
 			return;
 		}
 		setFieldErrors({});
+		// Persist trimmed values back to state so downstream steps use normalized data
+		dispatch({ type: "SET_SERVER_URL", value: result.data.serverUrl });
 		dispatch({ type: "CLEAR_PREFLIGHT" });
 		preflight.mutate({
 			body: {
@@ -81,7 +86,7 @@ export function ConnectGitLabStep() {
 					<Input
 						id="gitlab-pat"
 						type={showToken ? "text" : "password"}
-						placeholder="glpat-xxxxxxxxxxxxxxxxxxxx"
+						placeholder="glpat-..."
 						value={state.personalAccessToken}
 						onChange={(e) => dispatch({ type: "SET_PAT", value: e.target.value })}
 						autoComplete="off"
