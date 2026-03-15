@@ -271,6 +271,36 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
         }
 
         @Test
+        @DisplayName("should filter out blocked environment variables")
+        void shouldFilterBlockedEnvVars() {
+            setupHappyPath();
+
+            SandboxSpec spec = new SandboxSpec(
+                JOB_ID,
+                "alpine:latest",
+                List.of("echo"),
+                Map.of("SAFE_VAR", "ok", "LD_PRELOAD", "/evil.so", "AWS_SECRET_ACCESS_KEY", "leaked"),
+                new NetworkPolicy(false, null, "tok"),
+                ResourceLimits.DEFAULT,
+                SecurityProfile.DEFAULT,
+                Map.of(".prompt", "test".getBytes()),
+                "/workspace/.output"
+            );
+
+            sandboxAdapter.execute(spec);
+
+            ArgumentCaptor<DockerOperations.ContainerSpec> captor = ArgumentCaptor.forClass(
+                DockerOperations.ContainerSpec.class
+            );
+            verify(containerManager).createContainer(captor.capture());
+
+            Map<String, String> env = captor.getValue().environment();
+            assertThat(env).containsEntry("SAFE_VAR", "ok");
+            assertThat(env).doesNotContainKey("LD_PRELOAD");
+            assertThat(env).doesNotContainKey("AWS_SECRET_ACCESS_KEY");
+        }
+
+        @Test
         @DisplayName("should create internet-enabled network when allowed")
         void shouldCreateInternetNetwork() {
             when(networkManager.createJobNetwork(eq(JOB_ID), eq(true))).thenReturn(NETWORK_ID);

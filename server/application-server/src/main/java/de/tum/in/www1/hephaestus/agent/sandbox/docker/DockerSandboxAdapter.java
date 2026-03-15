@@ -15,6 +15,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -52,6 +53,36 @@ public class DockerSandboxAdapter implements SandboxManager {
 
     private static final String MDC_JOB_ID = "sandbox.jobId";
     private static final String MDC_CONTAINER_ID = "sandbox.containerId";
+
+    /** Maximum container log size to emit in a single log event (prevents log aggregator overflow). */
+    private static final int MAX_LOG_EVENT_BYTES = 32 * 1024; // 32 KB
+
+    /**
+     * Environment variable names that must never be set by callers. These can influence container
+     * behavior in security-critical ways (library injection, path manipulation, credential leakage).
+     */
+    static final Set<String> BLOCKED_ENV_VARS = Set.of(
+        "LD_PRELOAD",
+        "LD_LIBRARY_PATH",
+        "PATH",
+        "HOME",
+        "SHELL",
+        "USER",
+        "DOCKER_HOST",
+        "DOCKER_TLS_VERIFY",
+        "DOCKER_CERT_PATH",
+        "AWS_ACCESS_KEY_ID",
+        "AWS_SECRET_ACCESS_KEY",
+        "AWS_SESSION_TOKEN",
+        "GOOGLE_APPLICATION_CREDENTIALS",
+        "AZURE_CLIENT_SECRET",
+        "http_proxy",
+        "https_proxy",
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "no_proxy",
+        "NO_PROXY"
+    );
 
     private final SandboxNetworkManager networkManager;
     private final SandboxWorkspaceManager workspaceManager;
@@ -176,7 +207,7 @@ public class DockerSandboxAdapter implements SandboxManager {
             checkCancelled(cancelled, jobId);
 
             // Inject input files via docker cp
-            if (spec.inputFiles() != null && !spec.inputFiles().isEmpty()) {
+            if (!spec.inputFiles().isEmpty()) {
                 workspaceManager.injectFiles(containerId, spec.inputFiles());
                 log.debug("Injected {} input files", spec.inputFiles().size());
             }
@@ -279,9 +310,13 @@ public class DockerSandboxAdapter implements SandboxManager {
     private Map<String, String> buildEnvironment(SandboxSpec spec, String appServerIp) {
         Map<String, String> env = new HashMap<>();
 
-        // Copy user-provided environment
-        if (spec.environment() != null) {
-            env.putAll(spec.environment());
+        // Copy user-provided environment, filtering out blocked variables
+        for (var entry : spec.environment().entrySet()) {
+            if (BLOCKED_ENV_VARS.contains(entry.getKey())) {
+                log.warn("Blocked dangerous environment variable: {}", entry.getKey());
+            } else {
+                env.put(entry.getKey(), entry.getValue());
+            }
         }
 
         // Inject LLM proxy configuration
@@ -316,7 +351,15 @@ public class DockerSandboxAdapter implements SandboxManager {
         try {
             String logs = containerManager.getLogs(containerId, LOG_TAIL_LINES);
             if (logs != null && !logs.isEmpty()) {
-                log.warn("Container logs before cleanup:\n{}", logs);
+                // Truncate to prevent log aggregator overflow from large container output
+                String truncated =
+                    logs.length() > MAX_LOG_EVENT_BYTES
+                        ? logs.substring(0, MAX_LOG_EVENT_BYTES) +
+                          "\n... [truncated, " +
+                          logs.length() +
+                          " bytes total]"
+                        : logs;
+                log.warn("Container logs before cleanup:\n{}", truncated);
             }
         } catch (Exception e) {
             log.debug("Could not capture container logs on error path: {}", e.getMessage());

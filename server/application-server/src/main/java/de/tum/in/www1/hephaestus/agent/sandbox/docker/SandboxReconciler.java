@@ -138,6 +138,7 @@ public class SandboxReconciler {
 
     /** Periodic sweep: clean up orphaned Docker resources. */
     @Scheduled(
+        initialDelayString = "${hephaestus.sandbox.reconciliation-interval-seconds:60}",
         fixedDelayString = "${hephaestus.sandbox.reconciliation-interval-seconds:60}",
         timeUnit = TimeUnit.SECONDS
     )
@@ -201,6 +202,18 @@ public class SandboxReconciler {
                     UUID jobId = UUID.fromString(jobIdStr);
                     if (!activeJobIds.contains(jobId)) {
                         log.warn("Removing orphaned network: id={}, name={}", network.id(), name);
+                        // Disconnect app-server before removing — Docker refuses to remove
+                        // networks with connected containers. Normal cleanup may have failed
+                        // to disconnect (the exact scenario reconciliation handles).
+                        try {
+                            networkManager.disconnectAppServer(network.id());
+                        } catch (Exception disconnectEx) {
+                            log.debug(
+                                "Could not disconnect app-server from orphaned network {}: {}",
+                                name,
+                                disconnectEx.getMessage()
+                            );
+                        }
                         networkManager.removeNetwork(network.id());
                         orphanedNetworks.increment();
                     }

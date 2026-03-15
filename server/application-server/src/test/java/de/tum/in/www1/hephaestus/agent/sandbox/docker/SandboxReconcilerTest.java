@@ -58,6 +58,69 @@ class SandboxReconcilerTest extends BaseUnitTest {
     }
 
     @Nested
+    @DisplayName("Disabled guard")
+    class DisabledGuard {
+
+        @Test
+        @DisplayName("should skip startup reconciliation when disabled")
+        void shouldSkipStartupWhenDisabled() {
+            SandboxProperties disabledProps = new SandboxProperties(
+                false,
+                "unix:///var/run/docker.sock",
+                false,
+                null,
+                5,
+                10,
+                60,
+                null,
+                8080,
+                null,
+                null
+            );
+            var disabledReconciler = new SandboxReconciler(
+                jobRepository,
+                containerManager,
+                networkManager,
+                disabledProps,
+                meterRegistry
+            );
+
+            disabledReconciler.onStartup();
+
+            verify(jobRepository, never()).findByStatus(any());
+        }
+
+        @Test
+        @DisplayName("should skip periodic reconciliation when disabled")
+        void shouldSkipPeriodicWhenDisabled() {
+            SandboxProperties disabledProps = new SandboxProperties(
+                false,
+                "unix:///var/run/docker.sock",
+                false,
+                null,
+                5,
+                10,
+                60,
+                null,
+                8080,
+                null,
+                null
+            );
+            var disabledReconciler = new SandboxReconciler(
+                jobRepository,
+                containerManager,
+                networkManager,
+                disabledProps,
+                meterRegistry
+            );
+
+            disabledReconciler.periodicReconciliation();
+
+            verify(jobRepository, never()).findByStatusIn(any());
+        }
+    }
+
+    @Nested
     @DisplayName("Startup reconciliation")
     class StartupReconciliation {
 

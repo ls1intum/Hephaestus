@@ -97,9 +97,10 @@ class SandboxSpecTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("should accept valid spec with nullable fields")
+    @DisplayName("should accept valid spec with nullable fields and default collections to empty")
     void shouldAcceptValidSpec() {
-        // networkPolicy, securityProfile, inputFiles, outputPath can all be null
+        // networkPolicy, securityProfile, outputPath can be null
+        // command, environment, inputFiles are defaulted to empty collections
         var spec = new SandboxSpec(
             UUID.randomUUID(),
             "alpine:latest",
@@ -111,8 +112,10 @@ class SandboxSpecTest extends BaseUnitTest {
             null,
             null
         );
-        // No exception thrown
         assertThat(spec.jobId()).isNotNull();
+        assertThat(spec.command()).isEmpty();
+        assertThat(spec.environment()).isEmpty();
+        assertThat(spec.inputFiles()).isEmpty();
     }
 
     @Nested

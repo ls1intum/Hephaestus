@@ -34,6 +34,22 @@ public class ContainerSecurityPolicy {
     private static final int NOFILE_LIMIT = 1024;
     private static final long NANO_CPUS_PER_CPU = 1_000_000_000L;
 
+    /** IPC modes allowed by the enforcement floor — "host" and "shareable" are always rejected. */
+    private static final java.util.Set<String> ALLOWED_IPC_MODES = java.util.Set.of("none", "private");
+
+    /**
+     * Mandatory tmpfs mounts that are always applied. Caller-supplied mounts are merged on top, but
+     * these paths always have {@code noexec,nosuid,nodev} enforced.
+     */
+    private static final Map<String, String> MANDATORY_TMPFS = Map.of(
+        "/tmp",
+        "rw,noexec,nosuid,nodev,size=1073741824",
+        "/run",
+        "rw,noexec,nosuid,nodev,size=67108864",
+        "/home/agent/.local",
+        "rw,noexec,nosuid,nodev,size=1073741824"
+    );
+
     private final SandboxProperties properties;
     private final String seccompProfileJson;
 
@@ -78,16 +94,25 @@ public class ContainerSecurityPolicy {
             dns.add("0.0.0.0");
         }
 
-        // Ulimits
+        // Ulimits: nofile, nproc (defense-in-depth alongside pidsLimit), core=0 (no core dumps)
         Map<String, DockerOperations.UlimitSpec> ulimits = Map.of(
             "nofile",
-            new DockerOperations.UlimitSpec(NOFILE_LIMIT, NOFILE_LIMIT)
+            new DockerOperations.UlimitSpec(NOFILE_LIMIT, NOFILE_LIMIT),
+            "nproc",
+            new DockerOperations.UlimitSpec(resources.pidsLimit(), resources.pidsLimit()),
+            "core",
+            new DockerOperations.UlimitSpec(0, 0)
         );
 
-        // Resolve runtime (from security profile or global config)
-        String runtime = security.runtime();
-        if (runtime == null && properties.containerRuntime() != null) {
-            runtime = properties.containerRuntime();
+        // Resolve runtime: global config is the enforcement floor — callers cannot downgrade.
+        // If global says "runsc", caller cannot set "runc" to bypass gVisor.
+        String globalRuntime = properties.containerRuntime();
+        String runtime;
+        if (globalRuntime != null && !globalRuntime.isBlank()) {
+            // Global runtime is the floor — always use it (callers cannot downgrade)
+            runtime = globalRuntime;
+        } else {
+            runtime = security.runtime();
         }
 
         // Enforce minimum capability dropping: caller-supplied list must include "ALL".
@@ -95,6 +120,25 @@ public class ContainerSecurityPolicy {
         List<String> dropCaps = security.dropCapabilities();
         if (dropCaps == null || !dropCaps.contains("ALL")) {
             dropCaps = List.of("ALL");
+        }
+
+        // Enforce IPC mode floor: only "none" and "private" are allowed.
+        // "host" or "shareable" would leak host shared memory — always rejected.
+        String ipcMode = security.ipcMode();
+        if (ipcMode == null || !ALLOWED_IPC_MODES.contains(ipcMode)) {
+            ipcMode = "none";
+        }
+
+        // Enforce mandatory tmpfs mounts with noexec. Caller-supplied mounts are merged,
+        // but mandatory paths always keep their hardened options.
+        Map<String, String> tmpfs = new HashMap<>(MANDATORY_TMPFS);
+        if (security.tmpfsMounts() != null) {
+            for (var entry : security.tmpfsMounts().entrySet()) {
+                // Only add caller mounts for paths NOT in mandatory set
+                if (!MANDATORY_TMPFS.containsKey(entry.getKey())) {
+                    tmpfs.put(entry.getKey(), entry.getValue());
+                }
+            }
         }
 
         return new DockerOperations.HostConfigSpec(
@@ -106,10 +150,10 @@ public class ContainerSecurityPolicy {
             false, // never privileged
             dropCaps,
             securityOpts,
-            security.tmpfsMounts() != null ? new HashMap<>(security.tmpfsMounts()) : Map.of(),
+            tmpfs,
             dns,
             "private", // cgroup namespace always private
-            security.ipcMode() != null ? security.ipcMode() : "none",
+            ipcMode,
             runtime,
             ulimits
         );

@@ -202,6 +202,29 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         }
 
         @Test
+        @DisplayName("should skip single files exceeding per-file size limit")
+        void shouldSkipOversizedSingleFile() throws Exception {
+            // Use a manager with a 10-byte per-file limit to avoid allocating megabytes in tests
+            var limitedManager = new SandboxWorkspaceManager(fileOps, 10_000, 10);
+
+            byte[] smallContent = "small".getBytes(); // 5 bytes — under limit
+            byte[] oversizedContent = "this is way too big".getBytes(); // 19 bytes — over 10-byte limit
+
+            byte[] tarBytes = createTestTar(
+                Map.of(".output/small.txt", smallContent, ".output/toobig.txt", oversizedContent)
+            );
+            when(fileOps.copyArchiveFromContainer(CONTAINER_ID, "/workspace/.output")).thenReturn(
+                new ByteArrayInputStream(tarBytes)
+            );
+
+            Map<String, byte[]> output = limitedManager.collectOutput(CONTAINER_ID, "/workspace/.output");
+
+            // Only the small file should be collected — the oversized one is skipped
+            assertThat(output).containsKey("small.txt");
+            assertThat(output).doesNotContainKey("toobig.txt");
+        }
+
+        @Test
         @DisplayName("should skip directory entries in tar")
         void shouldSkipDirectories() throws Exception {
             byte[] tarBytes = createTestTarWithDir("result.json", "{}".getBytes());

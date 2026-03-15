@@ -35,15 +35,22 @@ public class SandboxWorkspaceManager {
 
     private final DockerFileOperations fileOps;
     private final long maxOutputBytes;
+    private final long maxSingleFileBytes;
 
     public SandboxWorkspaceManager(DockerFileOperations fileOps) {
-        this(fileOps, MAX_OUTPUT_BYTES);
+        this(fileOps, MAX_OUTPUT_BYTES, MAX_SINGLE_FILE_BYTES);
     }
 
-    /** Package-private constructor for testing with a smaller output limit. */
+    /** Package-private constructor for testing with smaller limits. */
     SandboxWorkspaceManager(DockerFileOperations fileOps, long maxOutputBytes) {
+        this(fileOps, maxOutputBytes, MAX_SINGLE_FILE_BYTES);
+    }
+
+    /** Package-private constructor for testing with smaller limits. */
+    SandboxWorkspaceManager(DockerFileOperations fileOps, long maxOutputBytes, long maxSingleFileBytes) {
         this.fileOps = fileOps;
         this.maxOutputBytes = maxOutputBytes;
+        this.maxSingleFileBytes = maxSingleFileBytes;
     }
 
     /**
@@ -108,7 +115,7 @@ public class SandboxWorkspaceManager {
                     name = normalized.toString();
                     // Per-file size guard: reject files with declared size > limit or negative
                     // (a long->int cast on a crafted size > 2GB would produce a negative int).
-                    if (entry.getSize() < 0 || entry.getSize() > MAX_SINGLE_FILE_BYTES) {
+                    if (entry.getSize() < 0 || entry.getSize() > maxSingleFileBytes) {
                         log.warn("Skipping oversized file in output archive: name={}, size={}", name, entry.getSize());
                         continue;
                     }

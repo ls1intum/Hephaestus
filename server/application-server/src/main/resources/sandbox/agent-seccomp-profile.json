@@ -45,7 +45,7 @@
         "listen", "listxattr", "llistxattr",
         "lseek", "lstat", "lstat64",
         "madvise", "membarrier", "memfd_create", "memfd_secret",
-        "mincore", "mkdir", "mkdirat", "mknod", "mknodat",
+        "mincore", "mkdir", "mkdirat",
         "mlock", "mlock2", "mlockall",
         "mmap", "mmap2", "mprotect", "mq_getsetattr",
         "mq_notify", "mq_open", "mq_timedreceive", "mq_timedreceive_time64",

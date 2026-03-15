@@ -417,15 +417,15 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should default ipc mode to none when profile sets host")
-        void shouldDefaultIpcToNone() {
+        @DisplayName("should reject ipc mode 'host' and force 'none'")
+        void shouldRejectHostIpcMode() {
             SecurityProfile hostIpcProfile = new SecurityProfile(
                 null,
                 null,
                 true,
                 true,
                 true,
-                null,
+                "host",
                 List.of("ALL"),
                 Map.of()
             );
@@ -437,6 +437,154 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
             );
 
             assertThat(config.ipcMode()).isEqualTo("none");
+        }
+
+        @Test
+        @DisplayName("should default ipc mode to none when profile sets null")
+        void shouldDefaultIpcToNone() {
+            SecurityProfile nullIpcProfile = new SecurityProfile(
+                null,
+                null,
+                true,
+                true,
+                true,
+                null,
+                List.of("ALL"),
+                Map.of()
+            );
+
+            DockerOperations.HostConfigSpec config = securityPolicy.buildHostConfig(
+                nullIpcProfile,
+                ResourceLimits.DEFAULT,
+                new NetworkPolicy(false, null, null)
+            );
+
+            assertThat(config.ipcMode()).isEqualTo("none");
+        }
+
+        @Test
+        @DisplayName("should allow ipc mode 'private'")
+        void shouldAllowPrivateIpcMode() {
+            SecurityProfile privateIpcProfile = new SecurityProfile(
+                null,
+                null,
+                true,
+                true,
+                true,
+                "private",
+                List.of("ALL"),
+                Map.of()
+            );
+
+            DockerOperations.HostConfigSpec config = securityPolicy.buildHostConfig(
+                privateIpcProfile,
+                ResourceLimits.DEFAULT,
+                new NetworkPolicy(false, null, null)
+            );
+
+            assertThat(config.ipcMode()).isEqualTo("private");
+        }
+
+        @Test
+        @DisplayName("should enforce mandatory tmpfs mounts over caller-supplied ones")
+        void shouldEnforceMandatoryTmpfs() {
+            SecurityProfile weakTmpfsProfile = new SecurityProfile(
+                null,
+                null,
+                true,
+                true,
+                true,
+                "none",
+                List.of("ALL"),
+                Map.of("/tmp", "rw,exec,size=100g", "/custom", "rw,size=512m")
+            );
+
+            DockerOperations.HostConfigSpec config = securityPolicy.buildHostConfig(
+                weakTmpfsProfile,
+                ResourceLimits.DEFAULT,
+                new NetworkPolicy(false, null, null)
+            );
+
+            // Mandatory /tmp mount should use hardened options, not the caller's "exec"
+            assertThat(config.tmpfsMounts().get("/tmp")).contains("noexec");
+            // Custom mount should be preserved
+            assertThat(config.tmpfsMounts()).containsKey("/custom");
+            // All mandatory mounts present
+            assertThat(config.tmpfsMounts()).containsKey("/run");
+            assertThat(config.tmpfsMounts()).containsKey("/home/agent/.local");
+        }
+
+        @Test
+        @DisplayName("should prevent runtime downgrade when global is configured")
+        void shouldPreventRuntimeDowngrade() {
+            SandboxProperties propsWithRuntime = new SandboxProperties(
+                true,
+                "unix:///var/run/docker.sock",
+                false,
+                null,
+                5,
+                10,
+                60,
+                "runsc",
+                8080,
+                null,
+                null
+            );
+            ContainerSecurityPolicy policyWithRuntime = new ContainerSecurityPolicy(propsWithRuntime, null);
+
+            // Caller tries to downgrade to runc
+            SecurityProfile runcProfile = new SecurityProfile(
+                "runc",
+                null,
+                true,
+                true,
+                true,
+                "none",
+                List.of("ALL"),
+                Map.of()
+            );
+
+            DockerOperations.HostConfigSpec config = policyWithRuntime.buildHostConfig(
+                runcProfile,
+                ResourceLimits.DEFAULT,
+                new NetworkPolicy(false, null, null)
+            );
+
+            // Global "runsc" should be enforced, not the caller's "runc"
+            assertThat(config.runtime()).isEqualTo("runsc");
+        }
+    }
+
+    @Nested
+    @DisplayName("Ulimits")
+    class UlimitTests {
+
+        @Test
+        @DisplayName("should set nproc ulimit matching pidsLimit")
+        void shouldSetNprocUlimit() {
+            DockerOperations.HostConfigSpec config = securityPolicy.buildHostConfig(
+                SecurityProfile.DEFAULT,
+                ResourceLimits.DEFAULT,
+                new NetworkPolicy(false, null, null)
+            );
+
+            assertThat(config.ulimits()).containsKey("nproc");
+            assertThat(config.ulimits().get("nproc").soft()).isEqualTo(256);
+            assertThat(config.ulimits().get("nproc").hard()).isEqualTo(256);
+        }
+
+        @Test
+        @DisplayName("should set core ulimit to zero (no core dumps)")
+        void shouldDisableCoreDumps() {
+            DockerOperations.HostConfigSpec config = securityPolicy.buildHostConfig(
+                SecurityProfile.DEFAULT,
+                ResourceLimits.DEFAULT,
+                new NetworkPolicy(false, null, null)
+            );
+
+            assertThat(config.ulimits()).containsKey("core");
+            assertThat(config.ulimits().get("core").soft()).isZero();
+            assertThat(config.ulimits().get("core").hard()).isZero();
         }
     }
 }

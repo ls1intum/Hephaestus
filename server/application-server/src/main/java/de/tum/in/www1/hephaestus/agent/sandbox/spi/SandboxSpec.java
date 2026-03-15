@@ -44,5 +44,9 @@ public record SandboxSpec(
         if (image.isBlank()) {
             throw new IllegalArgumentException("image must not be blank");
         }
+        // Default nullable collection fields to empty — avoids null-checking in consumers
+        command = command != null ? command : List.of();
+        environment = environment != null ? environment : Map.of();
+        inputFiles = inputFiles != null ? inputFiles : Map.of();
     }
 }
