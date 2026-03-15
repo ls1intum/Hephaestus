@@ -59,4 +59,21 @@ describe("generateSlug", () => {
 		const input = "a".repeat(51);
 		expect(generateSlug(input)).toBe("a".repeat(51));
 	});
+
+	it("strips CJK characters entirely", () => {
+		expect(generateSlug("测试")).toBe("");
+	});
+
+	it("strips emoji to empty", () => {
+		expect(generateSlug("🚀🔥")).toBe("");
+	});
+
+	it("is idempotent", () => {
+		const inputs = ["My Workspace", "hello--world", "  spaces  ", "Ünïcödé"];
+		for (const input of inputs) {
+			const once = generateSlug(input);
+			const twice = generateSlug(once);
+			expect(twice).toBe(once);
+		}
+	});
 });
