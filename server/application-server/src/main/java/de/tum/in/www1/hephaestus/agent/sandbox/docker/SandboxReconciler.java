@@ -190,11 +190,17 @@ public class SandboxReconciler {
             reconciliationDuration.record(() -> {
                 log.debug("Sandbox reconciler: periodic sweep");
 
-                Set<UUID> activeJobIds = jobRepository
-                    .findByStatusIn(List.of(AgentJobStatus.QUEUED, AgentJobStatus.RUNNING))
-                    .stream()
-                    .map(AgentJob::getId)
-                    .collect(Collectors.toSet());
+                Set<UUID> activeJobIds;
+                try {
+                    activeJobIds = jobRepository
+                        .findByStatusIn(List.of(AgentJobStatus.QUEUED, AgentJobStatus.RUNNING))
+                        .stream()
+                        .map(AgentJob::getId)
+                        .collect(Collectors.toSet());
+                } catch (Exception e) {
+                    log.warn("Could not query active jobs — cleaning ALL managed resources: {}", e.getMessage());
+                    activeJobIds = Set.of();
+                }
 
                 cleanupOrphanedContainers(activeJobIds);
                 cleanupOrphanedNetworks(activeJobIds);

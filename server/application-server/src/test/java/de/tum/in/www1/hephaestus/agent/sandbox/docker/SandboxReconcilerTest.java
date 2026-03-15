@@ -365,6 +365,37 @@ class SandboxReconcilerTest extends BaseUnitTest {
         }
 
         @Test
+        @DisplayName("should cleanup all managed resources when DB query fails")
+        void shouldCleanupAllWhenDbQueryFails() {
+            UUID orphanedJobId = UUID.randomUUID();
+
+            // DB is down — findByStatusIn throws
+            when(jobRepository.findByStatusIn(any())).thenThrow(new RuntimeException("DB unreachable"));
+
+            when(containerManager.listManagedContainers()).thenReturn(
+                List.of(
+                    new DockerOperations.ContainerInfo(
+                        "ctr-1",
+                        "test",
+                        Map.of("hephaestus.job-id", orphanedJobId.toString()),
+                        "running"
+                    )
+                )
+            );
+
+            when(networkManager.listOrphanedNetworks()).thenReturn(
+                List.of(new DockerOperations.NetworkInfo("net-1", "agent-net-" + orphanedJobId))
+            );
+
+            // Should not throw — treats all resources as orphaned when DB is down
+            reconciler.periodicReconciliation();
+
+            // Both container and network should be cleaned up
+            verify(containerManager).forceRemove("ctr-1");
+            verify(networkManager).removeNetwork("net-1");
+        }
+
+        @Test
         @DisplayName("should record reconciliation duration")
         void shouldRecordReconciliationDuration() {
             when(jobRepository.findByStatusIn(any())).thenReturn(List.of());

@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.agent.sandbox;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -87,7 +88,7 @@ public record SandboxProperties(
      */
     public record DefaultResourceLimits(
         @DefaultValue("4294967296") @Min(1) long memoryBytes,
-        @DefaultValue("2.0") double cpus,
+        @DefaultValue("2.0") @DecimalMin("0.01") double cpus,
         @DefaultValue("256") @Min(1) int pidsLimit
     ) {}
 }
