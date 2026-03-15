@@ -49,9 +49,6 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
     @Mock
     private ContainerSecurityPolicy securityPolicy;
 
-    @Mock
-    private DockerContainerOperations containerOps;
-
     private DockerSandboxAdapter sandboxAdapter;
     private SimpleMeterRegistry meterRegistry;
 
@@ -81,7 +78,6 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
             workspaceManager,
             containerManager,
             securityPolicy,
-            containerOps,
             properties,
             meterRegistry
         );
@@ -529,7 +525,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
             cancelDone.countDown();
             bg.join(5000);
 
-            verify(containerOps).stopContainer(eq(CONTAINER_ID), anyInt());
+            verify(containerManager).stopContainer(CONTAINER_ID);
         }
 
         @Test
@@ -547,14 +543,14 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
         @Test
         @DisplayName("should return true when Docker is reachable")
         void shouldReturnTrueWhenHealthy() {
-            when(containerOps.ping()).thenReturn(true);
+            when(containerManager.ping()).thenReturn(true);
             assertThat(sandboxAdapter.isHealthy()).isTrue();
         }
 
         @Test
         @DisplayName("should return false when Docker is unreachable")
         void shouldReturnFalseWhenUnhealthy() {
-            when(containerOps.ping()).thenReturn(false);
+            when(containerManager.ping()).thenReturn(false);
             assertThat(sandboxAdapter.isHealthy()).isFalse();
         }
     }

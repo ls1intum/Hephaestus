@@ -143,6 +143,22 @@ public class SandboxContainerManager {
     }
 
     /**
+     * Stop a running container (SIGTERM → grace period → SIGKILL).
+     *
+     * @param containerId the container to stop
+     */
+    public void stopContainer(String containerId) {
+        containerOps.stopContainer(containerId, properties.containerStopTimeoutSeconds());
+    }
+
+    /**
+     * Check if the Docker daemon is reachable.
+     */
+    public boolean ping() {
+        return containerOps.ping();
+    }
+
+    /**
      * Result of waiting for a container.
      *
      * @param exitCode the container exit code

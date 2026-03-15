@@ -55,7 +55,6 @@ public class DockerSandboxAdapter implements SandboxManager {
     private final SandboxWorkspaceManager workspaceManager;
     private final SandboxContainerManager containerManager;
     private final ContainerSecurityPolicy securityPolicy;
-    private final DockerContainerOperations containerOps;
     private final SandboxProperties properties;
 
     // Metrics
@@ -77,7 +76,6 @@ public class DockerSandboxAdapter implements SandboxManager {
         SandboxWorkspaceManager workspaceManager,
         SandboxContainerManager containerManager,
         ContainerSecurityPolicy securityPolicy,
-        DockerContainerOperations containerOps,
         SandboxProperties properties,
         MeterRegistry meterRegistry
     ) {
@@ -85,7 +83,6 @@ public class DockerSandboxAdapter implements SandboxManager {
         this.workspaceManager = workspaceManager;
         this.containerManager = containerManager;
         this.securityPolicy = securityPolicy;
-        this.containerOps = containerOps;
         this.properties = properties;
 
         this.executionsSuccess = Counter.builder("sandbox.executions")
@@ -243,7 +240,7 @@ public class DockerSandboxAdapter implements SandboxManager {
             // the job is still active (avoids race with cleanup removing the entry).
             activeContainers.computeIfPresent(jobId, (id, containerId) -> {
                 try {
-                    containerOps.stopContainer(containerId, properties.containerStopTimeoutSeconds());
+                    containerManager.stopContainer(containerId);
                 } catch (Exception e) {
                     log.warn("Failed to stop container for cancelled job: jobId={}, error={}", jobId, e.getMessage());
                 }
@@ -256,7 +253,7 @@ public class DockerSandboxAdapter implements SandboxManager {
 
     @Override
     public boolean isHealthy() {
-        return containerOps.ping();
+        return containerManager.ping();
     }
 
     // -------------------------------------------------------------------------

@@ -89,7 +89,6 @@ class DockerSandboxLiveTest {
             workspaceManager,
             containerManager,
             securityPolicy,
-            dockerOps,
             properties,
             new SimpleMeterRegistry()
         );

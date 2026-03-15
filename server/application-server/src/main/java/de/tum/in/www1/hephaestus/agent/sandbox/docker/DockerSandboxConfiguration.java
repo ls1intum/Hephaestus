@@ -128,7 +128,6 @@ public class DockerSandboxConfiguration {
         SandboxWorkspaceManager workspaceManager,
         SandboxContainerManager containerManager,
         ContainerSecurityPolicy securityPolicy,
-        DockerClientOperations ops,
         SandboxProperties properties,
         MeterRegistry meterRegistry
     ) {
@@ -137,7 +136,6 @@ public class DockerSandboxConfiguration {
             workspaceManager,
             containerManager,
             securityPolicy,
-            ops,
             properties,
             meterRegistry
         );
