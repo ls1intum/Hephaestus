@@ -367,6 +367,30 @@ hephaestus:
         personal-api-key: ${POSTHOG_PERSONAL_API_KEY:}
 
     # ═══════════════════════════════════════════════════════════════════════════
+    # SANDBOX CONFIGURATION
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Docker sandbox for running coding agent containers in isolation.
+    # Disabled by default — requires a reachable Docker daemon.
+    # Deployment requirements:
+    #   - Docker Engine >= 25.0.5 (CVE-2024-29018 fix)
+    #   - iptables -I DOCKER-USER -d 169.254.0.0/16 -j DROP (cloud metadata blocking)
+    #   - Recommended: Tecnativa docker-socket-proxy with EXEC=0
+    sandbox:
+        enabled: ${SANDBOX_ENABLED:false}
+        docker-host: ${SANDBOX_DOCKER_HOST:unix:///var/run/docker.sock}
+        tls-verify: ${SANDBOX_TLS_VERIFY:false}
+        max-concurrent-containers: ${SANDBOX_MAX_CONCURRENT:5}
+        container-stop-timeout-seconds: ${SANDBOX_STOP_TIMEOUT:10}
+        reconciliation-interval-seconds: ${SANDBOX_RECONCILIATION_INTERVAL:60}
+        # OCI runtime: null=runc (default), "runsc"=gVisor (recommended for production)
+        container-runtime: ${SANDBOX_CONTAINER_RUNTIME:}
+        llm-proxy-port: ${SANDBOX_LLM_PROXY_PORT:8080}
+        default-resource-limits:
+            memory-bytes: ${SANDBOX_MEMORY_BYTES:4294967296}  # 4 GB (includes tmpfs)
+            cpus: ${SANDBOX_CPUS:2.0}
+            pids-limit: ${SANDBOX_PIDS_LIMIT:256}
+
+    # ═══════════════════════════════════════════════════════════════════════════
     # GITLAB CONFIGURATION
     # ═══════════════════════════════════════════════════════════════════════════
     # Settings for GitLab API integration. Used by GitLab-mode workspaces

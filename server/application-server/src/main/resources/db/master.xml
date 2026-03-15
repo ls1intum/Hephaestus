@@ -50,4 +50,5 @@
     <include file="./changelog/1770916408627_create_user_achievement.xml" relativeToChangelogFile="true"/>
     <include file="./changelog/1770916408627_changelog.xml" relativeToChangelogFile="true"/>
     <include file="./changelog/1773354889621_changelog.xml" relativeToChangelogFile="true"/>
+    <include file="./changelog/1773500736939_changelog.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>
