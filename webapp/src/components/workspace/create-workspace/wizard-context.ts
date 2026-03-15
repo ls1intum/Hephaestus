@@ -23,7 +23,6 @@ export type WizardAction =
 	| { type: "SET_SERVER_URL"; value: string }
 	| { type: "SET_PAT"; value: string }
 	| { type: "SET_PREFLIGHT_RESULT"; result: GitLabPreflightResponse }
-	| { type: "CLEAR_PREFLIGHT" }
 	| { type: "ADVANCE_TO_GROUPS"; groups: GitLabGroup[] }
 	| { type: "SELECT_GROUP"; group: GitLabGroup }
 	| { type: "ADVANCE_TO_CONFIGURE" }
@@ -54,8 +53,6 @@ export function wizardReducer(state: WizardState, action: WizardAction): WizardS
 			return { ...state, personalAccessToken: action.value, preflightResult: null };
 		case "SET_PREFLIGHT_RESULT":
 			return { ...state, preflightResult: action.result };
-		case "CLEAR_PREFLIGHT":
-			return { ...state, preflightResult: null };
 		case "ADVANCE_TO_GROUPS":
 			if (state.step !== 1) return state;
 			return { ...state, step: 2, groups: action.groups };

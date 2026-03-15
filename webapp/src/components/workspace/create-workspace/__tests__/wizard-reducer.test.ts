@@ -60,14 +60,6 @@ describe("wizardReducer", () => {
 		});
 	});
 
-	describe("CLEAR_PREFLIGHT", () => {
-		it("clears the preflight result", () => {
-			const state = stateAt(1, { preflightResult: validPreflight });
-			const result = wizardReducer(state, { type: "CLEAR_PREFLIGHT" });
-			expect(result.preflightResult).toBeNull();
-		});
-	});
-
 	describe("ADVANCE_TO_GROUPS", () => {
 		it("advances from step 1 to step 2 with groups", () => {
 			const result = wizardReducer(initialWizardState, {
