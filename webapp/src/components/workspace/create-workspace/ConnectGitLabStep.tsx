@@ -43,7 +43,8 @@ export function ConnectGitLabStep() {
 		setFieldErrors({});
 		// Persist trimmed values back to state so downstream steps use normalized data
 		dispatch({ type: "SET_SERVER_URL", value: result.data.serverUrl });
-		dispatch({ type: "CLEAR_PREFLIGHT" });
+		// Reset any stale mutation state before firing the new request
+		preflight.reset();
 		preflight.mutate({
 			body: {
 				personalAccessToken: result.data.personalAccessToken,
@@ -133,7 +134,7 @@ export function ConnectGitLabStep() {
 			<Button
 				type="button"
 				onClick={handleValidate}
-				disabled={!state.personalAccessToken || preflight.isPending}
+				disabled={!state.personalAccessToken.trim() || preflight.isPending}
 			>
 				{preflight.isPending && <Spinner className="mr-2" />}
 				Validate Token

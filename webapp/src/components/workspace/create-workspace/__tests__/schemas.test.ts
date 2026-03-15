@@ -49,6 +49,30 @@ describe("connectionSchema", () => {
 		});
 		expect(result.success).toBe(false);
 	});
+
+	it("rejects javascript: URL", () => {
+		const result = connectionSchema.safeParse({
+			serverUrl: "javascript:alert(1)",
+			personalAccessToken: "token",
+		});
+		expect(result.success).toBe(false);
+	});
+
+	it("rejects ftp: URL", () => {
+		const result = connectionSchema.safeParse({
+			serverUrl: "ftp://files.example.com",
+			personalAccessToken: "token",
+		});
+		expect(result.success).toBe(false);
+	});
+
+	it("rejects whitespace-only PAT", () => {
+		const result = connectionSchema.safeParse({
+			serverUrl: "",
+			personalAccessToken: "   ",
+		});
+		expect(result.success).toBe(false);
+	});
 });
 
 describe("workspaceDetailsSchema", () => {
@@ -173,5 +197,65 @@ describe("workspaceDetailsSchema", () => {
 			workspaceSlug: "valid-slug",
 		});
 		expect(result.success).toBe(false);
+	});
+
+	it("accepts all-digit slug", () => {
+		const result = workspaceDetailsSchema.safeParse({
+			displayName: "Test",
+			workspaceSlug: "123",
+		});
+		expect(result.success).toBe(true);
+	});
+
+	it("rejects slug with underscores", () => {
+		const result = workspaceDetailsSchema.safeParse({
+			displayName: "Test",
+			workspaceSlug: "my_workspace",
+		});
+		expect(result.success).toBe(false);
+	});
+
+	it("rejects slug with periods", () => {
+		const result = workspaceDetailsSchema.safeParse({
+			displayName: "Test",
+			workspaceSlug: "my.workspace",
+		});
+		expect(result.success).toBe(false);
+	});
+
+	it("rejects slug with spaces", () => {
+		const result = workspaceDetailsSchema.safeParse({
+			displayName: "Test",
+			workspaceSlug: "my workspace",
+		});
+		expect(result.success).toBe(false);
+	});
+
+	it("trims whitespace from slug before validation", () => {
+		const result = workspaceDetailsSchema.safeParse({
+			displayName: "Test",
+			workspaceSlug: "  valid-slug  ",
+		});
+		expect(result.success).toBe(true);
+	});
+
+	it("rejects empty slug", () => {
+		const result = workspaceDetailsSchema.safeParse({
+			displayName: "Test",
+			workspaceSlug: "",
+		});
+		expect(result.success).toBe(false);
+	});
+
+	it("provides targeted error for slug starting with hyphen", () => {
+		const result = workspaceDetailsSchema.safeParse({
+			displayName: "Test",
+			workspaceSlug: "-abc",
+		});
+		expect(result.success).toBe(false);
+		if (!result.success) {
+			const slugErrors = result.error.issues.filter((i) => i.path[0] === "workspaceSlug");
+			expect(slugErrors.some((e) => e.message.includes("start with"))).toBe(true);
+		}
 	});
 });
