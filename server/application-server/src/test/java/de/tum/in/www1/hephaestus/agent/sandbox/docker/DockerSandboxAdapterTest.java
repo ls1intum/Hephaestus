@@ -57,6 +57,24 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
     private static final String CONTAINER_ID = "container-456def";
     private static final String APP_SERVER_IP = "172.18.0.2";
 
+    /** Reusable default host config — avoids 14-arg constructor duplication across tests. */
+    private static final DockerOperations.HostConfigSpec DEFAULT_HOST_CONFIG = new DockerOperations.HostConfigSpec(
+        4L * 1024 * 1024 * 1024,
+        4L * 1024 * 1024 * 1024,
+        2_000_000_000L,
+        256,
+        true,
+        false,
+        List.of("ALL"),
+        List.of(),
+        Map.of(),
+        List.of(),
+        "private",
+        "none",
+        null,
+        Map.of()
+    );
+
     @BeforeEach
     void setUp() {
         SandboxProperties properties = new SandboxProperties(
@@ -105,22 +123,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
         when(networkManager.createJobNetwork(eq(JOB_ID), eq(false))).thenReturn(NETWORK_ID);
         when(networkManager.connectAppServer(NETWORK_ID)).thenReturn(APP_SERVER_IP);
         when(securityPolicy.buildHostConfig(any(), any(), any())).thenReturn(
-            new DockerOperations.HostConfigSpec(
-                4L * 1024 * 1024 * 1024,
-                4L * 1024 * 1024 * 1024,
-                2_000_000_000L,
-                256,
-                true,
-                false,
-                List.of("ALL"),
-                List.of(),
-                Map.of(),
-                List.of(),
-                "private",
-                "none",
-                null,
-                Map.of()
-            )
+            DEFAULT_HOST_CONFIG
         );
         when(securityPolicy.buildLabels(JOB_ID)).thenReturn(
             Map.of("hephaestus.managed", "true", "hephaestus.job-id", JOB_ID.toString())
@@ -327,6 +330,68 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
 
             verify(workspaceManager, never()).injectFiles(anyString(), any());
         }
+
+        @Test
+        @DisplayName("should handle null networkPolicy gracefully")
+        void shouldHandleNullNetworkPolicy() {
+            when(networkManager.createJobNetwork(eq(JOB_ID), eq(false))).thenReturn(NETWORK_ID);
+            when(networkManager.connectAppServer(NETWORK_ID)).thenReturn(APP_SERVER_IP);
+            when(securityPolicy.buildHostConfig(any(), any(), any())).thenReturn(DEFAULT_HOST_CONFIG);
+            when(securityPolicy.buildLabels(JOB_ID)).thenReturn(Map.of());
+            when(containerManager.createContainer(any())).thenReturn(CONTAINER_ID);
+            when(containerManager.waitForCompletion(eq(CONTAINER_ID), any())).thenReturn(
+                new SandboxContainerManager.WaitOutcome(0, false)
+            );
+            when(workspaceManager.collectOutput(eq(CONTAINER_ID), anyString())).thenReturn(Map.of());
+            when(containerManager.getLogs(eq(CONTAINER_ID), anyInt())).thenReturn("");
+
+            SandboxSpec spec = new SandboxSpec(
+                JOB_ID,
+                "alpine:latest",
+                List.of("echo"),
+                Map.of("USER_VAR", "value"),
+                null, // null networkPolicy
+                ResourceLimits.DEFAULT,
+                SecurityProfile.DEFAULT,
+                Map.of(),
+                "/workspace/.output"
+            );
+
+            SandboxResult result = sandboxAdapter.execute(spec);
+            assertThat(result.exitCode()).isZero();
+
+            // Verify no LLM proxy vars injected
+            ArgumentCaptor<DockerOperations.ContainerSpec> captor = ArgumentCaptor.forClass(
+                DockerOperations.ContainerSpec.class
+            );
+            verify(containerManager).createContainer(captor.capture());
+            Map<String, String> env = captor.getValue().environment();
+            assertThat(env).doesNotContainKey("LLM_PROXY_URL");
+            assertThat(env).doesNotContainKey("LLM_PROXY_TOKEN");
+            assertThat(env).containsEntry("USER_VAR", "value");
+        }
+
+        @Test
+        @DisplayName("should use default output path when spec outputPath is null")
+        void shouldUseDefaultOutputPath() {
+            setupHappyPath();
+
+            SandboxSpec spec = new SandboxSpec(
+                JOB_ID,
+                "alpine:latest",
+                List.of("echo"),
+                Map.of(),
+                new NetworkPolicy(false, null, null),
+                ResourceLimits.DEFAULT,
+                SecurityProfile.DEFAULT,
+                Map.of(),
+                null // null outputPath
+            );
+
+            sandboxAdapter.execute(spec);
+
+            verify(workspaceManager).collectOutput(CONTAINER_ID, "/workspace/.output");
+        }
     }
 
     @Nested
@@ -454,6 +519,98 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
             verify(networkManager).disconnectAppServer(NETWORK_ID);
             verify(networkManager).removeNetwork(NETWORK_ID);
         }
+
+        @Test
+        @DisplayName("should capture container logs on error path before cleanup")
+        void shouldCaptureLogsOnError() {
+            when(networkManager.createJobNetwork(eq(JOB_ID), eq(false))).thenReturn(NETWORK_ID);
+            when(networkManager.connectAppServer(NETWORK_ID)).thenReturn(APP_SERVER_IP);
+            when(securityPolicy.buildHostConfig(any(), any(), any())).thenReturn(
+                new DockerOperations.HostConfigSpec(
+                    4L * 1024 * 1024 * 1024,
+                    4L * 1024 * 1024 * 1024,
+                    2_000_000_000L,
+                    256,
+                    true,
+                    false,
+                    List.of("ALL"),
+                    List.of(),
+                    Map.of(),
+                    List.of(),
+                    "private",
+                    "none",
+                    null,
+                    Map.of()
+                )
+            );
+            when(securityPolicy.buildLabels(JOB_ID)).thenReturn(Map.of());
+            when(containerManager.createContainer(any())).thenReturn(CONTAINER_ID);
+            when(containerManager.waitForCompletion(eq(CONTAINER_ID), any())).thenThrow(
+                new SandboxException("Docker daemon lost")
+            );
+            when(containerManager.getLogs(eq(CONTAINER_ID), anyInt())).thenReturn("error logs here");
+
+            try {
+                sandboxAdapter.execute(createSpec());
+            } catch (SandboxException ignored) {}
+
+            // captureLogsOnError should call getLogs before cleanup removes the container
+            verify(containerManager).getLogs(eq(CONTAINER_ID), anyInt());
+        }
+
+        @Test
+        @DisplayName("should use SecurityProfile.DEFAULT when spec has null securityProfile")
+        void shouldUseDefaultSecurityProfileWhenNull() {
+            when(networkManager.createJobNetwork(eq(JOB_ID), eq(false))).thenReturn(NETWORK_ID);
+            when(networkManager.connectAppServer(NETWORK_ID)).thenReturn(APP_SERVER_IP);
+            when(securityPolicy.buildHostConfig(any(), any(), any())).thenReturn(
+                new DockerOperations.HostConfigSpec(
+                    4L * 1024 * 1024 * 1024,
+                    4L * 1024 * 1024 * 1024,
+                    2_000_000_000L,
+                    256,
+                    true,
+                    false,
+                    List.of("ALL"),
+                    List.of(),
+                    Map.of(),
+                    List.of(),
+                    "private",
+                    "none",
+                    null,
+                    Map.of()
+                )
+            );
+            when(securityPolicy.buildLabels(JOB_ID)).thenReturn(Map.of());
+            when(containerManager.createContainer(any())).thenReturn(CONTAINER_ID);
+            when(containerManager.waitForCompletion(eq(CONTAINER_ID), any())).thenReturn(
+                new SandboxContainerManager.WaitOutcome(0, false)
+            );
+            when(workspaceManager.collectOutput(eq(CONTAINER_ID), anyString())).thenReturn(Map.of());
+            when(containerManager.getLogs(eq(CONTAINER_ID), anyInt())).thenReturn("");
+
+            // Create spec with null securityProfile — should NOT NPE
+            SandboxSpec specWithNullSecurity = new SandboxSpec(
+                JOB_ID,
+                "alpine:latest",
+                List.of("echo"),
+                Map.of(),
+                new NetworkPolicy(false, null, null),
+                ResourceLimits.DEFAULT,
+                null,
+                Map.of(),
+                "/workspace/.output"
+            );
+
+            SandboxResult result = sandboxAdapter.execute(specWithNullSecurity);
+            assertThat(result.exitCode()).isZero();
+
+            // Verify SecurityProfile.DEFAULT was used
+            ArgumentCaptor<de.tum.in.www1.hephaestus.agent.sandbox.spi.SecurityProfile> secCaptor =
+                ArgumentCaptor.forClass(de.tum.in.www1.hephaestus.agent.sandbox.spi.SecurityProfile.class);
+            verify(securityPolicy).buildHostConfig(secCaptor.capture(), any(), any());
+            assertThat(secCaptor.getValue()).isEqualTo(de.tum.in.www1.hephaestus.agent.sandbox.spi.SecurityProfile.DEFAULT);
+        }
     }
 
     @Nested
@@ -476,10 +633,11 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("cancel should stop running container")
+        @DisplayName("cancel should stop running container and cause SandboxCancelledException")
         void shouldStopRunningContainer() throws Exception {
             CountDownLatch containerStarted = new CountDownLatch(1);
             CountDownLatch cancelDone = new CountDownLatch(1);
+            var thrownException = new java.util.concurrent.atomic.AtomicReference<Exception>();
 
             when(networkManager.createJobNetwork(eq(JOB_ID), eq(false))).thenReturn(NETWORK_ID);
             when(networkManager.connectAppServer(NETWORK_ID)).thenReturn(APP_SERVER_IP);
@@ -510,13 +668,15 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
                 cancelDone.await(5, TimeUnit.SECONDS);
                 return new SandboxContainerManager.WaitOutcome(137, false);
             });
-            when(workspaceManager.collectOutput(eq(CONTAINER_ID), anyString())).thenReturn(Map.of());
-            when(containerManager.getLogs(eq(CONTAINER_ID), anyInt())).thenReturn("");
+            // Note: no getLogs stub needed — cancel throws SandboxCancelledException
+            // before reaching the COLLECT phase or captureLogsOnError()
 
             Thread bg = new Thread(() -> {
                 try {
                     sandboxAdapter.execute(createSpec());
-                } catch (Exception ignored) {}
+                } catch (Exception e) {
+                    thrownException.set(e);
+                }
             });
             bg.start();
 
@@ -524,8 +684,11 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
             sandboxAdapter.cancel(JOB_ID);
             cancelDone.countDown();
             bg.join(5000);
+            assertThat(bg.isAlive()).isFalse();
 
             verify(containerManager).stopContainer(CONTAINER_ID);
+            // After waitForCompletion returns, checkCancelled() should throw
+            assertThat(thrownException.get()).isInstanceOf(SandboxCancelledException.class);
         }
 
         @Test
@@ -711,6 +874,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
 
             release.countDown();
             bg.join(5000);
+            assertThat(bg.isAlive()).isFalse();
 
             // After execution, gauge should be 0
             assertThat(meterRegistry.get("sandbox.containers.active").gauge().value()).isZero();
@@ -751,6 +915,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
 
             releaseBlock.countDown();
             bg.join(5000);
+            assertThat(bg.isAlive()).isFalse();
         }
     }
 }

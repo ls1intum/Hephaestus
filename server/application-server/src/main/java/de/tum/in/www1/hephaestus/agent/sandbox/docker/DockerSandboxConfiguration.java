@@ -153,12 +153,8 @@ public class DockerSandboxConfiguration {
     }
 
     @Bean
-    public DockerHealthIndicator dockerHealthIndicator(
-        DockerClientOperations ops,
-        SandboxContainerManager containerManager,
-        SandboxProperties properties
-    ) {
-        return new DockerHealthIndicator(ops, containerManager, properties);
+    public DockerHealthIndicator dockerHealthIndicator(SandboxContainerManager containerManager, SandboxProperties properties) {
+        return new DockerHealthIndicator(containerManager, properties);
     }
 
     /**
@@ -171,8 +167,9 @@ public class DockerSandboxConfiguration {
     @Bean(name = "sandboxExecutor")
     public AsyncTaskExecutor sandboxExecutor(SandboxProperties properties) {
         var executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(2);
-        executor.setMaxPoolSize(properties.maxConcurrentContainers());
+        int maxPool = properties.maxConcurrentContainers();
+        executor.setCorePoolSize(Math.min(2, maxPool));
+        executor.setMaxPoolSize(maxPool);
         executor.setQueueCapacity(0);
         executor.setAllowCoreThreadTimeOut(true);
         executor.setThreadNamePrefix("sandbox-");

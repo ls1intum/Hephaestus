@@ -14,16 +14,10 @@ import org.springframework.boot.actuate.health.HealthIndicator;
  */
 public class DockerHealthIndicator implements HealthIndicator {
 
-    private final DockerContainerOperations containerOps;
     private final SandboxContainerManager containerManager;
     private final SandboxProperties properties;
 
-    public DockerHealthIndicator(
-        DockerContainerOperations containerOps,
-        SandboxContainerManager containerManager,
-        SandboxProperties properties
-    ) {
-        this.containerOps = containerOps;
+    public DockerHealthIndicator(SandboxContainerManager containerManager, SandboxProperties properties) {
         this.containerManager = containerManager;
         this.properties = properties;
     }
@@ -31,7 +25,7 @@ public class DockerHealthIndicator implements HealthIndicator {
     @Override
     public Health health() {
         try {
-            boolean reachable = containerOps.ping();
+            boolean reachable = containerManager.ping();
             if (reachable) {
                 int activeContainers = containerManager.listManagedContainers().size();
                 return Health.up()

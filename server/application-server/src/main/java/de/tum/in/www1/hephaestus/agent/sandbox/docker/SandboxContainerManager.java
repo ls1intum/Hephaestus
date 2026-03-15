@@ -97,6 +97,10 @@ public class SandboxContainerManager {
             try {
                 DockerOperations.WaitResult result = waitFuture.get(POST_STOP_WAIT_SECONDS, TimeUnit.SECONDS);
                 return new WaitOutcome(result.exitCode(), true);
+            } catch (InterruptedException ex) {
+                waitFuture.cancel(true);
+                Thread.currentThread().interrupt();
+                return new WaitOutcome(SIGKILL_EXIT_CODE, true);
             } catch (Exception ex) {
                 waitFuture.cancel(true);
                 return new WaitOutcome(SIGKILL_EXIT_CODE, true);

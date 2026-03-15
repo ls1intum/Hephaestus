@@ -33,7 +33,8 @@ import org.testcontainers.DockerClientFactory;
  * Integration tests for the Docker sandbox manager using a real Docker daemon.
  *
  * <p>These tests require Docker to be available on the machine. They are
- * excluded from the default test suite and only run with {@code -Dfailsafe.includedGroups=integration}.
+ * excluded from the default test suite (tagged {@code "live"}) and run
+ * with {@code -Dgroups=live}.
  *
  * <p>Each test creates real containers that are cleaned up in {@code @AfterEach}.
  */

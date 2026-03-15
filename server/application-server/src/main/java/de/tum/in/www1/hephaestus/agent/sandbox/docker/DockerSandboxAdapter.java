@@ -6,6 +6,7 @@ import de.tum.in.www1.hephaestus.agent.sandbox.spi.SandboxException;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.SandboxManager;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.SandboxResult;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.SandboxSpec;
+import de.tum.in.www1.hephaestus.agent.sandbox.spi.SecurityProfile;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
@@ -143,8 +144,9 @@ public class DockerSandboxAdapter implements SandboxManager {
             Map<String, String> environment = buildEnvironment(spec, appServerIp);
 
             // Build container spec with security hardening
+            var secProfile = spec.securityProfile() != null ? spec.securityProfile() : SecurityProfile.DEFAULT;
             DockerOperations.HostConfigSpec hostConfig = securityPolicy.buildHostConfig(
-                spec.securityProfile(),
+                secProfile,
                 spec.resourceLimits(),
                 spec.networkPolicy()
             );
@@ -166,13 +168,17 @@ public class DockerSandboxAdapter implements SandboxManager {
             MDC.put(MDC_CONTAINER_ID, containerId);
             log.info("Container created: containerId={}", containerId);
 
+            // Check cancellation immediately after container registration —
+            // if cancel() was called during createContainer(), the flag is set
+            // but the container wasn't in activeContainers yet so cancel couldn't
+            // stop it. Now we catch it before doing unnecessary file injection.
+            checkCancelled(cancelled, jobId);
+
             // Inject input files via docker cp
             if (spec.inputFiles() != null && !spec.inputFiles().isEmpty()) {
                 workspaceManager.injectFiles(containerId, spec.inputFiles());
                 log.debug("Injected {} input files", spec.inputFiles().size());
             }
-
-            checkCancelled(cancelled, jobId);
 
             // ── PHASE 2: EXECUTE ──
             containerManager.startContainer(containerId);
@@ -180,6 +186,11 @@ public class DockerSandboxAdapter implements SandboxManager {
 
             Duration timeout = spec.resourceLimits().maxRuntime();
             SandboxContainerManager.WaitOutcome waitOutcome = containerManager.waitForCompletion(containerId, timeout);
+
+            // Check cancellation after wait — cancel() stops the container, so
+            // waitForCompletion returns with exit code 137. Without this check,
+            // the caller would see a normal result instead of SandboxCancelledException.
+            checkCancelled(cancelled, jobId);
 
             // ── PHASE 3: COLLECT ──
             // Collect output regardless of exit code or timeout — agent may have written partial results
@@ -211,10 +222,12 @@ public class DockerSandboxAdapter implements SandboxManager {
             throw e;
         } catch (SandboxException e) {
             executionsFailed.increment();
+            captureLogsOnError(containerId);
             log.error("Sandbox execution failed: error={}", e.getMessage(), e);
             throw e;
         } catch (Exception e) {
             executionsFailed.increment();
+            captureLogsOnError(containerId);
             log.error("Unexpected error during sandbox execution", e);
             throw new SandboxException("Sandbox execution failed for job: " + jobId, e);
         } finally {
@@ -287,6 +300,25 @@ public class DockerSandboxAdapter implements SandboxManager {
         }
 
         return env;
+    }
+
+    /**
+     * Best-effort log capture on error paths — container is about to be removed
+     * by cleanup, so grab logs while we can. Logs are emitted at WARN for
+     * post-mortem debugging.
+     */
+    private void captureLogsOnError(String containerId) {
+        if (containerId == null) {
+            return;
+        }
+        try {
+            String logs = containerManager.getLogs(containerId, LOG_TAIL_LINES);
+            if (logs != null && !logs.isEmpty()) {
+                log.warn("Container logs before cleanup:\n{}", logs);
+            }
+        } catch (Exception e) {
+            log.debug("Could not capture container logs on error path: {}", e.getMessage());
+        }
     }
 
     private void checkCancelled(AtomicBoolean flag, UUID jobId) {

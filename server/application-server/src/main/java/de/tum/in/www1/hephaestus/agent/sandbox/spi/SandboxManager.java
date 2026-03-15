@@ -38,8 +38,9 @@ public interface SandboxManager {
      *
      * @param spec the complete sandbox specification
      * @return the execution result (exit code, output files, logs)
-     * @throws SandboxException if the sandbox infrastructure fails (Docker unreachable,
-     *                          container creation error, etc.)
+     * @throws SandboxException           if the sandbox infrastructure fails (Docker unreachable,
+     *                                    container creation error, etc.)
+     * @throws SandboxCancelledException  if the job was cancelled via {@link #cancel}
      */
     SandboxResult execute(SandboxSpec spec) throws SandboxException;
 
@@ -48,7 +49,7 @@ public interface SandboxManager {
      *
      * <p>If a container for the given job is running, it will be stopped
      * (SIGTERM → grace period → SIGKILL). The corresponding {@link #execute}
-     * call will return with a non-zero exit code.
+     * call will throw {@link SandboxCancelledException}.
      *
      * <p>Safe to call from any thread. No-op if the job is not running.
      *

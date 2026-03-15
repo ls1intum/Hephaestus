@@ -1,13 +1,16 @@
 package de.tum.in.www1.hephaestus.agent.sandbox.spi;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNullPointerException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 @DisplayName("SandboxSpec")
@@ -109,6 +112,60 @@ class SandboxSpecTest extends BaseUnitTest {
             null
         );
         // No exception thrown
-        assert spec.jobId() != null;
+        assertThat(spec.jobId()).isNotNull();
+    }
+
+    @Nested
+    @DisplayName("ResourceLimits validation")
+    class ResourceLimitsValidation {
+
+        @Test
+        @DisplayName("should reject zero memoryBytes")
+        void shouldRejectZeroMemory() {
+            assertThatThrownBy(() -> new ResourceLimits(0, 2.0, 256, Duration.ofMinutes(10)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("memoryBytes");
+        }
+
+        @Test
+        @DisplayName("should reject negative cpus")
+        void shouldRejectNegativeCpus() {
+            assertThatThrownBy(() -> new ResourceLimits(4L * 1024 * 1024 * 1024, -1.0, 256, Duration.ofMinutes(10)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("cpus");
+        }
+
+        @Test
+        @DisplayName("should reject zero pidsLimit")
+        void shouldRejectZeroPids() {
+            assertThatThrownBy(() -> new ResourceLimits(4L * 1024 * 1024 * 1024, 2.0, 0, Duration.ofMinutes(10)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("pidsLimit");
+        }
+
+        @Test
+        @DisplayName("should reject null maxRuntime")
+        void shouldRejectNullMaxRuntime() {
+            assertThatNullPointerException()
+                .isThrownBy(() -> new ResourceLimits(4L * 1024 * 1024 * 1024, 2.0, 256, null))
+                .withMessageContaining("maxRuntime");
+        }
+
+        @Test
+        @DisplayName("should reject zero maxRuntime")
+        void shouldRejectZeroMaxRuntime() {
+            assertThatThrownBy(() -> new ResourceLimits(4L * 1024 * 1024 * 1024, 2.0, 256, Duration.ZERO))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("maxRuntime");
+        }
+
+        @Test
+        @DisplayName("should accept DEFAULT constants")
+        void shouldAcceptDefaults() {
+            assertThat(ResourceLimits.DEFAULT.memoryBytes()).isEqualTo(4L * 1024 * 1024 * 1024);
+            assertThat(ResourceLimits.DEFAULT.cpus()).isEqualTo(2.0);
+            assertThat(ResourceLimits.DEFAULT.pidsLimit()).isEqualTo(256);
+            assertThat(ResourceLimits.DEFAULT.maxRuntime()).isEqualTo(Duration.ofMinutes(10));
+        }
     }
 }

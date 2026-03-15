@@ -17,9 +17,6 @@ import org.springframework.boot.actuate.health.Status;
 class DockerHealthIndicatorTest extends BaseUnitTest {
 
     @Mock
-    private DockerContainerOperations containerOps;
-
-    @Mock
     private SandboxContainerManager containerManager;
 
     private DockerHealthIndicator indicator;
@@ -39,13 +36,13 @@ class DockerHealthIndicatorTest extends BaseUnitTest {
             null,
             null
         );
-        indicator = new DockerHealthIndicator(containerOps, containerManager, properties);
+        indicator = new DockerHealthIndicator(containerManager, properties);
     }
 
     @Test
     @DisplayName("should report UP when Docker daemon is reachable")
     void shouldReportUpWhenReachable() {
-        when(containerOps.ping()).thenReturn(true);
+        when(containerManager.ping()).thenReturn(true);
         when(containerManager.listManagedContainers()).thenReturn(List.of());
 
         Health health = indicator.health();
@@ -59,7 +56,7 @@ class DockerHealthIndicatorTest extends BaseUnitTest {
     @Test
     @DisplayName("should report DOWN when Docker daemon is unreachable")
     void shouldReportDownWhenUnreachable() {
-        when(containerOps.ping()).thenReturn(false);
+        when(containerManager.ping()).thenReturn(false);
 
         Health health = indicator.health();
 
@@ -70,7 +67,7 @@ class DockerHealthIndicatorTest extends BaseUnitTest {
     @Test
     @DisplayName("should report DOWN with error details on exception")
     void shouldReportDownOnException() {
-        when(containerOps.ping()).thenThrow(new RuntimeException("Connection refused"));
+        when(containerManager.ping()).thenThrow(new RuntimeException("Connection refused"));
 
         Health health = indicator.health();
 

@@ -117,6 +117,71 @@ class SandboxContainerManagerTest extends BaseUnitTest {
                 SandboxException.class
             );
         }
+
+        @Test
+        @DisplayName("should re-interrupt thread and throw on InterruptedException during initial wait")
+        void shouldReInterruptOnInitialWaitInterruption() throws Exception {
+            // Block waitContainer so we can interrupt the calling thread
+            when(containerOps.waitContainer(CONTAINER_ID)).thenAnswer(inv -> {
+                Thread.sleep(10_000);
+                return new DockerOperations.WaitResult(0);
+            });
+
+            Thread testThread = Thread.currentThread();
+            // Schedule interruption after a short delay
+            var interruptor = new Thread(() -> {
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException ignored) {}
+                testThread.interrupt();
+            });
+            interruptor.start();
+
+            assertThatThrownBy(() -> manager.waitForCompletion(CONTAINER_ID, Duration.ofMinutes(5)))
+                .isInstanceOf(SandboxException.class)
+                .hasMessageContaining("Interrupted");
+
+            // Thread interrupt flag should be restored
+            assertThat(Thread.interrupted()).isTrue(); // also clears it
+            interruptor.join(1000);
+        }
+
+        @Test
+        @DisplayName("should handle post-timeout second wait failure gracefully")
+        void shouldHandlePostTimeoutWaitFailure() {
+            // waitContainer blocks forever, triggering timeout, then post-stop wait also fails
+            when(containerOps.waitContainer(CONTAINER_ID)).thenAnswer(inv -> {
+                Thread.sleep(60_000);
+                return new DockerOperations.WaitResult(0);
+            });
+
+            SandboxContainerManager.WaitOutcome outcome = manager.waitForCompletion(
+                CONTAINER_ID,
+                Duration.ofMillis(50)
+            );
+
+            // Should return SIGKILL exit code because post-stop wait times out
+            assertThat(outcome.timedOut()).isTrue();
+            assertThat(outcome.exitCode()).isEqualTo(137);
+        }
+
+        @Test
+        @DisplayName("should tolerate stopContainer failure during timeout")
+        void shouldTolerateStopFailureDuringTimeout() {
+            when(containerOps.waitContainer(CONTAINER_ID)).thenAnswer(inv -> {
+                Thread.sleep(60_000);
+                return new DockerOperations.WaitResult(0);
+            });
+            doThrow(new SandboxException("stop failed")).when(containerOps).stopContainer(eq(CONTAINER_ID), anyInt());
+
+            SandboxContainerManager.WaitOutcome outcome = manager.waitForCompletion(
+                CONTAINER_ID,
+                Duration.ofMillis(50)
+            );
+
+            // Should still return timeout result even if stop failed
+            assertThat(outcome.timedOut()).isTrue();
+        }
     }
 
     @Nested
