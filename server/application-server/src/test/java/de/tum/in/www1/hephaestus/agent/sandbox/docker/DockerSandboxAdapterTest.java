@@ -875,5 +875,15 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
             assertThat(DockerSandboxAdapter.isBlockedEnvVar("FOO")).isFalse();
             assertThat(DockerSandboxAdapter.isBlockedEnvVar("CUSTOM_VAR")).isFalse();
         }
+
+        @Test
+        @DisplayName("should block case variants of prefix-matched vars")
+        void shouldBlockCaseVariants() {
+            // Some tools/shells inject lowercase variants
+            assertThat(DockerSandboxAdapter.isBlockedEnvVar("aws_access_key_id")).isTrue();
+            assertThat(DockerSandboxAdapter.isBlockedEnvVar("docker_host")).isTrue();
+            assertThat(DockerSandboxAdapter.isBlockedEnvVar("Google_Cloud_Project")).isTrue();
+            assertThat(DockerSandboxAdapter.isBlockedEnvVar("Azure_Client_Secret")).isTrue();
+        }
     }
 }

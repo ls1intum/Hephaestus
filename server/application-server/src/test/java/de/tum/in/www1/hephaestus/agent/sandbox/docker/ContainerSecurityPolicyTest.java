@@ -182,7 +182,6 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
         void shouldUseGvisorFromProfile() {
             SecurityProfile gvisorProfile = new SecurityProfile(
                 "runsc",
-                "sandbox/agent-seccomp-profile.json",
                 true,
                 true,
                 true,
@@ -336,16 +335,7 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
         @Test
         @DisplayName("should enforce no-new-privileges even when profile disables it")
         void shouldEnforceNoNewPrivileges() {
-            SecurityProfile laxProfile = new SecurityProfile(
-                null,
-                null,
-                false,
-                false,
-                false,
-                "host",
-                List.of(),
-                Map.of()
-            );
+            SecurityProfile laxProfile = new SecurityProfile(null, false, false, false, "host", List.of(), Map.of());
 
             DockerOperations.HostConfigSpec config = securityPolicy.buildHostConfig(
                 laxProfile,
@@ -359,16 +349,7 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
         @Test
         @DisplayName("should enforce read-only rootfs even when profile disables it")
         void shouldEnforceReadOnlyRootfs() {
-            SecurityProfile laxProfile = new SecurityProfile(
-                null,
-                null,
-                false,
-                false,
-                false,
-                "host",
-                List.of(),
-                Map.of()
-            );
+            SecurityProfile laxProfile = new SecurityProfile(null, false, false, false, "host", List.of(), Map.of());
 
             DockerOperations.HostConfigSpec config = securityPolicy.buildHostConfig(
                 laxProfile,
@@ -382,7 +363,7 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
         @Test
         @DisplayName("should enforce cap-drop ALL even when profile drops nothing")
         void shouldEnforceCapDropAll() {
-            SecurityProfile laxProfile = new SecurityProfile(null, null, true, true, true, "none", List.of(), Map.of());
+            SecurityProfile laxProfile = new SecurityProfile(null, true, true, true, "none", List.of(), Map.of());
 
             DockerOperations.HostConfigSpec config = securityPolicy.buildHostConfig(
                 laxProfile,
@@ -396,16 +377,7 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
         @Test
         @DisplayName("should enforce private cgroup namespace even when profile disables it")
         void shouldEnforcePrivateCgroupns() {
-            SecurityProfile laxProfile = new SecurityProfile(
-                null,
-                null,
-                true,
-                true,
-                false,
-                "none",
-                List.of("ALL"),
-                Map.of()
-            );
+            SecurityProfile laxProfile = new SecurityProfile(null, true, true, false, "none", List.of("ALL"), Map.of());
 
             DockerOperations.HostConfigSpec config = securityPolicy.buildHostConfig(
                 laxProfile,
@@ -420,7 +392,6 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
         @DisplayName("should reject ipc mode 'host' and force 'none'")
         void shouldRejectHostIpcMode() {
             SecurityProfile hostIpcProfile = new SecurityProfile(
-                null,
                 null,
                 true,
                 true,
@@ -444,7 +415,6 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
         void shouldDefaultIpcToNone() {
             SecurityProfile nullIpcProfile = new SecurityProfile(
                 null,
-                null,
                 true,
                 true,
                 true,
@@ -467,7 +437,6 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
         void shouldAllowPrivateIpcMode() {
             SecurityProfile privateIpcProfile = new SecurityProfile(
                 null,
-                null,
                 true,
                 true,
                 true,
@@ -489,7 +458,6 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
         @DisplayName("should enforce mandatory tmpfs mounts over caller-supplied ones")
         void shouldEnforceMandatoryTmpfs() {
             SecurityProfile weakTmpfsProfile = new SecurityProfile(
-                null,
                 null,
                 true,
                 true,
@@ -535,7 +503,6 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
             // Caller tries to downgrade to runc
             SecurityProfile runcProfile = new SecurityProfile(
                 "runc",
-                null,
                 true,
                 true,
                 true,

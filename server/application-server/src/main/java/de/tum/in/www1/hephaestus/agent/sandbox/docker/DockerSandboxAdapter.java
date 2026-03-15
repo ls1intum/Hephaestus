@@ -274,6 +274,9 @@ public class DockerSandboxAdapter implements SandboxManager {
             log.error("Sandbox execution failed: error={}", e.getMessage(), e);
             throw e;
         } catch (Exception e) {
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
             executionsFailed.increment();
             captureLogsOnError(containerId);
             log.error("Unexpected error during sandbox execution", e);
@@ -391,8 +394,11 @@ public class DockerSandboxAdapter implements SandboxManager {
         if (BLOCKED_ENV_VARS.contains(name)) {
             return true;
         }
+        // Prefix matching uses uppercase comparison — catches case variants
+        // like "aws_access_key_id" that some tools/shells might inject
+        String upper = name.toUpperCase(java.util.Locale.ROOT);
         for (String prefix : BLOCKED_ENV_PREFIXES) {
-            if (name.startsWith(prefix)) {
+            if (upper.startsWith(prefix)) {
                 return true;
             }
         }
@@ -432,6 +438,9 @@ public class DockerSandboxAdapter implements SandboxManager {
         try {
             action.run();
         } catch (Exception e) {
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
             meterRegistry.counter("sandbox.cleanup.failures", "step", operation).increment();
             log.warn("Cleanup failed ({}): jobId={}, error={}", operation, jobId, e.getMessage());
         }

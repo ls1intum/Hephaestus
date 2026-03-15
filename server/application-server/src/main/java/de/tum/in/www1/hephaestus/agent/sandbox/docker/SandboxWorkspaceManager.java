@@ -42,11 +42,6 @@ public class SandboxWorkspaceManager {
     }
 
     /** Package-private constructor for testing with smaller limits. */
-    SandboxWorkspaceManager(DockerFileOperations fileOps, long maxOutputBytes) {
-        this(fileOps, maxOutputBytes, MAX_SINGLE_FILE_BYTES);
-    }
-
-    /** Package-private constructor for testing with smaller limits. */
     SandboxWorkspaceManager(DockerFileOperations fileOps, long maxOutputBytes, long maxSingleFileBytes) {
         this.fileOps = fileOps;
         this.maxOutputBytes = maxOutputBytes;

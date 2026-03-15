@@ -134,7 +134,11 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         @DisplayName("should stop collecting when output size limit is exceeded")
         void shouldEnforceOutputSizeLimit() throws Exception {
             // Use a small limit (1 KB) for this test to avoid allocating megabytes in CI
-            var limitedManager = new SandboxWorkspaceManager(fileOps, 1024);
+            var limitedManager = new SandboxWorkspaceManager(
+                fileOps,
+                1024,
+                SandboxWorkspaceManager.MAX_SINGLE_FILE_BYTES
+            );
 
             byte[] largeContent = new byte[800]; // 800 bytes
             byte[] secondContent = new byte[500]; // 500 bytes — total 1300 > 1024

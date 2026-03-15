@@ -6,8 +6,11 @@ import java.util.Map;
 /**
  * Security hardening profile for a sandboxed container.
  *
+ * <p>The seccomp profile is an infrastructure concern loaded once at startup by {@code
+ * DockerSandboxConfiguration} — it is NOT configurable per-execution. All containers share the same
+ * seccomp profile for consistent security posture.
+ *
  * @param runtime OCI runtime ({@code null} = default runc, {@code "runsc"} = gVisor)
- * @param seccompProfile classpath resource path to the seccomp JSON profile
  * @param readOnlyRootfs mount root filesystem as read-only
  * @param noNewPrivileges prevent privilege escalation via setuid/setgid
  * @param cgroupnsPrivate use private cgroup namespace
@@ -18,7 +21,6 @@ import java.util.Map;
  */
 public record SecurityProfile(
     String runtime,
-    String seccompProfile,
     boolean readOnlyRootfs,
     boolean noNewPrivileges,
     boolean cgroupnsPrivate,
@@ -29,7 +31,6 @@ public record SecurityProfile(
     /** Production defaults: maximum hardening with standard tmpfs layout. */
     public static final SecurityProfile DEFAULT = new SecurityProfile(
         null,
-        "sandbox/agent-seccomp-profile.json",
         true,
         true,
         true,

@@ -18,6 +18,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -41,6 +42,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 public class SandboxReconciler {
 
     private static final Logger log = LoggerFactory.getLogger(SandboxReconciler.class);
+    private static final String MDC_RECONCILER_TYPE = "reconciler.type";
 
     private final AgentJobRepository jobRepository;
     private final SandboxContainerManager containerManager;
@@ -91,8 +93,23 @@ public class SandboxReconciler {
             return;
         }
 
+        MDC.put(MDC_RECONCILER_TYPE, "startup");
+        try {
+            doStartup();
+        } finally {
+            MDC.remove(MDC_RECONCILER_TYPE);
+        }
+    }
+
+    private void doStartup() {
         log.info("Sandbox reconciler: startup check");
 
+        markOrphanedJobsFailed();
+        cleanupOrphanedDockerResources();
+    }
+
+    /** Mark RUNNING jobs with no matching container as FAILED. */
+    private void markOrphanedJobsFailed() {
         List<AgentJob> runningJobs = jobRepository.findByStatus(AgentJobStatus.RUNNING);
         if (runningJobs.isEmpty()) {
             log.info("No orphaned running jobs found");
@@ -136,6 +153,21 @@ public class SandboxReconciler {
         log.info("Startup reconciliation complete: {} orphaned jobs marked FAILED", orphanedCount);
     }
 
+    /** Clean up Docker resources left from previous runs — don't wait for periodic sweep. */
+    private void cleanupOrphanedDockerResources() {
+        try {
+            Set<UUID> activeJobIds = jobRepository
+                .findByStatusIn(List.of(AgentJobStatus.QUEUED, AgentJobStatus.RUNNING))
+                .stream()
+                .map(AgentJob::getId)
+                .collect(Collectors.toSet());
+            cleanupOrphanedContainers(activeJobIds);
+            cleanupOrphanedNetworks(activeJobIds);
+        } catch (Exception e) {
+            log.warn("Startup Docker resource cleanup failed: {}", e.getMessage());
+        }
+    }
+
     /** Periodic sweep: clean up orphaned Docker resources. */
     @Scheduled(
         initialDelayString = "${hephaestus.sandbox.reconciliation-initial-delay-seconds:10}",
@@ -147,18 +179,23 @@ public class SandboxReconciler {
             return;
         }
 
-        reconciliationDuration.record(() -> {
-            log.debug("Sandbox reconciler: periodic sweep");
+        MDC.put(MDC_RECONCILER_TYPE, "periodic");
+        try {
+            reconciliationDuration.record(() -> {
+                log.debug("Sandbox reconciler: periodic sweep");
 
-            Set<UUID> activeJobIds = jobRepository
-                .findByStatusIn(List.of(AgentJobStatus.QUEUED, AgentJobStatus.RUNNING))
-                .stream()
-                .map(AgentJob::getId)
-                .collect(Collectors.toSet());
+                Set<UUID> activeJobIds = jobRepository
+                    .findByStatusIn(List.of(AgentJobStatus.QUEUED, AgentJobStatus.RUNNING))
+                    .stream()
+                    .map(AgentJob::getId)
+                    .collect(Collectors.toSet());
 
-            cleanupOrphanedContainers(activeJobIds);
-            cleanupOrphanedNetworks(activeJobIds);
-        });
+                cleanupOrphanedContainers(activeJobIds);
+                cleanupOrphanedNetworks(activeJobIds);
+            });
+        } finally {
+            MDC.remove(MDC_RECONCILER_TYPE);
+        }
     }
 
     private void cleanupOrphanedContainers(Set<UUID> activeJobIds) {

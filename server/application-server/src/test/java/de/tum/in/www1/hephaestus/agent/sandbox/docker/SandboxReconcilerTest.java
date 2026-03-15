@@ -136,6 +136,9 @@ class SandboxReconcilerTest extends BaseUnitTest {
 
             when(jobRepository.findByStatus(AgentJobStatus.RUNNING)).thenReturn(List.of(orphanedJob));
             when(containerManager.listManagedContainers()).thenReturn(List.of()); // No containers running
+            // After marking jobs, startup also runs Docker cleanup
+            when(jobRepository.findByStatusIn(any())).thenReturn(List.of());
+            when(networkManager.listOrphanedNetworks()).thenReturn(List.of());
 
             reconciler.onStartup();
 
@@ -146,6 +149,34 @@ class SandboxReconcilerTest extends BaseUnitTest {
             assertThat(saved.getErrorMessage()).contains("Orphaned");
             assertThat(saved.getCompletedAt()).isNotNull();
             assertThat(meterRegistry.counter("sandbox.reconciler.orphaned", "resource", "job").count()).isEqualTo(1.0);
+        }
+
+        @Test
+        @DisplayName("should also cleanup Docker resources during startup")
+        void shouldCleanupDockerResourcesDuringStartup() {
+            UUID orphanedJobId = UUID.randomUUID();
+
+            when(jobRepository.findByStatus(AgentJobStatus.RUNNING)).thenReturn(List.of());
+            // No RUNNING jobs, but orphaned Docker resources exist from a previous crash
+            when(jobRepository.findByStatusIn(any())).thenReturn(List.of());
+            when(containerManager.listManagedContainers()).thenReturn(
+                List.of(
+                    new DockerOperations.ContainerInfo(
+                        "orphaned-ctr",
+                        "test",
+                        Map.of("hephaestus.job-id", orphanedJobId.toString()),
+                        "exited"
+                    )
+                )
+            );
+            when(networkManager.listOrphanedNetworks()).thenReturn(
+                List.of(new DockerOperations.NetworkInfo("net-1", "agent-net-" + orphanedJobId))
+            );
+
+            reconciler.onStartup();
+
+            verify(containerManager).forceRemove("orphaned-ctr");
+            verify(networkManager).removeNetwork("net-1");
         }
 
         @Test
@@ -168,6 +199,9 @@ class SandboxReconcilerTest extends BaseUnitTest {
                     )
                 )
             );
+            // Startup Docker cleanup stubs
+            when(jobRepository.findByStatusIn(any())).thenReturn(List.of(activeJob));
+            when(networkManager.listOrphanedNetworks()).thenReturn(List.of());
 
             reconciler.onStartup();
 
@@ -175,13 +209,17 @@ class SandboxReconcilerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should do nothing when no RUNNING jobs exist")
+        @DisplayName("should not mark any jobs as FAILED when no RUNNING jobs exist")
         void shouldDoNothingWithNoRunningJobs() {
             when(jobRepository.findByStatus(AgentJobStatus.RUNNING)).thenReturn(List.of());
+            // Startup always runs Docker resource cleanup
+            when(jobRepository.findByStatusIn(any())).thenReturn(List.of());
+            when(containerManager.listManagedContainers()).thenReturn(List.of());
+            when(networkManager.listOrphanedNetworks()).thenReturn(List.of());
 
             reconciler.onStartup();
 
-            verify(containerManager, never()).listManagedContainers();
+            verify(jobRepository, never()).save(any());
         }
     }
 
