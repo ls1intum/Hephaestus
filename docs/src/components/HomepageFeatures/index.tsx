@@ -18,11 +18,11 @@ const FeatureList: FeatureItem[] = [
     title: 'Practice Detection',
     kicker: 'Identify what\'s working and what\'s not — before it becomes habit',
     description:
-      'AI-powered analysis surfaces anti-patterns in pull requests — missing descriptions, oversized changes, incomplete templates — with lifecycle-aware severity. Drafts get coaching. Ready-to-merge work gets rigor.',
+      'Analyzes how your team works — across pull requests, reviews, and commits — to catch bad practices before they become habits. Early work gets coaching. Finished work gets rigor.',
     bullets: [
-      'Catches patterns like rubber-stamp reviews and missing context',
-      'Adapts severity to PR lifecycle — early work is a coaching moment, not a violation',
-      'Contributors close the loop by marking findings as fixed, adjusted, or incorrect',
+      'Catches bad practices across pull requests, reviews, and commits',
+      'Adapts to context — early work gets coaching, finished work gets rigor',
+      'You stay in control — accept, dismiss, or challenge any finding',
     ],
     cta: {label: 'See the conceptual model', to: '/contributor/conceptual-model'},
   },
@@ -30,11 +30,11 @@ const FeatureList: FeatureItem[] = [
     title: 'Multi-Channel Guidance',
     kicker: 'Coaching at the right time, through the right channel',
     description:
-      'Detected practices trigger targeted guidance — from structured AI mentoring sessions to Slack notifications and achievement unlocks. Humans and AI coding agents receive the same feedback grounded in the same activity stream.',
+      'When a practice is detected, guidance reaches the right person through the right channel — AI mentoring, Slack notifications, or achievement unlocks. Humans and AI coding agents get the same coaching, grounded in the same data.',
     bullets: [
-      'AI mentor (Heph) leads structured reflection tied to real PRs, reviews, and issues',
-      'Practice notifications reach contributors via email, Slack, and in-app alerts',
-      '60+ achievements with progression chains recognize sustained good practices',
+      'AI mentor (Heph) helps you reflect on your work and plan next steps',
+      'Timely notifications reach you where you work — Slack, email, or in-app',
+      'Achievements and progression chains celebrate sustained good practices',
     ],
     cta: {label: 'Work with the mentor', to: '/user/ai-mentor'},
   },
@@ -42,11 +42,11 @@ const FeatureList: FeatureItem[] = [
     title: 'Growth Tracking',
     kicker: 'See development trajectories, not just snapshots',
     description:
-      'Achievement progression chains and a league system track skill development over time. As practices improve, coaching intensity fades — matching the Cognitive Apprenticeship model of guided independence.',
+      'Achievements and a league system track skill development over time. As practices improve, coaching fades — the goal is independence, not dependence on the tool.',
     bullets: [
-      'Achievement chains from common to mythic track practice milestones',
-      'Elo-like league system provides persistent, transparent ranking',
-      'Weekly Slack digests and leaderboards make good practices visible to the whole team',
+      'Achievement milestones track your growth from first steps to mastery',
+      'A league system gives you a fair, evolving rank based on your contributions',
+      'Weekly digests and leaderboards make great work visible to the whole team',
     ],
     cta: {label: 'See the leaderboard', to: '/user/leaderboard'},
   },

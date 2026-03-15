@@ -10,9 +10,9 @@ export function AboutHeroSection() {
 				About <span className="text-provider-done-foreground">Heph</span>aestus
 			</h1>
 			<p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-				Formative practice analytics for project teams. Hephaestus observes how participants
-				collaborate — from issues to pull requests to code reviews — detects the practices that
-				drive quality, and guides every contributor — human and AI — toward growth.
+				Hephaestus helps teams build better practices, not just better code. It watches how you
+				collaborate, spots what's working and what needs attention, and coaches every contributor —
+				human and AI — toward growth.
 			</p>
 		</section>
 	);

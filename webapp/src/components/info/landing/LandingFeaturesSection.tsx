@@ -34,22 +34,17 @@ export function LandingFeaturesSection() {
 							<ul className="space-y-2">
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>
-										Catches patterns like rubber-stamp reviews and missing PR descriptions
-									</span>
+									<span>Catches bad practices across pull requests, reviews, and commits</span>
 								</li>
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
 									<span>
-										Adapts severity to PR lifecycle — early work is a coaching moment, not a
-										violation
+										Adapts to context — early work gets coaching, finished work gets rigor
 									</span>
 								</li>
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>
-										Contributors close the loop by marking findings as fixed, adjusted, or incorrect
-									</span>
+									<span>You stay in control — accept, dismiss, or challenge any finding</span>
 								</li>
 							</ul>
 						</CardContent>
@@ -69,21 +64,18 @@ export function LandingFeaturesSection() {
 							<ul className="space-y-2">
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
+									<span>AI mentor (Heph) helps you reflect on your work and plan next steps</span>
+								</li>
+								<li className="flex gap-2 items-start">
+									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
 									<span>
-										AI mentor (Heph) leads structured reflection tied to real PRs, reviews, and
-										issues
+										Timely notifications reach you where you work — Slack, email, or in-app
 									</span>
 								</li>
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
 									<span>
-										Practice notifications reach contributors via email, Slack, and in-app alerts
-									</span>
-								</li>
-								<li className="flex gap-2 items-start">
-									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>
-										60+ achievements with progression chains recognize sustained good practices
+										Achievements and progression chains celebrate sustained good practices
 									</span>
 								</li>
 							</ul>
@@ -102,17 +94,18 @@ export function LandingFeaturesSection() {
 							<ul className="space-y-2">
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>Achievement chains from common to mythic track practice milestones</span>
-								</li>
-								<li className="flex gap-2 items-start">
-									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>Elo-like league system provides persistent, transparent ranking</span>
+									<span>Achievement milestones track your growth from first steps to mastery</span>
 								</li>
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
 									<span>
-										Weekly Slack digests and leaderboards make good practices visible to the whole
-										team
+										A league system gives you a fair, evolving rank based on your contributions
+									</span>
+								</li>
+								<li className="flex gap-2 items-start">
+									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
+									<span>
+										Weekly digests and leaderboards make great work visible to the whole team
 									</span>
 								</li>
 							</ul>

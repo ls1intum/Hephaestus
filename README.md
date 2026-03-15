@@ -9,7 +9,7 @@
 
 # Hephaestus — How You Build Matters
 
-Hephaestus is an open-source platform for **formative practice analytics** in project-based work. It observes how participants collaborate — from issues to pull requests to code reviews — detects the practices that drive quality, and guides every contributor — human and AI — toward growth. Grounded in Cognitive Apprenticeship theory (Collins et al., 1989), Hephaestus bridges the gap between summative project metrics (built for managers) and formative feedback (built for the people doing the work).
+Hephaestus is an open-source platform that helps teams **build better practices** — not just better code. It watches how your team collaborates, spots what's working and what isn't, and coaches every contributor toward growth. Unlike dashboards built for managers, Hephaestus delivers feedback to the people doing the work, grounded in Cognitive Apprenticeship theory (Collins et al., 1989).
 
 <img alt="Agile Hephaestus" height="200px" src="./docs/user/img/overview/agile_hephaestus.png">
 
@@ -23,33 +23,33 @@ Hephaestus /hɪˈfɛstəs/ is the Greek god of blacksmiths, craftsmen, and artis
 Observe  →  Detect  →  Guide  →  Grow
 ```
 
-1. **Observe**: Ingest development activity from code platforms (GitHub, GitLab) as an immutable activity event ledger
-2. **Detect**: Identify behavioral practices — both beneficial and detrimental — across four health dimensions
-3. **Guide**: Deliver formative feedback through the right channel — AI mentor, notifications, achievements, or directly at the point of work
-4. **Grow**: Track participant trajectories to adapt coaching intensity as competence develops
+1. **Observe**: Connect to your code platform (GitHub, GitLab) and capture how your team actually works
+2. **Detect**: Spot the practices that help — and the ones that hurt — across code, process, collaboration, and learning
+3. **Guide**: Coach every contributor through the right channel at the right time — AI mentor, notifications, PR comments, or achievements
+4. **Grow**: Track how skills develop over time and adapt coaching as contributors improve
 
 ### Four Health Dimensions
 
 | Dimension | What it measures | Example |
 |-----------|-----------------|---------|
-| **Technical** | Domain skill quality | Review thoroughness, bad practice rate |
-| **Process** | Workflow effectiveness | Lead time, WIP count, PR abandonment |
-| **Social** | Collaboration quality | Review reciprocity, cross-team engagement |
-| **Cognitive** | Learning & self-regulation | Declining bad practice rate, reflection depth |
+| **Technical** | Code and review quality | Are reviews thorough? Are bad practices declining? |
+| **Process** | Workflow effectiveness | Are PRs timely? Is work-in-progress manageable? |
+| **Social** | Collaboration patterns | Is review load shared? Do people collaborate across teams? |
+| **Cognitive** | Learning and growth | Are contributors reflecting? Are they improving over time? |
 
 ## Features
 
 ### Practice Detection
 
-AI-powered analysis of pull requests that identifies anti-patterns (missing descriptions, oversized changes, incomplete templates) with lifecycle-aware severity — draft PRs receive gentler feedback, ready-to-merge PRs receive stricter review. Contributors can mark findings as fixed, won't fix, or incorrect, closing the feedback loop.
+Analyzes how your team works — across pull requests, reviews, commits, and issues — to catch bad practices before they become habits. Early-stage work gets coaching; finished work gets rigor. Contributors stay in control: accept, dismiss, or challenge any finding.
 
 ### AI Mentor (Heph)
 
-A conversational AI mentor grounded in your actual project activity. Heph guides structured reflection — goal-setting, progress review, and self-assessment — generates weekly progress summaries, and surfaces relevant pull requests and action items — all driven by real data, not guesswork.
+A conversational AI mentor grounded in your actual project activity. Heph helps contributors reflect on their work, set goals, and understand their progress — all driven by real data, not guesswork.
 
 ### Recognition & Growth
 
-Achievement progression chains (60+ across five categories, common to mythic rarity), an Elo-like league system for persistent ranking, and weekly leaderboards make good practices visible and track skill development over time. Automated Slack digests recognize top contributors each week.
+Achievements, leagues, and leaderboards make good practices visible and celebrate growth over time. Weekly digests highlight top contributors so the whole team sees what great work looks like.
 
 ### Agent Orchestration
 

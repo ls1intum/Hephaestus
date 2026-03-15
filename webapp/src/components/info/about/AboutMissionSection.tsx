@@ -9,7 +9,7 @@ const FEATURES_DATA: FeatureData[] = [
 		title: "Practice Detection",
 		description: "Identify what's working and what's not — before it becomes habit",
 		content:
-			"AI-powered analysis surfaces anti-patterns in pull requests — missing descriptions, oversized changes, incomplete templates — with lifecycle-aware severity. Drafts get coaching. Ready-to-merge work gets rigor.",
+			"Analyzes how your team works — across pull requests, reviews, and commits — to catch bad practices before they become habits. Early work gets coaching. Finished work gets rigor.",
 	},
 	{
 		icon: MessageCircle,
@@ -17,7 +17,7 @@ const FEATURES_DATA: FeatureData[] = [
 		title: "Multi-Channel Guidance",
 		description: "Coaching at the right time, through the right channel",
 		content:
-			"Detected practices trigger targeted guidance — from structured AI mentoring sessions to Slack notifications and achievement unlocks. Humans and AI coding agents receive the same feedback grounded in the same activity stream.",
+			"When a practice is detected, guidance reaches the right person through the right channel — AI mentoring, Slack notifications, or achievement unlocks. Humans and AI coding agents get the same coaching, grounded in the same data.",
 	},
 	{
 		icon: TrendingUp,
@@ -25,7 +25,7 @@ const FEATURES_DATA: FeatureData[] = [
 		title: "Growth Tracking",
 		description: "See development trajectories, not just snapshots",
 		content:
-			"Achievement progression chains and a league system track skill development over time. As practices improve, coaching intensity fades — matching the Cognitive Apprenticeship model of guided independence.",
+			"Achievements and a league system track skill development over time. As practices improve, coaching fades — the goal is independence, not dependence on the tool.",
 	},
 ];
 

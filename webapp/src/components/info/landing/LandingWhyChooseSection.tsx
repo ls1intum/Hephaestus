@@ -48,8 +48,8 @@ export function LandingWhyChooseSection({
 								<div>
 									<p className="font-medium">Detects what dashboards miss</p>
 									<p className="text-sm text-muted-foreground">
-										Goes beyond cycle time to identify behavioral patterns — like rubber-stamp
-										reviews, missing PR descriptions, or ignored review feedback.
+										Goes beyond cycle time to spot the practices that actually shape code quality —
+										across pull requests, reviews, and collaboration patterns.
 									</p>
 								</div>
 							</li>
@@ -60,8 +60,8 @@ export function LandingWhyChooseSection({
 								<div>
 									<p className="font-medium">Four dimensions of health</p>
 									<p className="text-sm text-muted-foreground">
-										Measures Technical, Process, Social, and Cognitive practices — so improving one
-										metric can't come at the expense of the others.
+										Looks at code quality, workflow, collaboration, and learning together — so
+										improving one area doesn't come at the expense of the others.
 									</p>
 								</div>
 							</li>

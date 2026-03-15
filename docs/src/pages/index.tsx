@@ -9,7 +9,7 @@ import styles from './index.module.css';
 const guideLinks = [
   {
     title: 'User Guide',
-    description: 'Navigate weekly rituals, mentoring flows, and leaderboard insights.',
+    description: 'Use the AI mentor, leaderboards, and weekly digests to improve your practices.',
     to: '/user/overview',
   },
   {
