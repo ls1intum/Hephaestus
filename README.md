@@ -9,7 +9,7 @@
 
 # Hephaestus — How You Build Matters
 
-Hephaestus is an open-source platform for **formative practice analytics** in project-based work. It observes how participants collaborate — from issues to pull requests to code reviews — detects behavioral practices, and coaches improvement through AI-guided mentoring and gamification. Grounded in Cognitive Apprenticeship theory (Collins et al., 1989), Hephaestus bridges the gap between summative project metrics (built for managers) and formative feedback (built for the people doing the work).
+Hephaestus is an open-source platform for **formative practice analytics** in project-based work. It observes how participants collaborate — from issues to pull requests to code reviews — detects behavioral practices, and guides improvement through AI mentoring and gamification. Grounded in Cognitive Apprenticeship theory (Collins et al., 1989), Hephaestus bridges the gap between summative project metrics (built for managers) and formative feedback (built for the people doing the work).
 
 <img alt="Agile Hephaestus" height="200px" src="./docs/user/img/overview/agile_hephaestus.png">
 

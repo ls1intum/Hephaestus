@@ -12,7 +12,7 @@ export function AboutHeroSection() {
 			<p className="text-xl text-muted-foreground max-w-2xl mx-auto">
 				Formative practice analytics for project teams. Hephaestus observes how participants
 				collaborate — from issues to pull requests to code reviews — detects behavioral patterns,
-				and coaches improvement through AI mentoring and gamification.
+				and guides improvement through AI mentoring and gamification.
 			</p>
 		</section>
 	);

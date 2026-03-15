@@ -40,13 +40,13 @@ const FeatureList: FeatureItem[] = [
   },
   {
     title: 'Practice Detection',
-    kicker: 'AI-powered behavioral analysis across your project lifecycle',
+    kicker: 'AI-powered analysis that catches anti-patterns early',
     description:
-      'Hephaestus analyzes PRs, reviews, and issues to detect behavioral patterns — then adjusts feedback based on lifecycle stage. Drafts get supportive coaching. Ready-to-merge work gets rigorous review.',
+      'Hephaestus analyzes pull requests to detect anti-patterns — missing descriptions, oversized changes, incomplete templates — then adjusts feedback based on lifecycle stage. Drafts get supportive coaching. Ready-to-merge work gets rigorous review.',
     bullets: [
       'Detects patterns like rubber-stamp reviews, missing context, and ignored feedback',
       'Lifecycle-aware severity — early work is a coaching moment, not a violation',
-      'Scores across four health dimensions: Technical, Process, Social, Cognitive',
+      'Contributors can mark findings as fixed, won\'t fix, or incorrect',
     ],
     cta: {label: 'See the conceptual model', to: '/contributor/conceptual-model'},
   },

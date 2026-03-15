@@ -119,7 +119,7 @@ export function LandingHeroSection({
 							How You Build Matters
 						</h1>
 						<p className="mx-auto max-w-[700px] text-xl text-muted-foreground">
-							Observe how your team collaborates. Detect the practices that drive quality. Coach
+							Observe how your team collaborates. Detect the practices that drive quality. Guide
 							improvement through AI mentoring and gamification.
 						</p>
 					</div>

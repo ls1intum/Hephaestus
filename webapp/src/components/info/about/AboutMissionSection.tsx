@@ -25,7 +25,7 @@ const FEATURES_DATA: FeatureData[] = [
 		title: "Practice Detection",
 		description: "Identifying what's working and what needs attention",
 		content:
-			"AI-powered analysis of project artifacts identifies both beneficial practices and areas for improvement. Feedback adapts to context — early-stage work receives supportive scaffolding while mature deliverables get rigorous review.",
+			"AI-powered analysis of pull requests identifies anti-patterns like missing descriptions and oversized changes. Feedback adapts to context — draft PRs receive supportive coaching while ready-to-merge work gets rigorous review.",
 	},
 ];
 

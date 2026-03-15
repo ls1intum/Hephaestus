@@ -81,7 +81,7 @@ export function LandingFeaturesSection() {
 								<ScanSearch className="h-5 w-5 text-blue-500" />
 							</div>
 							<CardTitle>Practice Detection</CardTitle>
-							<CardDescription>Identifies what's working and what needs attention</CardDescription>
+							<CardDescription>Catches anti-patterns before they become habits</CardDescription>
 						</CardHeader>
 						<CardContent>
 							<ul className="space-y-2">
@@ -97,7 +97,7 @@ export function LandingFeaturesSection() {
 								</li>
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>Scores across Technical, Process, Social, and Cognitive dimensions</span>
+									<span>Contributors can mark findings as fixed, won't fix, or incorrect</span>
 								</li>
 							</ul>
 						</CardContent>
