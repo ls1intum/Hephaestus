@@ -105,6 +105,9 @@ public class AgentJob {
     @Column(name = "container_id", length = 64)
     private String containerId;
 
+    @Column(name = "network_id", length = 64)
+    private String networkId;
+
     @Column(name = "exit_code")
     private Integer exitCode;
 

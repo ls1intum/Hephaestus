@@ -183,6 +183,7 @@ export const agentJob = pgTable(
 		}).notNull(),
 		startedAt: timestamp("started_at", { precision: 6, withTimezone: true, mode: "string" }),
 		completedAt: timestamp("completed_at", { precision: 6, withTimezone: true, mode: "string" }),
+		networkId: varchar("network_id", { length: 64 }),
 	},
 	(table) => [
 		index("idx_agent_job_status_started")
