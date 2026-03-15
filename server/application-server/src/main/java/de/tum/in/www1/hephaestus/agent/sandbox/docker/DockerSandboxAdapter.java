@@ -54,12 +54,19 @@ public class DockerSandboxAdapter implements SandboxManager {
     private static final String MDC_JOB_ID = "sandbox.jobId";
     private static final String MDC_CONTAINER_ID = "sandbox.containerId";
 
-    /** Maximum container log size to emit in a single log event (prevents log aggregator overflow). */
+    /**
+     * Maximum container log size to emit in a single log event (prevents log aggregator overflow).
+     * This is the <em>emission</em> limit; see {@link DockerClientOperations#MAX_LOG_BYTES} for the
+     * upstream <em>collection</em> limit (1 MB).
+     */
     private static final int MAX_LOG_EVENT_BYTES = 32 * 1024; // 32 KB
 
     /**
-     * Environment variable names that must never be set by callers. These can influence container
-     * behavior in security-critical ways (library injection, path manipulation, credential leakage).
+     * Exact environment variable names that must never be set by callers. Covers library injection,
+     * path manipulation, and proxy hijacking vectors.
+     *
+     * @see #BLOCKED_ENV_PREFIXES
+     * @see #isBlockedEnvVar(String)
      */
     static final Set<String> BLOCKED_ENV_VARS = Set.of(
         "LD_PRELOAD",
@@ -68,20 +75,29 @@ public class DockerSandboxAdapter implements SandboxManager {
         "HOME",
         "SHELL",
         "USER",
-        "DOCKER_HOST",
-        "DOCKER_TLS_VERIFY",
-        "DOCKER_CERT_PATH",
-        "AWS_ACCESS_KEY_ID",
-        "AWS_SECRET_ACCESS_KEY",
-        "AWS_SESSION_TOKEN",
-        "GOOGLE_APPLICATION_CREDENTIALS",
-        "AZURE_CLIENT_SECRET",
         "http_proxy",
         "https_proxy",
         "HTTP_PROXY",
         "HTTPS_PROXY",
         "no_proxy",
         "NO_PROXY"
+    );
+
+    /**
+     * Environment variable prefixes that must never be set by callers. Blocks entire credential
+     * families (AWS, GCP, Azure, Docker) rather than individual keys — catches new credential vars
+     * automatically (e.g. {@code AWS_ROLE_ARN}, {@code GOOGLE_CLOUD_PROJECT}).
+     *
+     * @see #BLOCKED_ENV_VARS
+     * @see #isBlockedEnvVar(String)
+     */
+    static final java.util.List<String> BLOCKED_ENV_PREFIXES = java.util.List.of(
+        "AWS_",
+        "GOOGLE_",
+        "GCP_",
+        "AZURE_",
+        "DOCKER_",
+        "ALIBABA_CLOUD_"
     );
 
     private final SandboxNetworkManager networkManager;
@@ -312,7 +328,7 @@ public class DockerSandboxAdapter implements SandboxManager {
 
         // Copy user-provided environment, filtering out blocked variables
         for (var entry : spec.environment().entrySet()) {
-            if (BLOCKED_ENV_VARS.contains(entry.getKey())) {
+            if (isBlockedEnvVar(entry.getKey())) {
                 log.warn("Blocked dangerous environment variable: {}", entry.getKey());
             } else {
                 env.put(entry.getKey(), entry.getValue());
@@ -364,6 +380,23 @@ public class DockerSandboxAdapter implements SandboxManager {
         } catch (Exception e) {
             log.debug("Could not capture container logs on error path: {}", e.getMessage());
         }
+    }
+
+    /**
+     * Check if an environment variable name is blocked (exact match or prefix match).
+     *
+     * <p>Package-private for testing.
+     */
+    static boolean isBlockedEnvVar(String name) {
+        if (BLOCKED_ENV_VARS.contains(name)) {
+            return true;
+        }
+        for (String prefix : BLOCKED_ENV_PREFIXES) {
+            if (name.startsWith(prefix)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void checkCancelled(AtomicBoolean flag, UUID jobId) {

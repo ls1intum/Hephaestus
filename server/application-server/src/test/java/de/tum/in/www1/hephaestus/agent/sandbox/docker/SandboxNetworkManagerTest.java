@@ -136,6 +136,59 @@ class SandboxNetworkManagerTest extends BaseUnitTest {
                 .isInstanceOf(SandboxException.class)
                 .hasMessageContaining("Cannot determine app-server container ID");
         }
+
+        @Test
+        @DisplayName("should throw when hostname is blank")
+        void shouldThrowWhenHostnameBlank() {
+            SandboxProperties propsNoId = new SandboxProperties(
+                true,
+                "unix:///var/run/docker.sock",
+                false,
+                null,
+                5,
+                10,
+                60,
+                null,
+                8080,
+                null,
+                null
+            );
+            SandboxNetworkManager mgr = new SandboxNetworkManager(networkOps, propsNoId, () -> "  ");
+
+            assertThatThrownBy(() -> mgr.connectAppServer(NETWORK_ID))
+                .isInstanceOf(SandboxException.class)
+                .hasMessageContaining("Cannot determine app-server container ID");
+        }
+
+        @Test
+        @DisplayName("should cache resolved container ID across calls (DCL)")
+        void shouldCacheContainerId() {
+            var callCount = new java.util.concurrent.atomic.AtomicInteger(0);
+            SandboxProperties propsNoId = new SandboxProperties(
+                true,
+                "unix:///var/run/docker.sock",
+                false,
+                null,
+                5,
+                10,
+                60,
+                null,
+                8080,
+                null,
+                null
+            );
+            SandboxNetworkManager mgr = new SandboxNetworkManager(networkOps, propsNoId, () -> {
+                callCount.incrementAndGet();
+                return "cached-id";
+            });
+            when(networkOps.connectToNetwork(anyString(), eq("cached-id"))).thenReturn("172.18.0.5");
+
+            mgr.connectAppServer(NETWORK_ID);
+            mgr.connectAppServer(NETWORK_ID);
+
+            // Supplier should only be invoked once — second call uses cached value
+            assertThat(callCount.get()).isEqualTo(1);
+        }
     }
 
     @Nested
@@ -148,6 +201,30 @@ class SandboxNetworkManagerTest extends BaseUnitTest {
             manager.disconnectAppServer(NETWORK_ID);
 
             verify(networkOps).disconnectFromNetwork(NETWORK_ID, "app-server-id");
+        }
+
+        @Test
+        @DisplayName("should no-op when container ID cannot be resolved")
+        void shouldNoOpWhenNoContainerId() {
+            SandboxProperties propsNoId = new SandboxProperties(
+                true,
+                "unix:///var/run/docker.sock",
+                false,
+                null,
+                5,
+                10,
+                60,
+                null,
+                8080,
+                null,
+                null
+            );
+            SandboxNetworkManager mgr = new SandboxNetworkManager(networkOps, propsNoId, () -> null);
+
+            // Should not throw — silently skips disconnect
+            mgr.disconnectAppServer(NETWORK_ID);
+
+            verify(networkOps, org.mockito.Mockito.never()).disconnectFromNetwork(anyString(), anyString());
         }
     }
 

@@ -35,8 +35,12 @@ public class DockerClientOperations
     private static final Logger log = LoggerFactory.getLogger(DockerClientOperations.class);
     private static final int LOG_COLLECTION_TIMEOUT_SECONDS = 30;
 
-    /** Maximum log output size to prevent OOM from runaway containers. */
-    private static final int MAX_LOG_BYTES = 1024 * 1024; // 1 MB
+    /**
+     * Maximum log output to collect from a container (prevents OOM from runaway output). This is
+     * the <em>collection</em> limit; see {@link DockerSandboxAdapter#MAX_LOG_EVENT_BYTES} for the
+     * downstream <em>emission</em> limit (32 KB) applied when logging captured output.
+     */
+    static final int MAX_LOG_BYTES = 1024 * 1024; // 1 MB
 
     private final DockerClient dockerClient;
 

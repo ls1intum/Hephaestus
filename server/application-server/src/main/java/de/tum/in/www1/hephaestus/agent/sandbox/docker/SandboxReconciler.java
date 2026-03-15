@@ -138,7 +138,7 @@ public class SandboxReconciler {
 
     /** Periodic sweep: clean up orphaned Docker resources. */
     @Scheduled(
-        initialDelayString = "${hephaestus.sandbox.reconciliation-interval-seconds:60}",
+        initialDelayString = "${hephaestus.sandbox.reconciliation-initial-delay-seconds:10}",
         fixedDelayString = "${hephaestus.sandbox.reconciliation-interval-seconds:60}",
         timeUnit = TimeUnit.SECONDS
     )

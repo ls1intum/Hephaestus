@@ -26,10 +26,13 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 
@@ -271,7 +274,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should filter out blocked environment variables")
+        @DisplayName("should filter out blocked environment variables (exact and prefix)")
         void shouldFilterBlockedEnvVars() {
             setupHappyPath();
 
@@ -279,7 +282,18 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
                 JOB_ID,
                 "alpine:latest",
                 List.of("echo"),
-                Map.of("SAFE_VAR", "ok", "LD_PRELOAD", "/evil.so", "AWS_SECRET_ACCESS_KEY", "leaked"),
+                Map.of(
+                    "SAFE_VAR",
+                    "ok",
+                    "LD_PRELOAD",
+                    "/evil.so",
+                    "AWS_SECRET_ACCESS_KEY",
+                    "leaked",
+                    "DOCKER_HOST",
+                    "tcp://evil",
+                    "GOOGLE_CLOUD_PROJECT",
+                    "stolen"
+                ),
                 new NetworkPolicy(false, null, "tok"),
                 ResourceLimits.DEFAULT,
                 SecurityProfile.DEFAULT,
@@ -298,6 +312,8 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
             assertThat(env).containsEntry("SAFE_VAR", "ok");
             assertThat(env).doesNotContainKey("LD_PRELOAD");
             assertThat(env).doesNotContainKey("AWS_SECRET_ACCESS_KEY");
+            assertThat(env).doesNotContainKey("DOCKER_HOST");
+            assertThat(env).doesNotContainKey("GOOGLE_CLOUD_PROJECT");
         }
 
         @Test
@@ -809,6 +825,55 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
             releaseBlock.countDown();
             bg.join(5000);
             assertThat(bg.isAlive()).isFalse();
+        }
+    }
+
+    @Nested
+    @DisplayName("Environment variable blocklist")
+    class EnvVarBlocklist {
+
+        static Stream<String> exactBlockedVars() {
+            return DockerSandboxAdapter.BLOCKED_ENV_VARS.stream();
+        }
+
+        static Stream<String> prefixBlockedVars() {
+            return Stream.of(
+                "AWS_ACCESS_KEY_ID",
+                "AWS_SECRET_ACCESS_KEY",
+                "AWS_SESSION_TOKEN",
+                "AWS_ROLE_ARN",
+                "GOOGLE_APPLICATION_CREDENTIALS",
+                "GOOGLE_CLOUD_PROJECT",
+                "GCP_PROJECT",
+                "AZURE_CLIENT_SECRET",
+                "AZURE_TENANT_ID",
+                "DOCKER_HOST",
+                "DOCKER_TLS_VERIFY",
+                "DOCKER_CERT_PATH",
+                "ALIBABA_CLOUD_ACCESS_KEY"
+            );
+        }
+
+        @ParameterizedTest(name = "should block exact var: {0}")
+        @MethodSource("exactBlockedVars")
+        @DisplayName("should block exact env vars")
+        void shouldBlockExactVars(String varName) {
+            assertThat(DockerSandboxAdapter.isBlockedEnvVar(varName)).isTrue();
+        }
+
+        @ParameterizedTest(name = "should block prefix var: {0}")
+        @MethodSource("prefixBlockedVars")
+        @DisplayName("should block prefix-matched env vars")
+        void shouldBlockPrefixVars(String varName) {
+            assertThat(DockerSandboxAdapter.isBlockedEnvVar(varName)).isTrue();
+        }
+
+        @Test
+        @DisplayName("should allow safe env vars")
+        void shouldAllowSafeVars() {
+            assertThat(DockerSandboxAdapter.isBlockedEnvVar("MY_APP_KEY")).isFalse();
+            assertThat(DockerSandboxAdapter.isBlockedEnvVar("FOO")).isFalse();
+            assertThat(DockerSandboxAdapter.isBlockedEnvVar("CUSTOM_VAR")).isFalse();
         }
     }
 }
