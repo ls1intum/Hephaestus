@@ -200,6 +200,9 @@ public class DockerClientOperations
         } catch (DockerException e) {
             throw new SandboxException("Failed to wait for container: " + containerId, e);
         } catch (Exception e) {
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
             throw new SandboxException("Failed waiting for container: " + containerId, e);
         }
     }
@@ -233,6 +236,10 @@ public class DockerClientOperations
             }
 
             return logs.toString();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.warn("Interrupted collecting logs for container {}", containerId);
+            return "";
         } catch (Exception e) {
             log.warn("Failed to collect logs for container {}: {}", containerId, e.getMessage());
             return "";

@@ -12,9 +12,9 @@ import java.util.UUID;
  * the data written to {@code outputPath}. Handlers and adapters produce a {@code SandboxSpec}; the
  * sandbox manager executes it.
  *
- * <p>Files are injected via {@code docker cp} (tar archive API), not bind mounts. This works
- * identically for local and remote Docker daemons, enabling future multi-node runner support
- * without any change to this contract.
+ * <p>Files are injected into the container workspace before execution and collected from the
+ * output path after completion. The transfer mechanism is an implementation detail of the
+ * underlying {@link SandboxManager}.
  *
  * @param jobId unique job identifier (used for labels, network naming, logging)
  * @param image Docker image to run (e.g. {@code ghcr.io/ls1intum/hephaestus/agent-opencode:latest})
@@ -23,7 +23,7 @@ import java.util.UUID;
  * @param networkPolicy network access and LLM proxy configuration
  * @param resourceLimits CPU, memory, PID, and timeout constraints
  * @param securityProfile container hardening flags
- * @param inputFiles files to inject into /workspace via docker cp (relative path → content)
+ * @param inputFiles files to inject into /workspace (relative path → content)
  * @param outputPath container path to collect results from after execution
  */
 public record SandboxSpec(

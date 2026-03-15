@@ -53,7 +53,7 @@ public record SandboxProperties(
     @DefaultValue("10") @Min(1) int containerStopTimeoutSeconds,
     @DefaultValue("60") @Min(10) int reconciliationIntervalSeconds,
     @Nullable String containerRuntime,
-    @DefaultValue("8080") int llmProxyPort,
+    @DefaultValue("8080") @Min(1) int llmProxyPort,
     @Nullable String appServerContainerId,
     @Valid DefaultResourceLimits defaultResourceLimits
 ) {
@@ -86,8 +86,8 @@ public record SandboxProperties(
      * @param pidsLimit maximum process count
      */
     public record DefaultResourceLimits(
-        @DefaultValue("4294967296") long memoryBytes,
+        @DefaultValue("4294967296") @Min(1) long memoryBytes,
         @DefaultValue("2.0") double cpus,
-        @DefaultValue("256") int pidsLimit
+        @DefaultValue("256") @Min(1) int pidsLimit
     ) {}
 }

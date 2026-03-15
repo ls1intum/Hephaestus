@@ -14,8 +14,11 @@ import io.micrometer.core.instrument.Timer;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -68,20 +71,28 @@ public class DockerSandboxAdapter implements SandboxManager {
      * @see #BLOCKED_ENV_PREFIXES
      * @see #isBlockedEnvVar(String)
      */
-    static final Set<String> BLOCKED_ENV_VARS = Set.of(
-        "LD_PRELOAD",
-        "LD_LIBRARY_PATH",
-        "PATH",
-        "HOME",
-        "SHELL",
-        "USER",
-        "http_proxy",
-        "https_proxy",
-        "HTTP_PROXY",
-        "HTTPS_PROXY",
-        "no_proxy",
-        "NO_PROXY"
-    );
+    static final Set<String> BLOCKED_ENV_VARS;
+
+    static {
+        TreeSet<String> vars = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        vars.addAll(
+            List.of(
+                "LD_PRELOAD",
+                "LD_LIBRARY_PATH",
+                "PATH",
+                "HOME",
+                "SHELL",
+                "USER",
+                "http_proxy",
+                "https_proxy",
+                "HTTP_PROXY",
+                "HTTPS_PROXY",
+                "no_proxy",
+                "NO_PROXY"
+            )
+        );
+        BLOCKED_ENV_VARS = vars;
+    }
 
     /**
      * Environment variable prefixes that must never be set by callers. Blocks entire credential
@@ -91,7 +102,7 @@ public class DockerSandboxAdapter implements SandboxManager {
      * @see #BLOCKED_ENV_VARS
      * @see #isBlockedEnvVar(String)
      */
-    static final java.util.List<String> BLOCKED_ENV_PREFIXES = java.util.List.of(
+    static final List<String> BLOCKED_ENV_PREFIXES = List.of(
         "AWS_",
         "GOOGLE_",
         "GCP_",
@@ -396,7 +407,7 @@ public class DockerSandboxAdapter implements SandboxManager {
         }
         // Prefix matching uses uppercase comparison — catches case variants
         // like "aws_access_key_id" that some tools/shells might inject
-        String upper = name.toUpperCase(java.util.Locale.ROOT);
+        String upper = name.toUpperCase(Locale.ROOT);
         for (String prefix : BLOCKED_ENV_PREFIXES) {
             if (upper.startsWith(prefix)) {
                 return true;

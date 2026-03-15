@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -35,7 +36,7 @@ public class ContainerSecurityPolicy {
     private static final long NANO_CPUS_PER_CPU = 1_000_000_000L;
 
     /** IPC modes allowed by the enforcement floor — "host" and "shareable" are always rejected. */
-    private static final java.util.Set<String> ALLOWED_IPC_MODES = java.util.Set.of("none", "private");
+    private static final Set<String> ALLOWED_IPC_MODES = Set.of("none", "private");
 
     /**
      * Mandatory tmpfs mounts that are always applied. Caller-supplied mounts are merged on top, but

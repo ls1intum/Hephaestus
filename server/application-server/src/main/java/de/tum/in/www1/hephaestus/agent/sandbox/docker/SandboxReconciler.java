@@ -104,7 +104,11 @@ public class SandboxReconciler {
     private void doStartup() {
         log.info("Sandbox reconciler: startup check");
 
-        markOrphanedJobsFailed();
+        try {
+            markOrphanedJobsFailed();
+        } catch (Exception e) {
+            log.error("Startup job reconciliation failed: {}", e.getMessage());
+        }
         cleanupOrphanedDockerResources();
     }
 
@@ -155,17 +159,19 @@ public class SandboxReconciler {
 
     /** Clean up Docker resources left from previous runs — don't wait for periodic sweep. */
     private void cleanupOrphanedDockerResources() {
+        Set<UUID> activeJobIds;
         try {
-            Set<UUID> activeJobIds = jobRepository
+            activeJobIds = jobRepository
                 .findByStatusIn(List.of(AgentJobStatus.QUEUED, AgentJobStatus.RUNNING))
                 .stream()
                 .map(AgentJob::getId)
                 .collect(Collectors.toSet());
-            cleanupOrphanedContainers(activeJobIds);
-            cleanupOrphanedNetworks(activeJobIds);
         } catch (Exception e) {
-            log.warn("Startup Docker resource cleanup failed: {}", e.getMessage());
+            log.warn("Could not query active jobs — cleaning ALL managed resources: {}", e.getMessage());
+            activeJobIds = Set.of(); // If DB is down, treat everything as orphaned
         }
+        cleanupOrphanedContainers(activeJobIds);
+        cleanupOrphanedNetworks(activeJobIds);
     }
 
     /** Periodic sweep: clean up orphaned Docker resources. */
