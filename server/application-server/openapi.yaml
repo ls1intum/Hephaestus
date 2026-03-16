@@ -8,7 +8,7 @@ info:
     name: MIT License
     url: https://github.com/ls1intum/Hephaestus/blob/develop/LICENSE
   title: Hephaestus API
-  version: 0.32.0
+  version: 0.33.0
 servers:
 - description: Default Server URL
   url: /
@@ -2652,7 +2652,6 @@ components:
           description: Type of coding agent
           enum:
           - CLAUDE_CODE
-          - CODEX
           - OPENCODE
         allowInternet:
           type: boolean
@@ -2661,6 +2660,13 @@ components:
           type: string
           format: date-time
           description: Timestamp when the config was created
+        credentialMode:
+          type: string
+          description: Authentication mode
+          enum:
+          - PROXY
+          - API_KEY
+          - OAUTH
         enabled:
           type: boolean
           description: Whether the agent is enabled
@@ -2700,6 +2706,7 @@ components:
       - agentType
       - allowInternet
       - createdAt
+      - credentialMode
       - enabled
       - hasLlmApiKey
       - id
@@ -2907,11 +2914,19 @@ components:
           description: Type of coding agent
           enum:
           - CLAUDE_CODE
-          - CODEX
           - OPENCODE
         allowInternet:
           type: boolean
           description: Whether agent containers have internet access
+        credentialMode:
+          type: string
+          default: PROXY
+          description: "Authentication mode: PROXY (internal proxy), API_KEY (direct),\
+            \ or OAUTH (direct OAuth)"
+          enum:
+          - PROXY
+          - API_KEY
+          - OAUTH
         enabled:
           type: boolean
           description: Whether the agent is enabled
@@ -3985,11 +4000,18 @@ components:
           description: Type of coding agent
           enum:
           - CLAUDE_CODE
-          - CODEX
           - OPENCODE
         allowInternet:
           type: boolean
           description: Whether agent containers have internet access
+        credentialMode:
+          type: string
+          description: "Authentication mode: PROXY (internal proxy), API_KEY (direct),\
+            \ or OAUTH (direct OAuth)"
+          enum:
+          - PROXY
+          - API_KEY
+          - OAUTH
         enabled:
           type: boolean
           description: Whether the agent is enabled

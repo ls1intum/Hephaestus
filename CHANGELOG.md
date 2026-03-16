@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.33.0](https://github.com/ls1intum/Hephaestus/compare/v0.32.0...v0.33.0) (2026-03-16)
+
+### 🚀 Features
+
+* **server:** agent adapters for OpenCode and Claude Code ([#842](https://github.com/ls1intum/Hephaestus/issues/842)) ([9cb991a](https://github.com/ls1intum/Hephaestus/commit/9cb991a4459fc418df02b1bb5c0a2f5607f4d6cf))
+
 ## [0.32.0](https://github.com/ls1intum/Hephaestus/compare/v0.31.0...v0.32.0) (2026-03-15)
 
 ### 🚀 Features

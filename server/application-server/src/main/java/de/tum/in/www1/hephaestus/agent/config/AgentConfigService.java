@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.agent.config;
 
 import de.tum.in.www1.hephaestus.agent.AgentType;
+import de.tum.in.www1.hephaestus.agent.CredentialMode;
 import de.tum.in.www1.hephaestus.agent.LlmProvider;
 import de.tum.in.www1.hephaestus.agent.job.AgentJobRepository;
 import de.tum.in.www1.hephaestus.agent.job.AgentJobStatus;
@@ -73,6 +74,11 @@ public class AgentConfigService {
         if (request.allowInternet() != null) {
             config.setAllowInternet(request.allowInternet());
         }
+        if (request.credentialMode() != null) {
+            config.setCredentialMode(request.credentialMode());
+        }
+
+        validateCredentialMode(config);
 
         return agentConfigRepository.save(config);
     }
@@ -116,6 +122,11 @@ public class AgentConfigService {
         if (request.allowInternet() != null) {
             config.setAllowInternet(request.allowInternet());
         }
+        if (request.credentialMode() != null) {
+            config.setCredentialMode(request.credentialMode());
+        }
+
+        validateCredentialMode(config);
 
         return agentConfigRepository.save(config);
     }
@@ -139,16 +150,20 @@ public class AgentConfigService {
         agentConfigRepository.delete(config);
     }
 
+    /**
+     * Validates that direct credential modes (API_KEY, OAUTH) have internet access enabled.
+     */
+    private void validateCredentialMode(AgentConfig config) {
+        if (config.getCredentialMode() != CredentialMode.PROXY && !config.isAllowInternet()) {
+            throw new AgentConfigCredentialModeException(config.getCredentialMode());
+        }
+    }
+
     private void validateProviderCompatibility(AgentType agentType, LlmProvider provider) {
         switch (agentType) {
             case CLAUDE_CODE -> {
                 if (provider != LlmProvider.ANTHROPIC) {
                     throw new AgentConfigProviderMismatchException(agentType, LlmProvider.ANTHROPIC, provider);
-                }
-            }
-            case CODEX -> {
-                if (provider != LlmProvider.OPENAI) {
-                    throw new AgentConfigProviderMismatchException(agentType, LlmProvider.OPENAI, provider);
                 }
             }
             case OPENCODE -> {

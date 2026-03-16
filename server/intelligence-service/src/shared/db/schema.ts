@@ -146,6 +146,7 @@ export const agentConfig = pgTable(
 			mode: "string",
 		}).notNull(),
 		updatedAt: timestamp("updated_at", { precision: 6, withTimezone: true, mode: "string" }),
+		credentialMode: varchar("credential_mode", { length: 16 }).default("PROXY").notNull(),
 	},
 	(table) => [
 		foreignKey({
