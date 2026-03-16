@@ -18,9 +18,9 @@ const FeatureList: FeatureItem[] = [
     title: 'Practice Detection',
     kicker: 'What gets checked, how to configure it, and how to respond to findings',
     description:
-      'LLM-powered checks on PR descriptions, review comments, and commit patterns flag anti-patterns with suggested improvements. Draft PRs receive lighter checks than ready-to-merge work.',
+      'LLM-powered checks flag anti-patterns in how contributors collaborate and document their work. Currently analyzes PR descriptions, review comments, and commit patterns. Drafts receive lighter checks than ready-to-merge work.',
     bullets: [
-      'Catches anti-patterns across pull requests, reviews, and commits',
+      'Catches anti-patterns in collaboration — across PRs, reviews, and commits',
       'Adapts to lifecycle — drafts get coaching, finished work gets rigor',
       'You stay in control — accept, dismiss, or challenge any finding',
     ],
@@ -42,10 +42,10 @@ const FeatureList: FeatureItem[] = [
     title: 'Growth Tracking',
     kicker: 'Understanding leaderboards, leagues, and weekly digests',
     description:
-      'Leaderboards rank contributors by review activity. A league system provides longer-term progression. Weekly Slack digests highlight top reviewers.',
+      'Leaderboards rank contributors by engagement and practice quality. A league system tracks longer-term progression. Weekly Slack digests highlight standout contributors.',
     bullets: [
       'Achievement tiers reflect increasing engagement and consistency',
-      'A league system ranks contributors by review activity, updated weekly',
+      'A league system ranks contributors by engagement and practice quality, updated weekly',
       'Weekly digests and leaderboards highlight top contributors to the team',
     ],
     cta: {label: 'See the leaderboard', to: '/user/leaderboard'},

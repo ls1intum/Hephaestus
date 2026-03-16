@@ -119,7 +119,7 @@ export function LandingHeroSection({
 							How You Build Matters
 						</h1>
 						<p className="mx-auto max-w-[700px] text-xl text-muted-foreground">
-							Analyzes your GitHub PRs and reviews to flag bad practices, coach contributors, and
+							Analyzes how your team collaborates to detect anti-patterns, coach contributors, and
 							track improvement over time.
 						</p>
 					</div>

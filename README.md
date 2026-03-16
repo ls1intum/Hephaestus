@@ -9,7 +9,7 @@
 
 # Hephaestus — How You Build Matters
 
-Hephaestus is an open-source platform that analyzes pull request and code review behavior to give individual contributors actionable feedback — not dashboards for managers. It ingests GitHub activity (PRs, reviews, commits, issues), flags anti-patterns, and delivers coaching through an AI mentor, Slack digests, and in-app notifications. Grounded in Cognitive Apprenticeship theory (Collins et al., 1989).
+Hephaestus is an open-source practice analytics platform that detects anti-patterns in how teams collaborate, coaches individual contributors, and tracks improvement over time — not dashboards for managers. Currently ingests GitHub activity (PRs, reviews, commits, issues) and delivers feedback through an AI mentor, Slack digests, and in-app notifications. Grounded in Cognitive Apprenticeship theory (Collins et al., 1989).
 
 <img alt="Agile Hephaestus" height="200px" src="./docs/user/img/overview/agile_hephaestus.png">
 
@@ -23,7 +23,7 @@ Hephaestus /hɪˈfɛstəs/ is the Greek god of blacksmiths, craftsmen, and artis
 Observe  →  Detect  →  Guide  →  Grow
 ```
 
-1. **Observe**: GitHub webhooks feed PRs, reviews, commits, and issues into the activity stream
+1. **Observe**: Ingest activity from development platforms into a unified stream (currently: GitHub via webhooks)
 2. **Detect**: Rule-based and LLM-powered checks flag anti-patterns (e.g., empty PR descriptions, rubber-stamp approvals)
 3. **Guide**: Findings surface via AI mentor chat, Slack digests, email, or achievement unlocks
 4. **Grow**: Leaderboards, achievement tiers, and league rankings track engagement over time
@@ -41,15 +41,15 @@ Observe  →  Detect  →  Guide  →  Grow
 
 ### Practice Detection
 
-LLM-powered checks on PR descriptions, review comments, and commit patterns flag anti-patterns with suggested improvements. Draft PRs receive lighter checks; ready-to-merge work gets rigor. Contributors stay in control: accept, dismiss, or challenge any finding.
+LLM-powered checks flag anti-patterns in how contributors collaborate and document their work — currently analyzing PR descriptions, review comments, and commit patterns. Early-stage work gets lighter checks; finished work gets rigor. Contributors stay in control: accept, dismiss, or challenge any finding.
 
 ### AI Mentor (Heph)
 
-A chat-based AI mentor with access to your PRs, reviews, and leaderboard data. Heph helps contributors reflect on their work, set goals, and generate shareable session summaries.
+A chat-based AI mentor that helps contributors reflect on their work, set goals, and plan improvement — grounded in their actual activity data (PRs, reviews, leaderboard standing). Generates shareable session summaries.
 
 ### Recognition & Growth
 
-Leaderboards rank contributors by review activity. A league system provides longer-term progression. Weekly Slack digests highlight top reviewers.
+Leaderboards rank contributors by engagement and practice quality. A league system tracks longer-term progression. Weekly Slack digests highlight standout contributors.
 
 ### Agent Orchestration
 
@@ -106,7 +106,7 @@ See the full [Conceptual Model](https://ls1intum.github.io/Hephaestus/contributo
 
 ## Roadmap
 
-- **Practice Detection**: Expand beyond PR descriptions to review quality, commit patterns, and issue management
+- **Practice Detection**: Broaden practice coverage beyond description quality to include review depth, commit patterns, and issue management
 - **PR Comments**: Post coaching feedback directly on pull requests (CA coaching at point of work)
 - **Good Practice Recognition**: Detect and reinforce beneficial patterns, not just flag anti-patterns
 - **Health Signals**: Explicit multi-dimensional health model with confidence scores

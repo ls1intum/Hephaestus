@@ -149,16 +149,16 @@ const config: Config = {
       {
         name: 'description',
         content:
-          'Hephaestus — open-source platform for analyzing GitHub code review practices with AI-powered feedback, leaderboards, and an AI mentor.',
+          'Hephaestus — open-source practice analytics platform that coaches contributors on how they collaborate, with AI-powered feedback, leaderboards, and an AI mentor.',
       },
-      {name: 'keywords', content: 'Hephaestus, code review tool, GitHub code review, developer coaching, code review automation, AI mentor, code review gamification, Cognitive Apprenticeship, software engineering education, open source, TUM'},
+      {name: 'keywords', content: 'Hephaestus, practice analytics, developer coaching, code review, GitHub, AI mentor, contributor engagement, Cognitive Apprenticeship, software engineering education, open source, TUM'},
       {name: 'twitter:card', content: 'summary_large_image'},
       {name: 'twitter:site', content: '@ls1intum'},
       {name: 'twitter:title', content: 'Hephaestus Documentation'},
       {
         name: 'twitter:description',
         content:
-          'Hephaestus — open-source platform for analyzing GitHub code review practices with AI-powered feedback, leaderboards, and an AI mentor.',
+          'Hephaestus — open-source practice analytics platform that coaches contributors on how they collaborate, with AI-powered feedback, leaderboards, and an AI mentor.',
       },
     ],
     navbar: {

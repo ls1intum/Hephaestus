@@ -14,7 +14,7 @@ export function LandingFeaturesSection() {
 						What Hephaestus Does
 					</h2>
 					<p className="text-muted-foreground text-lg">
-						Flags anti-patterns in PRs and reviews. Delivers feedback via AI mentor, Slack, or
+						Detects anti-patterns in how your team works. Delivers feedback via AI mentor, Slack, or
 						in-app. Tracks engagement with leaderboards.
 					</p>
 				</div>
@@ -34,7 +34,9 @@ export function LandingFeaturesSection() {
 							<ul className="space-y-2">
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>Catches bad practices across pull requests, reviews, and commits</span>
+									<span>
+										Catches anti-patterns in collaboration — across PRs, reviews, and commits
+									</span>
 								</li>
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
@@ -96,7 +98,10 @@ export function LandingFeaturesSection() {
 								</li>
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>A league system ranks contributors by review activity, updated weekly</span>
+									<span>
+										A league system ranks contributors by engagement and practice quality, updated
+										weekly
+									</span>
 								</li>
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />

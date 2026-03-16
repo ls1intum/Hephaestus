@@ -48,8 +48,8 @@ export function LandingWhyChooseSection({
 								<div>
 									<p className="font-medium">Analyzes behavior, not just throughput</p>
 									<p className="text-sm text-muted-foreground">
-										Flags process anti-patterns — empty descriptions, rubber-stamp approvals,
-										oversized PRs — that cycle-time dashboards ignore.
+										Flags process anti-patterns — shallow reviews, undocumented changes, lopsided
+										collaboration — that cycle-time dashboards miss.
 									</p>
 								</div>
 							</li>

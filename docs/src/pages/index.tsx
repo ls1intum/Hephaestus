@@ -33,7 +33,7 @@ function HomepageHeader() {
             How You Build Matters
           </Heading>
           <p className={styles.heroSubtitle}>
-            Documentation for the Hephaestus platform — practice analytics, AI mentoring, and code review engagement.
+            Documentation for the Hephaestus platform — practice analytics, AI mentoring, and contributor engagement.
           </p>
           <div className={styles.heroActions}>
             <Link className="button button--primary button--lg" to="/user/overview">
@@ -81,7 +81,7 @@ export default function Home(): ReactNode {
   return (
     <Layout
       title={siteConfig.title}
-      description="Hephaestus documentation — an open-source platform that analyzes GitHub activity to coach individual contributors on code review and collaboration practices.">
+      description="Hephaestus documentation — an open-source practice analytics platform that coaches individual contributors on how they collaborate. Currently analyzes GitHub activity.">
       <HomepageHeader />
       <main>
         <QuickstartGuides />

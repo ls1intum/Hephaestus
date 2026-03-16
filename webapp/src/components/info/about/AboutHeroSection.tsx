@@ -11,8 +11,8 @@ export function AboutHeroSection() {
 			</h1>
 			<p className="text-xl text-muted-foreground max-w-2xl mx-auto">
 				Hephaestus is a research project from TUM's Applied Education Technologies group. It applies
-				Cognitive Apprenticeship theory to software engineering — analyzing GitHub activity to give
-				contributors coaching feedback on their review and collaboration practices.
+				Cognitive Apprenticeship theory to software engineering — analyzing how contributors
+				practice their craft to deliver coaching feedback on collaboration quality and growth.
 			</p>
 		</section>
 	);

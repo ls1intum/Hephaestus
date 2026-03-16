@@ -41,8 +41,8 @@ export function AboutMissionSection() {
 				<div className="space-y-6">
 					<p className="text-lg leading-relaxed">
 						Most developer analytics tools report to managers. Hephaestus sends feedback directly to
-						individual contributors — analyzing pull requests, reviews, and collaboration patterns
-						to flag what needs attention and coach improvement.
+						individual contributors — analyzing how people collaborate to flag what needs attention
+						and coach improvement.
 					</p>
 
 					<div className="border-l-4 border-primary pl-6 py-2">
