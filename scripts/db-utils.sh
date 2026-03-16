@@ -16,6 +16,15 @@ APP_SERVER_DIR="$PROJECT_ROOT/server/application-server"
 SCRIPTS_DIR="$PROJECT_ROOT/scripts"
 LOCAL_POSTGRES_SCRIPT="$SCRIPTS_DIR/local-postgres.sh"
 
+# Source .env for port overrides (same pattern as check-ports.sh)
+ENV_FILE="$APP_SERVER_DIR/.env"
+if [[ -f "$ENV_FILE" ]]; then
+    set -a
+    # shellcheck disable=SC1090
+    eval "$(grep -E '^\s*[A-Z_]+=.+' "$ENV_FILE" 2>/dev/null || true)"
+    set +a
+fi
+
 POSTGRES_HOST="${POSTGRES_HOST:-localhost}"
 POSTGRES_PORT="${POSTGRES_PORT:-5432}"
 
