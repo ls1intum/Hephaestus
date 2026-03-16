@@ -2660,6 +2660,13 @@ components:
           type: string
           format: date-time
           description: Timestamp when the config was created
+        credentialMode:
+          type: string
+          description: Authentication mode
+          enum:
+          - PROXY
+          - API_KEY
+          - OAUTH
         enabled:
           type: boolean
           description: Whether the agent is enabled
@@ -2699,6 +2706,7 @@ components:
       - agentType
       - allowInternet
       - createdAt
+      - credentialMode
       - enabled
       - hasLlmApiKey
       - id
@@ -2910,6 +2918,15 @@ components:
         allowInternet:
           type: boolean
           description: Whether agent containers have internet access
+        credentialMode:
+          type: string
+          default: PROXY
+          description: "Authentication mode: PROXY (internal proxy), API_KEY (direct),\
+            \ or OAUTH (direct OAuth)"
+          enum:
+          - PROXY
+          - API_KEY
+          - OAUTH
         enabled:
           type: boolean
           description: Whether the agent is enabled
@@ -3987,6 +4004,14 @@ components:
         allowInternet:
           type: boolean
           description: Whether agent containers have internet access
+        credentialMode:
+          type: string
+          description: "Authentication mode: PROXY (internal proxy), API_KEY (direct),\
+            \ or OAUTH (direct OAuth)"
+          enum:
+          - PROXY
+          - API_KEY
+          - OAUTH
         enabled:
           type: boolean
           description: Whether the agent is enabled

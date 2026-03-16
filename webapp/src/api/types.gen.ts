@@ -566,6 +566,10 @@ export type UpdateAgentConfigRequest = {
      */
     allowInternet?: boolean;
     /**
+     * Authentication mode: PROXY (internal proxy), API_KEY (direct), or OAUTH (direct OAuth)
+     */
+    credentialMode?: 'PROXY' | 'API_KEY' | 'OAUTH';
+    /**
      * Whether the agent is enabled
      */
     enabled?: boolean;
@@ -1250,6 +1254,10 @@ export type CreateAgentConfigRequest = {
      */
     allowInternet?: boolean;
     /**
+     * Authentication mode: PROXY (internal proxy), API_KEY (direct), or OAUTH (direct OAuth)
+     */
+    credentialMode?: 'PROXY' | 'API_KEY' | 'OAUTH';
+    /**
      * Whether the agent is enabled
      */
     enabled?: boolean;
@@ -1379,6 +1387,10 @@ export type AgentConfig = {
      * Timestamp when the config was created
      */
     createdAt: Date;
+    /**
+     * Authentication mode
+     */
+    credentialMode: 'PROXY' | 'API_KEY' | 'OAUTH';
     /**
      * Whether the agent is enabled
      */
