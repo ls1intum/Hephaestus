@@ -560,11 +560,15 @@ export type UpdateAgentConfigRequest = {
     /**
      * Type of coding agent
      */
-    agentType?: 'CLAUDE_CODE' | 'CODEX' | 'OPENCODE';
+    agentType?: 'CLAUDE_CODE' | 'OPENCODE';
     /**
      * Whether agent containers have internet access
      */
     allowInternet?: boolean;
+    /**
+     * Authentication mode: PROXY (internal proxy), API_KEY (direct), or OAUTH (direct OAuth)
+     */
+    credentialMode?: 'PROXY' | 'API_KEY' | 'OAUTH';
     /**
      * Whether the agent is enabled
      */
@@ -1244,11 +1248,15 @@ export type CreateAgentConfigRequest = {
     /**
      * Type of coding agent
      */
-    agentType: 'CLAUDE_CODE' | 'CODEX' | 'OPENCODE';
+    agentType: 'CLAUDE_CODE' | 'OPENCODE';
     /**
      * Whether agent containers have internet access
      */
     allowInternet?: boolean;
+    /**
+     * Authentication mode: PROXY (internal proxy), API_KEY (direct), or OAUTH (direct OAuth)
+     */
+    credentialMode?: 'PROXY' | 'API_KEY' | 'OAUTH';
     /**
      * Whether the agent is enabled
      */
@@ -1370,7 +1378,7 @@ export type AgentConfig = {
     /**
      * Type of coding agent
      */
-    agentType: 'CLAUDE_CODE' | 'CODEX' | 'OPENCODE';
+    agentType: 'CLAUDE_CODE' | 'OPENCODE';
     /**
      * Whether agent containers have internet access
      */
@@ -1379,6 +1387,10 @@ export type AgentConfig = {
      * Timestamp when the config was created
      */
     createdAt: Date;
+    /**
+     * Authentication mode
+     */
+    credentialMode: 'PROXY' | 'API_KEY' | 'OAUTH';
     /**
      * Whether the agent is enabled
      */
