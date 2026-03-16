@@ -16,37 +16,37 @@ type FeatureItem = {
 const FeatureList: FeatureItem[] = [
   {
     title: 'Practice Detection',
-    kicker: 'Identify what\'s working and what\'s not — before it becomes habit',
+    kicker: 'What gets checked, how to configure it, and how to respond to findings',
     description:
-      'Analyzes how your team works — across pull requests, reviews, and commits — to catch bad practices before they become habits. Early work gets coaching. Finished work gets rigor.',
+      'LLM-powered checks on PR descriptions, review comments, and commit patterns flag anti-patterns with suggested improvements. Draft PRs receive lighter checks than ready-to-merge work.',
     bullets: [
-      'Catches bad practices across pull requests, reviews, and commits',
-      'Adapts to context — early work gets coaching, finished work gets rigor',
+      'Catches anti-patterns across pull requests, reviews, and commits',
+      'Adapts to lifecycle — drafts get coaching, finished work gets rigor',
       'You stay in control — accept, dismiss, or challenge any finding',
     ],
     cta: {label: 'See the conceptual model', to: '/contributor/conceptual-model'},
   },
   {
     title: 'Multi-Channel Guidance',
-    kicker: 'Coaching at the right time, through the right channel',
+    kicker: 'How the AI mentor, notifications, and achievements work',
     description:
-      'When a practice is detected, guidance reaches the right person through the right channel — AI mentoring, notifications, or achievement unlocks. All grounded in real project activity, not assumptions.',
+      'When a practice is detected, feedback reaches the contributor via AI mentor conversations, Slack notifications, or achievement unlocks — driven by actual project activity.',
     bullets: [
       'AI mentor (Heph) helps you reflect on your work and plan next steps',
-      'Timely notifications reach you where you work — Slack, email, or in-app',
-      'Achievements and progression chains celebrate sustained good practices',
+      'Notifications via Slack, email, or in-app',
+      'Achievements unlock for consistent engagement (e.g., reviewing weekly)',
     ],
     cta: {label: 'Work with the mentor', to: '/user/ai-mentor'},
   },
   {
     title: 'Growth Tracking',
-    kicker: 'See development trajectories, not just snapshots',
+    kicker: 'Understanding leaderboards, leagues, and weekly digests',
     description:
-      'Achievements and a league system track skill development over time. As practices improve, coaching fades — the goal is independence, not dependence on the tool.',
+      'Leaderboards rank contributors by review activity. A league system provides longer-term progression. Weekly Slack digests highlight top reviewers.',
     bullets: [
-      'Achievement milestones track your growth from first steps to mastery',
-      'A league system gives you a fair, evolving rank based on your contributions',
-      'Weekly digests and leaderboards make great work visible to the whole team',
+      'Achievement tiers reflect increasing engagement and consistency',
+      'A league system ranks contributors by review activity, updated weekly',
+      'Weekly digests and leaderboards highlight top contributors to the team',
     ],
     cta: {label: 'See the leaderboard', to: '/user/leaderboard'},
   },

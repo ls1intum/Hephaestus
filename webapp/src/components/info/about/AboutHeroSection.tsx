@@ -10,9 +10,9 @@ export function AboutHeroSection() {
 				About <span className="text-provider-done-foreground">Heph</span>aestus
 			</h1>
 			<p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-				Hephaestus helps teams build better practices, not just better code. It watches how you
-				collaborate, spots what's working and what needs attention, and guides every contributor
-				toward growth.
+				Hephaestus is a research project from TUM's Applied Education Technologies group. It applies
+				Cognitive Apprenticeship theory to software engineering — analyzing GitHub activity to give
+				contributors coaching feedback on their review and collaboration practices.
 			</p>
 		</section>
 	);

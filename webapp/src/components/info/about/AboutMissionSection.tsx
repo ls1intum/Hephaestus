@@ -15,9 +15,9 @@ const FEATURES_DATA: FeatureData[] = [
 		icon: MessageCircle,
 		badge: "Guide",
 		title: "Multi-Channel Guidance",
-		description: "Coaching at the right time, through the right channel",
+		description: "Feedback via AI mentor, Slack, and in-app notifications",
 		content:
-			"When a practice is detected, guidance reaches the right person through the right channel — AI mentoring, notifications, or achievement unlocks. All grounded in real project activity, not assumptions.",
+			"When a practice is detected, feedback reaches the contributor via AI mentor conversations, Slack notifications, or achievement unlocks — driven by actual project activity.",
 	},
 	{
 		icon: TrendingUp,
@@ -34,21 +34,21 @@ export function AboutMissionSection() {
 		<section className="space-y-12">
 			<div>
 				<Badge className="mb-4" variant="outline">
-					Our Purpose
+					What Hephaestus Does
 				</Badge>
-				<h2 className="text-3xl font-bold mb-6">The Mission</h2>
+				<h2 className="text-3xl font-bold mb-6">Purpose</h2>
 
 				<div className="space-y-6">
 					<p className="text-lg leading-relaxed">
-						We help teams develop professional practices by observing how they collaborate,
-						detecting what's working and what needs attention, and delivering targeted guidance
-						through multiple channels — all grounded in real project activity, not assumptions.
+						Most developer analytics tools report to managers. Hephaestus sends feedback directly to
+						individual contributors — analyzing pull requests, reviews, and collaboration patterns
+						to flag what needs attention and coach improvement.
 					</p>
 
 					<div className="border-l-4 border-primary pl-6 py-2">
 						<p className="text-lg font-medium">
-							We believe the best work isn't just about the output — it's about how people learn to
-							collaborate, reflect, and grow through the process of building together.
+							Feedback should reach the person who can act on it, at the moment they can act on it —
+							not aggregated into a quarterly report for their manager.
 						</p>
 					</div>
 				</div>

@@ -34,10 +34,10 @@ export function LandingWhyChooseSection({
 							Practices, Not Just Metrics
 						</h2>
 						<p className="text-lg text-muted-foreground">
-							Most engineering analytics tools produce summative dashboards for managers. Hephaestus
-							delivers formative feedback to the people doing the work — detecting practice patterns
-							across pull requests, reviews, and issues, then guiding improvement through the
-							channel that fits the moment.
+							Most engineering analytics tools aggregate data into dashboards for managers.
+							Hephaestus sends feedback directly to individual contributors — as AI mentor
+							conversations, Slack notifications, or in-app alerts — so the person who can act on it
+							sees it first.
 						</p>
 
 						<ul className="grid gap-4 mt-4">
@@ -46,10 +46,10 @@ export function LandingWhyChooseSection({
 									<ScanSearch className="h-4 w-4 text-primary" />
 								</div>
 								<div>
-									<p className="font-medium">Detects what dashboards miss</p>
+									<p className="font-medium">Analyzes behavior, not just throughput</p>
 									<p className="text-sm text-muted-foreground">
-										Goes beyond cycle time to spot the practices that actually shape code quality —
-										across pull requests, reviews, and collaboration patterns.
+										Flags process anti-patterns — empty descriptions, rubber-stamp approvals,
+										oversized PRs — that cycle-time dashboards ignore.
 									</p>
 								</div>
 							</li>
@@ -60,8 +60,8 @@ export function LandingWhyChooseSection({
 								<div>
 									<p className="font-medium">Four dimensions of health</p>
 									<p className="text-sm text-muted-foreground">
-										Looks at code quality, workflow, collaboration, and learning together — so
-										improving one area doesn't come at the expense of the others.
+										Organizes findings into technical, process, social, and cognitive dimensions —
+										so you can see where attention is needed.
 									</p>
 								</div>
 							</li>
@@ -70,10 +70,10 @@ export function LandingWhyChooseSection({
 									<MessageCircle className="h-4 w-4 text-primary" />
 								</div>
 								<div>
-									<p className="font-medium">Coaching, not surveillance</p>
+									<p className="font-medium">Feedback for contributors, not managers</p>
 									<p className="text-sm text-muted-foreground">
-										Feedback goes to the person who can act on it — not their manager. Formative,
-										not summative.
+										Feedback goes to the person who can act on it — not aggregated into a report for
+										their manager.
 									</p>
 								</div>
 							</li>

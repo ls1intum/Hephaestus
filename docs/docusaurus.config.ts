@@ -149,16 +149,16 @@ const config: Config = {
       {
         name: 'description',
         content:
-          'Formative practice analytics for project teams — detect practice patterns and guide every contributor toward growth through multi-channel coaching.',
+          'Hephaestus — open-source platform for analyzing GitHub code review practices with AI-powered feedback, leaderboards, and an AI mentor.',
       },
-      {name: 'keywords', content: 'Hephaestus, AI mentor, practice analytics, code review gamification, Cognitive Apprenticeship, formative assessment, software engineering education, practice detection, GitHub analytics, TUM'},
+      {name: 'keywords', content: 'Hephaestus, code review tool, GitHub code review, developer coaching, code review automation, AI mentor, code review gamification, Cognitive Apprenticeship, software engineering education, open source, TUM'},
       {name: 'twitter:card', content: 'summary_large_image'},
       {name: 'twitter:site', content: '@ls1intum'},
       {name: 'twitter:title', content: 'Hephaestus Documentation'},
       {
         name: 'twitter:description',
         content:
-          'Formative practice analytics for project teams — detect practice patterns and guide every contributor toward growth through multi-channel coaching.',
+          'Hephaestus — open-source platform for analyzing GitHub code review practices with AI-powered feedback, leaderboards, and an AI mentor.',
       },
     ],
     navbar: {

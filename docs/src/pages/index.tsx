@@ -14,7 +14,7 @@ const guideLinks = [
   },
   {
     title: 'Contributor Guide',
-    description: 'Set up local services, follow coding standards, and ship with confidence.',
+    description: 'Set up local development, understand the architecture, and follow coding standards.',
     to: '/contributor/overview',
   },
   {
@@ -33,7 +33,7 @@ function HomepageHeader() {
             How You Build Matters
           </Heading>
           <p className={styles.heroSubtitle}>
-            Observe how your team builds. Detect the practices that drive quality. Guide every contributor toward growth.
+            Documentation for the Hephaestus platform — practice analytics, AI mentoring, and code review engagement.
           </p>
           <div className={styles.heroActions}>
             <Link className="button button--primary button--lg" to="/user/overview">
@@ -81,7 +81,7 @@ export default function Home(): ReactNode {
   return (
     <Layout
       title={siteConfig.title}
-      description="How You Build Matters — formative practice analytics that detects practice patterns and guides every contributor toward growth.">
+      description="Hephaestus documentation — an open-source platform that analyzes GitHub activity to coach individual contributors on code review and collaboration practices.">
       <HomepageHeader />
       <main>
         <QuickstartGuides />

@@ -11,11 +11,11 @@ export function LandingFeaturesSection() {
 						Key Features
 					</Badge>
 					<h2 className="text-3xl font-bold tracking-tighter sm:text-4xl mb-4">
-						Built for How Teams Actually Work
+						What Hephaestus Does
 					</h2>
 					<p className="text-muted-foreground text-lg">
-						Detect practice patterns. Guide improvement through the right channel. Track growth over
-						time.
+						Flags anti-patterns in PRs and reviews. Delivers feedback via AI mentor, Slack, or
+						in-app. Tracks engagement with leaderboards.
 					</p>
 				</div>
 
@@ -57,7 +57,7 @@ export function LandingFeaturesSection() {
 							</div>
 							<CardTitle>Multi-Channel Guidance</CardTitle>
 							<CardDescription>
-								Coaching at the right time, through the right channel
+								Feedback via AI mentor, Slack, and in-app notifications
 							</CardDescription>
 						</CardHeader>
 						<CardContent>
@@ -68,14 +68,12 @@ export function LandingFeaturesSection() {
 								</li>
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>
-										Timely notifications reach you where you work — Slack, email, or in-app
-									</span>
+									<span>Notifications via Slack, email, or in-app</span>
 								</li>
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
 									<span>
-										Achievements and progression chains celebrate sustained good practices
+										Achievements unlock for consistent engagement (e.g., reviewing weekly)
 									</span>
 								</li>
 							</ul>
@@ -94,13 +92,11 @@ export function LandingFeaturesSection() {
 							<ul className="space-y-2">
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>Achievement milestones track your growth from first steps to mastery</span>
+									<span>Achievement tiers reflect increasing engagement and consistency</span>
 								</li>
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>
-										A league system gives you a fair, evolving rank based on your contributions
-									</span>
+									<span>A league system ranks contributors by review activity, updated weekly</span>
 								</li>
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />

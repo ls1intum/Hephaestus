@@ -119,8 +119,8 @@ export function LandingHeroSection({
 							How You Build Matters
 						</h1>
 						<p className="mx-auto max-w-[700px] text-xl text-muted-foreground">
-							Observe how your team builds. Detect the practices that drive quality. Guide every
-							contributor toward growth.
+							Analyzes your GitHub PRs and reviews to flag bad practices, coach contributors, and
+							track improvement over time.
 						</p>
 					</div>
 					<div className="flex flex-col items-center gap-4 sm:flex-row sm:gap-6">
