@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.35.0](https://github.com/ls1intum/Hephaestus/compare/v0.34.0...v0.35.0) (2026-03-17)
+
+### 🚀 Features
+
+* **server:** LLM proxy controller for agent containers ([#860](https://github.com/ls1intum/Hephaestus/issues/860)) ([1b6656f](https://github.com/ls1intum/Hephaestus/commit/1b6656f342c79683a0879f4e0f26e084f5847dc0))
+
 ## [0.34.0](https://github.com/ls1intum/Hephaestus/compare/v0.33.0...v0.34.0) (2026-03-17)
 
 ### 🐛 Bug Fixes
