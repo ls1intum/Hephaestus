@@ -278,6 +278,7 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
                     boolean inAdapterPackage =
                         javaClass.getPackageName().contains(".adapter") ||
                         javaClass.getPackageName().contains(".impl") ||
+                        javaClass.getPackageName().contains(".handler") || // Job type handlers implement handler SPI
                         javaClass.getPackageName().contains(".notification") || // Notification module implements activity SPIs
                         javaClass.getSimpleName().endsWith("Adapter") ||
                         javaClass.getSimpleName().endsWith("Provider") ||
