@@ -5,10 +5,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.lib.PersonIdent;
@@ -259,7 +261,7 @@ class GitRepositoryManagerTest extends BaseUnitTest {
 
         @Test
         @DisplayName("should throw GitOperationException for unresolvable toSha")
-        void shouldReturnEmptyListForUnresolvableToSha() throws Exception {
+        void shouldThrowForUnresolvableToSha() throws Exception {
             manager = createManager(true);
             try (Git sourceGit = createSourceRepo()) {
                 manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
@@ -467,6 +469,197 @@ class GitRepositoryManagerTest extends BaseUnitTest {
             String result = manager.resolveDefaultBranchHead(999L, "main");
 
             assertThat(result).isNull();
+        }
+    }
+
+    @Nested
+    @DisplayName("readFilesAtCommit")
+    class ReadFilesAtCommit {
+
+        @Test
+        @DisplayName("should return empty map when not enabled")
+        void shouldReturnEmptyMapWhenNotEnabled() {
+            manager = createManager(false);
+
+            Map<String, byte[]> result = manager.readFilesAtCommit(1L, "abc123", 50L * 1024 * 1024);
+
+            assertThat(result).isEmpty();
+        }
+
+        @Test
+        @DisplayName("should read all files at a given commit")
+        void shouldReadAllFilesAtCommit() throws Exception {
+            manager = createManager(true);
+            try (Git sourceGit = createSourceRepo()) {
+                String headSha = sourceGit.log().call().iterator().next().getName();
+
+                manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
+                Map<String, byte[]> files = manager.readFilesAtCommit(1L, headSha, 50L * 1024 * 1024);
+
+                assertThat(files).containsKey("README.md");
+                assertThat(new String(files.get("README.md"), StandardCharsets.UTF_8)).isEqualTo("# Test Repository\n");
+            }
+        }
+
+        @Test
+        @DisplayName("should read files from a specific commit, not working tree")
+        void shouldReadFromSpecificCommit() throws Exception {
+            manager = createManager(true);
+            try (Git sourceGit = createSourceRepo()) {
+                String firstSha = sourceGit.log().call().iterator().next().getName();
+
+                // Add another file in a second commit
+                Path file2 = sourceRepoPath.resolve("file2.txt");
+                Files.writeString(file2, "second file content");
+                sourceGit.add().addFilepattern("file2.txt").call();
+                sourceGit
+                    .commit()
+                    .setMessage("Add file2")
+                    .setAuthor(new PersonIdent("Test Author", "author@test.com"))
+                    .setCommitter(new PersonIdent("Test Committer", "committer@test.com"))
+                    .call();
+
+                manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
+
+                // Read from first commit — should NOT contain file2.txt
+                Map<String, byte[]> filesAtFirst = manager.readFilesAtCommit(1L, firstSha, 50L * 1024 * 1024);
+                assertThat(filesAtFirst).containsKey("README.md");
+                assertThat(filesAtFirst).doesNotContainKey("file2.txt");
+            }
+        }
+
+        @Test
+        @DisplayName("should respect maxTotalBytes limit")
+        void shouldRespectMaxTotalBytesLimit() throws Exception {
+            manager = createManager(true);
+            try (Git sourceGit = createSourceRepo()) {
+                // Add a file that exceeds a tiny limit
+                Path file = sourceRepoPath.resolve("large.txt");
+                Files.writeString(file, "a".repeat(1000));
+                sourceGit.add().addFilepattern("large.txt").call();
+                String sha = sourceGit
+                    .commit()
+                    .setMessage("Add large file")
+                    .setAuthor(new PersonIdent("Test Author", "author@test.com"))
+                    .setCommitter(new PersonIdent("Test Committer", "committer@test.com"))
+                    .call()
+                    .getName();
+
+                manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
+
+                // Set max to 500 bytes — README.md (~19 bytes) should fit, large.txt (1000 bytes) may not
+                Map<String, byte[]> files = manager.readFilesAtCommit(1L, sha, 500);
+                long totalSize = files
+                    .values()
+                    .stream()
+                    .mapToLong(b -> b.length)
+                    .sum();
+                assertThat(totalSize).isLessThanOrEqualTo(500);
+            }
+        }
+
+        @Test
+        @DisplayName("should throw GitOperationException for unresolvable commit")
+        void shouldThrowForUnresolvableCommit() throws Exception {
+            manager = createManager(true);
+            try (Git sourceGit = createSourceRepo()) {
+                manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
+
+                assertThatThrownBy(() ->
+                    manager.readFilesAtCommit(1L, "0000000000000000000000000000000000000000", 50L * 1024 * 1024)
+                )
+                    .isInstanceOf(GitRepositoryManager.GitOperationException.class)
+                    .hasMessageContaining("Failed to read files at commit");
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("generateUnifiedDiff")
+    class GenerateUnifiedDiff {
+
+        @Test
+        @DisplayName("should return empty string when not enabled")
+        void shouldReturnEmptyStringWhenNotEnabled() {
+            manager = createManager(false);
+
+            String result = manager.generateUnifiedDiff(1L, "main", "feature");
+
+            assertThat(result).isEmpty();
+        }
+
+        @Test
+        @DisplayName("should generate unified diff between two branches")
+        void shouldGenerateUnifiedDiff() throws Exception {
+            manager = createManager(true);
+            try (Git sourceGit = createSourceRepo()) {
+                String baseSha = sourceGit.log().call().iterator().next().getName();
+
+                // Create a branch and add a change
+                sourceGit.branchCreate().setName("feature").call();
+                sourceGit.checkout().setName("feature").call();
+
+                Path file = sourceRepoPath.resolve("new-file.java");
+                Files.writeString(file, "public class NewFile {}\n");
+                sourceGit.add().addFilepattern("new-file.java").call();
+                sourceGit
+                    .commit()
+                    .setMessage("Add new file on feature branch")
+                    .setAuthor(new PersonIdent("Test Author", "author@test.com"))
+                    .setCommitter(new PersonIdent("Test Committer", "committer@test.com"))
+                    .call();
+
+                manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
+
+                // Generate diff between master and feature using commit SHAs
+                String featureSha = sourceGit.log().call().iterator().next().getName();
+                String diff = manager.generateUnifiedDiff(1L, baseSha, featureSha);
+
+                assertThat(diff).contains("new-file.java");
+                assertThat(diff).contains("public class NewFile {}");
+            }
+        }
+
+        @Test
+        @DisplayName("should return empty string for unresolvable base ref")
+        void shouldReturnEmptyForUnresolvableBaseRef() throws Exception {
+            manager = createManager(true);
+            try (Git sourceGit = createSourceRepo()) {
+                String headSha = sourceGit.log().call().iterator().next().getName();
+                manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
+
+                String diff = manager.generateUnifiedDiff(1L, "nonexistent-ref-xyz", headSha);
+
+                assertThat(diff).isEmpty();
+            }
+        }
+
+        @Test
+        @DisplayName("should return empty string for unresolvable head ref")
+        void shouldReturnEmptyForUnresolvableHeadRef() throws Exception {
+            manager = createManager(true);
+            try (Git sourceGit = createSourceRepo()) {
+                String headSha = sourceGit.log().call().iterator().next().getName();
+                manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
+
+                String diff = manager.generateUnifiedDiff(1L, headSha, "nonexistent-ref-xyz");
+
+                assertThat(diff).isEmpty();
+            }
+        }
+
+        @Test
+        @DisplayName("should return empty diff when both refs are the same")
+        void shouldReturnEmptyDiffWhenSameRef() throws Exception {
+            manager = createManager(true);
+            try (Git sourceGit = createSourceRepo()) {
+                String headSha = sourceGit.log().call().iterator().next().getName();
+                manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
+
+                String diff = manager.generateUnifiedDiff(1L, headSha, headSha);
+
+                assertThat(diff).isEmpty();
+            }
         }
     }
 }

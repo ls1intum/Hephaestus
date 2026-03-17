@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment;
 
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -34,4 +35,23 @@ public interface PullRequestReviewCommentRepository extends JpaRepository<PullRe
         """
     )
     Optional<PullRequestReviewComment> findByIdWithPullRequestAuthor(@Param("id") Long id);
+
+    /**
+     * Fetch all review comments for a pull request with their authors eagerly loaded.
+     *
+     * @param pullRequestId the pull request ID
+     * @return comments with author eagerly loaded, ordered by creation time
+     */
+    @Query(
+        """
+        SELECT prrc
+        FROM PullRequestReviewComment prrc
+        LEFT JOIN FETCH prrc.author
+        WHERE prrc.pullRequest.id = :pullRequestId
+        ORDER BY prrc.createdAt ASC
+        """
+    )
+    List<PullRequestReviewComment> findByPullRequestIdWithAuthorOrderByCreatedAt(
+        @Param("pullRequestId") Long pullRequestId
+    );
 }
