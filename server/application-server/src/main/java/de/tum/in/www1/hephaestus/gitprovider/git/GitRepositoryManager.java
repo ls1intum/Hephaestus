@@ -1,6 +1,8 @@
 package de.tum.in.www1.hephaestus.gitprovider.git;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -16,6 +18,7 @@ import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.diff.DiffFormatter;
 import org.eclipse.jgit.diff.Edit;
 import org.eclipse.jgit.diff.RawTextComparator;
+import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.PersonIdent;
@@ -26,6 +29,7 @@ import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.EmptyTreeIterator;
+import org.eclipse.jgit.treewalk.TreeWalk;
 import org.eclipse.jgit.util.io.DisabledOutputStream;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.lang.Nullable;
@@ -502,6 +506,175 @@ public class GitRepositoryManager {
             case RENAME -> ChangeType.RENAMED;
             case COPY -> ChangeType.COPIED;
         };
+    }
+
+    /**
+     * Read all files from a commit's tree via JGit {@link TreeWalk}.
+     *
+     * <p>Walks the commit tree recursively, collecting file contents into a map suitable for
+     * {@code SandboxWorkspaceManager.injectFiles()}. Individual files larger than 10 MB are
+     * skipped. Collection stops when {@code maxTotalBytes} is reached.
+     *
+     * <p>Reads from the git object store, not the working directory — guarantees an exact
+     * snapshot at the given commit regardless of working tree state.
+     *
+     * @param repositoryId  the repository database ID
+     * @param commitSha     the commit SHA to read from
+     * @param maxTotalBytes maximum total bytes to collect (files beyond this limit are skipped)
+     * @return map of relative file paths to contents, empty if the commit cannot be resolved
+     * @throws GitOperationException if an I/O error occurs reading from the git object store
+     */
+    public Map<String, byte[]> readFilesAtCommit(Long repositoryId, String commitSha, long maxTotalBytes) {
+        if (!properties.enabled()) {
+            return Map.of();
+        }
+
+        return lockManager.withReadLock(repositoryId, () -> {
+            Path repoPath = getRepositoryPath(repositoryId);
+            Map<String, byte[]> result = new HashMap<>();
+            long totalBytes = 0;
+
+            try (Git git = Git.open(repoPath.toFile())) {
+                Repository repo = git.getRepository();
+
+                ObjectId commitId = repo.resolve(commitSha);
+                if (commitId == null) {
+                    log.warn("Cannot resolve commit SHA for file read: sha={}", commitSha);
+                    return result;
+                }
+
+                try (RevWalk revWalk = new RevWalk(repo); ObjectReader reader = repo.newObjectReader()) {
+                    RevCommit commit = revWalk.parseCommit(commitId);
+
+                    try (TreeWalk treeWalk = new TreeWalk(reader)) {
+                        treeWalk.addTree(commit.getTree());
+                        treeWalk.setRecursive(true);
+
+                        while (treeWalk.next()) {
+                            ObjectId blobId = treeWalk.getObjectId(0);
+                            long size = reader.getObjectSize(blobId, Constants.OBJ_BLOB);
+
+                            // Skip individual files larger than 10 MB
+                            if (size > 10L * 1024 * 1024) {
+                                log.debug("Skipping oversized file: path={}, size={}", treeWalk.getPathString(), size);
+                                continue;
+                            }
+
+                            if (totalBytes + size > maxTotalBytes) {
+                                log.warn(
+                                    "File collection exceeded size limit ({} bytes), stopping: repoId={}, commit={}",
+                                    maxTotalBytes,
+                                    repositoryId,
+                                    commitSha
+                                );
+                                break;
+                            }
+
+                            byte[] content = reader.open(blobId).getBytes();
+                            result.put(treeWalk.getPathString(), content);
+                            totalBytes += content.length;
+                        }
+                    }
+                }
+            } catch (IOException e) {
+                throw new GitOperationException(
+                    "Failed to read files at commit: repoId=" + repositoryId + ", commit=" + commitSha,
+                    e
+                );
+            }
+
+            return result;
+        });
+    }
+
+    /**
+     * Generate a unified diff between two refs (branches or commits).
+     *
+     * <p>Produces standard unified diff output suitable for code review. Resolves refs
+     * using the same fallback chain as {@link #resolveDefaultBranchHead}:
+     * {@code refs/remotes/origin/<ref>} → {@code refs/heads/<ref>} → raw SHA.
+     *
+     * @param repositoryId the repository database ID
+     * @param baseRef      the base ref (target branch or commit SHA)
+     * @param headRef      the head ref (source branch or commit SHA)
+     * @return unified diff text, or empty string if refs cannot be resolved
+     * @throws GitOperationException if an I/O error occurs computing the diff
+     */
+    public String generateUnifiedDiff(Long repositoryId, String baseRef, String headRef) {
+        if (!properties.enabled()) {
+            return "";
+        }
+
+        return lockManager.withReadLock(repositoryId, () -> {
+            Path repoPath = getRepositoryPath(repositoryId);
+
+            try (Git git = Git.open(repoPath.toFile())) {
+                Repository repo = git.getRepository();
+
+                ObjectId baseId = resolveRef(repo, baseRef);
+                ObjectId headId = resolveRef(repo, headRef);
+
+                if (baseId == null) {
+                    log.warn("Cannot resolve base ref for diff: ref={}, repoId={}", baseRef, repositoryId);
+                    return "";
+                }
+                if (headId == null) {
+                    log.warn("Cannot resolve head ref for diff: ref={}, repoId={}", headRef, repositoryId);
+                    return "";
+                }
+
+                try (
+                    RevWalk revWalk = new RevWalk(repo);
+                    ObjectReader reader = repo.newObjectReader();
+                    ByteArrayOutputStream out = new ByteArrayOutputStream();
+                    DiffFormatter formatter = new DiffFormatter(out)
+                ) {
+                    RevCommit baseCommit = revWalk.parseCommit(baseId);
+                    RevCommit headCommit = revWalk.parseCommit(headId);
+
+                    CanonicalTreeParser oldTree = new CanonicalTreeParser();
+                    oldTree.reset(reader, baseCommit.getTree());
+
+                    CanonicalTreeParser newTree = new CanonicalTreeParser();
+                    newTree.reset(reader, headCommit.getTree());
+
+                    formatter.setRepository(repo);
+                    formatter.setDiffComparator(RawTextComparator.DEFAULT);
+                    formatter.setDetectRenames(true);
+                    formatter.format(oldTree, newTree);
+                    formatter.flush();
+
+                    return out.toString(StandardCharsets.UTF_8);
+                }
+            } catch (IOException e) {
+                throw new GitOperationException(
+                    "Failed to generate unified diff: repoId=" +
+                        repositoryId +
+                        ", base=" +
+                        baseRef +
+                        ", head=" +
+                        headRef,
+                    e
+                );
+            }
+        });
+    }
+
+    /**
+     * Resolve a ref string to an ObjectId, trying remote tracking, local, and raw SHA.
+     */
+    @Nullable
+    private ObjectId resolveRef(Repository repo, String ref) throws IOException {
+        // Try refs/remotes/origin/<ref> first
+        ObjectId id = repo.resolve("refs/remotes/origin/" + ref);
+        if (id != null) return id;
+
+        // Try refs/heads/<ref>
+        id = repo.resolve("refs/heads/" + ref);
+        if (id != null) return id;
+
+        // Try raw SHA or other ref format
+        return repo.resolve(ref);
     }
 
     /**
