@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.mentor;
 
 import de.tum.in.www1.hephaestus.SecurityUtils;
 import de.tum.in.www1.hephaestus.config.IntelligenceServiceProperties;
+import de.tum.in.www1.hephaestus.core.proxy.ProxyStreamingUtils;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
@@ -9,19 +10,12 @@ import de.tum.in.www1.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Hidden;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.io.IOException;
-import java.io.OutputStream;
 import java.net.URI;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.core.io.buffer.DataBuffer;
-import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -30,8 +24,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 /**
  * Transparent proxy for mentor endpoints to the intelligence service.
@@ -67,17 +59,6 @@ public class MentorProxyController {
     public static final String USER_LOGIN_HEADER = "X-User-Login";
     /** Header used to pass user's first name to the intelligence service. */
     public static final String USER_FIRST_NAME_HEADER = "X-User-First-Name";
-
-    private static final Set<String> HOP_BY_HOP_HEADERS = Set.of(
-        HttpHeaders.CONNECTION,
-        "Keep-Alive",
-        HttpHeaders.PROXY_AUTHENTICATE,
-        HttpHeaders.PROXY_AUTHORIZATION,
-        HttpHeaders.TE,
-        HttpHeaders.TRAILER,
-        HttpHeaders.TRANSFER_ENCODING,
-        HttpHeaders.UPGRADE
-    );
 
     private final WebClient mentorWebClient;
     private final String intelligenceServiceBaseUrl;
@@ -138,122 +119,42 @@ public class MentorProxyController {
             log.debug("Found user '{}' (id={}) for mentor request", currentUser.getLogin(), currentUser.getId());
         }
         HttpHeaders outHeaders = prepareOutgoingHeaders(incomingHeaders, jwt, workspaceContext, currentUser);
-        byte[] safeBody = body != null ? body : new byte[0];
 
-        // First, make the request and check if it's SSE
-        var clientResponse = mentorWebClient
-            .method(method)
-            .uri(URI.create(target))
-            .headers(h -> {
-                h.clear();
-                h.addAll(outHeaders);
-            })
-            .bodyValue(safeBody)
-            .exchangeToMono(clientResp -> Mono.just(clientResp))
-            .block();
+        ProxyStreamingUtils.UpstreamResult upstream;
+        try {
+            var baseSpec = mentorWebClient
+                .method(method)
+                .uri(URI.create(target))
+                .headers(h -> {
+                    h.clear();
+                    h.addAll(outHeaders);
+                });
 
-        if (clientResponse == null) {
+            // Only attach body for methods that typically carry one (avoids Content-Length: 0 on GET)
+            WebClient.RequestHeadersSpec<?> readySpec = (body != null && body.length > 0)
+                ? baseSpec.bodyValue(body)
+                : baseSpec;
+
+            upstream = readySpec.exchangeToMono(ProxyStreamingUtils::consumeResponse).block(Duration.ofSeconds(310));
+        } catch (Exception e) {
+            log.warn("Intelligence service unreachable: {}", e.getMessage());
+            return ResponseEntity.status(502).body("Upstream service unreachable");
+        }
+
+        if (upstream == null) {
             return ResponseEntity.status(502).body("Upstream service unavailable");
         }
 
-        HttpHeaders respHeaders = filterResponseHeaders(clientResponse.headers().asHttpHeaders());
-        MediaType contentType = clientResponse.headers().contentType().orElse(null);
-        boolean isEventStream = contentType != null && contentType.isCompatibleWith(MediaType.TEXT_EVENT_STREAM);
-
-        if (isEventStream) {
-            // For SSE, stream directly to HttpServletResponse on the current servlet thread
-            streamSseToResponse(
-                clientResponse.bodyToFlux(DataBuffer.class),
-                respHeaders,
+        if (upstream.sseBody() != null) {
+            ProxyStreamingUtils.streamSseToResponse(
+                upstream.sseBody(),
+                upstream.headers(),
                 response,
-                clientResponse.statusCode().value()
+                upstream.status()
             );
             return null; // Response already committed
         } else {
-            // Buffer non-streaming responses and return as ResponseEntity
-            byte[] bytes = clientResponse.bodyToMono(byte[].class).defaultIfEmpty(new byte[0]).block();
-            return ResponseEntity.status(clientResponse.statusCode()).headers(respHeaders).body(bytes);
-        }
-    }
-
-    /**
-     * Streams SSE data directly to the HttpServletResponse output stream.
-     *
-     * <p>This method bypasses Spring MVC's message converters which do not properly handle
-     * SSE streaming with preset Content-Type headers. By writing directly to the servlet
-     * response, we ensure proper real-time streaming behavior.</p>
-     *
-     * <p>This method blocks until the stream completes or the client disconnects.</p>
-     *
-     * @param dataFlux The reactive stream of data buffers from the upstream service
-     * @param respHeaders Headers to copy to the response
-     * @param response The servlet response to write to
-     * @param statusCode The HTTP status code from the upstream response
-     */
-    private void streamSseToResponse(
-        Flux<DataBuffer> dataFlux,
-        HttpHeaders respHeaders,
-        HttpServletResponse response,
-        int statusCode
-    ) {
-        try {
-            // Set response status and headers for SSE
-            response.setStatus(statusCode);
-            response.setContentType(MediaType.TEXT_EVENT_STREAM_VALUE);
-            response.setCharacterEncoding("UTF-8");
-
-            // Disable caching for SSE
-            response.setHeader(HttpHeaders.CACHE_CONTROL, "no-cache, no-store, must-revalidate");
-            response.setHeader(HttpHeaders.PRAGMA, "no-cache");
-            response.setHeader(HttpHeaders.EXPIRES, "0");
-
-            // Copy other headers (excluding ones we set ourselves)
-            respHeaders.forEach((name, values) -> {
-                if (
-                    !HttpHeaders.CONTENT_TYPE.equalsIgnoreCase(name) &&
-                    !HttpHeaders.CONTENT_LENGTH.equalsIgnoreCase(name) &&
-                    !HttpHeaders.TRANSFER_ENCODING.equalsIgnoreCase(name) &&
-                    !HttpHeaders.CACHE_CONTROL.equalsIgnoreCase(name)
-                ) {
-                    for (String value : values) {
-                        response.addHeader(name, value);
-                    }
-                }
-            });
-
-            // Flush headers immediately to start streaming
-            response.flushBuffer();
-
-            OutputStream outputStream = response.getOutputStream();
-
-            // Block and stream each buffer to the client - this runs on servlet thread which allows blocking
-            dataFlux
-                .doOnNext(buffer -> {
-                    try {
-                        byte[] bytes = new byte[buffer.readableByteCount()];
-                        buffer.read(bytes);
-                        DataBufferUtils.release(buffer);
-                        outputStream.write(bytes);
-                        outputStream.flush();
-                    } catch (IOException e) {
-                        log.debug("Client disconnected during SSE streaming: {}", e.getMessage());
-                        throw new StreamingException("Client disconnected", e);
-                    }
-                })
-                .doOnError(e -> log.debug("SSE stream error: {}", e.getMessage()))
-                .doOnComplete(() -> {
-                    try {
-                        outputStream.flush();
-                    } catch (IOException e) {
-                        log.debug("Error flushing final SSE output: {}", e.getMessage());
-                    }
-                })
-                .blockLast(); // Safe to block here - we're on a servlet thread
-        } catch (IOException e) {
-            log.debug("SSE streaming initialization failed: {}", e.getMessage());
-        } catch (StreamingException e) {
-            // Client disconnected - this is expected behavior, not an error
-            log.debug("SSE streaming terminated: {}", e.getMessage());
+            return ResponseEntity.status(upstream.status()).headers(upstream.headers()).body(upstream.body());
         }
     }
 
@@ -267,12 +168,7 @@ public class MentorProxyController {
         WorkspaceContext workspaceContext,
         User currentUser
     ) {
-        HttpHeaders outHeaders = new HttpHeaders();
-        for (Map.Entry<String, List<String>> e : incomingHeaders.entrySet()) {
-            if (!HOP_BY_HOP_HEADERS.contains(e.getKey())) {
-                outHeaders.put(e.getKey(), e.getValue());
-            }
-        }
+        HttpHeaders outHeaders = ProxyStreamingUtils.filterHopByHopHeaders(incomingHeaders);
         outHeaders.remove(HttpHeaders.HOST);
         outHeaders.set(HttpHeaders.ACCEPT_ENCODING, "");
         if (jwt != null) {
@@ -295,18 +191,5 @@ public class MentorProxyController {
         // Get first name from JWT's given_name claim (Keycloak standard OIDC claim)
         SecurityUtils.getGivenName(jwt).ifPresent(name -> outHeaders.set(USER_FIRST_NAME_HEADER, name));
         return outHeaders;
-    }
-
-    /**
-     * Filters response headers, removing hop-by-hop headers that shouldn't be forwarded.
-     */
-    private HttpHeaders filterResponseHeaders(HttpHeaders headers) {
-        HttpHeaders respHeaders = new HttpHeaders();
-        headers.forEach((k, v) -> {
-            if (!HOP_BY_HOP_HEADERS.contains(k)) {
-                respHeaders.put(k, v);
-            }
-        });
-        return respHeaders;
     }
 }

@@ -31,4 +31,6 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
     List<AgentJob> findByStatus(AgentJobStatus status);
 
     List<AgentJob> findByStatusIn(Collection<AgentJobStatus> statuses);
+
+    Optional<AgentJob> findByJobTokenHashAndStatus(String jobTokenHash, AgentJobStatus status);
 }

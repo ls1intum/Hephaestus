@@ -185,6 +185,8 @@ export const agentJob = pgTable(
 		startedAt: timestamp("started_at", { precision: 6, withTimezone: true, mode: "string" }),
 		completedAt: timestamp("completed_at", { precision: 6, withTimezone: true, mode: "string" }),
 		networkId: varchar("network_id", { length: 64 }),
+		jobTokenHash: varchar("job_token_hash", { length: 64 }),
+		llmApiKey: text("llm_api_key"),
 	},
 	(table) => [
 		index("idx_agent_job_status_started")
@@ -205,6 +207,7 @@ export const agentJob = pgTable(
 			.where(
 				sql`(((status)::text = ANY ((ARRAY['QUEUED'::character varying, 'RUNNING'::character varying])::text[])) AND (idempotency_key IS NOT NULL))`,
 			),
+		uniqueIndex("uk_agent_job_token_hash").using("btree", table.jobTokenHash.asc().nullsLast()),
 		foreignKey({
 			columns: [table.workspaceId],
 			foreignColumns: [workspace.id],
