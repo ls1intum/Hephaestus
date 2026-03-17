@@ -62,6 +62,9 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         "BadPracticeDetection",
         "PullRequestBadPractice",
         "BadPracticeFeedback",
+        // Practice catalog entities
+        "Practice", // has direct Workspace field
+        "PracticeFinding", // through Practice.workspace
         // Through chat thread -> workspace
         "ChatMessage", // through ChatThread.workspace
         "ChatMessagePart", // through ChatMessage.thread.workspace
