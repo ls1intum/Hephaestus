@@ -121,8 +121,11 @@ class JobTokenAuthenticationFilter extends OncePerRequestFilter {
         return null;
     }
 
+    /** Matches numeric IPv4 or IPv6 address literals (rejects hostnames to avoid DNS resolution). */
+    private static final Pattern IP_LITERAL_PATTERN = Pattern.compile("^[0-9]{1,3}(\\.[0-9]{1,3}){3}$|^[0-9a-fA-F:]+$");
+
     static boolean isPrivateIp(String ip) {
-        if (ip == null) {
+        if (ip == null || !IP_LITERAL_PATTERN.matcher(ip).matches()) {
             return false;
         }
         try {

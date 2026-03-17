@@ -126,6 +126,14 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         void shouldRejectMalformedIp() {
             assertThat(JobTokenAuthenticationFilter.isPrivateIp("not-an-ip")).isFalse();
         }
+
+        @Test
+        @DisplayName("should reject hostname to prevent DNS resolution")
+        void shouldRejectHostname() {
+            // Hostnames must be rejected before InetAddress.getByName() to prevent DNS resolution
+            assertThat(JobTokenAuthenticationFilter.isPrivateIp("localhost")).isFalse();
+            assertThat(JobTokenAuthenticationFilter.isPrivateIp("internal.corp")).isFalse();
+        }
     }
 
     @Nested

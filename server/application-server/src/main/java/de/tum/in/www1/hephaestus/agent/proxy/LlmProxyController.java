@@ -154,10 +154,19 @@ class LlmProxyController {
         // Build upstream URL: strip proxy prefix, forward rest as-is.
         String fullPath = request.getRequestURI();
         String providerPrefix = PROXY_PATH_PREFIX + provider;
-        String subPath = fullPath.substring(fullPath.indexOf(providerPrefix) + providerPrefix.length());
+        if (!fullPath.startsWith(providerPrefix)) {
+            return ResponseEntity.badRequest().body("Invalid path");
+        }
+        String subPath = fullPath.substring(providerPrefix.length());
 
-        // Reject path traversal: check both literal and percent-encoded forms
-        if (subPath.contains("..") || subPath.toLowerCase(Locale.ROOT).contains("%2e")) {
+        // Reject path traversal: literal, single-encoded, double-encoded, and backslash forms
+        String subPathLower = subPath.toLowerCase(Locale.ROOT);
+        if (
+            subPath.contains("..") ||
+            subPath.contains("\\") ||
+            subPathLower.contains("%2e") ||
+            subPathLower.contains("%252e")
+        ) {
             return ResponseEntity.badRequest().body("Invalid path");
         }
 

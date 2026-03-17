@@ -198,10 +198,55 @@ class LlmProxyControllerTest extends BaseUnitTest {
             AgentJob job = createJobWithApiKey("sk-real-key");
             setUpAuthentication(job);
 
-            // MockHttpServletRequest stores the URI as-is. In production, servlet containers
-            // typically decode %2F before getRequestURI(), so ".." would be detected.
-            // We test the decoded form directly.
             var request = new MockHttpServletRequest("POST", "/internal/llm/anthropic/v1/../../etc/passwd");
+            var response = new MockHttpServletResponse();
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("x-api-key", "token");
+
+            var result = controller.proxy("anthropic", request, response, headers, "{}".getBytes());
+
+            assertThat(result.getStatusCode().value()).isEqualTo(400);
+        }
+
+        @Test
+        @DisplayName("should reject percent-encoded path traversal (%2e)")
+        void shouldRejectPercentEncodedDots() {
+            AgentJob job = createJobWithApiKey("sk-real-key");
+            setUpAuthentication(job);
+
+            var request = new MockHttpServletRequest("POST", "/internal/llm/anthropic/%2e%2e/etc/passwd");
+            var response = new MockHttpServletResponse();
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("x-api-key", "token");
+
+            var result = controller.proxy("anthropic", request, response, headers, "{}".getBytes());
+
+            assertThat(result.getStatusCode().value()).isEqualTo(400);
+        }
+
+        @Test
+        @DisplayName("should reject double-encoded path traversal (%252e)")
+        void shouldRejectDoubleEncodedDots() {
+            AgentJob job = createJobWithApiKey("sk-real-key");
+            setUpAuthentication(job);
+
+            var request = new MockHttpServletRequest("POST", "/internal/llm/anthropic/%252e%252e/etc/passwd");
+            var response = new MockHttpServletResponse();
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("x-api-key", "token");
+
+            var result = controller.proxy("anthropic", request, response, headers, "{}".getBytes());
+
+            assertThat(result.getStatusCode().value()).isEqualTo(400);
+        }
+
+        @Test
+        @DisplayName("should reject backslash in path")
+        void shouldRejectBackslash() {
+            AgentJob job = createJobWithApiKey("sk-real-key");
+            setUpAuthentication(job);
+
+            var request = new MockHttpServletRequest("POST", "/internal/llm/anthropic/v1\\..\\etc\\passwd");
             var response = new MockHttpServletResponse();
             HttpHeaders headers = new HttpHeaders();
             headers.set("x-api-key", "token");
