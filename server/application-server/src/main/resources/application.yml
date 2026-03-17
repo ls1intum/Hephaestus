@@ -375,6 +375,18 @@ hephaestus:
     #   - Docker Engine >= 25.0.5 (CVE-2024-29018 fix)
     #   - iptables -I DOCKER-USER -d 169.254.0.0/16 -j DROP (cloud metadata blocking)
     #   - Recommended: Tecnativa docker-socket-proxy with EXEC=0
+    # ═══════════════════════════════════════════════════════════════════════════
+    # LLM PROXY CONFIGURATION
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Upstream provider URLs for the LLM proxy. Override these for Azure OpenAI,
+    # testing with WireMock, or alternative API-compatible endpoints.
+    llm-proxy:
+        anthropic-upstream-url: ${LLM_PROXY_ANTHROPIC_URL:https://api.anthropic.com}
+        openai-upstream-url: ${LLM_PROXY_OPENAI_URL:https://api.openai.com}
+        # For Azure OpenAI, set openai-auth-header=api-key and openai-use-bearer-prefix=false
+        openai-auth-header: ${LLM_PROXY_OPENAI_AUTH_HEADER:Authorization}
+        openai-use-bearer-prefix: ${LLM_PROXY_OPENAI_USE_BEARER:true}
+
     sandbox:
         enabled: ${SANDBOX_ENABLED:false}
         docker-host: ${SANDBOX_DOCKER_HOST:unix:///var/run/docker.sock}
