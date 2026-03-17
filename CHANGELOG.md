@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.34.0](https://github.com/ls1intum/Hephaestus/compare/v0.33.0...v0.34.0) (2026-03-17)
+
+### 🐛 Bug Fixes
+
+* **scripts:** respect port overrides in all npm scripts ([#849](https://github.com/ls1intum/Hephaestus/issues/849)) ([158cc57](https://github.com/ls1intum/Hephaestus/commit/158cc57a4b00ab6e408cb8e1b37fb224f7c144d0))
+
+### 🚀 Features
+
+* **server:** job type handler pattern + context preparation ([#858](https://github.com/ls1intum/Hephaestus/issues/858)) ([c6348d1](https://github.com/ls1intum/Hephaestus/commit/c6348d1f7494813866100f649104b45c6b1b208f))
+
 ## [0.33.0](https://github.com/ls1intum/Hephaestus/compare/v0.32.0...v0.33.0) (2026-03-16)
 
 ### 🚀 Features
