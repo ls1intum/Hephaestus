@@ -70,6 +70,10 @@ public class PracticeFinding {
     @Column(name = "idempotency_key", nullable = false, length = 255)
     private String idempotencyKey;
 
+    /**
+     * The agent job that produced this finding. No cascade — agent jobs are long-lived
+     * and outlive their findings; deletion of an agent job is not expected while findings exist.
+     */
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(
@@ -112,8 +116,9 @@ public class PracticeFinding {
     @Column(name = "verdict", length = 16, nullable = false)
     private Verdict verdict;
 
+    @NotNull
     @Column(name = "confidence", nullable = false)
-    private float confidence;
+    private Float confidence;
 
     @Type(JsonType.class)
     @Column(name = "evidence", columnDefinition = "jsonb")
@@ -146,6 +151,9 @@ public class PracticeFinding {
     protected void onCreate() {
         if (id == null) {
             id = UUID.randomUUID();
+        }
+        if (detectedAt == null) {
+            detectedAt = Instant.now();
         }
     }
 }

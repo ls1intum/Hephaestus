@@ -60,7 +60,7 @@ public interface PracticeFindingRepository extends JpaRepository<PracticeFinding
         @Param("targetId") Long targetId,
         @Param("contributorId") Long contributorId,
         @Param("verdict") String verdict,
-        @Param("confidence") float confidence,
+        @Param("confidence") Float confidence,
         @Param("evidence") String evidence,
         @Param("reasoning") String reasoning,
         @Param("guidance") String guidance,
