@@ -25,6 +25,7 @@ public record PullRequestReviewSubmissionRequest(
 ) implements JobSubmissionRequest {
     public PullRequestReviewSubmissionRequest {
         Objects.requireNonNull(pullRequest, "pullRequest must not be null");
+        Objects.requireNonNull(pullRequest.repository(), "pullRequest.repository() must not be null");
         Objects.requireNonNull(headRefName, "headRefName must not be null");
         Objects.requireNonNull(headRefOid, "headRefOid must not be null");
         Objects.requireNonNull(baseRefName, "baseRefName must not be null");

@@ -59,6 +59,9 @@ public class PullRequestReviewHandler implements JobTypeHandler {
     /** Maximum diff size injected into the workspace (2 MB). Larger diffs are truncated with a note. */
     static final long MAX_DIFF_BYTES = 2L * 1024 * 1024;
 
+    /** Maximum number of review comments included in context. Most recent are kept on truncation. */
+    static final int MAX_COMMENTS = 500;
+
     private final ObjectMapper objectMapper;
     private final GitRepositoryManager gitRepositoryManager;
     private final PullRequestRepository pullRequestRepository;
@@ -116,6 +119,9 @@ public class PullRequestReviewHandler implements JobTypeHandler {
     public Map<String, byte[]> prepareInputFiles(AgentJob job) {
         long startNanos = System.nanoTime();
         JsonNode metadata = job.getMetadata();
+        if (metadata == null || metadata.isNull() || metadata.isMissingNode()) {
+            throw new JobPreparationException("Job has no metadata: jobId=" + job.getId());
+        }
         long repositoryId = requireLong(metadata, "repository_id");
         long pullRequestId = requireLong(metadata, "pull_request_id");
         String commitSha = requireText(metadata, "commit_sha");
@@ -237,6 +243,9 @@ public class PullRequestReviewHandler implements JobTypeHandler {
     @Override
     public String buildPrompt(AgentJob job) {
         JsonNode metadata = job.getMetadata();
+        if (metadata == null || metadata.isNull() || metadata.isMissingNode()) {
+            throw new JobPreparationException("Job has no metadata: jobId=" + job.getId());
+        }
         String pullRequestUrl = requireText(metadata, "pr_url");
         int pullRequestNumber = requireInt(metadata, "pr_number");
         String repoName = requireText(metadata, "repository_full_name");
@@ -338,6 +347,15 @@ public class PullRequestReviewHandler implements JobTypeHandler {
     private JsonNode buildReviewComments(long pullRequestId) {
         var comments = reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(pullRequestId);
         log.debug("Fetched {} review comments for pull request: pullRequestId={}", comments.size(), pullRequestId);
+        if (comments.size() > MAX_COMMENTS) {
+            log.warn(
+                "Truncating review comments from {} to {}: pullRequestId={}",
+                comments.size(),
+                MAX_COMMENTS,
+                pullRequestId
+            );
+            comments = comments.subList(comments.size() - MAX_COMMENTS, comments.size());
+        }
         var commentsArray = objectMapper.createArrayNode();
         for (var comment : comments) {
             var commentNode = objectMapper.createObjectNode();

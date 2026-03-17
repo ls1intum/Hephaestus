@@ -193,10 +193,8 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         @DisplayName("should include diff patch")
         void shouldIncludeDiffPatch() {
             String diffContent = "--- a/file.java\n+++ b/file.java\n@@ -1,3 +1,4 @@\n+new line\n";
-            when(gitRepositoryManager.readFilesAtCommit(eq(123L), anyString(), anyLong())).thenReturn(Map.of());
+            stubDefaults();
             when(gitRepositoryManager.generateUnifiedDiff(123L, "main", "feature/auth-fix")).thenReturn(diffContent);
-            when(pullRequestRepository.findByIdWithRepository(456L)).thenReturn(Optional.empty());
-            when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L)).thenReturn(List.of());
 
             Map<String, byte[]> files = handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata()));
 
@@ -235,10 +233,8 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             author.setLogin("testuser");
             pullRequest.setAuthor(author);
 
-            when(gitRepositoryManager.readFilesAtCommit(eq(123L), anyString(), anyLong())).thenReturn(Map.of());
-            when(gitRepositoryManager.generateUnifiedDiff(123L, "main", "feature/auth-fix")).thenReturn("diff");
+            stubDefaults();
             when(pullRequestRepository.findByIdWithRepository(456L)).thenReturn(Optional.of(pullRequest));
-            when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L)).thenReturn(List.of());
 
             Map<String, byte[]> files = handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata()));
 
@@ -252,7 +248,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         @Test
         @DisplayName("should throw JobPreparationException when diff is empty")
         void shouldThrowWhenDiffIsEmpty() {
-            when(gitRepositoryManager.readFilesAtCommit(eq(123L), anyString(), anyLong())).thenReturn(Map.of());
+            when(gitRepositoryManager.readFilesAtCommit(eq(123L), eq("abc123def456"), anyLong())).thenReturn(Map.of());
             when(gitRepositoryManager.generateUnifiedDiff(123L, "main", "feature/auth-fix")).thenReturn("");
 
             assertThatThrownBy(() -> handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata())))
@@ -276,7 +272,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         @Test
         @DisplayName("should throw JobPreparationException when generateUnifiedDiff fails")
         void shouldThrowWhenDiffGenerationFails() {
-            when(gitRepositoryManager.readFilesAtCommit(eq(123L), anyString(), anyLong())).thenReturn(Map.of());
+            when(gitRepositoryManager.readFilesAtCommit(eq(123L), eq("abc123def456"), anyLong())).thenReturn(Map.of());
             when(gitRepositoryManager.generateUnifiedDiff(123L, "main", "feature/auth-fix")).thenThrow(
                 new RuntimeException("Diff error")
             );
@@ -315,10 +311,8 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         void shouldTruncateOversizedDiff() {
             // Create a diff just over the 2 MB limit
             String largeDiff = "x".repeat((int) PullRequestReviewHandler.MAX_DIFF_BYTES + 1000);
-            when(gitRepositoryManager.readFilesAtCommit(eq(123L), anyString(), anyLong())).thenReturn(Map.of());
+            stubDefaults();
             when(gitRepositoryManager.generateUnifiedDiff(123L, "main", "feature/auth-fix")).thenReturn(largeDiff);
-            when(pullRequestRepository.findByIdWithRepository(456L)).thenReturn(Optional.empty());
-            when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L)).thenReturn(List.of());
 
             Map<String, byte[]> files = handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata()));
 
@@ -336,10 +330,8 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             // Build a diff that places a 3-byte UTF-8 character (€ = E2 82 AC) right at the boundary
             int padding = (int) PullRequestReviewHandler.MAX_DIFF_BYTES - 2;
             String largeDiff = "x".repeat(padding) + "€€€"; // € is 3 bytes, total > MAX_DIFF_BYTES
-            when(gitRepositoryManager.readFilesAtCommit(eq(123L), anyString(), anyLong())).thenReturn(Map.of());
+            stubDefaults();
             when(gitRepositoryManager.generateUnifiedDiff(123L, "main", "feature/auth-fix")).thenReturn(largeDiff);
-            when(pullRequestRepository.findByIdWithRepository(456L)).thenReturn(Optional.empty());
-            when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L)).thenReturn(List.of());
 
             Map<String, byte[]> files = handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata()));
 
@@ -347,6 +339,31 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             String diff = new String(files.get(".context/diff.patch"), StandardCharsets.UTF_8);
             assertThat(diff).doesNotContain("\uFFFD"); // replacement character = broken UTF-8
             assertThat(diff).contains("[... diff truncated at 2 MB");
+        }
+
+        @Test
+        @DisplayName("should not truncate diff exactly at limit")
+        void shouldNotTruncateDiffExactlyAtLimit() {
+            String exactDiff = "x".repeat((int) PullRequestReviewHandler.MAX_DIFF_BYTES);
+            stubDefaults();
+            when(gitRepositoryManager.generateUnifiedDiff(123L, "main", "feature/auth-fix")).thenReturn(exactDiff);
+
+            Map<String, byte[]> files = handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata()));
+
+            String diff = new String(files.get(".context/diff.patch"), StandardCharsets.UTF_8);
+            assertThat(diff).doesNotContain("[... diff truncated");
+            assertThat(diff).isEqualTo(exactDiff);
+        }
+
+        @Test
+        @DisplayName("should throw JobPreparationException when metadata is null")
+        void shouldThrowWhenMetadataIsNull() {
+            var job = new AgentJob();
+            job.setMetadata(null);
+
+            assertThatThrownBy(() -> handler.prepareInputFiles(job))
+                .isInstanceOf(JobPreparationException.class)
+                .hasMessageContaining("no metadata");
         }
 
         @Test
@@ -359,9 +376,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             comment.setAuthor(null);
             comment.setCreatedAt(Instant.parse("2025-01-15T10:30:00Z"));
 
-            when(gitRepositoryManager.readFilesAtCommit(eq(123L), anyString(), anyLong())).thenReturn(Map.of());
-            when(gitRepositoryManager.generateUnifiedDiff(123L, "main", "feature/auth-fix")).thenReturn("diff");
-            when(pullRequestRepository.findByIdWithRepository(456L)).thenReturn(Optional.empty());
+            stubDefaults();
             when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L)).thenReturn(
                 List.of(comment)
             );
@@ -377,54 +392,43 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should include created_at in review comments")
-        void shouldIncludeCreatedAtInComments() throws Exception {
-            PullRequestReviewComment comment = new PullRequestReviewComment();
-            comment.setPath("src/Main.java");
-            comment.setLine(10);
-            comment.setBody("Fix this");
-            comment.setCreatedAt(Instant.parse("2025-06-01T12:00:00Z"));
-            User author = new User();
-            author.setLogin("reviewer");
-            comment.setAuthor(author);
+        @DisplayName("should serialize comment fields conditionally based on null values")
+        void shouldSerializeCommentFieldsConditionally() throws Exception {
+            PullRequestReviewComment full = new PullRequestReviewComment();
+            full.setPath("src/Main.java");
+            full.setLine(10);
+            full.setBody("Fix this");
+            full.setCreatedAt(Instant.parse("2025-06-01T12:00:00Z"));
+            User reviewer = new User();
+            reviewer.setLogin("reviewer");
+            full.setAuthor(reviewer);
 
-            when(gitRepositoryManager.readFilesAtCommit(eq(123L), anyString(), anyLong())).thenReturn(Map.of());
-            when(gitRepositoryManager.generateUnifiedDiff(123L, "main", "feature/auth-fix")).thenReturn("diff");
-            when(pullRequestRepository.findByIdWithRepository(456L)).thenReturn(Optional.empty());
+            PullRequestReviewComment minimal = new PullRequestReviewComment();
+            minimal.setPath("src/Other.java");
+            minimal.setLine(5);
+            minimal.setBody("Old comment");
+            minimal.setCreatedAt(null);
+            minimal.setAuthor(null);
+
+            stubDefaults();
             when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L)).thenReturn(
-                List.of(comment)
+                List.of(full, minimal)
             );
 
             Map<String, byte[]> files = handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata()));
 
             JsonNode comments = objectMapper.readTree(files.get(".context/comments.json"));
+            assertThat(comments).hasSize(2);
+
+            // Full comment — all fields present
             assertThat(comments.get(0).get("created_at").asText()).isEqualTo("2025-06-01T12:00:00Z");
             assertThat(comments.get(0).get("author").asText()).isEqualTo("reviewer");
-        }
+            assertThat(comments.get(0).get("path").asText()).isEqualTo("src/Main.java");
 
-        @Test
-        @DisplayName("should handle comments with null createdAt")
-        void shouldHandleCommentsWithNullCreatedAt() throws Exception {
-            PullRequestReviewComment comment = new PullRequestReviewComment();
-            comment.setPath("src/Main.java");
-            comment.setLine(5);
-            comment.setBody("Old comment");
-            comment.setCreatedAt(null);
-            comment.setAuthor(null);
-
-            when(gitRepositoryManager.readFilesAtCommit(eq(123L), anyString(), anyLong())).thenReturn(Map.of());
-            when(gitRepositoryManager.generateUnifiedDiff(123L, "main", "feature/auth-fix")).thenReturn("diff");
-            when(pullRequestRepository.findByIdWithRepository(456L)).thenReturn(Optional.empty());
-            when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L)).thenReturn(
-                List.of(comment)
-            );
-
-            Map<String, byte[]> files = handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata()));
-
-            JsonNode comments = objectMapper.readTree(files.get(".context/comments.json"));
-            assertThat(comments).hasSize(1);
-            assertThat(comments.get(0).has("created_at")).isFalse();
-            assertThat(comments.get(0).has("author")).isFalse();
+            // Minimal comment — optional fields absent
+            assertThat(comments.get(1).has("created_at")).isFalse();
+            assertThat(comments.get(1).has("author")).isFalse();
+            assertThat(comments.get(1).get("body").asText()).isEqualTo("Old comment");
         }
     }
 
@@ -443,14 +447,6 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             assertThat(prompt).contains("/workspace/.output/result.json");
             assertThat(prompt).contains("#42");
             assertThat(prompt).contains("owner/repo");
-        }
-
-        @Test
-        @DisplayName("should not be blank")
-        void shouldNotBeBlank() {
-            String prompt = handler.buildPrompt(jobWithMetadata(sampleJobMetadata()));
-
-            assertThat(prompt).isNotBlank();
         }
 
         @Test
@@ -514,6 +510,22 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         void shouldHandleLimitBeyondData() {
             byte[] data = "abc".getBytes(StandardCharsets.UTF_8);
             assertThat(PullRequestReviewHandler.findUtf8CharBoundary(data, 100)).isEqualTo(3);
+        }
+
+        @Test
+        @DisplayName("should not split 4-byte characters (emoji)")
+        void shouldNotSplitFourByteCharacters() {
+            // "😀" is 4 bytes in UTF-8: F0 9F 98 80
+            byte[] data = "aa\uD83D\uDE00".getBytes(StandardCharsets.UTF_8);
+            // data = [0x61, 0x61, 0xF0, 0x9F, 0x98, 0x80] — 6 bytes
+
+            // Cutting at byte 3, 4, or 5 would split the emoji — should back up to byte 2
+            assertThat(PullRequestReviewHandler.findUtf8CharBoundary(data, 3)).isEqualTo(2);
+            assertThat(PullRequestReviewHandler.findUtf8CharBoundary(data, 4)).isEqualTo(2);
+            assertThat(PullRequestReviewHandler.findUtf8CharBoundary(data, 5)).isEqualTo(2);
+
+            // Cutting at byte 6 is safe (after the full character)
+            assertThat(PullRequestReviewHandler.findUtf8CharBoundary(data, 6)).isEqualTo(6);
         }
     }
 }

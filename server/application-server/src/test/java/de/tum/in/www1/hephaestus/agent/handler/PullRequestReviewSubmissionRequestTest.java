@@ -67,6 +67,35 @@ class PullRequestReviewSubmissionRequestTest extends BaseUnitTest {
         }
 
         @Test
+        @DisplayName("should reject pull request with null repository")
+        void shouldRejectNullRepository() {
+            var prDataNoRepo = new EventPayload.PullRequestData(
+                456L,
+                42,
+                "Fix bug",
+                "Body",
+                Issue.State.OPEN,
+                false,
+                false,
+                10,
+                5,
+                3,
+                "https://github.com/owner/repo/pull/42",
+                null, // null repository
+                789L,
+                Instant.now(),
+                Instant.now(),
+                null,
+                null,
+                null
+            );
+
+            assertThatThrownBy(() -> new PullRequestReviewSubmissionRequest(prDataNoRepo, "branch", "sha", "main"))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessageContaining("repository");
+        }
+
+        @Test
         @DisplayName("should reject null headRefName")
         void shouldRejectNullHeadRefName() {
             assertThatThrownBy(() ->

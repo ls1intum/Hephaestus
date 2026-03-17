@@ -49,6 +49,19 @@ class HandlerArchitectureTest extends HephaestusArchitectureTest {
                 .because("SPI types must remain domain-agnostic — handler implementations bridge to gitprovider")
                 .check(classes);
         }
+
+        @Test
+        @DisplayName("SPI package should not depend on handler implementations")
+        void spiShouldNotDependOnHandlerImpl() {
+            noClasses()
+                .that()
+                .resideInAPackage("..agent.handler.spi..")
+                .should()
+                .dependOnClassesThat()
+                .resideInAPackage("..agent.handler")
+                .because("SPI must not reference implementation details")
+                .check(classes);
+        }
     }
 
     @Nested
