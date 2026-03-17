@@ -96,7 +96,16 @@ class LlmProxyController {
         MDC.put("proxy.provider", provider);
         Timer.Sample timerSample = Timer.start();
         try {
-            ResponseEntity<?> result = doProxy(provider, llmProvider, config, job, request, response, incomingHeaders, body);
+            ResponseEntity<?> result = doProxy(
+                provider,
+                llmProvider,
+                config,
+                job,
+                request,
+                response,
+                incomingHeaders,
+                body
+            );
             int status = result != null ? result.getStatusCode().value() : response.getStatus();
             log.info(
                 "LLM proxy: job={} provider={} method={} path={} status={}",
