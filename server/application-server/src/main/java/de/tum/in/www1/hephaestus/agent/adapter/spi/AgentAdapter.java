@@ -71,8 +71,9 @@ public interface AgentAdapter {
      */
     static NetworkPolicy buildNetworkPolicy(AgentAdapterRequest request) {
         if (request.credentialMode() == CredentialMode.PROXY) {
-            return new NetworkPolicy(request.allowInternet(), null, request.jobToken());
+            String providerPath = request.llmProvider().name().toLowerCase(java.util.Locale.ROOT);
+            return new NetworkPolicy(request.allowInternet(), null, request.jobToken(), providerPath);
         }
-        return new NetworkPolicy(true, null, null);
+        return new NetworkPolicy(true, null, null, null);
     }
 }

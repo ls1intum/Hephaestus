@@ -19,9 +19,13 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.HexFormat;
 import java.util.UUID;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -99,6 +103,15 @@ public class AgentJob {
     @ToString.Exclude
     private String jobToken;
 
+    @Column(name = "job_token_hash", length = 64)
+    @ToString.Exclude
+    private String jobTokenHash;
+
+    @Convert(converter = EncryptedStringConverter.class)
+    @Column(name = "llm_api_key", columnDefinition = "TEXT")
+    @ToString.Exclude
+    private String llmApiKey;
+
     @Column(name = "idempotency_key", length = 255)
     private String idempotencyKey;
 
@@ -134,6 +147,9 @@ public class AgentJob {
         if (this.jobToken == null) {
             this.jobToken = generateJobToken();
         }
+        if (this.jobTokenHash == null && this.jobToken != null) {
+            this.jobTokenHash = computeTokenHash(this.jobToken);
+        }
         if (this.status == null) {
             this.status = AgentJobStatus.QUEUED;
         }
@@ -144,5 +160,19 @@ public class AgentJob {
         byte[] bytes = new byte[32]; // 256 bits
         SECURE_RANDOM.nextBytes(bytes);
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    }
+
+    /**
+     * Compute SHA-256 hex digest of a plaintext job token.
+     * Used for indexed lookup since the encrypted column cannot be queried directly.
+     */
+    public static String computeTokenHash(String token) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(token.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 not available", e);
+        }
     }
 }
