@@ -106,10 +106,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 null,
                 "Good quality",
                 "Keep it up",
-                "COACHING",
-                "src/Main.java",
-                10,
-                20,
                 Instant.now()
             );
 
@@ -120,10 +116,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
             assertThat(found.getVerdict().name()).isEqualTo("POSITIVE");
             assertThat(found.getConfidence()).isEqualTo(0.95f);
             assertThat(found.getReasoning()).isEqualTo("Good quality");
-            assertThat(found.getGuidanceMethod().name()).isEqualTo("COACHING");
-            assertThat(found.getFilePath()).isEqualTo("src/Main.java");
-            assertThat(found.getStartLine()).isEqualTo(10);
-            assertThat(found.getEndLine()).isEqualTo(20);
+            assertThat(found.getGuidance()).isEqualTo("Keep it up");
         }
 
         @Test
@@ -146,10 +139,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                null,
-                null,
-                null,
-                null,
                 now
             );
 
@@ -163,10 +152,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 contributor.getId(),
                 "NEGATIVE",
                 0.5f,
-                null,
-                null,
-                null,
-                null,
                 null,
                 null,
                 null,
@@ -197,10 +182,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 evidence,
                 "Missing error handling",
                 null,
-                null,
-                "src/Main.java",
-                5,
-                15,
                 Instant.now()
             );
 
@@ -231,10 +212,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 contributor.getId(),
                 "POSITIVE",
                 0.9f,
-                null,
-                null,
-                null,
-                null,
                 null,
                 null,
                 null,
@@ -286,10 +263,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                null,
-                null,
-                null,
-                null,
                 Instant.now()
             );
             // Finding in workspace B
@@ -303,10 +276,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 contributor.getId(),
                 "NEGATIVE",
                 0.5f,
-                null,
-                null,
-                null,
-                null,
                 null,
                 null,
                 null,
@@ -355,10 +324,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                null,
-                null,
-                null,
-                null,
                 Instant.now()
             );
             // Finding on the other practice (should survive)
@@ -372,10 +337,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 contributor.getId(),
                 "POSITIVE",
                 0.9f,
-                null,
-                null,
-                null,
-                null,
                 null,
                 null,
                 null,

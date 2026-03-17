@@ -6,4 +6,5 @@ package de.tum.in.www1.hephaestus.practices.model;
 public enum Verdict {
     POSITIVE,
     NEGATIVE,
+    NOT_APPLICABLE,
 }

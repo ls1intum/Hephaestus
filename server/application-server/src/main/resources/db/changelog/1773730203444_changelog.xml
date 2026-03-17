@@ -99,10 +99,6 @@
             <column name="evidence" type="JSONB"/>
             <column name="reasoning" type="TEXT"/>
             <column name="guidance" type="TEXT"/>
-            <column name="guidance_method" type="VARCHAR(64)"/>
-            <column name="file_path" type="VARCHAR(512)"/>
-            <column name="start_line" type="INTEGER"/>
-            <column name="end_line" type="INTEGER"/>
             <column name="detected_at" type="TIMESTAMP(6) WITH TIME ZONE">
                 <constraints nullable="false"/>
             </column>
@@ -120,17 +116,11 @@
         <sql>
             ALTER TABLE practice_finding
             ADD CONSTRAINT chk_practice_finding_verdict
-            CHECK (verdict IN ('POSITIVE', 'NEGATIVE'));
+            CHECK (verdict IN ('POSITIVE', 'NEGATIVE', 'NOT_APPLICABLE'));
 
             ALTER TABLE practice_finding
             ADD CONSTRAINT chk_practice_finding_confidence
             CHECK (confidence >= 0 AND confidence &lt;= 1);
-
-            ALTER TABLE practice_finding
-            ADD CONSTRAINT chk_practice_finding_guidance_method
-            CHECK (guidance_method IS NULL OR guidance_method IN (
-                'MODELING', 'COACHING', 'SCAFFOLDING', 'ARTICULATION', 'REFLECTION', 'EXPLORATION'
-            ));
         </sql>
     </changeSet>
 

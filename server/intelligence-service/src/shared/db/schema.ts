@@ -1236,10 +1236,6 @@ export const practiceFinding = pgTable(
 		evidence: jsonb(),
 		reasoning: text(),
 		guidance: text(),
-		guidanceMethod: varchar("guidance_method", { length: 64 }),
-		filePath: varchar("file_path", { length: 512 }),
-		startLine: integer("start_line"),
-		endLine: integer("end_line"),
 		detectedAt: timestamp("detected_at", {
 			precision: 6,
 			withTimezone: true,
@@ -1281,15 +1277,11 @@ export const practiceFinding = pgTable(
 		unique("uk_practice_finding_idempotency").on(table.idempotencyKey),
 		check(
 			"chk_practice_finding_verdict",
-			sql`(verdict)::text = ANY ((ARRAY['POSITIVE'::character varying, 'NEGATIVE'::character varying])::text[])`,
+			sql`(verdict)::text = ANY ((ARRAY['POSITIVE'::character varying, 'NEGATIVE'::character varying, 'NOT_APPLICABLE'::character varying])::text[])`,
 		),
 		check(
 			"chk_practice_finding_confidence",
 			sql`(confidence >= (0)::double precision) AND (confidence <= (1)::double precision)`,
-		),
-		check(
-			"chk_practice_finding_guidance_method",
-			sql`(guidance_method IS NULL) OR ((guidance_method)::text = ANY ((ARRAY['MODELING'::character varying, 'COACHING'::character varying, 'SCAFFOLDING'::character varying, 'ARTICULATION'::character varying, 'REFLECTION'::character varying, 'EXPLORATION'::character varying])::text[]))`,
 		),
 	],
 );
