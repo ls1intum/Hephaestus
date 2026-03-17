@@ -104,13 +104,12 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     /** Drain any queued requests from prior tests so takeRequest() is accurate. */
     private void drainMockUpstream() {
-        while (mockUpstream.getRequestCount() > 0) {
-            try {
-                if (mockUpstream.takeRequest(0, TimeUnit.MILLISECONDS) == null) break;
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                break;
+        try {
+            while (mockUpstream.takeRequest(0, TimeUnit.MILLISECONDS) != null) {
+                // keep draining until queue is empty (returns null)
             }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
     }
 
@@ -424,6 +423,67 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
 
         @Test
+        @DisplayName("should stream SSE responses end-to-end")
+        void shouldStreamSseResponse() throws Exception {
+            String ssePayload = "data: {\"id\":\"msg_stream\"}\n\ndata: [DONE]\n\n";
+            mockUpstream.enqueue(
+                new MockResponse()
+                    .setResponseCode(200)
+                    .setHeader("Content-Type", "text/event-stream")
+                    .setBody(ssePayload)
+            );
+
+            AgentJob job = createRunningJobWithApiKey("sk-ant-sse-key");
+
+            webTestClient
+                .post()
+                .uri("/internal/llm/anthropic/v1/messages")
+                .header("x-api-key", job.getJobToken())
+                .header("Content-Type", "application/json")
+                .bodyValue("{\"model\":\"claude-sonnet-4-20250514\",\"max_tokens\":1,\"stream\":true}")
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectHeader()
+                .contentTypeCompatibleWith("text/event-stream")
+                .expectBody(String.class)
+                .value(body -> {
+                    assertThat(body).contains("msg_stream");
+                    assertThat(body).contains("[DONE]");
+                });
+
+            RecordedRequest upstream = mockUpstream.takeRequest(5, TimeUnit.SECONDS);
+            assertThat(upstream).isNotNull();
+            assertThat(upstream.getHeader("x-api-key")).isEqualTo("sk-ant-sse-key");
+        }
+
+        @Test
+        @DisplayName("should forward query parameters to upstream")
+        void shouldForwardQueryParameters() throws Exception {
+            mockUpstream.enqueue(
+                new MockResponse()
+                    .setResponseCode(200)
+                    .setHeader("Content-Type", "application/json")
+                    .setBody("{\"data\":[]}")
+            );
+
+            AgentJob job = createRunningJobWithApiKey("sk-query-key");
+
+            webTestClient
+                .get()
+                .uri("/internal/llm/openai/v1/models?limit=10&order=desc")
+                .header("Authorization", "Bearer " + job.getJobToken())
+                .exchange()
+                .expectStatus()
+                .isOk();
+
+            RecordedRequest upstream = mockUpstream.takeRequest(5, TimeUnit.SECONDS);
+            assertThat(upstream).isNotNull();
+            assertThat(upstream.getPath()).contains("limit=10");
+            assertThat(upstream.getPath()).contains("order=desc");
+        }
+
+        @Test
         @DisplayName("should forward upstream error status codes transparently")
         void shouldForwardUpstreamErrors() throws Exception {
             mockUpstream.enqueue(new MockResponse().setResponseCode(429).setBody("{\"error\":\"rate_limited\"}"));
@@ -438,7 +498,9 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 .bodyValue("{\"model\":\"claude-sonnet-4-20250514\",\"max_tokens\":1}")
                 .exchange()
                 .expectStatus()
-                .isEqualTo(429);
+                .isEqualTo(429)
+                .expectBody()
+                .json("{\"error\":\"rate_limited\"}");
         }
     }
 

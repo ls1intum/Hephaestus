@@ -52,7 +52,7 @@ class LlmProxyControllerTest extends BaseUnitTest {
     }
 
     private void setUpAuthentication(AgentJob job) {
-        SecurityContextHolder.getContext().setAuthentication(new JobTokenAuthentication(job, "fake-token"));
+        SecurityContextHolder.getContext().setAuthentication(new JobTokenAuthentication(job));
     }
 
     private AgentJob createJobWithApiKey(String apiKey) {
@@ -124,8 +124,8 @@ class LlmProxyControllerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should remove Host and clear Accept-Encoding")
-        void shouldRemoveHostAndAcceptEncoding() {
+        @DisplayName("should remove Host and set Accept-Encoding to identity")
+        void shouldRemoveHostAndSetAcceptEncodingIdentity() {
             var config = ProviderProxyConfig.forProvider(LlmProvider.ANTHROPIC, DEFAULT_PROPS);
             HttpHeaders incoming = new HttpHeaders();
             incoming.set(HttpHeaders.HOST, "app-server:8080");
@@ -134,7 +134,7 @@ class LlmProxyControllerTest extends BaseUnitTest {
             HttpHeaders out = controller.buildUpstreamHeaders(incoming, config, "sk-real-key");
 
             assertThat(out.get(HttpHeaders.HOST)).isNull();
-            assertThat(out.getFirst(HttpHeaders.ACCEPT_ENCODING)).isEmpty();
+            assertThat(out.getFirst(HttpHeaders.ACCEPT_ENCODING)).isEqualTo("identity");
         }
 
         @Test
@@ -258,7 +258,7 @@ class LlmProxyControllerTest extends BaseUnitTest {
 
             controller.proxy("anthropic", request, response, headers, "{}".getBytes());
 
-            var errorCounter = meterRegistry.find("llm.proxy.errors").tag("provider", "anthropic").counter();
+            var errorCounter = meterRegistry.find("llm.proxy.errors").tag("provider", "ANTHROPIC").counter();
             assertThat(errorCounter).isNotNull();
             assertThat(errorCounter.count()).isEqualTo(1.0);
         }
@@ -385,7 +385,7 @@ class LlmProxyControllerTest extends BaseUnitTest {
 
             controller.proxy("anthropic", request, response, headers, "{}".getBytes());
 
-            var timer = meterRegistry.find("llm.proxy.duration").tag("provider", "anthropic").timer();
+            var timer = meterRegistry.find("llm.proxy.duration").tag("provider", "ANTHROPIC").timer();
             assertThat(timer).isNotNull();
             assertThat(timer.count()).isEqualTo(1);
         }
@@ -402,7 +402,7 @@ class LlmProxyControllerTest extends BaseUnitTest {
 
             controller.proxy("anthropic", request, response, headers, "{}".getBytes());
 
-            var timer = meterRegistry.find("llm.proxy.duration").tag("provider", "anthropic").timer();
+            var timer = meterRegistry.find("llm.proxy.duration").tag("provider", "ANTHROPIC").timer();
             assertThat(timer).isNotNull();
             assertThat(timer.count()).isEqualTo(1);
             assertThat(timer.totalTime(java.util.concurrent.TimeUnit.NANOSECONDS)).isGreaterThan(0);
@@ -422,7 +422,7 @@ class LlmProxyControllerTest extends BaseUnitTest {
             controller.proxy("anthropic", request, response, headers, "{}".getBytes());
             controller.proxy("anthropic", request, response, headers, "{}".getBytes());
 
-            var errorCounter = meterRegistry.find("llm.proxy.errors").tag("provider", "anthropic").counter();
+            var errorCounter = meterRegistry.find("llm.proxy.errors").tag("provider", "ANTHROPIC").counter();
             assertThat(errorCounter).isNotNull();
             assertThat(errorCounter.count()).isEqualTo(3.0);
         }
@@ -442,8 +442,8 @@ class LlmProxyControllerTest extends BaseUnitTest {
             controller.proxy("openai", openaiReq, response, headers, "{}".getBytes());
             controller.proxy("openai", openaiReq, response, headers, "{}".getBytes());
 
-            var anthropicErrors = meterRegistry.find("llm.proxy.errors").tag("provider", "anthropic").counter();
-            var openaiErrors = meterRegistry.find("llm.proxy.errors").tag("provider", "openai").counter();
+            var anthropicErrors = meterRegistry.find("llm.proxy.errors").tag("provider", "ANTHROPIC").counter();
+            var openaiErrors = meterRegistry.find("llm.proxy.errors").tag("provider", "OPENAI").counter();
 
             assertThat(anthropicErrors).isNotNull();
             assertThat(anthropicErrors.count()).isEqualTo(1.0);
@@ -551,7 +551,7 @@ class LlmProxyControllerTest extends BaseUnitTest {
             assertThat(result.getStatusCode().value()).isEqualTo(502);
             assertThat(result.getBody()).isEqualTo("Upstream provider unreachable");
 
-            var errorCounter = meterRegistry.find("llm.proxy.errors").tag("provider", "anthropic").counter();
+            var errorCounter = meterRegistry.find("llm.proxy.errors").tag("provider", "ANTHROPIC").counter();
             assertThat(errorCounter).isNotNull();
             assertThat(errorCounter.count()).isEqualTo(1.0);
         }
@@ -589,7 +589,7 @@ class LlmProxyControllerTest extends BaseUnitTest {
             assertThat(result.getStatusCode().value()).isEqualTo(502);
             assertThat(result.getBody()).isEqualTo("Upstream request failed");
 
-            var errorCounter = meterRegistry.find("llm.proxy.errors").tag("provider", "anthropic").counter();
+            var errorCounter = meterRegistry.find("llm.proxy.errors").tag("provider", "ANTHROPIC").counter();
             assertThat(errorCounter).isNotNull();
             assertThat(errorCounter.count()).isEqualTo(1.0);
         }

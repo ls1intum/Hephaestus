@@ -84,7 +84,7 @@ class JobTokenAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
-        SecurityContextHolder.getContext().setAuthentication(new JobTokenAuthentication(job, token));
+        SecurityContextHolder.getContext().setAuthentication(new JobTokenAuthentication(job));
         try {
             filterChain.doFilter(request, response);
         } finally {

@@ -4,6 +4,8 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.time.Duration;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import org.slf4j.Logger;
@@ -49,9 +51,23 @@ public final class ProxyStreamingUtils {
      * @return a new {@link HttpHeaders} instance with hop-by-hop headers removed
      */
     public static HttpHeaders filterHopByHopHeaders(HttpHeaders headers) {
+        // Build dynamic set: fixed RFC list + any headers named in Connection header value
+        Set<String> toStrip = new HashSet<>(HOP_BY_HOP_HEADERS_LOWER);
+        List<String> connectionValues = headers.get(HttpHeaders.CONNECTION);
+        if (connectionValues != null) {
+            for (String val : connectionValues) {
+                for (String token : val.split(",")) {
+                    String trimmed = token.trim();
+                    if (!trimmed.isEmpty()) {
+                        toStrip.add(trimmed.toLowerCase(Locale.ROOT));
+                    }
+                }
+            }
+        }
+
         HttpHeaders filtered = new HttpHeaders();
         headers.forEach((name, values) -> {
-            if (!HOP_BY_HOP_HEADERS_LOWER.contains(name.toLowerCase(Locale.ROOT))) {
+            if (!toStrip.contains(name.toLowerCase(Locale.ROOT))) {
                 filtered.put(name, values);
             }
         });
@@ -170,8 +186,6 @@ public final class ProxyStreamingUtils {
                 .blockLast(DEFAULT_SSE_TIMEOUT); // Safe: servlet thread, not Netty event loop
         } catch (IOException e) {
             log.debug("SSE streaming initialization failed: {}", e.getMessage());
-            // Drain the Flux to release any prefetched DataBuffers and close the upstream connection
-            dataFlux.subscribe(DataBufferUtils::release, err -> {});
         } catch (StreamingException e) {
             log.debug("SSE streaming terminated: {}", e.getMessage());
         } catch (Exception e) {

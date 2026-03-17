@@ -96,6 +96,21 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
         }
 
         @Test
+        @DisplayName("should strip headers named in Connection header value")
+        void shouldStripDynamicConnectionHeaders() {
+            HttpHeaders headers = new HttpHeaders();
+            headers.set(HttpHeaders.CONNECTION, "keep-alive, X-Custom-Hop");
+            headers.set("X-Custom-Hop", "should-be-removed");
+            headers.set("X-Safe-Header", "should-remain");
+
+            HttpHeaders filtered = ProxyStreamingUtils.filterHopByHopHeaders(headers);
+
+            assertThat(filtered.get("X-Custom-Hop")).isNull();
+            assertThat(filtered.getFirst("X-Safe-Header")).isEqualTo("should-remain");
+            assertThat(filtered.get(HttpHeaders.CONNECTION)).isNull();
+        }
+
+        @Test
         @DisplayName("should handle empty headers")
         void shouldHandleEmptyHeaders() {
             HttpHeaders headers = new HttpHeaders();
@@ -290,11 +305,12 @@ class ProxyStreamingUtilsTest extends BaseUnitTest {
             HttpHeaders headers,
             Flux<DataBuffer> sseFlux
         ) {
+            MediaType ct = headers.getContentType() != null ? headers.getContentType() : MediaType.TEXT_EVENT_STREAM;
             ClientResponse resp = mock(ClientResponse.class);
             ClientResponse.Headers respHeaders = mock(ClientResponse.Headers.class);
             when(resp.headers()).thenReturn(respHeaders);
             when(respHeaders.asHttpHeaders()).thenReturn(headers);
-            when(respHeaders.contentType()).thenReturn(Optional.of(MediaType.TEXT_EVENT_STREAM));
+            when(respHeaders.contentType()).thenReturn(Optional.of(ct));
             when(resp.statusCode()).thenReturn(org.springframework.http.HttpStatusCode.valueOf(status));
             when(resp.bodyToFlux(DataBuffer.class)).thenReturn(sseFlux);
             return resp;

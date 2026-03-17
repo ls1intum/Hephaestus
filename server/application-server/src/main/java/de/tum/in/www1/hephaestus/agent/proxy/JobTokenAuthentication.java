@@ -14,18 +14,16 @@ import org.springframework.security.authentication.AbstractAuthenticationToken;
 class JobTokenAuthentication extends AbstractAuthenticationToken {
 
     private final AgentJob job;
-    private final String rawToken;
 
-    JobTokenAuthentication(AgentJob job, String rawToken) {
+    JobTokenAuthentication(AgentJob job) {
         super(List.of());
         this.job = job;
-        this.rawToken = rawToken;
         setAuthenticated(true);
     }
 
     @Override
     public Object getCredentials() {
-        return rawToken;
+        return "[REDACTED]";
     }
 
     @Override

@@ -15,25 +15,25 @@ class JobTokenAuthenticationTest extends BaseUnitTest {
     @DisplayName("should return job as principal")
     void shouldReturnJobAsPrincipal() {
         AgentJob job = mock(AgentJob.class);
-        var auth = new JobTokenAuthentication(job, "token-abc");
+        var auth = new JobTokenAuthentication(job);
 
         assertThat(auth.getPrincipal()).isSameAs(job);
     }
 
     @Test
-    @DisplayName("should return raw token as credentials")
-    void shouldReturnRawTokenAsCredentials() {
+    @DisplayName("should redact credentials to prevent token leakage")
+    void shouldRedactCredentials() {
         AgentJob job = mock(AgentJob.class);
-        var auth = new JobTokenAuthentication(job, "token-abc");
+        var auth = new JobTokenAuthentication(job);
 
-        assertThat(auth.getCredentials()).isEqualTo("token-abc");
+        assertThat(auth.getCredentials()).isEqualTo("[REDACTED]");
     }
 
     @Test
     @DisplayName("should be authenticated on construction")
     void shouldBeAuthenticated() {
         AgentJob job = mock(AgentJob.class);
-        var auth = new JobTokenAuthentication(job, "token-abc");
+        var auth = new JobTokenAuthentication(job);
 
         assertThat(auth.isAuthenticated()).isTrue();
     }
@@ -42,7 +42,7 @@ class JobTokenAuthenticationTest extends BaseUnitTest {
     @DisplayName("should have empty authorities")
     void shouldHaveEmptyAuthorities() {
         AgentJob job = mock(AgentJob.class);
-        var auth = new JobTokenAuthentication(job, "token-abc");
+        var auth = new JobTokenAuthentication(job);
 
         assertThat(auth.getAuthorities()).isEmpty();
     }

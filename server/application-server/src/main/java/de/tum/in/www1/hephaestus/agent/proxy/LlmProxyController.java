@@ -96,7 +96,7 @@ class LlmProxyController {
         MDC.put("proxy.provider", provider);
         Timer.Sample timerSample = Timer.start();
         try {
-            ResponseEntity<?> result = doProxy(provider, config, job, request, response, incomingHeaders, body);
+            ResponseEntity<?> result = doProxy(provider, llmProvider, config, job, request, response, incomingHeaders, body);
             int status = result != null ? result.getStatusCode().value() : response.getStatus();
             log.info(
                 "LLM proxy: job={} provider={} method={} path={} status={}",
@@ -111,7 +111,7 @@ class LlmProxyController {
             timerSample.stop(
                 Timer.builder("llm.proxy.duration")
                     .description("LLM proxy request duration")
-                    .tag("provider", provider)
+                    .tag("provider", llmProvider.name())
                     .register(meterRegistry)
             );
             MDC.remove("proxy.jobId");
@@ -121,6 +121,7 @@ class LlmProxyController {
 
     private ResponseEntity<?> doProxy(
         String provider,
+        LlmProvider llmProvider,
         ProviderProxyConfig config,
         AgentJob job,
         HttpServletRequest request,
@@ -131,7 +132,7 @@ class LlmProxyController {
         String apiKey = job.getLlmApiKey();
         if (apiKey == null || apiKey.isBlank()) {
             log.warn("Job {} has no LLM API key configured", job.getId());
-            incrementErrors(provider);
+            incrementErrors(llmProvider);
             return ResponseEntity.status(502).body("No API key configured for this job");
         }
 
@@ -146,8 +147,8 @@ class LlmProxyController {
         String providerPrefix = PROXY_PATH_PREFIX + provider;
         String subPath = fullPath.substring(fullPath.indexOf(providerPrefix) + providerPrefix.length());
 
-        // Reject path traversal: check decoded form and normalize to catch double-encoding variants
-        if (subPath.contains("..")) {
+        // Reject path traversal: check both literal and percent-encoded forms
+        if (subPath.contains("..") || subPath.toLowerCase(Locale.ROOT).contains("%2e")) {
             return ResponseEntity.badRequest().body("Invalid path");
         }
 
@@ -200,16 +201,16 @@ class LlmProxyController {
             upstream = readySpec.exchangeToMono(ProxyStreamingUtils::consumeResponse).block(BLOCK_TIMEOUT);
         } catch (WebClientRequestException e) {
             log.warn("Upstream unreachable for provider {}: {}", provider, e.getMessage());
-            incrementErrors(provider);
+            incrementErrors(llmProvider);
             return ResponseEntity.status(502).body("Upstream provider unreachable");
         } catch (Exception e) {
             log.warn("Upstream request failed for provider {}: {}", provider, e.getMessage());
-            incrementErrors(provider);
+            incrementErrors(llmProvider);
             return ResponseEntity.status(502).body("Upstream request failed");
         }
 
         if (upstream == null) {
-            incrementErrors(provider);
+            incrementErrors(llmProvider);
             return ResponseEntity.status(502).body("Upstream provider unavailable");
         }
 
@@ -237,7 +238,7 @@ class LlmProxyController {
     HttpHeaders buildUpstreamHeaders(HttpHeaders incomingHeaders, ProviderProxyConfig config, String apiKey) {
         HttpHeaders out = ProxyStreamingUtils.filterHopByHopHeaders(incomingHeaders);
         out.remove(HttpHeaders.HOST);
-        out.set(HttpHeaders.ACCEPT_ENCODING, "");
+        out.set(HttpHeaders.ACCEPT_ENCODING, "identity");
 
         // Remove all incoming auth headers (they contain the job token)
         out.remove("x-api-key");
@@ -250,8 +251,8 @@ class LlmProxyController {
         return out;
     }
 
-    private void incrementErrors(String provider) {
-        meterRegistry.counter("llm.proxy.errors", "provider", provider).increment();
+    private void incrementErrors(LlmProvider provider) {
+        meterRegistry.counter("llm.proxy.errors", "provider", provider.name()).increment();
     }
 
     private AgentJob getAuthenticatedJob() {

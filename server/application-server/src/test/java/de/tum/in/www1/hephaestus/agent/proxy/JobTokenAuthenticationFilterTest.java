@@ -376,7 +376,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
 
         @Test
         @DisplayName("should not be bypassed by X-Forwarded-For header spoofing")
-        void shouldNotBeBypasedByXForwardedFor() throws Exception {
+        void shouldNotBeBypassedByXForwardedFor() throws Exception {
             var request = new MockHttpServletRequest();
             request.setRemoteAddr("8.8.8.8"); // Public IP
             request.addHeader("X-Forwarded-For", "10.0.0.2"); // Spoofed private IP
