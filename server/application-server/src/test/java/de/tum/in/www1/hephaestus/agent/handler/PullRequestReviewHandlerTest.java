@@ -186,7 +186,9 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
 
             assertThat(files).containsKey("repo/src/Main.java");
             assertThat(files).containsKey("repo/README.md");
-            assertThat(new String(files.get("repo/src/Main.java"))).isEqualTo("public class Main {}");
+            assertThat(new String(files.get("repo/src/Main.java"), StandardCharsets.UTF_8)).isEqualTo(
+                "public class Main {}"
+            );
         }
 
         @Test
@@ -429,6 +431,53 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             assertThat(comments.get(1).has("created_at")).isFalse();
             assertThat(comments.get(1).has("author")).isFalse();
             assertThat(comments.get(1).get("body").asText()).isEqualTo("Old comment");
+        }
+
+        @Test
+        @DisplayName("should truncate comments to MAX_COMMENTS keeping most recent")
+        void shouldTruncateCommentsToMaxKeepingMostRecent() throws Exception {
+            var comments = new java.util.ArrayList<PullRequestReviewComment>();
+            for (int i = 0; i < PullRequestReviewHandler.MAX_COMMENTS + 100; i++) {
+                PullRequestReviewComment c = new PullRequestReviewComment();
+                c.setPath("file.java");
+                c.setLine(i);
+                c.setBody("Comment " + i);
+                comments.add(c);
+            }
+
+            stubDefaults();
+            when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L)).thenReturn(comments);
+
+            Map<String, byte[]> files = handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata()));
+
+            JsonNode commentsJson = objectMapper.readTree(files.get(".context/comments.json"));
+            assertThat(commentsJson).hasSize(PullRequestReviewHandler.MAX_COMMENTS);
+            // Should keep the most recent (last) comments
+            assertThat(commentsJson.get(0).get("body").asText()).isEqualTo("Comment 100");
+            assertThat(commentsJson.get(PullRequestReviewHandler.MAX_COMMENTS - 1).get("body").asText()).isEqualTo(
+                "Comment " + (PullRequestReviewHandler.MAX_COMMENTS + 99)
+            );
+        }
+
+        @Test
+        @DisplayName("should handle enriched metadata with null author")
+        void shouldHandleEnrichedMetadataWithNullAuthor() throws Exception {
+            PullRequest pullRequest = new PullRequest();
+            pullRequest.setTitle("Some PR");
+            pullRequest.setBody("Body");
+            pullRequest.setState(Issue.State.OPEN);
+            pullRequest.setAuthor(null);
+
+            stubDefaults();
+            when(pullRequestRepository.findByIdWithRepository(456L)).thenReturn(Optional.of(pullRequest));
+
+            Map<String, byte[]> files = handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata()));
+
+            JsonNode metadataJson = objectMapper.readTree(files.get(".context/metadata.json"));
+            assertThat(metadataJson.get("enriched").asBoolean()).isTrue();
+            assertThat(metadataJson.get("title").asText()).isEqualTo("Some PR");
+            assertThat(metadataJson.get("state").asText()).isEqualTo("OPEN");
+            assertThat(metadataJson.has("author")).isFalse();
         }
     }
 

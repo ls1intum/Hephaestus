@@ -45,9 +45,9 @@ import org.slf4j.LoggerFactory;
  *
  * <h2>Memory budget</h2>
  * <p>{@link #prepareInputFiles} materialises all workspace files in heap before handing them
- * to the sandbox's tar injector. Peak usage per job is bounded by {@link #MAX_REPO_BYTES}
- * plus diff and context files (~42 MB worst-case). Concurrent job count is limited by
- * {@code SandboxProperties.maxConcurrentContainers}.
+ * to the sandbox's tar injector. Repo files are copied into a new map with {@code repo/} prefixes,
+ * so peak usage is ~2× {@link #MAX_REPO_BYTES} plus diff and context files (~82 MB worst-case).
+ * Concurrent job count is limited by {@code SandboxProperties.maxConcurrentContainers}.
  */
 public class PullRequestReviewHandler implements JobTypeHandler {
 

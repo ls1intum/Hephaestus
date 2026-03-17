@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
@@ -496,7 +497,7 @@ class GitRepositoryManagerTest extends BaseUnitTest {
                 Map<String, byte[]> files = manager.readFilesAtCommit(1L, headSha, 50L * 1024 * 1024);
 
                 assertThat(files).containsKey("README.md");
-                assertThat(new String(files.get("README.md"))).isEqualTo("# Test Repository\n");
+                assertThat(new String(files.get("README.md"), StandardCharsets.UTF_8)).isEqualTo("# Test Repository\n");
             }
         }
 

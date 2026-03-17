@@ -521,8 +521,8 @@ public class GitRepositoryManager {
      * @param repositoryId  the repository database ID
      * @param commitSha     the commit SHA to read from
      * @param maxTotalBytes maximum total bytes to collect (files beyond this limit are skipped)
-     * @return map of relative file paths to contents, empty if the commit cannot be resolved
-     * @throws GitOperationException if an I/O error occurs reading from the git object store
+     * @return map of relative file paths to contents
+     * @throws GitOperationException if the commit cannot be resolved or an I/O error occurs
      */
     public Map<String, byte[]> readFilesAtCommit(Long repositoryId, String commitSha, long maxTotalBytes) {
         if (!properties.enabled()) {
@@ -539,8 +539,7 @@ public class GitRepositoryManager {
 
                 ObjectId commitId = repo.resolve(commitSha);
                 if (commitId == null) {
-                    log.warn("Cannot resolve commit SHA for file read: sha={}", commitSha);
-                    return result;
+                    throw new IOException("Cannot resolve commit SHA: " + commitSha);
                 }
 
                 try (RevWalk revWalk = new RevWalk(repo); ObjectReader reader = repo.newObjectReader()) {
