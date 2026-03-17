@@ -19,6 +19,7 @@ import org.slf4j.MDC;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -47,6 +48,7 @@ import org.springframework.web.reactive.function.client.WebClientRequestExceptio
 @RestController
 @Hidden
 @RequestMapping("/internal/llm")
+@PreAuthorize("isAuthenticated()")
 class LlmProxyController {
 
     private static final Logger log = LoggerFactory.getLogger(LlmProxyController.class);
