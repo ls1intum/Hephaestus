@@ -80,9 +80,6 @@ hephaestus:
     git:
         enabled: false
         storage-path: /tmp/hephaestus-test-git-repos
-    llm-proxy:
-        anthropic-upstream-url: http://localhost:1
-        openai-upstream-url: http://localhost:1
 
 # Logging configuration for tests
 logging:
