@@ -14,6 +14,7 @@ import {
 	jsonb,
 	pgTable,
 	primaryKey,
+	real,
 	text,
 	timestamp,
 	unique,
@@ -542,7 +543,6 @@ export const discussion = pgTable(
 			name: "fk_discussion_provider",
 		}),
 		unique("uq_discussion_repo_number").on(table.number, table.repositoryId),
-		unique("uknlcwyn2relkgw95s8okgpkqrt").on(table.number, table.repositoryId),
 		unique("uk_discussion_answer_comment_id").on(table.answerCommentId),
 		unique("uq_discussion_provider_native_id").on(table.nativeId, table.providerId),
 	],
@@ -573,7 +573,6 @@ export const discussionCategory = pgTable(
 			name: "fk_discussion_category_repository",
 		}).onDelete("cascade"),
 		unique("uq_discussion_category_repo_slug").on(table.slug, table.repositoryId),
-		unique("uk6cjmvjyh5jc9bfnn8i9wggbo5").on(table.slug, table.repositoryId),
 	],
 );
 
@@ -851,11 +850,6 @@ export const issue = pgTable(
 		index("idx_issue_repository_id").using("btree", table.repositoryId.asc().nullsLast()),
 		index("idx_issue_state").using("btree", table.state.asc().nullsLast()),
 		foreignKey({
-			columns: [table.providerId],
-			foreignColumns: [gitProvider.id],
-			name: "fk_issue_provider",
-		}),
-		foreignKey({
 			columns: [table.repositoryId],
 			foreignColumns: [repository.id],
 			name: "fk76s4b6ncspm9bk35y49xh4s9t",
@@ -885,6 +879,11 @@ export const issue = pgTable(
 			foreignColumns: [issueType.id],
 			name: "fk_issue_issue_type",
 		}).onDelete("set null"),
+		foreignKey({
+			columns: [table.providerId],
+			foreignColumns: [gitProvider.id],
+			name: "fk_issue_provider",
+		}),
 		unique("uk_issue_repository_type_number").on(table.issueType, table.number, table.repositoryId),
 		unique("uq_issue_provider_native_id").on(table.nativeId, table.providerId),
 		check(
@@ -977,11 +976,6 @@ export const issueComment = pgTable(
 		index("idx_issue_comment_author_id").using("btree", table.authorId.asc().nullsLast()),
 		index("idx_issue_comment_created_at").using("btree", table.createdAt.asc().nullsLast()),
 		foreignKey({
-			columns: [table.providerId],
-			foreignColumns: [gitProvider.id],
-			name: "fk_issue_comment_provider",
-		}),
-		foreignKey({
 			columns: [table.issueId],
 			foreignColumns: [issue.id],
 			name: "fk8wy5rxggrte2ntcq80g7o7210",
@@ -990,6 +984,11 @@ export const issueComment = pgTable(
 			columns: [table.authorId],
 			foreignColumns: [user.id],
 			name: "fkdy6oeojymud1wna20olqgyt31",
+		}),
+		foreignKey({
+			columns: [table.providerId],
+			foreignColumns: [gitProvider.id],
+			name: "fk_issue_comment_provider",
 		}),
 		unique("uq_issue_comment_provider_native_id").on(table.nativeId, table.providerId),
 	],
@@ -1062,14 +1061,14 @@ export const label = pgTable(
 	},
 	(table) => [
 		foreignKey({
-			columns: [table.providerId],
-			foreignColumns: [gitProvider.id],
-			name: "fk_label_provider",
-		}),
-		foreignKey({
 			columns: [table.repositoryId],
 			foreignColumns: [repository.id],
 			name: "fk2951edbl9g9y8ee1q97e2ff75",
+		}),
+		foreignKey({
+			columns: [table.providerId],
+			foreignColumns: [gitProvider.id],
+			name: "fk_label_provider",
 		}),
 		unique("uq_label_repository_name").on(table.name, table.repositoryId),
 		unique("uq_label_provider_native_id").on(table.nativeId, table.providerId),
@@ -1109,11 +1108,6 @@ export const milestone = pgTable(
 	},
 	(table) => [
 		foreignKey({
-			columns: [table.providerId],
-			foreignColumns: [gitProvider.id],
-			name: "fk_milestone_provider",
-		}),
-		foreignKey({
 			columns: [table.repositoryId],
 			foreignColumns: [repository.id],
 			name: "fkbjhs37s6qmqtd330gu9mit6w0",
@@ -1122,6 +1116,11 @@ export const milestone = pgTable(
 			columns: [table.creatorId],
 			foreignColumns: [user.id],
 			name: "fkg6ieho7gomiumy85puy6l13f1",
+		}),
+		foreignKey({
+			columns: [table.providerId],
+			foreignColumns: [gitProvider.id],
+			name: "fk_milestone_provider",
 		}),
 		unique("uk_milestone_number_repository").on(table.number, table.repositoryId),
 		unique("uq_milestone_provider_native_id").on(table.nativeId, table.providerId),
@@ -1175,6 +1174,123 @@ export const organizationMembership = pgTable(
 			columns: [table.organizationId, table.userId],
 			name: "organization_membershipPK",
 		}),
+	],
+);
+
+export const practice = pgTable(
+	"practice",
+	{
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({
+			name: "practice_id_seq",
+			startWith: 1,
+			increment: 1,
+			cache: 1,
+		}),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		workspaceId: bigint("workspace_id", { mode: "number" }).notNull(),
+		slug: varchar({ length: 64 }).notNull(),
+		name: varchar({ length: 128 }).notNull(),
+		category: varchar({ length: 64 }),
+		description: text().notNull(),
+		triggerEvents: jsonb("trigger_events").default([]).notNull(),
+		detectionPrompt: text("detection_prompt"),
+		isActive: boolean("is_active").default(true).notNull(),
+		createdAt: timestamp("created_at", {
+			precision: 6,
+			withTimezone: true,
+			mode: "string",
+		}).notNull(),
+		updatedAt: timestamp("updated_at", { precision: 6, withTimezone: true, mode: "string" }),
+	},
+	(table) => [
+		index("idx_practice_workspace_active").using(
+			"btree",
+			table.workspaceId.asc().nullsLast(),
+			table.isActive.asc().nullsLast(),
+		),
+		foreignKey({
+			columns: [table.workspaceId],
+			foreignColumns: [workspace.id],
+			name: "fk_practice_workspace",
+		}),
+		unique("uk_practice_workspace_slug").on(table.workspaceId, table.slug),
+	],
+);
+
+export const practiceFinding = pgTable(
+	"practice_finding",
+	{
+		id: uuid().primaryKey().notNull(),
+		idempotencyKey: varchar("idempotency_key", { length: 255 }).notNull(),
+		agentJobId: uuid("agent_job_id").notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		practiceId: bigint("practice_id", { mode: "number" }).notNull(),
+		targetType: varchar("target_type", { length: 32 }).notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		targetId: bigint("target_id", { mode: "number" }).notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		contributorId: bigint("contributor_id", { mode: "number" }).notNull(),
+		verdict: varchar({ length: 16 }).notNull(),
+		confidence: real().notNull(),
+		evidence: jsonb(),
+		reasoning: text(),
+		guidance: text(),
+		guidanceMethod: varchar("guidance_method", { length: 64 }),
+		filePath: varchar("file_path", { length: 512 }),
+		startLine: integer("start_line"),
+		endLine: integer("end_line"),
+		detectedAt: timestamp("detected_at", {
+			precision: 6,
+			withTimezone: true,
+			mode: "string",
+		}).notNull(),
+	},
+	(table) => [
+		index("idx_practice_finding_agent_job").using("btree", table.agentJobId.asc().nullsLast()),
+		index("idx_practice_finding_contributor_detected").using(
+			"btree",
+			table.contributorId.asc().nullsLast(),
+			table.detectedAt.desc().nullsFirst(),
+		),
+		index("idx_practice_finding_practice_detected").using(
+			"btree",
+			table.practiceId.asc().nullsLast(),
+			table.detectedAt.desc().nullsFirst(),
+		),
+		index("idx_practice_finding_target").using(
+			"btree",
+			table.targetType.asc().nullsLast(),
+			table.targetId.asc().nullsLast(),
+		),
+		foreignKey({
+			columns: [table.agentJobId],
+			foreignColumns: [agentJob.id],
+			name: "fk_practice_finding_agent_job",
+		}),
+		foreignKey({
+			columns: [table.practiceId],
+			foreignColumns: [practice.id],
+			name: "fk_practice_finding_practice",
+		}).onDelete("cascade"),
+		foreignKey({
+			columns: [table.contributorId],
+			foreignColumns: [user.id],
+			name: "fk_practice_finding_contributor",
+		}),
+		unique("uk_practice_finding_idempotency").on(table.idempotencyKey),
+		check(
+			"chk_practice_finding_verdict",
+			sql`(verdict)::text = ANY ((ARRAY['POSITIVE'::character varying, 'NEGATIVE'::character varying])::text[])`,
+		),
+		check(
+			"chk_practice_finding_confidence",
+			sql`(confidence >= (0)::double precision) AND (confidence <= (1)::double precision)`,
+		),
+		check(
+			"chk_practice_finding_guidance_method",
+			sql`(guidance_method IS NULL) OR ((guidance_method)::text = ANY ((ARRAY['MODELING'::character varying, 'COACHING'::character varying, 'SCAFFOLDING'::character varying, 'ARTICULATION'::character varying, 'REFLECTION'::character varying, 'EXPLORATION'::character varying])::text[]))`,
+		),
 	],
 );
 
@@ -1529,11 +1645,6 @@ export const pullRequestReview = pgTable(
 		index("idx_pr_review_pull_request_id").using("btree", table.pullRequestId.asc().nullsLast()),
 		index("idx_pr_review_submitted_at").using("btree", table.submittedAt.asc().nullsLast()),
 		foreignKey({
-			columns: [table.providerId],
-			foreignColumns: [gitProvider.id],
-			name: "fk_pr_review_provider",
-		}),
-		foreignKey({
 			columns: [table.authorId],
 			foreignColumns: [user.id],
 			name: "fkeehfcwrodfu61gremlcvhgir5",
@@ -1542,6 +1653,11 @@ export const pullRequestReview = pgTable(
 			columns: [table.pullRequestId],
 			foreignColumns: [issue.id],
 			name: "fkio96gq2jetvy6a4in9nl8vkvd",
+		}),
+		foreignKey({
+			columns: [table.providerId],
+			foreignColumns: [gitProvider.id],
+			name: "fk_pr_review_provider",
 		}),
 		unique("uq_pr_review_provider_native_id").on(table.nativeId, table.providerId),
 	],
@@ -1592,11 +1708,6 @@ export const pullRequestReviewComment = pgTable(
 			table.threadId.asc().nullsLast(),
 		),
 		foreignKey({
-			columns: [table.providerId],
-			foreignColumns: [gitProvider.id],
-			name: "fk_pr_review_comment_provider",
-		}),
-		foreignKey({
 			columns: [table.reviewId],
 			foreignColumns: [pullRequestReview.id],
 			name: "fkbx1g5jpdegymhyv9pbk2jdgfw",
@@ -1621,6 +1732,11 @@ export const pullRequestReviewComment = pgTable(
 			foreignColumns: [table.id],
 			name: "fk_pr_review_comment_reply",
 		}).onDelete("set null"),
+		foreignKey({
+			columns: [table.providerId],
+			foreignColumns: [gitProvider.id],
+			name: "fk_pr_review_comment_provider",
+		}),
 		unique("uq_pr_review_comment_provider_native_id").on(table.nativeId, table.providerId),
 	],
 );
@@ -1667,11 +1783,6 @@ export const pullRequestReviewThread = pgTable(
 			table.resolvedById.asc().nullsLast(),
 		),
 		foreignKey({
-			columns: [table.providerId],
-			foreignColumns: [gitProvider.id],
-			name: "fk_pr_review_thread_provider",
-		}),
-		foreignKey({
 			columns: [table.pullRequestId],
 			foreignColumns: [issue.id],
 			name: "fk_pr_review_thread_pull_request",
@@ -1686,6 +1797,11 @@ export const pullRequestReviewThread = pgTable(
 			foreignColumns: [user.id],
 			name: "fk_pull_request_review_thread_resolved_by",
 		}).onDelete("set null"),
+		foreignKey({
+			columns: [table.providerId],
+			foreignColumns: [gitProvider.id],
+			name: "fk_pr_review_thread_provider",
+		}),
 		unique("uq_pr_review_thread_root_comment").on(table.rootCommentId),
 		unique("uq_pr_review_thread_provider_native_id").on(table.nativeId, table.providerId),
 	],
@@ -1726,14 +1842,14 @@ export const repository = pgTable(
 		index("idx_repository_name_with_owner").using("btree", table.nameWithOwner.asc().nullsLast()),
 		index("idx_repository_organization_id").using("btree", table.organizationId.asc().nullsLast()),
 		foreignKey({
-			columns: [table.providerId],
-			foreignColumns: [gitProvider.id],
-			name: "fk_repository_provider",
-		}),
-		foreignKey({
 			columns: [table.organizationId],
 			foreignColumns: [organization.id],
 			name: "fk_repository_organization",
+		}),
+		foreignKey({
+			columns: [table.providerId],
+			foreignColumns: [gitProvider.id],
+			name: "fk_repository_provider",
 		}),
 		unique("uq_repository_provider_name_with_owner").on(table.nameWithOwner, table.providerId),
 		unique("uq_repository_provider_native_id").on(table.nativeId, table.providerId),
