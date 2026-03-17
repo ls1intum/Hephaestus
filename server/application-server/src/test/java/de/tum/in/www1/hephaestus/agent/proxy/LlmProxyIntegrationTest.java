@@ -358,7 +358,13 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 .bodyValue("{}")
                 .exchange()
                 .expectStatus()
-                .value(status -> assertThat(status).isIn(400, 404));
+                .value(status ->
+                    assertThat(status)
+                        .as(
+                            "Path traversal should be rejected: 400 (our check), 404 (not found), or 401 (servlet normalizes path out of /internal/llm/** to main auth chain)"
+                        )
+                        .isIn(400, 401, 404)
+                );
         }
     }
 
