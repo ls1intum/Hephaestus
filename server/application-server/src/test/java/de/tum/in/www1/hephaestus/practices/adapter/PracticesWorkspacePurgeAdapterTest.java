@@ -43,6 +43,7 @@ class PracticesWorkspacePurgeAdapterTest extends BaseUnitTest {
     }
 
     @Test
+    @DisplayName("cancels scheduled tasks when PRs exist")
     void deleteWorkspaceData_withPullRequests_cancelsScheduledTasks() {
         // Given
         Long workspaceId = 123L;
@@ -59,6 +60,7 @@ class PracticesWorkspacePurgeAdapterTest extends BaseUnitTest {
     }
 
     @Test
+    @DisplayName("skips scheduler when no PRs exist")
     void deleteWorkspaceData_withNoPullRequests_skipsSchedulerCall() {
         // Given
         Long workspaceId = 456L;
@@ -75,7 +77,8 @@ class PracticesWorkspacePurgeAdapterTest extends BaseUnitTest {
     }
 
     @Test
-    void deleteWorkspaceData_deletesFindingsBeforePractices() {
+    @DisplayName("deletes both findings and practices for workspace")
+    void deleteWorkspaceData_deletesFindingsAndPractices() {
         // Given
         Long workspaceId = 789L;
         when(pullRequestQueryRepository.findPullRequestIdsByWorkspaceId(workspaceId)).thenReturn(
@@ -91,6 +94,7 @@ class PracticesWorkspacePurgeAdapterTest extends BaseUnitTest {
     }
 
     @Test
+    @DisplayName("runs before default-order contributors")
     void getOrder_returnsNegativeValue() {
         // The adapter should run early, before other contributors
         assertThat(adapter.getOrder()).isLessThan(0);

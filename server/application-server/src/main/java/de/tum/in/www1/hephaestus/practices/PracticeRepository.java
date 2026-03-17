@@ -21,6 +21,7 @@ public interface PracticeRepository extends JpaRepository<Practice, Long> {
 
     boolean existsByWorkspaceId(Long workspaceId);
 
+    /** Deletes all practices for the workspace. Cascades to practice_finding via ON DELETE CASCADE. */
     @Modifying
     @Transactional
     @Query("DELETE FROM Practice p WHERE p.workspace.id = :workspaceId")
