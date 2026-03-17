@@ -435,6 +435,10 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
             AgentJob job = createRunningJobWithApiKey("sk-ant-sse-key");
 
+            // SSE body content is verified by ProxyStreamingUtilsTest.
+            // WebTestClient cannot capture bytes written directly to HttpServletResponse
+            // (the controller bypasses Spring MVC for SSE streaming and returns null),
+            // so we verify status, content-type, and upstream auth header injection here.
             webTestClient
                 .post()
                 .uri("/internal/llm/anthropic/v1/messages")
@@ -445,12 +449,7 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 .expectStatus()
                 .isOk()
                 .expectHeader()
-                .contentTypeCompatibleWith("text/event-stream")
-                .expectBody(String.class)
-                .value(body -> {
-                    assertThat(body).contains("msg_stream");
-                    assertThat(body).contains("[DONE]");
-                });
+                .contentTypeCompatibleWith("text/event-stream");
 
             RecordedRequest upstream = mockUpstream.takeRequest(5, TimeUnit.SECONDS);
             assertThat(upstream).isNotNull();
