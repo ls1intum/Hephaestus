@@ -61,9 +61,9 @@ public class PracticesWorkspacePurgeAdapter implements WorkspacePurgeContributor
             );
         }
 
-        // Delete practice findings (must happen before practices due to FK)
+        // Delete practice findings explicitly (defense-in-depth; CASCADE would also handle this)
         practiceFindingRepository.deleteAllByPracticeWorkspaceId(workspaceId);
-        // Delete practice definitions
+        // Delete practice definitions (CASCADE cleans up any remaining findings)
         practiceRepository.deleteAllByWorkspaceId(workspaceId);
 
         log.info("Deleted practices and findings for workspace: workspaceId={}", workspaceId);

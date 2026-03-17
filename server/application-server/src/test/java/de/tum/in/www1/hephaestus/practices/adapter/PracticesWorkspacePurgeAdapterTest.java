@@ -13,7 +13,6 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mockito.InOrder;
 import org.mockito.Mock;
 
 @DisplayName("PracticesWorkspacePurgeAdapter")
@@ -86,10 +85,9 @@ class PracticesWorkspacePurgeAdapterTest extends BaseUnitTest {
         // When
         adapter.deleteWorkspaceData(workspaceId);
 
-        // Then — findings must be deleted before practices (FK ordering)
-        InOrder inOrder = inOrder(practiceFindingRepository, practiceRepository);
-        inOrder.verify(practiceFindingRepository).deleteAllByPracticeWorkspaceId(workspaceId);
-        inOrder.verify(practiceRepository).deleteAllByWorkspaceId(workspaceId);
+        // Then — both deletes called (explicit finding deletion is defense-in-depth; CASCADE also handles it)
+        verify(practiceFindingRepository).deleteAllByPracticeWorkspaceId(workspaceId);
+        verify(practiceRepository).deleteAllByWorkspaceId(workspaceId);
     }
 
     @Test
