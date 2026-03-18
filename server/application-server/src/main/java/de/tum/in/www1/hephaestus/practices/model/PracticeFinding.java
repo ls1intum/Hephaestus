@@ -103,6 +103,11 @@ public class PracticeFinding {
     @Column(name = "target_id", nullable = false)
     private Long targetId;
 
+    /**
+     * The contributor whose work is being evaluated. No cascade — users are long-lived
+     * and findings must survive independently; deleting a user with existing findings
+     * is blocked by the FK constraint (RESTRICT).
+     */
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(
