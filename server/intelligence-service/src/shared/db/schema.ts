@@ -14,6 +14,7 @@ import {
 	jsonb,
 	pgTable,
 	primaryKey,
+	real,
 	text,
 	timestamp,
 	unique,
@@ -1173,6 +1174,126 @@ export const organizationMembership = pgTable(
 			columns: [table.organizationId, table.userId],
 			name: "organization_membershipPK",
 		}),
+	],
+);
+
+export const practice = pgTable(
+	"practice",
+	{
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({
+			name: "practice_id_seq",
+			startWith: 1,
+			increment: 1,
+			cache: 1,
+		}),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		workspaceId: bigint("workspace_id", { mode: "number" }).notNull(),
+		slug: varchar({ length: 64 }).notNull(),
+		name: varchar({ length: 128 }).notNull(),
+		category: varchar({ length: 64 }),
+		description: text().notNull(),
+		triggerEvents: jsonb("trigger_events").default([]).notNull(),
+		detectionPrompt: text("detection_prompt"),
+		isActive: boolean("is_active").default(true).notNull(),
+		createdAt: timestamp("created_at", {
+			precision: 6,
+			withTimezone: true,
+			mode: "string",
+		}).notNull(),
+		updatedAt: timestamp("updated_at", { precision: 6, withTimezone: true, mode: "string" }),
+	},
+	(table) => [
+		index("idx_practice_workspace_active").using(
+			"btree",
+			table.workspaceId.asc().nullsLast(),
+			table.isActive.asc().nullsLast(),
+		),
+		foreignKey({
+			columns: [table.workspaceId],
+			foreignColumns: [workspace.id],
+			name: "fk_practice_workspace",
+		}),
+		unique("uk_practice_workspace_slug").on(table.workspaceId, table.slug),
+	],
+);
+
+export const practiceFinding = pgTable(
+	"practice_finding",
+	{
+		id: uuid().primaryKey().notNull(),
+		idempotencyKey: varchar("idempotency_key", { length: 255 }).notNull(),
+		agentJobId: uuid("agent_job_id").notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		practiceId: bigint("practice_id", { mode: "number" }).notNull(),
+		targetType: varchar("target_type", { length: 32 }).notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		targetId: bigint("target_id", { mode: "number" }).notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		contributorId: bigint("contributor_id", { mode: "number" }).notNull(),
+		title: varchar({ length: 255 }).notNull(),
+		verdict: varchar({ length: 16 }).notNull(),
+		severity: varchar({ length: 16 }).notNull(),
+		confidence: real().notNull(),
+		evidence: jsonb(),
+		reasoning: text(),
+		guidance: text(),
+		guidanceMethod: varchar("guidance_method", { length: 16 }),
+		detectedAt: timestamp("detected_at", {
+			precision: 6,
+			withTimezone: true,
+			mode: "string",
+		}).notNull(),
+	},
+	(table) => [
+		index("idx_practice_finding_agent_job").using("btree", table.agentJobId.asc().nullsLast()),
+		index("idx_practice_finding_contributor_detected").using(
+			"btree",
+			table.contributorId.asc().nullsLast(),
+			table.detectedAt.desc().nullsFirst(),
+		),
+		index("idx_practice_finding_practice_detected").using(
+			"btree",
+			table.practiceId.asc().nullsLast(),
+			table.detectedAt.desc().nullsFirst(),
+		),
+		index("idx_practice_finding_target").using(
+			"btree",
+			table.targetType.asc().nullsLast(),
+			table.targetId.asc().nullsLast(),
+		),
+		foreignKey({
+			columns: [table.agentJobId],
+			foreignColumns: [agentJob.id],
+			name: "fk_practice_finding_agent_job",
+		}),
+		foreignKey({
+			columns: [table.practiceId],
+			foreignColumns: [practice.id],
+			name: "fk_practice_finding_practice",
+		}).onDelete("cascade"),
+		foreignKey({
+			columns: [table.contributorId],
+			foreignColumns: [user.id],
+			name: "fk_practice_finding_contributor",
+		}),
+		unique("uk_practice_finding_idempotency").on(table.idempotencyKey),
+		check(
+			"chk_practice_finding_verdict",
+			sql`(verdict)::text = ANY ((ARRAY['POSITIVE'::character varying, 'NEGATIVE'::character varying, 'NOT_APPLICABLE'::character varying, 'NEEDS_REVIEW'::character varying])::text[])`,
+		),
+		check(
+			"chk_practice_finding_severity",
+			sql`(severity)::text = ANY ((ARRAY['CRITICAL'::character varying, 'MAJOR'::character varying, 'MINOR'::character varying, 'INFO'::character varying])::text[])`,
+		),
+		check(
+			"chk_practice_finding_confidence",
+			sql`(confidence >= (0)::double precision) AND (confidence <= (1)::double precision)`,
+		),
+		check(
+			"chk_practice_finding_guidance_method",
+			sql`(guidance_method IS NULL) OR ((guidance_method)::text = ANY ((ARRAY['MODELING'::character varying, 'COACHING'::character varying, 'SCAFFOLDING'::character varying, 'ARTICULATION'::character varying, 'REFLECTION'::character varying, 'EXPLORATION'::character varying])::text[]))`,
+		),
 	],
 );
 

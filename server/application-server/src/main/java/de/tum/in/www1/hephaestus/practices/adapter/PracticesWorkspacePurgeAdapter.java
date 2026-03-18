@@ -1,7 +1,9 @@
 package de.tum.in.www1.hephaestus.practices.adapter;
 
+import de.tum.in.www1.hephaestus.practices.PracticeRepository;
 import de.tum.in.www1.hephaestus.practices.PracticesPullRequestQueryRepository;
 import de.tum.in.www1.hephaestus.practices.detection.BadPracticeDetectorScheduler;
+import de.tum.in.www1.hephaestus.practices.finding.PracticeFindingRepository;
 import de.tum.in.www1.hephaestus.workspace.spi.WorkspacePurgeContributor;
 import java.util.List;
 import org.slf4j.Logger;
@@ -9,16 +11,18 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
- * Adapter that handles bad practice detection cleanup when a workspace is purged.
+ * Adapter that handles practices cleanup when a workspace is purged.
  *
- * <p>This contributor cancels all scheduled bad practice detection tasks for pull requests
- * belonging to the workspace being purged. This prevents orphaned scheduled tasks from
- * running after the workspace data has been deleted.
+ * <p>This contributor:
+ * <ul>
+ *   <li>Cancels all scheduled bad practice detection tasks for pull requests</li>
+ *   <li>Deletes practice findings (via native query through practice.workspace_id)</li>
+ *   <li>Deletes practice definitions for the workspace</li>
+ * </ul>
  *
- * <p>Note: This only cancels in-memory scheduled tasks. The persisted bad practice
- * detections (PullRequestBadPractice entities) are cleaned up via cascade delete
- * from the PullRequest entities, which are in turn cleaned up when Repository
- * entities are deleted.
+ * <p>Note: The persisted bad practice detections (PullRequestBadPractice entities) are
+ * cleaned up via cascade delete from the PullRequest entities, which are in turn
+ * cleaned up when Repository entities are deleted.
  */
 @Component
 public class PracticesWorkspacePurgeAdapter implements WorkspacePurgeContributor {
@@ -27,31 +31,42 @@ public class PracticesWorkspacePurgeAdapter implements WorkspacePurgeContributor
 
     private final PracticesPullRequestQueryRepository pullRequestQueryRepository;
     private final BadPracticeDetectorScheduler detectorScheduler;
+    private final PracticeFindingRepository practiceFindingRepository;
+    private final PracticeRepository practiceRepository;
 
     public PracticesWorkspacePurgeAdapter(
         PracticesPullRequestQueryRepository pullRequestQueryRepository,
-        BadPracticeDetectorScheduler detectorScheduler
+        BadPracticeDetectorScheduler detectorScheduler,
+        PracticeFindingRepository practiceFindingRepository,
+        PracticeRepository practiceRepository
     ) {
         this.pullRequestQueryRepository = pullRequestQueryRepository;
         this.detectorScheduler = detectorScheduler;
+        this.practiceFindingRepository = practiceFindingRepository;
+        this.practiceRepository = practiceRepository;
     }
 
     @Override
     public void deleteWorkspaceData(Long workspaceId) {
+        // Cancel scheduled bad practice detection tasks
         List<Long> pullRequestIds = pullRequestQueryRepository.findPullRequestIdsByWorkspaceId(workspaceId);
 
-        if (pullRequestIds.isEmpty()) {
-            log.debug("No scheduled tasks to cancel for workspace: workspaceId={}", workspaceId);
-            return;
+        if (!pullRequestIds.isEmpty()) {
+            int cancelledCount = detectorScheduler.cancelScheduledTasksForPullRequests(pullRequestIds);
+            log.debug(
+                "Cancelled scheduled bad practice detection tasks for workspace: workspaceId={}, prCount={}, cancelledCount={}",
+                workspaceId,
+                pullRequestIds.size(),
+                cancelledCount
+            );
         }
 
-        int cancelledCount = detectorScheduler.cancelScheduledTasksForPullRequests(pullRequestIds);
-        log.debug(
-            "Cancelled scheduled bad practice detection tasks for workspace: workspaceId={}, prCount={}, cancelledCount={}",
-            workspaceId,
-            pullRequestIds.size(),
-            cancelledCount
-        );
+        // Delete practice findings explicitly (defense-in-depth; CASCADE would also handle this)
+        practiceFindingRepository.deleteAllByPracticeWorkspaceId(workspaceId);
+        // Delete practice definitions (CASCADE cleans up any remaining findings)
+        practiceRepository.deleteAllByWorkspaceId(workspaceId);
+
+        log.info("Deleted practices and findings for workspace: workspaceId={}", workspaceId);
     }
 
     @Override
