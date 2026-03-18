@@ -36,14 +36,16 @@ public interface PracticeFindingRepository extends JpaRepository<PracticeFinding
         INSERT INTO practice_finding (
             id, idempotency_key, agent_job_id, practice_id,
             target_type, target_id, contributor_id,
-            verdict, confidence, evidence, reasoning,
-            guidance, detected_at
+            title, verdict, severity, confidence,
+            evidence, reasoning, guidance, guidance_method,
+            detected_at
         )
         VALUES (
             :id, :idempotencyKey, :agentJobId, :practiceId,
             :targetType, :targetId, :contributorId,
-            :verdict, :confidence, CAST(:evidence AS jsonb), :reasoning,
-            :guidance, :detectedAt
+            :title, :verdict, :severity, :confidence,
+            CAST(:evidence AS jsonb), :reasoning, :guidance, :guidanceMethod,
+            :detectedAt
         )
         ON CONFLICT (idempotency_key) DO NOTHING
         """,
@@ -57,11 +59,14 @@ public interface PracticeFindingRepository extends JpaRepository<PracticeFinding
         @Param("targetType") String targetType,
         @Param("targetId") Long targetId,
         @Param("contributorId") Long contributorId,
+        @Param("title") String title,
         @Param("verdict") String verdict,
+        @Param("severity") String severity,
         @Param("confidence") Float confidence,
         @Param("evidence") String evidence,
         @Param("reasoning") String reasoning,
         @Param("guidance") String guidance,
+        @Param("guidanceMethod") String guidanceMethod,
         @Param("detectedAt") Instant detectedAt
     );
 

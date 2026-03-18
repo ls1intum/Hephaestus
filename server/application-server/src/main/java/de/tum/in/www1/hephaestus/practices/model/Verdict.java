@@ -7,4 +7,5 @@ public enum Verdict {
     POSITIVE,
     NEGATIVE,
     NOT_APPLICABLE,
+    NEEDS_REVIEW,
 }

@@ -402,11 +402,14 @@ erDiagram
         VARCHAR(32) target_type "NOT NULL"
         BIGINT target_id "NOT NULL"
         BIGINT contributor_id FK "NOT NULL"
+        VARCHAR(255) title "NOT NULL"
         VARCHAR(16) verdict "NOT NULL"
+        VARCHAR(16) severity "NOT NULL"
         REAL confidence "NOT NULL"
         JSONB evidence
         TEXT reasoning
         TEXT guidance
+        VARCHAR(16) guidance_method
         TIMESTAMPTZ detected_at "NOT NULL"
     }
 

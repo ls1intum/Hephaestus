@@ -40,6 +40,8 @@ import org.hibernate.annotations.Type;
  * {@code @PrePersist}, and {@code insertIfAbsent} for race-condition-safe insertion.
  *
  * @see Practice for the practice definition being evaluated
+ * @see CaMethod for the cognitive apprenticeship guidance method
+ * @see Severity for the impact level (orthogonal to verdict)
  */
 @Entity
 @Immutable
@@ -111,14 +113,38 @@ public class PracticeFinding {
     private User contributor;
 
     @NotNull
+    @Column(name = "title", nullable = false, length = 255)
+    private String title;
+
+    @NotNull
     @Enumerated(EnumType.STRING)
     @Column(name = "verdict", length = 16, nullable = false)
     private Verdict verdict;
 
     @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "severity", length = 16, nullable = false)
+    private Severity severity;
+
+    @NotNull
     @Column(name = "confidence", nullable = false)
     private Float confidence;
 
+    /**
+     * Structured evidence supporting the verdict. Recommended shape:
+     *
+     * <pre>{@code
+     * {
+     *   "locations": [{"path": "src/Main.java", "startLine": 42, "endLine": 50}],
+     *   "snippets": ["try { ... } catch (Exception e) {}"],
+     *   "references": ["https://example.com/best-practices"]
+     * }
+     * }</pre>
+     *
+     * <p>Location data lives here (not as top-level columns) because many practices
+     * (PR description quality, review thoroughness) have no file location, and
+     * multi-location findings need arrays.
+     */
     @Type(JsonType.class)
     @Column(name = "evidence", columnDefinition = "jsonb")
     private JsonNode evidence;
@@ -128,6 +154,10 @@ public class PracticeFinding {
 
     @Column(name = "guidance", columnDefinition = "TEXT")
     private String guidance;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "guidance_method", length = 16)
+    private CaMethod guidanceMethod;
 
     @NotNull
     @Column(name = "detected_at", nullable = false)

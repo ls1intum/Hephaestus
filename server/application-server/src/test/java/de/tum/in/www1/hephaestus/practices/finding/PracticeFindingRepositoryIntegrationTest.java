@@ -101,11 +101,14 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "pull_request",
                 42L,
                 contributor.getId(),
+                "Good PR description",
                 "POSITIVE",
+                "INFO",
                 0.95f,
                 null,
                 "Good quality",
                 "Keep it up",
+                "COACHING",
                 Instant.now()
             );
 
@@ -113,10 +116,13 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
 
             PracticeFinding found = practiceFindingRepository.findById(id).orElseThrow();
             assertThat(found.getIdempotencyKey()).isEqualTo("key-1");
+            assertThat(found.getTitle()).isEqualTo("Good PR description");
             assertThat(found.getVerdict().name()).isEqualTo("POSITIVE");
+            assertThat(found.getSeverity().name()).isEqualTo("INFO");
             assertThat(found.getConfidence()).isEqualTo(0.95f);
             assertThat(found.getReasoning()).isEqualTo("Good quality");
             assertThat(found.getGuidance()).isEqualTo("Keep it up");
+            assertThat(found.getGuidanceMethod().name()).isEqualTo("COACHING");
         }
 
         @Test
@@ -134,8 +140,11 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "pull_request",
                 1L,
                 contributor.getId(),
+                "Duplicate test",
                 "POSITIVE",
+                "INFO",
                 0.8f,
+                null,
                 null,
                 null,
                 null,
@@ -150,8 +159,11 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "pull_request",
                 2L,
                 contributor.getId(),
+                "Should not insert",
                 "NEGATIVE",
+                "MAJOR",
                 0.5f,
+                null,
                 null,
                 null,
                 null,
@@ -177,10 +189,13 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "pull_request",
                 99L,
                 contributor.getId(),
+                "Missing error handling in Main.java",
                 "NEGATIVE",
+                "MAJOR",
                 0.7f,
                 evidence,
                 "Missing error handling",
+                null,
                 null,
                 Instant.now()
             );
@@ -210,8 +225,11 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "pull_request",
                 1L,
                 contributor.getId(),
+                "Purge test finding",
                 "POSITIVE",
+                "INFO",
                 0.9f,
+                null,
                 null,
                 null,
                 null,
@@ -258,8 +276,11 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "pull_request",
                 1L,
                 contributor.getId(),
+                "WS-A finding",
                 "POSITIVE",
+                "INFO",
                 0.9f,
+                null,
                 null,
                 null,
                 null,
@@ -274,8 +295,11 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "pull_request",
                 2L,
                 contributor.getId(),
+                "WS-B finding",
                 "NEGATIVE",
+                "MINOR",
                 0.5f,
+                null,
                 null,
                 null,
                 null,
@@ -319,8 +343,11 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "pull_request",
                 1L,
                 contributor.getId(),
+                "Cascade test 1",
                 "NEGATIVE",
+                "MAJOR",
                 0.6f,
+                null,
                 null,
                 null,
                 null,
@@ -335,8 +362,11 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "pull_request",
                 2L,
                 contributor.getId(),
+                "Cascade test 2",
                 "POSITIVE",
+                "INFO",
                 0.9f,
+                null,
                 null,
                 null,
                 null,

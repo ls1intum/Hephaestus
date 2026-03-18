@@ -1231,11 +1231,14 @@ export const practiceFinding = pgTable(
 		targetId: bigint("target_id", { mode: "number" }).notNull(),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		contributorId: bigint("contributor_id", { mode: "number" }).notNull(),
+		title: varchar({ length: 255 }).notNull(),
 		verdict: varchar({ length: 16 }).notNull(),
+		severity: varchar({ length: 16 }).notNull(),
 		confidence: real().notNull(),
 		evidence: jsonb(),
 		reasoning: text(),
 		guidance: text(),
+		guidanceMethod: varchar("guidance_method", { length: 16 }),
 		detectedAt: timestamp("detected_at", {
 			precision: 6,
 			withTimezone: true,
@@ -1277,11 +1280,19 @@ export const practiceFinding = pgTable(
 		unique("uk_practice_finding_idempotency").on(table.idempotencyKey),
 		check(
 			"chk_practice_finding_verdict",
-			sql`(verdict)::text = ANY ((ARRAY['POSITIVE'::character varying, 'NEGATIVE'::character varying, 'NOT_APPLICABLE'::character varying])::text[])`,
+			sql`(verdict)::text = ANY ((ARRAY['POSITIVE'::character varying, 'NEGATIVE'::character varying, 'NOT_APPLICABLE'::character varying, 'NEEDS_REVIEW'::character varying])::text[])`,
+		),
+		check(
+			"chk_practice_finding_severity",
+			sql`(severity)::text = ANY ((ARRAY['CRITICAL'::character varying, 'MAJOR'::character varying, 'MINOR'::character varying, 'INFO'::character varying])::text[])`,
 		),
 		check(
 			"chk_practice_finding_confidence",
 			sql`(confidence >= (0)::double precision) AND (confidence <= (1)::double precision)`,
+		),
+		check(
+			"chk_practice_finding_guidance_method",
+			sql`(guidance_method IS NULL) OR ((guidance_method)::text = ANY ((ARRAY['MODELING'::character varying, 'COACHING'::character varying, 'SCAFFOLDING'::character varying, 'ARTICULATION'::character varying, 'REFLECTION'::character varying, 'EXPLORATION'::character varying])::text[]))`,
 		),
 	],
 );
