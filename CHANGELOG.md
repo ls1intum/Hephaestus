@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.36.0](https://github.com/ls1intum/Hephaestus/compare/v0.35.0...v0.36.0) (2026-03-18)
+
+### 🚀 Features
+
+* **server:** practice data model + seed practices ([#861](https://github.com/ls1intum/Hephaestus/issues/861)) ([bbda64f](https://github.com/ls1intum/Hephaestus/commit/bbda64ff24ae1994a507d5618958bf0fd3e2f28f))
+
 ## [0.35.0](https://github.com/ls1intum/Hephaestus/compare/v0.34.0...v0.35.0) (2026-03-17)
 
 ### 🚀 Features
