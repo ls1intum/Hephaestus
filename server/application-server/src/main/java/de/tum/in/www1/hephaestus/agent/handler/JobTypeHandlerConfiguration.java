@@ -23,17 +23,26 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class JobTypeHandlerConfiguration {
 
+    private final ObjectMapper objectMapper;
+
+    JobTypeHandlerConfiguration(ObjectMapper objectMapper) {
+        this.objectMapper = objectMapper;
+    }
+
+    @Bean
+    public PracticeDetectionResultParser practiceDetectionResultParser(PracticeDetectionProperties properties) {
+        return new PracticeDetectionResultParser(objectMapper, properties.maxFindingsPerJob());
+    }
+
     @Bean
     public JobTypeHandler pullRequestReviewHandler(
-        ObjectMapper objectMapper,
         GitRepositoryManager gitRepositoryManager,
         PullRequestRepository pullRequestRepository,
         PullRequestReviewCommentRepository reviewCommentRepository,
         PracticeRepository practiceRepository,
-        PracticeDetectionDeliveryService deliveryService,
-        PracticeDetectionProperties properties
+        PracticeDetectionResultParser resultParser,
+        PracticeDetectionDeliveryService deliveryService
     ) {
-        var resultParser = new PracticeDetectionResultParser(objectMapper, properties.maxFindingsPerJob());
         return new PullRequestReviewHandler(
             objectMapper,
             gitRepositoryManager,
