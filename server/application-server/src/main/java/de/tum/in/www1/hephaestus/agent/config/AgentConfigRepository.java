@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.agent.config;
 
+import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import jakarta.persistence.LockModeType;
 import jakarta.persistence.QueryHint;
 import java.util.List;
@@ -24,6 +25,7 @@ public interface AgentConfigRepository extends JpaRepository<AgentConfig, Long> 
      * Serializes concurrent executors checking {@code maxConcurrentJobs}.
      * Lock timeout prevents indefinite blocking under contention.
      */
+    @WorkspaceAgnostic("ID-based lookup; config ID obtained from workspace-scoped job context")
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "5000"))
     @Query("SELECT c FROM AgentConfig c WHERE c.id = :id")

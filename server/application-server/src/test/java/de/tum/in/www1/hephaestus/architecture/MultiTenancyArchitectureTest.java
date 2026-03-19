@@ -595,6 +595,7 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                                 "Commit", // Through repository.organization.workspaceId
                                 "Project", // Through organization.workspaceId
                                 "ActivitySavedEvent", // Carries user context for achievement evaluation
+                                "AgentJob", // AgentJobCreatedEvent carries workspaceId directly
                                 "ApplicationReadyEvent", // Spring lifecycle, no workspace needed
                                 "ContextRefreshedEvent", // Spring lifecycle, no workspace needed
                                 "WorkspacesInitializedEvent" // Startup lifecycle, signals all workspaces ready
@@ -644,7 +645,11 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
             // BadPracticeEventListener handles PullRequestUpdated events which carry full entity graphs
             "BadPracticeEventListener",
             // AchievementEventListener handles ActivitySavedEvent which carries workspaceId context
-            "AchievementEventListener"
+            "AchievementEventListener",
+            // AgentJobSubmitter handles AgentJobCreatedEvent which directly carries workspaceId
+            "AgentJobSubmitter",
+            // AgentJobEventListener handles AgentJobCreatedEvent which directly carries workspaceId
+            "AgentJobEventListener"
         );
 
         /**
