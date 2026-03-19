@@ -5,7 +5,9 @@ import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.integrations.posthog.PosthogClientException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.keycloak.admin.client.Keycloak;
+import org.springframework.validation.annotation.Validated;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -27,6 +29,7 @@ import org.springframework.web.bind.annotation.RestController;
  * Controller for user account management operations.
  * Handles account deletion (GDPR) and user preferences/settings.
  */
+@Validated
 @RestController
 @RequestMapping("/user")
 @Tag(name = "Account", description = "User account management (settings, deletion)")
@@ -108,7 +111,7 @@ public class AccountController {
     )
     public ResponseEntity<UserSettingsDTO> updateUserSettings(
         @AuthenticationPrincipal JwtAuthenticationToken auth,
-        @RequestBody UserSettingsDTO userSettings
+        @Valid @RequestBody UserSettingsDTO userSettings
     ) {
         var user = userRepository.getCurrentUser();
         if (user.isEmpty()) {

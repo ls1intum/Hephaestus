@@ -22,7 +22,7 @@ import org.mockito.Mock;
  * Unit tests for {@link AccountService}.
  * <p>
  * Covers user settings retrieval/update and the AI review preference
- * query method used by the delivery gate.
+ * query method.
  */
 class AccountServiceTest extends BaseUnitTest {
 
@@ -196,6 +196,73 @@ class AccountServiceTest extends BaseUnitTest {
             when(userPreferencesRepository.findByUserLogin(USER_LOGIN)).thenReturn(Optional.empty());
 
             assertThat(accountService.isAiReviewEnabled(USER_LOGIN)).isTrue();
+        }
+
+        @Test
+        @DisplayName("throws IllegalArgumentException when userLogin is null")
+        void throwsWhenUserLoginNull() {
+            assertThatThrownBy(() -> accountService.isAiReviewEnabled(null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("userLogin must not be blank");
+        }
+
+        @Test
+        @DisplayName("throws IllegalArgumentException when userLogin is blank")
+        void throwsWhenUserLoginBlank() {
+            assertThatThrownBy(() -> accountService.isAiReviewEnabled("   "))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("userLogin must not be blank");
+        }
+
+        @Test
+        @DisplayName("throws IllegalArgumentException when userLogin is empty string")
+        void throwsWhenUserLoginEmpty() {
+            assertThatThrownBy(() -> accountService.isAiReviewEnabled(""))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("userLogin must not be blank");
+        }
+    }
+
+    // ── updateUserSettings + PostHog combination ─────────────────────────────
+
+    @Nested
+    @DisplayName("updateUserSettings – PostHog interaction")
+    class UpdateSettingsPosthogInteraction {
+
+        @Test
+        @DisplayName("disabling aiReview while opting out of research triggers PostHog deletion")
+        void aiReviewChangeWithResearchOptOutTriggersPosthog() {
+            User user = createUser();
+            UserPreferences prefs = createPreferences(user);
+            prefs.setParticipateInResearch(true);
+            prefs.setAiReviewEnabled(true);
+            when(userPreferencesRepository.findByUserId(USER_ID)).thenReturn(Optional.of(prefs));
+            when(userPreferencesRepository.save(any(UserPreferences.class))).thenAnswer(inv -> inv.getArgument(0));
+            when(posthogClient.deletePersonData(any())).thenReturn(true);
+
+            UserSettingsDTO dto = new UserSettingsDTO(true, false, false);
+            accountService.updateUserSettings(user, dto, KEYCLOAK_USER_ID);
+
+            verify(posthogClient).deletePersonData(KEYCLOAK_USER_ID);
+        }
+
+        @Test
+        @DisplayName("round-trip: update then get returns consistent values")
+        void roundTripConsistency() {
+            User user = createUser();
+            UserPreferences prefs = createPreferences(user);
+            when(userPreferencesRepository.findByUserId(USER_ID)).thenReturn(Optional.of(prefs));
+            when(userPreferencesRepository.save(any(UserPreferences.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            UserSettingsDTO updateDto = new UserSettingsDTO(false, true, false);
+            UserSettingsDTO updated = accountService.updateUserSettings(user, updateDto, KEYCLOAK_USER_ID);
+
+            UserSettingsDTO fetched = accountService.getUserSettings(user);
+
+            assertThat(fetched).isEqualTo(updated);
+            assertThat(fetched.receiveNotifications()).isFalse();
+            assertThat(fetched.participateInResearch()).isTrue();
+            assertThat(fetched.aiReviewEnabled()).isFalse();
         }
     }
 }

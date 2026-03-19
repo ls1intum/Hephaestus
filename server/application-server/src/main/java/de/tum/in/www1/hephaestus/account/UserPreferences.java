@@ -79,7 +79,7 @@ public class UserPreferences {
     /**
      * Whether the user wants to receive AI-generated practice review comments on their PRs.
      * Defaults to true for new users (opt-out model).
-     * The delivery gate checks this before posting comments; findings are always stored regardless.
+     * Checked before posting comments; findings are always stored regardless.
      */
     @Column(name = "ai_review_enabled", nullable = false)
     private boolean aiReviewEnabled = true;

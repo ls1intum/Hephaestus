@@ -104,13 +104,16 @@ public class AccountService {
     /**
      * Checks whether AI review comments are enabled for a user.
      * Returns {@code true} (default) if the user has no preferences row yet.
-     * Intended for consumption by the delivery gate before posting PR comments.
      *
-     * @param userLogin the user's git provider login
+     * @param userLogin the user's git provider login (must not be blank)
      * @return true if AI review is enabled or no preferences exist
+     * @throws IllegalArgumentException if userLogin is null or blank
      */
     @Transactional(readOnly = true)
     public boolean isAiReviewEnabled(String userLogin) {
+        if (!StringUtils.hasText(userLogin)) {
+            throw new IllegalArgumentException("userLogin must not be blank");
+        }
         return userPreferencesRepository
             .findByUserLogin(userLogin)
             .map(UserPreferences::isAiReviewEnabled)

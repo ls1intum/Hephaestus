@@ -83,11 +83,12 @@ function RouteComponent() {
 		},
 	});
 
-	// Spread-based helper: prevents N-field update bugs when adding new preferences
+	// Spread-based helper: reads latest cache to avoid stale-closure race under rapid toggling
 	const updateSetting = (patch: Partial<UserSettings>) => {
-		if (!settings) return;
+		const current = queryClient.getQueryData<UserSettings>(userSettingsQueryKey);
+		if (!current) return;
 		updateSettingsMutation.mutate({
-			body: { ...settings, ...patch },
+			body: { ...current, ...patch },
 		});
 	};
 
