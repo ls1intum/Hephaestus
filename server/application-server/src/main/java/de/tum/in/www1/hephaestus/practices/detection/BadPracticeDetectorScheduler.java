@@ -4,6 +4,7 @@ import static de.tum.in.www1.hephaestus.practices.model.PullRequestLabels.READY_
 import static de.tum.in.www1.hephaestus.practices.model.PullRequestLabels.READY_TO_MERGE;
 import static de.tum.in.www1.hephaestus.practices.model.PullRequestLabels.READY_TO_REVIEW;
 
+import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
@@ -32,6 +33,9 @@ import org.springframework.stereotype.Component;
  * Schedules detection based on PR events (opened, labeled, closed) and user roles.
  */
 @Component
+@WorkspaceAgnostic(
+    "Scheduled cleanup of completed detection tasks is system-wide infrastructure, not workspace-specific"
+)
 public class BadPracticeDetectorScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(BadPracticeDetectorScheduler.class);
