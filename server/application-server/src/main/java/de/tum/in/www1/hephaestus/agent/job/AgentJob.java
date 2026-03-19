@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.agent.job;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.JsonNode;
 import de.tum.in.www1.hephaestus.agent.AgentJobType;
 import de.tum.in.www1.hephaestus.agent.config.AgentConfig;
@@ -98,15 +99,18 @@ public class AgentJob {
     @Column(name = "config_snapshot", columnDefinition = "jsonb", nullable = false)
     private JsonNode configSnapshot;
 
+    @JsonIgnore
     @Convert(converter = EncryptedStringConverter.class)
     @Column(name = "job_token", columnDefinition = "TEXT", nullable = false)
     @ToString.Exclude
     private String jobToken;
 
+    @JsonIgnore
     @Column(name = "job_token_hash", length = 64)
     @ToString.Exclude
     private String jobTokenHash;
 
+    @JsonIgnore
     @Convert(converter = EncryptedStringConverter.class)
     @Column(name = "llm_api_key", columnDefinition = "TEXT")
     @ToString.Exclude
@@ -153,7 +157,9 @@ public class AgentJob {
         if (this.status == null) {
             this.status = AgentJobStatus.QUEUED;
         }
-        this.createdAt = Instant.now();
+        if (this.createdAt == null) {
+            this.createdAt = Instant.now();
+        }
     }
 
     private static String generateJobToken() {

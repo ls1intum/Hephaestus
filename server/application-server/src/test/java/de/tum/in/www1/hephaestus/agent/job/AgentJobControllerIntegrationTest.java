@@ -257,6 +257,131 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         }
     }
 
+    // ── Cancel endpoint tests ──
+
+    @Test
+    @WithAdminUser
+    void cancelQueuedJobReturns200() {
+        Workspace workspace = setupWorkspace();
+        AgentJob job = createJob(workspace, AgentJobStatus.QUEUED);
+
+        AgentJobDTO result = webTestClient
+            .post()
+            .uri("/workspaces/{slug}/agent-jobs/{id}/cancel", workspace.getWorkspaceSlug(), job.getId())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody(AgentJobDTO.class)
+            .returnResult()
+            .getResponseBody();
+
+        assertThat(result).isNotNull();
+        assertThat(result.status()).isEqualTo(AgentJobStatus.CANCELLED);
+    }
+
+    @Test
+    @WithAdminUser
+    void cancelRunningJobReturns200() {
+        Workspace workspace = setupWorkspace();
+        AgentJob job = createJob(workspace, AgentJobStatus.RUNNING);
+
+        webTestClient
+            .post()
+            .uri("/workspaces/{slug}/agent-jobs/{id}/cancel", workspace.getWorkspaceSlug(), job.getId())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody()
+            .jsonPath("$.status")
+            .isEqualTo("CANCELLED");
+    }
+
+    @Test
+    @WithAdminUser
+    void cancelCompletedJobReturns409() {
+        Workspace workspace = setupWorkspace();
+        AgentJob job = createJob(workspace, AgentJobStatus.COMPLETED);
+
+        webTestClient
+            .post()
+            .uri("/workspaces/{slug}/agent-jobs/{id}/cancel", workspace.getWorkspaceSlug(), job.getId())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isEqualTo(409);
+    }
+
+    @Test
+    @WithAdminUser
+    void cancelNonExistentJobReturns404() {
+        Workspace workspace = setupWorkspace();
+
+        webTestClient
+            .post()
+            .uri("/workspaces/{slug}/agent-jobs/{id}/cancel", workspace.getWorkspaceSlug(), UUID.randomUUID())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isNotFound();
+    }
+
+    @Test
+    @WithAdminUser
+    void cancelJobInDifferentWorkspaceReturns404() {
+        Workspace workspaceA = setupWorkspace();
+
+        User ownerB = persistUser("cancel-owner-b");
+        Workspace workspaceB = createWorkspace("cancel-ws-b", "Cancel B", "cancel-org-b", AccountType.ORG, ownerB);
+        ensureAdminMembership(workspaceB);
+
+        AgentJob jobInA = createJob(workspaceA, AgentJobStatus.QUEUED);
+
+        // IDOR protection: cancel workspace A's job via workspace B → 404
+        webTestClient
+            .post()
+            .uri("/workspaces/{slug}/agent-jobs/{id}/cancel", workspaceB.getWorkspaceSlug(), jobInA.getId())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isNotFound();
+    }
+
+    @Test
+    @WithAdminUser
+    void cancelAlreadyCancelledJobIsIdempotent() {
+        Workspace workspace = setupWorkspace();
+        AgentJob job = createJob(workspace, AgentJobStatus.CANCELLED);
+
+        AgentJobDTO result = webTestClient
+            .post()
+            .uri("/workspaces/{slug}/agent-jobs/{id}/cancel", workspace.getWorkspaceSlug(), job.getId())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody(AgentJobDTO.class)
+            .returnResult()
+            .getResponseBody();
+
+        assertThat(result).isNotNull();
+        assertThat(result.status()).isEqualTo(AgentJobStatus.CANCELLED);
+    }
+
+    @Test
+    void cancelJobRequiresAuthentication() {
+        User owner = persistUser("unauth-cancel-owner");
+        Workspace workspace = createWorkspace("unauth-cancel-ws", "Unauth", "unauth-cancel", AccountType.ORG, owner);
+
+        webTestClient
+            .post()
+            .uri("/workspaces/{slug}/agent-jobs/{id}/cancel", workspace.getWorkspaceSlug(), UUID.randomUUID())
+            .exchange()
+            .expectStatus()
+            .isUnauthorized();
+    }
+
     @Test
     void listJobsRequiresAuthentication() {
         User owner = persistUser("unauth-job-owner");

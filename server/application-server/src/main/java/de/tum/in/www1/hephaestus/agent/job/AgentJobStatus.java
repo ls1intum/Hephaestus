@@ -16,5 +16,10 @@ public enum AgentJobStatus {
     COMPLETED,
     FAILED,
     TIMED_OUT,
-    CANCELLED,
+    CANCELLED;
+
+    /** Returns {@code true} if no further state transitions are possible. */
+    public boolean isTerminal() {
+        return this == COMPLETED || this == FAILED || this == TIMED_OUT || this == CANCELLED;
+    }
 }

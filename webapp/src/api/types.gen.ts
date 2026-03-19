@@ -1838,6 +1838,39 @@ export type GetJobResponses = {
 
 export type GetJobResponse = GetJobResponses[keyof GetJobResponses];
 
+export type CancelJobData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        jobId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/agent-jobs/{jobId}/cancel';
+};
+
+export type CancelJobErrors = {
+    /**
+     * Job not found in this workspace
+     */
+    404: unknown;
+    /**
+     * Job already in terminal state
+     */
+    409: unknown;
+};
+
+export type CancelJobResponses = {
+    /**
+     * Job cancelled
+     */
+    200: AgentJob;
+};
+
+export type CancelJobResponse = CancelJobResponses[keyof CancelJobResponses];
+
 export type GetLeaderboardData = {
     body?: never;
     path: {

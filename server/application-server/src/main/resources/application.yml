@@ -403,6 +403,23 @@ hephaestus:
             pids-limit: ${SANDBOX_PIDS_LIMIT:256}
 
     # ═══════════════════════════════════════════════════════════════════════════
+    # AGENT JOB NATS CONFIGURATION
+    # ═══════════════════════════════════════════════════════════════════════════
+    # NATS stream and consumer for agent job execution pipeline.
+    # Disabled by default — requires a reachable NATS server.
+    agent:
+        nats:
+            enabled: ${AGENT_NATS_ENABLED:false}
+            server: ${NATS_SERVER:nats://localhost:4222}
+            stream-name: AGENT
+            consumer-name: hephaestus-agent-executor
+            # Must exceed max container timeout (1hr) + buffer
+            ack-wait: 70m
+            max-deliver: 5
+            max-ack-pending: 5
+            heartbeat-interval: 25s
+
+    # ═══════════════════════════════════════════════════════════════════════════
     # GITLAB CONFIGURATION
     # ═══════════════════════════════════════════════════════════════════════════
     # Settings for GitLab API integration. Used by GitLab-mode workspaces
