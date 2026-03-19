@@ -15,6 +15,7 @@ import type {
 } from "@/api/types.gen";
 import { SettingsPage } from "@/components/settings/SettingsPage";
 import { useAuth } from "@/integrations/auth/AuthContext";
+import { isPosthogEnabled } from "@/integrations/posthog/config";
 
 export const Route = createFileRoute("/_authenticated/settings")({
 	component: RouteComponent,
@@ -119,6 +120,7 @@ function RouteComponent() {
 				isLoading: updateSettingsMutation.isPending,
 			}}
 			showAiReviewSection={showAiReviewSection}
+			showResearchSection={isPosthogEnabled}
 			researchProps={{
 				participateInResearch: settings?.participateInResearch ?? true,
 				onToggleResearch: handleResearchToggle,

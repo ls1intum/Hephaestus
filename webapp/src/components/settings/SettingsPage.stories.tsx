@@ -23,11 +23,15 @@ const meta = {
 			control: "boolean",
 			description: "Whether to show the AI review section (feature-flagged)",
 		},
-		accountProps: {
-			description: "Props for the AccountSection component",
+		showResearchSection: {
+			control: "boolean",
+			description: "Whether to show the research participation section",
 		},
 		researchProps: {
 			description: "Props for the ResearchParticipationSection component",
+		},
+		accountProps: {
+			description: "Props for the AccountSection component",
 		},
 		isLoading: {
 			control: "boolean",
@@ -53,6 +57,7 @@ export const Default: Story = {
 			onToggleAiReview: fn(),
 		},
 		showAiReviewSection: true,
+		showResearchSection: true,
 		researchProps: {
 			participateInResearch: true,
 			onToggleResearch: fn(),
@@ -78,6 +83,7 @@ export const NotificationsDisabled: Story = {
 			onToggleAiReview: fn(),
 		},
 		showAiReviewSection: true,
+		showResearchSection: true,
 		researchProps: {
 			participateInResearch: false,
 			onToggleResearch: fn(),
@@ -103,6 +109,7 @@ export const Loading: Story = {
 			onToggleAiReview: fn(),
 		},
 		showAiReviewSection: true,
+		showResearchSection: true,
 		researchProps: {
 			participateInResearch: true,
 			onToggleResearch: fn(),
@@ -128,6 +135,7 @@ export const AiReviewHidden: Story = {
 			onToggleAiReview: fn(),
 		},
 		showAiReviewSection: false,
+		showResearchSection: true,
 		researchProps: {
 			participateInResearch: true,
 			onToggleResearch: fn(),

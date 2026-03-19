@@ -125,16 +125,12 @@ public class AccountService {
      * Called before account deletion.
      */
     public void deleteUserTrackingData(Optional<User> user, String keycloakUserId) {
-        try {
-            boolean anyDeleted = deletePosthogIdentities(user.orElse(null), keycloakUserId);
-            if (!anyDeleted) {
-                log.warn(
-                    "No PostHog person matched provided identifiers during account deletion: userLogin={}",
-                    user.map(User::getLogin).orElse("unknown")
-                );
-            }
-        } catch (PosthogClientException exception) {
-            throw exception;
+        boolean anyDeleted = deletePosthogIdentities(user.orElse(null), keycloakUserId);
+        if (!anyDeleted) {
+            log.warn(
+                "No PostHog person matched provided identifiers during account deletion: userLogin={}",
+                user.map(User::getLogin).orElse("unknown")
+            );
         }
     }
 

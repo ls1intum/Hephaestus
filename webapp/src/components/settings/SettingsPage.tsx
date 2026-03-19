@@ -1,5 +1,4 @@
 import { Separator } from "@/components/ui/separator";
-import { isPosthogEnabled } from "@/integrations/posthog/config";
 import { AccountSection, type AccountSectionProps } from "./AccountSection";
 import { AiReviewSection, type AiReviewSectionProps } from "./AiReviewSection";
 import { NotificationsSection, type NotificationsSectionProps } from "./NotificationsSection";
@@ -26,6 +25,10 @@ export interface SettingsPageProps {
 	 */
 	researchProps: ResearchParticipationSectionProps;
 	/**
+	 * Whether to show the research participation section (requires PostHog)
+	 */
+	showResearchSection: boolean;
+	/**
 	 * Props for the AccountSection component
 	 */
 	accountProps: AccountSectionProps;
@@ -44,6 +47,7 @@ export function SettingsPage({
 	aiReviewProps,
 	showAiReviewSection,
 	researchProps,
+	showResearchSection,
 	accountProps,
 	isLoading = false,
 }: SettingsPageProps) {
@@ -56,7 +60,6 @@ export function SettingsPage({
 	const aiReviewPending = isLoading || aiReviewLoading;
 	const researchPending = isLoading || researchLoading;
 	const accountPending = isLoading || accountLoading;
-	const showResearchSection = isPosthogEnabled;
 
 	return (
 		<div className="w-full max-w-3xl mx-auto space-y-8">
