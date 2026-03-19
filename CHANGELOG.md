@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.39.0](https://github.com/ls1intum/Hephaestus/compare/v0.38.0...v0.39.0) (2026-03-19)
+
+### 🚀 Features
+
+* **server:** practice review detection gate + Keycloak role ([#869](https://github.com/ls1intum/Hephaestus/issues/869)) ([5aacb3e](https://github.com/ls1intum/Hephaestus/commit/5aacb3e0f5a058c6f78ffbea28019f3f2f28ae71))
+
 ## [0.38.0](https://github.com/ls1intum/Hephaestus/compare/v0.37.0...v0.38.0) (2026-03-19)
 
 ### 🚀 Features
