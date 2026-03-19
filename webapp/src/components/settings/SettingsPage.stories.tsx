@@ -146,3 +146,29 @@ export const AiReviewHidden: Story = {
 		isLoading: false,
 	},
 };
+
+/**
+ * View without research section (PostHog not configured)
+ */
+export const ResearchHidden: Story = {
+	args: {
+		notificationsProps: {
+			receiveNotifications: true,
+			onToggleNotifications: fn(),
+		},
+		aiReviewProps: {
+			aiReviewEnabled: true,
+			onToggleAiReview: fn(),
+		},
+		showAiReviewSection: true,
+		showResearchSection: false,
+		researchProps: {
+			participateInResearch: true,
+			onToggleResearch: fn(),
+		},
+		accountProps: {
+			onDeleteAccount: fn(),
+		},
+		isLoading: false,
+	},
+};

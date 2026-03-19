@@ -74,7 +74,7 @@ public class AccountController {
         }
 
         try {
-            accountService.deleteUserTrackingData(gitUser, keycloakUserId);
+            accountService.deleteUserTrackingData(gitUser.orElse(null), keycloakUserId);
         } catch (PosthogClientException exception) {
             log.error("Failed to remove analytics data before deleting user {}", keycloakUserId, exception);
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY).build();

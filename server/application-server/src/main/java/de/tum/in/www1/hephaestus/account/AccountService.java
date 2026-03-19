@@ -6,7 +6,6 @@ import de.tum.in.www1.hephaestus.integrations.posthog.PosthogClient;
 import de.tum.in.www1.hephaestus.integrations.posthog.PosthogClientException;
 import java.util.LinkedHashSet;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -123,13 +122,17 @@ public class AccountService {
     /**
      * Delete all tracking data for a user (GDPR compliance).
      * Called before account deletion.
+     *
+     * @param user the git provider user, or null if unresolved
+     * @param keycloakUserId the Keycloak subject identifier
      */
-    public void deleteUserTrackingData(Optional<User> user, String keycloakUserId) {
-        boolean anyDeleted = deletePosthogIdentities(user.orElse(null), keycloakUserId);
+    public void deleteUserTrackingData(User user, String keycloakUserId) {
+        boolean anyDeleted = deletePosthogIdentities(user, keycloakUserId);
         if (!anyDeleted) {
+            String login = user != null ? user.getLogin() : "unknown";
             log.warn(
                 "No PostHog person matched provided identifiers during account deletion: userLogin={}",
-                user.map(User::getLogin).orElse("unknown")
+                login
             );
         }
     }
