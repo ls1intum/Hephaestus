@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.tum.in.www1.hephaestus.agent.AgentJobType;
+import de.tum.in.www1.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.in.www1.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.in.www1.hephaestus.agent.handler.spi.JobSubmission;
 import de.tum.in.www1.hephaestus.agent.handler.spi.JobSubmissionRequest;
@@ -66,17 +67,23 @@ public class PullRequestReviewHandler implements JobTypeHandler {
     private final GitRepositoryManager gitRepositoryManager;
     private final PullRequestRepository pullRequestRepository;
     private final PullRequestReviewCommentRepository reviewCommentRepository;
+    private final PracticeDetectionResultParser resultParser;
+    private final PracticeDetectionDeliveryService deliveryService;
 
     PullRequestReviewHandler(
         ObjectMapper objectMapper,
         GitRepositoryManager gitRepositoryManager,
         PullRequestRepository pullRequestRepository,
-        PullRequestReviewCommentRepository reviewCommentRepository
+        PullRequestReviewCommentRepository reviewCommentRepository,
+        PracticeDetectionResultParser resultParser,
+        PracticeDetectionDeliveryService deliveryService
     ) {
         this.objectMapper = objectMapper;
         this.gitRepositoryManager = gitRepositoryManager;
         this.pullRequestRepository = pullRequestRepository;
         this.reviewCommentRepository = reviewCommentRepository;
+        this.resultParser = resultParser;
+        this.deliveryService = deliveryService;
     }
 
     @Override
@@ -303,6 +310,39 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             "}\n" +
             "```\n"
         );
+    }
+
+    @Override
+    public void deliver(AgentJob job) {
+        var parsed = resultParser.parse(job.getOutput());
+        if (!parsed.discarded().isEmpty()) {
+            log.info(
+                "Discarded {} findings during parsing: jobId={}, reasons={}",
+                parsed.discarded().size(),
+                job.getId(),
+                parsed.discarded()
+            );
+        }
+        if (parsed.validFindings().isEmpty()) {
+            throw new JobDeliveryException(
+                "No valid findings in agent output: jobId=" + job.getId() + ", discarded=" + parsed.discarded().size()
+            );
+        }
+        try {
+            var result = deliveryService.deliver(job, parsed.validFindings());
+            log.info(
+                "Delivery complete: inserted={}, unknownSlug={}, overCap={}, duplicate={}, jobId={}",
+                result.inserted(),
+                result.discardedUnknownSlug(),
+                result.discardedOverCap(),
+                result.discardedDuplicate(),
+                job.getId()
+            );
+        } catch (JobDeliveryException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new JobDeliveryException("Delivery failed unexpectedly: jobId=" + job.getId(), e);
+        }
     }
 
     // -------------------------------------------------------------------------

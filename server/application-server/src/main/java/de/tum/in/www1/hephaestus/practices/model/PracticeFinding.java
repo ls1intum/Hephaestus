@@ -1,7 +1,6 @@
 package de.tum.in.www1.hephaestus.practices.model;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import de.tum.in.www1.hephaestus.agent.job.AgentJob;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.Column;
@@ -72,17 +71,16 @@ public class PracticeFinding {
     private String idempotencyKey;
 
     /**
-     * The agent job that produced this finding. No cascade — agent jobs are long-lived
-     * and outlive their findings; deletion of an agent job is not expected while findings exist.
+     * The agent job that produced this finding. Stored as a raw UUID to avoid a module
+     * cycle between {@code practices} and {@code agent}. The FK constraint
+     * {@code fk_practice_finding_agent_job} is managed by Liquibase at the DB level.
+     *
+     * <p>Primary insert path is {@link de.tum.in.www1.hephaestus.practices.finding.PracticeFindingRepository#insertIfAbsent}
+     * which bypasses {@code @PrePersist} — callers must supply the UUID explicitly.
      */
     @NotNull
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(
-        name = "agent_job_id",
-        nullable = false,
-        foreignKey = @ForeignKey(name = "fk_practice_finding_agent_job")
-    )
-    private AgentJob agentJob;
+    @Column(name = "agent_job_id", nullable = false, columnDefinition = "UUID")
+    private UUID agentJobId;
 
     /**
      * The practice being evaluated. Uses DB-level {@code ON DELETE CASCADE} so that
