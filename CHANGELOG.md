@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.38.0](https://github.com/ls1intum/Hephaestus/compare/v0.37.0...v0.38.0) (2026-03-19)
+
+### 🚀 Features
+
+* **server:** agent job execution pipeline (NATS + executor) ([#870](https://github.com/ls1intum/Hephaestus/issues/870)) ([a7eaa0e](https://github.com/ls1intum/Hephaestus/commit/a7eaa0e19214f9cdbb9a38297541fbe54e1bab3d))
+
 ## [0.37.0](https://github.com/ls1intum/Hephaestus/compare/v0.36.0...v0.37.0) (2026-03-19)
 
 ### 🚀 Features
