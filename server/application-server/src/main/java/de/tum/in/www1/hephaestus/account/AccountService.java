@@ -130,10 +130,7 @@ public class AccountService {
         boolean anyDeleted = deletePosthogIdentities(user, keycloakUserId);
         if (!anyDeleted) {
             String login = user != null ? user.getLogin() : "unknown";
-            log.warn(
-                "No PostHog person matched provided identifiers during account deletion: userLogin={}",
-                login
-            );
+            log.warn("No PostHog person matched provided identifiers during account deletion: userLogin={}", login);
         }
     }
 
