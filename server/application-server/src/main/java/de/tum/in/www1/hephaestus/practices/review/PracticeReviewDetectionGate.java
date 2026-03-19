@@ -1,11 +1,11 @@
 package de.tum.in.www1.hephaestus.practices.review;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import de.tum.in.www1.hephaestus.agent.config.AgentConfigRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.practices.PracticeRepository;
 import de.tum.in.www1.hephaestus.practices.model.Practice;
+import de.tum.in.www1.hephaestus.practices.spi.AgentConfigChecker;
 import de.tum.in.www1.hephaestus.practices.spi.UserRoleChecker;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceResolver;
@@ -54,7 +54,7 @@ public class PracticeReviewDetectionGate {
 
     private final PracticeReviewProperties properties;
     private final UserRoleChecker userRoleChecker;
-    private final AgentConfigRepository agentConfigRepository;
+    private final AgentConfigChecker agentConfigChecker;
     private final PracticeRepository practiceRepository;
     private final WorkspaceResolver workspaceResolver;
 
@@ -64,13 +64,13 @@ public class PracticeReviewDetectionGate {
     public PracticeReviewDetectionGate(
         PracticeReviewProperties properties,
         UserRoleChecker userRoleChecker,
-        AgentConfigRepository agentConfigRepository,
+        AgentConfigChecker agentConfigChecker,
         PracticeRepository practiceRepository,
         WorkspaceResolver workspaceResolver
     ) {
         this.properties = properties;
         this.userRoleChecker = userRoleChecker;
-        this.agentConfigRepository = agentConfigRepository;
+        this.agentConfigChecker = agentConfigChecker;
         this.practiceRepository = practiceRepository;
         this.workspaceResolver = workspaceResolver;
     }
@@ -114,7 +114,7 @@ public class PracticeReviewDetectionGate {
         }
 
         // 4. Agent config gate: at least one enabled agent config must exist
-        if (!agentConfigRepository.existsByWorkspaceIdAndEnabledTrue(workspace.getId())) {
+        if (!agentConfigChecker.hasEnabledConfig(workspace.getId())) {
             log.debug(
                 "Practice review gate: SKIP, reason=noEnabledAgentConfig, prId={}, workspaceId={}",
                 pullRequest.getId(),

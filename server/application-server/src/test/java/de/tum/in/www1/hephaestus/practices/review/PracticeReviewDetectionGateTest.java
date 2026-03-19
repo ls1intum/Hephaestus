@@ -10,13 +10,13 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
-import de.tum.in.www1.hephaestus.agent.config.AgentConfigRepository;
 import de.tum.in.www1.hephaestus.gitprovider.label.Label;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.practices.PracticeRepository;
 import de.tum.in.www1.hephaestus.practices.model.Practice;
+import de.tum.in.www1.hephaestus.practices.spi.AgentConfigChecker;
 import de.tum.in.www1.hephaestus.practices.spi.UserRoleChecker;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
@@ -49,7 +49,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
     private UserRoleChecker userRoleChecker;
 
     @Mock
-    private AgentConfigRepository agentConfigRepository;
+    private AgentConfigChecker agentConfigChecker;
 
     @Mock
     private PracticeRepository practiceRepository;
@@ -65,7 +65,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         gate = new PracticeReviewDetectionGate(
             properties,
             userRoleChecker,
-            agentConfigRepository,
+            agentConfigChecker,
             practiceRepository,
             workspaceResolver
         );
@@ -121,7 +121,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
     private Workspace setupThroughPracticeMatching(PullRequest pr, Practice... practices) {
         Workspace workspace = createWorkspace();
         when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
-        when(agentConfigRepository.existsByWorkspaceIdAndEnabledTrue(WORKSPACE_ID)).thenReturn(true);
+        when(agentConfigChecker.hasEnabledConfig(WORKSPACE_ID)).thenReturn(true);
         when(practiceRepository.findByWorkspaceIdAndActiveTrue(WORKSPACE_ID)).thenReturn(List.of(practices));
         return workspace;
     }
@@ -152,7 +152,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
 
             gate.evaluate(pr, TRIGGER_EVENT);
 
-            verifyNoInteractions(workspaceResolver, agentConfigRepository, practiceRepository, userRoleChecker);
+            verifyNoInteractions(workspaceResolver, agentConfigChecker, practiceRepository, userRoleChecker);
         }
 
         @Test
@@ -162,7 +162,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             PracticeReviewDetectionGate runForAllGate = new PracticeReviewDetectionGate(
                 runForAllProps,
                 userRoleChecker,
-                agentConfigRepository,
+                agentConfigChecker,
                 practiceRepository,
                 workspaceResolver
             );
@@ -240,7 +240,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             PracticeReviewDetectionGate noSkipGate = new PracticeReviewDetectionGate(
                 noSkipProps,
                 userRoleChecker,
-                agentConfigRepository,
+                agentConfigChecker,
                 practiceRepository,
                 workspaceResolver
             );
@@ -265,7 +265,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
 
             gate.evaluate(pr, TRIGGER_EVENT);
 
-            verifyNoInteractions(workspaceResolver, agentConfigRepository, practiceRepository, userRoleChecker);
+            verifyNoInteractions(workspaceResolver, agentConfigChecker, practiceRepository, userRoleChecker);
         }
     }
 
@@ -309,7 +309,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             PullRequest pr = createPullRequest();
             Workspace workspace = createWorkspace();
             when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
-            when(agentConfigRepository.existsByWorkspaceIdAndEnabledTrue(WORKSPACE_ID)).thenReturn(false);
+            when(agentConfigChecker.hasEnabledConfig(WORKSPACE_ID)).thenReturn(false);
 
             GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT);
 
@@ -341,7 +341,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             PullRequest pr = createPullRequest();
             Workspace workspace = createWorkspace();
             when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
-            when(agentConfigRepository.existsByWorkspaceIdAndEnabledTrue(WORKSPACE_ID)).thenReturn(true);
+            when(agentConfigChecker.hasEnabledConfig(WORKSPACE_ID)).thenReturn(true);
 
             Practice practice = new Practice();
             practice.setTriggerEvents(null);
@@ -362,7 +362,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             Practice nonMatching = createPractice("ReviewSubmitted");
             Workspace workspace = createWorkspace();
             when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
-            when(agentConfigRepository.existsByWorkspaceIdAndEnabledTrue(WORKSPACE_ID)).thenReturn(true);
+            when(agentConfigChecker.hasEnabledConfig(WORKSPACE_ID)).thenReturn(true);
             when(practiceRepository.findByWorkspaceIdAndActiveTrue(WORKSPACE_ID)).thenReturn(
                 List.of(matching1, matching2, nonMatching)
             );
@@ -392,7 +392,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             PracticeReviewDetectionGate runForAllGate = new PracticeReviewDetectionGate(
                 runForAllProps,
                 userRoleChecker,
-                agentConfigRepository,
+                agentConfigChecker,
                 practiceRepository,
                 workspaceResolver
             );
