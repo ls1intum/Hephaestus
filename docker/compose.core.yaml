@@ -372,7 +372,9 @@ configs:
               "composites": {
                 "realm": [
                   "mentor_access",
-                  "notification_access"
+                  "notification_access",
+                  "run_automatic_detection",
+                  "run_practice_review"
                 ]
               }
             },
@@ -382,6 +384,14 @@ configs:
             },
             { "name": "notification_access",
               "description": "Get notification emails"
+            },
+            {
+              "name": "run_automatic_detection",
+              "description": "Trigger automatic bad practice detection"
+            },
+            {
+              "name": "run_practice_review",
+              "description": "Trigger practice-aware PR review"
             },
             {
               "name": "offline_access",

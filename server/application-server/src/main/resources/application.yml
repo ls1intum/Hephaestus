@@ -360,6 +360,19 @@ hephaestus:
             # The secret key of the langfuse server
             secret-key: ${LANGFUSE_SECRET_KEY:}
 
+    # ═══════════════════════════════════════════════════════════════════════════
+    # PRACTICE REVIEW GATE
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Controls the detection gate for the practice-aware PR review agent.
+    # The gate decides whether to submit an agent job for a PR event.
+    practice-review:
+        # true = run for ALL users (bypass Keycloak role check); false = require run_practice_review role
+        run-for-all-users: false
+        # true = skip practice review for draft PRs
+        skip-drafts: true
+        # Maximum number of inline diff comments per review (0-50)
+        max-inline-notes: 5
+
     posthog:
         enabled: ${POSTHOG_ENABLED:false}
         api-host: ${POSTHOG_API_HOST:https://app.posthog.com}

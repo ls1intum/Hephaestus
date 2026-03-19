@@ -315,9 +315,11 @@ configs:
         ],
         "roles": {
           "realm": [
-            {"name": "admin", "description": "Administrator privileges", "composites": {"realm": ["mentor_access", "notification_access"]}},
+            {"name": "admin", "description": "Administrator privileges", "composites": {"realm": ["mentor_access", "notification_access", "run_automatic_detection", "run_practice_review"]}},
             {"name": "mentor_access", "description": "Access to AI Mentor"},
             {"name": "notification_access", "description": "Get notification emails"},
+            {"name": "run_automatic_detection", "description": "Trigger automatic bad practice detection"},
+            {"name": "run_practice_review", "description": "Trigger practice-aware PR review"},
             {"name": "offline_access", "description": "Offline access", "composite": false, "clientRole": false},
             {"name": "uma_authorization", "description": "UMA authorization", "composite": false, "clientRole": false},
             {"name": "default-roles-hephaestus", "description": "Default roles", "composite": true, "composites": {"realm": ["offline_access", "uma_authorization"], "client": {"account": ["view-profile", "manage-account"]}}, "clientRole": false}
