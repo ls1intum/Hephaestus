@@ -101,6 +101,23 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
     Optional<PullRequest> findByIdWithRepository(@Param("id") Long id);
 
     /**
+     * Finds a pull request by ID with author eagerly fetched.
+     * Used by the practice detection delivery pipeline where the PR author
+     * (contributor) is needed for finding attribution.
+     *
+     * @param id the pull request ID
+     * @return the pull request with author loaded, or empty if not found
+     */
+    @Query(
+        """
+        SELECT p FROM PullRequest p
+        LEFT JOIN FETCH p.author
+        WHERE p.id = :id
+        """
+    )
+    Optional<PullRequest> findByIdWithAuthor(@Param("id") Long id);
+
+    /**
      * Finds all pull requests belonging to a repository.
      * Repository ID inherently has scope through Organization.
      *

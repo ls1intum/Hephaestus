@@ -2,15 +2,20 @@ package de.tum.in.www1.hephaestus.agent.handler;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.tum.in.www1.hephaestus.agent.AgentJobType;
+import de.tum.in.www1.hephaestus.agent.handler.PracticeDetectionDeliveryService.DeliveryResult;
+import de.tum.in.www1.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.in.www1.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.in.www1.hephaestus.agent.handler.spi.JobSubmission;
 import de.tum.in.www1.hephaestus.agent.handler.spi.JobSubmissionRequest;
@@ -24,6 +29,8 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewComment;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewCommentRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import de.tum.in.www1.hephaestus.practices.model.Severity;
+import de.tum.in.www1.hephaestus.practices.model.Verdict;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -50,15 +57,22 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
     @Mock
     private PullRequestReviewCommentRepository reviewCommentRepository;
 
+    @Mock
+    private PracticeDetectionDeliveryService deliveryService;
+
+    private PracticeDetectionResultParser resultParser;
     private PullRequestReviewHandler handler;
 
     @BeforeEach
     void setUp() {
+        resultParser = new PracticeDetectionResultParser(objectMapper, 100);
         handler = new PullRequestReviewHandler(
             objectMapper,
             gitRepositoryManager,
             pullRequestRepository,
-            reviewCommentRepository
+            reviewCommentRepository,
+            resultParser,
+            deliveryService
         );
     }
 
@@ -526,11 +540,101 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
     @DisplayName("deliver")
     class Deliver {
 
+        private AgentJob jobWithOutput(String rawOutputJson) {
+            var job = new AgentJob();
+            ObjectNode output = objectMapper.createObjectNode();
+            output.put("rawOutput", rawOutputJson);
+            job.setOutput(output);
+            return job;
+        }
+
         @Test
-        @DisplayName("should be a no-op by default")
-        void shouldBeNoOp() {
-            // deliver() should not throw — it's a no-op
-            handler.deliver(new AgentJob());
+        @DisplayName("should delegate to parser and delivery service with valid findings")
+        void shouldDelegateToDeliveryService() {
+            String rawOutput = """
+                {
+                  "findings": [{
+                    "practiceSlug": "pr-description-quality",
+                    "title": "Good PR description",
+                    "verdict": "POSITIVE",
+                    "severity": "INFO",
+                    "confidence": 0.95
+                  }]
+                }
+                """;
+            AgentJob job = jobWithOutput(rawOutput);
+            when(deliveryService.deliver(eq(job), any())).thenReturn(new DeliveryResult(1, 0, 0, 0));
+
+            handler.deliver(job);
+
+            verify(deliveryService).deliver(eq(job), any());
+        }
+
+        @Test
+        @DisplayName("should wrap unexpected exceptions from delivery service")
+        void shouldWrapUnexpectedExceptions() {
+            String rawOutput = """
+                {
+                  "findings": [{
+                    "practiceSlug": "pr-description-quality",
+                    "title": "Good PR description",
+                    "verdict": "POSITIVE",
+                    "severity": "INFO",
+                    "confidence": 0.95
+                  }]
+                }
+                """;
+            AgentJob job = jobWithOutput(rawOutput);
+            when(deliveryService.deliver(eq(job), any())).thenThrow(new RuntimeException("DB connection lost"));
+
+            assertThatThrownBy(() -> handler.deliver(job))
+                .isInstanceOf(JobDeliveryException.class)
+                .hasMessageContaining("Delivery failed unexpectedly")
+                .hasCauseInstanceOf(RuntimeException.class);
+        }
+
+        @Test
+        @DisplayName("should throw JobDeliveryException when no valid findings")
+        void shouldThrowWhenNoValidFindings() {
+            String rawOutput = """
+                {
+                  "findings": [{
+                    "practiceSlug": "",
+                    "title": "",
+                    "verdict": "POSITIVE",
+                    "severity": "INFO",
+                    "confidence": 0.95
+                  }]
+                }
+                """;
+            AgentJob job = jobWithOutput(rawOutput);
+
+            assertThatThrownBy(() -> handler.deliver(job))
+                .isInstanceOf(JobDeliveryException.class)
+                .hasMessageContaining("No valid findings");
+
+            verifyNoInteractions(deliveryService);
+        }
+
+        @Test
+        @DisplayName("should throw JobDeliveryException when output is null")
+        void shouldThrowWhenOutputIsNull() {
+            var job = new AgentJob();
+            job.setOutput(null);
+
+            assertThatThrownBy(() -> handler.deliver(job))
+                .isInstanceOf(JobDeliveryException.class)
+                .hasMessageContaining("No valid findings");
+        }
+
+        @Test
+        @DisplayName("should throw JobDeliveryException when rawOutput is invalid JSON")
+        void shouldThrowWhenInvalidJson() {
+            AgentJob job = jobWithOutput("not valid json {{{");
+
+            assertThatThrownBy(() -> handler.deliver(job))
+                .isInstanceOf(JobDeliveryException.class)
+                .hasMessageContaining("No valid findings");
         }
     }
 
