@@ -4,6 +4,7 @@ import de.tum.in.www1.hephaestus.agent.config.AgentConfigCredentialModeException
 import de.tum.in.www1.hephaestus.agent.config.AgentConfigHasActiveJobsException;
 import de.tum.in.www1.hephaestus.agent.config.AgentConfigNameConflictException;
 import de.tum.in.www1.hephaestus.agent.config.AgentConfigProviderMismatchException;
+import de.tum.in.www1.hephaestus.agent.job.AgentJobStateConflictException;
 import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import java.util.Optional;
 import org.springframework.core.Ordered;
@@ -39,6 +40,11 @@ public class AgentControllerAdvice {
     @ExceptionHandler(AgentConfigCredentialModeException.class)
     ProblemDetail handleAgentConfigCredentialMode(AgentConfigCredentialModeException exception) {
         return problem(HttpStatus.BAD_REQUEST, "Invalid credential mode", exception.getMessage());
+    }
+
+    @ExceptionHandler(AgentJobStateConflictException.class)
+    ProblemDetail handleAgentJobStateConflict(AgentJobStateConflictException exception) {
+        return problem(HttpStatus.CONFLICT, "Agent job state conflict", exception.getMessage());
     }
 
     private ProblemDetail problem(HttpStatus status, String title, String detail) {

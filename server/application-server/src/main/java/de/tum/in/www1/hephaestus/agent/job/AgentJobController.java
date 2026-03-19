@@ -19,6 +19,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
@@ -42,8 +43,9 @@ public class AgentJobController {
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "20") int size
     ) {
-        int pageSize = Math.min(size, 100);
-        Pageable pageable = PageRequest.of(page, pageSize, Sort.by("createdAt").descending());
+        int safePage = Math.max(page, 0);
+        int pageSize = Math.max(1, Math.min(size, 100));
+        Pageable pageable = PageRequest.of(safePage, pageSize, Sort.by("createdAt").descending());
         Page<AgentJobDTO> jobs = agentJobService
             .getJobs(workspaceContext.id(), status, configId, pageable)
             .map(AgentJobDTO::from);
@@ -65,6 +67,25 @@ public class AgentJobController {
     @RequireAtLeastWorkspaceAdmin
     public ResponseEntity<AgentJobDTO> getJob(WorkspaceContext workspaceContext, @PathVariable UUID jobId) {
         AgentJob job = agentJobService.getJob(workspaceContext.id(), jobId);
+        return ResponseEntity.ok(AgentJobDTO.from(job));
+    }
+
+    @PostMapping("/{jobId}/cancel")
+    @Operation(summary = "Cancel an agent job")
+    @ApiResponse(responseCode = "200", description = "Job cancelled")
+    @ApiResponse(
+        responseCode = "404",
+        description = "Job not found in this workspace",
+        content = @Content(schema = @Schema(hidden = true))
+    )
+    @ApiResponse(
+        responseCode = "409",
+        description = "Job already in terminal state",
+        content = @Content(schema = @Schema(hidden = true))
+    )
+    @RequireAtLeastWorkspaceAdmin
+    public ResponseEntity<AgentJobDTO> cancelJob(WorkspaceContext workspaceContext, @PathVariable UUID jobId) {
+        AgentJob job = agentJobService.cancel(workspaceContext.id(), jobId);
         return ResponseEntity.ok(AgentJobDTO.from(job));
     }
 }
