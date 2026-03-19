@@ -51,6 +51,7 @@ import org.springframework.context.event.EventListener;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.dao.CannotAcquireLockException;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -485,22 +486,44 @@ public class AgentJobExecutor {
             if (freshJob != null) {
                 freshJob.setOutput(objectMapper.valueToTree(agentResult.output()));
                 freshJob.setExitCode(sandboxResult.exitCode());
+                if (finalStatus == AgentJobStatus.COMPLETED) {
+                    // Mark delivery as PENDING so crash recovery can distinguish
+                    // "delivery not attempted yet" from "no delivery needed"
+                    freshJob.setDeliveryStatus(DeliveryStatus.PENDING);
+                }
                 jobRepository.saveAndFlush(freshJob);
             }
         });
 
         // Deliver results (outside transaction — may call external APIs)
         if (terminalStatus == AgentJobStatus.COMPLETED) {
-            try {
-                // Reload to get the freshly persisted output
-                AgentJob deliverJob = jobRepository.findById(jobId).orElse(null);
-                if (deliverJob != null) {
+            // Reload to get the freshly persisted output
+            AgentJob deliverJob = jobRepository.findById(jobId).orElse(null);
+            if (deliverJob != null) {
+                try {
                     handler.deliver(deliverJob);
+                    persistDeliveryStatus(jobId, DeliveryStatus.DELIVERED, deliverJob.getDeliveryCommentId());
+                } catch (Exception e) {
+                    log.warn(
+                        "Delivery failed for job {} (output saved, job still COMPLETED): {}",
+                        jobId,
+                        e.getMessage()
+                    );
+                    // Preserve comment ID from partial delivery (e.g., comment posted but practice detection failed)
+                    persistDeliveryStatus(jobId, DeliveryStatus.FAILED, deliverJob.getDeliveryCommentId());
+                    meterRegistry.counter("agent.job.delivery.failure").increment();
                 }
-            } catch (Exception e) {
-                log.warn("Delivery failed for job {} (output saved, job still COMPLETED): {}", jobId, e.getMessage());
-                meterRegistry.counter("agent.job.delivery.failure").increment();
             }
+        }
+    }
+
+    private void persistDeliveryStatus(UUID jobId, DeliveryStatus status, @Nullable String commentId) {
+        try {
+            transactionTemplate.executeWithoutResult(tx ->
+                jobRepository.updateDeliveryStatus(jobId, status, commentId)
+            );
+        } catch (Exception e) {
+            log.warn("Failed to persist delivery status (non-fatal): jobId={}, status={}", jobId, status, e);
         }
     }
 

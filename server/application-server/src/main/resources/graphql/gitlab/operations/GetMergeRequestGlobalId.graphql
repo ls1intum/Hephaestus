@@ -1,0 +1,10 @@
+# Resolves the GraphQL Global ID for a merge request.
+# Used by agent feedback delivery to obtain the noteableId required by the createNote mutation.
+
+query GetMergeRequestGlobalId($fullPath: ID!, $iid: String!) {
+    project(fullPath: $fullPath) {
+        mergeRequest(iid: $iid) {
+            id
+        }
+    }
+}

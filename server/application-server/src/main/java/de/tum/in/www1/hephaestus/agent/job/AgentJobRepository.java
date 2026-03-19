@@ -86,4 +86,16 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
     @WorkspaceAgnostic("Cross-workspace stale job reaper; caller is @WorkspaceAgnostic sweeper")
     @Query("SELECT j FROM AgentJob j WHERE j.status = 'RUNNING' AND j.startedAt < :cutoff")
     List<AgentJob> findStaleRunningJobs(@Param("cutoff") Instant cutoff);
+
+    // ── Delivery tracking (issue #748) ──
+
+    /** Update delivery status and comment ID after feedback posting. */
+    @WorkspaceAgnostic("ID-based delivery update; job ID from workspace-scoped delivery context")
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("UPDATE AgentJob j SET j.deliveryStatus = :status, j.deliveryCommentId = :commentId " + "WHERE j.id = :id")
+    void updateDeliveryStatus(
+        @Param("id") UUID id,
+        @Param("status") DeliveryStatus status,
+        @Param("commentId") String commentId
+    );
 }

@@ -131,6 +131,13 @@ public class AgentJob {
     @Column(name = "error_message", columnDefinition = "TEXT")
     private String errorMessage;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "delivery_status", length = 20)
+    private DeliveryStatus deliveryStatus;
+
+    @Column(name = "delivery_comment_id", length = 255)
+    private String deliveryCommentId;
+
     @Column(name = "retry_count", nullable = false)
     private int retryCount = 0;
 
