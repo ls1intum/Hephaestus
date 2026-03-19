@@ -55,7 +55,7 @@ public class AccountService {
     public UserSettingsDTO getUserSettings(User user) {
         log.debug("Fetching user settings: userLogin={}", user.getLogin());
         UserPreferences preferences = getOrCreatePreferences(user);
-        return new UserSettingsDTO(preferences.isNotificationsEnabled(), preferences.isParticipateInResearch());
+        return toDTO(preferences);
     }
 
     @Transactional
@@ -66,6 +66,9 @@ public class AccountService {
 
         preferences.setNotificationsEnabled(
             Objects.requireNonNull(userSettings.receiveNotifications(), "receiveNotifications must not be null")
+        );
+        preferences.setAiReviewEnabled(
+            Objects.requireNonNull(userSettings.aiReviewEnabled(), "aiReviewEnabled must not be null")
         );
 
         boolean previousParticipation = preferences.isParticipateInResearch();
@@ -95,7 +98,23 @@ public class AccountService {
             }
         }
 
-        return new UserSettingsDTO(preferences.isNotificationsEnabled(), preferences.isParticipateInResearch());
+        return toDTO(preferences);
+    }
+
+    /**
+     * Checks whether AI review comments are enabled for a user.
+     * Returns {@code true} (default) if the user has no preferences row yet.
+     * Intended for consumption by the delivery gate before posting PR comments.
+     *
+     * @param userLogin the user's git provider login
+     * @return true if AI review is enabled or no preferences exist
+     */
+    @Transactional(readOnly = true)
+    public boolean isAiReviewEnabled(String userLogin) {
+        return userPreferencesRepository
+            .findByUserLogin(userLogin)
+            .map(UserPreferences::isAiReviewEnabled)
+            .orElse(true);
     }
 
     /**
@@ -114,6 +133,14 @@ public class AccountService {
         } catch (PosthogClientException exception) {
             throw exception;
         }
+    }
+
+    private static UserSettingsDTO toDTO(UserPreferences preferences) {
+        return new UserSettingsDTO(
+            preferences.isNotificationsEnabled(),
+            preferences.isParticipateInResearch(),
+            preferences.isAiReviewEnabled()
+        );
     }
 
     private boolean deletePosthogIdentities(User user, String primaryDistinctId) {

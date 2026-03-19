@@ -8,5 +8,8 @@ public record UserSettingsDTO(
     @NonNull @Schema(description = "Whether the user wants to receive notifications") Boolean receiveNotifications,
     @NonNull
     @Schema(description = "Whether the user consents to participate in research studies")
-    Boolean participateInResearch
+    Boolean participateInResearch,
+    @NonNull
+    @Schema(description = "Whether the user wants to receive AI-generated practice review comments on pull requests")
+    Boolean aiReviewEnabled
 ) {}

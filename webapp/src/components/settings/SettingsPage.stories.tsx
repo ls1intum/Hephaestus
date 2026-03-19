@@ -4,7 +4,7 @@ import { SettingsPage } from "./SettingsPage";
 
 /**
  * SettingsPage component for the user settings page
- * Combines notification and account management sections
+ * Combines notification, AI review, research, and account management sections
  */
 const meta = {
 	component: SettingsPage,
@@ -15,6 +15,13 @@ const meta = {
 	argTypes: {
 		notificationsProps: {
 			description: "Props for the NotificationsSection component",
+		},
+		aiReviewProps: {
+			description: "Props for the AiReviewSection component",
+		},
+		showAiReviewSection: {
+			control: "boolean",
+			description: "Whether to show the AI review section (feature-flagged)",
 		},
 		accountProps: {
 			description: "Props for the AccountSection component",
@@ -33,7 +40,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * Default view with notifications enabled
+ * Default view with all settings enabled
  */
 export const Default: Story = {
 	args: {
@@ -41,6 +48,11 @@ export const Default: Story = {
 			receiveNotifications: true,
 			onToggleNotifications: fn(),
 		},
+		aiReviewProps: {
+			aiReviewEnabled: true,
+			onToggleAiReview: fn(),
+		},
+		showAiReviewSection: true,
 		researchProps: {
 			participateInResearch: true,
 			onToggleResearch: fn(),
@@ -53,7 +65,7 @@ export const Default: Story = {
 };
 
 /**
- * View with notifications disabled
+ * View with notifications and AI review disabled
  */
 export const NotificationsDisabled: Story = {
 	args: {
@@ -61,6 +73,11 @@ export const NotificationsDisabled: Story = {
 			receiveNotifications: false,
 			onToggleNotifications: fn(),
 		},
+		aiReviewProps: {
+			aiReviewEnabled: false,
+			onToggleAiReview: fn(),
+		},
+		showAiReviewSection: true,
 		researchProps: {
 			participateInResearch: false,
 			onToggleResearch: fn(),
@@ -81,6 +98,11 @@ export const Loading: Story = {
 			receiveNotifications: false,
 			onToggleNotifications: fn(),
 		},
+		aiReviewProps: {
+			aiReviewEnabled: true,
+			onToggleAiReview: fn(),
+		},
+		showAiReviewSection: true,
 		researchProps: {
 			participateInResearch: true,
 			onToggleResearch: fn(),
@@ -89,5 +111,30 @@ export const Loading: Story = {
 			onDeleteAccount: fn(),
 		},
 		isLoading: true,
+	},
+};
+
+/**
+ * View without AI review section (user lacks run_practice_review role)
+ */
+export const AiReviewHidden: Story = {
+	args: {
+		notificationsProps: {
+			receiveNotifications: true,
+			onToggleNotifications: fn(),
+		},
+		aiReviewProps: {
+			aiReviewEnabled: true,
+			onToggleAiReview: fn(),
+		},
+		showAiReviewSection: false,
+		researchProps: {
+			participateInResearch: true,
+			onToggleResearch: fn(),
+		},
+		accountProps: {
+			onDeleteAccount: fn(),
+		},
+		isLoading: false,
 	},
 };

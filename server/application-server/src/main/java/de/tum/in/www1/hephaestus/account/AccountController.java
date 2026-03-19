@@ -89,7 +89,7 @@ public class AccountController {
     @GetMapping("/settings")
     @Operation(
         summary = "Get user settings",
-        description = "Get the current user's notification and research participation preferences"
+        description = "Get the current user's notification, research participation, and AI review preferences"
     )
     public ResponseEntity<UserSettingsDTO> getUserSettings() {
         var user = userRepository.getCurrentUser();
@@ -104,7 +104,7 @@ public class AccountController {
     @PostMapping("/settings")
     @Operation(
         summary = "Update user settings",
-        description = "Update the current user's notification and research participation preferences"
+        description = "Update the current user's notification, research participation, and AI review preferences"
     )
     public ResponseEntity<UserSettingsDTO> updateUserSettings(
         @AuthenticationPrincipal JwtAuthenticationToken auth,

@@ -1,6 +1,7 @@
 import { Separator } from "@/components/ui/separator";
 import { isPosthogEnabled } from "@/integrations/posthog/config";
 import { AccountSection, type AccountSectionProps } from "./AccountSection";
+import { AiReviewSection, type AiReviewSectionProps } from "./AiReviewSection";
 import { NotificationsSection, type NotificationsSectionProps } from "./NotificationsSection";
 import {
 	ResearchParticipationSection,
@@ -12,6 +13,14 @@ export interface SettingsPageProps {
 	 * Props for the NotificationsSection component
 	 */
 	notificationsProps: NotificationsSectionProps;
+	/**
+	 * Props for the AiReviewSection component (only rendered when showAiReviewSection is true)
+	 */
+	aiReviewProps: AiReviewSectionProps;
+	/**
+	 * Whether to show the AI review section (feature-flagged via Keycloak role)
+	 */
+	showAiReviewSection: boolean;
 	/**
 	 * Props for the ResearchParticipationSection component
 	 */
@@ -32,15 +41,19 @@ export interface SettingsPageProps {
  */
 export function SettingsPage({
 	notificationsProps,
+	aiReviewProps,
+	showAiReviewSection,
 	researchProps,
 	accountProps,
 	isLoading = false,
 }: SettingsPageProps) {
 	const { isLoading: notificationsLoading = false, ...notificationsRest } = notificationsProps;
+	const { isLoading: aiReviewLoading = false, ...aiReviewRest } = aiReviewProps;
 	const { isLoading: researchLoading = false, ...researchRest } = researchProps;
 	const { isLoading: accountLoading = false, ...accountRest } = accountProps;
 
 	const notificationsPending = isLoading || notificationsLoading;
+	const aiReviewPending = isLoading || aiReviewLoading;
 	const researchPending = isLoading || researchLoading;
 	const accountPending = isLoading || accountLoading;
 	const showResearchSection = isPosthogEnabled;
@@ -57,6 +70,13 @@ export function SettingsPage({
 			<Separator />
 
 			<NotificationsSection {...notificationsRest} isLoading={notificationsPending} />
+
+			{showAiReviewSection && (
+				<>
+					<Separator />
+					<AiReviewSection {...aiReviewRest} isLoading={aiReviewPending} />
+				</>
+			)}
 
 			{showResearchSection && (
 				<>
