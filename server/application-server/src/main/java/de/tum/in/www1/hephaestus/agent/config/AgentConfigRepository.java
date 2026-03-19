@@ -30,4 +30,6 @@ public interface AgentConfigRepository extends JpaRepository<AgentConfig, Long> 
     @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "5000"))
     @Query("SELECT c FROM AgentConfig c WHERE c.id = :id")
     Optional<AgentConfig> findByIdForUpdate(@Param("id") Long id);
+
+    boolean existsByWorkspaceIdAndEnabledTrue(Long workspaceId);
 }

@@ -8,8 +8,7 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.practices.DetectionProperties;
 import de.tum.in.www1.hephaestus.practices.spi.BadPracticeNotificationSender;
 import de.tum.in.www1.hephaestus.practices.spi.UserRoleChecker;
-import de.tum.in.www1.hephaestus.workspace.RepositoryToMonitorRepository;
-import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceResolver;
 import java.lang.reflect.Field;
 import java.time.Instant;
 import java.util.Collections;
@@ -42,10 +41,7 @@ class BadPracticeDetectorSchedulerTest {
     private UserRoleChecker userRoleChecker;
 
     @Mock
-    private RepositoryToMonitorRepository repositoryToMonitorRepository;
-
-    @Mock
-    private WorkspaceRepository workspaceRepository;
+    private WorkspaceResolver workspaceResolver;
 
     @Mock
     private ScheduledFuture<?> scheduledFuture1;
@@ -66,8 +62,7 @@ class BadPracticeDetectorSchedulerTest {
             pullRequestBadPracticeDetector,
             notificationSender,
             userRoleChecker,
-            repositoryToMonitorRepository,
-            workspaceRepository,
+            workspaceResolver,
             detectionProperties
         );
     }

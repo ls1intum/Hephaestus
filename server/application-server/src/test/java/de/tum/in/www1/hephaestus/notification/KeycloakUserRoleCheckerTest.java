@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.notification;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -43,6 +44,7 @@ class KeycloakUserRoleCheckerTest extends BaseUnitTest {
     private static final String TEST_REALM = "test-realm";
     private static final String TEST_USERNAME = "test-user";
     private static final String TEST_USER_ID = "user-123";
+    private static final String TEST_ROLE = "run_automatic_detection";
 
     @Mock
     private Keycloak keycloak;
@@ -142,8 +144,9 @@ class KeycloakUserRoleCheckerTest extends BaseUnitTest {
         );
         checker = new KeycloakUserRoleChecker(keycloak, keycloakProperties, circuitBreaker);
 
-        when(keycloak.realm(TEST_REALM)).thenReturn(realmResource);
-        when(realmResource.users()).thenReturn(usersResource);
+        // Lenient: precondition tests (null/blank params) short-circuit before any Keycloak call
+        lenient().when(keycloak.realm(TEST_REALM)).thenReturn(realmResource);
+        lenient().when(realmResource.users()).thenReturn(usersResource);
     }
 
     private void resetMocks() {
@@ -153,6 +156,10 @@ class KeycloakUserRoleCheckerTest extends BaseUnitTest {
     }
 
     private void setupUserWithRole(boolean hasRole) {
+        setupUserWithRole(hasRole, TEST_ROLE);
+    }
+
+    private void setupUserWithRole(boolean hasRole, String roleName) {
         resetMocks();
         UserRepresentation user = new UserRepresentation();
         user.setId(TEST_USER_ID);
@@ -165,10 +172,10 @@ class KeycloakUserRoleCheckerTest extends BaseUnitTest {
 
         if (hasRole) {
             RoleRepresentation role = new RoleRepresentation();
-            role.setName("run_automatic_detection");
-            when(roleScopeResource.listAll()).thenReturn(List.of(role));
+            role.setName(roleName);
+            when(roleScopeResource.listEffective()).thenReturn(List.of(role));
         } else {
-            when(roleScopeResource.listAll()).thenReturn(Collections.emptyList());
+            when(roleScopeResource.listEffective()).thenReturn(Collections.emptyList());
         }
     }
 
@@ -225,7 +232,7 @@ class KeycloakUserRoleCheckerTest extends BaseUnitTest {
         void userHasRole() {
             setupUserWithRole(true);
 
-            boolean result = checker.hasAutomaticDetectionRole(TEST_USERNAME);
+            boolean result = checker.hasRole(TEST_USERNAME, TEST_ROLE);
 
             assertThat(result).isTrue();
             assertThat(checker.isHealthy()).isTrue();
@@ -237,7 +244,7 @@ class KeycloakUserRoleCheckerTest extends BaseUnitTest {
         void userMissingRole() {
             setupUserWithRole(false);
 
-            boolean result = checker.hasAutomaticDetectionRole(TEST_USERNAME);
+            boolean result = checker.hasRole(TEST_USERNAME, TEST_ROLE);
 
             assertThat(result).isFalse();
             assertThat(checker.isHealthy()).isTrue();
@@ -248,7 +255,7 @@ class KeycloakUserRoleCheckerTest extends BaseUnitTest {
         void userNotFound() {
             when(usersResource.searchByUsername(TEST_USERNAME, true)).thenReturn(Collections.emptyList());
 
-            boolean result = checker.hasAutomaticDetectionRole(TEST_USERNAME);
+            boolean result = checker.hasRole(TEST_USERNAME, TEST_ROLE);
 
             assertThat(result).isFalse();
             assertThat(checker.isHealthy()).isTrue();
@@ -266,11 +273,11 @@ class KeycloakUserRoleCheckerTest extends BaseUnitTest {
 
             // Auth failures should be ignored by the circuit breaker
             // because they indicate credential misconfiguration, not service unavailability
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
 
             // Circuit should remain closed - auth errors don't count as failures
             assertThat(checker.getCircuitState()).isEqualTo(CircuitBreaker.State.CLOSED);
@@ -282,7 +289,7 @@ class KeycloakUserRoleCheckerTest extends BaseUnitTest {
         void authFailuresReturnFalseButDontBreakCircuit() {
             setupAuthFailure();
 
-            boolean result = checker.hasAutomaticDetectionRole(TEST_USERNAME);
+            boolean result = checker.hasRole(TEST_USERNAME, TEST_ROLE);
 
             assertThat(result).isFalse();
             assertThat(checker.getCircuitState()).isEqualTo(CircuitBreaker.State.CLOSED);
@@ -294,9 +301,9 @@ class KeycloakUserRoleCheckerTest extends BaseUnitTest {
         void connectionFailuresOpenCircuit() {
             setupConnectionFailure();
 
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
 
             assertThat(checker.getCircuitState()).isEqualTo(CircuitBreaker.State.OPEN);
             assertThat(checker.isHealthy()).isFalse();
@@ -308,15 +315,15 @@ class KeycloakUserRoleCheckerTest extends BaseUnitTest {
             setupConnectionFailure();
 
             // Open the circuit with 3 connection failures
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
 
             // Reset mock to verify no more calls
             org.mockito.Mockito.reset(usersResource);
 
             // Should skip without calling Keycloak
-            boolean result = checker.hasAutomaticDetectionRole(TEST_USERNAME);
+            boolean result = checker.hasRole(TEST_USERNAME, TEST_ROLE);
 
             assertThat(result).isFalse();
             verify(usersResource, times(0)).searchByUsername(anyString(), anyBoolean());
@@ -327,9 +334,9 @@ class KeycloakUserRoleCheckerTest extends BaseUnitTest {
         void connectionFailureCountsAsFailure() {
             setupConnectionFailure();
 
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
 
             assertThat(checker.getCircuitState()).isEqualTo(CircuitBreaker.State.OPEN);
         }
@@ -341,11 +348,11 @@ class KeycloakUserRoleCheckerTest extends BaseUnitTest {
             // Without cause-chain checking, this would incorrectly trip the circuit
             setupWrappedAuthFailure();
 
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
 
             // Circuit should remain closed - wrapped auth errors still indicate config problems
             assertThat(checker.getCircuitState()).isEqualTo(CircuitBreaker.State.CLOSED);
@@ -359,9 +366,9 @@ class KeycloakUserRoleCheckerTest extends BaseUnitTest {
             // The cause-chain checking should NOT prevent this from tripping the circuit
             setupWrappedIOFailure();
 
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
 
             // Circuit should open - this is a real infrastructure failure
             assertThat(checker.getCircuitState()).isEqualTo(CircuitBreaker.State.OPEN);
@@ -379,9 +386,9 @@ class KeycloakUserRoleCheckerTest extends BaseUnitTest {
             setupConnectionFailure();
 
             // Open the circuit with connection failures
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
 
             assertThat(checker.getCircuitState()).isEqualTo(CircuitBreaker.State.OPEN);
 
@@ -397,16 +404,16 @@ class KeycloakUserRoleCheckerTest extends BaseUnitTest {
             setupConnectionFailure();
 
             // Open the circuit with connection failures
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
 
             // Transition to half-open
             circuitBreaker.transitionToHalfOpenState();
 
             // Setup success and make request
             setupUserWithRole(true);
-            boolean result = checker.hasAutomaticDetectionRole(TEST_USERNAME);
+            boolean result = checker.hasRole(TEST_USERNAME, TEST_ROLE);
 
             assertThat(result).isTrue();
             assertThat(checker.getCircuitState()).isEqualTo(CircuitBreaker.State.CLOSED);
@@ -418,15 +425,15 @@ class KeycloakUserRoleCheckerTest extends BaseUnitTest {
             setupConnectionFailure();
 
             // Open the circuit with connection failures
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
 
             // Transition to half-open
             circuitBreaker.transitionToHalfOpenState();
 
             // Test request fails again
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
 
             assertThat(checker.getCircuitState()).isEqualTo(CircuitBreaker.State.OPEN);
         }
@@ -441,28 +448,28 @@ class KeycloakUserRoleCheckerTest extends BaseUnitTest {
         void multipleRecoveryCycles() {
             // First circuit break (use connection failures, not auth failures)
             setupConnectionFailure();
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
             assertThat(checker.getCircuitState()).isEqualTo(CircuitBreaker.State.OPEN);
 
             // Recover
             circuitBreaker.transitionToHalfOpenState();
             setupUserWithRole(true);
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
             assertThat(checker.getCircuitState()).isEqualTo(CircuitBreaker.State.CLOSED);
 
             // Second circuit break
             setupConnectionFailure();
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
             assertThat(checker.getCircuitState()).isEqualTo(CircuitBreaker.State.OPEN);
 
             // Recover again
             circuitBreaker.transitionToHalfOpenState();
             setupUserWithRole(false);
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
             assertThat(checker.getCircuitState()).isEqualTo(CircuitBreaker.State.CLOSED);
         }
 
@@ -471,7 +478,7 @@ class KeycloakUserRoleCheckerTest extends BaseUnitTest {
         void healthyWhenClosed() {
             // Make a successful call first to use the stubs from setUp
             setupUserWithRole(false);
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
 
             assertThat(checker.isHealthy()).isTrue();
             assertThat(checker.getCircuitState()).isEqualTo(CircuitBreaker.State.CLOSED);
@@ -483,9 +490,9 @@ class KeycloakUserRoleCheckerTest extends BaseUnitTest {
             // Use connection failure to open the circuit (auth failures don't open it)
             setupConnectionFailure();
 
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
 
             assertThat(checker.isHealthy()).isFalse();
         }
@@ -496,11 +503,11 @@ class KeycloakUserRoleCheckerTest extends BaseUnitTest {
             // Auth failures should not affect circuit health
             setupAuthFailure();
 
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
 
             // Circuit should remain healthy - auth failures indicate config problems,
             // not service unavailability
@@ -515,11 +522,11 @@ class KeycloakUserRoleCheckerTest extends BaseUnitTest {
 
             // 403 failures should be ignored by the circuit breaker
             // because they indicate permission misconfiguration, not service unavailability
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
 
             // Circuit should remain closed - forbidden errors don't count as failures
             assertThat(checker.getCircuitState()).isEqualTo(CircuitBreaker.State.CLOSED);
@@ -527,13 +534,37 @@ class KeycloakUserRoleCheckerTest extends BaseUnitTest {
         }
 
         @Test
+        @DisplayName("Should throw NullPointerException for null username")
+        void throwsOnNullUsername() {
+            org.junit.jupiter.api.Assertions.assertThrows(NullPointerException.class, () ->
+                checker.hasRole(null, TEST_ROLE)
+            );
+        }
+
+        @Test
+        @DisplayName("Should throw NullPointerException for null roleName")
+        void throwsOnNullRoleName() {
+            org.junit.jupiter.api.Assertions.assertThrows(NullPointerException.class, () ->
+                checker.hasRole(TEST_USERNAME, null)
+            );
+        }
+
+        @Test
+        @DisplayName("Should throw IllegalArgumentException for blank roleName")
+        void throwsOnBlankRoleName() {
+            org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () ->
+                checker.hasRole(TEST_USERNAME, "   ")
+            );
+        }
+
+        @Test
         @DisplayName("Should report healthy in HALF_OPEN state to allow recovery traffic")
         void healthyWhenHalfOpen() {
             // Open the circuit with connection failures
             setupConnectionFailure();
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
-            checker.hasAutomaticDetectionRole(TEST_USERNAME);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
+            checker.hasRole(TEST_USERNAME, TEST_ROLE);
             assertThat(checker.getCircuitState()).isEqualTo(CircuitBreaker.State.OPEN);
             assertThat(checker.isHealthy()).isFalse();
 

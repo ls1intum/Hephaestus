@@ -8,6 +8,7 @@ import jakarta.ws.rs.ForbiddenException;
 import jakarta.ws.rs.NotAuthorizedException;
 import jakarta.ws.rs.ProcessingException;
 import java.util.List;
+import java.util.Objects;
 import java.util.function.Supplier;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.representations.idm.RoleRepresentation;
@@ -37,7 +38,6 @@ import org.springframework.stereotype.Component;
 public class KeycloakUserRoleChecker implements UserRoleChecker {
 
     private static final Logger log = LoggerFactory.getLogger(KeycloakUserRoleChecker.class);
-    private static final String AUTOMATIC_DETECTION_ROLE = "run_automatic_detection";
 
     private final Keycloak keycloak;
     private final KeycloakProperties keycloakProperties;
@@ -54,47 +54,60 @@ public class KeycloakUserRoleChecker implements UserRoleChecker {
     }
 
     @Override
-    public boolean hasAutomaticDetectionRole(@NonNull String username) {
+    public boolean hasRole(@NonNull String username, @NonNull String roleName) {
+        // Fail fast before circuit breaker to avoid contaminating failure metrics with programming errors
+        Objects.requireNonNull(username, "username must not be null");
+        Objects.requireNonNull(roleName, "roleName must not be null");
+        if (roleName.isBlank()) {
+            throw new IllegalArgumentException("roleName must not be blank");
+        }
+
         Supplier<Boolean> decoratedSupplier = CircuitBreaker.decorateSupplier(circuitBreaker, () ->
-            checkRoleInternal(username)
+            checkRoleInternal(username, roleName)
         );
 
         try {
             return decoratedSupplier.get();
         } catch (CallNotPermittedException e) {
-            log.debug("Skipped role check: reason=circuitOpen, userLogin={}", username);
+            log.debug("Skipped role check: reason=circuitOpen, userLogin={}, role={}", username, roleName);
             return false;
         } catch (NotAuthorizedException e) {
             // 401: Auth failures indicate credential misconfiguration - log at WARN level
             // so operators can see this clearly, but don't spam (circuit breaker ignores these)
             log.warn(
-                "Keycloak authentication failed (401) - check KEYCLOAK_CLIENT_SECRET configuration: userLogin={}, error={}",
+                "Keycloak authentication failed (401) - check KEYCLOAK_CLIENT_SECRET configuration: userLogin={}, role={}, error={}",
                 username,
+                roleName,
                 e.getMessage()
             );
             return false;
         } catch (ForbiddenException e) {
             // 403: Client lacks required permissions - check Keycloak client role mappings
             log.warn(
-                "Keycloak access forbidden (403) - check client has 'view-users' role in Keycloak: userLogin={}, error={}",
+                "Keycloak access forbidden (403) - check client has 'view-users' role in Keycloak: userLogin={}, role={}, error={}",
                 username,
+                roleName,
                 e.getMessage()
             );
             return false;
         } catch (ProcessingException e) {
             // Connection/transport failures are recorded by the circuit breaker
-            log.debug("Keycloak request failed: userLogin={}, error={}", username, e.getMessage());
+            log.debug("Keycloak request failed: userLogin={}, role={}, error={}", username, roleName, e.getMessage());
             return false;
         } catch (Exception e) {
-            log.error("Unexpected error checking user role: userLogin={}", username, e);
+            log.error("Unexpected error checking user role: userLogin={}, role={}", username, roleName, e);
             return false;
         }
     }
 
     /**
      * Internal method to check user role - called within circuit breaker.
+     * <p>
+     * Uses {@code listEffective()} instead of {@code listAll()} to include roles
+     * inherited through composite roles (e.g., a user with the "admin" composite role
+     * inherits "run_practice_review" without direct assignment).
      */
-    private boolean checkRoleInternal(String username) {
+    private boolean checkRoleInternal(String username, String roleName) {
         List<UserRepresentation> users = keycloak
             .realm(keycloakProperties.realm())
             .users()
@@ -106,20 +119,21 @@ public class KeycloakUserRoleChecker implements UserRoleChecker {
         }
 
         UserRepresentation user = users.getFirst();
+        // listEffective() expands composite roles; listAll() only returns directly-assigned roles.
         List<RoleRepresentation> roles = keycloak
             .realm(keycloakProperties.realm())
             .users()
             .get(user.getId())
             .roles()
             .realmLevel()
-            .listAll();
+            .listEffective();
 
-        boolean hasRole = roles.stream().anyMatch(role -> AUTOMATIC_DETECTION_ROLE.equals(role.getName()));
+        boolean hasRole = roles.stream().anyMatch(role -> roleName.equals(role.getName()));
 
         if (hasRole) {
-            log.debug("User has role: userLogin={}, role={}", username, AUTOMATIC_DETECTION_ROLE);
+            log.debug("User has role: userLogin={}, role={}", username, roleName);
         } else {
-            log.debug("User missing role: userLogin={}, role={}", username, AUTOMATIC_DETECTION_ROLE);
+            log.debug("User missing role: userLogin={}, role={}", username, roleName);
         }
 
         return hasRole;
