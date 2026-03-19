@@ -1263,11 +1263,6 @@ export const practiceFinding = pgTable(
 			table.targetId.asc().nullsLast(),
 		),
 		foreignKey({
-			columns: [table.agentJobId],
-			foreignColumns: [agentJob.id],
-			name: "fk_practice_finding_agent_job",
-		}),
-		foreignKey({
 			columns: [table.practiceId],
 			foreignColumns: [practice.id],
 			name: "fk_practice_finding_practice",

@@ -397,7 +397,7 @@ erDiagram
     PracticeFinding {
         UUID id PK
         VARCHAR(255) idempotency_key UK "NOT NULL"
-        UUID agent_job_id FK "NOT NULL"
+        UUID agent_job_id "NOT NULL"
         BIGINT practice_id FK "NOT NULL"
         VARCHAR(32) target_type "NOT NULL"
         BIGINT target_id "NOT NULL"
@@ -827,7 +827,6 @@ erDiagram
     Issue ||--o{ IssueComment : commented_on
     Organization ||--o{ IssueType : has
     User ||--o{ Milestone : created_by
-    AgentJob ||--o{ PracticeFinding : has
     User ||--o{ PracticeFinding : references
     Practice ||--o{ PracticeFinding : has
     User ||--o{ Project : created_by
