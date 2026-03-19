@@ -70,9 +70,9 @@ export const Default: Story = {
 };
 
 /**
- * View with notifications and AI review disabled
+ * View with all toggles disabled
  */
-export const NotificationsDisabled: Story = {
+export const AllTogglesDisabled: Story = {
 	args: {
 		notificationsProps: {
 			receiveNotifications: false,
