@@ -118,6 +118,34 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
     Optional<PullRequest> findByIdWithAuthor(@Param("id") Long id);
 
     /**
+     * Finds a pull request by ID with all associations needed by the practice review detection gate.
+     * <p>
+     * Eagerly fetches labels, assignees, repository, author, and mergedBy in a single query.
+     * The gate requires labels (step 1: no-ai-review label check), assignees (step 7: assignee gate),
+     * and repository (step 3: workspace resolution). Author and mergedBy are needed by
+     * {@link de.tum.in.www1.hephaestus.gitprovider.common.events.EventPayload.PullRequestData#from(PullRequest)}
+     * for the ReviewSubmitted path.
+     * <p>
+     * Uses {@code DISTINCT} because the Cartesian product of two {@code @ManyToMany} collections
+     * (labels × assignees) produces duplicate root rows that Hibernate de-duplicates.
+     *
+     * @param id the pull request ID
+     * @return the pull request with all gate associations loaded, or empty if not found
+     */
+    @Query(
+        """
+        SELECT DISTINCT p FROM PullRequest p
+        LEFT JOIN FETCH p.labels
+        LEFT JOIN FETCH p.assignees
+        LEFT JOIN FETCH p.repository
+        LEFT JOIN FETCH p.author
+        LEFT JOIN FETCH p.mergedBy
+        WHERE p.id = :id
+        """
+    )
+    Optional<PullRequest> findByIdWithAllForGate(@Param("id") Long id);
+
+    /**
      * Finds all pull requests belonging to a repository.
      * Repository ID inherently has scope through Organization.
      *

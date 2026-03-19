@@ -41,6 +41,23 @@ public final class DomainEvent {
 
     private DomainEvent() {}
 
+    /**
+     * Canonical trigger event names used for practice matching.
+     * <p>
+     * These must match exactly the strings stored in the {@code trigger_events} JSONB column
+     * of the {@code practice} table. Practices are matched by comparing their trigger events
+     * against these constants in {@code PracticeReviewDetectionGate.findMatchingPractices()}.
+     */
+    public static final class TriggerEventNames {
+
+        public static final String PULL_REQUEST_CREATED = "PullRequestCreated";
+        public static final String PULL_REQUEST_READY = "PullRequestReady";
+        public static final String PULL_REQUEST_SYNCHRONIZED = "PullRequestSynchronized";
+        public static final String REVIEW_SUBMITTED = "ReviewSubmitted";
+
+        private TriggerEventNames() {}
+    }
+
     // ========================================================================
     // Common base interfaces
     // ========================================================================
