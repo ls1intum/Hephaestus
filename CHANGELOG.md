@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.37.0](https://github.com/ls1intum/Hephaestus/compare/v0.36.0...v0.37.0) (2026-03-19)
+
+### 🚀 Features
+
+* **server:** practice detection result parser + persistence ([#868](https://github.com/ls1intum/Hephaestus/issues/868)) ([21938ca](https://github.com/ls1intum/Hephaestus/commit/21938cacb193c64b70fe794b66cc2ce066770851))
+
 ## [0.36.0](https://github.com/ls1intum/Hephaestus/compare/v0.35.0...v0.36.0) (2026-03-18)
 
 ### 🚀 Features
