@@ -5,6 +5,7 @@ import de.tum.in.www1.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.in.www1.hephaestus.gitprovider.git.GitRepositoryManager;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewCommentRepository;
+import de.tum.in.www1.hephaestus.practices.PracticeRepository;
 import de.tum.in.www1.hephaestus.practices.finding.PracticeDetectionProperties;
 import java.util.List;
 import org.springframework.context.annotation.Bean;
@@ -28,6 +29,7 @@ public class JobTypeHandlerConfiguration {
         GitRepositoryManager gitRepositoryManager,
         PullRequestRepository pullRequestRepository,
         PullRequestReviewCommentRepository reviewCommentRepository,
+        PracticeRepository practiceRepository,
         PracticeDetectionDeliveryService deliveryService,
         PracticeDetectionProperties properties
     ) {
@@ -37,6 +39,7 @@ public class JobTypeHandlerConfiguration {
             gitRepositoryManager,
             pullRequestRepository,
             reviewCommentRepository,
+            practiceRepository,
             resultParser,
             deliveryService
         );

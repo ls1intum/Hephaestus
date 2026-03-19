@@ -61,6 +61,7 @@ public interface JobTypeHandler {
      *
      * @param job the persisted job
      * @return prompt text (must not be blank)
+     * @throws JobPreparationException if prompt generation fails (e.g. missing practices or metadata)
      */
     String buildPrompt(AgentJob job);
 
