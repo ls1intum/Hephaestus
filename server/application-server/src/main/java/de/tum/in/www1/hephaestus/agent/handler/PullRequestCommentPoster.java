@@ -123,7 +123,7 @@ class PullRequestCommentPoster {
     /**
      * Matches GitLab slash commands at the start of a line (e.g., /approve, /merge, /close).
      * These are interpreted as actions by GitLab when posted in MR notes.
-     * Escaped by prefixing with a zero-width space to render as plain text.
+     * Escaped by wrapping in backticks (inline code) so they render as plain text.
      */
     private static final Pattern GITLAB_SLASH_COMMAND = Pattern.compile(
         "^(\\s*/(?:approve|merge|close|reopen|assign|unassign|label|unlabel|lock|unlock|" +

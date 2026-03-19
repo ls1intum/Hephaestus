@@ -523,7 +523,7 @@ public class AgentJobExecutor {
                 jobRepository.updateDeliveryStatus(jobId, status, commentId)
             );
         } catch (Exception e) {
-            log.warn("Failed to persist delivery status (non-fatal): jobId={}, status={}", jobId, status, e);
+            log.error("Failed to persist delivery status: jobId={}, status={}", jobId, status, e);
         }
     }
 
