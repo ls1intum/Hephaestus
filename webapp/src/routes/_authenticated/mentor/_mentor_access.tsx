@@ -1,13 +1,13 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { Spinner } from "@/components/ui/spinner";
-import { useAuth } from "@/integrations/auth";
+import { useFeatureFlag } from "@/integrations/feature-flags";
 
 export const Route = createFileRoute("/_authenticated/mentor/_mentor_access")({
 	component: MentorLayout,
 });
 
 function MentorLayout() {
-	const { hasRole, isLoading } = useAuth();
+	const { enabled: hasMentorAccess, isLoading, isError } = useFeatureFlag("MENTOR_ACCESS");
 
 	if (isLoading) {
 		return (
@@ -17,7 +17,15 @@ function MentorLayout() {
 		);
 	}
 
-	if (hasRole("mentor_access") === false) {
+	if (isError) {
+		return (
+			<div className="flex items-center justify-center h-96">
+				<p className="text-muted-foreground">Failed to check access. Please try again later.</p>
+			</div>
+		);
+	}
+
+	if (!hasMentorAccess) {
 		redirect({ to: "/", throw: true });
 	}
 

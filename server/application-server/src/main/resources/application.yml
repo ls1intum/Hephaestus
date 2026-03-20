@@ -361,6 +361,17 @@ hephaestus:
             secret-key: ${LANGFUSE_SECRET_KEY:}
 
     # ═══════════════════════════════════════════════════════════════════════════
+    # FEATURE FLAGS (operational / development toggles)
+    # ═══════════════════════════════════════════════════════════════════════════
+    # CONFIG-backed feature flags evaluated by FeatureFlagService.
+    # ROLE-backed flags (mentor_access, admin, etc.) are managed in Keycloak.
+    features:
+        flags:
+            practice-review-for-all: false
+            detection-for-all: false
+            gitlab-workspace-creation: false
+
+    # ═══════════════════════════════════════════════════════════════════════════
     # PRACTICE REVIEW GATE
     # ═══════════════════════════════════════════════════════════════════════════
     # Controls the detection gate for the practice-aware PR review agent.
