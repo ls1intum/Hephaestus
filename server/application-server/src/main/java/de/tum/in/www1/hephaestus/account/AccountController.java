@@ -5,6 +5,7 @@ import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.integrations.posthog.PosthogClientException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.keycloak.admin.client.Keycloak;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,6 +17,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.core.oidc.StandardClaimNames;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -27,6 +29,7 @@ import org.springframework.web.bind.annotation.RestController;
  * Controller for user account management operations.
  * Handles account deletion (GDPR) and user preferences/settings.
  */
+@Validated
 @RestController
 @RequestMapping("/user")
 @Tag(name = "Account", description = "User account management (settings, deletion)")
@@ -71,7 +74,7 @@ public class AccountController {
         }
 
         try {
-            accountService.deleteUserTrackingData(gitUser, keycloakUserId);
+            accountService.deleteUserTrackingData(gitUser.orElse(null), keycloakUserId);
         } catch (PosthogClientException exception) {
             log.error("Failed to remove analytics data before deleting user {}", keycloakUserId, exception);
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY).build();
@@ -89,7 +92,7 @@ public class AccountController {
     @GetMapping("/settings")
     @Operation(
         summary = "Get user settings",
-        description = "Get the current user's notification and research participation preferences"
+        description = "Get the current user's notification, research participation, and AI review preferences"
     )
     public ResponseEntity<UserSettingsDTO> getUserSettings() {
         var user = userRepository.getCurrentUser();
@@ -104,11 +107,11 @@ public class AccountController {
     @PostMapping("/settings")
     @Operation(
         summary = "Update user settings",
-        description = "Update the current user's notification and research participation preferences"
+        description = "Update the current user's notification, research participation, and AI review preferences"
     )
     public ResponseEntity<UserSettingsDTO> updateUserSettings(
         @AuthenticationPrincipal JwtAuthenticationToken auth,
-        @RequestBody UserSettingsDTO userSettings
+        @Valid @RequestBody UserSettingsDTO userSettings
     ) {
         var user = userRepository.getCurrentUser();
         if (user.isEmpty()) {

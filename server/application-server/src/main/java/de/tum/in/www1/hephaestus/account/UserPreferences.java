@@ -28,6 +28,7 @@ import lombok.ToString;
  * <ul>
  *   <li>{@link #notificationsEnabled} - Whether the user wants to receive platform notifications</li>
  *   <li>{@link #participateInResearch} - Whether the user consents to analytics/research data collection</li>
+ *   <li>{@link #aiReviewEnabled} - Whether the user wants AI-generated practice review comments on PRs</li>
  * </ul>
  *
  * @see AccountService
@@ -74,6 +75,14 @@ public class UserPreferences {
      */
     @Column(name = "participate_in_research", nullable = false)
     private boolean participateInResearch = true;
+
+    /**
+     * Whether the user wants to receive AI-generated practice review comments on their PRs.
+     * Defaults to true for new users (opt-out model).
+     * Checked before posting comments; findings are always stored regardless.
+     */
+    @Column(name = "ai_review_enabled", nullable = false)
+    private boolean aiReviewEnabled = true;
 
     /**
      * Creates a new UserPreferences instance for the given user with default settings.

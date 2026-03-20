@@ -39,7 +39,7 @@ export const deleteUser = <ThrowOnError extends boolean = false>(options?: Optio
 /**
  * Get user settings
  *
- * Get the current user's notification and research participation preferences
+ * Get the current user's notification, research participation, and AI review preferences
  */
 export const getUserSettings = <ThrowOnError extends boolean = false>(options?: Options<GetUserSettingsData, ThrowOnError>) => (options?.client ?? client).get<GetUserSettingsResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -50,7 +50,7 @@ export const getUserSettings = <ThrowOnError extends boolean = false>(options?: 
 /**
  * Update user settings
  *
- * Update the current user's notification and research participation preferences
+ * Update the current user's notification, research participation, and AI review preferences
  */
 export const updateUserSettings = <ThrowOnError extends boolean = false>(options: Options<UpdateUserSettingsData, ThrowOnError>) => (options.client ?? client).post<UpdateUserSettingsResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],

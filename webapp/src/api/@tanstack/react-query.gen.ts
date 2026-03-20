@@ -83,7 +83,7 @@ export const getUserSettingsQueryKey = (options?: Options<GetUserSettingsData>) 
 /**
  * Get user settings
  *
- * Get the current user's notification and research participation preferences
+ * Get the current user's notification, research participation, and AI review preferences
  */
 export const getUserSettingsOptions = (options?: Options<GetUserSettingsData>) => queryOptions<GetUserSettingsResponse, DefaultError, GetUserSettingsResponse, ReturnType<typeof getUserSettingsQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
@@ -101,7 +101,7 @@ export const getUserSettingsOptions = (options?: Options<GetUserSettingsData>) =
 /**
  * Update user settings
  *
- * Update the current user's notification and research participation preferences
+ * Update the current user's notification, research participation, and AI review preferences
  */
 export const updateUserSettingsMutation = (options?: Partial<Options<UpdateUserSettingsData>>): UseMutationOptions<UpdateUserSettingsResponse, DefaultError, Options<UpdateUserSettingsData>> => {
     const mutationOptions: UseMutationOptions<UpdateUserSettingsResponse, DefaultError, Options<UpdateUserSettingsData>> = {

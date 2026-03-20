@@ -2095,6 +2095,7 @@ export const userPreferences = pgTable(
 		userId: bigint("user_id", { mode: "number" }).notNull(),
 		notificationsEnabled: boolean("notifications_enabled").default(true).notNull(),
 		participateInResearch: boolean("participate_in_research").default(true).notNull(),
+		aiReviewEnabled: boolean("ai_review_enabled").default(true).notNull(),
 	},
 	(table) => [
 		foreignKey({
