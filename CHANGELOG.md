@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.42.0](https://github.com/ls1intum/Hephaestus/compare/v0.41.0...v0.42.0) (2026-03-20)
+
+### 🚀 Features
+
+* **server:** agent result delivery — post AI review comments on PRs/MRs ([#877](https://github.com/ls1intum/Hephaestus/issues/877)) ([ad2b451](https://github.com/ls1intum/Hephaestus/commit/ad2b4515e77876a18ef0f1ed35f1fbee5751414d))
+
 ## [0.41.0](https://github.com/ls1intum/Hephaestus/compare/v0.40.0...v0.41.0) (2026-03-20)
 
 ### 🚀 Features
