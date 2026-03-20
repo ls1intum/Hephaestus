@@ -5,6 +5,7 @@ import static de.tum.in.www1.hephaestus.practices.model.PullRequestLabels.READY_
 import static de.tum.in.www1.hephaestus.practices.model.PullRequestLabels.READY_TO_REVIEW;
 
 import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
+import de.tum.in.www1.hephaestus.feature.FeatureFlag;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
@@ -40,7 +41,7 @@ public class BadPracticeDetectorScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(BadPracticeDetectorScheduler.class);
     private static final Duration SKIP_WARNING_INTERVAL = Duration.ofSeconds(30);
-    private static final String AUTOMATIC_DETECTION_ROLE = "run_automatic_detection";
+    private static final String AUTOMATIC_DETECTION_ROLE = FeatureFlag.RUN_AUTOMATIC_DETECTION.key();
 
     private final TaskScheduler taskScheduler;
     private final PullRequestBadPracticeDetector pullRequestBadPracticeDetector;

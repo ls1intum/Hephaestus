@@ -73,6 +73,21 @@ paths:
       summary: Delete user account
       tags:
       - Account
+  /user/features:
+    get:
+      description: Returns all feature flags evaluated for the authenticated user.
+        Combines Keycloak role checks and server-side config toggles.
+      operationId: getUserFeatures
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeatureFlags"
+          description: Feature flags evaluated successfully
+      summary: Get feature flags for the current user
+      tags:
+      - Account
   /user/settings:
     get:
       description: Get the current user's notification and research participation
@@ -3149,6 +3164,34 @@ components:
       - error
       x-hephaestus:
         export: true
+    FeatureFlags:
+      type: object
+      description: Feature flags evaluated for the current user
+      properties:
+        ADMIN:
+          type: boolean
+          description: User has admin privileges
+        DETECTION_FOR_ALL:
+          type: boolean
+          description: Automatic detection runs for all users regardless of role
+        GITLAB_WORKSPACE_CREATION:
+          type: boolean
+          description: GitLab workspace creation feature is enabled
+        MENTOR_ACCESS:
+          type: boolean
+          description: User has access to the AI Mentor feature
+        NOTIFICATION_ACCESS:
+          type: boolean
+          description: User can receive notifications
+        PRACTICE_REVIEW_FOR_ALL:
+          type: boolean
+          description: Practice review runs for all users regardless of role
+        RUN_AUTOMATIC_DETECTION:
+          type: boolean
+          description: User's PRs trigger automatic detection
+        RUN_PRACTICE_REVIEW:
+          type: boolean
+          description: User's PRs trigger practice review
     GitLabGroup:
       type: object
       description: GitLab group accessible to the provided PAT

@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus;
 
 import de.tum.in.www1.hephaestus.config.CorsProperties;
+import de.tum.in.www1.hephaestus.feature.FeatureFlag;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -104,7 +105,7 @@ public class SecurityConfig {
             requests.requestMatchers(HttpMethod.GET, "/workspaces", "/workspaces/").authenticated();
             // Non-GET workspace operations still require authentication.
             requests.requestMatchers("/workspaces/**").authenticated();
-            requests.requestMatchers("/mentor/**").hasAuthority("mentor_access");
+            requests.requestMatchers("/mentor/**").hasAuthority(FeatureFlag.MENTOR_ACCESS.key());
             // Public endpoints
             requests.requestMatchers(HttpMethod.GET, "/contributors").permitAll();
             // User account management requires authentication

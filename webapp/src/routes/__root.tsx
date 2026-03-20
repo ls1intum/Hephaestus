@@ -24,6 +24,7 @@ import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { useWorkspaceAccess } from "@/hooks/use-workspace-access";
 import { useMentorChat } from "@/hooks/useMentorChat";
 import { type AuthContextType, useAuth } from "@/integrations/auth/AuthContext";
+import { FeatureFlagDevTools, useFeatureFlag } from "@/integrations/feature-flags";
 import { isPosthogEnabled } from "@/integrations/posthog/config";
 import { useTheme } from "@/integrations/theme";
 import { getProviderSlug } from "@/lib/provider";
@@ -38,7 +39,8 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 	component: () => {
 		const { theme } = useTheme();
 		const { pathname } = useLocation();
-		const { isAuthenticated, hasRole, isLoading } = useAuth();
+		const { isAuthenticated, isLoading } = useAuth();
+		const { enabled: hasMentorAccess } = useFeatureFlag("MENTOR_ACCESS");
 		const { data: userSettings, isError: userSettingsError } = useQuery({
 			...getUserSettingsOptions({}),
 			enabled: isAuthenticated && isPosthogEnabled,
@@ -62,8 +64,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 			pathname === "/imprint" ||
 			pathname === "/privacy";
 
-		const showCopilot =
-			!isLoading && isAuthenticated && hasRole("mentor_access") && !isExcludedRoute;
+		const showCopilot = !isLoading && isAuthenticated && hasMentorAccess && !isExcludedRoute;
 
 		return (
 			<>
@@ -88,6 +89,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 				<Toaster theme={theme} />
 				{showCopilot && <GlobalCopilot />}
 				{!isLoading && isAuthenticated && allowSurveys && <PostHogSurveyWidget />}
+				<FeatureFlagDevTools />
 			</>
 		);
 	},
@@ -114,7 +116,8 @@ function GlobalCopilot() {
 	});
 
 	const router = useRouter();
-	const { isAuthenticated, hasRole, isLoading } = useAuth();
+	const { isAuthenticated, isLoading } = useAuth();
+	const { enabled: hasMentorAccess } = useFeatureFlag("MENTOR_ACCESS");
 	const { workspaceSlug } = useActiveWorkspaceSlug();
 
 	const handleMessageSubmit = ({ text }: { text: string }) => {
@@ -142,7 +145,7 @@ function GlobalCopilot() {
 		});
 	};
 
-	if (isLoading || !isAuthenticated || !hasRole("mentor_access")) {
+	if (isLoading || !isAuthenticated || !hasMentorAccess) {
 		return null;
 	}
 
@@ -234,7 +237,8 @@ function ProviderColorScope({ children }: { children: React.ReactNode }) {
 
 function AppSidebarContainer() {
 	const { pathname } = useLocation();
-	const { isAuthenticated, username, hasRole } = useAuth();
+	const { isAuthenticated, username } = useAuth();
+	const { enabled: hasMentorAccess } = useFeatureFlag("MENTOR_ACCESS");
 	const navigate = useNavigate();
 	const workspaceAccess = useWorkspaceAccess();
 	const { workspaceSlug, workspaces, selectWorkspace } = workspaceAccess;
@@ -280,7 +284,7 @@ function AppSidebarContainer() {
 		<AppSidebar
 			username={username}
 			isAdmin={workspaceAccess.isAdmin}
-			hasMentorAccess={hasRole("mentor_access")}
+			hasMentorAccess={hasMentorAccess}
 			context={sidebarContext}
 			workspaces={workspaceList}
 			activeWorkspace={activeWorkspace}

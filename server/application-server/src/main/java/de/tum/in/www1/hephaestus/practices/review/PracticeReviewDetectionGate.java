@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.practices.review;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import de.tum.in.www1.hephaestus.feature.FeatureFlag;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.practices.PracticeRepository;
@@ -48,7 +49,7 @@ import org.springframework.stereotype.Service;
 public class PracticeReviewDetectionGate {
 
     private static final Logger log = LoggerFactory.getLogger(PracticeReviewDetectionGate.class);
-    private static final String PRACTICE_REVIEW_ROLE = "run_practice_review";
+    private static final String PRACTICE_REVIEW_ROLE = FeatureFlag.RUN_PRACTICE_REVIEW.key();
     private static final String NO_AI_REVIEW_LABEL = "no-ai-review";
     private static final Duration SKIP_WARNING_INTERVAL = Duration.ofSeconds(30);
 
