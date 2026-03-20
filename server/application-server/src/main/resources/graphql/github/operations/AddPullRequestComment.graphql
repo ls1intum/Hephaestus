@@ -1,0 +1,18 @@
+# Posts a comment on a pull request (or issue).
+# Used by agent feedback delivery to post review results.
+
+mutation AddPullRequestComment($subjectId: ID!, $body: String!) {
+    rateLimit {
+        cost
+        limit
+        remaining
+        resetAt
+    }
+    addComment(input: {subjectId: $subjectId, body: $body}) {
+        commentEdge {
+            node {
+                id
+            }
+        }
+    }
+}

@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.agent.handler;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -23,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.lang.Nullable;
 
 /**
  * Handler for {@link AgentJobType#PULL_REQUEST_REVIEW} jobs.
@@ -75,6 +77,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
     private final PracticeRepository practiceRepository;
     private final PracticeDetectionResultParser resultParser;
     private final PracticeDetectionDeliveryService deliveryService;
+    private final PullRequestCommentPoster commentPoster;
 
     PullRequestReviewHandler(
         ObjectMapper objectMapper,
@@ -83,7 +86,8 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         PullRequestReviewCommentRepository reviewCommentRepository,
         PracticeRepository practiceRepository,
         PracticeDetectionResultParser resultParser,
-        PracticeDetectionDeliveryService deliveryService
+        PracticeDetectionDeliveryService deliveryService,
+        PullRequestCommentPoster commentPoster
     ) {
         this.objectMapper = objectMapper;
         this.gitRepositoryManager = gitRepositoryManager;
@@ -92,6 +96,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         this.practiceRepository = practiceRepository;
         this.resultParser = resultParser;
         this.deliveryService = deliveryService;
+        this.commentPoster = commentPoster;
     }
 
     @Override
@@ -438,6 +443,35 @@ public class PullRequestReviewHandler implements JobTypeHandler {
 
     @Override
     public void deliver(AgentJob job) {
+        // 1. Post PR comment (soft failure — logged, not thrown)
+        postFeedbackComment(job);
+
+        // 2. Practice detection delivery (existing logic, hard failure)
+        deliverPracticeDetectionFindings(job);
+    }
+
+    /**
+     * Posts the agent's review comment on the PR/MR. This is best-effort:
+     * failure is logged but does not prevent practice detection delivery.
+     */
+    private void postFeedbackComment(AgentJob job) {
+        try {
+            String reviewComment = extractOutputField(job.getOutput(), "review_comment");
+            if (reviewComment == null || reviewComment.isBlank()) {
+                log.debug("No review_comment in agent output, skipping feedback post: jobId={}", job.getId());
+                return;
+            }
+            String summary = extractOutputField(job.getOutput(), "summary");
+            String commentId = commentPoster.postComment(job, reviewComment, summary);
+            if (commentId != null) {
+                job.setDeliveryCommentId(commentId);
+            }
+        } catch (Exception e) {
+            log.warn("Comment posting failed (non-fatal): jobId={}", job.getId(), e);
+        }
+    }
+
+    private void deliverPracticeDetectionFindings(AgentJob job) {
         var parsed = resultParser.parse(job.getOutput());
         if (!parsed.discarded().isEmpty()) {
             log.info(
@@ -466,6 +500,39 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             throw e;
         } catch (Exception e) {
             throw new JobDeliveryException("Delivery failed unexpectedly: jobId=" + job.getId(), e);
+        }
+    }
+
+    /**
+     * Extracts a string field from the agent output's double-encoded rawOutput JSON.
+     *
+     * <p>Output structure: {@code {"rawOutput": "{\"review_comment\": \"...\", ...}"}}.
+     * The rawOutput value is a JSON string that must be parsed a second time.
+     *
+     * @return the field value, or null if not present or unparseable
+     */
+    @Nullable
+    private String extractOutputField(JsonNode jobOutput, String field) {
+        if (jobOutput == null || jobOutput.isNull() || jobOutput.isMissingNode()) {
+            return null;
+        }
+        JsonNode rawOutputNode = jobOutput.get("rawOutput");
+        if (rawOutputNode == null || rawOutputNode.isNull() || !rawOutputNode.isTextual()) {
+            return null;
+        }
+        try {
+            JsonNode parsed = objectMapper.readTree(rawOutputNode.asText());
+            if (parsed == null || !parsed.has(field)) {
+                return null;
+            }
+            JsonNode fieldNode = parsed.get(field);
+            if (fieldNode.isNull() || !fieldNode.isTextual()) {
+                return null;
+            }
+            return fieldNode.asText();
+        } catch (JsonProcessingException e) {
+            log.debug("Failed to parse rawOutput for field '{}': {}", field, e.getMessage());
+            return null;
         }
     }
 

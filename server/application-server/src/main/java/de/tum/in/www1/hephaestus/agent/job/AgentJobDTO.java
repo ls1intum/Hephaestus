@@ -17,6 +17,11 @@ public record AgentJobDTO(
     @Schema(description = "Docker container ID") String containerId,
     @Schema(description = "Container exit code") Integer exitCode,
     @Schema(description = "Human-readable error message") String errorMessage,
+    @Schema(
+        description = "Delivery status: null = not applicable, PENDING = awaiting delivery, DELIVERED = posted, FAILED = delivery error"
+    )
+    DeliveryStatus deliveryStatus,
+    @Schema(description = "Git provider comment/note ID for posted feedback") String deliveryCommentId,
     @NonNull @Schema(description = "Number of retry attempts") Integer retryCount,
     @NonNull @Schema(description = "Timestamp when the job was created") Instant createdAt,
     @Schema(description = "Timestamp when the job started running") Instant startedAt,
@@ -33,6 +38,8 @@ public record AgentJobDTO(
             job.getContainerId(),
             job.getExitCode(),
             job.getErrorMessage(),
+            job.getDeliveryStatus(),
+            job.getDeliveryCommentId(),
             job.getRetryCount(),
             job.getCreatedAt(),
             job.getStartedAt(),
