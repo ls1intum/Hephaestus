@@ -1,17 +1,19 @@
 import { useState } from "react";
 import { type FeatureFlagName, useFeatureFlags } from "./hooks";
 
-/**
- * Floating dev-only panel showing all feature flag states.
- * Only renders when `import.meta.env.DEV` is true.
- *
- * Toggle with the button in the bottom-right corner.
- */
-export function FeatureFlagDevTools() {
-	const [isOpen, setIsOpen] = useState(false);
-	const { flags, isLoading } = useFeatureFlags();
+interface FeatureFlagDevToolsPanelProps {
+	/** Feature flags to display. `undefined` means "not authenticated". */
+	flags: Record<FeatureFlagName, boolean> | undefined;
+	/** Whether flags are currently loading. */
+	isLoading: boolean;
+}
 
-	if (!import.meta.env.DEV) return null;
+/**
+ * Pure presentational panel for feature flag state.
+ * Exported for Storybook — use {@link FeatureFlagDevTools} in application code.
+ */
+export function FeatureFlagDevToolsPanel({ flags, isLoading }: FeatureFlagDevToolsPanelProps) {
+	const [isOpen, setIsOpen] = useState(false);
 
 	return (
 		<div className="fixed bottom-4 right-4 z-[9999]">
@@ -84,4 +86,18 @@ export function FeatureFlagDevTools() {
 			</button>
 		</div>
 	);
+}
+
+/**
+ * Floating dev-only panel showing all feature flag states.
+ * Only renders when `import.meta.env.DEV` is true.
+ *
+ * Toggle with the button in the bottom-right corner.
+ */
+export function FeatureFlagDevTools() {
+	const { flags, isLoading } = useFeatureFlags();
+
+	if (!import.meta.env.DEV) return null;
+
+	return <FeatureFlagDevToolsPanel flags={flags} isLoading={isLoading} />;
 }
