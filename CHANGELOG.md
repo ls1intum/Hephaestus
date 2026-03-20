@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.43.0](https://github.com/ls1intum/Hephaestus/compare/v0.42.0...v0.43.0) (2026-03-20)
+
+### 🚀 Features
+
+* **server:** add user AI review preference ([#865](https://github.com/ls1intum/Hephaestus/issues/865)) ([#876](https://github.com/ls1intum/Hephaestus/issues/876)) ([9e2d4d2](https://github.com/ls1intum/Hephaestus/commit/9e2d4d2ae47c5448f3ac1d5af840a1a6f8c388b1))
+
 ## [0.42.0](https://github.com/ls1intum/Hephaestus/compare/v0.41.0...v0.42.0) (2026-03-20)
 
 ### 🚀 Features
