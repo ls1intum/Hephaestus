@@ -258,6 +258,10 @@ export type TeamSummary = {
  */
 export type UserSettings = {
     /**
+     * Whether the user wants to receive AI-generated practice review comments on pull requests
+     */
+    aiReviewEnabled: boolean;
+    /**
      * Whether the user consents to participate in research studies
      */
     participateInResearch: boolean;

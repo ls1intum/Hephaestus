@@ -6,7 +6,6 @@ import de.tum.in.www1.hephaestus.integrations.posthog.PosthogClient;
 import de.tum.in.www1.hephaestus.integrations.posthog.PosthogClientException;
 import java.util.LinkedHashSet;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,7 +54,7 @@ public class AccountService {
     public UserSettingsDTO getUserSettings(User user) {
         log.debug("Fetching user settings: userLogin={}", user.getLogin());
         UserPreferences preferences = getOrCreatePreferences(user);
-        return new UserSettingsDTO(preferences.isNotificationsEnabled(), preferences.isParticipateInResearch());
+        return toDTO(preferences);
     }
 
     @Transactional
@@ -66,6 +65,9 @@ public class AccountService {
 
         preferences.setNotificationsEnabled(
             Objects.requireNonNull(userSettings.receiveNotifications(), "receiveNotifications must not be null")
+        );
+        preferences.setAiReviewEnabled(
+            Objects.requireNonNull(userSettings.aiReviewEnabled(), "aiReviewEnabled must not be null")
         );
 
         boolean previousParticipation = preferences.isParticipateInResearch();
@@ -95,25 +97,49 @@ public class AccountService {
             }
         }
 
-        return new UserSettingsDTO(preferences.isNotificationsEnabled(), preferences.isParticipateInResearch());
+        return toDTO(preferences);
+    }
+
+    /**
+     * Checks whether AI review comments are enabled for a user.
+     * Returns {@code true} (default) if the user has no preferences row yet.
+     *
+     * @param userLogin the user's git provider login (must not be blank)
+     * @return true if AI review is enabled or no preferences exist
+     * @throws IllegalArgumentException if userLogin is null or blank
+     */
+    @Transactional(readOnly = true)
+    public boolean isAiReviewEnabled(String userLogin) {
+        if (!StringUtils.hasText(userLogin)) {
+            throw new IllegalArgumentException("userLogin must not be blank");
+        }
+        return userPreferencesRepository
+            .findByUserLogin(userLogin)
+            .map(UserPreferences::isAiReviewEnabled)
+            .orElse(true);
     }
 
     /**
      * Delete all tracking data for a user (GDPR compliance).
      * Called before account deletion.
+     *
+     * @param user the git provider user, or null if unresolved
+     * @param keycloakUserId the Keycloak subject identifier
      */
-    public void deleteUserTrackingData(Optional<User> user, String keycloakUserId) {
-        try {
-            boolean anyDeleted = deletePosthogIdentities(user.orElse(null), keycloakUserId);
-            if (!anyDeleted) {
-                log.warn(
-                    "No PostHog person matched provided identifiers during account deletion: userLogin={}",
-                    user.map(User::getLogin).orElse("unknown")
-                );
-            }
-        } catch (PosthogClientException exception) {
-            throw exception;
+    public void deleteUserTrackingData(User user, String keycloakUserId) {
+        boolean anyDeleted = deletePosthogIdentities(user, keycloakUserId);
+        if (!anyDeleted) {
+            String login = user != null ? user.getLogin() : "unknown";
+            log.warn("No PostHog person matched provided identifiers during account deletion: userLogin={}", login);
         }
+    }
+
+    private static UserSettingsDTO toDTO(UserPreferences preferences) {
+        return new UserSettingsDTO(
+            preferences.isNotificationsEnabled(),
+            preferences.isParticipateInResearch(),
+            preferences.isAiReviewEnabled()
+        );
     }
 
     private boolean deletePosthogIdentities(User user, String primaryDistinctId) {

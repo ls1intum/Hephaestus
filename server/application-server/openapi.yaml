@@ -90,8 +90,8 @@ paths:
       - Account
   /user/settings:
     get:
-      description: Get the current user's notification and research participation
-        preferences
+      description: "Get the current user's notification, research participation, and\
+        \ AI review preferences"
       operationId: getUserSettings
       responses:
         "200":
@@ -104,8 +104,8 @@ paths:
       tags:
       - Account
     post:
-      description: Update the current user's notification and research participation
-        preferences
+      description: "Update the current user's notification, research participation,\
+        \ and AI review preferences"
       operationId: updateUserSettings
       requestBody:
         content:
@@ -4275,6 +4275,10 @@ components:
       type: object
       description: User preferences and settings
       properties:
+        aiReviewEnabled:
+          type: boolean
+          description: Whether the user wants to receive AI-generated practice review
+            comments on pull requests
         participateInResearch:
           type: boolean
           description: Whether the user consents to participate in research studies
@@ -4282,6 +4286,7 @@ components:
           type: boolean
           description: Whether the user wants to receive notifications
       required:
+      - aiReviewEnabled
       - participateInResearch
       - receiveNotifications
     UserTeams:
