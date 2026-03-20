@@ -1,0 +1,11 @@
+# Updates an existing merge request note (comment).
+# Used by agent feedback delivery when re-delivering to an existing note.
+
+mutation UpdateMergeRequestNote($noteId: NoteID!, $body: String!) {
+    updateNote(input: {id: $noteId, body: $body}) {
+        note {
+            id
+        }
+        errors
+    }
+}

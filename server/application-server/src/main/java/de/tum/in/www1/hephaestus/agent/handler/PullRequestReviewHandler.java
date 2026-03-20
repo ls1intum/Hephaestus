@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.agent.handler;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -15,21 +16,26 @@ import de.tum.in.www1.hephaestus.gitprovider.git.GitRepositoryManager;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewCommentRepository;
+import de.tum.in.www1.hephaestus.practices.PracticeRepository;
+import de.tum.in.www1.hephaestus.practices.model.Practice;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.lang.Nullable;
 
 /**
  * Handler for {@link AgentJobType#PULL_REQUEST_REVIEW} jobs.
  *
- * <p>Prepares workspace context for an AI agent to review a pull request:
+ * <p>Prepares workspace context for an AI agent to perform practice-aware code review:
  * <ul>
  *   <li>Repository source files at the pull request's head commit</li>
  *   <li>Unified diff between target and source branches</li>
  *   <li>Pull request metadata (title, body, author, branches)</li>
  *   <li>Review comments from the database</li>
+ *   <li>Practice definitions from the workspace</li>
  * </ul>
  *
  * <p>Files are injected into the container's {@code /workspace} directory:
@@ -39,7 +45,8 @@ import org.slf4j.LoggerFactory;
  * ├── .context/
  * │   ├── metadata.json  # Title, body, author, branches
  * │   ├── diff.patch     # Unified diff (target..source)
- * │   └── comments.json  # Review comments (ordered by creation time)
+ * │   ├── comments.json  # Review comments (ordered by creation time)
+ * │   └── practices.json # Practice definitions for this workspace
  * ├── .prompt            # Written by executor from buildPrompt()
  * └── .output/           # Agent writes results here
  * </pre>
@@ -67,23 +74,29 @@ public class PullRequestReviewHandler implements JobTypeHandler {
     private final GitRepositoryManager gitRepositoryManager;
     private final PullRequestRepository pullRequestRepository;
     private final PullRequestReviewCommentRepository reviewCommentRepository;
+    private final PracticeRepository practiceRepository;
     private final PracticeDetectionResultParser resultParser;
     private final PracticeDetectionDeliveryService deliveryService;
+    private final PullRequestCommentPoster commentPoster;
 
     PullRequestReviewHandler(
         ObjectMapper objectMapper,
         GitRepositoryManager gitRepositoryManager,
         PullRequestRepository pullRequestRepository,
         PullRequestReviewCommentRepository reviewCommentRepository,
+        PracticeRepository practiceRepository,
         PracticeDetectionResultParser resultParser,
-        PracticeDetectionDeliveryService deliveryService
+        PracticeDetectionDeliveryService deliveryService,
+        PullRequestCommentPoster commentPoster
     ) {
         this.objectMapper = objectMapper;
         this.gitRepositoryManager = gitRepositoryManager;
         this.pullRequestRepository = pullRequestRepository;
         this.reviewCommentRepository = reviewCommentRepository;
+        this.practiceRepository = practiceRepository;
         this.resultParser = resultParser;
         this.deliveryService = deliveryService;
+        this.commentPoster = commentPoster;
     }
 
     @Override
@@ -236,6 +249,33 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             throw new JobPreparationException("Failed to serialize review comments", e);
         }
 
+        // 5. Practice definitions
+        if (job.getWorkspace() == null) {
+            throw new JobPreparationException("Job has no workspace: jobId=" + job.getId());
+        }
+        Long workspaceId = job.getWorkspace().getId();
+        List<Practice> practices = practiceRepository.findByWorkspaceIdAndActiveTrue(workspaceId);
+        if (practices.isEmpty()) {
+            throw new JobPreparationException(
+                "No active practices for workspace: workspaceId=" + workspaceId + ", jobId=" + job.getId()
+            );
+        }
+        JsonNode practicesJson = buildPracticeDefinitions(practices);
+        try {
+            files.put(
+                ".context/practices.json",
+                objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(practicesJson)
+            );
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new JobPreparationException("Failed to serialize practice definitions", e);
+        }
+        log.info(
+            "Included {} active practice definitions: workspaceId={}, jobId={}",
+            practices.size(),
+            workspaceId,
+            job.getId()
+        );
+
         long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
         log.info(
             "Context preparation complete: {} files, {} ms, repoId={}, pullRequestId={}",
@@ -257,63 +297,181 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         int pullRequestNumber = requireInt(metadata, "pr_number");
         String repoName = requireText(metadata, "repository_full_name");
 
+        // NOTE: practices are queried here independently of prepareInputFiles() because the
+        // handler is a singleton bean — no instance state can be shared between calls.
+        // The SPI does not support passing data from prepareInputFiles to buildPrompt.
+        // Both calls are sequential on the same thread (AgentJobExecutor), and the query is
+        // cheap (indexed on workspace_id + active). This mirrors PracticeDetectionDeliveryService
+        // which also re-queries at delivery time for freshness.
+        if (job.getWorkspace() == null) {
+            throw new JobPreparationException("Job has no workspace: jobId=" + job.getId());
+        }
+        Long workspaceId = job.getWorkspace().getId();
+        List<Practice> practices = practiceRepository.findByWorkspaceIdAndActiveTrue(workspaceId);
+        if (practices.isEmpty()) {
+            throw new JobPreparationException(
+                "No active practices for workspace: workspaceId=" + workspaceId + ", jobId=" + job.getId()
+            );
+        }
+
         // Use concatenation instead of String.formatted() — metadata fields (repo name, URL)
         // may contain '%' characters which would be misinterpreted as format specifiers.
-        return (
-            "You are a senior software engineer performing a thorough code review.\n" +
-            "\n" +
-            "## Context\n" +
-            "\n" +
-            "You are reviewing Pull Request #" +
-            pullRequestNumber +
-            " in repository " +
-            repoName +
-            ".\n" +
-            "PR URL: " +
-            pullRequestUrl +
-            "\n" +
-            "\n" +
-            "## Workspace Layout\n" +
-            "\n" +
-            "- `/workspace/repo/` — Full source code at the PR's head commit\n" +
-            "- `/workspace/.context/diff.patch` — Unified diff (target branch vs source branch)\n" +
-            "- `/workspace/.context/metadata.json` — PR title, description, author, branches\n" +
-            "- `/workspace/.context/comments.json` — Existing review comments\n" +
-            "\n" +
-            "## Instructions\n" +
-            "\n" +
-            "1. Read the diff to understand what changed\n" +
-            "2. Examine the relevant source files in `/workspace/repo/` for full context\n" +
-            "3. Review the PR metadata and existing comments\n" +
-            "4. Provide a thorough code review covering:\n" +
-            "   - Correctness and potential bugs\n" +
-            "   - Security concerns\n" +
-            "   - Performance implications\n" +
-            "   - Code style and best practices\n" +
-            "   - Missing test coverage\n" +
-            "\n" +
-            "## Output\n" +
-            "\n" +
-            "Write your review as a JSON file to `/workspace/.output/result.json` with this structure:\n" +
-            "```json\n" +
-            "{\n" +
-            "  \"summary\": \"Brief overall assessment\",\n" +
-            "  \"review_comment\": \"Detailed markdown review suitable for posting as a PR comment\",\n" +
-            "  \"severity\": \"info|warning|critical\",\n" +
-            "  \"suggestions\": [\n" +
-            "    {\n" +
-            "      \"file\": \"path/to/file\",\n" +
-            "      \"line\": 42,\n" +
-            "      \"suggestion\": \"Description of the suggestion\"\n" +
-            "    }\n" +
-            "  ]\n" +
-            "}\n" +
-            "```\n"
+        StringBuilder sb = new StringBuilder(4096);
+
+        sb.append("You are an AI agent performing practice-aware code review on a pull request.\n");
+        sb.append(
+            "Your task is to evaluate the PR against specific engineering practices and produce structured findings.\n"
         );
+        sb.append('\n');
+
+        // -- Context
+        sb.append("## Context\n");
+        sb.append('\n');
+        sb.append("Pull Request #").append(pullRequestNumber);
+        sb.append(" in repository ").append(repoName).append('\n');
+        sb.append("PR URL: ").append(pullRequestUrl).append('\n');
+        sb.append('\n');
+
+        // -- Workspace layout
+        sb.append("## Workspace Layout\n");
+        sb.append('\n');
+        sb.append("- `/workspace/repo/` — Full source code at the PR's head commit\n");
+        sb.append("- `/workspace/.context/diff.patch` — Unified diff (target branch vs source branch)\n");
+        sb.append("- `/workspace/.context/metadata.json` — PR title, description, author, branches\n");
+        sb.append("- `/workspace/.context/comments.json` — Existing review comments\n");
+        sb.append("- `/workspace/.context/practices.json` — Practice definitions (structured, see below)\n");
+        sb.append('\n');
+
+        // -- Practice definitions (inline in prompt for direct agent consumption)
+        sb.append("## Practices to Evaluate\n");
+        sb.append('\n');
+        sb.append("Evaluate the PR against each of the following practices. ");
+        sb.append("Produce exactly one finding per practice.\n");
+        sb.append('\n');
+        for (Practice p : practices) {
+            sb.append("### ").append(p.getSlug()).append(": ").append(p.getName()).append('\n');
+            if (p.getCategory() != null) {
+                sb.append("Category: ").append(p.getCategory()).append('\n');
+            }
+            // Prefer detectionPrompt (agent-specific instructions); fall back to description
+            String instructions = p.getDetectionPrompt() != null ? p.getDetectionPrompt() : p.getDescription();
+            if (instructions != null) {
+                sb.append(instructions).append('\n');
+            }
+            sb.append('\n');
+        }
+
+        // -- Instructions
+        sb.append("## Instructions\n");
+        sb.append('\n');
+        sb.append("1. Read the diff at `/workspace/.context/diff.patch` to understand what changed\n");
+        sb.append("2. Examine relevant source files in `/workspace/repo/` for full context\n");
+        sb.append("3. Review the PR metadata at `/workspace/.context/metadata.json`\n");
+        sb.append("4. For EACH practice listed above, produce exactly one finding\n");
+        sb.append("5. Focus your evaluation on the CHANGED code (lines in the diff). ");
+        sb.append("Pre-existing code outside the diff is context only, not a finding target.\n");
+        sb.append("6. When uncertain, prefer NOT_APPLICABLE or NEEDS_REVIEW over a false NEGATIVE. ");
+        sb.append("Precision is more valuable than recall.\n");
+        sb.append('\n');
+        sb.append("Verdict meanings:\n");
+        sb.append("- `POSITIVE`: the contributor followed this practice\n");
+        sb.append("- `NEGATIVE`: the contributor violated or missed this practice\n");
+        sb.append("- `NOT_APPLICABLE`: the practice does not apply to this PR's changes ");
+        sb.append("(use severity `INFO` and confidence `1.0`; evidence and guidance may be omitted)\n");
+        sb.append("- `NEEDS_REVIEW`: borderline case where your confidence is below 0.6\n");
+        sb.append('\n');
+
+        // -- Output contract (must match PracticeDetectionResultParser expectations exactly)
+        // NOTE: The JSON schema is shown WITHOUT markdown fences (no ```json wrapper)
+        // because LLMs tend to imitate example formatting — fences in the example cause
+        // the agent to wrap its output in fences, which breaks JSON parsing.
+        sb.append("## Output\n");
+        sb.append('\n');
+        sb.append("Write ONLY a JSON object to `/workspace/.output/result.json`.\n");
+        sb.append("Start the file with `{` and end with `}` — no surrounding text, ");
+        sb.append("no markdown fences, no code blocks, no commentary.\n");
+        sb.append('\n');
+        sb.append("Required structure:\n");
+        sb.append("{\n");
+        sb.append("  \"findings\": [\n");
+        sb.append("    {\n");
+        sb.append("      \"practiceSlug\": \"string (required, must match a practice slug above)\",\n");
+        sb.append("      \"title\": \"string (required, concise finding summary, max 255 chars)\",\n");
+        sb.append("      \"verdict\": \"POSITIVE | NEGATIVE | NOT_APPLICABLE | NEEDS_REVIEW\",\n");
+        sb.append("      \"severity\": \"CRITICAL | MAJOR | MINOR | INFO\",\n");
+        sb.append("      \"confidence\": 0.95,\n");
+        sb.append("      \"evidence\": {\n");
+        sb.append("        \"locations\": [{\"path\": \"src/File.java\", \"startLine\": 10, \"endLine\": 20}],\n");
+        sb.append("        \"snippets\": [\"relevant code snippet\"]\n");
+        sb.append("      },\n");
+        sb.append("      \"reasoning\": \"string (optional, detailed explanation)\",\n");
+        sb.append("      \"guidance\": \"string (optional, actionable advice for the contributor)\",\n");
+        sb.append(
+            "      \"guidanceMethod\": \"MODELING | COACHING | SCAFFOLDING | ARTICULATION | REFLECTION | EXPLORATION (optional)\"\n"
+        );
+        sb.append("    }\n");
+        sb.append("  ]\n");
+        sb.append("}\n");
+        sb.append('\n');
+        sb.append("Field rules:\n");
+        sb.append(
+            "- `practiceSlug` must match one of the slugs above (case-insensitive; underscores treated as hyphens)\n"
+        );
+        sb.append("- Produce exactly one finding per practice (").append(practices.size()).append(" total)\n");
+        sb.append("- `confidence` is a float in [0.0, 1.0] — not a percentage\n");
+        sb.append("- `evidence` is optional; when provided, `locations[].path` is relative to repo root\n");
+        // NOTE: Prompt limits (2K/1K) are intentionally stricter than parser limits (10K/5K).
+        // This keeps agent output concise while the parser's higher caps provide tolerance.
+        sb.append("- `reasoning` should be under 2,000 characters; `guidance` under 1,000 characters\n");
+        sb.append("- `guidanceMethod` selects a cognitive apprenticeship method appropriate for the finding\n");
+        sb.append("- Severity describes importance, not whether the practice was followed. ");
+        sb.append(
+            "Example: verdict=POSITIVE severity=MAJOR means the contributor correctly handled a critical practice; "
+        );
+        sb.append("verdict=NEGATIVE severity=MINOR means a low-impact style violation\n");
+
+        String prompt = sb.toString();
+        log.info(
+            "Built practice-aware prompt: {} chars, {} practices, workspaceId={}, jobId={}",
+            prompt.length(),
+            practices.size(),
+            workspaceId,
+            job.getId()
+        );
+        return prompt;
     }
 
     @Override
     public void deliver(AgentJob job) {
+        // 1. Post PR comment (soft failure — logged, not thrown)
+        postFeedbackComment(job);
+
+        // 2. Practice detection delivery (existing logic, hard failure)
+        deliverPracticeDetectionFindings(job);
+    }
+
+    /**
+     * Posts the agent's review comment on the PR/MR. This is best-effort:
+     * failure is logged but does not prevent practice detection delivery.
+     */
+    private void postFeedbackComment(AgentJob job) {
+        try {
+            String reviewComment = extractOutputField(job.getOutput(), "review_comment");
+            if (reviewComment == null || reviewComment.isBlank()) {
+                log.debug("No review_comment in agent output, skipping feedback post: jobId={}", job.getId());
+                return;
+            }
+            String summary = extractOutputField(job.getOutput(), "summary");
+            String commentId = commentPoster.postComment(job, reviewComment, summary);
+            if (commentId != null) {
+                job.setDeliveryCommentId(commentId);
+            }
+        } catch (Exception e) {
+            log.warn("Comment posting failed (non-fatal): jobId={}", job.getId(), e);
+        }
+    }
+
+    private void deliverPracticeDetectionFindings(AgentJob job) {
         var parsed = resultParser.parse(job.getOutput());
         if (!parsed.discarded().isEmpty()) {
             log.info(
@@ -342,6 +500,39 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             throw e;
         } catch (Exception e) {
             throw new JobDeliveryException("Delivery failed unexpectedly: jobId=" + job.getId(), e);
+        }
+    }
+
+    /**
+     * Extracts a string field from the agent output's double-encoded rawOutput JSON.
+     *
+     * <p>Output structure: {@code {"rawOutput": "{\"review_comment\": \"...\", ...}"}}.
+     * The rawOutput value is a JSON string that must be parsed a second time.
+     *
+     * @return the field value, or null if not present or unparseable
+     */
+    @Nullable
+    private String extractOutputField(JsonNode jobOutput, String field) {
+        if (jobOutput == null || jobOutput.isNull() || jobOutput.isMissingNode()) {
+            return null;
+        }
+        JsonNode rawOutputNode = jobOutput.get("rawOutput");
+        if (rawOutputNode == null || rawOutputNode.isNull() || !rawOutputNode.isTextual()) {
+            return null;
+        }
+        try {
+            JsonNode parsed = objectMapper.readTree(rawOutputNode.asText());
+            if (parsed == null || !parsed.has(field)) {
+                return null;
+            }
+            JsonNode fieldNode = parsed.get(field);
+            if (fieldNode.isNull() || !fieldNode.isTextual()) {
+                return null;
+            }
+            return fieldNode.asText();
+        } catch (JsonProcessingException e) {
+            log.debug("Failed to parse rawOutput for field '{}': {}", field, e.getMessage());
+            return null;
         }
     }
 
@@ -382,6 +573,26 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         }
 
         return result;
+    }
+
+    private JsonNode buildPracticeDefinitions(List<Practice> practices) {
+        var array = objectMapper.createArrayNode();
+        for (Practice p : practices) {
+            var node = objectMapper.createObjectNode();
+            node.put("slug", p.getSlug());
+            node.put("name", p.getName());
+            if (p.getCategory() != null) {
+                node.put("category", p.getCategory());
+            }
+            if (p.getDescription() != null) {
+                node.put("description", p.getDescription());
+            }
+            if (p.getDetectionPrompt() != null) {
+                node.put("detection_prompt", p.getDetectionPrompt());
+            }
+            array.add(node);
+        }
+        return array;
     }
 
     private JsonNode buildReviewComments(long pullRequestId) {

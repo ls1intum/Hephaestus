@@ -1,0 +1,16 @@
+# Updates an existing pull request comment.
+# Used by agent feedback delivery when re-delivering to an existing comment.
+
+mutation UpdatePullRequestComment($commentId: ID!, $body: String!) {
+    rateLimit {
+        cost
+        limit
+        remaining
+        resetAt
+    }
+    updateIssueComment(input: {id: $commentId, body: $body}) {
+        issueComment {
+            id
+        }
+    }
+}

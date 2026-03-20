@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.42.0](https://github.com/ls1intum/Hephaestus/compare/v0.41.0...v0.42.0) (2026-03-20)
+
+### 🚀 Features
+
+* **server:** agent result delivery — post AI review comments on PRs/MRs ([#877](https://github.com/ls1intum/Hephaestus/issues/877)) ([ad2b451](https://github.com/ls1intum/Hephaestus/commit/ad2b4515e77876a18ef0f1ed35f1fbee5751414d))
+
+## [0.41.0](https://github.com/ls1intum/Hephaestus/compare/v0.40.0...v0.41.0) (2026-03-20)
+
+### 🚀 Features
+
+* **server:** practice-aware prompt builder for PR review agent ([#874](https://github.com/ls1intum/Hephaestus/issues/874)) ([6b290e2](https://github.com/ls1intum/Hephaestus/commit/6b290e21c0406af4e3e70ed8e7d43647daafc332))
+
+## [0.40.0](https://github.com/ls1intum/Hephaestus/compare/v0.39.0...v0.40.0) (2026-03-20)
+
+### 🚀 Features
+
+* **server:** practice detection event bridge ([#875](https://github.com/ls1intum/Hephaestus/issues/875)) ([358df8a](https://github.com/ls1intum/Hephaestus/commit/358df8a86009f8a6405f6a9d3722023870c97cca))
+
 ## [0.39.0](https://github.com/ls1intum/Hephaestus/compare/v0.38.0...v0.39.0) (2026-03-19)
 
 ### 🚀 Features

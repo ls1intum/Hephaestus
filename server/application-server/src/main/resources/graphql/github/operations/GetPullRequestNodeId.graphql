@@ -1,0 +1,16 @@
+# Resolves the GraphQL Node ID for a pull request.
+# Used by agent feedback delivery to obtain the subjectId required by the addComment mutation.
+
+query GetPullRequestNodeId($owner: String!, $name: String!, $number: Int!) {
+    rateLimit {
+        cost
+        limit
+        remaining
+        resetAt
+    }
+    repository(owner: $owner, name: $name) {
+        pullRequest(number: $number) {
+            id
+        }
+    }
+}

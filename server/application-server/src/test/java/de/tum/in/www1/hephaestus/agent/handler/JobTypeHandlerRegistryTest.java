@@ -11,6 +11,7 @@ import de.tum.in.www1.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.in.www1.hephaestus.gitprovider.git.GitRepositoryManager;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewCommentRepository;
+import de.tum.in.www1.hephaestus.practices.PracticeRepository;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -31,7 +32,13 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
     private PullRequestReviewCommentRepository reviewCommentRepository;
 
     @Mock
+    private PracticeRepository practiceRepository;
+
+    @Mock
     private PracticeDetectionDeliveryService deliveryService;
+
+    @Mock
+    private PullRequestCommentPoster commentPoster;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -42,8 +49,10 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
             gitRepositoryManager,
             pullRequestRepository,
             reviewCommentRepository,
+            practiceRepository,
             parser,
-            deliveryService
+            deliveryService,
+            commentPoster
         );
     }
 

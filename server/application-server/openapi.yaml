@@ -8,7 +8,7 @@ info:
     name: MIT License
     url: https://github.com/ls1intum/Hephaestus/blob/develop/LICENSE
   title: Hephaestus API
-  version: 0.39.0
+  version: 0.42.0
 servers:
 - description: Default Server URL
   url: /
@@ -2777,6 +2777,17 @@ components:
           type: string
           format: date-time
           description: Timestamp when the job was created
+        deliveryCommentId:
+          type: string
+          description: Git provider comment/note ID for posted feedback
+        deliveryStatus:
+          type: string
+          description: "Delivery status: null = not applicable, PENDING = awaiting\
+            \ delivery, DELIVERED = posted, FAILED = delivery error"
+          enum:
+          - PENDING
+          - DELIVERED
+          - FAILED
         errorMessage:
           type: string
           description: Human-readable error message
