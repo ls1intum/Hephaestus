@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, Navigate, useNavigate } from "@tanstack/react-router";
 import { ArrowLeftIcon, OctagonXIcon } from "lucide-react";
 import { useReducer, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -21,6 +21,7 @@ import {
 	WizardContext,
 	wizardReducer,
 } from "@/components/workspace/create-workspace/wizard-context";
+import { useFeatureFlag } from "@/integrations/feature-flags";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
 export const Route = createFileRoute("/_authenticated/workspaces/new/gitlab")({
@@ -37,6 +38,10 @@ const STEP_META = [
 ] as const;
 
 function GitLabWizardPage() {
+	const { enabled: gitlabEnabled, isLoading: flagLoading } = useFeatureFlag(
+		"GITLAB_WORKSPACE_CREATION",
+	);
+
 	const [state, dispatch] = useReducer(wizardReducer, initialWizardState);
 	const queryClient = useQueryClient();
 	const navigate = useNavigate();
@@ -150,6 +155,17 @@ function GitLabWizardPage() {
 	const isTransitioning = listGroups.isPending;
 	const isCreating = createWorkspace.isPending;
 	const stepKey = `step-${state.step}`;
+
+	if (flagLoading) {
+		return (
+			<div className="flex justify-center py-16">
+				<Spinner />
+			</div>
+		);
+	}
+	if (!gitlabEnabled) {
+		return <Navigate to="/workspaces/new" />;
+	}
 
 	return (
 		<div className="mx-auto max-w-lg px-4 py-8">

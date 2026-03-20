@@ -3,6 +3,7 @@ import type { LucideIcon } from "lucide-react";
 import { ArrowLeftIcon, GithubIcon, GitlabIcon } from "lucide-react";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import environment from "@/environment";
+import { useFeatureFlag } from "@/integrations/feature-flags";
 
 export const Route = createFileRoute("/_authenticated/workspaces/new/")({
 	component: ProviderSelectionPage,
@@ -16,7 +17,9 @@ interface Provider {
 	to: string;
 }
 
-function getProviders(): Provider[] {
+function ProviderSelectionPage() {
+	const { enabled: gitlabEnabled } = useFeatureFlag("GITLAB_WORKSPACE_CREATION");
+
 	const providers: Provider[] = [];
 	if (environment.github.appUrl) {
 		providers.push({
@@ -28,18 +31,15 @@ function getProviders(): Provider[] {
 			to: "/workspaces/new/github",
 		});
 	}
-	providers.push({
-		id: "gitlab",
-		name: "GitLab",
-		description: "Connect with a Personal Access Token and select a group to monitor.",
-		icon: GitlabIcon,
-		to: "/workspaces/new/gitlab",
-	});
-	return providers;
-}
-
-function ProviderSelectionPage() {
-	const providers = getProviders();
+	if (gitlabEnabled) {
+		providers.push({
+			id: "gitlab",
+			name: "GitLab",
+			description: "Connect with a Personal Access Token and select a group to monitor.",
+			icon: GitlabIcon,
+			to: "/workspaces/new/gitlab",
+		});
+	}
 
 	return (
 		<div className="mx-auto max-w-2xl py-8">
