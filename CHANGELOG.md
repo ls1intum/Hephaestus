@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.40.0](https://github.com/ls1intum/Hephaestus/compare/v0.39.0...v0.40.0) (2026-03-20)
+
+### 🚀 Features
+
+* **server:** practice detection event bridge ([#875](https://github.com/ls1intum/Hephaestus/issues/875)) ([358df8a](https://github.com/ls1intum/Hephaestus/commit/358df8a86009f8a6405f6a9d3722023870c97cca))
+
 ## [0.39.0](https://github.com/ls1intum/Hephaestus/compare/v0.38.0...v0.39.0) (2026-03-19)
 
 ### 🚀 Features
