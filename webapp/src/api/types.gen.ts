@@ -985,6 +985,14 @@ export type AgentJob = {
      */
     createdAt: Date;
     /**
+     * Git provider comment/note ID for posted feedback
+     */
+    deliveryCommentId?: string;
+    /**
+     * Delivery status: null = not applicable, PENDING = awaiting delivery, DELIVERED = posted, FAILED = delivery error
+     */
+    deliveryStatus?: 'PENDING' | 'DELIVERED' | 'FAILED';
+    /**
      * Human-readable error message
      */
     errorMessage?: string;

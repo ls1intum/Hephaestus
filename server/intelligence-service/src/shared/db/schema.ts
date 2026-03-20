@@ -188,6 +188,8 @@ export const agentJob = pgTable(
 		networkId: varchar("network_id", { length: 64 }),
 		jobTokenHash: varchar("job_token_hash", { length: 64 }),
 		llmApiKey: text("llm_api_key"),
+		deliveryStatus: varchar("delivery_status", { length: 20 }),
+		deliveryCommentId: varchar("delivery_comment_id", { length: 255 }),
 	},
 	(table) => [
 		index("idx_agent_job_status_started")
@@ -220,6 +222,10 @@ export const agentJob = pgTable(
 			name: "fk_agent_job_config",
 		}).onDelete("set null"),
 		unique("uk_agent_job_token").on(table.jobToken),
+		check(
+			"chk_agent_job_delivery_status",
+			sql`(delivery_status IS NULL) OR ((delivery_status)::text = ANY ((ARRAY['PENDING'::character varying, 'DELIVERED'::character varying, 'FAILED'::character varying])::text[]))`,
+		),
 	],
 );
 
@@ -2091,7 +2097,6 @@ export const userPreferences = pgTable(
 		userId: bigint("user_id", { mode: "number" }).notNull(),
 		notificationsEnabled: boolean("notifications_enabled").default(true).notNull(),
 		participateInResearch: boolean("participate_in_research").default(true).notNull(),
-		aiReviewEnabled: boolean("ai_review_enabled").default(true).notNull(),
 	},
 	(table) => [
 		foreignKey({

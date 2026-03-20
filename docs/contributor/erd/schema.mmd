@@ -61,6 +61,8 @@ erDiagram
         VARCHAR(64) network_id
         VARCHAR(64) job_token_hash
         TEXT llm_api_key
+        VARCHAR(20) delivery_status
+        VARCHAR(255) delivery_comment_id
     }
 
     BadPracticeDetection {
@@ -681,7 +683,6 @@ erDiagram
         BIGINT user_id FK,UK "NOT NULL"
         BOOLEAN notifications_enabled "NOT NULL"
         BOOLEAN participate_in_research "NOT NULL"
-        BOOLEAN ai_review_enabled "NOT NULL"
     }
 
     Workspace {

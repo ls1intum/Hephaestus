@@ -2762,6 +2762,17 @@ components:
           type: string
           format: date-time
           description: Timestamp when the job was created
+        deliveryCommentId:
+          type: string
+          description: Git provider comment/note ID for posted feedback
+        deliveryStatus:
+          type: string
+          description: "Delivery status: null = not applicable, PENDING = awaiting\
+            \ delivery, DELIVERED = posted, FAILED = delivery error"
+          enum:
+          - PENDING
+          - DELIVERED
+          - FAILED
         errorMessage:
           type: string
           description: Human-readable error message
