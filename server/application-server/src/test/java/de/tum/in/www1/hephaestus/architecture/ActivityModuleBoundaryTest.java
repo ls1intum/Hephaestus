@@ -189,6 +189,7 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
                     "..gitprovider..",
                     "..workspace..",
                     "..intelligenceservice..",
+                    "..feature..",
                     "..core..",
                     "..shared..",
                     "java..",
