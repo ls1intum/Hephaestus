@@ -8,6 +8,7 @@ import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 
 /**
  * DTO for creating a new workspace.
@@ -31,6 +32,7 @@ public record CreateWorkspaceRequestDTO(
     String workspaceSlug,
 
     @NotBlank(message = "Display name is required")
+    @Size(max = 120, message = "Display name must not exceed 120 characters")
     @Schema(
         description = "Human-readable name of the workspace",
         example = "My Workspace",
@@ -39,6 +41,7 @@ public record CreateWorkspaceRequestDTO(
     String displayName,
 
     @NotBlank(message = "Account login is required")
+    @Size(max = 255, message = "Account login must not exceed 255 characters")
     @Schema(
         description = "Git provider account login (GitHub org/user or GitLab group path)",
         example = "my-org",
@@ -50,8 +53,11 @@ public record CreateWorkspaceRequestDTO(
     @Schema(description = "Type of account (USER or ORG)", requiredMode = Schema.RequiredMode.REQUIRED)
     AccountType accountType,
 
-    @NotNull(message = "Owner user ID is required")
-    @Schema(description = "User ID of the workspace owner", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Deprecated(forRemoval = true)
+    @Schema(
+        description = "Deprecated: ignored by the server. The authenticated user always becomes the owner.",
+        requiredMode = Schema.RequiredMode.NOT_REQUIRED
+    )
     Long ownerUserId,
 
     @Schema(
@@ -60,6 +66,7 @@ public record CreateWorkspaceRequestDTO(
     )
     Workspace.GitProviderMode gitProviderMode,
 
+    @Size(max = 512, message = "Personal access token must not exceed 512 characters")
     @Schema(
         description = "Personal Access Token for GitLab API access. Required when gitProviderMode is GITLAB_PAT. Stored encrypted at rest.",
         example = "your-gitlab-token"

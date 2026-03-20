@@ -898,7 +898,7 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
 
                     // Skip user account operations - these are USER-scoped, not WORKSPACE-scoped.
                     // Users can access their account settings regardless of workspace context.
-                    if (controllerName.contains("Account")) {
+                    if (controllerName.contains("Account") || controllerName.contains("FeatureFlag")) {
                         return;
                     }
 

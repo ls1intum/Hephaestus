@@ -1163,6 +1163,44 @@ export type GitLabGroup = {
     webUrl?: string;
 };
 
+/**
+ * Feature flags evaluated for the current user
+ */
+export type FeatureFlags = {
+    /**
+     * User has admin privileges
+     */
+    ADMIN?: boolean;
+    /**
+     * Automatic detection runs for all users regardless of role
+     */
+    DETECTION_FOR_ALL?: boolean;
+    /**
+     * GitLab workspace creation feature is enabled
+     */
+    GITLAB_WORKSPACE_CREATION?: boolean;
+    /**
+     * User has access to the AI Mentor feature
+     */
+    MENTOR_ACCESS?: boolean;
+    /**
+     * User can receive notifications
+     */
+    NOTIFICATION_ACCESS?: boolean;
+    /**
+     * Practice review runs for all users regardless of role
+     */
+    PRACTICE_REVIEW_FOR_ALL?: boolean;
+    /**
+     * User's PRs trigger automatic detection
+     */
+    RUN_AUTOMATIC_DETECTION?: boolean;
+    /**
+     * User's PRs trigger practice review
+     */
+    RUN_PRACTICE_REVIEW?: boolean;
+};
+
 export type ErrorResponse = {
     /**
      * Human-readable error message
@@ -1218,9 +1256,11 @@ export type CreateWorkspaceRequest = {
      */
     gitProviderMode?: 'PAT_ORG' | 'GITHUB_APP_INSTALLATION' | 'GITLAB_PAT';
     /**
-     * User ID of the workspace owner
+     * Deprecated: ignored by the server. The authenticated user always becomes the owner.
+     *
+     * @deprecated
      */
-    ownerUserId: number;
+    ownerUserId?: number;
     /**
      * Personal Access Token for GitLab API access. Required when gitProviderMode is GITLAB_PAT. Stored encrypted at rest.
      */
@@ -1498,6 +1538,22 @@ export type DeleteUserResponses = {
      */
     200: unknown;
 };
+
+export type GetUserFeaturesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/user/features';
+};
+
+export type GetUserFeaturesResponses = {
+    /**
+     * Feature flags evaluated successfully
+     */
+    200: FeatureFlags;
+};
+
+export type GetUserFeaturesResponse = GetUserFeaturesResponses[keyof GetUserFeaturesResponses];
 
 export type GetUserSettingsData = {
     body?: never;
