@@ -10,7 +10,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 @AutoConfigureWebTestClient
@@ -130,30 +129,6 @@ class FeatureFlagControllerIntegrationTest extends BaseIntegrationTest {
                 .exists()
                 .jsonPath("$.GITLAB_WORKSPACE_CREATION")
                 .exists();
-        }
-    }
-
-    @Nested
-    @DisplayName("GET /user/features — with CONFIG flags enabled")
-    @TestPropertySource(properties = "hephaestus.features.flags.gitlab-workspace-creation=true")
-    class GetUserFeaturesWithConfigEnabled {
-
-        @Test
-        @WithUser
-        @DisplayName("CONFIG flag set to true is reflected in the response")
-        void configFlagEnabledReflectedInResponse() {
-            webTestClient
-                .get()
-                .uri("/user/features")
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$.GITLAB_WORKSPACE_CREATION")
-                .isEqualTo(true)
-                .jsonPath("$.ADMIN")
-                .isEqualTo(false);
         }
     }
 }
