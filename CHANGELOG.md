@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.44.0](https://github.com/ls1intum/Hephaestus/compare/v0.43.0...v0.44.0) (2026-03-20)
+
+### 🚀 Features
+
+* **server:** centralized feature flag system with Keycloak + config backing ([#878](https://github.com/ls1intum/Hephaestus/issues/878)) ([29fa18f](https://github.com/ls1intum/Hephaestus/commit/29fa18f78d96d5e6add774b99632584b66a2a252))
+
 ## [0.43.0](https://github.com/ls1intum/Hephaestus/compare/v0.42.0...v0.43.0) (2026-03-20)
 
 ### 🚀 Features
