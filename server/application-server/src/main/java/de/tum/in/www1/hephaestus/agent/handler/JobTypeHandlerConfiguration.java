@@ -11,6 +11,8 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewCommentRepository;
 import de.tum.in.www1.hephaestus.practices.PracticeRepository;
 import de.tum.in.www1.hephaestus.practices.finding.PracticeDetectionProperties;
+import de.tum.in.www1.hephaestus.practices.review.PracticeReviewDeliveryGate;
+import de.tum.in.www1.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import java.util.List;
 import org.springframework.context.annotation.Bean;
@@ -31,10 +33,19 @@ public class JobTypeHandlerConfiguration {
 
     private final ObjectMapper objectMapper;
     private final GitRepositoryManager gitRepositoryManager;
+    private final PracticeReviewDeliveryGate deliveryGate;
+    private final PracticeReviewProperties reviewProperties;
 
-    JobTypeHandlerConfiguration(ObjectMapper objectMapper, GitRepositoryManager gitRepositoryManager) {
+    JobTypeHandlerConfiguration(
+        ObjectMapper objectMapper,
+        GitRepositoryManager gitRepositoryManager,
+        PracticeReviewDeliveryGate deliveryGate,
+        PracticeReviewProperties reviewProperties
+    ) {
         this.objectMapper = objectMapper;
         this.gitRepositoryManager = gitRepositoryManager;
+        this.deliveryGate = deliveryGate;
+        this.reviewProperties = reviewProperties;
     }
 
     @Bean
@@ -70,11 +81,13 @@ public class JobTypeHandlerConfiguration {
         AgentJobRepository agentJobRepository
     ) {
         return new FeedbackDeliveryService(
+            deliveryGate,
             commentPoster,
             diffNotePoster,
             userPreferencesRepository,
             pullRequestRepository,
-            agentJobRepository
+            agentJobRepository,
+            reviewProperties
         );
     }
 

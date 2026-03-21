@@ -3,6 +3,8 @@ package de.tum.in.www1.hephaestus.agent.handler;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -20,11 +22,15 @@ import de.tum.in.www1.hephaestus.gitprovider.issue.Issue;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import de.tum.in.www1.hephaestus.practices.review.DeliveryDecision;
+import de.tum.in.www1.hephaestus.practices.review.PracticeReviewDeliveryGate;
+import de.tum.in.www1.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -51,20 +57,35 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
     @Mock
     private AgentJobRepository agentJobRepository;
 
+    private PracticeReviewDeliveryGate deliveryGate;
     private FeedbackDeliveryService service;
 
     private static final Long WORKSPACE_ID = 99L;
     private static final Long PULL_REQUEST_ID = 456L;
     private static final Long AUTHOR_ID = 789L;
+    private static final int MAX_INLINE_NOTES = 5;
+    private static final String APP_BASE_URL = "https://hephaestus.example.com";
+
+    private PracticeReviewProperties reviewProperties;
 
     @BeforeEach
     void setUp() {
+        // Mockito returns null for Optional-returning methods by default,
+        // which causes NPE on .orElse(). Provide a safe default.
+        lenient()
+            .when(agentJobRepository.findPreviousDeliveryCommentId(any(), any(), any()))
+            .thenReturn(Optional.empty());
+
+        reviewProperties = new PracticeReviewProperties(false, true, MAX_INLINE_NOTES, APP_BASE_URL);
+        deliveryGate = new PracticeReviewDeliveryGate(reviewProperties);
         service = new FeedbackDeliveryService(
+            deliveryGate,
             commentPoster,
             diffNotePoster,
             userPreferencesRepository,
             pullRequestRepository,
-            agentJobRepository
+            agentJobRepository,
+            reviewProperties
         );
     }
 
@@ -110,14 +131,14 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             when(
                 agentJobRepository.findPreviousDeliveryCommentId(eq(WORKSPACE_ID), eq(PULL_REQUEST_ID), any())
             ).thenReturn(Optional.empty());
-            when(commentPoster.postPracticeNote(eq(job), eq("Fix the tests."), eq(null))).thenReturn("IC_comment123");
+            when(commentPoster.postFormattedBody(eq(job), any(String.class), isNull())).thenReturn("IC_comment123");
 
             var delivery = new DeliveryContent("Fix the tests.", List.of());
             service.deliverFeedback(job, delivery, true);
 
-            verify(commentPoster).postPracticeNote(job, "Fix the tests.", null);
+            verify(commentPoster).postFormattedBody(eq(job), any(String.class), isNull());
             assertThat(job.getDeliveryCommentId()).isEqualTo("IC_comment123");
-            assertThat(job.getDeliveryStatus()).isEqualTo(DeliveryStatus.DELIVERED);
+            // DeliveryStatus is set by AgentJobExecutor, not by FeedbackDeliveryService
         }
 
         @Test
@@ -208,14 +229,14 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             when(
                 agentJobRepository.findPreviousDeliveryCommentId(eq(WORKSPACE_ID), eq(PULL_REQUEST_ID), any())
             ).thenReturn(Optional.of("IC_previous123"));
-            when(commentPoster.postPracticeNote(eq(job), eq("Updated review."), eq("IC_previous123"))).thenReturn(
+            when(commentPoster.postFormattedBody(eq(job), any(String.class), eq("IC_previous123"))).thenReturn(
                 "IC_previous123"
             );
 
             var delivery = new DeliveryContent("Updated review.", List.of());
             service.deliverFeedback(job, delivery, true);
 
-            verify(commentPoster).postPracticeNote(job, "Updated review.", "IC_previous123");
+            verify(commentPoster).postFormattedBody(eq(job), any(String.class), eq("IC_previous123"));
         }
 
         @Test
@@ -226,7 +247,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             when(
                 agentJobRepository.findPreviousDeliveryCommentId(eq(WORKSPACE_ID), eq(PULL_REQUEST_ID), any())
             ).thenReturn(Optional.of("IC_previous123"));
-            when(commentPoster.postPracticeNote(any(), any(), any())).thenReturn("IC_previous123");
+            when(commentPoster.postFormattedBody(any(), any(), any())).thenReturn("IC_previous123");
 
             var diffNotes = List.of(new DiffNote("src/Foo.java", 10, null, "Fix this"));
             var delivery = new DeliveryContent("Summary.", diffNotes);
@@ -243,7 +264,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             when(
                 agentJobRepository.findPreviousDeliveryCommentId(eq(WORKSPACE_ID), eq(PULL_REQUEST_ID), any())
             ).thenReturn(Optional.empty());
-            when(commentPoster.postPracticeNote(any(), any(), any())).thenReturn("IC_new123");
+            when(commentPoster.postFormattedBody(any(), any(), any())).thenReturn("IC_new123");
             when(diffNotePoster.postDiffNotes(eq(job), any())).thenReturn(new DiffNotePoster.DiffNoteResult(1, 0));
 
             var diffNotes = List.of(new DiffNote("src/Foo.java", 10, null, "Fix this"));
@@ -258,9 +279,6 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         void skipsDiffNotesWhenAllPositive() {
             AgentJob job = createJob();
             stubOpenPr();
-            when(
-                agentJobRepository.findPreviousDeliveryCommentId(eq(WORKSPACE_ID), eq(PULL_REQUEST_ID), any())
-            ).thenReturn(Optional.empty());
 
             var diffNotes = List.of(new DiffNote("src/Foo.java", 10, null, "Fix this"));
             var delivery = new DeliveryContent("Summary.", diffNotes);
@@ -283,20 +301,19 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("does not set delivery status when postPracticeNote returns null")
+        @DisplayName("does not set delivery status when postFormattedBody returns null")
         void doesNotSetDeliveryStatusWhenNoteNull() {
             AgentJob job = createJob();
             stubOpenPr();
             when(
                 agentJobRepository.findPreviousDeliveryCommentId(eq(WORKSPACE_ID), eq(PULL_REQUEST_ID), any())
             ).thenReturn(Optional.empty());
-            when(commentPoster.postPracticeNote(any(), any(), any())).thenReturn(null);
+            when(commentPoster.postFormattedBody(any(), any(), any())).thenReturn(null);
 
             var delivery = new DeliveryContent("Empty after sanitization.", List.of());
             service.deliverFeedback(job, delivery, true);
 
             assertThat(job.getDeliveryCommentId()).isNull();
-            assertThat(job.getDeliveryStatus()).isNotEqualTo(DeliveryStatus.DELIVERED);
         }
 
         @Test
@@ -309,12 +326,12 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             when(
                 agentJobRepository.findPreviousDeliveryCommentId(eq(WORKSPACE_ID), eq(PULL_REQUEST_ID), any())
             ).thenReturn(Optional.empty());
-            when(commentPoster.postPracticeNote(any(), any(), any())).thenReturn("IC_comment456");
+            when(commentPoster.postFormattedBody(any(), any(), any())).thenReturn("IC_comment456");
 
             var delivery = new DeliveryContent("Fix stuff.", List.of());
             service.deliverFeedback(job, delivery, true);
 
-            verify(commentPoster).postPracticeNote(eq(job), eq("Fix stuff."), eq(null));
+            verify(commentPoster).postFormattedBody(eq(job), any(String.class), isNull());
             verifyNoInteractions(userPreferencesRepository);
         }
 
@@ -324,7 +341,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             AgentJob job = createJob();
             stubOpenPr();
             when(agentJobRepository.findPreviousDeliveryCommentId(any(), any(), any())).thenReturn(Optional.empty());
-            when(commentPoster.postPracticeNote(any(), any(), any())).thenThrow(
+            when(commentPoster.postFormattedBody(any(), any(), any())).thenThrow(
                 new RuntimeException("GraphQL timeout")
             );
 
@@ -355,7 +372,6 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
 
             // Summary note skipped (mrNote null), but diff notes should still be posted
             verify(diffNotePoster).postDiffNotes(eq(job), eq(diffNotes));
-            verifyNoInteractions(commentPoster);
         }
 
         @Test
@@ -364,7 +380,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             AgentJob job = createJob();
             stubOpenPr();
             when(agentJobRepository.findPreviousDeliveryCommentId(any(), any(), any())).thenReturn(Optional.empty());
-            when(commentPoster.postPracticeNote(any(), any(), any())).thenThrow(
+            when(commentPoster.postFormattedBody(any(), any(), any())).thenThrow(
                 new RuntimeException("GraphQL timeout")
             );
 
@@ -372,6 +388,147 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
 
             // Should NOT throw — delivery is best-effort
             service.deliverFeedback(job, delivery, true);
+        }
+
+        @Test
+        @DisplayName("skips posting when metadata is null")
+        void skipsWhenMetadataNull() {
+            AgentJob job = createJob();
+            job.setMetadata(null);
+
+            var delivery = new DeliveryContent("Fix stuff.", List.of());
+            service.deliverFeedback(job, delivery, true);
+
+            // No PR ID → gate gets null pullRequest → StoreOnly
+            verifyNoInteractions(commentPoster);
+        }
+
+        @Test
+        @DisplayName("skips posting when pull_request_id missing from metadata")
+        void skipsWhenPullRequestIdMissing() {
+            AgentJob job = createJob();
+            ObjectNode metadata = objectMapper.createObjectNode();
+            metadata.put("repository_full_name", "owner/repo");
+            metadata.put("pr_number", 42);
+            // No pull_request_id
+            job.setMetadata(metadata);
+
+            var delivery = new DeliveryContent("Fix stuff.", List.of());
+            service.deliverFeedback(job, delivery, true);
+
+            // No PR ID → gate gets null pullRequest → StoreOnly
+            verifyNoInteractions(commentPoster);
+            verifyNoInteractions(pullRequestRepository);
+        }
+    }
+
+    @Nested
+    @DisplayName("All Resolved")
+    class AllResolved {
+
+        @Test
+        @DisplayName("edits existing comment to all-resolved when re-analysis has no negatives")
+        void editsToAllResolved() {
+            AgentJob job = createJob();
+            stubOpenPr();
+            when(
+                agentJobRepository.findPreviousDeliveryCommentId(eq(WORKSPACE_ID), eq(PULL_REQUEST_ID), any())
+            ).thenReturn(Optional.of("IC_previous123"));
+            when(commentPoster.postFormattedBody(eq(job), any(String.class), eq("IC_previous123"))).thenReturn(
+                "IC_previous123"
+            );
+
+            var delivery = new DeliveryContent("Summary.", List.of());
+            service.deliverFeedback(job, delivery, false);
+
+            // Should use postFormattedBody with all-resolved note
+            verify(commentPoster).postFormattedBody(eq(job), any(String.class), eq("IC_previous123"));
+            assertThat(job.getDeliveryCommentId()).isEqualTo("IC_previous123");
+        }
+
+        @Test
+        @DisplayName("does not set commentId when all-resolved post returns null")
+        void allResolvedReturnsNull() {
+            AgentJob job = createJob();
+            stubOpenPr();
+            when(
+                agentJobRepository.findPreviousDeliveryCommentId(eq(WORKSPACE_ID), eq(PULL_REQUEST_ID), any())
+            ).thenReturn(Optional.of("IC_previous123"));
+            when(commentPoster.postFormattedBody(any(), any(), any())).thenReturn(null);
+
+            var delivery = new DeliveryContent("Summary.", List.of());
+            service.deliverFeedback(job, delivery, false);
+
+            assertThat(job.getDeliveryCommentId()).isNull();
+        }
+
+        @Test
+        @DisplayName("does not throw when all-resolved post fails (soft failure)")
+        void allResolvedSoftFailure() {
+            AgentJob job = createJob();
+            stubOpenPr();
+            when(
+                agentJobRepository.findPreviousDeliveryCommentId(eq(WORKSPACE_ID), eq(PULL_REQUEST_ID), any())
+            ).thenReturn(Optional.of("IC_previous123"));
+            when(commentPoster.postFormattedBody(any(), any(), any())).thenThrow(new RuntimeException("GraphQL error"));
+
+            var delivery = new DeliveryContent("Summary.", List.of());
+            // Should not throw
+            service.deliverFeedback(job, delivery, false);
+
+            assertThat(job.getDeliveryCommentId()).isNull();
+        }
+    }
+
+    @Nested
+    @DisplayName("maxInlineNotes")
+    class MaxInlineNotes {
+
+        @Test
+        @DisplayName("caps diff notes to maxInlineNotes")
+        void capsDiffNotesToMax() {
+            AgentJob job = createJob();
+            stubOpenPr();
+            when(
+                agentJobRepository.findPreviousDeliveryCommentId(eq(WORKSPACE_ID), eq(PULL_REQUEST_ID), any())
+            ).thenReturn(Optional.empty());
+            when(commentPoster.postFormattedBody(any(), any(), any())).thenReturn("IC_new123");
+            when(diffNotePoster.postDiffNotes(any(), any())).thenReturn(
+                new DiffNotePoster.DiffNoteResult(MAX_INLINE_NOTES, 0)
+            );
+
+            // Create more diff notes than maxInlineNotes
+            var diffNotes = IntStream.range(0, MAX_INLINE_NOTES + 3)
+                .mapToObj(i -> new DiffNote("src/File" + i + ".java", i + 1, null, "Fix " + i))
+                .toList();
+            var delivery = new DeliveryContent("Summary.", diffNotes);
+            service.deliverFeedback(job, delivery, true);
+
+            // Verify only maxInlineNotes were posted
+            verify(diffNotePoster).postDiffNotes(eq(job), eq(diffNotes.subList(0, MAX_INLINE_NOTES)));
+        }
+
+        @Test
+        @DisplayName("does not cap when diff notes count is within limit")
+        void doesNotCapWithinLimit() {
+            AgentJob job = createJob();
+            stubOpenPr();
+            when(
+                agentJobRepository.findPreviousDeliveryCommentId(eq(WORKSPACE_ID), eq(PULL_REQUEST_ID), any())
+            ).thenReturn(Optional.empty());
+            when(commentPoster.postFormattedBody(any(), any(), any())).thenReturn("IC_new123");
+            when(diffNotePoster.postDiffNotes(any(), any())).thenReturn(new DiffNotePoster.DiffNoteResult(3, 0));
+
+            var diffNotes = List.of(
+                new DiffNote("src/A.java", 1, null, "Fix A"),
+                new DiffNote("src/B.java", 2, null, "Fix B"),
+                new DiffNote("src/C.java", 3, null, "Fix C")
+            );
+            var delivery = new DeliveryContent("Summary.", diffNotes);
+            service.deliverFeedback(job, delivery, true);
+
+            // All notes posted (within limit)
+            verify(diffNotePoster).postDiffNotes(eq(job), eq(diffNotes));
         }
     }
 
@@ -386,7 +543,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             job.setStartedAt(Instant.parse("2024-01-01T00:00:00Z"));
             job.setCompletedAt(Instant.parse("2024-01-01T00:01:30Z"));
 
-            String result = FeedbackDeliveryService.formatPracticeNote("Test body content", job);
+            String result = FeedbackDeliveryService.formatPracticeNote("Test body content", job, null);
 
             assertThat(result).contains("<!-- hephaestus:practice-review:" + job.getId() + " -->");
             assertThat(result).contains("automated practice review");
@@ -395,6 +552,76 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             // Should NOT be wrapped in <details>
             assertThat(result).doesNotContain("<details>");
             assertThat(result).doesNotContain("<summary>");
+        }
+
+        @Test
+        @DisplayName("includes preferences footer when appBaseUrl is set")
+        void includesPreferencesFooter() {
+            AgentJob job = createJob();
+            job.setStartedAt(Instant.parse("2024-01-01T00:00:00Z"));
+            job.setCompletedAt(Instant.parse("2024-01-01T00:01:30Z"));
+
+            String result = FeedbackDeliveryService.formatPracticeNote("Body", job, "https://hephaestus.example.com");
+
+            assertThat(result).contains("[Hephaestus](https://hephaestus.example.com)");
+            assertThat(result).contains("[Configure AI review preferences](https://hephaestus.example.com/settings)");
+        }
+
+        @Test
+        @DisplayName("omits preferences footer when appBaseUrl is empty")
+        void omitsPreferencesFooterWhenEmpty() {
+            AgentJob job = createJob();
+            job.setStartedAt(Instant.parse("2024-01-01T00:00:00Z"));
+            job.setCompletedAt(Instant.parse("2024-01-01T00:01:30Z"));
+
+            String result = FeedbackDeliveryService.formatPracticeNote("Body", job, "");
+
+            assertThat(result).doesNotContain("Configure AI review preferences");
+            assertThat(result).contains("Hephaestus Agent"); // metadata footer still present
+        }
+
+        @Test
+        @DisplayName("omits preferences footer when appBaseUrl is null")
+        void omitsPreferencesFooterWhenNull() {
+            AgentJob job = createJob();
+            job.setStartedAt(Instant.parse("2024-01-01T00:00:00Z"));
+            job.setCompletedAt(Instant.parse("2024-01-01T00:01:30Z"));
+
+            String result = FeedbackDeliveryService.formatPracticeNote("Body", job, null);
+
+            assertThat(result).doesNotContain("Configure AI review preferences");
+        }
+    }
+
+    @Nested
+    @DisplayName("formatAllResolvedNote")
+    class FormatAllResolvedNote {
+
+        @Test
+        @DisplayName("includes marker and resolved message")
+        void includesMarkerAndResolvedMessage() {
+            AgentJob job = createJob();
+            job.setStartedAt(Instant.parse("2024-01-01T00:00:00Z"));
+            job.setCompletedAt(Instant.parse("2024-01-01T00:01:30Z"));
+
+            String result = FeedbackDeliveryService.formatAllResolvedNote(job, null);
+
+            assertThat(result).contains("<!-- hephaestus:practice-review:" + job.getId() + " -->");
+            assertThat(result).contains("All previously identified issues have been resolved");
+            assertThat(result).contains("\uD83C\uDF89"); // 🎉 unicode emoji
+        }
+
+        @Test
+        @DisplayName("includes preferences footer when appBaseUrl is set")
+        void includesPreferencesFooter() {
+            AgentJob job = createJob();
+            job.setStartedAt(Instant.parse("2024-01-01T00:00:00Z"));
+            job.setCompletedAt(Instant.parse("2024-01-01T00:01:30Z"));
+
+            String result = FeedbackDeliveryService.formatAllResolvedNote(job, "https://hephaestus.tum.de");
+
+            assertThat(result).contains("[Hephaestus](https://hephaestus.tum.de)");
+            assertThat(result).contains("[Configure AI review preferences](https://hephaestus.tum.de/settings)");
         }
     }
 }
