@@ -3,8 +3,8 @@
 import { type DefaultError, type InfiniteData, infiniteQueryOptions, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { addLabelFilter, addLabelToTeam, addRepositoryToMonitor, assignRole, cancelJob, computeUserLeagueStats, createConfig, createDocument, createWorkspace, deleteConfig, deleteDocument, deleteDocumentVersionsAfter, deleteUser, detectForPullRequest, detectForUser, getAllAchievementDefinitions, getAllTeams, getBadPractice, getBadPracticesForPullRequest, getBadPracticesForUser, getConfig, getConfigs, getCurrentUserMembership, getDocument, getGroupedThreads, getJob, getLabelFilters, getLeaderboard, getMember, getRepositoriesToMonitor, getRepositorySettings, getTeamSettings, getThread, getUserAchievements, getUserFeatures, getUserProfile, getUserSettings, getUsersWithTeams, getVersion, getWorkspace, gitLabPreflight, listDocuments, listGitLabGroups, listGlobalContributors, listJobs, listMembers, listVersions, listWorkspaces, type Options, provideFeedback, purgeWorkspace, recalculateUserAchievements, reloadAchievements, removeLabelFilter, removeLabelFromTeam, removeMember, removeRepositoryToMonitor, renameSlug, resetAndRecalculateLeagues, resolve, updateConfig, updateDocument, updateNotifications, updatePublicVisibility, updateRepositorySettings, updateRepositoryVisibility, updateSchedule, updateSlackCredentials, updateStatus, updateTeamSettings, updateTeamVisibility, updateToken, updateUserSettings, voteMessage } from '../sdk.gen';
-import type { AddLabelFilterData, AddLabelToTeamData, AddLabelToTeamResponse, AddRepositoryToMonitorData, AssignRoleData, AssignRoleResponse, CancelJobData, CancelJobResponse, ComputeUserLeagueStatsData, ComputeUserLeagueStatsResponse, CreateConfigData, CreateConfigResponse, CreateDocumentData, CreateDocumentError, CreateDocumentResponse, CreateWorkspaceData, CreateWorkspaceResponse, DeleteConfigData, DeleteConfigResponse, DeleteDocumentData, DeleteDocumentError, DeleteDocumentResponse, DeleteDocumentVersionsAfterData, DeleteDocumentVersionsAfterError, DeleteDocumentVersionsAfterResponse, DeleteUserData, DetectForPullRequestData, DetectForPullRequestError, DetectForPullRequestResponse, DetectForUserData, DetectForUserError, DetectForUserResponse, GetAllAchievementDefinitionsData, GetAllAchievementDefinitionsResponse, GetAllTeamsData, GetAllTeamsResponse, GetBadPracticeData, GetBadPracticeResponse, GetBadPracticesForPullRequestData, GetBadPracticesForPullRequestResponse, GetBadPracticesForUserData, GetBadPracticesForUserResponse, GetConfigData, GetConfigResponse, GetConfigsData, GetConfigsResponse, GetCurrentUserMembershipData, GetCurrentUserMembershipResponse, GetDocumentData, GetDocumentError, GetDocumentResponse, GetGroupedThreadsData, GetGroupedThreadsError, GetGroupedThreadsResponse, GetJobData, GetJobResponse, GetLabelFiltersData, GetLabelFiltersResponse, GetLeaderboardData, GetLeaderboardResponse, GetMemberData, GetMemberResponse, GetRepositoriesToMonitorData, GetRepositoriesToMonitorResponse, GetRepositorySettingsData, GetRepositorySettingsResponse, GetTeamSettingsData, GetTeamSettingsResponse, GetThreadData, GetThreadError, GetThreadResponse, GetUserAchievementsData, GetUserAchievementsResponse, GetUserFeaturesData, GetUserFeaturesResponse, GetUserProfileData, GetUserProfileResponse, GetUserSettingsData, GetUserSettingsResponse, GetUsersWithTeamsData, GetUsersWithTeamsResponse, GetVersionData, GetVersionError, GetVersionResponse, GetWorkspaceData, GetWorkspaceResponse, GitLabPreflightData, GitLabPreflightResponse2, ListDocumentsData, ListDocumentsError, ListDocumentsResponse, ListGitLabGroupsData, ListGitLabGroupsResponse, ListGlobalContributorsData, ListGlobalContributorsResponse, ListJobsData, ListJobsResponse, ListMembersData, ListMembersResponse, ListVersionsData, ListVersionsError, ListVersionsResponse, ListWorkspacesData, ListWorkspacesResponse, ProvideFeedbackData, PurgeWorkspaceData, PurgeWorkspaceResponse, RecalculateUserAchievementsData, ReloadAchievementsData, RemoveLabelFilterData, RemoveLabelFilterResponse, RemoveLabelFromTeamData, RemoveLabelFromTeamResponse, RemoveMemberData, RemoveRepositoryToMonitorData, RenameSlugData, RenameSlugResponse, ResetAndRecalculateLeaguesData, ResolveData, UpdateConfigData, UpdateConfigResponse, UpdateDocumentData, UpdateDocumentError, UpdateDocumentResponse, UpdateNotificationsData, UpdateNotificationsResponse, UpdatePublicVisibilityData, UpdatePublicVisibilityResponse, UpdateRepositorySettingsData, UpdateRepositorySettingsError, UpdateRepositorySettingsResponse, UpdateRepositoryVisibilityData, UpdateScheduleData, UpdateScheduleResponse, UpdateSlackCredentialsData, UpdateSlackCredentialsResponse, UpdateStatusData, UpdateStatusResponse, UpdateTeamSettingsData, UpdateTeamSettingsError, UpdateTeamSettingsResponse, UpdateTeamVisibilityData, UpdateTokenData, UpdateTokenResponse, UpdateUserSettingsData, UpdateUserSettingsResponse, VoteMessageData, VoteMessageError, VoteMessageResponse } from '../types.gen';
+import { addLabelFilter, addLabelToTeam, addRepositoryToMonitor, assignRole, cancelJob, computeUserLeagueStats, createConfig, createDocument, createPractice, createWorkspace, deleteConfig, deleteDocument, deleteDocumentVersionsAfter, deletePractice, deleteUser, detectForPullRequest, detectForUser, getAllAchievementDefinitions, getAllTeams, getBadPractice, getBadPracticesForPullRequest, getBadPracticesForUser, getConfig, getConfigs, getCurrentUserMembership, getDocument, getGroupedThreads, getJob, getLabelFilters, getLeaderboard, getMember, getPractice, getRepositoriesToMonitor, getRepositorySettings, getTeamSettings, getThread, getUserAchievements, getUserFeatures, getUserProfile, getUserSettings, getUsersWithTeams, getVersion, getWorkspace, gitLabPreflight, listDocuments, listGitLabGroups, listGlobalContributors, listJobs, listMembers, listPractices, listVersions, listWorkspaces, type Options, provideFeedback, purgeWorkspace, recalculateUserAchievements, reloadAchievements, removeLabelFilter, removeLabelFromTeam, removeMember, removeRepositoryToMonitor, renameSlug, resetAndRecalculateLeagues, resolve, setActive, updateConfig, updateDocument, updateNotifications, updatePractice, updatePublicVisibility, updateRepositorySettings, updateRepositoryVisibility, updateSchedule, updateSlackCredentials, updateStatus, updateTeamSettings, updateTeamVisibility, updateToken, updateUserSettings, voteMessage } from '../sdk.gen';
+import type { AddLabelFilterData, AddLabelToTeamData, AddLabelToTeamResponse, AddRepositoryToMonitorData, AssignRoleData, AssignRoleResponse, CancelJobData, CancelJobResponse, ComputeUserLeagueStatsData, ComputeUserLeagueStatsResponse, CreateConfigData, CreateConfigResponse, CreateDocumentData, CreateDocumentError, CreateDocumentResponse, CreatePracticeData, CreatePracticeResponse, CreateWorkspaceData, CreateWorkspaceResponse, DeleteConfigData, DeleteConfigResponse, DeleteDocumentData, DeleteDocumentError, DeleteDocumentResponse, DeleteDocumentVersionsAfterData, DeleteDocumentVersionsAfterError, DeleteDocumentVersionsAfterResponse, DeletePracticeData, DeletePracticeResponse, DeleteUserData, DetectForPullRequestData, DetectForPullRequestError, DetectForPullRequestResponse, DetectForUserData, DetectForUserError, DetectForUserResponse, GetAllAchievementDefinitionsData, GetAllAchievementDefinitionsResponse, GetAllTeamsData, GetAllTeamsResponse, GetBadPracticeData, GetBadPracticeResponse, GetBadPracticesForPullRequestData, GetBadPracticesForPullRequestResponse, GetBadPracticesForUserData, GetBadPracticesForUserResponse, GetConfigData, GetConfigResponse, GetConfigsData, GetConfigsResponse, GetCurrentUserMembershipData, GetCurrentUserMembershipResponse, GetDocumentData, GetDocumentError, GetDocumentResponse, GetGroupedThreadsData, GetGroupedThreadsError, GetGroupedThreadsResponse, GetJobData, GetJobResponse, GetLabelFiltersData, GetLabelFiltersResponse, GetLeaderboardData, GetLeaderboardResponse, GetMemberData, GetMemberResponse, GetPracticeData, GetPracticeResponse, GetRepositoriesToMonitorData, GetRepositoriesToMonitorResponse, GetRepositorySettingsData, GetRepositorySettingsResponse, GetTeamSettingsData, GetTeamSettingsResponse, GetThreadData, GetThreadError, GetThreadResponse, GetUserAchievementsData, GetUserAchievementsResponse, GetUserFeaturesData, GetUserFeaturesResponse, GetUserProfileData, GetUserProfileResponse, GetUserSettingsData, GetUserSettingsResponse, GetUsersWithTeamsData, GetUsersWithTeamsResponse, GetVersionData, GetVersionError, GetVersionResponse, GetWorkspaceData, GetWorkspaceResponse, GitLabPreflightData, GitLabPreflightResponse2, ListDocumentsData, ListDocumentsError, ListDocumentsResponse, ListGitLabGroupsData, ListGitLabGroupsResponse, ListGlobalContributorsData, ListGlobalContributorsResponse, ListJobsData, ListJobsResponse, ListMembersData, ListMembersResponse, ListPracticesData, ListPracticesResponse, ListVersionsData, ListVersionsError, ListVersionsResponse, ListWorkspacesData, ListWorkspacesResponse, ProvideFeedbackData, PurgeWorkspaceData, PurgeWorkspaceResponse, RecalculateUserAchievementsData, ReloadAchievementsData, RemoveLabelFilterData, RemoveLabelFilterResponse, RemoveLabelFromTeamData, RemoveLabelFromTeamResponse, RemoveMemberData, RemoveRepositoryToMonitorData, RenameSlugData, RenameSlugResponse, ResetAndRecalculateLeaguesData, ResolveData, SetActiveData, SetActiveResponse, UpdateConfigData, UpdateConfigResponse, UpdateDocumentData, UpdateDocumentError, UpdateDocumentResponse, UpdateNotificationsData, UpdateNotificationsResponse, UpdatePracticeData, UpdatePracticeResponse, UpdatePublicVisibilityData, UpdatePublicVisibilityResponse, UpdateRepositorySettingsData, UpdateRepositorySettingsError, UpdateRepositorySettingsResponse, UpdateRepositoryVisibilityData, UpdateScheduleData, UpdateScheduleResponse, UpdateSlackCredentialsData, UpdateSlackCredentialsResponse, UpdateStatusData, UpdateStatusResponse, UpdateTeamSettingsData, UpdateTeamSettingsError, UpdateTeamSettingsResponse, UpdateTeamVisibilityData, UpdateTokenData, UpdateTokenResponse, UpdateUserSettingsData, UpdateUserSettingsResponse, VoteMessageData, VoteMessageError, VoteMessageResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -427,6 +427,156 @@ export const cancelJobMutation = (options?: Partial<Options<CancelJobData>>): Us
     const mutationOptions: UseMutationOptions<CancelJobResponse, DefaultError, Options<CancelJobData>> = {
         mutationFn: async (fnOptions) => {
             const { data } = await cancelJob({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const getBadPracticeQueryKey = (options: Options<GetBadPracticeData>) => createQueryKey('getBadPractice', options);
+
+/**
+ * Get a specific bad practice
+ *
+ * Retrieves details of a specific bad practice by ID
+ *
+ * @deprecated
+ */
+export const getBadPracticeOptions = (options: Options<GetBadPracticeData>) => queryOptions<GetBadPracticeResponse, DefaultError, GetBadPracticeResponse, ReturnType<typeof getBadPracticeQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getBadPractice({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getBadPracticeQueryKey(options)
+});
+
+/**
+ * Provide feedback for a bad practice
+ *
+ * Submits user feedback for a detected bad practice
+ *
+ * @deprecated
+ */
+export const provideFeedbackMutation = (options?: Partial<Options<ProvideFeedbackData>>): UseMutationOptions<unknown, DefaultError, Options<ProvideFeedbackData>> => {
+    const mutationOptions: UseMutationOptions<unknown, DefaultError, Options<ProvideFeedbackData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await provideFeedback({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Resolve a bad practice
+ *
+ * Updates the state of a bad practice to FIXED, WONT_FIX, or WRONG
+ *
+ * @deprecated
+ */
+export const resolveMutation = (options?: Partial<Options<ResolveData>>): UseMutationOptions<unknown, DefaultError, Options<ResolveData>> => {
+    const mutationOptions: UseMutationOptions<unknown, DefaultError, Options<ResolveData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await resolve({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const getBadPracticesForPullRequestQueryKey = (options: Options<GetBadPracticesForPullRequestData>) => createQueryKey('getBadPracticesForPullRequest', options);
+
+/**
+ * Get bad practices for a pull request
+ *
+ * Retrieves all detected bad practices for a specific pull request
+ *
+ * @deprecated
+ */
+export const getBadPracticesForPullRequestOptions = (options: Options<GetBadPracticesForPullRequestData>) => queryOptions<GetBadPracticesForPullRequestResponse, DefaultError, GetBadPracticesForPullRequestResponse, ReturnType<typeof getBadPracticesForPullRequestQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getBadPracticesForPullRequest({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getBadPracticesForPullRequestQueryKey(options)
+});
+
+/**
+ * Detect bad practices for a pull request
+ *
+ * Triggers bad practice detection for a specific pull request
+ *
+ * @deprecated
+ */
+export const detectForPullRequestMutation = (options?: Partial<Options<DetectForPullRequestData>>): UseMutationOptions<DetectForPullRequestResponse, DetectForPullRequestError, Options<DetectForPullRequestData>> => {
+    const mutationOptions: UseMutationOptions<DetectForPullRequestResponse, DetectForPullRequestError, Options<DetectForPullRequestData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await detectForPullRequest({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const getBadPracticesForUserQueryKey = (options: Options<GetBadPracticesForUserData>) => createQueryKey('getBadPracticesForUser', options);
+
+/**
+ * Get bad practices for a user
+ *
+ * Retrieves all detected bad practices for pull requests assigned to the user
+ *
+ * @deprecated
+ */
+export const getBadPracticesForUserOptions = (options: Options<GetBadPracticesForUserData>) => queryOptions<GetBadPracticesForUserResponse, DefaultError, GetBadPracticesForUserResponse, ReturnType<typeof getBadPracticesForUserQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getBadPracticesForUser({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getBadPracticesForUserQueryKey(options)
+});
+
+/**
+ * Detect bad practices for a user
+ *
+ * Triggers bad practice detection for all pull requests of the specified user
+ *
+ * @deprecated
+ */
+export const detectForUserMutation = (options?: Partial<Options<DetectForUserData>>): UseMutationOptions<DetectForUserResponse, DetectForUserError, Options<DetectForUserData>> => {
+    const mutationOptions: UseMutationOptions<DetectForUserResponse, DetectForUserError, Options<DetectForUserData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await detectForUser({
                 ...options,
                 ...fnOptions,
                 throwOnError: true
@@ -952,16 +1102,16 @@ export const updateNotificationsMutation = (options?: Partial<Options<UpdateNoti
     return mutationOptions;
 };
 
-export const getBadPracticeQueryKey = (options: Options<GetBadPracticeData>) => createQueryKey('getBadPractice', options);
+export const listPracticesQueryKey = (options: Options<ListPracticesData>) => createQueryKey('listPractices', options);
 
 /**
- * Get a specific bad practice
+ * List practice definitions
  *
- * Retrieves details of a specific bad practice by ID
+ * Returns all practice definitions for the workspace, optionally filtered by category and/or active state
  */
-export const getBadPracticeOptions = (options: Options<GetBadPracticeData>) => queryOptions<GetBadPracticeResponse, DefaultError, GetBadPracticeResponse, ReturnType<typeof getBadPracticeQueryKey>>({
+export const listPracticesOptions = (options: Options<ListPracticesData>) => queryOptions<ListPracticesResponse, DefaultError, ListPracticesResponse, ReturnType<typeof listPracticesQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
-        const { data } = await getBadPractice({
+        const { data } = await listPractices({
             ...options,
             ...queryKey[0],
             signal,
@@ -969,18 +1119,16 @@ export const getBadPracticeOptions = (options: Options<GetBadPracticeData>) => q
         });
         return data;
     },
-    queryKey: getBadPracticeQueryKey(options)
+    queryKey: listPracticesQueryKey(options)
 });
 
 /**
- * Provide feedback for a bad practice
- *
- * Submits user feedback for a detected bad practice
+ * Create a new practice definition
  */
-export const provideFeedbackMutation = (options?: Partial<Options<ProvideFeedbackData>>): UseMutationOptions<unknown, DefaultError, Options<ProvideFeedbackData>> => {
-    const mutationOptions: UseMutationOptions<unknown, DefaultError, Options<ProvideFeedbackData>> = {
+export const createPracticeMutation = (options?: Partial<Options<CreatePracticeData>>): UseMutationOptions<CreatePracticeResponse, DefaultError, Options<CreatePracticeData>> => {
+    const mutationOptions: UseMutationOptions<CreatePracticeResponse, DefaultError, Options<CreatePracticeData>> = {
         mutationFn: async (fnOptions) => {
-            const { data } = await provideFeedback({
+            const { data } = await createPractice({
                 ...options,
                 ...fnOptions,
                 throwOnError: true
@@ -992,14 +1140,12 @@ export const provideFeedbackMutation = (options?: Partial<Options<ProvideFeedbac
 };
 
 /**
- * Resolve a bad practice
- *
- * Updates the state of a bad practice to FIXED, WONT_FIX, or WRONG
+ * Delete a practice definition
  */
-export const resolveMutation = (options?: Partial<Options<ResolveData>>): UseMutationOptions<unknown, DefaultError, Options<ResolveData>> => {
-    const mutationOptions: UseMutationOptions<unknown, DefaultError, Options<ResolveData>> = {
+export const deletePracticeMutation = (options?: Partial<Options<DeletePracticeData>>): UseMutationOptions<DeletePracticeResponse, DefaultError, Options<DeletePracticeData>> => {
+    const mutationOptions: UseMutationOptions<DeletePracticeResponse, DefaultError, Options<DeletePracticeData>> = {
         mutationFn: async (fnOptions) => {
-            const { data } = await resolve({
+            const { data } = await deletePractice({
                 ...options,
                 ...fnOptions,
                 throwOnError: true
@@ -1010,16 +1156,14 @@ export const resolveMutation = (options?: Partial<Options<ResolveData>>): UseMut
     return mutationOptions;
 };
 
-export const getBadPracticesForPullRequestQueryKey = (options: Options<GetBadPracticesForPullRequestData>) => createQueryKey('getBadPracticesForPullRequest', options);
+export const getPracticeQueryKey = (options: Options<GetPracticeData>) => createQueryKey('getPractice', options);
 
 /**
- * Get bad practices for a pull request
- *
- * Retrieves all detected bad practices for a specific pull request
+ * Get a practice definition
  */
-export const getBadPracticesForPullRequestOptions = (options: Options<GetBadPracticesForPullRequestData>) => queryOptions<GetBadPracticesForPullRequestResponse, DefaultError, GetBadPracticesForPullRequestResponse, ReturnType<typeof getBadPracticesForPullRequestQueryKey>>({
+export const getPracticeOptions = (options: Options<GetPracticeData>) => queryOptions<GetPracticeResponse, DefaultError, GetPracticeResponse, ReturnType<typeof getPracticeQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
-        const { data } = await getBadPracticesForPullRequest({
+        const { data } = await getPractice({
             ...options,
             ...queryKey[0],
             signal,
@@ -1027,18 +1171,16 @@ export const getBadPracticesForPullRequestOptions = (options: Options<GetBadPrac
         });
         return data;
     },
-    queryKey: getBadPracticesForPullRequestQueryKey(options)
+    queryKey: getPracticeQueryKey(options)
 });
 
 /**
- * Detect bad practices for a pull request
- *
- * Triggers bad practice detection for a specific pull request
+ * Update a practice definition
  */
-export const detectForPullRequestMutation = (options?: Partial<Options<DetectForPullRequestData>>): UseMutationOptions<DetectForPullRequestResponse, DetectForPullRequestError, Options<DetectForPullRequestData>> => {
-    const mutationOptions: UseMutationOptions<DetectForPullRequestResponse, DetectForPullRequestError, Options<DetectForPullRequestData>> = {
+export const updatePracticeMutation = (options?: Partial<Options<UpdatePracticeData>>): UseMutationOptions<UpdatePracticeResponse, DefaultError, Options<UpdatePracticeData>> => {
+    const mutationOptions: UseMutationOptions<UpdatePracticeResponse, DefaultError, Options<UpdatePracticeData>> = {
         mutationFn: async (fnOptions) => {
-            const { data } = await detectForPullRequest({
+            const { data } = await updatePractice({
                 ...options,
                 ...fnOptions,
                 throwOnError: true
@@ -1049,35 +1191,13 @@ export const detectForPullRequestMutation = (options?: Partial<Options<DetectFor
     return mutationOptions;
 };
 
-export const getBadPracticesForUserQueryKey = (options: Options<GetBadPracticesForUserData>) => createQueryKey('getBadPracticesForUser', options);
-
 /**
- * Get bad practices for a user
- *
- * Retrieves all detected bad practices for pull requests assigned to the user
+ * Set practice active state
  */
-export const getBadPracticesForUserOptions = (options: Options<GetBadPracticesForUserData>) => queryOptions<GetBadPracticesForUserResponse, DefaultError, GetBadPracticesForUserResponse, ReturnType<typeof getBadPracticesForUserQueryKey>>({
-    queryFn: async ({ queryKey, signal }) => {
-        const { data } = await getBadPracticesForUser({
-            ...options,
-            ...queryKey[0],
-            signal,
-            throwOnError: true
-        });
-        return data;
-    },
-    queryKey: getBadPracticesForUserQueryKey(options)
-});
-
-/**
- * Detect bad practices for a user
- *
- * Triggers bad practice detection for all pull requests of the specified user
- */
-export const detectForUserMutation = (options?: Partial<Options<DetectForUserData>>): UseMutationOptions<DetectForUserResponse, DetectForUserError, Options<DetectForUserData>> => {
-    const mutationOptions: UseMutationOptions<DetectForUserResponse, DetectForUserError, Options<DetectForUserData>> = {
+export const setActiveMutation = (options?: Partial<Options<SetActiveData>>): UseMutationOptions<SetActiveResponse, DefaultError, Options<SetActiveData>> => {
+    const mutationOptions: UseMutationOptions<SetActiveResponse, DefaultError, Options<SetActiveData>> = {
         mutationFn: async (fnOptions) => {
-            const { data } = await detectForUser({
+            const { data } = await setActive({
                 ...options,
                 ...fnOptions,
                 throwOnError: true

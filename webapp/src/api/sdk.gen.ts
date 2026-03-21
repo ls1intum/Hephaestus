@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddLabelFilterData, AddLabelFilterErrors, AddLabelFilterResponses, AddLabelToTeamData, AddLabelToTeamResponses, AddRepositoryToMonitorData, AddRepositoryToMonitorResponses, AssignRoleData, AssignRoleResponses, CancelJobData, CancelJobErrors, CancelJobResponses, ComputeUserLeagueStatsData, ComputeUserLeagueStatsResponses, CreateConfigData, CreateConfigErrors, CreateConfigResponses, CreateDocumentData, CreateDocumentErrors, CreateDocumentResponses, CreateWorkspaceData, CreateWorkspaceResponses, DeleteConfigData, DeleteConfigErrors, DeleteConfigResponses, DeleteDocumentData, DeleteDocumentErrors, DeleteDocumentResponses, DeleteDocumentVersionsAfterData, DeleteDocumentVersionsAfterErrors, DeleteDocumentVersionsAfterResponses, DeleteUserData, DeleteUserResponses, DetectForPullRequestData, DetectForPullRequestErrors, DetectForPullRequestResponses, DetectForUserData, DetectForUserErrors, DetectForUserResponses, GetAllAchievementDefinitionsData, GetAllAchievementDefinitionsResponses, GetAllTeamsData, GetAllTeamsResponses, GetBadPracticeData, GetBadPracticeResponses, GetBadPracticesForPullRequestData, GetBadPracticesForPullRequestResponses, GetBadPracticesForUserData, GetBadPracticesForUserResponses, GetConfigData, GetConfigErrors, GetConfigResponses, GetConfigsData, GetConfigsResponses, GetCurrentUserMembershipData, GetCurrentUserMembershipResponses, GetDocumentData, GetDocumentErrors, GetDocumentResponses, GetGroupedThreadsData, GetGroupedThreadsErrors, GetGroupedThreadsResponses, GetJobData, GetJobErrors, GetJobResponses, GetLabelFiltersData, GetLabelFiltersResponses, GetLeaderboardData, GetLeaderboardResponses, GetMemberData, GetMemberResponses, GetRepositoriesToMonitorData, GetRepositoriesToMonitorResponses, GetRepositorySettingsData, GetRepositorySettingsResponses, GetTeamSettingsData, GetTeamSettingsResponses, GetThreadData, GetThreadErrors, GetThreadResponses, GetUserAchievementsData, GetUserAchievementsResponses, GetUserFeaturesData, GetUserFeaturesResponses, GetUserProfileData, GetUserProfileResponses, GetUserSettingsData, GetUserSettingsResponses, GetUsersWithTeamsData, GetUsersWithTeamsResponses, GetVersionData, GetVersionErrors, GetVersionResponses, GetWorkspaceData, GetWorkspaceResponses, GitLabPreflightData, GitLabPreflightResponses, ListDocumentsData, ListDocumentsErrors, ListDocumentsResponses, ListGitLabGroupsData, ListGitLabGroupsResponses, ListGlobalContributorsData, ListGlobalContributorsResponses, ListJobsData, ListJobsResponses, ListMembersData, ListMembersResponses, ListVersionsData, ListVersionsErrors, ListVersionsResponses, ListWorkspacesData, ListWorkspacesResponses, ProvideFeedbackData, ProvideFeedbackErrors, ProvideFeedbackResponses, PurgeWorkspaceData, PurgeWorkspaceResponses, RecalculateUserAchievementsData, RecalculateUserAchievementsResponses, ReloadAchievementsData, ReloadAchievementsResponses, RemoveLabelFilterData, RemoveLabelFilterErrors, RemoveLabelFilterResponses, RemoveLabelFromTeamData, RemoveLabelFromTeamResponses, RemoveMemberData, RemoveMemberResponses, RemoveRepositoryToMonitorData, RemoveRepositoryToMonitorResponses, RenameSlugData, RenameSlugResponses, ResetAndRecalculateLeaguesData, ResetAndRecalculateLeaguesResponses, ResolveData, ResolveResponses, UpdateConfigData, UpdateConfigErrors, UpdateConfigResponses, UpdateDocumentData, UpdateDocumentErrors, UpdateDocumentResponses, UpdateNotificationsData, UpdateNotificationsResponses, UpdatePublicVisibilityData, UpdatePublicVisibilityResponses, UpdateRepositorySettingsData, UpdateRepositorySettingsErrors, UpdateRepositorySettingsResponses, UpdateRepositoryVisibilityData, UpdateRepositoryVisibilityResponses, UpdateScheduleData, UpdateScheduleResponses, UpdateSlackCredentialsData, UpdateSlackCredentialsResponses, UpdateStatusData, UpdateStatusResponses, UpdateTeamSettingsData, UpdateTeamSettingsErrors, UpdateTeamSettingsResponses, UpdateTeamVisibilityData, UpdateTeamVisibilityResponses, UpdateTokenData, UpdateTokenResponses, UpdateUserSettingsData, UpdateUserSettingsResponses, VoteMessageData, VoteMessageErrors, VoteMessageResponses } from './types.gen';
+import type { AddLabelFilterData, AddLabelFilterErrors, AddLabelFilterResponses, AddLabelToTeamData, AddLabelToTeamResponses, AddRepositoryToMonitorData, AddRepositoryToMonitorResponses, AssignRoleData, AssignRoleResponses, CancelJobData, CancelJobErrors, CancelJobResponses, ComputeUserLeagueStatsData, ComputeUserLeagueStatsResponses, CreateConfigData, CreateConfigErrors, CreateConfigResponses, CreateDocumentData, CreateDocumentErrors, CreateDocumentResponses, CreatePracticeData, CreatePracticeErrors, CreatePracticeResponses, CreateWorkspaceData, CreateWorkspaceResponses, DeleteConfigData, DeleteConfigErrors, DeleteConfigResponses, DeleteDocumentData, DeleteDocumentErrors, DeleteDocumentResponses, DeleteDocumentVersionsAfterData, DeleteDocumentVersionsAfterErrors, DeleteDocumentVersionsAfterResponses, DeletePracticeData, DeletePracticeErrors, DeletePracticeResponses, DeleteUserData, DeleteUserResponses, DetectForPullRequestData, DetectForPullRequestErrors, DetectForPullRequestResponses, DetectForUserData, DetectForUserErrors, DetectForUserResponses, GetAllAchievementDefinitionsData, GetAllAchievementDefinitionsResponses, GetAllTeamsData, GetAllTeamsResponses, GetBadPracticeData, GetBadPracticeResponses, GetBadPracticesForPullRequestData, GetBadPracticesForPullRequestResponses, GetBadPracticesForUserData, GetBadPracticesForUserResponses, GetConfigData, GetConfigErrors, GetConfigResponses, GetConfigsData, GetConfigsResponses, GetCurrentUserMembershipData, GetCurrentUserMembershipResponses, GetDocumentData, GetDocumentErrors, GetDocumentResponses, GetGroupedThreadsData, GetGroupedThreadsErrors, GetGroupedThreadsResponses, GetJobData, GetJobErrors, GetJobResponses, GetLabelFiltersData, GetLabelFiltersResponses, GetLeaderboardData, GetLeaderboardResponses, GetMemberData, GetMemberResponses, GetPracticeData, GetPracticeErrors, GetPracticeResponses, GetRepositoriesToMonitorData, GetRepositoriesToMonitorResponses, GetRepositorySettingsData, GetRepositorySettingsResponses, GetTeamSettingsData, GetTeamSettingsResponses, GetThreadData, GetThreadErrors, GetThreadResponses, GetUserAchievementsData, GetUserAchievementsResponses, GetUserFeaturesData, GetUserFeaturesResponses, GetUserProfileData, GetUserProfileResponses, GetUserSettingsData, GetUserSettingsResponses, GetUsersWithTeamsData, GetUsersWithTeamsResponses, GetVersionData, GetVersionErrors, GetVersionResponses, GetWorkspaceData, GetWorkspaceResponses, GitLabPreflightData, GitLabPreflightResponses, ListDocumentsData, ListDocumentsErrors, ListDocumentsResponses, ListGitLabGroupsData, ListGitLabGroupsResponses, ListGlobalContributorsData, ListGlobalContributorsResponses, ListJobsData, ListJobsResponses, ListMembersData, ListMembersResponses, ListPracticesData, ListPracticesResponses, ListVersionsData, ListVersionsErrors, ListVersionsResponses, ListWorkspacesData, ListWorkspacesResponses, ProvideFeedbackData, ProvideFeedbackErrors, ProvideFeedbackResponses, PurgeWorkspaceData, PurgeWorkspaceResponses, RecalculateUserAchievementsData, RecalculateUserAchievementsResponses, ReloadAchievementsData, ReloadAchievementsResponses, RemoveLabelFilterData, RemoveLabelFilterErrors, RemoveLabelFilterResponses, RemoveLabelFromTeamData, RemoveLabelFromTeamResponses, RemoveMemberData, RemoveMemberResponses, RemoveRepositoryToMonitorData, RemoveRepositoryToMonitorResponses, RenameSlugData, RenameSlugResponses, ResetAndRecalculateLeaguesData, ResetAndRecalculateLeaguesResponses, ResolveData, ResolveResponses, SetActiveData, SetActiveErrors, SetActiveResponses, UpdateConfigData, UpdateConfigErrors, UpdateConfigResponses, UpdateDocumentData, UpdateDocumentErrors, UpdateDocumentResponses, UpdateNotificationsData, UpdateNotificationsResponses, UpdatePracticeData, UpdatePracticeErrors, UpdatePracticeResponses, UpdatePublicVisibilityData, UpdatePublicVisibilityResponses, UpdateRepositorySettingsData, UpdateRepositorySettingsErrors, UpdateRepositorySettingsResponses, UpdateRepositoryVisibilityData, UpdateRepositoryVisibilityResponses, UpdateScheduleData, UpdateScheduleResponses, UpdateSlackCredentialsData, UpdateSlackCredentialsResponses, UpdateStatusData, UpdateStatusResponses, UpdateTeamSettingsData, UpdateTeamSettingsErrors, UpdateTeamSettingsResponses, UpdateTeamVisibilityData, UpdateTeamVisibilityResponses, UpdateTokenData, UpdateTokenResponses, UpdateUserSettingsData, UpdateUserSettingsResponses, VoteMessageData, VoteMessageErrors, VoteMessageResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean> = Options2<TData, ThrowOnError> & {
     /**
@@ -216,6 +216,89 @@ export const cancelJob = <ThrowOnError extends boolean = false>(options: Options
 });
 
 /**
+ * Get a specific bad practice
+ *
+ * Retrieves details of a specific bad practice by ID
+ *
+ * @deprecated
+ */
+export const getBadPractice = <ThrowOnError extends boolean = false>(options: Options<GetBadPracticeData, ThrowOnError>) => (options.client ?? client).get<GetBadPracticeResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/bad-practices/badpractice/{id}', ...options });
+
+/**
+ * Provide feedback for a bad practice
+ *
+ * Submits user feedback for a detected bad practice
+ *
+ * @deprecated
+ */
+export const provideFeedback = <ThrowOnError extends boolean = false>(options: Options<ProvideFeedbackData, ThrowOnError>) => (options.client ?? client).post<ProvideFeedbackResponses, ProvideFeedbackErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/bad-practices/badpractice/{id}/feedback',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Resolve a bad practice
+ *
+ * Updates the state of a bad practice to FIXED, WONT_FIX, or WRONG
+ *
+ * @deprecated
+ */
+export const resolve = <ThrowOnError extends boolean = false>(options: Options<ResolveData, ThrowOnError>) => (options.client ?? client).post<ResolveResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/bad-practices/badpractice/{id}/resolve',
+    ...options
+});
+
+/**
+ * Get bad practices for a pull request
+ *
+ * Retrieves all detected bad practices for a specific pull request
+ *
+ * @deprecated
+ */
+export const getBadPracticesForPullRequest = <ThrowOnError extends boolean = false>(options: Options<GetBadPracticesForPullRequestData, ThrowOnError>) => (options.client ?? client).get<GetBadPracticesForPullRequestResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/bad-practices/pullrequest/{pullRequestId}', ...options });
+
+/**
+ * Detect bad practices for a pull request
+ *
+ * Triggers bad practice detection for a specific pull request
+ *
+ * @deprecated
+ */
+export const detectForPullRequest = <ThrowOnError extends boolean = false>(options: Options<DetectForPullRequestData, ThrowOnError>) => (options.client ?? client).post<DetectForPullRequestResponses, DetectForPullRequestErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/bad-practices/pullrequest/{pullRequestId}/detect',
+    ...options
+});
+
+/**
+ * Get bad practices for a user
+ *
+ * Retrieves all detected bad practices for pull requests assigned to the user
+ *
+ * @deprecated
+ */
+export const getBadPracticesForUser = <ThrowOnError extends boolean = false>(options: Options<GetBadPracticesForUserData, ThrowOnError>) => (options.client ?? client).get<GetBadPracticesForUserResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/bad-practices/user/{login}', ...options });
+
+/**
+ * Detect bad practices for a user
+ *
+ * Triggers bad practice detection for all pull requests of the specified user
+ *
+ * @deprecated
+ */
+export const detectForUser = <ThrowOnError extends boolean = false>(options: Options<DetectForUserData, ThrowOnError>) => (options.client ?? client).post<DetectForUserResponses, DetectForUserErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/bad-practices/user/{login}/detect',
+    ...options
+});
+
+/**
  * Generate leaderboard
  *
  * Creates a ranked contributor list for the specified time range
@@ -418,20 +501,18 @@ export const updateNotifications = <ThrowOnError extends boolean = false>(option
 });
 
 /**
- * Get a specific bad practice
+ * List practice definitions
  *
- * Retrieves details of a specific bad practice by ID
+ * Returns all practice definitions for the workspace, optionally filtered by category and/or active state
  */
-export const getBadPractice = <ThrowOnError extends boolean = false>(options: Options<GetBadPracticeData, ThrowOnError>) => (options.client ?? client).get<GetBadPracticeResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practices/badpractice/{id}', ...options });
+export const listPractices = <ThrowOnError extends boolean = false>(options: Options<ListPracticesData, ThrowOnError>) => (options.client ?? client).get<ListPracticesResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practices', ...options });
 
 /**
- * Provide feedback for a bad practice
- *
- * Submits user feedback for a detected bad practice
+ * Create a new practice definition
  */
-export const provideFeedback = <ThrowOnError extends boolean = false>(options: Options<ProvideFeedbackData, ThrowOnError>) => (options.client ?? client).post<ProvideFeedbackResponses, ProvideFeedbackErrors, ThrowOnError>({
+export const createPractice = <ThrowOnError extends boolean = false>(options: Options<CreatePracticeData, ThrowOnError>) => (options.client ?? client).post<CreatePracticeResponses, CreatePracticeErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/workspaces/{workspaceSlug}/practices/badpractice/{id}/feedback',
+    url: '/workspaces/{workspaceSlug}/practices',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -440,50 +521,43 @@ export const provideFeedback = <ThrowOnError extends boolean = false>(options: O
 });
 
 /**
- * Resolve a bad practice
- *
- * Updates the state of a bad practice to FIXED, WONT_FIX, or WRONG
+ * Delete a practice definition
  */
-export const resolve = <ThrowOnError extends boolean = false>(options: Options<ResolveData, ThrowOnError>) => (options.client ?? client).post<ResolveResponses, unknown, ThrowOnError>({
+export const deletePractice = <ThrowOnError extends boolean = false>(options: Options<DeletePracticeData, ThrowOnError>) => (options.client ?? client).delete<DeletePracticeResponses, DeletePracticeErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/workspaces/{workspaceSlug}/practices/badpractice/{id}/resolve',
+    url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}',
     ...options
 });
 
 /**
- * Get bad practices for a pull request
- *
- * Retrieves all detected bad practices for a specific pull request
+ * Get a practice definition
  */
-export const getBadPracticesForPullRequest = <ThrowOnError extends boolean = false>(options: Options<GetBadPracticesForPullRequestData, ThrowOnError>) => (options.client ?? client).get<GetBadPracticesForPullRequestResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practices/pullrequest/{pullRequestId}', ...options });
+export const getPractice = <ThrowOnError extends boolean = false>(options: Options<GetPracticeData, ThrowOnError>) => (options.client ?? client).get<GetPracticeResponses, GetPracticeErrors, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}', ...options });
 
 /**
- * Detect bad practices for a pull request
- *
- * Triggers bad practice detection for a specific pull request
+ * Update a practice definition
  */
-export const detectForPullRequest = <ThrowOnError extends boolean = false>(options: Options<DetectForPullRequestData, ThrowOnError>) => (options.client ?? client).post<DetectForPullRequestResponses, DetectForPullRequestErrors, ThrowOnError>({
+export const updatePractice = <ThrowOnError extends boolean = false>(options: Options<UpdatePracticeData, ThrowOnError>) => (options.client ?? client).patch<UpdatePracticeResponses, UpdatePracticeErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/workspaces/{workspaceSlug}/practices/pullrequest/{pullRequestId}/detect',
-    ...options
+    url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });
 
 /**
- * Get bad practices for a user
- *
- * Retrieves all detected bad practices for pull requests assigned to the user
+ * Set practice active state
  */
-export const getBadPracticesForUser = <ThrowOnError extends boolean = false>(options: Options<GetBadPracticesForUserData, ThrowOnError>) => (options.client ?? client).get<GetBadPracticesForUserResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practices/user/{login}', ...options });
-
-/**
- * Detect bad practices for a user
- *
- * Triggers bad practice detection for all pull requests of the specified user
- */
-export const detectForUser = <ThrowOnError extends boolean = false>(options: Options<DetectForUserData, ThrowOnError>) => (options.client ?? client).post<DetectForUserResponses, DetectForUserErrors, ThrowOnError>({
+export const setActive = <ThrowOnError extends boolean = false>(options: Options<SetActiveData, ThrowOnError>) => (options.client ?? client).patch<SetActiveResponses, SetActiveErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/workspaces/{workspaceSlug}/practices/user/{login}/detect',
-    ...options
+    url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}/active',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });
 
 /**

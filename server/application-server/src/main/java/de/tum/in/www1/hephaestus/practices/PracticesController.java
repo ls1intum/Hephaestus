@@ -24,17 +24,23 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 /**
- * Controller for code practices detection and resolution.
+ * Controller for bad practice detection and resolution.
  *
- * <p>This controller is the API surface for the practices bounded context.
- * It handles bad practice detection, resolution, and feedback workflows.
+ * <p>This controller handles the legacy bad practice detection, resolution, and feedback workflows.
+ * It is scheduled for removal — new practice management is handled by {@code PracticeCatalogController}.
  *
  * <p>All endpoints require workspace membership via {@link WorkspaceScopedController}.
+ *
+ * @deprecated Scheduled for removal. Use the practice catalog and practice-aware review system instead.
  */
+@Deprecated(forRemoval = true)
 @WorkspaceScopedController
-@RequestMapping("/practices")
+@RequestMapping("/bad-practices")
 @RequiredArgsConstructor
-@Tag(name = "Code Practices", description = "Bad practice detection and resolution")
+@Tag(
+    name = "Bad Practices (Deprecated)",
+    description = "Legacy bad practice detection — deprecated, scheduled for removal"
+)
 public class PracticesController {
 
     private final PracticesService practicesService;
@@ -48,7 +54,8 @@ public class PracticesController {
     @GetMapping("/user/{login}")
     @Operation(
         summary = "Get bad practices for a user",
-        description = "Retrieves all detected bad practices for pull requests assigned to the user"
+        description = "Retrieves all detected bad practices for pull requests assigned to the user",
+        deprecated = true
     )
     @ApiResponse(
         responseCode = "200",
@@ -68,7 +75,8 @@ public class PracticesController {
     @GetMapping("/pullrequest/{pullRequestId}")
     @Operation(
         summary = "Get bad practices for a pull request",
-        description = "Retrieves all detected bad practices for a specific pull request"
+        description = "Retrieves all detected bad practices for a specific pull request",
+        deprecated = true
     )
     @ApiResponse(
         responseCode = "200",
@@ -91,7 +99,8 @@ public class PracticesController {
     @GetMapping("/badpractice/{id}")
     @Operation(
         summary = "Get a specific bad practice",
-        description = "Retrieves details of a specific bad practice by ID"
+        description = "Retrieves details of a specific bad practice by ID",
+        deprecated = true
     )
     @ApiResponse(
         responseCode = "200",
@@ -115,7 +124,8 @@ public class PracticesController {
     @PostMapping("/user/{login}/detect")
     @Operation(
         summary = "Detect bad practices for a user",
-        description = "Triggers bad practice detection for all pull requests of the specified user"
+        description = "Triggers bad practice detection for all pull requests of the specified user",
+        deprecated = true
     )
     @ApiResponse(responseCode = "200", description = "Detection completed successfully")
     @ApiResponse(responseCode = "400", description = "Detection failed due to no updates on pull requests")
@@ -131,7 +141,8 @@ public class PracticesController {
     @PostMapping("/pullrequest/{pullRequestId}/detect")
     @Operation(
         summary = "Detect bad practices for a pull request",
-        description = "Triggers bad practice detection for a specific pull request"
+        description = "Triggers bad practice detection for a specific pull request",
+        deprecated = true
     )
     @ApiResponse(responseCode = "200", description = "Detection completed successfully")
     @ApiResponse(responseCode = "400", description = "Detection failed due to no updates on pull request")
@@ -147,7 +158,8 @@ public class PracticesController {
     @PostMapping("/badpractice/{id}/resolve")
     @Operation(
         summary = "Resolve a bad practice",
-        description = "Updates the state of a bad practice to FIXED, WONT_FIX, or WRONG"
+        description = "Updates the state of a bad practice to FIXED, WONT_FIX, or WRONG",
+        deprecated = true
     )
     @ApiResponse(responseCode = "200", description = "Bad practice resolved successfully")
     public ResponseEntity<Void> resolve(
@@ -163,7 +175,8 @@ public class PracticesController {
     @PostMapping("/badpractice/{id}/feedback")
     @Operation(
         summary = "Provide feedback for a bad practice",
-        description = "Submits user feedback for a detected bad practice"
+        description = "Submits user feedback for a detected bad practice",
+        deprecated = true
     )
     @ApiResponse(responseCode = "200", description = "Feedback submitted successfully")
     @ApiResponse(responseCode = "403", description = "User is not an assignee of the pull request")

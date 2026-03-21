@@ -37,6 +37,9 @@
         <maven.test.skip>false</maven.test.skip>
         <hephaestus.surefire.timeout>300</hephaestus.surefire.timeout>
 
+        <!-- Server port for OpenAPI spec generation (overridable via -Dopenapi.server.port=38091) -->
+        <openapi.server.port>8080</openapi.server.port>
+
         <!-- Tag filtering: unit tests by default, exclude live tests -->
         <surefire.excludedGroups>live</surefire.excludedGroups>
         <surefire.includedGroups>unit</surefire.includedGroups>
@@ -920,7 +923,7 @@
                     </execution>
                 </executions>
                 <configuration>
-                    <apiDocsUrl>http://localhost:8080/v3/api-docs.yaml</apiDocsUrl>
+                    <apiDocsUrl>http://localhost:${openapi.server.port}/v3/api-docs.yaml</apiDocsUrl>
                     <outputFileName>openapi.yaml</outputFileName>
                     <outputDir>.</outputDir>
                 </configuration>

@@ -21,6 +21,27 @@ public interface PracticeRepository extends JpaRepository<Practice, Long> {
 
     boolean existsByWorkspaceId(Long workspaceId);
 
+    boolean existsByWorkspaceIdAndSlug(Long workspaceId, String slug);
+
+    /**
+     * Lists practices for a workspace with optional category and active filters.
+     * Null filter values are ignored (match all).
+     */
+    @Query(
+        """
+        SELECT p FROM Practice p
+        WHERE p.workspace.id = :workspaceId
+        AND (:category IS NULL OR p.category = :category)
+        AND (:active IS NULL OR p.active = :active)
+        ORDER BY p.name ASC
+        """
+    )
+    List<Practice> findByFilters(
+        @Param("workspaceId") Long workspaceId,
+        @Param("category") String category,
+        @Param("active") Boolean active
+    );
+
     /** Deletes all practices for the workspace. Cascades to practice_finding via ON DELETE CASCADE. */
     @Modifying
     @Transactional

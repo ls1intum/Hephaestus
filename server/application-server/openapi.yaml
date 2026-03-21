@@ -24,26 +24,28 @@ tags:
      These routes stay under the classic /workspaces base path while slugged routes
      live in {@link WorkspaceController WorkspaceController} via <code>@WorkspaceScopedController</code>.
   name: workspace-registry-controller
-- description: Workspace-scoped team settings management
-  name: Team Settings
-- description: Team management within workspace
-  name: Teams
 - description: Workspace-scoped agent configuration management
   name: Agent Config
-- description: Bad practice detection and resolution
-  name: Code Practices
-- description: User profile and activity data
-  name: Profile
 - description: |-
     Controller for managing workspace memberships and roles.
      Handles CRUD operations for workspace members and role assignments.
   name: workspace-membership-controller
 - description: Workspace-scoped agent job monitoring
   name: Agent Jobs
-- description: Contributor rankings and league statistics
-  name: Leaderboard
 - description: "User account management (settings, deletion)"
   name: Account
+- description: "Legacy bad practice detection — deprecated, scheduled for removal"
+  name: Bad Practices (Deprecated)
+- description: Manage practice definitions
+  name: Practice Catalog
+- description: Workspace-scoped team settings management
+  name: Team Settings
+- description: Team management within workspace
+  name: Teams
+- description: User profile and activity data
+  name: Profile
+- description: Contributor rankings and league statistics
+  name: Leaderboard
 paths:
   /contributors:
     get:
@@ -489,6 +491,237 @@ paths:
       summary: Cancel an agent job
       tags:
       - Agent Jobs
+  /workspaces/{workspaceSlug}/bad-practices/badpractice/{id}:
+    get:
+      deprecated: true
+      description: Retrieves details of a specific bad practice by ID
+      operationId: getBadPractice
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PullRequestBadPractice"
+          description: Bad practice returned
+      security: []
+      summary: Get a specific bad practice
+      tags:
+      - Bad Practices (Deprecated)
+  /workspaces/{workspaceSlug}/bad-practices/badpractice/{id}/feedback:
+    post:
+      deprecated: true
+      description: Submits user feedback for a detected bad practice
+      operationId: provideFeedback
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BadPracticeFeedback"
+        required: true
+      responses:
+        "200":
+          description: Feedback submitted successfully
+        "403":
+          description: User is not an assignee of the pull request
+      summary: Provide feedback for a bad practice
+      tags:
+      - Bad Practices (Deprecated)
+  /workspaces/{workspaceSlug}/bad-practices/badpractice/{id}/resolve:
+    post:
+      deprecated: true
+      description: "Updates the state of a bad practice to FIXED, WONT_FIX, or WRONG"
+      operationId: resolve
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - in: query
+        name: state
+        required: true
+        schema:
+          type: string
+          enum:
+          - GOOD_PRACTICE
+          - MINOR_ISSUE
+          - NORMAL_ISSUE
+          - CRITICAL_ISSUE
+          - FIXED
+          - WONT_FIX
+          - WRONG
+      responses:
+        "200":
+          description: Bad practice resolved successfully
+      summary: Resolve a bad practice
+      tags:
+      - Bad Practices (Deprecated)
+  /workspaces/{workspaceSlug}/bad-practices/pullrequest/{pullRequestId}:
+    get:
+      deprecated: true
+      description: Retrieves all detected bad practices for a specific pull request
+      operationId: getBadPracticesForPullRequest
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: pullRequestId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PullRequestWithBadPractices"
+          description: Bad practices returned
+      security: []
+      summary: Get bad practices for a pull request
+      tags:
+      - Bad Practices (Deprecated)
+  /workspaces/{workspaceSlug}/bad-practices/pullrequest/{pullRequestId}/detect:
+    post:
+      deprecated: true
+      description: Triggers bad practice detection for a specific pull request
+      operationId: detectForPullRequest
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: pullRequestId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DetectionResult"
+          description: Detection completed successfully
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DetectionResult"
+          description: Detection failed due to no updates on pull request
+      summary: Detect bad practices for a pull request
+      tags:
+      - Bad Practices (Deprecated)
+  /workspaces/{workspaceSlug}/bad-practices/user/{login}:
+    get:
+      deprecated: true
+      description: Retrieves all detected bad practices for pull requests assigned
+        to the user
+      operationId: getBadPracticesForUser
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: login
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserPractices"
+          description: Bad practices returned
+      security: []
+      summary: Get bad practices for a user
+      tags:
+      - Bad Practices (Deprecated)
+  /workspaces/{workspaceSlug}/bad-practices/user/{login}/detect:
+    post:
+      deprecated: true
+      description: Triggers bad practice detection for all pull requests of the specified
+        user
+      operationId: detectForUser
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: login
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DetectionResult"
+          description: Detection completed successfully
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DetectionResult"
+          description: Detection failed due to no updates on pull requests
+      summary: Detect bad practices for a user
+      tags:
+      - Bad Practices (Deprecated)
   /workspaces/{workspaceSlug}/leaderboard:
     get:
       description: Creates a ranked contributor list for the specified time range
@@ -1493,10 +1726,11 @@ paths:
       summary: Update leaderboard notification preferences
       tags:
       - workspace
-  /workspaces/{workspaceSlug}/practices/badpractice/{id}:
+  /workspaces/{workspaceSlug}/practices:
     get:
-      description: Retrieves details of a specific bad practice by ID
-      operationId: getBadPractice
+      description: "Returns all practice definitions for the workspace, optionally\
+        \ filtered by category and/or active state"
+      operationId: listPractices
       parameters:
       - description: Workspace slug
         in: path
@@ -1505,27 +1739,33 @@ paths:
         schema:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: id
-        required: true
+      - description: Filter by practice category
+        in: query
+        name: category
+        required: false
         schema:
-          type: integer
-          format: int64
+          type: string
+      - description: Filter by active state
+        in: query
+        name: active
+        required: false
+        schema:
+          type: boolean
       responses:
         "200":
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PullRequestBadPractice"
-          description: Bad practice returned
+                type: array
+                items:
+                  $ref: "#/components/schemas/Practice"
+          description: Practices returned
       security: []
-      summary: Get a specific bad practice
+      summary: List practice definitions
       tags:
-      - Code Practices
-  /workspaces/{workspaceSlug}/practices/badpractice/{id}/feedback:
+      - Practice Catalog
     post:
-      description: Submits user feedback for a detected bad practice
-      operationId: provideFeedback
+      operationId: createPractice
       parameters:
       - description: Workspace slug
         in: path
@@ -1534,30 +1774,27 @@ paths:
         schema:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: integer
-          format: int64
       requestBody:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/BadPracticeFeedback"
+              $ref: "#/components/schemas/CreatePracticeRequest"
         required: true
       responses:
-        "200":
-          description: Feedback submitted successfully
-        "403":
-          description: User is not an assignee of the pull request
-      summary: Provide feedback for a bad practice
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Practice"
+          description: Practice created
+        "409":
+          description: Practice slug already exists in this workspace
+      summary: Create a new practice definition
       tags:
-      - Code Practices
-  /workspaces/{workspaceSlug}/practices/badpractice/{id}/resolve:
-    post:
-      description: "Updates the state of a bad practice to FIXED, WONT_FIX, or WRONG"
-      operationId: resolve
+      - Practice Catalog
+  /workspaces/{workspaceSlug}/practices/{practiceSlug}:
+    delete:
+      operationId: deletePractice
       parameters:
       - description: Workspace slug
         in: path
@@ -1567,34 +1804,20 @@ paths:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       - in: path
-        name: id
-        required: true
-        schema:
-          type: integer
-          format: int64
-      - in: query
-        name: state
+        name: practiceSlug
         required: true
         schema:
           type: string
-          enum:
-          - GOOD_PRACTICE
-          - MINOR_ISSUE
-          - NORMAL_ISSUE
-          - CRITICAL_ISSUE
-          - FIXED
-          - WONT_FIX
-          - WRONG
       responses:
-        "200":
-          description: Bad practice resolved successfully
-      summary: Resolve a bad practice
+        "204":
+          description: Practice deleted
+        "404":
+          description: Practice not found
+      summary: Delete a practice definition
       tags:
-      - Code Practices
-  /workspaces/{workspaceSlug}/practices/pullrequest/{pullRequestId}:
+      - Practice Catalog
     get:
-      description: Retrieves all detected bad practices for a specific pull request
-      operationId: getBadPracticesForPullRequest
+      operationId: getPractice
       parameters:
       - description: Workspace slug
         in: path
@@ -1604,26 +1827,25 @@ paths:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       - in: path
-        name: pullRequestId
+        name: practiceSlug
         required: true
         schema:
-          type: integer
-          format: int64
+          type: string
       responses:
         "200":
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PullRequestWithBadPractices"
-          description: Bad practices returned
+                $ref: "#/components/schemas/Practice"
+          description: Practice returned
+        "404":
+          description: Practice not found
       security: []
-      summary: Get bad practices for a pull request
+      summary: Get a practice definition
       tags:
-      - Code Practices
-  /workspaces/{workspaceSlug}/practices/pullrequest/{pullRequestId}/detect:
-    post:
-      description: Triggers bad practice detection for a specific pull request
-      operationId: detectForPullRequest
+      - Practice Catalog
+    patch:
+      operationId: updatePractice
       parameters:
       - description: Workspace slug
         in: path
@@ -1633,32 +1855,31 @@ paths:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       - in: path
-        name: pullRequestId
+        name: practiceSlug
         required: true
         schema:
-          type: integer
-          format: int64
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePracticeRequest"
+        required: true
       responses:
         "200":
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/DetectionResult"
-          description: Detection completed successfully
-        "400":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/DetectionResult"
-          description: Detection failed due to no updates on pull request
-      summary: Detect bad practices for a pull request
+                $ref: "#/components/schemas/Practice"
+          description: Practice updated
+        "404":
+          description: Practice not found
+      summary: Update a practice definition
       tags:
-      - Code Practices
-  /workspaces/{workspaceSlug}/practices/user/{login}:
-    get:
-      description: Retrieves all detected bad practices for pull requests assigned
-        to the user
-      operationId: getBadPracticesForUser
+      - Practice Catalog
+  /workspaces/{workspaceSlug}/practices/{practiceSlug}/active:
+    patch:
+      operationId: setActive
       parameters:
       - description: Workspace slug
         in: path
@@ -1668,55 +1889,28 @@ paths:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       - in: path
-        name: login
+        name: practiceSlug
         required: true
         schema:
           type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePracticeActiveRequest"
+        required: true
       responses:
         "200":
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/UserPractices"
-          description: Bad practices returned
-      security: []
-      summary: Get bad practices for a user
+                $ref: "#/components/schemas/Practice"
+          description: Active state updated
+        "404":
+          description: Practice not found
+      summary: Set practice active state
       tags:
-      - Code Practices
-  /workspaces/{workspaceSlug}/practices/user/{login}/detect:
-    post:
-      description: Triggers bad practice detection for all pull requests of the specified
-        user
-      operationId: detectForUser
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: login
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/DetectionResult"
-          description: Detection completed successfully
-        "400":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/DetectionResult"
-          description: Detection failed due to no updates on pull requests
-      summary: Detect bad practices for a user
-      tags:
-      - Code Practices
+      - Practice Catalog
   /workspaces/{workspaceSlug}/profile/{login}:
     get:
       description: "Returns user profile with workspace-scoped activity data including\
@@ -3044,6 +3238,55 @@ components:
       - title
       x-hephaestus:
         export: true
+    CreatePracticeRequest:
+      type: object
+      description: Request to create a new practice definition
+      properties:
+        category:
+          type: string
+          description: Practice category
+          example: code-quality
+          maxLength: 64
+          minLength: 0
+        description:
+          type: string
+          description: Practice description
+          example: Ensures pull request descriptions are detailed and informative
+          maxLength: 10000
+          minLength: 0
+        detectionPrompt:
+          type: string
+          description: AI detection prompt template
+          maxLength: 50000
+          minLength: 0
+        name:
+          type: string
+          description: Human-readable name
+          example: PR Description Quality
+          maxLength: 128
+          minLength: 3
+        slug:
+          type: string
+          description: URL-safe identifier unique within the workspace
+          example: pr-description-quality
+          maxLength: 64
+          minLength: 3
+          pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        triggerEvents:
+          type: array
+          description: Domain events that trigger detection
+          example:
+          - PullRequestCreated
+          - ReviewSubmitted
+          items:
+            type: string
+          maxItems: 10
+          minItems: 1
+      required:
+      - description
+      - name
+      - slug
+      - triggerEvents
     CreateWorkspaceRequest:
       type: object
       description: Request to create a new workspace
@@ -3434,6 +3677,54 @@ components:
           $ref: "#/components/schemas/SortObject"
         unpaged:
           type: boolean
+    Practice:
+      type: object
+      description: Practice definition for evaluating developer contributions
+      properties:
+        active:
+          type: boolean
+          description: Whether this practice is actively being detected
+        category:
+          type: string
+          description: Practice category
+        createdAt:
+          type: string
+          format: date-time
+          description: Timestamp when the practice was created
+        description:
+          type: string
+          description: Practice description
+        detectionPrompt:
+          type: string
+          description: AI detection prompt template
+        id:
+          type: integer
+          format: int64
+          description: Practice ID
+        name:
+          type: string
+          description: Human-readable name
+        slug:
+          type: string
+          description: URL-safe identifier unique within workspace
+        triggerEvents:
+          type: array
+          description: Domain events that trigger detection
+          items:
+            type: string
+        updatedAt:
+          type: string
+          format: date-time
+          description: Timestamp when the practice was last updated
+      required:
+      - active
+      - createdAt
+      - description
+      - id
+      - name
+      - slug
+      - triggerEvents
+      - updatedAt
     Profile:
       type: object
       description: Complete user profile including contribution history and activity
@@ -4129,6 +4420,51 @@ components:
           example: 600
           maximum: 3600
           minimum: 30
+    UpdatePracticeActiveRequest:
+      type: object
+      description: Request to set a practice's active state
+      properties:
+        active:
+          type: boolean
+          description: Whether the practice should be active
+      required:
+      - active
+    UpdatePracticeRequest:
+      type: object
+      description: Request to update an existing practice definition (PATCH — only
+        non-null fields applied)
+      properties:
+        category:
+          type: string
+          description: Practice category
+          example: code-quality
+          maxLength: 64
+          minLength: 0
+        description:
+          type: string
+          description: Practice description
+          maxLength: 10000
+          minLength: 0
+          pattern: .*\S.*
+        detectionPrompt:
+          type: string
+          description: AI detection prompt template
+          maxLength: 50000
+          minLength: 0
+        name:
+          type: string
+          description: Human-readable name
+          example: PR Description Quality
+          maxLength: 128
+          minLength: 3
+          pattern: .*\S.*
+        triggerEvents:
+          type: array
+          description: Domain events that trigger detection
+          items:
+            type: string
+          maxItems: 10
+          minItems: 1
     UpdateRepositorySettingsRequest:
       type: object
       description: Request to update repository contribution visibility settings in
