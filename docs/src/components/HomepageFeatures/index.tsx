@@ -15,40 +15,40 @@ type FeatureItem = {
 
 const FeatureList: FeatureItem[] = [
   {
-    title: 'Code Review Gamification',
-    kicker: 'Transform code reviews into learning opportunities',
+    title: 'Practice Detection',
+    kicker: 'What gets checked, how to configure it, and how to respond to findings',
     description:
-      'Friendly competition keeps healthy review habits visible with leaderboards, leagues, and team-wide recognition.',
+      'LLM-powered checks flag anti-patterns in how contributors collaborate and document their work. Currently analyzes PR descriptions, review comments, and commit patterns. Drafts receive lighter checks than ready-to-merge work.',
     bullets: [
-      'Weekly leaderboards with GitHub integration',
-      'Team competitions across multiple repositories',
-      'Structured league system for ongoing engagement',
+      'Catches anti-patterns in collaboration — across PRs, reviews, and commits',
+      'Adapts to lifecycle — drafts get coaching, finished work gets rigor',
+      'You stay in control — accept, dismiss, or challenge any finding',
     ],
-    cta: {label: 'See the leaderboard tour', to: '/user/leaderboard'},
+    cta: {label: 'See the conceptual model', to: '/contributor/conceptual-model'},
   },
   {
-    title: 'Process-Aware AI Mentoring',
-    kicker: 'Heph provides guidance grounded in your repository activity',
+    title: 'Multi-Channel Guidance',
+    kicker: 'How the AI mentor, notifications, and achievements work',
     description:
-      'Mentoring sessions blend self-regulated learning prompts with real repo events so goals, reflections, and next steps stay actionable.',
+      'When a practice is detected, feedback reaches the contributor via AI mentor conversations, Slack notifications, or achievement unlocks — driven by actual project activity.',
     bullets: [
-      'SRL-guided weekly reflection',
-      'Repo activity context for objective feedback',
-      'Goal setting and progress tracking',
+      'AI mentor (Heph) helps you reflect on your work and plan next steps',
+      'Notifications via Slack, email, or in-app',
+      'Achievements unlock for consistent engagement (e.g., reviewing weekly)',
     ],
     cta: {label: 'Work with the mentor', to: '/user/ai-mentor'},
   },
   {
-    title: 'Build Better Team Habits',
-    kicker: 'Creativity meets technical expertise — just like on the landing page',
+    title: 'Growth Tracking',
+    kicker: 'Understanding leaderboards, leagues, and weekly digests',
     description:
-      'Our approach combines craft, collaboration, and quality so teams stay aligned while the platform scales with them.',
+      'Leaderboards rank contributors by engagement and practice quality. A league system tracks longer-term progression. Weekly Slack digests highlight standout contributors.',
     bullets: [
-      'Empower engineers with real-world feedback loops',
-      'Foster collaboration that strengthens engineering culture',
-      'Improve code quality through friendly competition',
+      'Achievement tiers reflect increasing engagement and consistency',
+      'A league system ranks contributors by engagement and practice quality, updated weekly',
+      'Weekly digests and leaderboards highlight top contributors to the team',
     ],
-    cta: {label: 'Dive into contributor docs', to: '/contributor/overview'},
+    cta: {label: 'See the leaderboard', to: '/user/leaderboard'},
   },
 ];
 
