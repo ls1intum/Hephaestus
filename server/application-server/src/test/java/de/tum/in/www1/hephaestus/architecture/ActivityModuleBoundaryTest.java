@@ -275,13 +275,11 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
     class PracticesControllerTests {
 
         /**
-         * PracticesController should be the only entry point for practices-related API.
-         *
-         * <p>All bad practice detection, resolution, and feedback endpoints should be
-         * consolidated in PracticesController, not scattered across other controllers.
+         * Only PracticesController (legacy detection) and PracticeCatalogController (CRUD)
+         * are allowed as REST entry points in the practices module.
          */
         @Test
-        @DisplayName("Practices has a dedicated controller")
+        @DisplayName("Practices has dedicated controllers")
         void practicesHasDedicatedController() {
             ArchRule rule = classes()
                 .that()
@@ -290,7 +288,9 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
                 .haveSimpleNameEndingWith("Controller")
                 .should()
                 .haveSimpleName("PracticesController")
-                .because("All practices endpoints should be in PracticesController");
+                .orShould()
+                .haveSimpleName("PracticeCatalogController")
+                .because("Only PracticesController and PracticeCatalogController are allowed REST entry points");
             rule.check(classes);
         }
     }

@@ -558,6 +558,42 @@ export type UpdateRepositorySettingsRequest = {
 };
 
 /**
+ * Request to update an existing practice definition (PATCH — only non-null fields applied)
+ */
+export type UpdatePracticeRequest = {
+    /**
+     * Practice category
+     */
+    category?: string;
+    /**
+     * Practice description
+     */
+    description?: string;
+    /**
+     * AI detection prompt template
+     */
+    detectionPrompt?: string;
+    /**
+     * Human-readable name
+     */
+    name?: string;
+    /**
+     * Domain events that trigger detection
+     */
+    triggerEvents?: Array<string>;
+};
+
+/**
+ * Request to set a practice's active state
+ */
+export type UpdatePracticeActiveRequest = {
+    /**
+     * Whether the practice should be active
+     */
+    active: boolean;
+};
+
+/**
  * Request to update an existing agent configuration (all fields optional — null fields are not changed)
  */
 export type UpdateAgentConfigRequest = {
@@ -945,6 +981,52 @@ export type Profile = {
     xpRecord: ProfileXpRecord;
 };
 
+/**
+ * Practice definition for evaluating developer contributions
+ */
+export type Practice = {
+    /**
+     * Whether this practice is actively being detected
+     */
+    active: boolean;
+    /**
+     * Practice category
+     */
+    category?: string;
+    /**
+     * Timestamp when the practice was created
+     */
+    createdAt: Date;
+    /**
+     * Practice description
+     */
+    description: string;
+    /**
+     * AI detection prompt template
+     */
+    detectionPrompt?: string;
+    /**
+     * Practice ID
+     */
+    id: number;
+    /**
+     * Human-readable name
+     */
+    name: string;
+    /**
+     * URL-safe identifier unique within workspace
+     */
+    slug: string;
+    /**
+     * Domain events that trigger detection
+     */
+    triggerEvents: Array<string>;
+    /**
+     * Timestamp when the practice was last updated
+     */
+    updatedAt: Date;
+};
+
 export type PageableObject = {
     offset?: number;
     pageNumber?: number;
@@ -1283,6 +1365,36 @@ export type CreateWorkspaceRequest = {
      * URL-friendly identifier for the workspace
      */
     workspaceSlug: string;
+};
+
+/**
+ * Request to create a new practice definition
+ */
+export type CreatePracticeRequest = {
+    /**
+     * Practice category
+     */
+    category?: string;
+    /**
+     * Practice description
+     */
+    description: string;
+    /**
+     * AI detection prompt template
+     */
+    detectionPrompt?: string;
+    /**
+     * Human-readable name
+     */
+    name: string;
+    /**
+     * URL-safe identifier unique within the workspace
+     */
+    slug: string;
+    /**
+     * Domain events that trigger detection
+     */
+    triggerEvents: Array<string>;
 };
 
 export type CreateDocumentRequest = {
@@ -1936,6 +2048,183 @@ export type CancelJobResponses = {
 };
 
 export type CancelJobResponse = CancelJobResponses[keyof CancelJobResponses];
+
+export type GetBadPracticeData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        id: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/bad-practices/badpractice/{id}';
+};
+
+export type GetBadPracticeResponses = {
+    /**
+     * Bad practice returned
+     */
+    200: PullRequestBadPractice;
+};
+
+export type GetBadPracticeResponse = GetBadPracticeResponses[keyof GetBadPracticeResponses];
+
+export type ProvideFeedbackData = {
+    body: BadPracticeFeedback;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        id: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/bad-practices/badpractice/{id}/feedback';
+};
+
+export type ProvideFeedbackErrors = {
+    /**
+     * User is not an assignee of the pull request
+     */
+    403: unknown;
+};
+
+export type ProvideFeedbackResponses = {
+    /**
+     * Feedback submitted successfully
+     */
+    200: unknown;
+};
+
+export type ResolveData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        id: number;
+    };
+    query: {
+        state: 'GOOD_PRACTICE' | 'MINOR_ISSUE' | 'NORMAL_ISSUE' | 'CRITICAL_ISSUE' | 'FIXED' | 'WONT_FIX' | 'WRONG';
+    };
+    url: '/workspaces/{workspaceSlug}/bad-practices/badpractice/{id}/resolve';
+};
+
+export type ResolveResponses = {
+    /**
+     * Bad practice resolved successfully
+     */
+    200: unknown;
+};
+
+export type GetBadPracticesForPullRequestData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        pullRequestId: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/bad-practices/pullrequest/{pullRequestId}';
+};
+
+export type GetBadPracticesForPullRequestResponses = {
+    /**
+     * Bad practices returned
+     */
+    200: PullRequestWithBadPractices;
+};
+
+export type GetBadPracticesForPullRequestResponse = GetBadPracticesForPullRequestResponses[keyof GetBadPracticesForPullRequestResponses];
+
+export type DetectForPullRequestData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        pullRequestId: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/bad-practices/pullrequest/{pullRequestId}/detect';
+};
+
+export type DetectForPullRequestErrors = {
+    /**
+     * Detection failed due to no updates on pull request
+     */
+    400: DetectionResult;
+};
+
+export type DetectForPullRequestError = DetectForPullRequestErrors[keyof DetectForPullRequestErrors];
+
+export type DetectForPullRequestResponses = {
+    /**
+     * Detection completed successfully
+     */
+    200: DetectionResult;
+};
+
+export type DetectForPullRequestResponse = DetectForPullRequestResponses[keyof DetectForPullRequestResponses];
+
+export type GetBadPracticesForUserData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        login: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/bad-practices/user/{login}';
+};
+
+export type GetBadPracticesForUserResponses = {
+    /**
+     * Bad practices returned
+     */
+    200: UserPractices;
+};
+
+export type GetBadPracticesForUserResponse = GetBadPracticesForUserResponses[keyof GetBadPracticesForUserResponses];
+
+export type DetectForUserData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        login: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/bad-practices/user/{login}/detect';
+};
+
+export type DetectForUserErrors = {
+    /**
+     * Detection failed due to no updates on pull requests
+     */
+    400: DetectionResult;
+};
+
+export type DetectForUserError = DetectForUserErrors[keyof DetectForUserErrors];
+
+export type DetectForUserResponses = {
+    /**
+     * Detection completed successfully
+     */
+    200: DetectionResult;
+};
+
+export type DetectForUserResponse = DetectForUserResponses[keyof DetectForUserResponses];
 
 export type GetLeaderboardData = {
     body?: never;
@@ -2612,182 +2901,179 @@ export type UpdateNotificationsResponses = {
 
 export type UpdateNotificationsResponse = UpdateNotificationsResponses[keyof UpdateNotificationsResponses];
 
-export type GetBadPracticeData = {
+export type ListPracticesData = {
     body?: never;
     path: {
         /**
          * Workspace slug
          */
         workspaceSlug: string;
-        id: number;
     };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/badpractice/{id}';
+    query?: {
+        /**
+         * Filter by practice category
+         */
+        category?: string;
+        /**
+         * Filter by active state
+         */
+        active?: boolean;
+    };
+    url: '/workspaces/{workspaceSlug}/practices';
 };
 
-export type GetBadPracticeResponses = {
+export type ListPracticesResponses = {
     /**
-     * Bad practice returned
+     * Practices returned
      */
-    200: PullRequestBadPractice;
+    200: Array<Practice>;
 };
 
-export type GetBadPracticeResponse = GetBadPracticeResponses[keyof GetBadPracticeResponses];
+export type ListPracticesResponse = ListPracticesResponses[keyof ListPracticesResponses];
 
-export type ProvideFeedbackData = {
-    body: BadPracticeFeedback;
+export type CreatePracticeData = {
+    body: CreatePracticeRequest;
     path: {
         /**
          * Workspace slug
          */
         workspaceSlug: string;
-        id: number;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/badpractice/{id}/feedback';
+    url: '/workspaces/{workspaceSlug}/practices';
 };
 
-export type ProvideFeedbackErrors = {
+export type CreatePracticeErrors = {
     /**
-     * User is not an assignee of the pull request
+     * Practice slug already exists in this workspace
      */
-    403: unknown;
+    409: unknown;
 };
 
-export type ProvideFeedbackResponses = {
+export type CreatePracticeResponses = {
     /**
-     * Feedback submitted successfully
+     * Practice created
      */
-    200: unknown;
+    201: Practice;
 };
 
-export type ResolveData = {
+export type CreatePracticeResponse = CreatePracticeResponses[keyof CreatePracticeResponses];
+
+export type DeletePracticeData = {
     body?: never;
     path: {
         /**
          * Workspace slug
          */
         workspaceSlug: string;
-        id: number;
+        practiceSlug: string;
     };
-    query: {
-        state: 'GOOD_PRACTICE' | 'MINOR_ISSUE' | 'NORMAL_ISSUE' | 'CRITICAL_ISSUE' | 'FIXED' | 'WONT_FIX' | 'WRONG';
-    };
-    url: '/workspaces/{workspaceSlug}/practices/badpractice/{id}/resolve';
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}';
 };
 
-export type ResolveResponses = {
+export type DeletePracticeErrors = {
     /**
-     * Bad practice resolved successfully
+     * Practice not found
      */
-    200: unknown;
+    404: unknown;
 };
 
-export type GetBadPracticesForPullRequestData = {
+export type DeletePracticeResponses = {
+    /**
+     * Practice deleted
+     */
+    204: void;
+};
+
+export type DeletePracticeResponse = DeletePracticeResponses[keyof DeletePracticeResponses];
+
+export type GetPracticeData = {
     body?: never;
     path: {
         /**
          * Workspace slug
          */
         workspaceSlug: string;
-        pullRequestId: number;
+        practiceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/pullrequest/{pullRequestId}';
+    url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}';
 };
 
-export type GetBadPracticesForPullRequestResponses = {
+export type GetPracticeErrors = {
     /**
-     * Bad practices returned
+     * Practice not found
      */
-    200: PullRequestWithBadPractices;
+    404: unknown;
 };
 
-export type GetBadPracticesForPullRequestResponse = GetBadPracticesForPullRequestResponses[keyof GetBadPracticesForPullRequestResponses];
+export type GetPracticeResponses = {
+    /**
+     * Practice returned
+     */
+    200: Practice;
+};
 
-export type DetectForPullRequestData = {
-    body?: never;
+export type GetPracticeResponse = GetPracticeResponses[keyof GetPracticeResponses];
+
+export type UpdatePracticeData = {
+    body: UpdatePracticeRequest;
     path: {
         /**
          * Workspace slug
          */
         workspaceSlug: string;
-        pullRequestId: number;
+        practiceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/pullrequest/{pullRequestId}/detect';
+    url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}';
 };
 
-export type DetectForPullRequestErrors = {
+export type UpdatePracticeErrors = {
     /**
-     * Detection failed due to no updates on pull request
+     * Practice not found
      */
-    400: DetectionResult;
+    404: unknown;
 };
 
-export type DetectForPullRequestError = DetectForPullRequestErrors[keyof DetectForPullRequestErrors];
-
-export type DetectForPullRequestResponses = {
+export type UpdatePracticeResponses = {
     /**
-     * Detection completed successfully
+     * Practice updated
      */
-    200: DetectionResult;
+    200: Practice;
 };
 
-export type DetectForPullRequestResponse = DetectForPullRequestResponses[keyof DetectForPullRequestResponses];
+export type UpdatePracticeResponse = UpdatePracticeResponses[keyof UpdatePracticeResponses];
 
-export type GetBadPracticesForUserData = {
-    body?: never;
+export type SetActiveData = {
+    body: UpdatePracticeActiveRequest;
     path: {
         /**
          * Workspace slug
          */
         workspaceSlug: string;
-        login: string;
+        practiceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/user/{login}';
+    url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}/active';
 };
 
-export type GetBadPracticesForUserResponses = {
+export type SetActiveErrors = {
     /**
-     * Bad practices returned
+     * Practice not found
      */
-    200: UserPractices;
+    404: unknown;
 };
 
-export type GetBadPracticesForUserResponse = GetBadPracticesForUserResponses[keyof GetBadPracticesForUserResponses];
-
-export type DetectForUserData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        login: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/user/{login}/detect';
-};
-
-export type DetectForUserErrors = {
+export type SetActiveResponses = {
     /**
-     * Detection failed due to no updates on pull requests
+     * Active state updated
      */
-    400: DetectionResult;
+    200: Practice;
 };
 
-export type DetectForUserError = DetectForUserErrors[keyof DetectForUserErrors];
-
-export type DetectForUserResponses = {
-    /**
-     * Detection completed successfully
-     */
-    200: DetectionResult;
-};
-
-export type DetectForUserResponse = DetectForUserResponses[keyof DetectForUserResponses];
+export type SetActiveResponse = SetActiveResponses[keyof SetActiveResponses];
 
 export type GetUserProfileData = {
     body?: never;

@@ -65,7 +65,7 @@ class PracticesControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
     }
 
     @Nested
-    @DisplayName("GET /practices/pullrequest/{pullRequestId}")
+    @DisplayName("GET /bad-practices/pullrequest/{pullRequestId}")
     class GetBadPracticesForPullRequest {
 
         @Test
@@ -78,7 +78,7 @@ class PracticesControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             ProblemDetail problem = webTestClient
                 .get()
                 .uri(
-                    "/workspaces/{workspaceSlug}/practices/pullrequest/{pullRequestId}",
+                    "/workspaces/{workspaceSlug}/bad-practices/pullrequest/{pullRequestId}",
                     workspace.getWorkspaceSlug(),
                     nonExistentPullRequestId
                 )
@@ -105,7 +105,7 @@ class PracticesControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             webTestClient
                 .get()
                 .uri(
-                    "/workspaces/{workspaceSlug}/practices/pullrequest/{pullRequestId}",
+                    "/workspaces/{workspaceSlug}/bad-practices/pullrequest/{pullRequestId}",
                     workspace.getWorkspaceSlug(),
                     pullRequestId
                 )
@@ -116,7 +116,7 @@ class PracticesControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
     }
 
     @Nested
-    @DisplayName("POST /practices/pullrequest/{pullRequestId}/detect")
+    @DisplayName("POST /bad-practices/pullrequest/{pullRequestId}/detect")
     class DetectBadPracticesForPullRequest {
 
         @Test
@@ -127,7 +127,7 @@ class PracticesControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             webTestClient
                 .post()
                 .uri(
-                    "/workspaces/{workspaceSlug}/practices/pullrequest/{pullRequestId}/detect",
+                    "/workspaces/{workspaceSlug}/bad-practices/pullrequest/{pullRequestId}/detect",
                     workspace.getWorkspaceSlug(),
                     pullRequestId
                 )
@@ -230,7 +230,7 @@ class PracticesControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             webTestClient
                 .get()
                 .uri(
-                    "/workspaces/{workspaceSlug}/practices/pullrequest/{pullRequestId}",
+                    "/workspaces/{workspaceSlug}/bad-practices/pullrequest/{pullRequestId}",
                     workspaceAlpha.getWorkspaceSlug(),
                     prAlpha.getId()
                 )
@@ -243,7 +243,7 @@ class PracticesControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             ProblemDetail problem = webTestClient
                 .get()
                 .uri(
-                    "/workspaces/{workspaceSlug}/practices/pullrequest/{pullRequestId}",
+                    "/workspaces/{workspaceSlug}/bad-practices/pullrequest/{pullRequestId}",
                     workspaceBeta.getWorkspaceSlug(),
                     prAlpha.getId()
                 )
