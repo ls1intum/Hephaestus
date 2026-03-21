@@ -150,12 +150,16 @@ class FeedbackDeliveryService {
         // Diff notes (only when negative findings exist; skip on re-analysis)
         if (hasNegative && !delivery.diffNotes().isEmpty() && !isReAnalysis) {
             DiffNotePoster.DiffNoteResult diffResult = diffNotePoster.postDiffNotes(job, delivery.diffNotes());
-            log.info(
-                "Diff notes delivery: posted={}, failed={}, jobId={}",
-                diffResult.posted(),
-                diffResult.failed(),
-                job.getId()
-            );
+            if (diffResult != null) {
+                log.info(
+                    "Diff notes delivery: posted={}, failed={}, jobId={}",
+                    diffResult.posted(),
+                    diffResult.failed(),
+                    job.getId()
+                );
+            } else {
+                log.warn("Diff note poster returned null result: jobId={}", job.getId());
+            }
         } else if (!delivery.diffNotes().isEmpty() && isReAnalysis) {
             log.debug("Skipping diff notes on re-analysis: jobId={}", job.getId());
         } else if (!delivery.diffNotes().isEmpty()) {
