@@ -1,7 +1,6 @@
 package de.tum.in.www1.hephaestus.achievement;
 
 import de.tum.in.www1.hephaestus.activity.ActivitySavedEvent;
-import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -58,6 +57,10 @@ public class AchievementEventListener {
         }
 
         var user = event.user().get();
+        // Eagerly extract ID (safe on detached proxies) for logging.
+        // getLogin() may throw LazyInitializationException if the proxy is detached
+        // (which happens because this listener is @Async + AFTER_COMMIT).
+        Long userId = user.getId();
 
         try {
             List<AchievementDefinition> unlocked = achievementService.checkAndUnlock(event);
@@ -65,20 +68,14 @@ public class AchievementEventListener {
             if (!unlocked.isEmpty()) {
                 log.info(
                     "User {} unlocked {} achievement(s): {}",
-                    LoggingUtils.sanitizeForLog(user.getLogin()),
+                    userId,
                     unlocked.size(),
                     unlocked.stream().map(AchievementDefinition::id).toList()
                 );
             }
         } catch (Exception e) {
             // Log but don't rethrow - achievements are non-critical
-            log.error(
-                "Failed to evaluate achievements: userId={}, login={}, eventType={}",
-                user.getId(),
-                LoggingUtils.sanitizeForLog(user.getLogin()),
-                event.eventType(),
-                e
-            );
+            log.error("Failed to evaluate achievements: userId={}, eventType={}", userId, event.eventType(), e);
         }
     }
 }
