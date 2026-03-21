@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.45.0](https://github.com/ls1intum/Hephaestus/compare/v0.44.0...v0.45.0) (2026-03-21)
+
+### 🚀 Features
+
+* **server:** practice delivery integration ([#884](https://github.com/ls1intum/Hephaestus/issues/884)) ([0478a42](https://github.com/ls1intum/Hephaestus/commit/0478a42c96e50fa37186ed6c85b1734f5bad0347))
+
 ## [0.44.0](https://github.com/ls1intum/Hephaestus/compare/v0.43.0...v0.44.0) (2026-03-20)
 
 ### 🚀 Features
