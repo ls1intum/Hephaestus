@@ -6,6 +6,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import de.tum.in.www1.hephaestus.agent.handler.PracticeDetectionResultParser.DeliveryContent;
+import de.tum.in.www1.hephaestus.agent.handler.PracticeDetectionResultParser.DiffNote;
 import de.tum.in.www1.hephaestus.agent.handler.PracticeDetectionResultParser.DiscardedEntry;
 import de.tum.in.www1.hephaestus.agent.handler.PracticeDetectionResultParser.ParseResult;
 import de.tum.in.www1.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
@@ -447,6 +449,130 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
 
             assertThat(result.validFindings()).isEmpty();
             assertThat(result.discarded()).hasSize(2);
+        }
+    }
+
+    @Nested
+    @DisplayName("Delivery content extraction")
+    class DeliveryContentExtraction {
+
+        private String wrapWithDelivery(String deliveryJson) {
+            return """
+            {"findings": [%s], "delivery": %s}
+            """.formatted(validFindingNode().toString(), deliveryJson);
+        }
+
+        @Test
+        @DisplayName("delivery with mrNote and diffNotes parsed correctly")
+        void deliveryPresentParsedCorrectly() {
+            String raw = """
+                {
+                  "findings": [%s],
+                  "delivery": {
+                    "mrNote": "Please fix the tests.",
+                    "diffNotes": [
+                      {"filePath": "src/Foo.java", "startLine": 10, "endLine": 20, "body": "Add null check here."}
+                    ]
+                  }
+                }
+                """.formatted(validFindingNode().toString());
+            ParseResult result = parser.parse(wrapRawOutput(raw));
+
+            assertThat(result.validFindings()).hasSize(1);
+            assertThat(result.delivery()).isNotNull();
+            assertThat(result.delivery().mrNote()).isEqualTo("Please fix the tests.");
+            assertThat(result.delivery().diffNotes()).hasSize(1);
+            DiffNote note = result.delivery().diffNotes().get(0);
+            assertThat(note.filePath()).isEqualTo("src/Foo.java");
+            assertThat(note.startLine()).isEqualTo(10);
+            assertThat(note.endLine()).isEqualTo(20);
+            assertThat(note.body()).isEqualTo("Add null check here.");
+        }
+
+        @Test
+        @DisplayName("missing delivery does not affect findings")
+        void deliveryMissingFindingsStillValid() {
+            ParseResult result = parser.parse(wrapRawOutput(wrapFindings(validFindingNode())));
+
+            assertThat(result.validFindings()).hasSize(1);
+            assertThat(result.delivery()).isNull();
+        }
+
+        @Test
+        @DisplayName("malformed delivery does not affect findings")
+        void deliveryMalformedFindingsStillValid() {
+            String raw = """
+                {"findings": [%s], "delivery": "not an object"}
+                """.formatted(validFindingNode().toString());
+            ParseResult result = parser.parse(wrapRawOutput(raw));
+
+            assertThat(result.validFindings()).hasSize(1);
+            assertThat(result.delivery()).isNull();
+        }
+
+        @Test
+        @DisplayName("mrNote null but diffNotes still parsed")
+        void mrNoteNullDiffNotesStillParsed() {
+            String raw = wrapWithDelivery(
+                """
+                {"diffNotes": [{"filePath": "a.txt", "startLine": 1, "body": "Fix"}]}
+                """
+            );
+            ParseResult result = parser.parse(wrapRawOutput(raw));
+
+            assertThat(result.delivery()).isNotNull();
+            assertThat(result.delivery().mrNote()).isNull();
+            assertThat(result.delivery().diffNotes()).hasSize(1);
+        }
+
+        @Test
+        @DisplayName("mrNote truncated at max length")
+        void mrNoteTruncatedAtMaxLength() {
+            String longNote = "x".repeat(PracticeDetectionResultParser.MAX_MR_NOTE_LENGTH + 1000);
+            String raw = wrapWithDelivery("{\"mrNote\": \"%s\"}".formatted(longNote));
+            ParseResult result = parser.parse(wrapRawOutput(raw));
+
+            assertThat(result.delivery()).isNotNull();
+            assertThat(result.delivery().mrNote()).hasSize(PracticeDetectionResultParser.MAX_MR_NOTE_LENGTH);
+        }
+
+        @Test
+        @DisplayName("diffNotes with missing fields are skipped")
+        void diffNotesMissingFieldsSkipped() {
+            String raw = wrapWithDelivery(
+                """
+                {
+                  "diffNotes": [
+                    {"startLine": 1, "body": "Missing filePath"},
+                    {"filePath": "a.txt", "body": "Missing startLine"},
+                    {"filePath": "b.txt", "startLine": 5, "body": "Valid note"}
+                  ]
+                }
+                """
+            );
+            ParseResult result = parser.parse(wrapRawOutput(raw));
+
+            assertThat(result.delivery()).isNotNull();
+            assertThat(result.delivery().diffNotes()).hasSize(1);
+            assertThat(result.delivery().diffNotes().get(0).filePath()).isEqualTo("b.txt");
+        }
+
+        @Test
+        @DisplayName("diffNotes exceeding max are capped")
+        void diffNotesExceedMaxCapped() {
+            var sb = new StringBuilder("{\"diffNotes\": [");
+            for (int i = 0; i < PracticeDetectionResultParser.MAX_DIFF_NOTES + 5; i++) {
+                if (i > 0) sb.append(',');
+                sb.append(
+                    "{\"filePath\": \"f%d.txt\", \"startLine\": %d, \"body\": \"Note %d\"}".formatted(i, i + 1, i)
+                );
+            }
+            sb.append("]}");
+            String raw = wrapWithDelivery(sb.toString());
+            ParseResult result = parser.parse(wrapRawOutput(raw));
+
+            assertThat(result.delivery()).isNotNull();
+            assertThat(result.delivery().diffNotes()).hasSize(PracticeDetectionResultParser.MAX_DIFF_NOTES);
         }
     }
 

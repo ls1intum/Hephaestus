@@ -13,9 +13,10 @@ import java.util.List;
 import java.util.Locale;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.lang.Nullable;
 
 /**
- * Parses structured agent output into validated practice findings.
+ * Parses structured agent output into validated practice findings and optional delivery content.
  *
  * <p>This is a pure function with no Spring dependencies. It never throws — all
  * parse failures are captured in {@link ParseResult#discarded()}.
@@ -35,7 +36,13 @@ import org.slf4j.LoggerFactory;
  *       "guidance": "...",
  *       "guidanceMethod": "COACHING"
  *     }
- *   ]
+ *   ],
+ *   "delivery": {
+ *     "mrNote": "Markdown summary for PR author...",
+ *     "diffNotes": [
+ *       { "filePath": "src/Foo.java", "startLine": 10, "body": "Suggestion..." }
+ *     ]
+ *   }
  * }
  * }</pre>
  */
@@ -48,6 +55,15 @@ public class PracticeDetectionResultParser {
     private static final int MAX_GUIDANCE_LENGTH = 5_000;
     private static final int MAX_EVIDENCE_BYTES = 64 * 1024;
 
+    /** Maximum length for the pre-rendered MR/PR summary note (matches PullRequestCommentPoster.MAX_BODY_LENGTH). */
+    static final int MAX_MR_NOTE_LENGTH = 60_000;
+
+    /** Maximum length for a single diff note body. */
+    static final int MAX_DIFF_NOTE_BODY_LENGTH = 2_000;
+
+    /** Maximum number of diff notes per job. Bounds API calls for GitLab (one per note). */
+    static final int MAX_DIFF_NOTES = 10;
+
     private final ObjectMapper objectMapper;
     private final int maxFindingsPerJob;
 
@@ -57,10 +73,10 @@ public class PracticeDetectionResultParser {
     }
 
     /**
-     * Parse agent output into validated findings. Never throws.
+     * Parse agent output into validated findings and optional delivery content. Never throws.
      *
      * @param jobOutput the {@code AgentJob.output} JSONB node (contains {@code rawOutput} string)
-     * @return parse result with valid findings and discarded entries
+     * @return parse result with valid findings, discarded entries, and optional delivery content
      */
     public ParseResult parse(JsonNode jobOutput) {
         if (jobOutput == null || jobOutput.isNull() || jobOutput.isMissingNode()) {
@@ -119,8 +135,131 @@ public class PracticeDetectionResultParser {
             }
         }
 
-        return new ParseResult(Collections.unmodifiableList(valid), Collections.unmodifiableList(discarded));
+        // Step 6: Extract optional delivery content (never affects findings)
+        DeliveryContent delivery = parseDeliveryContent(root);
+
+        return new ParseResult(Collections.unmodifiableList(valid), Collections.unmodifiableList(discarded), delivery);
     }
+
+    // =========================================================================
+    // Delivery content parsing
+    // =========================================================================
+
+    @Nullable
+    private DeliveryContent parseDeliveryContent(JsonNode root) {
+        JsonNode deliveryNode = root.get("delivery");
+        if (deliveryNode == null || deliveryNode.isNull() || deliveryNode.isMissingNode()) {
+            return null;
+        }
+        if (!deliveryNode.isObject()) {
+            log.debug("delivery field is not an object, ignoring");
+            return null;
+        }
+
+        // mrNote — optional text
+        String mrNote = null;
+        JsonNode mrNoteNode = deliveryNode.get("mrNote");
+        if (mrNoteNode != null && !mrNoteNode.isNull() && mrNoteNode.isTextual()) {
+            mrNote = mrNoteNode.asText();
+            if (mrNote.isBlank()) {
+                mrNote = null;
+            } else if (mrNote.length() > MAX_MR_NOTE_LENGTH) {
+                log.debug("Truncating mrNote from {} to {} chars", mrNote.length(), MAX_MR_NOTE_LENGTH);
+                mrNote = mrNote.substring(0, MAX_MR_NOTE_LENGTH);
+            }
+        }
+
+        // diffNotes — optional array
+        List<DiffNote> diffNotes = parseDiffNotes(deliveryNode);
+
+        if (mrNote == null && diffNotes.isEmpty()) {
+            return null;
+        }
+
+        return new DeliveryContent(mrNote, diffNotes);
+    }
+
+    private List<DiffNote> parseDiffNotes(JsonNode deliveryNode) {
+        JsonNode diffNotesNode = deliveryNode.get("diffNotes");
+        if (diffNotesNode == null || diffNotesNode.isNull() || !diffNotesNode.isArray()) {
+            return List.of();
+        }
+
+        List<DiffNote> notes = new ArrayList<>();
+        int limit = Math.min(diffNotesNode.size(), MAX_DIFF_NOTES);
+
+        if (diffNotesNode.size() > MAX_DIFF_NOTES) {
+            log.debug("Capping diffNotes from {} to {}", diffNotesNode.size(), MAX_DIFF_NOTES);
+        }
+
+        for (int i = 0; i < limit; i++) {
+            JsonNode entry = diffNotesNode.get(i);
+            if (!entry.isObject()) {
+                log.debug("Skipping non-object diffNote at index {}", i);
+                continue;
+            }
+
+            // Required: filePath
+            JsonNode filePathNode = entry.get("filePath");
+            if (
+                filePathNode == null ||
+                filePathNode.isNull() ||
+                !filePathNode.isTextual() ||
+                filePathNode.asText().isBlank()
+            ) {
+                log.debug("Skipping diffNote at index {}: missing filePath", i);
+                continue;
+            }
+            String filePath = filePathNode.asText();
+
+            // Required: startLine (positive integer)
+            JsonNode startLineNode = entry.get("startLine");
+            if (startLineNode == null || startLineNode.isNull() || !startLineNode.isNumber()) {
+                log.debug("Skipping diffNote at index {}: missing or non-numeric startLine", i);
+                continue;
+            }
+            int startLine = startLineNode.asInt();
+            if (startLine <= 0) {
+                log.debug("Skipping diffNote at index {}: startLine must be positive, got {}", i, startLine);
+                continue;
+            }
+
+            // Optional: endLine (positive integer, must be >= startLine)
+            Integer endLine = null;
+            JsonNode endLineNode = entry.get("endLine");
+            if (endLineNode != null && !endLineNode.isNull() && endLineNode.isNumber()) {
+                int endLineValue = endLineNode.asInt();
+                if (endLineValue >= startLine) {
+                    endLine = endLineValue;
+                }
+            }
+
+            // Required: body
+            JsonNode bodyNode = entry.get("body");
+            if (bodyNode == null || bodyNode.isNull() || !bodyNode.isTextual() || bodyNode.asText().isBlank()) {
+                log.debug("Skipping diffNote at index {}: missing body", i);
+                continue;
+            }
+            String body = bodyNode.asText();
+            if (body.length() > MAX_DIFF_NOTE_BODY_LENGTH) {
+                log.debug(
+                    "Truncating diffNote body from {} to {} chars at index {}",
+                    body.length(),
+                    MAX_DIFF_NOTE_BODY_LENGTH,
+                    i
+                );
+                body = body.substring(0, MAX_DIFF_NOTE_BODY_LENGTH);
+            }
+
+            notes.add(new DiffNote(filePath, startLine, endLine, body));
+        }
+
+        return Collections.unmodifiableList(notes);
+    }
+
+    // =========================================================================
+    // Finding entry validation
+    // =========================================================================
 
     private ValidatedFinding validateEntry(JsonNode entry, int index) {
         // Required: practiceSlug
@@ -273,9 +412,18 @@ public class PracticeDetectionResultParser {
     // Result types
     // =========================================================================
 
-    public record ParseResult(List<ValidatedFinding> validFindings, List<DiscardedEntry> discarded) {
+    /**
+     * @param validFindings validated findings from the agent output
+     * @param discarded entries that failed validation with reasons
+     * @param delivery optional pre-rendered delivery content (null if absent or malformed)
+     */
+    public record ParseResult(
+        List<ValidatedFinding> validFindings,
+        List<DiscardedEntry> discarded,
+        @Nullable DeliveryContent delivery
+    ) {
         static ParseResult empty(String reason) {
-            return new ParseResult(List.of(), List.of(new DiscardedEntry(-1, reason)));
+            return new ParseResult(List.of(), List.of(new DiscardedEntry(-1, reason)), null);
         }
     }
 
@@ -292,4 +440,23 @@ public class PracticeDetectionResultParser {
     ) {}
 
     public record DiscardedEntry(int index, String reason) {}
+
+    /**
+     * Pre-rendered delivery content from the agent. The agent produces this alongside
+     * structured findings — the server sanitizes and posts it without further rendering.
+     *
+     * @param mrNote  markdown summary for the PR/MR comment (null if agent didn't produce one)
+     * @param diffNotes inline diff comments with file locations
+     */
+    public record DeliveryContent(@Nullable String mrNote, List<DiffNote> diffNotes) {}
+
+    /**
+     * An inline diff note targeting a specific file and line range.
+     *
+     * @param filePath  path relative to repo root (new path, not old)
+     * @param startLine first line number (1-based, must be positive)
+     * @param endLine   optional last line number for multi-line (GitHub only; GitLab ignores)
+     * @param body      markdown comment body (sanitized before posting)
+     */
+    public record DiffNote(String filePath, int startLine, @Nullable Integer endLine, String body) {}
 }

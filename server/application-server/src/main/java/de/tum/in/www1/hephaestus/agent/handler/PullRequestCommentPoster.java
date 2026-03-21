@@ -26,14 +26,14 @@ import org.springframework.lang.Nullable;
  * Delivery status is tracked on the {@link AgentJob} entity.
  *
  * <p>Package-private — created via {@code new} in {@link JobTypeHandlerConfiguration}
- * and injected into {@link PullRequestReviewHandler}. Not a Spring proxy, so
+ * and injected into {@link FeedbackDeliveryService}. Not a Spring proxy, so
  * {@code @Transactional} annotations on this class would be silently ignored.
  */
 class PullRequestCommentPoster {
 
     private static final Logger log = LoggerFactory.getLogger(PullRequestCommentPoster.class);
 
-    private static final Duration GRAPHQL_TIMEOUT = Duration.ofSeconds(15);
+    static final Duration GRAPHQL_TIMEOUT = Duration.ofSeconds(15);
 
     /** Maximum comment body length before header/footer (GitHub limit is 65,536). */
     static final int MAX_BODY_LENGTH = 60_000;
@@ -138,10 +138,10 @@ class PullRequestCommentPoster {
     /** Matches 3+ consecutive newlines — collapsed to 2. */
     private static final Pattern EXCESSIVE_NEWLINES = Pattern.compile("\\n{3,}");
 
-    private final GitHubGraphQlClientProvider gitHubProvider;
+    final GitHubGraphQlClientProvider gitHubProvider;
 
     @Nullable
-    private final GitLabGraphQlClientProvider gitLabProvider;
+    final GitLabGraphQlClientProvider gitLabProvider;
 
     private final WorkspaceRepository workspaceRepository;
 
@@ -172,8 +172,43 @@ class PullRequestCommentPoster {
             return null;
         }
         String formatted = formatComment(sanitized, summary != null ? sanitize(summary) : null, job);
+        return postFormattedBody(job, formatted, job.getDeliveryCommentId());
+    }
 
-        // getId() on a lazy proxy does NOT trigger initialization
+    /**
+     * Posts a practice summary note on the PR/MR associated with the given job.
+     *
+     * @param job               the completed agent job
+     * @param mrNote            the raw markdown note from agent output (untrusted)
+     * @param existingCommentId comment ID from a previous job for this PR (re-analysis dedup), may be null
+     * @return the provider-specific comment ID, or null if the sanitized body is empty
+     * @throws JobDeliveryException if posting fails
+     */
+    @Nullable
+    String postPracticeNote(AgentJob job, String mrNote, @Nullable String existingCommentId) {
+        String sanitized = sanitize(mrNote);
+        if (sanitized.isBlank()) {
+            log.debug("Practice note was empty after sanitization, skipping post: jobId={}", job.getId());
+            return null;
+        }
+        String formatted = FeedbackDeliveryService.formatPracticeNote(sanitized, job);
+        return postFormattedBody(job, formatted, existingCommentId);
+    }
+
+    // ── Core posting (shared by all comment types) ──
+
+    /**
+     * Posts a fully formatted body to the PR/MR associated with the given job.
+     * If an existing comment ID is provided, updates that comment instead of creating a new one.
+     *
+     * @param job               the completed agent job (must have metadata)
+     * @param formattedBody     the fully formatted comment body (already sanitized)
+     * @param existingCommentId an existing comment/note ID to update, or null to create a new one
+     * @return the provider-specific comment ID
+     * @throws JobDeliveryException if posting fails
+     */
+    @Nullable
+    String postFormattedBody(AgentJob job, String formattedBody, @Nullable String existingCommentId) {
         Long workspaceId = job.getWorkspace().getId();
         Workspace workspace = workspaceRepository
             .findById(workspaceId)
@@ -181,9 +216,9 @@ class PullRequestCommentPoster {
 
         String commentId;
         if (workspace.getProviderType() == GitProviderType.GITHUB) {
-            commentId = postGitHubComment(workspaceId, job, formatted);
+            commentId = postGitHubComment(workspaceId, job, formattedBody, existingCommentId);
         } else {
-            commentId = postGitLabNote(workspaceId, job, formatted);
+            commentId = postGitLabNote(workspaceId, job, formattedBody, existingCommentId);
         }
 
         log.info(
@@ -197,18 +232,15 @@ class PullRequestCommentPoster {
 
     // ── GitHub ──
 
-    private String postGitHubComment(Long scopeId, AgentJob job, String body) {
+    private String postGitHubComment(Long scopeId, AgentJob job, String body, @Nullable String existingCommentId) {
         if (gitHubProvider.isRateLimitCritical(scopeId)) {
             throw new JobDeliveryException("GitHub rate limit critical — skipping comment post for scope " + scopeId);
         }
 
-        // Update existing comment if we already posted one (avoids node ID resolution)
-        String existingCommentId = job.getDeliveryCommentId();
         if (existingCommentId != null && !existingCommentId.isBlank()) {
             return updateGitHubComment(scopeId, existingCommentId, body);
         }
 
-        // New comment: resolve PR node ID first
         JsonNode metadata = job.getMetadata();
         String repoFullName = requireMetadataText(metadata, "repository_full_name");
         int prNumber = requireMetadataInt(metadata, "pr_number");
@@ -222,7 +254,7 @@ class PullRequestCommentPoster {
         return createGitHubComment(scopeId, nodeId, body);
     }
 
-    private String resolveGitHubPrNodeId(Long scopeId, String owner, String name, int number) {
+    String resolveGitHubPrNodeId(Long scopeId, String owner, String name, int number) {
         ClientGraphQlResponse response = gitHubProvider
             .forScope(scopeId)
             .documentName("GetPullRequestNodeId")
@@ -300,7 +332,7 @@ class PullRequestCommentPoster {
 
     // ── GitLab ──
 
-    private String postGitLabNote(Long scopeId, AgentJob job, String body) {
+    private String postGitLabNote(Long scopeId, AgentJob job, String body, @Nullable String existingNoteId) {
         if (gitLabProvider == null) {
             throw new JobDeliveryException("GitLab provider not configured — cannot post note for scope " + scopeId);
         }
@@ -308,13 +340,10 @@ class PullRequestCommentPoster {
             throw new JobDeliveryException("GitLab rate limit critical — skipping note post for scope " + scopeId);
         }
 
-        // Update existing note if we already posted one (avoids global ID resolution)
-        String existingNoteId = job.getDeliveryCommentId();
         if (existingNoteId != null && !existingNoteId.isBlank()) {
             return updateGitLabNote(scopeId, existingNoteId, body);
         }
 
-        // New note: resolve MR global ID first
         JsonNode metadata = job.getMetadata();
         String repoFullName = requireMetadataText(metadata, "repository_full_name");
         int prNumber = requireMetadataInt(metadata, "pr_number");
@@ -323,7 +352,7 @@ class PullRequestCommentPoster {
         return createGitLabNote(scopeId, globalId, body);
     }
 
-    private String resolveGitLabMrGlobalId(Long scopeId, String projectPath, int mrIid) {
+    String resolveGitLabMrGlobalId(Long scopeId, String projectPath, int mrIid) {
         ClientGraphQlResponse response = gitLabProvider
             .forScope(scopeId)
             .documentName("GetMergeRequestGlobalId")
@@ -470,10 +499,10 @@ class PullRequestCommentPoster {
         //    Prefix with backtick to render as inline code instead of being executed
         result = GITLAB_SLASH_COMMAND.matcher(result).replaceAll("`$1`");
 
-        // 10. Collapse excessive newlines
+        // 9. Collapse excessive newlines
         result = EXCESSIVE_NEWLINES.matcher(result).replaceAll("\n\n");
 
-        // 11. Truncate
+        // 10. Truncate
         result = result.strip();
         if (result.length() > MAX_BODY_LENGTH) {
             result = result.substring(0, MAX_BODY_LENGTH) + "\n\n[... truncated — comment exceeded length limit]";
@@ -512,7 +541,13 @@ class PullRequestCommentPoster {
         sb.append(sanitizedBody).append("\n\n");
         sb.append("</details>\n\n");
 
-        // Metadata footer
+        appendMetadataFooter(sb, job);
+
+        return sb.toString();
+    }
+
+    /** Appends the metadata footer (agent name, model, duration) to a comment being built. */
+    static void appendMetadataFooter(StringBuilder sb, AgentJob job) {
         sb.append("---\n");
         sb.append("<sub>Hephaestus Agent");
 
@@ -530,11 +565,9 @@ class PullRequestCommentPoster {
         }
 
         sb.append("</sub>\n");
-
-        return sb.toString();
     }
 
-    private static String formatDuration(Duration duration) {
+    static String formatDuration(Duration duration) {
         long totalSeconds = Math.max(0, duration.toSeconds());
         if (totalSeconds < 60) {
             return totalSeconds + "s";
@@ -545,13 +578,13 @@ class PullRequestCommentPoster {
     }
 
     /** Lightweight HTML escaping for trusted short strings (e.g., model names). */
-    private static String escapeHtml(String text) {
+    static String escapeHtml(String text) {
         return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
     }
 
     // ── Metadata helpers ──
 
-    private static String requireMetadataText(JsonNode metadata, String field) {
+    static String requireMetadataText(JsonNode metadata, String field) {
         JsonNode node = metadata.get(field);
         if (node == null || node.isNull()) {
             throw new JobDeliveryException("Missing required metadata field: " + field);
@@ -559,7 +592,7 @@ class PullRequestCommentPoster {
         return node.asText();
     }
 
-    private static int requireMetadataInt(JsonNode metadata, String field) {
+    static int requireMetadataInt(JsonNode metadata, String field) {
         JsonNode node = metadata.get(field);
         if (node == null || node.isNull()) {
             throw new JobDeliveryException("Missing required metadata field: " + field);

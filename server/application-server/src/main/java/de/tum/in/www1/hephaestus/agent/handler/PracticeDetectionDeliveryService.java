@@ -90,7 +90,7 @@ public class PracticeDetectionDeliveryService {
                 workspaceId,
                 job.getId()
             );
-            return new DeliveryResult(0, validFindings.size(), 0, 0);
+            return new DeliveryResult(0, validFindings.size(), 0, 0, false);
         }
 
         // Resolve target PR and author
@@ -218,13 +218,20 @@ public class PracticeDetectionDeliveryService {
             )
         );
 
-        return new DeliveryResult(inserted, discardedUnknownSlug, discardedOverCap, discardedDuplicate);
+        return new DeliveryResult(
+            inserted,
+            discardedUnknownSlug,
+            discardedOverCap,
+            discardedDuplicate,
+            hasNegativeInserted
+        );
     }
 
     public record DeliveryResult(
         int inserted,
         int discardedUnknownSlug,
         int discardedOverCap,
-        int discardedDuplicate
+        int discardedDuplicate,
+        boolean hasNegative
     ) {}
 }

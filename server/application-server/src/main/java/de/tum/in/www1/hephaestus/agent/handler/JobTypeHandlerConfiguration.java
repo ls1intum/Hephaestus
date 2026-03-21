@@ -1,7 +1,9 @@
 package de.tum.in.www1.hephaestus.agent.handler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.tum.in.www1.hephaestus.account.UserPreferencesRepository;
 import de.tum.in.www1.hephaestus.agent.handler.spi.JobTypeHandler;
+import de.tum.in.www1.hephaestus.agent.job.AgentJobRepository;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.git.GitRepositoryManager;
@@ -50,13 +52,40 @@ public class JobTypeHandlerConfiguration {
     }
 
     @Bean
+    DiffNotePoster diffNotePoster(
+        PullRequestCommentPoster commentPoster,
+        GitHubGraphQlClientProvider gitHubProvider,
+        @Nullable GitLabGraphQlClientProvider gitLabProvider,
+        WorkspaceRepository workspaceRepository
+    ) {
+        return new DiffNotePoster(commentPoster, gitHubProvider, gitLabProvider, workspaceRepository);
+    }
+
+    @Bean
+    FeedbackDeliveryService feedbackDeliveryService(
+        PullRequestCommentPoster commentPoster,
+        DiffNotePoster diffNotePoster,
+        UserPreferencesRepository userPreferencesRepository,
+        PullRequestRepository pullRequestRepository,
+        AgentJobRepository agentJobRepository
+    ) {
+        return new FeedbackDeliveryService(
+            commentPoster,
+            diffNotePoster,
+            userPreferencesRepository,
+            pullRequestRepository,
+            agentJobRepository
+        );
+    }
+
+    @Bean
     public JobTypeHandler pullRequestReviewHandler(
         PullRequestRepository pullRequestRepository,
         PullRequestReviewCommentRepository reviewCommentRepository,
         PracticeRepository practiceRepository,
         PracticeDetectionResultParser resultParser,
         PracticeDetectionDeliveryService deliveryService,
-        PullRequestCommentPoster commentPoster
+        FeedbackDeliveryService feedbackService
     ) {
         return new PullRequestReviewHandler(
             objectMapper,
@@ -66,7 +95,7 @@ public class JobTypeHandlerConfiguration {
             practiceRepository,
             resultParser,
             deliveryService,
-            commentPoster
+            feedbackService
         );
     }
 
