@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.46.0](https://github.com/ls1intum/Hephaestus/compare/v0.45.0...v0.46.0) (2026-03-21)
+
+### 🚀 Features
+
+* **server:** practice CRUD API ([#885](https://github.com/ls1intum/Hephaestus/issues/885)) ([8756078](https://github.com/ls1intum/Hephaestus/commit/87560780fa378a890fda3f89c166de29cafcecc6))
+
 ## [0.45.0](https://github.com/ls1intum/Hephaestus/compare/v0.44.0...v0.45.0) (2026-03-21)
 
 ### 🚀 Features
