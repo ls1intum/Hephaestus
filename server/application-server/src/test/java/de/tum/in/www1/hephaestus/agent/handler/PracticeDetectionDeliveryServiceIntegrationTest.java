@@ -6,6 +6,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.tum.in.www1.hephaestus.agent.AgentJobType;
+import de.tum.in.www1.hephaestus.agent.AgentType;
+import de.tum.in.www1.hephaestus.agent.CredentialMode;
+import de.tum.in.www1.hephaestus.agent.LlmProvider;
+import de.tum.in.www1.hephaestus.agent.config.AgentConfig;
+import de.tum.in.www1.hephaestus.agent.config.AgentConfigRepository;
 import de.tum.in.www1.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
 import de.tum.in.www1.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.in.www1.hephaestus.agent.job.AgentJob;
@@ -42,6 +47,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.event.ApplicationEvents;
 import org.springframework.test.context.event.RecordApplicationEvents;
 
+/**
+ * Integration test for {@link PracticeDetectionDeliveryService} exercising real PostgreSQL
+ * for finding persistence (INSERT ... ON CONFLICT DO NOTHING), negative cap enforcement,
+ * verdict classification, and {@link PracticeDetectionCompletedEvent} publication.
+ *
+ * <p>No mocks required — this service layer does not call external APIs. It resolves practice
+ * slugs against the DB and persists findings via {@code PracticeFindingRepository.insertIfAbsent()}.
+ */
 @DisplayName("PracticeDetectionDeliveryService Integration")
 @RecordApplicationEvents
 class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTest {
@@ -59,6 +72,9 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
 
     @Autowired
     private AgentJobRepository agentJobRepository;
+
+    @Autowired
+    private AgentConfigRepository agentConfigRepository;
 
     @Autowired
     private UserRepository userRepository;
@@ -79,8 +95,6 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
     private ApplicationEvents applicationEvents;
 
     private Workspace workspace;
-    private Practice practice1;
-    private Practice practice2;
     private AgentJob agentJob;
     private User contributor;
     private Long prId;
@@ -91,11 +105,22 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
 
         workspace = workspaceRepository.save(WorkspaceTestFactory.activeWorkspace("delivery-test"));
 
-        practice1 = createPractice("pr-description-quality", "PR Description Quality");
-        practice2 = createPractice("error-handling", "Error Handling");
+        createPractice("pr-description-quality", "PR Description Quality");
+        createPractice("error-handling", "Error Handling");
+
+        AgentConfig config = new AgentConfig();
+        config.setWorkspace(workspace);
+        config.setName("delivery-config");
+        config.setEnabled(true);
+        config.setAgentType(AgentType.CLAUDE_CODE);
+        config.setLlmProvider(LlmProvider.ANTHROPIC);
+        config.setCredentialMode(CredentialMode.PROXY);
+        config.setTimeoutSeconds(300);
+        config = agentConfigRepository.save(config);
 
         agentJob = new AgentJob();
         agentJob.setWorkspace(workspace);
+        agentJob.setConfig(config);
         agentJob.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
         agentJob.setConfigSnapshot(OBJECT_MAPPER.valueToTree(Map.of("model", "test")));
         agentJob = agentJobRepository.save(agentJob);
@@ -194,6 +219,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
 
             assertThat(result.inserted()).isEqualTo(2);
             assertThat(result.discardedUnknownSlug()).isZero();
+            assertThat(result.hasNegative()).isTrue();
 
             List<PracticeFinding> persisted = practiceFindingRepository.findAll();
             assertThat(persisted).hasSize(2);
@@ -201,7 +227,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
                 .extracting(PracticeFinding::getVerdict)
                 .containsExactlyInAnyOrder(Verdict.POSITIVE, Verdict.NEGATIVE);
             assertThat(persisted)
-                .extracting(f -> f.getConfidence())
+                .extracting(PracticeFinding::getConfidence)
                 .allMatch(c -> c == 0.9f);
         }
 
@@ -291,10 +317,54 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
             PracticeDetectionCompletedEvent event = events.get(0);
             assertThat(event.agentJobId()).isEqualTo(agentJob.getId());
             assertThat(event.workspaceId()).isEqualTo(workspace.getId());
+            assertThat(event.targetType()).isEqualTo("pull_request");
+            assertThat(event.targetId()).isEqualTo(prId);
             assertThat(event.findingsInserted()).isEqualTo(1);
             assertThat(event.findingsDiscarded()).isZero();
             assertThat(event.hasNegative()).isFalse();
             assertThat(event.contributorId()).isEqualTo(contributor.getId());
+        }
+
+        @Test
+        @DisplayName("empty findings list publishes event with zero counts")
+        void emptyFindingsPublishesZeroEvent() {
+            var result = deliveryService.deliver(agentJob, List.of());
+
+            assertThat(result.inserted()).isZero();
+            assertThat(result.hasNegative()).isFalse();
+
+            List<PracticeDetectionCompletedEvent> events = applicationEvents
+                .stream(PracticeDetectionCompletedEvent.class)
+                .toList();
+            assertThat(events).hasSize(1);
+            assertThat(events.get(0).findingsInserted()).isZero();
+            assertThat(events.get(0).findingsDiscarded()).isZero();
+            assertThat(events.get(0).hasNegative()).isFalse();
+        }
+    }
+
+    @Nested
+    @DisplayName("Non-negative verdicts")
+    class NonNegativeVerdicts {
+
+        @Test
+        @DisplayName("NOT_APPLICABLE and NEEDS_REVIEW verdicts persisted without triggering hasNegative")
+        void nonNegativeVerdictsDoNotTriggerHasNegative() {
+            var findings = List.of(
+                finding("pr-description-quality", Verdict.NOT_APPLICABLE),
+                finding("error-handling", Verdict.NEEDS_REVIEW)
+            );
+
+            var result = deliveryService.deliver(agentJob, findings);
+
+            assertThat(result.inserted()).isEqualTo(2);
+            assertThat(result.hasNegative()).isFalse();
+
+            List<PracticeFinding> persisted = practiceFindingRepository.findAll();
+            assertThat(persisted).hasSize(2);
+            assertThat(persisted)
+                .extracting(PracticeFinding::getVerdict)
+                .containsExactlyInAnyOrder(Verdict.NOT_APPLICABLE, Verdict.NEEDS_REVIEW);
         }
     }
 
