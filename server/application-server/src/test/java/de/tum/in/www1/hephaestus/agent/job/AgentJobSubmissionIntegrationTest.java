@@ -217,9 +217,7 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
             );
 
             assertThat(result).isPresent();
-            List<AgentJobCreatedEvent> events = applicationEvents
-                .stream(AgentJobCreatedEvent.class)
-                .toList();
+            List<AgentJobCreatedEvent> events = applicationEvents.stream(AgentJobCreatedEvent.class).toList();
             assertThat(events).hasSize(1);
             assertThat(events.get(0).jobId()).isEqualTo(result.get().getId());
             assertThat(events.get(0).workspaceId()).isEqualTo(workspace.getId());

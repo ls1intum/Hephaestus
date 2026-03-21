@@ -155,18 +155,18 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
             "OPEN",
             null,
             "https://github.com/org/gate-repo/pull/100",
-            false,      // isLocked
-            null,       // closedAt
-            0,          // commentsCount
-            now,        // lastSyncAt
-            now,        // createdAt
-            now,        // updatedAt
+            false, // isLocked
+            null, // closedAt
+            0, // commentsCount
+            now, // lastSyncAt
+            now, // createdAt
+            now, // updatedAt
             assignee.getId(),
             repo.getId(),
-            null,       // milestoneId
-            null,       // mergedAt
-            isDraft,    // isDraft
-            false,      // isMerged
+            null, // milestoneId
+            null, // mergedAt
+            isDraft, // isDraft
+            false, // isMerged
             1,
             10,
             5,
@@ -180,9 +180,7 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
             "basesha",
             null
         );
-        PullRequest pr = pullRequestRepository
-            .findByRepositoryIdAndNumber(repo.getId(), 100)
-            .orElseThrow();
+        PullRequest pr = pullRequestRepository.findByRepositoryIdAndNumber(repo.getId(), 100).orElseThrow();
 
         // Attach relationships that the gate reads (these are on the Issue superclass)
         pr.setLabels(labels != null ? labels : Set.of());

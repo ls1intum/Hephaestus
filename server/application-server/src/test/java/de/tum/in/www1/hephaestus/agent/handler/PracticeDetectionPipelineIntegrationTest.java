@@ -192,7 +192,9 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         agentJob.setConfig(config);
         agentJob.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
         agentJob.setStatus(AgentJobStatus.COMPLETED);
-        agentJob.setConfigSnapshot(OBJECT_MAPPER.valueToTree(Map.of("model", "claude-3.5", "agentType", "CLAUDE_CODE")));
+        agentJob.setConfigSnapshot(
+            OBJECT_MAPPER.valueToTree(Map.of("model", "claude-3.5", "agentType", "CLAUDE_CODE"))
+        );
 
         ObjectNode metadata = OBJECT_MAPPER.createObjectNode();
         metadata.put("pull_request_id", prId);
@@ -250,18 +252,21 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
               ]""";
 
         if (includeDelivery) {
-            return findings + """
-                ,
-                "delivery": {
-                  "mrNote": "## Practice Review\\nPlease add null checks for safety.",
-                  "diffNotes": [{
-                    "filePath": "src/Main.java",
-                    "startLine": 10,
-                    "endLine": 15,
-                    "body": "Consider adding a null check here."
-                  }]
-                }
-              }""";
+            return (
+                findings +
+                """
+                  ,
+                  "delivery": {
+                    "mrNote": "## Practice Review\\nPlease add null checks for safety.",
+                    "diffNotes": [{
+                      "filePath": "src/Main.java",
+                      "startLine": 10,
+                      "endLine": 15,
+                      "body": "Consider adding a null check here."
+                    }]
+                  }
+                }"""
+            );
         }
         return findings + "\n}";
     }
@@ -275,8 +280,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         void fullPipelineFromParseToDelivery() {
             setJobOutput(validAgentOutput(true));
             when(commentPoster.postPracticeNote(any(), any(), isNull())).thenReturn("comment-123");
-            when(diffNotePoster.postDiffNotes(any(), any()))
-                .thenReturn(new DiffNotePoster.DiffNoteResult(1, 0));
+            when(diffNotePoster.postDiffNotes(any(), any())).thenReturn(new DiffNotePoster.DiffNoteResult(1, 0));
 
             handler.deliver(agentJob);
 
@@ -472,8 +476,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         void redeliveryNoDuplicates() {
             setJobOutput(validAgentOutput(true));
             when(commentPoster.postPracticeNote(any(), any(), any())).thenReturn("comment-789");
-            when(diffNotePoster.postDiffNotes(any(), any()))
-                .thenReturn(new DiffNotePoster.DiffNoteResult(1, 0));
+            when(diffNotePoster.postDiffNotes(any(), any())).thenReturn(new DiffNotePoster.DiffNoteResult(1, 0));
 
             // First delivery
             handler.deliver(agentJob);
