@@ -38,7 +38,7 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
     private PracticeDetectionDeliveryService deliveryService;
 
     @Mock
-    private PullRequestCommentPoster commentPoster;
+    private FeedbackDeliveryService feedbackService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -52,7 +52,7 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
             practiceRepository,
             parser,
             deliveryService,
-            commentPoster
+            feedbackService
         );
     }
 

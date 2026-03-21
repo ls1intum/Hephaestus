@@ -98,4 +98,33 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
         @Param("status") DeliveryStatus status,
         @Param("commentId") String commentId
     );
+
+    /**
+     * Find the delivery comment ID from the most recent delivered job for the same PR.
+     * Used for re-analysis dedup: update the existing comment instead of creating a duplicate.
+     *
+     * <p>Note: {@code CAST(:pullRequestId AS text)} is required because the expression index
+     * {@code idx_agent_job_delivery_dedup} is defined on {@code (metadata->>'pull_request_id')}
+     * which returns text. Without the explicit cast, PostgreSQL may not match the index.
+     */
+    @WorkspaceAgnostic("Cross-job lookup for re-analysis dedup; workspace-scoped by parameter")
+    @Query(
+        value = """
+        SELECT delivery_comment_id FROM agent_job
+        WHERE workspace_id = :workspaceId
+        AND job_type = 'PULL_REQUEST_REVIEW'
+        AND delivery_comment_id IS NOT NULL
+        AND delivery_status = 'DELIVERED'
+        AND metadata->>'pull_request_id' = CAST(:pullRequestId AS text)
+        AND id != :currentJobId
+        ORDER BY completed_at DESC NULLS LAST
+        LIMIT 1
+        """,
+        nativeQuery = true
+    )
+    Optional<String> findPreviousDeliveryCommentId(
+        @Param("workspaceId") Long workspaceId,
+        @Param("pullRequestId") Long pullRequestId,
+        @Param("currentJobId") UUID currentJobId
+    );
 }
