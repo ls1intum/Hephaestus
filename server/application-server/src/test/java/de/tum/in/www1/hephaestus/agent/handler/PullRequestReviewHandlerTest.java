@@ -71,7 +71,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
     private static final Long WORKSPACE_ID = 99L;
 
     @Mock
-    private PullRequestCommentPoster commentPoster;
+    private FeedbackDeliveryService feedbackService;
 
     private PracticeDetectionResultParser resultParser;
     private PullRequestReviewHandler handler;
@@ -87,7 +87,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             practiceRepository,
             resultParser,
             deliveryService,
-            commentPoster
+            feedbackService
         );
     }
 
@@ -889,7 +889,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                 }
                 """;
             AgentJob job = jobWithOutput(rawOutput);
-            when(deliveryService.deliver(eq(job), any())).thenReturn(new DeliveryResult(1, 0, 0, 0));
+            when(deliveryService.deliver(eq(job), any())).thenReturn(new DeliveryResult(1, 0, 0, 0, false));
 
             handler.deliver(job);
 
@@ -1016,7 +1016,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                 }
                 """;
             AgentJob job = jobWithOutput(rawOutput);
-            when(deliveryService.deliver(eq(job), any())).thenReturn(new DeliveryResult(1, 0, 0, 0));
+            when(deliveryService.deliver(eq(job), any())).thenReturn(new DeliveryResult(1, 0, 0, 0, false));
 
             handler.deliver(job);
 
@@ -1029,36 +1029,38 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should call commentPoster when review_comment is present in output")
-        void shouldCallCommentPosterWhenReviewCommentPresent() {
+        @DisplayName("should call feedbackService after findings delivery")
+        void shouldCallFeedbackServiceAfterFindings() {
             String rawOutput = """
                 {
-                  "review_comment": "Great code!",
-                  "summary": "Looks good overall",
                   "findings": [{
                     "practiceSlug": "pr-description-quality",
                     "title": "Good PR description",
-                    "verdict": "POSITIVE",
-                    "severity": "INFO",
-                    "confidence": 0.95
-                  }]
+                    "verdict": "NEGATIVE",
+                    "severity": "MAJOR",
+                    "confidence": 0.85
+                  }],
+                  "delivery": {
+                    "mrNote": "Please improve PR description."
+                  }
                 }
                 """;
             AgentJob job = jobWithOutput(rawOutput);
-            when(deliveryService.deliver(eq(job), any())).thenReturn(new DeliveryResult(1, 0, 0, 0));
-            when(commentPoster.postComment(eq(job), eq("Great code!"), eq("Looks good overall"))).thenReturn(
-                "IC_abc123"
-            );
+            when(deliveryService.deliver(eq(job), any())).thenReturn(new DeliveryResult(1, 0, 0, 0, true));
 
             handler.deliver(job);
 
-            verify(commentPoster).postComment(job, "Great code!", "Looks good overall");
-            assertThat(job.getDeliveryCommentId()).isEqualTo("IC_abc123");
+            var deliveryCaptor = ArgumentCaptor.forClass(PracticeDetectionResultParser.DeliveryContent.class);
+            verify(feedbackService).deliverFeedback(eq(job), deliveryCaptor.capture(), eq(true));
+            var delivery = deliveryCaptor.getValue();
+            assertThat(delivery).isNotNull();
+            assertThat(delivery.mrNote()).isEqualTo("Please improve PR description.");
+            assertThat(delivery.diffNotes()).isEmpty();
         }
 
         @Test
-        @DisplayName("should skip comment posting when review_comment is absent")
-        void shouldSkipCommentPostingWhenAbsent() {
+        @DisplayName("should call feedbackService with null delivery when no delivery content")
+        void shouldCallFeedbackServiceWithNullDelivery() {
             String rawOutput = """
                 {
                   "findings": [{
@@ -1071,69 +1073,11 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                 }
                 """;
             AgentJob job = jobWithOutput(rawOutput);
-            when(deliveryService.deliver(eq(job), any())).thenReturn(new DeliveryResult(1, 0, 0, 0));
+            when(deliveryService.deliver(eq(job), any())).thenReturn(new DeliveryResult(1, 0, 0, 0, false));
 
             handler.deliver(job);
 
-            verifyNoInteractions(commentPoster);
-        }
-
-        @Test
-        @DisplayName("should not propagate comment posting failures (soft failure isolation)")
-        void shouldNotPropagateCommentPostingFailures() {
-            String rawOutput = """
-                {
-                  "review_comment": "Review text",
-                  "findings": [{
-                    "practiceSlug": "pr-description-quality",
-                    "title": "Good PR description",
-                    "verdict": "POSITIVE",
-                    "severity": "INFO",
-                    "confidence": 0.95
-                  }]
-                }
-                """;
-            AgentJob job = jobWithOutput(rawOutput);
-            when(commentPoster.postComment(eq(job), any(), any())).thenThrow(
-                new JobDeliveryException("GitHub API timeout")
-            );
-            when(deliveryService.deliver(eq(job), any())).thenReturn(new DeliveryResult(1, 0, 0, 0));
-
-            // Should NOT throw — comment failure is soft
-            handler.deliver(job);
-
-            // Practice detection should still proceed
-            verify(deliveryService).deliver(eq(job), any());
-        }
-
-        @Test
-        @DisplayName("should not propagate RuntimeException from comment posting (generic exception)")
-        void shouldNotPropagateRuntimeExceptionFromCommentPosting() {
-            String rawOutput = """
-                {
-                  "review_comment": "Review text",
-                  "findings": [{
-                    "practiceSlug": "pr-description-quality",
-                    "title": "Good PR description",
-                    "verdict": "POSITIVE",
-                    "severity": "INFO",
-                    "confidence": 0.95
-                  }]
-                }
-                """;
-            AgentJob job = jobWithOutput(rawOutput);
-            when(commentPoster.postComment(eq(job), any(), any())).thenThrow(
-                new NullPointerException("Unexpected null from GraphQL response")
-            );
-            when(deliveryService.deliver(eq(job), any())).thenReturn(new DeliveryResult(1, 0, 0, 0));
-
-            // Should NOT throw — comment failure is soft, even for unchecked exceptions
-            handler.deliver(job);
-
-            // Practice detection should still proceed
-            verify(deliveryService).deliver(eq(job), any());
-            // Comment ID should NOT be set when posting fails
-            assertThat(job.getDeliveryCommentId()).isNull();
+            verify(feedbackService).deliverFeedback(eq(job), eq(null), eq(false));
         }
 
         @Test
@@ -1155,52 +1099,8 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             when(deliveryService.deliver(eq(job), any())).thenThrow(original);
 
             assertThatThrownBy(() -> handler.deliver(job)).isSameAs(original); // Not wrapped — same instance
-        }
 
-        @Test
-        @DisplayName("should skip comment posting when review_comment is numeric (non-textual)")
-        void shouldSkipWhenReviewCommentIsNumeric() {
-            String rawOutput = """
-                {
-                  "review_comment": 42,
-                  "findings": [{
-                    "practiceSlug": "pr-description-quality",
-                    "title": "Good PR description",
-                    "verdict": "POSITIVE",
-                    "severity": "INFO",
-                    "confidence": 0.95
-                  }]
-                }
-                """;
-            AgentJob job = jobWithOutput(rawOutput);
-            when(deliveryService.deliver(eq(job), any())).thenReturn(new DeliveryResult(1, 0, 0, 0));
-
-            handler.deliver(job);
-
-            verifyNoInteractions(commentPoster);
-        }
-
-        @Test
-        @DisplayName("should skip comment posting when review_comment is JSON null")
-        void shouldSkipWhenReviewCommentIsJsonNull() {
-            String rawOutput = """
-                {
-                  "review_comment": null,
-                  "findings": [{
-                    "practiceSlug": "pr-description-quality",
-                    "title": "Good PR description",
-                    "verdict": "POSITIVE",
-                    "severity": "INFO",
-                    "confidence": 0.95
-                  }]
-                }
-                """;
-            AgentJob job = jobWithOutput(rawOutput);
-            when(deliveryService.deliver(eq(job), any())).thenReturn(new DeliveryResult(1, 0, 0, 0));
-
-            handler.deliver(job);
-
-            verifyNoInteractions(commentPoster);
+            verifyNoInteractions(feedbackService);
         }
     }
 

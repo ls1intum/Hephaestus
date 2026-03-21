@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.lang.Nullable;
 
 /**
  * Handler for {@link AgentJobType#PULL_REQUEST_REVIEW} jobs.
@@ -77,7 +76,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
     private final PracticeRepository practiceRepository;
     private final PracticeDetectionResultParser resultParser;
     private final PracticeDetectionDeliveryService deliveryService;
-    private final PullRequestCommentPoster commentPoster;
+    private final FeedbackDeliveryService feedbackService;
 
     PullRequestReviewHandler(
         ObjectMapper objectMapper,
@@ -87,7 +86,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         PracticeRepository practiceRepository,
         PracticeDetectionResultParser resultParser,
         PracticeDetectionDeliveryService deliveryService,
-        PullRequestCommentPoster commentPoster
+        FeedbackDeliveryService feedbackService
     ) {
         this.objectMapper = objectMapper;
         this.gitRepositoryManager = gitRepositoryManager;
@@ -96,7 +95,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         this.practiceRepository = practiceRepository;
         this.resultParser = resultParser;
         this.deliveryService = deliveryService;
-        this.commentPoster = commentPoster;
+        this.feedbackService = feedbackService;
     }
 
     @Override
@@ -234,7 +233,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
                 ".context/metadata.json",
                 objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(pullRequestMetadata)
             );
-        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+        } catch (JsonProcessingException e) {
             throw new JobPreparationException("Failed to serialize pull request metadata", e);
         }
 
@@ -245,7 +244,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
                 ".context/comments.json",
                 objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(comments)
             );
-        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+        } catch (JsonProcessingException e) {
             throw new JobPreparationException("Failed to serialize review comments", e);
         }
 
@@ -266,7 +265,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
                 ".context/practices.json",
                 objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(practicesJson)
             );
-        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+        } catch (JsonProcessingException e) {
             throw new JobPreparationException("Failed to serialize practice definitions", e);
         }
         log.info(
@@ -410,7 +409,18 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             "      \"guidanceMethod\": \"MODELING | COACHING | SCAFFOLDING | ARTICULATION | REFLECTION | EXPLORATION (optional)\"\n"
         );
         sb.append("    }\n");
-        sb.append("  ]\n");
+        sb.append("  ],\n");
+        sb.append("  \"delivery\": {\n");
+        sb.append("    \"mrNote\": \"string (optional, markdown summary for PR comment)\",\n");
+        sb.append("    \"diffNotes\": [\n");
+        sb.append("      {\n");
+        sb.append("        \"filePath\": \"src/File.java\",\n");
+        sb.append("        \"startLine\": 10,\n");
+        sb.append("        \"endLine\": 20,\n");
+        sb.append("        \"body\": \"string (markdown inline comment)\"\n");
+        sb.append("      }\n");
+        sb.append("    ]\n");
+        sb.append("  }\n");
         sb.append("}\n");
         sb.append('\n');
         sb.append("Field rules:\n");
@@ -420,7 +430,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         sb.append("- Produce exactly one finding per practice (").append(practices.size()).append(" total)\n");
         sb.append("- `confidence` is a float in [0.0, 1.0] — not a percentage\n");
         sb.append("- `evidence` is optional; when provided, `locations[].path` is relative to repo root\n");
-        // NOTE: Prompt limits (2K/1K) are intentionally stricter than parser limits (10K/5K).
+        // NOTE: Prompt limits (2K/1K) are intentionally stricter than parser limits (60K/2K for mrNote/diffNote).
         // This keeps agent output concise while the parser's higher caps provide tolerance.
         sb.append("- `reasoning` should be under 2,000 characters; `guidance` under 1,000 characters\n");
         sb.append("- `guidanceMethod` selects a cognitive apprenticeship method appropriate for the finding\n");
@@ -429,6 +439,22 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             "Example: verdict=POSITIVE severity=MAJOR means the contributor correctly handled a critical practice; "
         );
         sb.append("verdict=NEGATIVE severity=MINOR means a low-impact style violation\n");
+        sb.append('\n');
+        sb.append("## Delivery Content\n");
+        sb.append('\n');
+        sb.append("If ANY finding has verdict=NEGATIVE, include a `delivery` object:\n");
+        sb.append('\n');
+        sb.append("- `delivery.mrNote`: A concise, constructive markdown summary addressed to the PR author. ");
+        sb.append("Focus on the NEGATIVE findings — what to fix and why. ");
+        sb.append("Be actionable, not preachy. Omit positive findings from the note. ");
+        sb.append("Max 2,000 characters.\n");
+        sb.append("- `delivery.diffNotes`: Up to 10 inline comments targeting specific code locations. ");
+        sb.append("Each note must reference a file path and line number from the diff (new file side). ");
+        sb.append("`filePath` is relative to repo root, `startLine` is 1-based. ");
+        sb.append("`endLine` is optional (for multi-line annotations). ");
+        sb.append("`body` should be a short, actionable suggestion (max 500 chars).\n");
+        sb.append('\n');
+        sb.append("If all findings are POSITIVE or NOT_APPLICABLE, omit the `delivery` object entirely.\n");
 
         String prompt = sb.toString();
         log.info(
@@ -443,35 +469,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
 
     @Override
     public void deliver(AgentJob job) {
-        // 1. Post PR comment (soft failure — logged, not thrown)
-        postFeedbackComment(job);
-
-        // 2. Practice detection delivery (existing logic, hard failure)
-        deliverPracticeDetectionFindings(job);
-    }
-
-    /**
-     * Posts the agent's review comment on the PR/MR. This is best-effort:
-     * failure is logged but does not prevent practice detection delivery.
-     */
-    private void postFeedbackComment(AgentJob job) {
-        try {
-            String reviewComment = extractOutputField(job.getOutput(), "review_comment");
-            if (reviewComment == null || reviewComment.isBlank()) {
-                log.debug("No review_comment in agent output, skipping feedback post: jobId={}", job.getId());
-                return;
-            }
-            String summary = extractOutputField(job.getOutput(), "summary");
-            String commentId = commentPoster.postComment(job, reviewComment, summary);
-            if (commentId != null) {
-                job.setDeliveryCommentId(commentId);
-            }
-        } catch (Exception e) {
-            log.warn("Comment posting failed (non-fatal): jobId={}", job.getId(), e);
-        }
-    }
-
-    private void deliverPracticeDetectionFindings(AgentJob job) {
+        // 1. Parse findings + delivery content
         var parsed = resultParser.parse(job.getOutput());
         if (!parsed.discarded().isEmpty()) {
             log.info(
@@ -486,8 +484,11 @@ public class PullRequestReviewHandler implements JobTypeHandler {
                 "No valid findings in agent output: jobId=" + job.getId() + ", discarded=" + parsed.discarded().size()
             );
         }
+
+        // 2. Persist findings (hard failure — must succeed)
+        PracticeDetectionDeliveryService.DeliveryResult result;
         try {
-            var result = deliveryService.deliver(job, parsed.validFindings());
+            result = deliveryService.deliver(job, parsed.validFindings());
             log.info(
                 "Delivery complete: inserted={}, unknownSlug={}, overCap={}, duplicate={}, jobId={}",
                 result.inserted(),
@@ -501,39 +502,9 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         } catch (Exception e) {
             throw new JobDeliveryException("Delivery failed unexpectedly: jobId=" + job.getId(), e);
         }
-    }
 
-    /**
-     * Extracts a string field from the agent output's double-encoded rawOutput JSON.
-     *
-     * <p>Output structure: {@code {"rawOutput": "{\"review_comment\": \"...\", ...}"}}.
-     * The rawOutput value is a JSON string that must be parsed a second time.
-     *
-     * @return the field value, or null if not present or unparseable
-     */
-    @Nullable
-    private String extractOutputField(JsonNode jobOutput, String field) {
-        if (jobOutput == null || jobOutput.isNull() || jobOutput.isMissingNode()) {
-            return null;
-        }
-        JsonNode rawOutputNode = jobOutput.get("rawOutput");
-        if (rawOutputNode == null || rawOutputNode.isNull() || !rawOutputNode.isTextual()) {
-            return null;
-        }
-        try {
-            JsonNode parsed = objectMapper.readTree(rawOutputNode.asText());
-            if (parsed == null || !parsed.has(field)) {
-                return null;
-            }
-            JsonNode fieldNode = parsed.get(field);
-            if (fieldNode.isNull() || !fieldNode.isTextual()) {
-                return null;
-            }
-            return fieldNode.asText();
-        } catch (JsonProcessingException e) {
-            log.debug("Failed to parse rawOutput for field '{}': {}", field, e.getMessage());
-            return null;
-        }
+        // 3. Post feedback to PR/MR (soft failure — logged, not thrown)
+        feedbackService.deliverFeedback(job, parsed.delivery(), result.hasNegative());
     }
 
     // -------------------------------------------------------------------------
