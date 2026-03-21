@@ -175,26 +175,6 @@ class PullRequestCommentPoster {
         return postFormattedBody(job, formatted, job.getDeliveryCommentId());
     }
 
-    /**
-     * Posts a practice summary note on the PR/MR associated with the given job.
-     *
-     * @param job               the completed agent job
-     * @param mrNote            the raw markdown note from agent output (untrusted)
-     * @param existingCommentId comment ID from a previous job for this PR (re-analysis dedup), may be null
-     * @return the provider-specific comment ID, or null if the sanitized body is empty
-     * @throws JobDeliveryException if posting fails
-     */
-    @Nullable
-    String postPracticeNote(AgentJob job, String mrNote, @Nullable String existingCommentId) {
-        String sanitized = sanitize(mrNote);
-        if (sanitized.isBlank()) {
-            log.debug("Practice note was empty after sanitization, skipping post: jobId={}", job.getId());
-            return null;
-        }
-        String formatted = FeedbackDeliveryService.formatPracticeNote(sanitized, job);
-        return postFormattedBody(job, formatted, existingCommentId);
-    }
-
     // ── Core posting (shared by all comment types) ──
 
     /**
@@ -541,6 +521,7 @@ class PullRequestCommentPoster {
         sb.append(sanitizedBody).append("\n\n");
         sb.append("</details>\n\n");
 
+        sb.append("---\n");
         appendMetadataFooter(sb, job);
 
         return sb.toString();
@@ -548,7 +529,6 @@ class PullRequestCommentPoster {
 
     /** Appends the metadata footer (agent name, model, duration) to a comment being built. */
     static void appendMetadataFooter(StringBuilder sb, AgentJob job) {
-        sb.append("---\n");
         sb.append("<sub>Hephaestus Agent");
 
         JsonNode configSnapshot = job.getConfigSnapshot();
