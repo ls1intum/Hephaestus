@@ -1,3 +1,10 @@
+# Pin server port to match pom.xml's openapi.server.port.
+# Without this, a local .env (SERVER_PORT=38080) causes a port mismatch:
+# the server starts on 38080 while the springdoc-openapi-maven-plugin
+# fetches from localhost:8080, silently producing a stale spec.
+server:
+    port: 38090
+
 spring:
     docker:
         compose:

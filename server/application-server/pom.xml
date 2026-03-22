@@ -37,8 +37,8 @@
         <maven.test.skip>false</maven.test.skip>
         <hephaestus.surefire.timeout>300</hephaestus.surefire.timeout>
 
-        <!-- Server port for OpenAPI spec generation (overridable via -Dopenapi.server.port=38091) -->
-        <openapi.server.port>8080</openapi.server.port>
+        <!-- Server port for OpenAPI spec generation — must match application-specs.yml's server.port -->
+        <openapi.server.port>38090</openapi.server.port>
 
         <!-- Tag filtering: unit tests by default, exclude live tests -->
         <surefire.excludedGroups>live</surefire.excludedGroups>

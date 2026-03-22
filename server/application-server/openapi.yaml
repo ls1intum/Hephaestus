@@ -491,6 +491,37 @@ paths:
       summary: Cancel an agent job
       tags:
       - Agent Jobs
+  /workspaces/{workspaceSlug}/agent-jobs/{jobId}/delivery/retry:
+    post:
+      operationId: retryDelivery
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: jobId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentJob"
+          description: Delivery retried
+        "404":
+          description: Job not found in this workspace
+        "409":
+          description: Job not in a retryable state
+      summary: Retry delivery for a completed agent job
+      tags:
+      - Agent Jobs
   /workspaces/{workspaceSlug}/bad-practices/badpractice/{id}:
     get:
       deprecated: true
@@ -2893,6 +2924,7 @@ components:
           enum:
           - CLAUDE_CODE
           - OPENCODE
+          - DIRECT_LLM
         allowInternet:
           type: boolean
           description: Whether agent containers have internet access
@@ -3166,6 +3198,7 @@ components:
           enum:
           - CLAUDE_CODE
           - OPENCODE
+          - DIRECT_LLM
         allowInternet:
           type: boolean
           description: Whether agent containers have internet access
@@ -4377,6 +4410,7 @@ components:
           enum:
           - CLAUDE_CODE
           - OPENCODE
+          - DIRECT_LLM
         allowInternet:
           type: boolean
           description: Whether agent containers have internet access
