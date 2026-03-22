@@ -2924,7 +2924,6 @@ components:
           enum:
           - CLAUDE_CODE
           - OPENCODE
-          - DIRECT_LLM
         allowInternet:
           type: boolean
           description: Whether agent containers have internet access
@@ -3198,7 +3197,6 @@ components:
           enum:
           - CLAUDE_CODE
           - OPENCODE
-          - DIRECT_LLM
         allowInternet:
           type: boolean
           description: Whether agent containers have internet access
@@ -4410,7 +4408,6 @@ components:
           enum:
           - CLAUDE_CODE
           - OPENCODE
-          - DIRECT_LLM
         allowInternet:
           type: boolean
           description: Whether agent containers have internet access

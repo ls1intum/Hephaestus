@@ -27,11 +27,6 @@ public class AgentAdapterConfiguration {
     }
 
     @Bean
-    public AgentAdapter directLlmAgentAdapter() {
-        return new DirectLlmAgentAdapter();
-    }
-
-    @Bean
     public AgentAdapterRegistry agentAdapterRegistry(List<AgentAdapter> adapters) {
         return new AgentAdapterRegistry(adapters);
     }
