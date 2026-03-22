@@ -116,7 +116,7 @@ public class PracticeDetectionDeliveryService {
         int discardedUnknownSlug = 0;
         int discardedOverCap = 0;
         int discardedDuplicate = 0;
-        boolean hasNegativeInserted = false;
+        boolean hasNegative = false;
         Instant detectedAt = Instant.now();
 
         for (int i = 0; i < validFindings.size(); i++) {
@@ -186,11 +186,14 @@ public class PracticeDetectionDeliveryService {
 
             if (rows == 1) {
                 inserted++;
-                if (finding.verdict() == Verdict.NEGATIVE) {
-                    hasNegativeInserted = true;
-                }
             } else {
                 discardedDuplicate++;
+            }
+            // Track negative findings based on verdict, not insert result.
+            // Critical for retry delivery: on retry, insertIfAbsent returns 0 for existing
+            // findings, but we still need correct hasNegative for the delivery gate.
+            if (finding.verdict() == Verdict.NEGATIVE) {
+                hasNegative = true;
             }
         }
 
@@ -214,17 +217,11 @@ public class PracticeDetectionDeliveryService {
                 contributorId,
                 inserted,
                 totalDiscarded,
-                hasNegativeInserted
+                hasNegative
             )
         );
 
-        return new DeliveryResult(
-            inserted,
-            discardedUnknownSlug,
-            discardedOverCap,
-            discardedDuplicate,
-            hasNegativeInserted
-        );
+        return new DeliveryResult(inserted, discardedUnknownSlug, discardedOverCap, discardedDuplicate, hasNegative);
     }
 
     public record DeliveryResult(

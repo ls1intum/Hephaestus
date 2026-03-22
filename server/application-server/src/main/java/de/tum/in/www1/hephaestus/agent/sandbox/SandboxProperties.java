@@ -89,6 +89,6 @@ public record SandboxProperties(
     public record DefaultResourceLimits(
         @DefaultValue("4294967296") @Min(1) long memoryBytes,
         @DefaultValue("2.0") @DecimalMin("0.01") double cpus,
-        @DefaultValue("256") @Min(1) int pidsLimit
+        @DefaultValue("512") @Min(1) int pidsLimit
     ) {}
 }

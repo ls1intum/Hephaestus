@@ -81,9 +81,23 @@ public class DockerClientOperations
         try {
             dockerClient.connectToNetworkCmd().withNetworkId(networkId).withContainerId(containerId).exec();
 
-            // Read back the assigned IP
+            // Read back the assigned IP.
+            // Network.getContainers() is keyed by FULL 64-char container ID, but containerId
+            // may be a short 12-char ID (e.g. from HOSTNAME env var). Try exact match first,
+            // then fall back to prefix match.
             Network network = dockerClient.inspectNetworkCmd().withNetworkId(networkId).exec();
             Network.ContainerNetworkConfig containerConfig = network.getContainers().get(containerId);
+            if (containerConfig == null) {
+                // Prefix match: short ID → full ID lookup
+                containerConfig = network
+                    .getContainers()
+                    .entrySet()
+                    .stream()
+                    .filter(e -> e.getKey().startsWith(containerId))
+                    .map(Map.Entry::getValue)
+                    .findFirst()
+                    .orElse(null);
+            }
             if (containerConfig == null) {
                 throw new SandboxException(
                     "Container " + containerId + " not found in network " + networkId + " after connect"

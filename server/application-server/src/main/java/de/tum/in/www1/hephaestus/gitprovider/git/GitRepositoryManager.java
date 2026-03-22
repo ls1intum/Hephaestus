@@ -660,6 +660,30 @@ public class GitRepositoryManager {
     }
 
     /**
+     * Resolve a ref or branch name to a commit SHA string.
+     * Uses the same resolution strategy as diff generation (remote tracking → local → raw SHA).
+     *
+     * @param repositoryId the repository database ID
+     * @param ref          branch name, tag, or SHA
+     * @return the full 40-char SHA, or null if the ref cannot be resolved
+     */
+    @Nullable
+    public String resolveRefToSha(Long repositoryId, String ref) {
+        if (!properties.enabled()) {
+            return null;
+        }
+        return lockManager.withReadLock(repositoryId, () -> {
+            Path repoPath = getRepositoryPath(repositoryId);
+            try (Git git = Git.open(repoPath.toFile())) {
+                ObjectId id = resolveRef(git.getRepository(), ref);
+                return id != null ? id.getName() : null;
+            } catch (IOException e) {
+                throw new GitOperationException("Failed to resolve ref: " + ref + ", repoId=" + repositoryId, e);
+            }
+        });
+    }
+
+    /**
      * Resolve a ref string to an ObjectId, trying remote tracking, local, and raw SHA.
      */
     @Nullable

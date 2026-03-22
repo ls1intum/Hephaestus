@@ -71,9 +71,12 @@ class FeedbackDeliveryService {
     }
 
     private void doDeliver(AgentJob job, @Nullable DeliveryContent delivery, boolean hasNegative) {
-        // Short-circuit: no delivery content → avoid all DB queries
-        if (delivery == null) {
-            log.debug("No delivery content in agent output, skipping feedback: jobId={}", job.getId());
+        // Short-circuit: no delivery content AND has negative findings → nothing useful to do.
+        // The agent should have provided delivery content for negative findings; this is a malformed output.
+        // When delivery is null and all findings are positive, we proceed to check for a previous
+        // comment — the "all resolved" message is system-generated, not agent-generated.
+        if (delivery == null && hasNegative) {
+            log.debug("No delivery content in agent output despite negative findings, skipping: jobId={}", job.getId());
             return;
         }
 
@@ -100,7 +103,7 @@ class FeedbackDeliveryService {
         DeliveryDecision decision = deliveryGate.evaluate(
             pullRequest,
             hasNegative,
-            true, // delivery guaranteed non-null by early return above
+            delivery != null,
             userAiReviewEnabled,
             previousCommentId
         );

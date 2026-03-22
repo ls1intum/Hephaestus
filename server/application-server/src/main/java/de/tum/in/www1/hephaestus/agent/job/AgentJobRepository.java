@@ -100,6 +100,23 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
     );
 
     /**
+     * Conditional delivery status transition (CAS). Returns 1 if transitioned, 0 if the
+     * current status didn't match any of the expected {@code fromStatuses}.
+     * Used by {@code retryDelivery} to prevent concurrent retry races.
+     */
+    @WorkspaceAgnostic("ID-based delivery transition; job ID from workspace-scoped context")
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(
+        "UPDATE AgentJob j SET j.deliveryStatus = :newStatus " +
+            "WHERE j.id = :id AND j.status = 'COMPLETED' AND j.deliveryStatus IN :fromStatuses"
+    )
+    int transitionDeliveryStatus(
+        @Param("id") UUID id,
+        @Param("newStatus") DeliveryStatus newStatus,
+        @Param("fromStatuses") Collection<DeliveryStatus> fromStatuses
+    );
+
+    /**
      * Find the delivery comment ID from the most recent delivered job for the same PR.
      * Used for re-analysis dedup: update the existing comment instead of creating a duplicate.
      *

@@ -9,12 +9,6 @@ mutation AddPullRequestReviewWithThreads(
     $commitOID: GitObjectID,
     $threads: [DraftPullRequestReviewThread!]
 ) {
-    rateLimit {
-        cost
-        limit
-        remaining
-        resetAt
-    }
     addPullRequestReview(input: {
         pullRequestId: $pullRequestId,
         body: $body,

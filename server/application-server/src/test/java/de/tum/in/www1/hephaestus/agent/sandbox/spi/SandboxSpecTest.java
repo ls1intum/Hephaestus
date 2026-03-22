@@ -167,7 +167,7 @@ class SandboxSpecTest extends BaseUnitTest {
         void shouldAcceptDefaults() {
             assertThat(ResourceLimits.DEFAULT.memoryBytes()).isEqualTo(4L * 1024 * 1024 * 1024);
             assertThat(ResourceLimits.DEFAULT.cpus()).isEqualTo(2.0);
-            assertThat(ResourceLimits.DEFAULT.pidsLimit()).isEqualTo(256);
+            assertThat(ResourceLimits.DEFAULT.pidsLimit()).isEqualTo(512);
             assertThat(ResourceLimits.DEFAULT.maxRuntime()).isEqualTo(Duration.ofMinutes(10));
         }
 

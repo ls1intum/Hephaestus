@@ -45,28 +45,30 @@ class PracticeReviewDeliveryGateTest extends BaseUnitTest {
     // ── Gate Check Tests ────────────────────────────────────────────────────
 
     @Nested
-    @DisplayName("1. Delivery Content Gate")
+    @DisplayName("7. Delivery Content Gate (negative findings, no delivery)")
     class DeliveryContentGateTests {
 
         @Test
-        @DisplayName("Should STORE_ONLY when no delivery content")
+        @DisplayName("Should STORE_ONLY when no delivery content for negative findings")
         void storeOnlyWhenNoDeliveryContent() {
             PullRequest pr = createOpenPr();
 
             DeliveryDecision decision = gate.evaluate(pr, true, false, true, null);
 
             assertThat(decision).isInstanceOf(DeliveryDecision.StoreOnly.class);
-            assertThat(((DeliveryDecision.StoreOnly) decision).reason()).isEqualTo("no delivery content");
+            assertThat(((DeliveryDecision.StoreOnly) decision).reason()).isEqualTo(
+                "no delivery content for negative findings"
+            );
         }
 
         @Test
-        @DisplayName("No delivery content check should short-circuit before PR state checks")
-        void noDeliveryContentShortCircuits() {
-            // Even with a null PR, the gate should return StoreOnly for no delivery content
+        @DisplayName("PR state checks take precedence over delivery content check")
+        void prStateBeforeDeliveryContent() {
+            // Null PR returns "PR not found" even when delivery content is also missing
             DeliveryDecision decision = gate.evaluate(null, true, false, true, null);
 
             assertThat(decision).isInstanceOf(DeliveryDecision.StoreOnly.class);
-            assertThat(((DeliveryDecision.StoreOnly) decision).reason()).isEqualTo("no delivery content");
+            assertThat(((DeliveryDecision.StoreOnly) decision).reason()).isEqualTo("PR not found");
         }
     }
 
@@ -198,6 +200,20 @@ class PracticeReviewDeliveryGateTest extends BaseUnitTest {
             assertThat(resolved.pullRequest()).isSameAs(pr);
             assertThat(resolved.commentId()).isEqualTo("IC_previous123");
         }
+
+        @Test
+        @DisplayName("Should EDIT_ALL_RESOLVED even when agent omits delivery content (all-positive)")
+        void editAllResolvedEvenWithoutDeliveryContent() {
+            PullRequest pr = createOpenPr();
+
+            // Agent prompt says: omit delivery when all positive → hasDeliveryContent=false
+            // The gate must still reach EDIT_ALL_RESOLVED for re-analysis
+            DeliveryDecision decision = gate.evaluate(pr, false, false, true, "IC_previous123");
+
+            assertThat(decision).isInstanceOf(DeliveryDecision.EditAllResolved.class);
+            DeliveryDecision.EditAllResolved resolved = (DeliveryDecision.EditAllResolved) decision;
+            assertThat(resolved.commentId()).isEqualTo("IC_previous123");
+        }
     }
 
     @Nested
@@ -240,16 +256,16 @@ class PracticeReviewDeliveryGateTest extends BaseUnitTest {
     class OrderingTests {
 
         @Test
-        @DisplayName("No delivery content check takes precedence over PR state")
-        void noDeliveryContentBeforePrState() {
+        @DisplayName("PR state takes precedence over delivery content check")
+        void prStateBeforeDeliveryContent() {
             PullRequest pr = createOpenPr();
             pr.setState(Issue.State.CLOSED);
 
-            // Even with closed PR, no delivery content should win
+            // Closed PR should win over missing delivery content
             DeliveryDecision decision = gate.evaluate(pr, true, false, true, null);
 
             assertThat(decision).isInstanceOf(DeliveryDecision.StoreOnly.class);
-            assertThat(((DeliveryDecision.StoreOnly) decision).reason()).isEqualTo("no delivery content");
+            assertThat(((DeliveryDecision.StoreOnly) decision).reason()).isEqualTo("PR is CLOSED");
         }
 
         @Test

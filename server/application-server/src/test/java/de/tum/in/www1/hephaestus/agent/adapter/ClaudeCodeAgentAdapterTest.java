@@ -24,7 +24,7 @@ class ClaudeCodeAgentAdapterTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        adapter = new ClaudeCodeAgentAdapter();
+        adapter = new ClaudeCodeAgentAdapter(new com.fasterxml.jackson.databind.ObjectMapper());
     }
 
     @Test

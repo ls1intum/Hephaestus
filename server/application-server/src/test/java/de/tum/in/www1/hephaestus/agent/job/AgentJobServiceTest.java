@@ -42,6 +42,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @DisplayName("AgentJobService")
 class AgentJobServiceTest extends BaseUnitTest {
@@ -62,6 +63,9 @@ class AgentJobServiceTest extends BaseUnitTest {
     private ApplicationEventPublisher eventPublisher;
 
     @Mock
+    private TransactionTemplate transactionTemplate;
+
+    @Mock
     private SandboxManager sandboxManager;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -80,6 +84,7 @@ class AgentJobServiceTest extends BaseUnitTest {
             handlerRegistry,
             objectMapper,
             eventPublisher,
+            transactionTemplate,
             sandboxManager
         );
 
@@ -244,10 +249,10 @@ class AgentJobServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should not copy llmApiKey for PROXY credential mode")
-        void shouldNotCopyLlmApiKeyForProxyMode() {
+        @DisplayName("should copy llmApiKey for PROXY credential mode (used by proxy for upstream auth)")
+        void shouldCopyLlmApiKeyForProxyMode() {
             enabledConfig.setCredentialMode(CredentialMode.PROXY);
-            enabledConfig.setLlmApiKey("sk-should-not-copy");
+            enabledConfig.setLlmApiKey("sk-proxy-key");
 
             when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(List.of(enabledConfig));
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
@@ -272,7 +277,7 @@ class AgentJobServiceTest extends BaseUnitTest {
             );
 
             assertThat(result).isPresent();
-            assertThat(result.get().getLlmApiKey()).isNull();
+            assertThat(result.get().getLlmApiKey()).isEqualTo("sk-proxy-key");
         }
 
         @Test

@@ -11,7 +11,7 @@ import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
@@ -27,7 +27,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * <p>If NATS publish fails, the zombie sweeper re-publishes stale QUEUED jobs periodically.
  */
 @Component
-@ConditionalOnBean(name = "agentNatsConnection")
+@ConditionalOnProperty(prefix = "hephaestus.agent.nats", name = "enabled", havingValue = "true")
 public class AgentJobSubmitter {
 
     private static final Logger log = LoggerFactory.getLogger(AgentJobSubmitter.class);

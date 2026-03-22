@@ -6,11 +6,13 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.in.www1.hephaestus.agent.LlmProvider;
 import de.tum.in.www1.hephaestus.agent.job.AgentJob;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,13 +38,15 @@ class LlmProxyControllerTest extends BaseUnitTest {
         true
     );
 
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
     private LlmProxyController controller;
     private SimpleMeterRegistry meterRegistry;
 
     @BeforeEach
     void setUp() {
         meterRegistry = new SimpleMeterRegistry();
-        controller = new LlmProxyController(WebClient.create(), DEFAULT_PROPS, meterRegistry);
+        controller = new LlmProxyController(WebClient.create(), DEFAULT_PROPS, OBJECT_MAPPER, meterRegistry);
         SecurityContextHolder.clearContext();
     }
 
@@ -582,7 +586,7 @@ class LlmProxyControllerTest extends BaseUnitTest {
                 )
             );
 
-            var mockedController = new LlmProxyController(mockWebClient, DEFAULT_PROPS, meterRegistry);
+            var mockedController = new LlmProxyController(mockWebClient, DEFAULT_PROPS, OBJECT_MAPPER, meterRegistry);
 
             AgentJob job = createJobWithApiKey("sk-real-key");
             setUpAuthentication(job);
@@ -620,7 +624,7 @@ class LlmProxyControllerTest extends BaseUnitTest {
                 Mono.error(new RuntimeException("Unexpected upstream error"))
             );
 
-            var mockedController = new LlmProxyController(mockWebClient, DEFAULT_PROPS, meterRegistry);
+            var mockedController = new LlmProxyController(mockWebClient, DEFAULT_PROPS, OBJECT_MAPPER, meterRegistry);
 
             AgentJob job = createJobWithApiKey("sk-real-key");
             setUpAuthentication(job);
@@ -637,6 +641,115 @@ class LlmProxyControllerTest extends BaseUnitTest {
             var errorCounter = meterRegistry.find("llm.proxy.errors").tag("provider", "ANTHROPIC").counter();
             assertThat(errorCounter).isNotNull();
             assertThat(errorCounter.count()).isEqualTo(1.0);
+        }
+    }
+
+    @Nested
+    @DisplayName("Azure body sanitization")
+    class AzureBodySanitization {
+
+        private static final LlmProxyProperties AZURE_PROPS = new LlmProxyProperties(
+            "https://api.anthropic.com",
+            "https://my-resource.openai.azure.com/openai/deployments/gpt-4",
+            "api-key",
+            false
+        );
+
+        @Test
+        @DisplayName("should strip reasoningSummary when upstream is Azure OpenAI")
+        void shouldStripReasoningSummaryForAzure() throws Exception {
+            var azureController = new LlmProxyController(WebClient.create(), AZURE_PROPS, OBJECT_MAPPER, meterRegistry);
+            var config = ProviderProxyConfig.forProvider(LlmProvider.OPENAI, AZURE_PROPS);
+
+            byte[] body = "{\"model\":\"gpt-4\",\"reasoningSummary\":\"auto\",\"messages\":[]}".getBytes(
+                StandardCharsets.UTF_8
+            );
+            byte[] sanitized = azureController.sanitizeBodyForAzure(config, body);
+
+            var tree = OBJECT_MAPPER.readTree(sanitized);
+            assertThat(tree.has("reasoningSummary")).isFalse();
+            assertThat(tree.has("model")).isTrue();
+            assertThat(tree.has("messages")).isTrue();
+        }
+
+        @Test
+        @DisplayName("should NOT strip reasoningSummary when upstream is standard OpenAI")
+        void shouldNotStripForStandardOpenAI() throws Exception {
+            var config = ProviderProxyConfig.forProvider(LlmProvider.OPENAI, DEFAULT_PROPS);
+
+            byte[] body = "{\"model\":\"gpt-4\",\"reasoningSummary\":\"auto\",\"messages\":[]}".getBytes(
+                StandardCharsets.UTF_8
+            );
+            byte[] result = controller.sanitizeBodyForAzure(config, body);
+
+            // Should return same reference (no modification)
+            assertThat(result).isSameAs(body);
+        }
+
+        @Test
+        @DisplayName("should pass through null body unchanged")
+        void shouldPassThroughNullBody() {
+            var config = ProviderProxyConfig.forProvider(LlmProvider.OPENAI, AZURE_PROPS);
+            assertThat(controller.sanitizeBodyForAzure(config, null)).isNull();
+        }
+
+        @Test
+        @DisplayName("should pass through empty body unchanged")
+        void shouldPassThroughEmptyBody() {
+            var config = ProviderProxyConfig.forProvider(LlmProvider.OPENAI, AZURE_PROPS);
+            byte[] empty = new byte[0];
+            assertThat(controller.sanitizeBodyForAzure(config, empty)).isSameAs(empty);
+        }
+
+        @Test
+        @DisplayName("should pass through non-JSON body unchanged for Azure")
+        void shouldPassThroughNonJsonBody() {
+            var azureController = new LlmProxyController(WebClient.create(), AZURE_PROPS, OBJECT_MAPPER, meterRegistry);
+            var config = ProviderProxyConfig.forProvider(LlmProvider.OPENAI, AZURE_PROPS);
+
+            byte[] body = "not-json".getBytes(StandardCharsets.UTF_8);
+            byte[] result = azureController.sanitizeBodyForAzure(config, body);
+
+            assertThat(result).isSameAs(body);
+        }
+
+        @Test
+        @DisplayName("should rename max_tokens to max_completion_tokens for Azure")
+        void shouldRenameMaxTokensForAzure() throws Exception {
+            var azureController = new LlmProxyController(WebClient.create(), AZURE_PROPS, OBJECT_MAPPER, meterRegistry);
+            var config = ProviderProxyConfig.forProvider(LlmProvider.OPENAI, AZURE_PROPS);
+
+            byte[] body = "{\"model\":\"gpt-4\",\"max_tokens\":1024,\"messages\":[]}".getBytes(StandardCharsets.UTF_8);
+            byte[] sanitized = azureController.sanitizeBodyForAzure(config, body);
+
+            var tree = OBJECT_MAPPER.readTree(sanitized);
+            assertThat(tree.has("max_tokens")).isFalse();
+            assertThat(tree.get("max_completion_tokens").asInt()).isEqualTo(1024);
+            assertThat(tree.has("model")).isTrue();
+        }
+
+        @Test
+        @DisplayName("should NOT rename max_tokens for standard OpenAI")
+        void shouldNotRenameMaxTokensForStandardOpenAI() throws Exception {
+            var config = ProviderProxyConfig.forProvider(LlmProvider.OPENAI, DEFAULT_PROPS);
+
+            byte[] body = "{\"model\":\"gpt-4\",\"max_tokens\":1024,\"messages\":[]}".getBytes(StandardCharsets.UTF_8);
+            byte[] result = controller.sanitizeBodyForAzure(config, body);
+
+            assertThat(result).isSameAs(body);
+        }
+
+        @Test
+        @DisplayName("should not modify body when no unsupported params present")
+        void shouldNotModifyCleanBody() throws Exception {
+            var azureController = new LlmProxyController(WebClient.create(), AZURE_PROPS, OBJECT_MAPPER, meterRegistry);
+            var config = ProviderProxyConfig.forProvider(LlmProvider.OPENAI, AZURE_PROPS);
+
+            byte[] body = "{\"model\":\"gpt-4\",\"messages\":[]}".getBytes(StandardCharsets.UTF_8);
+            byte[] result = azureController.sanitizeBodyForAzure(config, body);
+
+            // Should return same reference (no modification needed)
+            assertThat(result).isSameAs(body);
         }
     }
 

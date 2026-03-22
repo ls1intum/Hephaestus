@@ -20,13 +20,13 @@ import org.springframework.stereotype.Service;
  *
  * <h2>Gate checks (in order)</h2>
  * <ol>
- *   <li>No delivery content → STORE ONLY</li>
  *   <li>PR not found → STORE ONLY</li>
  *   <li>PR closed/merged → STORE ONLY</li>
  *   <li>PR draft + {@code skipDrafts} config → STORE ONLY</li>
  *   <li>User opted out ({@code aiReviewEnabled=false}) → STORE ONLY</li>
- *   <li>All positive + previous comment exists → EDIT ALL RESOLVED</li>
+ *   <li>All positive + previous comment exists → EDIT ALL RESOLVED (system-generated message)</li>
  *   <li>All positive, no previous comment → STORE ONLY (silence = positive signal)</li>
+ *   <li>No delivery content for negative findings → STORE ONLY (malformed agent output)</li>
  *   <li>Has negatives + previous comment → EDIT EXISTING</li>
  *   <li>Has negatives, no previous comment → POST NEW</li>
  * </ol>
@@ -64,13 +64,7 @@ public class PracticeReviewDeliveryGate {
             ? previousCommentId
             : null;
 
-        // 1. No delivery content → nothing to post
-        if (!hasDeliveryContent) {
-            log.debug("Review delivery gate: STORE_ONLY, reason=noDeliveryContent");
-            return new DeliveryDecision.StoreOnly("no delivery content");
-        }
-
-        // 2. PR not found
+        // 1. PR not found
         if (pullRequest == null) {
             log.debug("Review delivery gate: STORE_ONLY, reason=prNotFound");
             return new DeliveryDecision.StoreOnly("PR not found");
@@ -78,25 +72,28 @@ public class PracticeReviewDeliveryGate {
 
         Long prId = pullRequest.getId();
 
-        // 3. PR state: closed or merged
+        // 2. PR state: closed or merged
         if (pullRequest.getState() == Issue.State.CLOSED || pullRequest.getState() == Issue.State.MERGED) {
             log.info("Review delivery gate: STORE_ONLY, reason=PR is {}, prId={}", pullRequest.getState(), prId);
             return new DeliveryDecision.StoreOnly("PR is " + pullRequest.getState());
         }
 
-        // 4. Draft gate (defense in depth — detection gate also checks this)
+        // 3. Draft gate (defense in depth — detection gate also checks this)
         if (properties.skipDrafts() && pullRequest.isDraft()) {
             log.info("Review delivery gate: STORE_ONLY, reason=draftPR, prId={}", prId);
             return new DeliveryDecision.StoreOnly("PR is draft");
         }
 
-        // 5. User preference (opt-out model)
+        // 4. User preference (opt-out model)
         if (!userAiReviewEnabled) {
             log.info("Review delivery gate: STORE_ONLY, reason=userOptedOut, prId={}", prId);
             return new DeliveryDecision.StoreOnly("user opted out");
         }
 
-        // 6–7. All findings positive
+        // 5–6. All findings positive
+        // NOTE: this check is BEFORE the delivery content check so that EDIT_ALL_RESOLVED
+        // is reachable even when the agent correctly omits delivery for all-positive findings.
+        // The "all resolved" message is system-generated, not agent-generated.
         if (!hasNegativeFindings) {
             if (effectiveCommentId != null) {
                 // Re-analysis: all issues resolved → edit to positive message
@@ -108,7 +105,13 @@ public class PracticeReviewDeliveryGate {
             return new DeliveryDecision.StoreOnly("all findings positive");
         }
 
-        // 8–9. Has negative findings
+        // 7. No delivery content for negative findings → agent output malformed, store only
+        if (!hasDeliveryContent) {
+            log.warn("Review delivery gate: STORE_ONLY, reason=noDeliveryContentForNegativeFindings, prId={}", prId);
+            return new DeliveryDecision.StoreOnly("no delivery content for negative findings");
+        }
+
+        // 8–9. Has negative findings with delivery content
         if (effectiveCommentId != null) {
             // Re-analysis: edit existing comment (no diff notes re-posted)
             log.info("Review delivery gate: EDIT_EXISTING, prId={}, commentId={}", prId, effectiveCommentId);

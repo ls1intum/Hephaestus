@@ -1,5 +1,8 @@
 package de.tum.in.www1.hephaestus.agent.proxy;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.tum.in.www1.hephaestus.agent.LlmProvider;
 import de.tum.in.www1.hephaestus.agent.job.AgentJob;
 import de.tum.in.www1.hephaestus.core.proxy.ProxyStreamingUtils;
@@ -13,6 +16,7 @@ import java.net.URI;
 import java.time.Duration;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -61,12 +65,31 @@ class LlmProxyController {
     /** Maximum request body size (4 MB). LLM APIs typically accept large prompts with code context. */
     private static final int MAX_REQUEST_BODY_SIZE = 4 * 1024 * 1024;
 
+    /**
+     * Parameters rejected by Azure OpenAI that standard OpenAI accepts.
+     * Azure returns 400 "Unknown parameter" for these. Stripped when upstream is Azure.
+     */
+    private static final Set<String> AZURE_UNSUPPORTED_PARAMS = Set.of("reasoningSummary");
+
+    /**
+     * Parameters that Azure OpenAI requires to be renamed.
+     * Key = original name (from client SDK), Value = Azure-compatible name.
+     */
+    private static final Map<String, String> AZURE_PARAM_RENAMES = Map.of("max_tokens", "max_completion_tokens");
+
     private final WebClient llmProxyWebClient;
     private final Map<LlmProvider, ProviderProxyConfig> providerConfigs;
+    private final ObjectMapper objectMapper;
     private final MeterRegistry meterRegistry;
 
-    LlmProxyController(WebClient llmProxyWebClient, LlmProxyProperties properties, MeterRegistry meterRegistry) {
+    LlmProxyController(
+        WebClient llmProxyWebClient,
+        LlmProxyProperties properties,
+        ObjectMapper objectMapper,
+        MeterRegistry meterRegistry
+    ) {
         this.llmProxyWebClient = llmProxyWebClient;
+        this.objectMapper = objectMapper;
         this.providerConfigs = Map.of(
             LlmProvider.ANTHROPIC,
             ProviderProxyConfig.forProvider(LlmProvider.ANTHROPIC, properties),
@@ -199,6 +222,9 @@ class LlmProxyController {
 
         HttpHeaders outHeaders = buildUpstreamHeaders(incomingHeaders, config, apiKey);
 
+        // Sanitize body for Azure OpenAI compatibility (strip unsupported params)
+        byte[] sanitizedBody = sanitizeBodyForAzure(config, body);
+
         log.debug("Proxying {} {} for job {}", request.getMethod(), upstreamUrl, job.getId());
 
         UpstreamResult upstream;
@@ -212,8 +238,8 @@ class LlmProxyController {
                 });
 
             // Only attach body for methods that typically carry one (avoids Content-Length: 0 on GET)
-            WebClient.RequestHeadersSpec<?> readySpec = (body != null && body.length > 0)
-                ? baseSpec.bodyValue(body)
+            WebClient.RequestHeadersSpec<?> readySpec = (sanitizedBody != null && sanitizedBody.length > 0)
+                ? baseSpec.bodyValue(sanitizedBody)
                 : baseSpec;
 
             upstream = readySpec.exchangeToMono(ProxyStreamingUtils::consumeResponse).block(BLOCK_TIMEOUT);
@@ -279,6 +305,50 @@ class LlmProxyController {
             return jta.getPrincipal();
         }
         throw new IllegalStateException("Expected JobTokenAuthentication on security context");
+    }
+
+    /**
+     * Strip parameters that Azure OpenAI rejects but standard OpenAI accepts.
+     * No-op when upstream is not Azure or body is not JSON.
+     */
+    byte[] sanitizeBodyForAzure(ProviderProxyConfig config, byte[] body) {
+        if (body == null || body.length == 0) {
+            return body;
+        }
+        if (!config.upstreamBaseUrl().contains("openai.azure.com")) {
+            return body;
+        }
+
+        try {
+            JsonNode tree = objectMapper.readTree(body);
+            if (!tree.isObject()) {
+                return body;
+            }
+            ObjectNode obj = (ObjectNode) tree;
+            boolean modified = false;
+
+            // Strip unsupported parameters
+            for (String param : AZURE_UNSUPPORTED_PARAMS) {
+                if (obj.has(param)) {
+                    obj.remove(param);
+                    modified = true;
+                }
+            }
+
+            // Rename parameters
+            for (var entry : AZURE_PARAM_RENAMES.entrySet()) {
+                JsonNode value = obj.remove(entry.getKey());
+                if (value != null) {
+                    obj.set(entry.getValue(), value);
+                    modified = true;
+                }
+            }
+
+            return modified ? objectMapper.writeValueAsBytes(obj) : body;
+        } catch (Exception e) {
+            log.debug("Failed to parse body for Azure sanitization: {}", e.getMessage());
+            return body;
+        }
     }
 
     /**

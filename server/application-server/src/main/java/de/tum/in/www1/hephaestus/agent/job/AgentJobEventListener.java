@@ -14,7 +14,7 @@ import de.tum.in.www1.hephaestus.practices.review.GateDecision;
 import de.tum.in.www1.hephaestus.practices.review.PracticeReviewDetectionGate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
@@ -47,7 +47,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * to the same events. Only active when the NATS submitter is available.
  */
 @Component
-@ConditionalOnBean(AgentJobSubmitter.class)
+@ConditionalOnProperty(prefix = "hephaestus.agent.nats", name = "enabled", havingValue = "true")
 public class AgentJobEventListener {
 
     private static final Logger log = LoggerFactory.getLogger(AgentJobEventListener.class);

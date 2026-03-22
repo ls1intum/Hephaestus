@@ -48,14 +48,14 @@ class OpenCodeAgentAdapterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should generate config with proxy env var references")
+        @DisplayName("should generate config with built-in provider prefix")
         void shouldGenerateProxyConfig() {
             var spec = adapter.buildSandboxSpec(proxyRequest(LlmProvider.ANTHROPIC, "claude-sonnet-4-20250514"));
             String config = new String(spec.inputFiles().get("opencode.json"), StandardCharsets.UTF_8);
-            assertThat(config).contains("{env:LLM_PROXY_URL}");
-            assertThat(config).contains("{env:LLM_PROXY_TOKEN}");
-            assertThat(config).contains("hephaestus");
-            assertThat(config).contains("claude-sonnet-4-20250514");
+            // Uses built-in provider prefix — env vars are aliased in the shell command
+            assertThat(config).contains("\"anthropic/claude-sonnet-4-20250514\"");
+            assertThat(config).contains("\"share\"");
+            assertThat(config).contains("\"disabled\"");
         }
 
         @Test
@@ -189,17 +189,15 @@ class OpenCodeAgentAdapterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should build shell command with opencode CLI flags")
+        @DisplayName("should build shell command with Node.js wrapper and proxy env aliases")
         void shouldBuildCorrectCliFlags() {
             var spec = adapter.buildSandboxSpec(proxyRequest(LlmProvider.ANTHROPIC, "claude-sonnet-4-20250514"));
             String cmd = spec.command().get(2);
-            assertThat(cmd).contains("opencode run \"$PROMPT\"");
-            assertThat(cmd).contains("--format json");
-            // Must NOT use -p as an opencode flag (that's not how it takes prompts)
-            assertThat(cmd).doesNotContain("opencode -p");
-            assertThat(cmd).doesNotContain("opencode run -p");
-            // Must NOT contain -f (that's --file, not format)
-            assertThat(cmd).doesNotContain(" -f ");
+            // Uses Node.js wrapper to invoke opencode (avoids shell variable issues with large prompts)
+            assertThat(cmd).contains("node /workspace/.run-opencode.mjs");
+            // In proxy mode, aliases LLM_PROXY_URL/TOKEN to provider-specific env vars
+            assertThat(cmd).contains("export ANTHROPIC_BASE_URL=$LLM_PROXY_URL");
+            assertThat(cmd).contains("export ANTHROPIC_API_KEY=$LLM_PROXY_TOKEN");
         }
 
         @Test
@@ -222,11 +220,12 @@ class OpenCodeAgentAdapterTest extends BaseUnitTest {
     class BuildConfigJson {
 
         @Test
-        @DisplayName("should produce valid JSON with model name")
+        @DisplayName("should produce valid JSON with provider-prefixed model name")
         void shouldProduceValidJsonWithModel() {
             var request = proxyRequest(LlmProvider.ANTHROPIC, "claude-sonnet-4-20250514");
             String json = new String(adapter.buildConfigJson(request), StandardCharsets.UTF_8);
-            assertThat(json).contains("\"claude-sonnet-4-20250514\"");
+            // Built-in provider prefix is prepended to model name
+            assertThat(json).contains("\"anthropic/claude-sonnet-4-20250514\"");
             assertThat(json).contains("\"share\"");
             assertThat(json).contains("\"disabled\"");
             assertThat(json).contains("\"autoupdate\"");
@@ -264,8 +263,81 @@ class OpenCodeAgentAdapterTest extends BaseUnitTest {
     }
 
     @Nested
+    @DisplayName("extractTextFromNdjson")
+    class ExtractTextFromNdjson {
+
+        @Test
+        @DisplayName("should extract text content from NDJSON streaming output")
+        void shouldExtractTextFromNdjson() {
+            String ndjson = """
+                {"type":"step_start","timestamp":123,"part":{"type":"step-start"}}
+                {"type":"text","timestamp":124,"part":{"type":"text","text":"{\\"findings\\":[{\\"title\\":\\"test\\"}]}"}}
+                {"type":"step_finish","timestamp":125,"part":{"type":"step-finish"}}""";
+            String result = adapter.extractTextFromNdjson(ndjson);
+            assertThat(result).contains("findings");
+            assertThat(result).contains("test");
+        }
+
+        @Test
+        @DisplayName("should return plain JSON as-is when not NDJSON")
+        void shouldReturnPlainJsonAsIs() {
+            String plainJson = "{\"findings\":[{\"title\":\"test\"}]}";
+            String result = adapter.extractTextFromNdjson(plainJson);
+            assertThat(result).isEqualTo(plainJson);
+        }
+
+        @Test
+        @DisplayName("should concatenate multiple text events")
+        void shouldConcatenateMultipleTextEvents() {
+            String ndjson = """
+                {"type":"text","timestamp":1,"part":{"type":"text","text":"hello "}}
+                {"type":"text","timestamp":2,"part":{"type":"text","text":"world"}}""";
+            String result = adapter.extractTextFromNdjson(ndjson);
+            assertThat(result).isEqualTo("hello world");
+        }
+
+        @Test
+        @DisplayName("should return null for null or blank input")
+        void shouldReturnNullForBlankInput() {
+            assertThat(adapter.extractTextFromNdjson(null)).isNull();
+            assertThat(adapter.extractTextFromNdjson("")).isNull();
+            assertThat(adapter.extractTextFromNdjson("  ")).isNull();
+        }
+
+        @Test
+        @DisplayName("should return null when no text events found")
+        void shouldReturnNullWhenNoTextEvents() {
+            String ndjson = """
+                {"type":"step_start","timestamp":123,"part":{"type":"step-start"}}
+                {"type":"step_finish","timestamp":125,"part":{"type":"step-finish"}}""";
+            String result = adapter.extractTextFromNdjson(ndjson);
+            assertThat(result).isNull();
+        }
+    }
+
+    @Nested
     @DisplayName("parseResult")
     class ParseResult {
+
+        @Test
+        @DisplayName("should extract text from NDJSON in result.json")
+        void shouldExtractTextFromNdjsonResult() {
+            String ndjson =
+                "{\"type\":\"step_start\",\"part\":{}}\n" +
+                "{\"type\":\"text\",\"part\":{\"text\":\"{\\\"findings\\\":[{\\\"title\\\":\\\"test\\\"}]}\"}}\n" +
+                "{\"type\":\"step_finish\",\"part\":{}}";
+            var sandboxResult = new SandboxResult(
+                0,
+                Map.of("result.json", ndjson.getBytes()),
+                "done",
+                false,
+                Duration.ofSeconds(10)
+            );
+            AgentResult result = adapter.parseResult(sandboxResult);
+            assertThat(result.success()).isTrue();
+            assertThat(result.output().get("rawOutput").toString()).contains("findings");
+            assertThat(result.output().get("rawOutput").toString()).doesNotContain("step_start");
+        }
 
         @Test
         @DisplayName("should return success when exit code is 0")

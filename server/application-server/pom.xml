@@ -257,6 +257,11 @@
         <!-- Docker Java SDK for sandbox container management -->
         <dependency>
             <groupId>com.github.docker-java</groupId>
+            <artifactId>docker-java-api</artifactId>
+            <version>3.7.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.github.docker-java</groupId>
             <artifactId>docker-java-core</artifactId>
             <version>3.7.0</version>
         </dependency>

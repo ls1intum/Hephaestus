@@ -57,11 +57,11 @@ public record ResourceLimits(long memoryBytes, double cpus, int pidsLimit, Durat
         }
     }
 
-    /** Sensible defaults: 4 GB RAM, 2 CPUs, 256 PIDs, 10 min timeout. */
+    /** Sensible defaults: 4 GB RAM, 2 CPUs, 512 PIDs, 10 min timeout. */
     public static final ResourceLimits DEFAULT = new ResourceLimits(
         4L * 1024 * 1024 * 1024,
         2.0,
-        256,
+        512,
         Duration.ofMinutes(10)
     );
 }
