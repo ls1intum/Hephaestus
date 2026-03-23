@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.47.0](https://github.com/ls1intum/Hephaestus/compare/v0.46.0...v0.47.0) (2026-03-21)
+
+### 🚀 Features
+
+* **server:** review delivery gate + comment spam prevention ([#889](https://github.com/ls1intum/Hephaestus/issues/889)) ([c19cc5b](https://github.com/ls1intum/Hephaestus/commit/c19cc5b0baae27895eba03dfd971c398491bf016))
+
 ## [0.46.0](https://github.com/ls1intum/Hephaestus/compare/v0.45.0...v0.46.0) (2026-03-21)
 
 ### 🚀 Features
