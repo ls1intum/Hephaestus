@@ -126,7 +126,7 @@ jobs:
           # -Dmaven.test.skip=false overrides the quick profile (auto-activated when target/classes exists from cache)
           case "${{ matrix.test-type }}" in
             "application-server-unit-arch") ./mvnw test -Dsurefire.includedGroups="unit | architecture" -DskipAfterFailureCount=10 -Dmaven.test.skip=false -T 2C --batch-mode -Dmaven.build.cache.enabled=true ;;
-            "application-server-integration") ./mvnw test -Dsurefire.includedGroups="integration" -Dparallel=none -Dmaven.test.skip=false -T 2C --batch-mode -Dmaven.build.cache.enabled=true ;;
+            "application-server-integration") ./mvnw test -Dsurefire.includedGroups="integration" -Dparallel=none -Dhephaestus.surefire.timeout=600 -Dmaven.test.skip=false -T 2C --batch-mode -Dmaven.build.cache.enabled=true ;;
           esac
 
       - name: Run tests
