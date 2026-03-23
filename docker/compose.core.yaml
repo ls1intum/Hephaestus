@@ -41,7 +41,7 @@ services:
         max-file: "3"
 
   nats-server:
-    image: nats:alpine
+    image: nats:alpine@sha256:c1379a8588df47244a4789ede85e8ae7490bd37006bde837e4d6fb6f559cb0ce
     restart: unless-stopped
     # Lock down the 4222 port from the internet for production
     # We expose it to the host so we can interact with it from the host machine via the nats cli
@@ -123,7 +123,7 @@ services:
       retries: 10
 
   keycloak-postgres:
-    image: postgres:16-alpine
+    image: postgres:16-alpine@sha256:20edbde7749f822887a1a022ad526fde0a47d6b2be9a8364433605cf65099416
     restart: unless-stopped
     networks:
       - shared-network
@@ -142,7 +142,7 @@ services:
       retries: 10
 
   postfix:
-    image: ghcr.io/ls1admin/postfix:latest
+    image: ghcr.io/ls1admin/postfix:latest@sha256:c7d7f2dab71992b7a137e787573258a51ea7936f4b4a1786d0de0254acdde302
     container_name: hephaestus-postfix
     restart: unless-stopped
     volumes:
