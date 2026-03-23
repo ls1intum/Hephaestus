@@ -31,6 +31,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -80,6 +81,7 @@ public class AgentJobExecutor {
     private static final String MDC_JOB_ID = "agent.jobId";
     private static final String MDC_JOB_TYPE = "agent.jobType";
     private static final int MAX_ERROR_MESSAGE_LENGTH = 4000;
+    private static final int MAX_CONTAINER_LOGS_CHARS = 65536; // 64KB
 
     private final Connection natsConnection;
     private final AgentNatsProperties natsProperties;
@@ -351,11 +353,12 @@ public class AgentJobExecutor {
         // resolve lazy JPA proxies (e.g. PullRequest.author) on this sandbox thread.
         TransactionTemplate readOnlyTx = new TransactionTemplate(transactionTemplate.getTransactionManager());
         readOnlyTx.setReadOnly(true);
-        record PrepareResult(Map<String, byte[]> files, String prompt) {}
+        record PrepareResult(Map<String, byte[]> files, String prompt, Map<String, String> volumeMounts) {}
         PrepareResult prepared = readOnlyTx.execute(status -> {
             Map<String, byte[]> files = handler.prepareInputFiles(job);
             String p = handler.buildPrompt(job);
-            return new PrepareResult(files, p);
+            Map<String, String> volumes = handler.volumeMounts(job);
+            return new PrepareResult(files, p, volumes);
         });
 
         AgentAdapterRequest adapterRequest = new AgentAdapterRequest(
@@ -371,7 +374,13 @@ public class AgentJobExecutor {
         );
 
         AgentSandboxSpec agentSpec = adapter.buildSandboxSpec(adapterRequest);
-        SandboxSpec sandboxSpec = buildSandboxSpec(jobId, prepared.files(), agentSpec, snapshot);
+        SandboxSpec sandboxSpec = buildSandboxSpec(
+            jobId,
+            prepared.files(),
+            prepared.volumeMounts(),
+            agentSpec,
+            snapshot
+        );
         return sandboxManager.execute(sandboxSpec);
     }
 
@@ -379,12 +388,32 @@ public class AgentJobExecutor {
     private static SandboxSpec buildSandboxSpec(
         UUID jobId,
         Map<String, byte[]> handlerFiles,
+        Map<String, String> handlerVolumeMounts,
         AgentSandboxSpec agentSpec,
         ConfigSnapshot snapshot
     ) {
         // Merge handler + adapter input files (adapter takes precedence on collision)
         Map<String, byte[]> allInputFiles = new HashMap<>(handlerFiles);
         allInputFiles.putAll(agentSpec.inputFiles());
+
+        // Merge handler + adapter volume mounts with collision detection
+        Map<String, String> allVolumeMounts = new HashMap<>(handlerVolumeMounts);
+        for (var entry : agentSpec.volumeMounts().entrySet()) {
+            String existing = allVolumeMounts.put(entry.getKey(), entry.getValue());
+            if (existing != null && !existing.equals(entry.getValue())) {
+                log.warn(
+                    "Volume mount collision: hostPath={}, handler={}, adapter={} (using adapter)",
+                    entry.getKey(),
+                    existing,
+                    entry.getValue()
+                );
+            }
+        }
+        // Detect multiple host paths mapped to the same container path
+        Set<String> containerPaths = new HashSet<>(allVolumeMounts.values());
+        if (containerPaths.size() < allVolumeMounts.size()) {
+            log.warn("Multiple host paths mapped to the same container path: {}", allVolumeMounts);
+        }
 
         ResourceLimits limits = new ResourceLimits(
             ResourceLimits.DEFAULT.memoryBytes(),
@@ -402,7 +431,8 @@ public class AgentJobExecutor {
             limits,
             agentSpec.securityProfile(),
             allInputFiles,
-            agentSpec.outputPath()
+            agentSpec.outputPath(),
+            allVolumeMounts
         );
     }
 
@@ -586,10 +616,14 @@ public class AgentJobExecutor {
             if (freshJob != null) {
                 freshJob.setOutput(objectMapper.valueToTree(agentResult.output()));
                 freshJob.setExitCode(sandboxResult.exitCode());
-                // Persist container logs for introspection (truncate to 64KB to avoid bloat)
+                // Persist container logs for introspection (truncate to limit to avoid bloat)
                 if (sandboxResult.logs() != null && !sandboxResult.logs().isBlank()) {
                     String logs = sandboxResult.logs();
-                    freshJob.setContainerLogs(logs.length() > 65536 ? logs.substring(logs.length() - 65536) : logs);
+                    freshJob.setContainerLogs(
+                        logs.length() > MAX_CONTAINER_LOGS_CHARS
+                            ? logs.substring(logs.length() - MAX_CONTAINER_LOGS_CHARS)
+                            : logs
+                    );
                 }
                 if (terminalStatus == AgentJobStatus.COMPLETED) {
                     // Mark delivery as PENDING so crash recovery can distinguish

@@ -291,6 +291,99 @@ class ClaudeCodeAgentAdapterTest extends BaseUnitTest {
         }
     }
 
+    @Nested
+    @DisplayName("extractModelResponse")
+    class ExtractModelResponse {
+
+        @Test
+        @DisplayName("should extract structured_output from result event in array format")
+        void shouldExtractStructuredOutputFromArray() {
+            String cliOutput = """
+                [{"type":"system","message":"starting"},\
+                {"type":"result","structured_output":{"findings":[{"practiceSlug":"sec","title":"ok","verdict":"POSITIVE","severity":"INFO","confidence":0.9}]}}]""";
+            String result = adapter.extractModelResponse(cliOutput);
+            assertThat(result).isNotNull();
+            assertThat(result).contains("findings");
+            assertThat(result).contains("practiceSlug");
+        }
+
+        @Test
+        @DisplayName("should extract findings from result text field when structured_output absent")
+        void shouldExtractFromResultText() {
+            String cliOutput = """
+                [{"type":"system","message":"starting"},\
+                {"type":"result","result":"{\\"findings\\":[{\\"practiceSlug\\":\\"test\\",\\"title\\":\\"ok\\",\\"verdict\\":\\"POSITIVE\\",\\"severity\\":\\"INFO\\",\\"confidence\\":0.9}]}"}]""";
+            String result = adapter.extractModelResponse(cliOutput);
+            assertThat(result).isNotNull();
+            assertThat(result).contains("findings");
+        }
+
+        @Test
+        @DisplayName("should extract JSON from mixed text with markdown in result field")
+        void shouldExtractJsonFromMixedText() {
+            String cliOutput = """
+                [{"type":"result","result":"Here is my analysis:\\n```json\\n{\\"findings\\":[{\\"practiceSlug\\":\\"test\\",\\"title\\":\\"found\\",\\"verdict\\":\\"NEGATIVE\\",\\"severity\\":\\"MAJOR\\",\\"confidence\\":0.8}]}\\n```"}]""";
+            String result = adapter.extractModelResponse(cliOutput);
+            assertThat(result).isNotNull();
+            assertThat(result).contains("findings");
+            assertThat(result).contains("NEGATIVE");
+        }
+
+        @Test
+        @DisplayName("should handle single result object format")
+        void shouldHandleSingleResultObject() {
+            String cliOutput =
+                "{\"type\":\"result\",\"structured_output\":{\"findings\":[{\"practiceSlug\":\"test\",\"title\":\"ok\",\"verdict\":\"POSITIVE\",\"severity\":\"INFO\",\"confidence\":0.9}]}}";
+            String result = adapter.extractModelResponse(cliOutput);
+            assertThat(result).isNotNull();
+            assertThat(result).contains("findings");
+        }
+
+        @Test
+        @DisplayName("should handle direct findings object (no event wrapper)")
+        void shouldHandleDirectFindingsObject() {
+            String cliOutput =
+                "{\"findings\":[{\"practiceSlug\":\"test\",\"title\":\"ok\",\"verdict\":\"POSITIVE\",\"severity\":\"INFO\",\"confidence\":0.9}]}";
+            String result = adapter.extractModelResponse(cliOutput);
+            assertThat(result).isNotNull();
+            assertThat(result).contains("findings");
+        }
+
+        @Test
+        @DisplayName("should return null for empty array")
+        void shouldReturnNullForEmptyArray() {
+            assertThat(adapter.extractModelResponse("[]")).isNull();
+        }
+
+        @Test
+        @DisplayName("should return null for array with no result event")
+        void shouldReturnNullForArrayWithNoResultEvent() {
+            String cliOutput =
+                "[{\"type\":\"system\",\"message\":\"starting\"},{\"type\":\"assistant\",\"message\":\"thinking\"}]";
+            assertThat(adapter.extractModelResponse(cliOutput)).isNull();
+        }
+
+        @Test
+        @DisplayName("should return null for malformed JSON")
+        void shouldReturnNullForMalformedJson() {
+            assertThat(adapter.extractModelResponse("not json at all")).isNull();
+        }
+
+        @Test
+        @DisplayName("should return null for result event with empty result text")
+        void shouldReturnNullForEmptyResultText() {
+            String cliOutput = "[{\"type\":\"result\",\"result\":\"\"}]";
+            assertThat(adapter.extractModelResponse(cliOutput)).isNull();
+        }
+
+        @Test
+        @DisplayName("should return null for result text without findings key")
+        void shouldReturnNullForResultWithoutFindings() {
+            String cliOutput = "[{\"type\":\"result\",\"result\":\"{\\\"summary\\\":\\\"all good\\\"}\"}]";
+            assertThat(adapter.extractModelResponse(cliOutput)).isNull();
+        }
+    }
+
     // ── Test helpers ──
 
     private AgentAdapterRequest proxyRequest(String modelName) {

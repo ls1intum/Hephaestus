@@ -316,6 +316,100 @@ class OpenCodeAgentAdapterTest extends BaseUnitTest {
     }
 
     @Nested
+    @DisplayName("buildAgentDefinition")
+    class BuildAgentDefinition {
+
+        @Test
+        @DisplayName("should contain restrictive bash permissions")
+        void shouldContainRestrictiveBashPermissions() {
+            var spec = adapter.buildSandboxSpec(proxyRequest(LlmProvider.ANTHROPIC, "claude-sonnet-4-20250514"));
+            String agentDef = new String(
+                spec.inputFiles().get(".opencode/agent/practice-review.md"),
+                StandardCharsets.UTF_8
+            );
+            assertThat(agentDef).contains("\"*\": deny");
+            assertThat(agentDef).contains("edit: deny");
+            assertThat(agentDef).contains("write: deny");
+            assertThat(agentDef).contains("webfetch: deny");
+        }
+
+        @Test
+        @DisplayName("should contain allowed read-only bash commands")
+        void shouldContainAllowedReadOnlyCommands() {
+            var spec = adapter.buildSandboxSpec(proxyRequest(LlmProvider.ANTHROPIC, "claude-sonnet-4-20250514"));
+            String agentDef = new String(
+                spec.inputFiles().get(".opencode/agent/practice-review.md"),
+                StandardCharsets.UTF_8
+            );
+            assertThat(agentDef).contains("\"grep *\": allow");
+            assertThat(agentDef).contains("\"git log *\": allow");
+            assertThat(agentDef).contains("\"git blame *\": allow");
+            assertThat(agentDef).contains("read: allow");
+        }
+
+        @Test
+        @DisplayName("should set MAX_AGENT_STEPS in agent definition")
+        void shouldSetMaxAgentSteps() {
+            var spec = adapter.buildSandboxSpec(proxyRequest(LlmProvider.ANTHROPIC, "claude-sonnet-4-20250514"));
+            String agentDef = new String(
+                spec.inputFiles().get(".opencode/agent/practice-review.md"),
+                StandardCharsets.UTF_8
+            );
+            assertThat(agentDef).contains("steps: 15");
+        }
+    }
+
+    @Nested
+    @DisplayName("buildRunnerScript and buildProxyEnvAliases")
+    class RunnerScriptAndProxyEnv {
+
+        @Test
+        @DisplayName("should contain spawnSync invocation of opencode")
+        void shouldContainSpawnSyncInvocation() {
+            var spec = adapter.buildSandboxSpec(proxyRequest(LlmProvider.ANTHROPIC, "claude-sonnet-4-20250514"));
+            String script = new String(spec.inputFiles().get(".run-opencode.mjs"), StandardCharsets.UTF_8);
+            assertThat(script).contains("spawnSync('opencode'");
+            assertThat(script).contains("'--agent', 'practice-review'");
+        }
+
+        @Test
+        @DisplayName("should calculate timeout with buffer subtracted")
+        void shouldCalculateTimeoutWithBuffer() {
+            // timeout=600s, buffer=60s → agent timeout = 540000ms
+            var spec = adapter.buildSandboxSpec(proxyRequest(LlmProvider.ANTHROPIC, "claude-sonnet-4-20250514"));
+            String script = new String(spec.inputFiles().get(".run-opencode.mjs"), StandardCharsets.UTF_8);
+            assertThat(script).contains("timeout: 540000");
+        }
+
+        @Test
+        @DisplayName("should generate OpenAI proxy env aliases for OpenAI provider")
+        void shouldGenerateOpenaiProxyEnvAliases() {
+            var spec = adapter.buildSandboxSpec(proxyRequest(LlmProvider.OPENAI, "gpt-4o"));
+            String cmd = spec.command().get(2);
+            assertThat(cmd).contains("export OPENAI_BASE_URL=$LLM_PROXY_URL");
+            assertThat(cmd).contains("export OPENAI_API_KEY=$LLM_PROXY_TOKEN");
+        }
+
+        @Test
+        @DisplayName("should generate Anthropic proxy env aliases for Anthropic provider")
+        void shouldGenerateAnthropicProxyEnvAliases() {
+            var spec = adapter.buildSandboxSpec(proxyRequest(LlmProvider.ANTHROPIC, "claude-sonnet-4-20250514"));
+            String cmd = spec.command().get(2);
+            assertThat(cmd).contains("export ANTHROPIC_BASE_URL=$LLM_PROXY_URL");
+            assertThat(cmd).contains("export ANTHROPIC_API_KEY=$LLM_PROXY_TOKEN");
+        }
+
+        @Test
+        @DisplayName("should not generate proxy env aliases for API_KEY mode")
+        void shouldNotGenerateProxyEnvAliasesForApiKeyMode() {
+            var spec = adapter.buildSandboxSpec(apiKeyRequest(LlmProvider.OPENAI));
+            String cmd = spec.command().get(2);
+            assertThat(cmd).doesNotContain("$LLM_PROXY_URL");
+            assertThat(cmd).doesNotContain("$LLM_PROXY_TOKEN");
+        }
+    }
+
+    @Nested
     @DisplayName("parseResult")
     class ParseResult {
 
@@ -385,6 +479,67 @@ class OpenCodeAgentAdapterTest extends BaseUnitTest {
             assertThat(result.output()).doesNotContainKey("rawOutput");
             assertThat(result.output()).containsEntry("exitCode", 0);
             assertThat(result.output()).containsEntry("timedOut", false);
+        }
+
+        @Test
+        @DisplayName("should capture debug.log when present")
+        void shouldCaptureDebugLog() {
+            var sandboxResult = new SandboxResult(
+                0,
+                Map.of(
+                    "result.json",
+                    "{\"findings\":[]}".getBytes(),
+                    "debug.log",
+                    "STATUS=0\nSTDERR=some debug info".getBytes()
+                ),
+                "done",
+                false,
+                Duration.ofSeconds(10)
+            );
+            AgentResult result = adapter.parseResult(sandboxResult);
+            assertThat(result.output()).containsKey("debugLog");
+            assertThat(result.output().get("debugLog").toString()).contains("STATUS=0");
+        }
+
+        @Test
+        @DisplayName("should capture workspace-listing.txt when present")
+        void shouldCaptureWorkspaceListing() {
+            var sandboxResult = new SandboxResult(
+                0,
+                Map.of(
+                    "result.json",
+                    "{\"findings\":[]}".getBytes(),
+                    "workspace-listing.txt",
+                    "/workspace/repo\n/workspace/.prompt".getBytes()
+                ),
+                "done",
+                false,
+                Duration.ofSeconds(10)
+            );
+            AgentResult result = adapter.parseResult(sandboxResult);
+            assertThat(result.output()).containsKey("workspaceListing");
+        }
+
+        @Test
+        @DisplayName("should skip empty debug.log and workspace-listing.txt")
+        void shouldSkipEmptyOptionalFiles() {
+            var sandboxResult = new SandboxResult(
+                0,
+                Map.of(
+                    "result.json",
+                    "{\"findings\":[]}".getBytes(),
+                    "debug.log",
+                    new byte[0],
+                    "workspace-listing.txt",
+                    new byte[0]
+                ),
+                "done",
+                false,
+                Duration.ofSeconds(10)
+            );
+            AgentResult result = adapter.parseResult(sandboxResult);
+            assertThat(result.output()).doesNotContainKey("debugLog");
+            assertThat(result.output()).doesNotContainKey("workspaceListing");
         }
     }
 

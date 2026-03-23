@@ -38,8 +38,9 @@ public class OpenCodeAgentAdapter implements AgentAdapter {
     static final String OUTPUT_PATH = "/workspace/.output";
     private static final int MAX_AGENT_STEPS = 15;
     private static final int MAX_STDOUT_BUFFER_BYTES = 10 * 1024 * 1024;
+    private static final int MAX_DEBUG_LOG_DISPLAY_CHARS = 4096;
     /** Buffer time (seconds) reserved for cleanup before container timeout. */
-    private static final int TIMEOUT_BUFFER_SECONDS = 60;
+    static final int TIMEOUT_BUFFER_SECONDS = 60;
 
     private final ObjectMapper objectMapper;
 
@@ -70,7 +71,7 @@ public class OpenCodeAgentAdapter implements AgentAdapter {
         // This bypasses shell variable handling entirely — the prompt file is read
         // by Node and passed as a single argument array element, avoiding shell expansion
         // issues with large prompts containing special characters.
-        int agentTimeoutMs = (request.timeoutSeconds() - TIMEOUT_BUFFER_SECONDS) * 1000;
+        long agentTimeoutMs = Math.max(0L, (long) (request.timeoutSeconds() - TIMEOUT_BUFFER_SECONDS) * 1000);
         inputFiles.put(".run-opencode.mjs", buildRunnerScript(agentTimeoutMs));
 
         // In proxy mode, alias the generic LLM_PROXY_URL/LLM_PROXY_TOKEN env vars
@@ -78,23 +79,7 @@ public class OpenCodeAgentAdapter implements AgentAdapter {
         // This lets us use built-in providers (no npm install) even through the proxy.
         String proxyEnvSetup = buildProxyEnvAliases(request);
 
-        // Initialize git repo from injected source files (same as ClaudeCodeAgentAdapter)
-        String gitSetup =
-            "cd /workspace/repo" +
-            " && git init -q" +
-            " && git config user.email agent@hephaestus" +
-            " && git config user.name agent" +
-            " && git add -A" +
-            " && git commit -q --allow-empty -m 'pr-head'" +
-            " && git branch -m pr" +
-            " && git checkout -q -b target" +
-            " && git apply -q --reverse /workspace/.context/diff.patch 2>/dev/null" +
-            " && git add -A" +
-            " && git commit -q --allow-empty -am 'target-base'" +
-            " && git checkout -q pr" +
-            " && cd /workspace && ";
-
-        String command = gitSetup + "mkdir -p " + OUTPUT_PATH + proxyEnvSetup + " && node /workspace/.run-opencode.mjs";
+        String command = "mkdir -p " + OUTPUT_PATH + proxyEnvSetup + " && node /workspace/.run-opencode.mjs";
 
         return new AgentSandboxSpec(
             IMAGE,
@@ -103,7 +88,8 @@ public class OpenCodeAgentAdapter implements AgentAdapter {
             inputFiles,
             OUTPUT_PATH,
             null,
-            AgentAdapter.buildNetworkPolicy(request)
+            AgentAdapter.buildNetworkPolicy(request),
+            null
         );
     }
 
@@ -190,7 +176,9 @@ public class OpenCodeAgentAdapter implements AgentAdapter {
             log.debug(
                 "OpenCode debug log ({} bytes):\n{}",
                 debugLog.length,
-                debugContent.length() > 4096 ? debugContent.substring(debugContent.length() - 4096) : debugContent
+                debugContent.length() > MAX_DEBUG_LOG_DISPLAY_CHARS
+                    ? debugContent.substring(debugContent.length() - MAX_DEBUG_LOG_DISPLAY_CHARS)
+                    : debugContent
             );
             output.put("debugLog", debugContent);
         }
@@ -199,7 +187,13 @@ public class OpenCodeAgentAdapter implements AgentAdapter {
         byte[] listing = sandboxResult.outputFiles().get("workspace-listing.txt");
         if (listing != null && listing.length > 0) {
             String listingContent = new String(listing, StandardCharsets.UTF_8);
-            log.debug("OpenCode workspace listing:\n{}", listingContent);
+            log.debug(
+                "OpenCode workspace listing ({} bytes):\n{}",
+                listing.length,
+                listingContent.length() > MAX_DEBUG_LOG_DISPLAY_CHARS
+                    ? listingContent.substring(0, MAX_DEBUG_LOG_DISPLAY_CHARS) + "..."
+                    : listingContent
+            );
             output.put("workspaceListing", listingContent);
         }
 
@@ -211,7 +205,7 @@ public class OpenCodeAgentAdapter implements AgentAdapter {
      * Reads the prompt from /workspace/.prompt, passes it as a single argument,
      * and writes stdout/stderr to output files.
      */
-    private byte[] buildRunnerScript(int agentTimeoutMs) {
+    private byte[] buildRunnerScript(long agentTimeoutMs) {
         String script = """
             import { spawnSync } from 'child_process';
             import { readFileSync, writeFileSync, mkdirSync } from 'fs';
@@ -315,9 +309,6 @@ public class OpenCodeAgentAdapter implements AgentAdapter {
                 switch (request.llmProvider()) {
                     case ANTHROPIC -> env.put("ANTHROPIC_API_KEY", request.credential());
                     case OPENAI -> env.put("OPENAI_API_KEY", request.credential());
-                    default -> throw new IllegalArgumentException(
-                        "Unsupported LLM provider for OpenCode: " + request.llmProvider()
-                    );
                 }
             }
         }

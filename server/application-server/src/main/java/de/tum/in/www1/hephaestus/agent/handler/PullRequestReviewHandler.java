@@ -19,6 +19,7 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullReques
 import de.tum.in.www1.hephaestus.practices.PracticeRepository;
 import de.tum.in.www1.hephaestus.practices.model.Practice;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,44 +29,24 @@ import org.slf4j.LoggerFactory;
 /**
  * Handler for {@link AgentJobType#PULL_REQUEST_REVIEW} jobs.
  *
- * <p>Prepares workspace context for an AI agent to perform practice-aware code review:
- * <ul>
- *   <li>Repository source files at the pull request's head commit</li>
- *   <li>Unified diff between target and source branches</li>
- *   <li>Pull request metadata (title, body, author, branches)</li>
- *   <li>Review comments from the database</li>
- *   <li>Practice definitions from the workspace</li>
- * </ul>
+ * <p>Mounts the real locally-cloned git repository into the container read-only, giving the
+ * agent full access to git history, blame, diffs, and the complete codebase. Only DB-sourced
+ * context (PR metadata and review comments) is injected as files.
  *
- * <p>Files are injected into the container's {@code /workspace} directory:
+ * <p>Container workspace layout:
  * <pre>
  * /workspace/
- * ├── repo/                  # Source files at head commit
+ * ├── repo/                  # Real git repo (read-only bind mount)
  * ├── .context/
  * │   ├── metadata.json      # Title, body, author, branches, stats
- * │   ├── diff.patch         # Unified diff (target..source)
- * │   ├── commits.json       # Commit history with messages and per-commit file changes
- * │   ├── file_changes.json  # Aggregated file change manifest (path, type, additions, deletions)
  * │   └── comments.json      # Review comments (ordered by creation time)
  * ├── .prompt                # Written by executor from buildPrompt()
  * └── .output/               # Agent writes results here
  * </pre>
- *
- * <h2>Memory budget</h2>
- * <p>{@link #prepareInputFiles} materialises all workspace files in heap before handing them
- * to the sandbox's tar injector. Repo files are copied into a new map with {@code repo/} prefixes,
- * so peak usage is ~2× {@link #MAX_REPO_BYTES} plus diff and context files (~82 MB worst-case).
- * Concurrent job count is limited by {@code SandboxProperties.maxConcurrentContainers}.
  */
 public class PullRequestReviewHandler implements JobTypeHandler {
 
     private static final Logger log = LoggerFactory.getLogger(PullRequestReviewHandler.class);
-
-    /** Maximum total bytes for repository files (40 MB, leaving room for context files within 50 MB). */
-    static final long MAX_REPO_BYTES = 40L * 1024 * 1024;
-
-    /** Maximum diff size injected into the workspace (2 MB). Larger diffs are truncated with a note. */
-    static final long MAX_DIFF_BYTES = 2L * 1024 * 1024;
 
     /** Maximum number of review comments included in context. Most recent are kept on truncation. */
     static final int MAX_COMMENTS = 500;
@@ -78,22 +59,6 @@ public class PullRequestReviewHandler implements JobTypeHandler {
     private final PracticeDetectionResultParser resultParser;
     private final PracticeDetectionDeliveryService deliveryService;
     private final FeedbackDeliveryService feedbackService;
-
-    /**
-     * Thread-local cache for expensive Git I/O results computed in {@link #prepareInputFiles}.
-     *
-     * <p>The executor calls {@code prepareInputFiles} then {@code buildPrompt} sequentially on the
-     * same thread (inside a single read-only transaction). Previously, both methods independently
-     * called {@code generateUnifiedDiff} and {@code walkCommits}, doubling Git I/O. This record
-     * caches the intermediate results so {@code buildPrompt} can reuse them.
-     *
-     * <p>Thread-local storage is required because this handler is a Spring singleton — simple
-     * instance fields would be shared across concurrent job executions on different threads.
-     * The value is always cleared in {@code buildPrompt}'s finally block to prevent leaks.
-     */
-    private record CachedGitContext(String diff, List<GitRepositoryManager.CommitInfo> commits) {}
-
-    private final ThreadLocal<CachedGitContext> cachedGitContext = new ThreadLocal<>();
 
     PullRequestReviewHandler(
         ObjectMapper objectMapper,
@@ -151,6 +116,10 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         return new JobSubmission(metadata, idempotencyKey);
     }
 
+    /**
+     * Prepare context files for the agent. Only DB-sourced data is injected as files —
+     * the repository itself is bind-mounted via {@link #volumeMounts(AgentJob)}.
+     */
     @Override
     public Map<String, byte[]> prepareInputFiles(AgentJob job) {
         long startNanos = System.nanoTime();
@@ -160,27 +129,14 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         }
         long repositoryId = requireLong(metadata, "repository_id");
         long pullRequestId = requireLong(metadata, "pull_request_id");
-        String commitSha = requireText(metadata, "commit_sha");
-        String sourceBranch = requireText(metadata, "source_branch");
-        String targetBranch = requireText(metadata, "target_branch");
 
         Map<String, byte[]> files = new HashMap<>();
 
+        // Ensure repo is cloned/fetched before volumeMounts() resolves the path
         ensureRepositoryCloned(metadata, repositoryId);
-        collectRepoFiles(files, repositoryId, commitSha);
-        String diff = generateAndStoreDiff(files, repositoryId, targetBranch, sourceBranch);
+
+        // Only inject DB-sourced context (metadata + comments)
         storeMetadataAndComments(files, pullRequestId, metadata);
-        List<GitRepositoryManager.CommitInfo> commitList = collectCommitContext(
-            files,
-            repositoryId,
-            targetBranch,
-            commitSha
-        );
-
-        // Cache diff and commits for buildPrompt() to avoid duplicate Git I/O.
-        // buildPrompt() is called next on the same thread and always clears this in its finally block.
-        cachedGitContext.set(new CachedGitContext(diff, commitList));
-
         verifyActivePractices(job);
 
         long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
@@ -194,217 +150,28 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         return files;
     }
 
-    // -------------------------------------------------------------------------
-    // Input file preparation helpers (called by prepareInputFiles)
-    // -------------------------------------------------------------------------
+    /**
+     * Mount the real locally-cloned git repository into the container read-only.
+     * The agent gets full access to git history, blame, diffs, and the complete codebase.
+     */
+    @Override
+    public Map<String, String> volumeMounts(AgentJob job) {
+        JsonNode metadata = job.getMetadata();
+        long repositoryId = requireLong(metadata, "repository_id");
 
-    /** Ensure the repository is cloned/fetched locally (may be first access since server restart). */
-    private void ensureRepositoryCloned(JsonNode metadata, long repositoryId) {
-        String repoFullName = metadata.has("repository_full_name")
-            ? metadata.get("repository_full_name").asText()
-            : null;
-        if (repoFullName != null && gitRepositoryManager.isEnabled()) {
-            try {
-                String cloneUrl = "https://github.com/" + repoFullName + ".git";
-                gitRepositoryManager.ensureRepository(repositoryId, cloneUrl, null);
-            } catch (Exception e) {
-                log.warn(
-                    "Failed to ensure repository (will attempt read anyway): repoId={}, error={}",
-                    repositoryId,
-                    e.getMessage()
-                );
-            }
-        }
-    }
-
-    /** Read repository source files at the pull request's head commit and add them with {@code repo/} prefix. */
-    private void collectRepoFiles(Map<String, byte[]> files, long repositoryId, String commitSha) {
-        Map<String, byte[]> repoFiles;
-        try {
-            repoFiles = gitRepositoryManager.readFilesAtCommit(repositoryId, commitSha, MAX_REPO_BYTES);
-        } catch (Exception e) {
+        Path repoPath = gitRepositoryManager.getRepositoryPath(repositoryId);
+        if (!gitRepositoryManager.isRepositoryCloned(repositoryId)) {
             throw new JobPreparationException(
-                "Failed to read repo files: repoId=" + repositoryId + ", commit=" + commitSha,
-                e
+                "Repository not cloned: repoId=" + repositoryId + ", jobId=" + job.getId()
             );
-        }
-        long repoBytes = 0;
-        for (Map.Entry<String, byte[]> entry : repoFiles.entrySet()) {
-            files.put("repo/" + entry.getKey(), entry.getValue());
-            repoBytes += entry.getValue().length;
-        }
-        if (repoFiles.isEmpty()) {
-            log.warn(
-                "No repo files collected — agent will rely on diff only: repoId={}, commit={}",
-                repositoryId,
-                commitSha
-            );
-        } else {
-            log.info(
-                "Collected {} repo files ({} bytes) for pull request review: repoId={}, commit={}",
-                repoFiles.size(),
-                repoBytes,
-                repositoryId,
-                commitSha
-            );
-        }
-    }
-
-    /** Generate unified diff, truncate if necessary, and store as {@code .context/diff.patch}. Returns the raw diff. */
-    private String generateAndStoreDiff(
-        Map<String, byte[]> files,
-        long repositoryId,
-        String targetBranch,
-        String sourceBranch
-    ) {
-        String diff;
-        try {
-            diff = gitRepositoryManager.generateUnifiedDiff(repositoryId, targetBranch, sourceBranch);
-        } catch (Exception e) {
-            throw new JobPreparationException(
-                "Failed to generate diff: repoId=" + repositoryId + ", base=" + targetBranch + ", head=" + sourceBranch,
-                e
-            );
-        }
-        if (diff.isEmpty()) {
-            throw new JobPreparationException(
-                "Empty diff — nothing to review: repoId=" +
-                    repositoryId +
-                    ", base=" +
-                    targetBranch +
-                    ", head=" +
-                    sourceBranch
-            );
-        }
-        byte[] diffBytes = diff.getBytes(StandardCharsets.UTF_8);
-        if (diffBytes.length > MAX_DIFF_BYTES) {
-            log.warn(
-                "Diff truncated from {} to {} bytes: repoId={}, base={}, head={}",
-                diffBytes.length,
-                MAX_DIFF_BYTES,
-                repositoryId,
-                targetBranch,
-                sourceBranch
-            );
-            // Truncate on a character boundary by decoding and re-encoding a safe prefix
-            int safeLimit = findUtf8CharBoundary(diffBytes, (int) MAX_DIFF_BYTES);
-            String truncated =
-                new String(diffBytes, 0, safeLimit, StandardCharsets.UTF_8) +
-                "\n\n[... diff truncated at 2 MB — review the full diff via the repo source files]\n";
-            diffBytes = truncated.getBytes(StandardCharsets.UTF_8);
-        }
-        files.put(".context/diff.patch", diffBytes);
-        log.info(
-            "Generated diff ({} bytes): repoId={}, base={}, head={}",
-            diffBytes.length,
-            repositoryId,
-            targetBranch,
-            sourceBranch
-        );
-        return diff;
-    }
-
-    /** Build and store pull request metadata and review comments as context JSON files. */
-    private void storeMetadataAndComments(Map<String, byte[]> files, long pullRequestId, JsonNode metadata) {
-        ObjectNode pullRequestMetadata = buildPullRequestMetadata(pullRequestId, metadata);
-        try {
-            files.put(
-                ".context/metadata.json",
-                objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(pullRequestMetadata)
-            );
-        } catch (JsonProcessingException e) {
-            throw new JobPreparationException("Failed to serialize pull request metadata", e);
         }
 
-        JsonNode comments = buildReviewComments(pullRequestId);
-        try {
-            files.put(
-                ".context/comments.json",
-                objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(comments)
-            );
-        } catch (JsonProcessingException e) {
-            throw new JobPreparationException("Failed to serialize review comments", e);
-        }
-    }
-
-    /** Walk commit history and store commits and file change manifest as context JSON files. */
-    private List<GitRepositoryManager.CommitInfo> collectCommitContext(
-        Map<String, byte[]> files,
-        long repositoryId,
-        String targetBranch,
-        String commitSha
-    ) {
-        List<GitRepositoryManager.CommitInfo> commitList = List.of();
-        String baseSha = gitRepositoryManager.resolveRefToSha(repositoryId, targetBranch);
-        if (baseSha != null) {
-            try {
-                commitList = gitRepositoryManager.walkCommits(repositoryId, baseSha, commitSha);
-                JsonNode commitsJson = buildCommitHistory(commitList);
-                files.put(
-                    ".context/commits.json",
-                    objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(commitsJson)
-                );
-
-                // File change manifest (structured summary extracted from commit data)
-                JsonNode fileChangesJson = buildFileChangeManifest(commitList);
-                files.put(
-                    ".context/file_changes.json",
-                    objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(fileChangesJson)
-                );
-                log.info(
-                    "Included {} commits in context: repoId={}, base={}, head={}",
-                    commitList.size(),
-                    repositoryId,
-                    baseSha.substring(0, 7),
-                    commitSha.substring(0, Math.min(7, commitSha.length()))
-                );
-            } catch (Exception e) {
-                log.warn(
-                    "Failed to walk commits (non-fatal, agent will lack commit context): repoId={}, error={}",
-                    repositoryId,
-                    e.getMessage()
-                );
-            }
-        } else {
-            log.warn(
-                "Cannot resolve target branch ref for commit walk: branch={}, repoId={}",
-                targetBranch,
-                repositoryId
-            );
-        }
-        return commitList;
-    }
-
-    /** Verify the job's workspace has active practices (required for prompt, not written to file). */
-    private void verifyActivePractices(AgentJob job) {
-        if (job.getWorkspace() == null) {
-            throw new JobPreparationException("Job has no workspace: jobId=" + job.getId());
-        }
-        Long workspaceId = job.getWorkspace().getId();
-        List<Practice> practices = practiceRepository.findByWorkspaceIdAndActiveTrue(workspaceId);
-        if (practices.isEmpty()) {
-            throw new JobPreparationException(
-                "No active practices for workspace: workspaceId=" + workspaceId + ", jobId=" + job.getId()
-            );
-        }
-        log.info(
-            "Verified {} active practices for workspace: workspaceId={}, jobId={}",
-            practices.size(),
-            workspaceId,
-            job.getId()
-        );
+        log.info("Mounting real repo: repoId={}, path={}", repositoryId, repoPath);
+        return Map.of(repoPath.toAbsolutePath().toString(), "/workspace/repo");
     }
 
     @Override
     public String buildPrompt(AgentJob job) {
-        try {
-            return doBuildPrompt(job);
-        } finally {
-            cachedGitContext.remove();
-        }
-    }
-
-    private String doBuildPrompt(AgentJob job) {
         JsonNode metadata = job.getMetadata();
         if (metadata == null || metadata.isNull() || metadata.isMissingNode()) {
             throw new JobPreparationException("Job has no metadata: jobId=" + job.getId());
@@ -412,10 +179,9 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         String pullRequestUrl = requireText(metadata, "pr_url");
         int pullRequestNumber = requireInt(metadata, "pr_number");
         String repoName = requireText(metadata, "repository_full_name");
+        String sourceBranch = requireText(metadata, "source_branch");
+        String targetBranch = requireText(metadata, "target_branch");
 
-        // NOTE: practices are queried here independently of prepareInputFiles() because the
-        // query is cheap (indexed on workspace_id + active) and re-querying ensures freshness.
-        // This mirrors PracticeDetectionDeliveryService which also re-queries at delivery time.
         if (job.getWorkspace() == null) {
             throw new JobPreparationException("Job has no workspace: jobId=" + job.getId());
         }
@@ -427,35 +193,10 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             );
         }
 
-        // Build a compact diff summary from cached commit data (file paths + additions/deletions).
-        // The agent uses git commands to explore the full diff — no inline diff in the prompt.
-        String diffSummary = "";
-        try {
-            CachedGitContext cached = cachedGitContext.get();
-            List<GitRepositoryManager.CommitInfo> commits;
-            if (cached != null) {
-                commits = cached.commits();
-            } else {
-                log.warn("No cached Git context — regenerating commits for prompt (jobId={})", job.getId());
-                long repositoryId = requireLong(metadata, "repository_id");
-                String targetBranch = requireText(metadata, "target_branch");
-                String commitSha = requireText(metadata, "commit_sha");
-                String baseSha = gitRepositoryManager.resolveRefToSha(repositoryId, targetBranch);
-                commits = (baseSha != null)
-                    ? gitRepositoryManager.walkCommits(repositoryId, baseSha, commitSha)
-                    : List.of();
-            }
-            if (!commits.isEmpty()) {
-                diffSummary = buildDiffStatSummary(commits);
-            }
-        } catch (Exception e) {
-            log.warn("Failed to build diff summary for prompt: {}", e.getMessage());
-        }
-
         StringBuilder sb = new StringBuilder(8192);
 
         appendContextSection(sb, pullRequestNumber, repoName, pullRequestUrl);
-        appendDiffSummary(sb, diffSummary);
+        appendGitInstructions(sb, targetBranch, sourceBranch);
         appendPracticeDefinitions(sb, practices);
         appendInstructions(sb, practices.size());
         appendOutputContract(sb, practices.size());
@@ -472,7 +213,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
     }
 
     // -------------------------------------------------------------------------
-    // Prompt section builders (called by doBuildPrompt)
+    // Prompt section builders
     // -------------------------------------------------------------------------
 
     private void appendContextSection(StringBuilder sb, int prNumber, String repoName, String prUrl) {
@@ -501,18 +242,46 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         sb.append('\n');
     }
 
-    private void appendDiffSummary(StringBuilder sb, String diffSummary) {
-        sb.append("## Changes Summary\n");
+    private void appendGitInstructions(StringBuilder sb, String targetBranch, String sourceBranch) {
+        sb.append("## Repository\n");
         sb.append('\n');
-        sb.append("The repository is a git repo at `/workspace/repo/` with branches:\n");
-        sb.append("- `target` — the base branch (merge target)\n");
-        sb.append("- `pr` — the PR head (checked out)\n");
+        sb.append("The full git repository is mounted at `/workspace/repo/` with complete history.\n");
+        // Sanitize branch names — a malicious contributor could create a branch with newlines
+        // to inject adversarial content into the trusted instruction section of the prompt.
+        String safeSrc = sourceBranch.replaceAll("[\\r\\n\\t]", "_");
+        String safeTgt = targetBranch.replaceAll("[\\r\\n\\t]", "_");
+        sb.append("The PR merges `origin/").append(safeSrc).append("` into `origin/");
+        sb.append(safeTgt).append("`.\n");
         sb.append('\n');
-        if (!diffSummary.isEmpty()) {
-            sb.append("```\n");
-            sb.append(diffSummary);
-            sb.append("```\n");
-        }
+        sb.append("Use real git commands to explore the changes:\n");
+        sb.append('\n');
+        sb.append("```bash\n");
+        sb.append("cd /workspace/repo\n");
+        sb.append('\n');
+        sb.append("# Overview of all changes\n");
+        sb.append("git diff origin/").append(safeTgt).append("..origin/").append(safeSrc);
+        sb.append(" --stat\n");
+        sb.append('\n');
+        sb.append("# Full diff (or for a specific file)\n");
+        sb.append("git diff origin/").append(safeTgt).append("..origin/").append(safeSrc).append('\n');
+        sb.append("git diff origin/").append(safeTgt).append("..origin/").append(safeSrc);
+        sb.append(" -- path/to/file.java\n");
+        sb.append('\n');
+        sb.append("# Commit history\n");
+        sb.append("git log origin/").append(safeTgt).append("..origin/").append(safeSrc);
+        sb.append(" --oneline\n");
+        sb.append("git log origin/").append(safeTgt).append("..origin/").append(safeSrc);
+        sb.append(" --stat\n");
+        sb.append('\n');
+        sb.append("# Blame to understand history of specific lines\n");
+        sb.append("git blame path/to/file.java\n");
+        sb.append('\n');
+        sb.append("# Explore the codebase\n");
+        sb.append("cat path/to/file.java\n");
+        sb.append("grep -r 'pattern' --include='*.java'\n");
+        sb.append("find . -name '*.java' -path '*/test/*'\n");
+        sb.append("tree -L 3\n");
+        sb.append("```\n");
         sb.append('\n');
     }
 
@@ -542,36 +311,18 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         sb.append("## Instructions\n");
         sb.append('\n');
         sb.append("You are working in a git repository at `/workspace/repo/`.\n");
-        sb.append("Use git commands to investigate the PR changes:\n");
-        sb.append('\n');
-        sb.append("```bash\n");
-        sb.append("# Overview of all changes\n");
-        sb.append("git diff target..pr --stat\n");
-        sb.append('\n');
-        sb.append("# Full diff (or for a specific file)\n");
-        sb.append("git diff target..pr\n");
-        sb.append("git diff target..pr -- path/to/file.java\n");
-        sb.append('\n');
-        sb.append("# Blame to understand history of specific lines\n");
-        sb.append("git blame path/to/file.java\n");
-        sb.append('\n');
-        sb.append("# Explore the codebase\n");
-        sb.append("cat path/to/file.java\n");
-        sb.append("grep -r 'pattern' --include='*.java'\n");
-        sb.append("find . -name '*.java' -path '*/test/*'\n");
-        sb.append("```\n");
-        sb.append('\n');
         sb.append("PR metadata and review comments are at `/workspace/.context/metadata.json` ");
         sb.append("and `/workspace/.context/comments.json`.\n");
         sb.append('\n');
         sb.append("Write your final findings to `/workspace/.output/result.json`.\n");
         sb.append('\n');
         sb.append("**Review process:**\n");
-        sb.append("1. Run `git diff target..pr --stat` to see all changed files\n");
-        sb.append("2. Run `git diff target..pr` to read the full diff\n");
-        sb.append("3. Explore related source files for architectural context\n");
-        sb.append("4. For each RELEVANT practice, produce one finding\n");
-        sb.append("5. Focus on CHANGED code. Pre-existing code is context only.\n");
+        sb.append("1. Run `git diff --stat` to see all changed files\n");
+        sb.append("2. Run `git diff` to read the full diff\n");
+        sb.append("3. Run `git log --stat` to understand commit structure\n");
+        sb.append("4. Explore related source files for architectural context\n");
+        sb.append("5. For each RELEVANT practice, produce one finding\n");
+        sb.append("6. Focus on CHANGED code. Pre-existing code is context only.\n");
         sb.append('\n');
         sb.append("**Rules:**\n");
         sb.append("- Use PRECISE line numbers for evidence. Never use broad ranges.\n");
@@ -777,6 +528,78 @@ public class PullRequestReviewHandler implements JobTypeHandler {
     }
 
     // -------------------------------------------------------------------------
+    // Input file preparation helpers
+    // -------------------------------------------------------------------------
+
+    /**
+     * Ensure the repository is cloned/fetched locally. Throws on failure because the bind-mount
+     * approach requires a valid local clone — there is no fallback.
+     */
+    private void ensureRepositoryCloned(JsonNode metadata, long repositoryId) {
+        if (!gitRepositoryManager.isEnabled()) {
+            throw new JobPreparationException(
+                "Git local checkout is disabled but required for bind-mount: repoId=" + repositoryId
+            );
+        }
+        String repoFullName = requireText(metadata, "repository_full_name");
+        if (!repoFullName.matches("[a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+")) {
+            throw new JobPreparationException("Invalid repository name: " + repoFullName);
+        }
+        String cloneUrl = "https://github.com/" + repoFullName + ".git";
+        try {
+            gitRepositoryManager.ensureRepository(repositoryId, cloneUrl, null);
+        } catch (Exception e) {
+            throw new JobPreparationException(
+                "Failed to clone/fetch repository for bind-mount: repoId=" + repositoryId,
+                e
+            );
+        }
+    }
+
+    /** Build and store pull request metadata and review comments as context JSON files. */
+    private void storeMetadataAndComments(Map<String, byte[]> files, long pullRequestId, JsonNode metadata) {
+        ObjectNode pullRequestMetadata = buildPullRequestMetadata(pullRequestId, metadata);
+        try {
+            files.put(
+                ".context/metadata.json",
+                objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(pullRequestMetadata)
+            );
+        } catch (JsonProcessingException e) {
+            throw new JobPreparationException("Failed to serialize pull request metadata", e);
+        }
+
+        JsonNode comments = buildReviewComments(pullRequestId);
+        try {
+            files.put(
+                ".context/comments.json",
+                objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(comments)
+            );
+        } catch (JsonProcessingException e) {
+            throw new JobPreparationException("Failed to serialize review comments", e);
+        }
+    }
+
+    /** Verify the job's workspace has active practices. */
+    private void verifyActivePractices(AgentJob job) {
+        if (job.getWorkspace() == null) {
+            throw new JobPreparationException("Job has no workspace: jobId=" + job.getId());
+        }
+        Long workspaceId = job.getWorkspace().getId();
+        List<Practice> practices = practiceRepository.findByWorkspaceIdAndActiveTrue(workspaceId);
+        if (practices.isEmpty()) {
+            throw new JobPreparationException(
+                "No active practices for workspace: workspaceId=" + workspaceId + ", jobId=" + job.getId()
+            );
+        }
+        log.info(
+            "Verified {} active practices for workspace: workspaceId={}, jobId={}",
+            practices.size(),
+            workspaceId,
+            job.getId()
+        );
+    }
+
+    // -------------------------------------------------------------------------
     // Internal helpers
     // -------------------------------------------------------------------------
 
@@ -792,7 +615,6 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         result.put("commit_sha", requireText(jobMetadata, "commit_sha"));
 
         // Enrich from current DB state (title, body, author, etc.)
-        // Use findByIdWithAllForGate to eagerly fetch author (avoids LazyInitializationException on sandbox thread)
         PullRequest pullRequest = pullRequestRepository.findByIdWithAllForGate(pullRequestId).orElse(null);
         if (pullRequest == null) {
             log.warn("Pull request not found in database during context preparation: pullRequestId={}", pullRequestId);
@@ -814,151 +636,6 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         }
 
         return result;
-    }
-
-    /**
-     * Build a compact git diff --stat-style summary from commit data.
-     * Format: " path/to/file.java | +42 -10\n" for each changed file.
-     */
-    private String buildDiffStatSummary(List<GitRepositoryManager.CommitInfo> commits) {
-        Map<String, int[]> fileStats = new java.util.LinkedHashMap<>();
-        for (var commit : commits) {
-            for (var fc : commit.fileChanges()) {
-                fileStats.merge(fc.filename(), new int[] { fc.additions(), fc.deletions() }, (a, b) -> {
-                    a[0] += b[0];
-                    a[1] += b[1];
-                    return a;
-                });
-            }
-        }
-        int totalAdd = 0,
-            totalDel = 0;
-        StringBuilder sb = new StringBuilder();
-        for (var entry : fileStats.entrySet()) {
-            int[] stats = entry.getValue();
-            totalAdd += stats[0];
-            totalDel += stats[1];
-            sb.append(" ").append(entry.getKey()).append(" | +").append(stats[0]).append(" -").append(stats[1]);
-            sb.append('\n');
-        }
-        sb.append('\n');
-        sb.append(fileStats.size()).append(" files changed, +").append(totalAdd).append(" -").append(totalDel);
-        sb.append('\n');
-        return sb.toString();
-    }
-
-    private JsonNode buildCommitHistory(List<GitRepositoryManager.CommitInfo> commits) {
-        var array = objectMapper.createArrayNode();
-        for (var commit : commits) {
-            var node = objectMapper.createObjectNode();
-            node.put("sha", commit.sha());
-            node.put("message", commit.message());
-            if (commit.messageBody() != null) {
-                node.put("message_body", commit.messageBody());
-            }
-            node.put("author", commit.authorName());
-            node.put("author_email", commit.authorEmail());
-            node.put("authored_at", commit.authoredAt().toString());
-            node.put("additions", commit.additions());
-            node.put("deletions", commit.deletions());
-            node.put("changed_files", commit.changedFiles());
-
-            var filesArray = objectMapper.createArrayNode();
-            for (var fc : commit.fileChanges()) {
-                var fcNode = objectMapper.createObjectNode();
-                fcNode.put("path", fc.filename());
-                fcNode.put("change_type", fc.changeType().name());
-                fcNode.put("additions", fc.additions());
-                fcNode.put("deletions", fc.deletions());
-                if (fc.previousFilename() != null) {
-                    fcNode.put("previous_path", fc.previousFilename());
-                }
-                filesArray.add(fcNode);
-            }
-            node.set("file_changes", filesArray);
-            array.add(node);
-        }
-        return array;
-    }
-
-    private JsonNode buildFileChangeManifest(List<GitRepositoryManager.CommitInfo> commits) {
-        // Aggregate per-file changes across all commits
-        Map<String, int[]> fileStats = new java.util.LinkedHashMap<>();
-        Map<String, GitRepositoryManager.ChangeType> fileTypes = new java.util.LinkedHashMap<>();
-        Map<String, String> renames = new java.util.LinkedHashMap<>();
-
-        for (var commit : commits) {
-            for (var fc : commit.fileChanges()) {
-                String path = fc.filename();
-                fileStats.merge(path, new int[] { fc.additions(), fc.deletions() }, (a, b) -> {
-                    a[0] += b[0];
-                    a[1] += b[1];
-                    return a;
-                });
-                // First change type wins (ADDED stays ADDED even if later modified)
-                fileTypes.putIfAbsent(path, fc.changeType());
-                if (fc.previousFilename() != null) {
-                    renames.putIfAbsent(path, fc.previousFilename());
-                }
-            }
-        }
-
-        var array = objectMapper.createArrayNode();
-        for (var entry : fileStats.entrySet()) {
-            String path = entry.getKey();
-            int[] stats = entry.getValue();
-            var node = objectMapper.createObjectNode();
-            node.put("path", path);
-            node.put("change_type", fileTypes.getOrDefault(path, GitRepositoryManager.ChangeType.MODIFIED).name());
-            node.put("additions", stats[0]);
-            node.put("deletions", stats[1]);
-            if (renames.containsKey(path)) {
-                node.put("previous_path", renames.get(path));
-            }
-            // Heuristic: test file detection
-            node.put("is_test", isTestFile(path));
-            node.put("is_generated", isGeneratedFile(path));
-            array.add(node);
-        }
-        return array;
-    }
-
-    private static boolean isTestFile(String path) {
-        String lower = path.toLowerCase();
-        return (
-            lower.contains("/test/") ||
-            lower.contains("/tests/") ||
-            lower.contains("/__tests__/") ||
-            lower.endsWith("test.java") ||
-            lower.endsWith("test.ts") ||
-            lower.endsWith("test.js") ||
-            lower.endsWith("test.tsx") ||
-            lower.endsWith("test.jsx") ||
-            lower.endsWith("test.py") ||
-            lower.endsWith("_test.go") ||
-            lower.endsWith("_test.rs") ||
-            lower.endsWith(".spec.ts") ||
-            lower.endsWith(".spec.js") ||
-            lower.endsWith(".spec.tsx")
-        );
-    }
-
-    private static boolean isGeneratedFile(String path) {
-        String lower = path.toLowerCase();
-        return (
-            lower.endsWith("package-lock.json") ||
-            lower.endsWith("yarn.lock") ||
-            lower.endsWith("pnpm-lock.yaml") ||
-            lower.endsWith("cargo.lock") ||
-            lower.endsWith("go.sum") ||
-            lower.contains("/vendor/") ||
-            lower.contains("/node_modules/") ||
-            lower.contains("/generated/") ||
-            lower.endsWith(".generated.ts") ||
-            lower.endsWith(".generated.java") ||
-            lower.endsWith(".pb.go") ||
-            lower.endsWith(".pb.java")
-        );
     }
 
     private JsonNode buildReviewComments(long pullRequestId) {
@@ -990,11 +667,6 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         return commentsArray;
     }
 
-    /**
-     * Extract a required text field from job metadata.
-     *
-     * @throws JobPreparationException if the field is missing or blank
-     */
     private static String requireText(JsonNode metadata, String field) {
         JsonNode node = metadata.get(field);
         if (node == null || node.isNull() || node.asText().isBlank()) {
@@ -1003,11 +675,6 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         return node.asText();
     }
 
-    /**
-     * Extract a required integer field from job metadata.
-     *
-     * @throws JobPreparationException if the field is missing or not a number
-     */
     private static int requireInt(JsonNode metadata, String field) {
         JsonNode node = metadata.get(field);
         if (node == null || node.isNull()) {
@@ -1021,11 +688,6 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         return node.asInt();
     }
 
-    /**
-     * Extract a required numeric field from job metadata.
-     *
-     * @throws JobPreparationException if the field is missing or not a number
-     */
     private static long requireLong(JsonNode metadata, String field) {
         JsonNode node = metadata.get(field);
         if (node == null || node.isNull()) {
@@ -1037,23 +699,5 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             );
         }
         return node.asLong();
-    }
-
-    /**
-     * Find the largest byte offset ≤ limit that does not split a multi-byte UTF-8 character.
-     *
-     * <p>UTF-8 continuation bytes start with {@code 10xxxxxx} (0x80..0xBF). Walking backwards
-     * from the limit skips any continuation bytes that would be orphaned by the cut.
-     */
-    static int findUtf8CharBoundary(byte[] data, int limit) {
-        if (limit >= data.length) {
-            return data.length;
-        }
-        int pos = limit;
-        // Walk backwards past continuation bytes (0x80..0xBF)
-        while (pos > 0 && (data[pos] & 0xC0) == 0x80) {
-            pos--;
-        }
-        return pos;
     }
 }
