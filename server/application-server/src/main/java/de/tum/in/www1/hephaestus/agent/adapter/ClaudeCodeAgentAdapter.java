@@ -65,6 +65,24 @@ public class ClaudeCodeAgentAdapter implements AgentAdapter {
         inputFiles.put(".prompt", request.prompt().getBytes(StandardCharsets.UTF_8));
         inputFiles.put(".json-schema", buildJsonSchema());
 
+        // Initialize a git repo from injected source files so the agent can use git commands.
+        // Creates two branches: 'target' (base) and 'pr' (head, checked out).
+        // The target branch is reconstructed by reverse-applying the diff patch.
+        String gitSetup =
+            "cd /workspace/repo" +
+            " && git init -q" +
+            " && git config user.email agent@hephaestus" +
+            " && git config user.name agent" +
+            " && git add -A" +
+            " && git commit -q --allow-empty -m 'pr-head'" +
+            " && git branch -m pr" +
+            " && git checkout -q -b target" +
+            " && git apply -q --reverse /workspace/.context/diff.patch 2>/dev/null" +
+            " && git add -A" +
+            " && git commit -q --allow-empty -am 'target-base'" +
+            " && git checkout -q pr" +
+            " && ";
+
         // Full agentic mode with optimal flags:
         // --json-schema: constrained decoding for reliable structured output (post-agentic-loop)
         // --effort max: maximum extended thinking for thorough code review
@@ -73,6 +91,7 @@ public class ClaudeCodeAgentAdapter implements AgentAdapter {
         // --verbose: debug info on stderr (does not affect stdout)
         String command =
             authSetup +
+            gitSetup +
             "mkdir -p " +
             OUTPUT_PATH +
             " && PROMPT=$(cat /workspace/.prompt)" +
@@ -176,6 +195,11 @@ public class ClaudeCodeAgentAdapter implements AgentAdapter {
     String extractModelResponse(String cliOutput) {
         try {
             JsonNode root = objectMapper.readTree(cliOutput);
+
+            // Direct findings JSON (produced by --json-schema constrained decoding)
+            if (root.isObject() && root.has("findings")) {
+                return objectMapper.writeValueAsString(root);
+            }
 
             // Single result object format
             if (root.isObject() && "result".equals(root.path("type").asText())) {

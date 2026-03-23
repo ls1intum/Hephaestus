@@ -271,6 +271,24 @@ class ClaudeCodeAgentAdapterTest extends BaseUnitTest {
             assertThat(result.output()).containsEntry("exitCode", 0);
             assertThat(result.output()).containsEntry("timedOut", false);
         }
+
+        @Test
+        @DisplayName("should extract direct findings JSON from --json-schema output")
+        void shouldExtractDirectFindingsJson() {
+            String directFindings =
+                "{\"findings\":[{\"practiceSlug\":\"test\",\"title\":\"ok\",\"verdict\":\"POSITIVE\",\"severity\":\"INFO\",\"confidence\":0.9}]}";
+            var sandboxResult = new SandboxResult(
+                0,
+                Map.of("result.json", directFindings.getBytes()),
+                "done",
+                false,
+                Duration.ofSeconds(10)
+            );
+            AgentResult result = adapter.parseResult(sandboxResult);
+            assertThat(result.success()).isTrue();
+            assertThat(result.output().get("rawOutput").toString()).contains("findings");
+            assertThat(result.output().get("rawOutput").toString()).contains("practiceSlug");
+        }
     }
 
     // ── Test helpers ──

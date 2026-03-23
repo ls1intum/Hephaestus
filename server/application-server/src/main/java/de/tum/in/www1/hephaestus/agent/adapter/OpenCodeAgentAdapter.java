@@ -78,7 +78,23 @@ public class OpenCodeAgentAdapter implements AgentAdapter {
         // This lets us use built-in providers (no npm install) even through the proxy.
         String proxyEnvSetup = buildProxyEnvAliases(request);
 
-        String command = "mkdir -p " + OUTPUT_PATH + proxyEnvSetup + " && node /workspace/.run-opencode.mjs";
+        // Initialize git repo from injected source files (same as ClaudeCodeAgentAdapter)
+        String gitSetup =
+            "cd /workspace/repo" +
+            " && git init -q" +
+            " && git config user.email agent@hephaestus" +
+            " && git config user.name agent" +
+            " && git add -A" +
+            " && git commit -q --allow-empty -m 'pr-head'" +
+            " && git branch -m pr" +
+            " && git checkout -q -b target" +
+            " && git apply -q --reverse /workspace/.context/diff.patch 2>/dev/null" +
+            " && git add -A" +
+            " && git commit -q --allow-empty -am 'target-base'" +
+            " && git checkout -q pr" +
+            " && cd /workspace && ";
+
+        String command = gitSetup + "mkdir -p " + OUTPUT_PATH + proxyEnvSetup + " && node /workspace/.run-opencode.mjs";
 
         return new AgentSandboxSpec(
             IMAGE,

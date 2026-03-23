@@ -818,8 +818,8 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
 
             assertThat(prompt).contains("POSITIVE`: the contributor followed");
             assertThat(prompt).contains("NEGATIVE`: the contributor violated");
-            assertThat(prompt).contains("NOT_APPLICABLE`: the practice does not apply");
-            assertThat(prompt).contains("NEEDS_REVIEW`: borderline case");
+            assertThat(prompt).contains("NOT_APPLICABLE`: practice does not apply");
+            assertThat(prompt).contains("NEEDS_REVIEW`: borderline");
         }
 
         @Test

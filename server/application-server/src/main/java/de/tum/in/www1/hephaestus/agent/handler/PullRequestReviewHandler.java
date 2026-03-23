@@ -70,9 +70,6 @@ public class PullRequestReviewHandler implements JobTypeHandler {
     /** Maximum number of review comments included in context. Most recent are kept on truncation. */
     static final int MAX_COMMENTS = 500;
 
-    /** Maximum characters of inline diff included directly in the prompt. */
-    private static final int MAX_INLINE_DIFF_CHARS = 200_000;
-
     private final ObjectMapper objectMapper;
     private final GitRepositoryManager gitRepositoryManager;
     private final PullRequestRepository pullRequestRepository;
@@ -430,59 +427,35 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             );
         }
 
-        // Reuse diff and commits cached by prepareInputFiles() to avoid duplicate Git I/O.
-        // Falls back to re-generating if cache is missing (e.g. called without prepareInputFiles).
-        String inlineDiff = "";
-        String inlineFileChanges = "";
-        String inlineCommits = "";
+        // Build a compact diff summary from cached commit data (file paths + additions/deletions).
+        // The agent uses git commands to explore the full diff — no inline diff in the prompt.
+        String diffSummary = "";
         try {
             CachedGitContext cached = cachedGitContext.get();
-            String rawDiff;
             List<GitRepositoryManager.CommitInfo> commits;
-
             if (cached != null) {
-                rawDiff = cached.diff();
                 commits = cached.commits();
             } else {
-                log.warn("No cached Git context — regenerating diff and commits for prompt (jobId={})", job.getId());
+                log.warn("No cached Git context — regenerating commits for prompt (jobId={})", job.getId());
                 long repositoryId = requireLong(metadata, "repository_id");
-                String sourceBranch = requireText(metadata, "source_branch");
                 String targetBranch = requireText(metadata, "target_branch");
                 String commitSha = requireText(metadata, "commit_sha");
-                rawDiff = gitRepositoryManager.generateUnifiedDiff(repositoryId, targetBranch, sourceBranch);
                 String baseSha = gitRepositoryManager.resolveRefToSha(repositoryId, targetBranch);
                 commits = (baseSha != null)
                     ? gitRepositoryManager.walkCommits(repositoryId, baseSha, commitSha)
                     : List.of();
             }
-
-            // Cap inline diff to keep prompt manageable for the LLM
-            if (rawDiff.length() > MAX_INLINE_DIFF_CHARS) {
-                inlineDiff = rawDiff.substring(0, MAX_INLINE_DIFF_CHARS) + "\n[... diff truncated at 200K chars]\n";
-            } else {
-                inlineDiff = rawDiff;
-            }
-
             if (!commits.isEmpty()) {
-                inlineFileChanges = objectMapper
-                    .writerWithDefaultPrettyPrinter()
-                    .writeValueAsString(buildFileChangeManifest(commits));
-                inlineCommits = objectMapper
-                    .writerWithDefaultPrettyPrinter()
-                    .writeValueAsString(buildCommitHistory(commits));
+                diffSummary = buildDiffStatSummary(commits);
             }
         } catch (Exception e) {
-            log.warn("Failed to inline context in prompt (agent will read from files): {}", e.getMessage());
+            log.warn("Failed to build diff summary for prompt: {}", e.getMessage());
         }
 
-        // Use concatenation instead of String.formatted() — metadata fields (repo name, URL)
-        // may contain '%' characters which would be misinterpreted as format specifiers.
-        StringBuilder sb = new StringBuilder(inlineDiff.length() + inlineFileChanges.length() + 8192);
+        StringBuilder sb = new StringBuilder(8192);
 
         appendContextSection(sb, pullRequestNumber, repoName, pullRequestUrl);
-        appendInlineDiffSection(sb, inlineDiff);
-        appendFileChangesSection(sb, inlineFileChanges);
-        appendCommitHistorySection(sb, inlineCommits);
+        appendDiffSummary(sb, diffSummary);
         appendPracticeDefinitions(sb, practices);
         appendInstructions(sb, practices.size());
         appendOutputContract(sb, practices.size());
@@ -528,31 +501,19 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         sb.append('\n');
     }
 
-    private void appendInlineDiffSection(StringBuilder sb, String inlineDiff) {
-        if (!inlineDiff.isEmpty()) {
-            sb.append("## Diff (all code changes)\n");
-            sb.append('\n');
-            sb.append(inlineDiff);
-            sb.append('\n');
+    private void appendDiffSummary(StringBuilder sb, String diffSummary) {
+        sb.append("## Changes Summary\n");
+        sb.append('\n');
+        sb.append("The repository is a git repo at `/workspace/repo/` with branches:\n");
+        sb.append("- `target` — the base branch (merge target)\n");
+        sb.append("- `pr` — the PR head (checked out)\n");
+        sb.append('\n');
+        if (!diffSummary.isEmpty()) {
+            sb.append("```\n");
+            sb.append(diffSummary);
+            sb.append("```\n");
         }
-    }
-
-    private void appendFileChangesSection(StringBuilder sb, String inlineFileChanges) {
-        if (!inlineFileChanges.isEmpty()) {
-            sb.append("## File Changes\n");
-            sb.append('\n');
-            sb.append(inlineFileChanges);
-            sb.append('\n');
-        }
-    }
-
-    private void appendCommitHistorySection(StringBuilder sb, String inlineCommits) {
-        if (!inlineCommits.isEmpty()) {
-            sb.append("## Commits\n");
-            sb.append('\n');
-            sb.append(inlineCommits);
-            sb.append('\n');
-        }
+        sb.append('\n');
     }
 
     private void appendPracticeDefinitions(StringBuilder sb, List<Practice> practices) {
@@ -580,49 +541,53 @@ public class PullRequestReviewHandler implements JobTypeHandler {
     private void appendInstructions(StringBuilder sb, int practiceCount) {
         sb.append("## Instructions\n");
         sb.append('\n');
-        sb.append("The diff, file changes, and commits are provided inline above for convenience.\n");
-        sb.append(
-            "The full repository is cloned at `/workspace/repo/` — you have full read access and can run commands.\n"
-        );
+        sb.append("You are working in a git repository at `/workspace/repo/`.\n");
+        sb.append("Use git commands to investigate the PR changes:\n");
         sb.append('\n');
-        sb.append("**Use your tools to produce a thorough, high-quality review.** For example:\n");
-        sb.append("- Read related source files to understand architectural context and design patterns\n");
-        sb.append("- Check if issues in the diff exist elsewhere in the codebase\n");
-        sb.append("- Verify imports, dependencies, configuration files, and test coverage\n");
-        sb.append("- Run grep/find to check for hardcoded secrets, similar patterns, or missing tests\n");
-        sb.append("- Inspect the project structure to understand the codebase organization\n");
+        sb.append("```bash\n");
+        sb.append("# Overview of all changes\n");
+        sb.append("git diff target..pr --stat\n");
+        sb.append('\n');
+        sb.append("# Full diff (or for a specific file)\n");
+        sb.append("git diff target..pr\n");
+        sb.append("git diff target..pr -- path/to/file.java\n");
+        sb.append('\n');
+        sb.append("# Blame to understand history of specific lines\n");
+        sb.append("git blame path/to/file.java\n");
+        sb.append('\n');
+        sb.append("# Explore the codebase\n");
+        sb.append("cat path/to/file.java\n");
+        sb.append("grep -r 'pattern' --include='*.java'\n");
+        sb.append("find . -name '*.java' -path '*/test/*'\n");
+        sb.append("```\n");
+        sb.append('\n');
+        sb.append("PR metadata and review comments are at `/workspace/.context/metadata.json` ");
+        sb.append("and `/workspace/.context/comments.json`.\n");
         sb.append('\n');
         sb.append("Write your final findings to `/workspace/.output/result.json`.\n");
         sb.append('\n');
-        sb.append("1. Start by analyzing the inline diff, then explore the repo for deeper context\n");
-        sb.append("2. For each RELEVANT practice, produce one finding\n");
-        sb.append("3. Focus on CHANGED code (lines in the diff). Pre-existing code is context only.\n");
-        sb.append("4. When uncertain, prefer NOT_APPLICABLE or NEEDS_REVIEW. Precision over recall.\n");
-        sb.append("5. Skip generated/vendored files (`is_generated: true`), lock files, IDE configs.\n");
-        sb.append("6. If the diff was truncated, explore `/workspace/repo/` to see the full changes.\n");
-        sb.append("7. Guard against cosmetic compliance: descriptions without \"WHY\" should be NEGATIVE.\n");
-        sb.append("8. Ensure cross-practice coherence: don't praise commit structure while recommending a split.\n");
-        sb.append("9. Binary files in the diff should not trigger code quality findings.\n");
+        sb.append("**Review process:**\n");
+        sb.append("1. Run `git diff target..pr --stat` to see all changed files\n");
+        sb.append("2. Run `git diff target..pr` to read the full diff\n");
+        sb.append("3. Explore related source files for architectural context\n");
+        sb.append("4. For each RELEVANT practice, produce one finding\n");
+        sb.append("5. Focus on CHANGED code. Pre-existing code is context only.\n");
+        sb.append('\n');
+        sb.append("**Rules:**\n");
+        sb.append("- Use PRECISE line numbers for evidence. Never use broad ranges.\n");
+        sb.append("- When uncertain, prefer NOT_APPLICABLE or NEEDS_REVIEW. Precision over recall.\n");
+        sb.append("- Skip generated/vendored files, lock files, IDE configs.\n");
+        sb.append("- Guard against cosmetic compliance: descriptions without 'WHY' should be NEGATIVE.\n");
+        sb.append("- Cross-practice coherence: don't praise commit structure while recommending a split.\n");
         sb.append(
-            "10. If a practice requires data NOT present in this prompt (e.g., PR body/description text is absent), "
-        );
-        sb.append("use NOT_APPLICABLE rather than speculating about missing information.\n");
-        sb.append("11. Use PRECISE line numbers from the diff for evidence locations. ");
-        sb.append("Never use broad ranges like startLine=1, endLine=200. ");
-        sb.append("Pinpoint the exact lines where the issue or positive pattern occurs.\n");
-        sb.append(
-            "12. For security practices, check ALL sub-categories: hardcoded secrets, injection (SQL/XSS/command), "
-        );
-        sb.append(
-            "SSRF, authorization gaps, PII exposure, email injection, input validation, and unsafe deserialization.\n"
+            "- For security practices, check ALL: hardcoded secrets, injection, SSRF, auth gaps, PII, input validation.\n"
         );
         sb.append('\n');
         sb.append("Verdict meanings:\n");
         sb.append("- `POSITIVE`: the contributor followed this practice\n");
         sb.append("- `NEGATIVE`: the contributor violated or missed this practice\n");
-        sb.append("- `NOT_APPLICABLE`: the practice does not apply to this PR's changes ");
-        sb.append("(use severity `INFO` and confidence `1.0`; evidence and guidance may be omitted)\n");
-        sb.append("- `NEEDS_REVIEW`: borderline case where your confidence is below 0.6\n");
+        sb.append("- `NOT_APPLICABLE`: practice does not apply (use severity `INFO`, confidence `1.0`)\n");
+        sb.append("- `NEEDS_REVIEW`: borderline, confidence below 0.6\n");
         sb.append('\n');
     }
 
@@ -849,6 +814,36 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         }
 
         return result;
+    }
+
+    /**
+     * Build a compact git diff --stat-style summary from commit data.
+     * Format: " path/to/file.java | +42 -10\n" for each changed file.
+     */
+    private String buildDiffStatSummary(List<GitRepositoryManager.CommitInfo> commits) {
+        Map<String, int[]> fileStats = new java.util.LinkedHashMap<>();
+        for (var commit : commits) {
+            for (var fc : commit.fileChanges()) {
+                fileStats.merge(fc.filename(), new int[] { fc.additions(), fc.deletions() }, (a, b) -> {
+                    a[0] += b[0];
+                    a[1] += b[1];
+                    return a;
+                });
+            }
+        }
+        int totalAdd = 0, totalDel = 0;
+        StringBuilder sb = new StringBuilder();
+        for (var entry : fileStats.entrySet()) {
+            int[] stats = entry.getValue();
+            totalAdd += stats[0];
+            totalDel += stats[1];
+            sb.append(" ").append(entry.getKey()).append(" | +").append(stats[0]).append(" -").append(stats[1]);
+            sb.append('\n');
+        }
+        sb.append('\n');
+        sb.append(fileStats.size()).append(" files changed, +").append(totalAdd).append(" -").append(totalDel);
+        sb.append('\n');
+        return sb.toString();
     }
 
     private JsonNode buildCommitHistory(List<GitRepositoryManager.CommitInfo> commits) {
