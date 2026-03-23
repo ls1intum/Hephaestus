@@ -194,8 +194,23 @@ public class DockerSandboxAdapter implements SandboxManager {
             boolean allowInternet = spec.networkPolicy() != null && spec.networkPolicy().internetAccess();
             networkId = networkManager.createJobNetwork(jobId, allowInternet);
 
-            // Connect app-server to the job network (multi-homing) and get its IP
+            // Connect app-server to the job network (multi-homing) and get its IP.
+            // Returns null when the app-server runs on the host (not in Docker).
             String appServerIp = networkManager.connectAppServer(networkId);
+            List<String> extraHosts = List.of();
+            if (appServerIp == null) {
+                // App-server is on the host — use host.docker.internal with host-gateway mapping.
+                // Requires allowInternet=true (non-internal network) so the container can reach the host.
+                if (!allowInternet) {
+                    throw new SandboxException(
+                        "App-server is not in Docker and network is internal (allowInternet=false). " +
+                            "Set allow_internet=true on the agent config, or run the app-server in Docker."
+                    );
+                }
+                appServerIp = "host.docker.internal";
+                extraHosts = List.of("host.docker.internal:host-gateway");
+                log.info("Using host gateway for LLM proxy: appServerIp={}", appServerIp);
+            }
 
             checkCancelled(cancelled, jobId);
 
@@ -219,7 +234,8 @@ public class DockerSandboxAdapter implements SandboxManager {
                 CONTAINER_HOSTNAME,
                 CONTAINER_USER,
                 labels,
-                hostConfig
+                hostConfig,
+                extraHosts
             );
 
             containerId = containerManager.createContainer(containerSpec);
@@ -237,6 +253,12 @@ public class DockerSandboxAdapter implements SandboxManager {
             if (!spec.inputFiles().isEmpty()) {
                 workspaceManager.injectFiles(containerId, spec.inputFiles());
                 log.debug("Injected {} input files", spec.inputFiles().size());
+            }
+
+            // Inject host directories via docker cp (works with local and remote Docker daemons)
+            if (spec.volumeMounts() != null && !spec.volumeMounts().isEmpty()) {
+                workspaceManager.injectDirectories(containerId, spec.volumeMounts());
+                log.debug("Injected {} directories into container", spec.volumeMounts().size());
             }
 
             // ── PHASE 2: EXECUTE ──
@@ -347,6 +369,24 @@ public class DockerSandboxAdapter implements SandboxManager {
             } else {
                 env.put(entry.getKey(), entry.getValue());
             }
+        }
+
+        // Git security: env-based config has HIGHEST precedence — overrides .git/config in mounted repos.
+        // This prevents malicious repos from re-enabling hooks or fsmonitor via local config.
+        if (spec.volumeMounts() != null && !spec.volumeMounts().isEmpty()) {
+            int idx = 0;
+            for (String containerPath : spec.volumeMounts().values()) {
+                env.put("GIT_CONFIG_KEY_" + idx, "safe.directory");
+                env.put("GIT_CONFIG_VALUE_" + idx, containerPath);
+                idx++;
+            }
+            env.put("GIT_CONFIG_KEY_" + idx, "core.hooksPath");
+            env.put("GIT_CONFIG_VALUE_" + idx, "/nonexistent");
+            idx++;
+            env.put("GIT_CONFIG_KEY_" + idx, "core.fsmonitor");
+            env.put("GIT_CONFIG_VALUE_" + idx, "false");
+            idx++;
+            env.put("GIT_CONFIG_COUNT", String.valueOf(idx));
         }
 
         // Inject LLM proxy configuration

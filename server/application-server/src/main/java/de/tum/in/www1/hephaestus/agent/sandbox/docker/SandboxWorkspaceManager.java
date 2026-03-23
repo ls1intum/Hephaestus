@@ -5,6 +5,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
@@ -65,6 +66,86 @@ public class SandboxWorkspaceManager {
             log.debug("Injected {} files into container {}", files.size(), containerId);
         } catch (IOException e) {
             throw new SandboxException("Failed to inject files into container: " + containerId, e);
+        }
+    }
+
+    /**
+     * Inject host directories into a container via {@code docker cp}.
+     *
+     * <p>Manually creates a tar archive from the host directory and streams it via the Docker API.
+     * This avoids docker-java's internal tar creation which has a commons-compress version conflict.
+     * Works identically for local and remote Docker daemons.
+     *
+     * @param containerId the target container (must be created but can be stopped)
+     * @param directoryMounts map of host path to container path
+     */
+    public void injectDirectories(String containerId, Map<String, String> directoryMounts) {
+        if (directoryMounts == null || directoryMounts.isEmpty()) {
+            return;
+        }
+        for (var entry : directoryMounts.entrySet()) {
+            String hostPath = entry.getKey();
+            String containerPath = entry.getValue();
+            validateDirectoryMount(hostPath, containerPath);
+            injectDirectoryViaTar(containerId, hostPath, containerPath);
+            log.debug("Injected directory into container {}: {} -> {}", containerId, hostPath, containerPath);
+        }
+    }
+
+    /**
+     * Walk a host directory, create a tar archive, and copy it into the container.
+     * The tar entries are prefixed with the final path component so that extracting at
+     * the parent of containerPath produces the correct layout.
+     */
+    private void injectDirectoryViaTar(String containerId, String hostPath, String containerPath) {
+        Path hostDir = Path.of(hostPath);
+        // Container path parent is where we extract; the tar has the dir name as prefix
+        Path containerParent = Path.of(containerPath).getParent();
+        String dirName = Path.of(containerPath).getFileName().toString();
+        if (containerParent == null) {
+            containerParent = Path.of("/");
+        }
+
+        try (
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            TarArchiveOutputStream tar = new TarArchiveOutputStream(baos)
+        ) {
+            tar.setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
+            tar.setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_POSIX);
+
+            // Walk the directory tree and add each file/directory
+            Files.walk(hostDir).forEach(path -> {
+                try {
+                    String relativePath = hostDir.relativize(path).toString();
+                    String entryName = relativePath.isEmpty() ? dirName : dirName + "/" + relativePath;
+
+                    if (Files.isDirectory(path)) {
+                        TarArchiveEntry dirEntry = new TarArchiveEntry(entryName + "/");
+                        dirEntry.setModTime(Files.getLastModifiedTime(path).toMillis());
+                        tar.putArchiveEntry(dirEntry);
+                        tar.closeArchiveEntry();
+                    } else if (Files.isRegularFile(path)) {
+                        byte[] content = Files.readAllBytes(path);
+                        TarArchiveEntry fileEntry = new TarArchiveEntry(entryName);
+                        fileEntry.setSize(content.length);
+                        fileEntry.setModTime(Files.getLastModifiedTime(path).toMillis());
+                        tar.putArchiveEntry(fileEntry);
+                        tar.write(content);
+                        tar.closeArchiveEntry();
+                    }
+                    // Skip symlinks for security (already validated above)
+                } catch (IOException e) {
+                    throw new SandboxException("Failed to add file to tar: " + path, e);
+                }
+            });
+
+            tar.finish();
+
+            try (InputStream tarStream = new ByteArrayInputStream(baos.toByteArray())) {
+                fileOps.copyArchiveToContainer(containerId, containerParent.toString(), tarStream);
+            }
+        } catch (IOException e) {
+            throw new SandboxException("Failed to inject directory " + hostPath + " into container " + containerId, e);
         }
     }
 
@@ -175,6 +256,33 @@ public class SandboxWorkspaceManager {
             return baos.toByteArray();
         } catch (IOException e) {
             throw new SandboxException("Failed to create tar archive", e);
+        }
+    }
+
+    /**
+     * Validate a directory mount path pair. Rejects relative paths, non-existent paths, and
+     * symlinks (prevents symlink escape attacks).
+     */
+    private static void validateDirectoryMount(String hostPath, String containerPath) {
+        if (hostPath == null || hostPath.isEmpty()) {
+            throw new SandboxException("Host path must not be empty");
+        }
+        if (containerPath == null || containerPath.isEmpty()) {
+            throw new SandboxException("Container path must not be empty");
+        }
+        Path host = Path.of(hostPath);
+        if (!host.isAbsolute()) {
+            throw new SandboxException("Host path must be absolute: " + hostPath);
+        }
+        if (!Files.exists(host)) {
+            throw new SandboxException("Host path does not exist: " + hostPath);
+        }
+        if (Files.isSymbolicLink(host)) {
+            throw new SandboxException("Host path must not be a symlink: " + hostPath);
+        }
+        Path container = Path.of(containerPath);
+        if (!container.isAbsolute()) {
+            throw new SandboxException("Container path must be absolute: " + containerPath);
         }
     }
 

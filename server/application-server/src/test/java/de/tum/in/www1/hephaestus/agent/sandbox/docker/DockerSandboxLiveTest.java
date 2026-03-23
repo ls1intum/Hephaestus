@@ -158,7 +158,8 @@ class DockerSandboxLiveTest {
                 new ResourceLimits(512 * 1024 * 1024, 1.0, 128, Duration.ofMinutes(1)),
                 testSecurityProfile(),
                 Map.of(),
-                "/workspace/.output"
+                "/workspace/.output",
+                null
             );
 
             SandboxResult result = sandboxAdapter.execute(spec);
@@ -184,7 +185,8 @@ class DockerSandboxLiveTest {
                 new ResourceLimits(256 * 1024 * 1024, 0.5, 64, Duration.ofMinutes(1)),
                 testSecurityProfile(),
                 Map.of(),
-                "/workspace/.output"
+                "/workspace/.output",
+                null
             );
 
             SandboxResult result = sandboxAdapter.execute(spec);
@@ -212,7 +214,8 @@ class DockerSandboxLiveTest {
                 new ResourceLimits(256 * 1024 * 1024, 0.5, 64, Duration.ofSeconds(3)),
                 testSecurityProfile(),
                 Map.of(),
-                "/workspace/.output"
+                "/workspace/.output",
+                null
             );
 
             SandboxResult result = sandboxAdapter.execute(spec);
@@ -245,7 +248,8 @@ class DockerSandboxLiveTest {
                 new ResourceLimits(256 * 1024 * 1024, 0.5, 64, Duration.ofMinutes(1)),
                 testSecurityProfile(),
                 Map.of(".prompt", "injected content".getBytes()),
-                "/workspace/.output"
+                "/workspace/.output",
+                null
             );
 
             SandboxResult result = sandboxAdapter.execute(spec);
@@ -274,7 +278,8 @@ class DockerSandboxLiveTest {
                 new ResourceLimits(256 * 1024 * 1024, 0.5, 64, Duration.ofMinutes(1)),
                 testSecurityProfile(),
                 Map.of(),
-                "/workspace/.output"
+                "/workspace/.output",
+                null
             );
 
             sandboxAdapter.execute(spec);

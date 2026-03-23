@@ -117,7 +117,8 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
             ResourceLimits.DEFAULT,
             SecurityProfile.DEFAULT,
             Map.of(".prompt", "test prompt".getBytes()),
-            "/workspace/.output"
+            "/workspace/.output",
+            null
         );
     }
 
@@ -185,7 +186,8 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
                 ResourceLimits.DEFAULT,
                 SecurityProfile.DEFAULT,
                 Map.of(".prompt", "test".getBytes()),
-                "/workspace/.output"
+                "/workspace/.output",
+                null
             );
 
             sandboxAdapter.execute(spec);
@@ -214,7 +216,8 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
                 ResourceLimits.DEFAULT,
                 SecurityProfile.DEFAULT,
                 Map.of(".prompt", "test".getBytes()),
-                "/workspace/.output"
+                "/workspace/.output",
+                null
             );
 
             sandboxAdapter.execute(spec);
@@ -241,7 +244,8 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
                 ResourceLimits.DEFAULT,
                 SecurityProfile.DEFAULT,
                 Map.of(".prompt", "test".getBytes()),
-                "/workspace/.output"
+                "/workspace/.output",
+                null
             );
 
             sandboxAdapter.execute(spec);
@@ -298,7 +302,8 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
                 ResourceLimits.DEFAULT,
                 SecurityProfile.DEFAULT,
                 Map.of(".prompt", "test".getBytes()),
-                "/workspace/.output"
+                "/workspace/.output",
+                null
             );
 
             sandboxAdapter.execute(spec);
@@ -349,7 +354,8 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
                 ResourceLimits.DEFAULT,
                 SecurityProfile.DEFAULT,
                 Map.of(),
-                "/workspace/.output"
+                "/workspace/.output",
+                null
             );
 
             sandboxAdapter.execute(specWithoutFiles);
@@ -380,7 +386,8 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
                 ResourceLimits.DEFAULT,
                 SecurityProfile.DEFAULT,
                 Map.of(),
-                "/workspace/.output"
+                "/workspace/.output",
+                null
             );
 
             SandboxResult result = sandboxAdapter.execute(spec);
@@ -411,7 +418,8 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
                 ResourceLimits.DEFAULT,
                 SecurityProfile.DEFAULT,
                 Map.of(),
-                null // null outputPath
+                null, // null outputPath
+                null
             );
 
             sandboxAdapter.execute(spec);
@@ -557,7 +565,8 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
                 ResourceLimits.DEFAULT,
                 null,
                 Map.of(),
-                "/workspace/.output"
+                "/workspace/.output",
+                null
             );
 
             SandboxResult result = sandboxAdapter.execute(specWithNullSecurity);

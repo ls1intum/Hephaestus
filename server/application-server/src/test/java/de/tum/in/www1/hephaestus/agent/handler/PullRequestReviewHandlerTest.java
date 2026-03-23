@@ -3,7 +3,6 @@ package de.tum.in.www1.hephaestus.agent.handler;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
@@ -169,10 +168,11 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
 
     /** Stub all git/DB calls to return minimal valid data. */
     private void stubDefaults() {
-        when(gitRepositoryManager.readFilesAtCommit(eq(123L), eq("abc123def456"), anyLong())).thenReturn(Map.of());
-        when(gitRepositoryManager.generateUnifiedDiff(123L, "main", "feature/auth-fix")).thenReturn("diff content");
-        // resolveRefToSha returns null by default (commit context will be skipped gracefully)
-        lenient().when(gitRepositoryManager.resolveRefToSha(eq(123L), eq("main"))).thenReturn(null);
+        lenient().when(gitRepositoryManager.isEnabled()).thenReturn(true);
+        lenient().when(gitRepositoryManager.isRepositoryCloned(123L)).thenReturn(true);
+        lenient()
+            .when(gitRepositoryManager.getRepositoryPath(123L))
+            .thenReturn(java.nio.file.Path.of("/tmp/hephaestus-git-repos/123"));
         when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.empty());
         when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L)).thenReturn(List.of());
         when(practiceRepository.findByWorkspaceIdAndActiveTrue(WORKSPACE_ID)).thenReturn(samplePractices());
@@ -233,56 +233,24 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
     class PrepareInputFiles {
 
         @Test
-        @DisplayName("should include repo files under repo/ prefix and all context files")
-        void shouldIncludeRepoFiles() {
-            Map<String, byte[]> repoFiles = Map.of(
-                "src/Main.java",
-                "public class Main {}".getBytes(),
-                "README.md",
-                "# My Project".getBytes()
-            );
-            // Stub readFilesAtCommit directly with custom data (avoids double-stub from stubDefaults)
-            when(gitRepositoryManager.readFilesAtCommit(eq(123L), eq("abc123def456"), anyLong())).thenReturn(repoFiles);
-            when(gitRepositoryManager.generateUnifiedDiff(123L, "main", "feature/auth-fix")).thenReturn("diff content");
-            lenient().when(gitRepositoryManager.resolveRefToSha(eq(123L), eq("main"))).thenReturn(null);
-            when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.empty());
-            when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L)).thenReturn(List.of());
-            when(practiceRepository.findByWorkspaceIdAndActiveTrue(WORKSPACE_ID)).thenReturn(samplePractices());
-
-            Map<String, byte[]> files = handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata()));
-
-            // Repo files prefixed with repo/
-            assertThat(files).containsKey("repo/src/Main.java");
-            assertThat(files).containsKey("repo/README.md");
-            assertThat(new String(files.get("repo/src/Main.java"), StandardCharsets.UTF_8)).isEqualTo(
-                "public class Main {}"
-            );
-            // All context files present (practices are inline in prompt, not in workspace files)
-            assertThat(files).containsKeys(".context/diff.patch", ".context/metadata.json", ".context/comments.json");
-        }
-
-        @Test
-        @DisplayName("should include diff patch")
-        void shouldIncludeDiffPatch() {
-            String diffContent = "--- a/file.java\n+++ b/file.java\n@@ -1,3 +1,4 @@\n+new line\n";
-            stubDefaults();
-            when(gitRepositoryManager.generateUnifiedDiff(123L, "main", "feature/auth-fix")).thenReturn(diffContent);
-
-            Map<String, byte[]> files = handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata()));
-
-            assertThat(files).containsKey(".context/diff.patch");
-            assertThat(new String(files.get(".context/diff.patch"), StandardCharsets.UTF_8)).isEqualTo(diffContent);
-        }
-
-        @Test
-        @DisplayName("should include metadata.json and comments.json")
-        void shouldIncludeMetadataAndComments() throws Exception {
+        @DisplayName("should include only metadata.json and comments.json (repo is bind-mounted)")
+        void shouldIncludeOnlyDbSourcedContextFiles() throws Exception {
             stubDefaults();
 
             Map<String, byte[]> files = handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata()));
 
+            // Only DB-sourced context files — no repo files, no diff.patch
             assertThat(files).containsKey(".context/metadata.json");
             assertThat(files).containsKey(".context/comments.json");
+            assertThat(files).doesNotContainKey(".context/diff.patch");
+            assertThat(
+                files
+                    .keySet()
+                    .stream()
+                    .noneMatch(k -> k.startsWith("repo/"))
+            )
+                .as("repo files should not be injected (repo is bind-mounted)")
+                .isTrue();
 
             // Verify metadata.json is valid JSON
             JsonNode metadataJson = objectMapper.readTree(files.get(".context/metadata.json"));
@@ -318,44 +286,6 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should throw JobPreparationException when diff is empty")
-        void shouldThrowWhenDiffIsEmpty() {
-            when(gitRepositoryManager.readFilesAtCommit(eq(123L), eq("abc123def456"), anyLong())).thenReturn(Map.of());
-            when(gitRepositoryManager.generateUnifiedDiff(123L, "main", "feature/auth-fix")).thenReturn("");
-
-            assertThatThrownBy(() -> handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata())))
-                .isInstanceOf(JobPreparationException.class)
-                .hasMessageContaining("Empty diff");
-        }
-
-        @Test
-        @DisplayName("should throw JobPreparationException when readFilesAtCommit fails")
-        void shouldThrowWhenReadFilesFails() {
-            when(gitRepositoryManager.readFilesAtCommit(eq(123L), anyString(), anyLong())).thenThrow(
-                new RuntimeException("Git error")
-            );
-
-            assertThatThrownBy(() -> handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata())))
-                .isInstanceOf(JobPreparationException.class)
-                .hasMessageContaining("Failed to read repo files")
-                .hasCauseInstanceOf(RuntimeException.class);
-        }
-
-        @Test
-        @DisplayName("should throw JobPreparationException when generateUnifiedDiff fails")
-        void shouldThrowWhenDiffGenerationFails() {
-            when(gitRepositoryManager.readFilesAtCommit(eq(123L), eq("abc123def456"), anyLong())).thenReturn(Map.of());
-            when(gitRepositoryManager.generateUnifiedDiff(123L, "main", "feature/auth-fix")).thenThrow(
-                new RuntimeException("Diff error")
-            );
-
-            assertThatThrownBy(() -> handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata())))
-                .isInstanceOf(JobPreparationException.class)
-                .hasMessageContaining("Failed to generate diff")
-                .hasCauseInstanceOf(RuntimeException.class);
-        }
-
-        @Test
         @DisplayName("should throw JobPreparationException on missing metadata field")
         void shouldThrowOnMissingMetadataField() {
             ObjectNode incomplete = objectMapper.createObjectNode();
@@ -379,55 +309,6 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should truncate oversized diff")
-        void shouldTruncateOversizedDiff() {
-            // Create a diff just over the 2 MB limit
-            String largeDiff = "x".repeat((int) PullRequestReviewHandler.MAX_DIFF_BYTES + 1000);
-            stubDefaults();
-            when(gitRepositoryManager.generateUnifiedDiff(123L, "main", "feature/auth-fix")).thenReturn(largeDiff);
-
-            Map<String, byte[]> files = handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata()));
-
-            String diff = new String(files.get(".context/diff.patch"), StandardCharsets.UTF_8);
-            assertThat(diff).contains("[... diff truncated at 2 MB");
-            // Should be truncated to approximately MAX_DIFF_BYTES + truncation note
-            assertThat(diff.getBytes(StandardCharsets.UTF_8).length).isLessThan(
-                (int) PullRequestReviewHandler.MAX_DIFF_BYTES + 200
-            );
-        }
-
-        @Test
-        @DisplayName("should truncate oversized diff without splitting multi-byte UTF-8 characters")
-        void shouldTruncateWithoutSplittingUtf8() {
-            // Build a diff that places a 3-byte UTF-8 character (€ = E2 82 AC) right at the boundary
-            int padding = (int) PullRequestReviewHandler.MAX_DIFF_BYTES - 2;
-            String largeDiff = "x".repeat(padding) + "€€€"; // € is 3 bytes, total > MAX_DIFF_BYTES
-            stubDefaults();
-            when(gitRepositoryManager.generateUnifiedDiff(123L, "main", "feature/auth-fix")).thenReturn(largeDiff);
-
-            Map<String, byte[]> files = handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata()));
-
-            // The result must be valid UTF-8 (no orphaned continuation bytes)
-            String diff = new String(files.get(".context/diff.patch"), StandardCharsets.UTF_8);
-            assertThat(diff).doesNotContain("\uFFFD"); // replacement character = broken UTF-8
-            assertThat(diff).contains("[... diff truncated at 2 MB");
-        }
-
-        @Test
-        @DisplayName("should not truncate diff exactly at limit")
-        void shouldNotTruncateDiffExactlyAtLimit() {
-            String exactDiff = "x".repeat((int) PullRequestReviewHandler.MAX_DIFF_BYTES);
-            stubDefaults();
-            when(gitRepositoryManager.generateUnifiedDiff(123L, "main", "feature/auth-fix")).thenReturn(exactDiff);
-
-            Map<String, byte[]> files = handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata()));
-
-            String diff = new String(files.get(".context/diff.patch"), StandardCharsets.UTF_8);
-            assertThat(diff).doesNotContain("[... diff truncated");
-            assertThat(diff).isEqualTo(exactDiff);
-        }
-
-        @Test
         @DisplayName("should throw JobPreparationException when metadata is null")
         void shouldThrowWhenMetadataIsNull() {
             var job = new AgentJob();
@@ -441,10 +322,8 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         @Test
         @DisplayName("should throw JobPreparationException when workspace is null")
         void shouldThrowWhenWorkspaceIsNull() {
-            // Workspace null-guard fires in step 5, AFTER git/DB calls in steps 1-4.
-            // Stub those but NOT practiceRepository (which would be unused).
-            when(gitRepositoryManager.readFilesAtCommit(eq(123L), eq("abc123def456"), anyLong())).thenReturn(Map.of());
-            when(gitRepositoryManager.generateUnifiedDiff(123L, "main", "feature/auth-fix")).thenReturn("diff content");
+            // Workspace null-guard fires after DB-sourced context preparation
+            lenient().when(gitRepositoryManager.isEnabled()).thenReturn(true);
             when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.empty());
             when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L)).thenReturn(List.of());
 
@@ -610,7 +489,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
     class BuildPrompt {
 
         @Test
-        @DisplayName("should contain section headers, output path, and pull request details")
+        @DisplayName("should contain section headers, output path, git instructions, and pull request details")
         void shouldReferenceWorkspacePaths() {
             when(practiceRepository.findByWorkspaceIdAndActiveTrue(WORKSPACE_ID)).thenReturn(samplePractices());
 
@@ -618,6 +497,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
 
             // Prompt structure: section headers for inline context and instructions
             assertThat(prompt).contains("## Context");
+            assertThat(prompt).contains("## Repository");
             assertThat(prompt).contains("## Practices to Evaluate");
             assertThat(prompt).contains("## Instructions");
             assertThat(prompt).contains("## Output");
@@ -626,6 +506,10 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             // Pull request details are present
             assertThat(prompt).contains("#42");
             assertThat(prompt).contains("owner/repo");
+            // Git instructions reference real branch names
+            assertThat(prompt).contains("origin/feature/auth-fix");
+            assertThat(prompt).contains("origin/main");
+            assertThat(prompt).contains("git diff origin/main..origin/feature/auth-fix");
         }
 
         @Test
@@ -1090,46 +974,34 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("findUtf8CharBoundary")
-    class FindUtf8CharBoundary {
+    @DisplayName("volumeMounts")
+    class VolumeMounts {
 
         @Test
-        @DisplayName("should not split multi-byte characters")
-        void shouldNotSplitMultiByteCharacters() {
-            // "é" is 2 bytes in UTF-8: 0xC3 0xA9
-            byte[] data = "aaé".getBytes(StandardCharsets.UTF_8);
-            // data = [0x61, 0x61, 0xC3, 0xA9] — 4 bytes
+        @DisplayName("should mount real repo path read-only at /workspace/repo")
+        void shouldMountRealRepoPath() {
+            when(gitRepositoryManager.isRepositoryCloned(123L)).thenReturn(true);
+            when(gitRepositoryManager.getRepositoryPath(123L)).thenReturn(
+                java.nio.file.Path.of("/tmp/hephaestus-git-repos/123")
+            );
 
-            // Cutting at byte 3 would split the "é" — should back up to byte 2
-            int boundary = PullRequestReviewHandler.findUtf8CharBoundary(data, 3);
-            assertThat(boundary).isEqualTo(2);
+            Map<String, String> mounts = handler.volumeMounts(jobWithMetadata(sampleJobMetadata()));
 
-            // Cutting at byte 4 is safe (after the full character)
-            boundary = PullRequestReviewHandler.findUtf8CharBoundary(data, 4);
-            assertThat(boundary).isEqualTo(4);
+            assertThat(mounts).containsEntry("/tmp/hephaestus-git-repos/123", "/workspace/repo");
+            assertThat(mounts).hasSize(1);
         }
 
         @Test
-        @DisplayName("should handle limit beyond data length")
-        void shouldHandleLimitBeyondData() {
-            byte[] data = "abc".getBytes(StandardCharsets.UTF_8);
-            assertThat(PullRequestReviewHandler.findUtf8CharBoundary(data, 100)).isEqualTo(3);
-        }
+        @DisplayName("should throw when repository is not cloned")
+        void shouldThrowWhenRepoNotCloned() {
+            when(gitRepositoryManager.isRepositoryCloned(123L)).thenReturn(false);
+            when(gitRepositoryManager.getRepositoryPath(123L)).thenReturn(
+                java.nio.file.Path.of("/tmp/hephaestus-git-repos/123")
+            );
 
-        @Test
-        @DisplayName("should not split 4-byte characters (emoji)")
-        void shouldNotSplitFourByteCharacters() {
-            // "😀" is 4 bytes in UTF-8: F0 9F 98 80
-            byte[] data = "aa\uD83D\uDE00".getBytes(StandardCharsets.UTF_8);
-            // data = [0x61, 0x61, 0xF0, 0x9F, 0x98, 0x80] — 6 bytes
-
-            // Cutting at byte 3, 4, or 5 would split the emoji — should back up to byte 2
-            assertThat(PullRequestReviewHandler.findUtf8CharBoundary(data, 3)).isEqualTo(2);
-            assertThat(PullRequestReviewHandler.findUtf8CharBoundary(data, 4)).isEqualTo(2);
-            assertThat(PullRequestReviewHandler.findUtf8CharBoundary(data, 5)).isEqualTo(2);
-
-            // Cutting at byte 6 is safe (after the full character)
-            assertThat(PullRequestReviewHandler.findUtf8CharBoundary(data, 6)).isEqualTo(6);
+            assertThatThrownBy(() -> handler.volumeMounts(jobWithMetadata(sampleJobMetadata())))
+                .isInstanceOf(JobPreparationException.class)
+                .hasMessageContaining("Repository not cloned");
         }
     }
 }

@@ -418,7 +418,8 @@ class AgentJobExecutorTest extends BaseUnitTest {
             Map.of("config.json", "{}".getBytes()),
             "/output",
             SecurityProfile.DEFAULT,
-            new NetworkPolicy(false, null, "test-token", "anthropic")
+            new NetworkPolicy(false, null, "test-token", "anthropic"),
+            null
         );
         when(adapter.buildSandboxSpec(any())).thenReturn(agentSpec);
         when(adapter.parseResult(any())).thenReturn(new AgentResult(true, Map.of("review", "LGTM")));
@@ -441,6 +442,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
             Map.of(),
             Map.of(),
             "/output",
+            null,
             null,
             null
         );

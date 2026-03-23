@@ -22,7 +22,8 @@ final class DockerOperations {
         String hostname,
         String user,
         Map<String, String> labels,
-        HostConfigSpec hostConfig
+        HostConfigSpec hostConfig,
+        List<String> extraHosts
     ) {}
 
     /** Host configuration for container resource limits and security. */

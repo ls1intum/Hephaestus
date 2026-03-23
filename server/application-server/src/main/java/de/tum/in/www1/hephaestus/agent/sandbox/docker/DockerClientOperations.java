@@ -152,6 +152,11 @@ public class DockerClientOperations
         try {
             HostConfig hostConfig = buildHostConfig(spec.hostConfig());
 
+            // Extra hosts (e.g. "host.docker.internal:host-gateway" for host access on Linux)
+            if (spec.extraHosts() != null && !spec.extraHosts().isEmpty()) {
+                hostConfig.withExtraHosts(spec.extraHosts().toArray(String[]::new));
+            }
+
             CreateContainerCmd cmd = dockerClient
                 .createContainerCmd(spec.image())
                 .withHostConfig(hostConfig)
@@ -257,6 +262,23 @@ public class DockerClientOperations
         } catch (Exception e) {
             log.warn("Failed to collect logs for container {}: {}", containerId, e.getMessage());
             return "";
+        }
+    }
+
+    @Override
+    public void copyHostDirectoryToContainer(String containerId, String hostPath, String remotePath) {
+        try {
+            dockerClient
+                .copyArchiveToContainerCmd(containerId)
+                .withHostResource(hostPath)
+                .withRemotePath(remotePath)
+                .exec();
+            log.debug("Copied host directory to container {}: {} -> {}", containerId, hostPath, remotePath);
+        } catch (DockerException e) {
+            throw new SandboxException(
+                "Failed to copy directory to container " + containerId + ": " + hostPath + " -> " + remotePath,
+                e
+            );
         }
     }
 

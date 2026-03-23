@@ -19,6 +19,18 @@ interface DockerFileOperations {
     void copyArchiveToContainer(String containerId, String remotePath, InputStream tarStream);
 
     /**
+     * Copy a host directory into a container via {@code docker cp}.
+     *
+     * <p>Reads the directory from the Docker API client's filesystem, creates a tar archive,
+     * and streams it to the Docker daemon. Works identically for local and remote daemons.
+     *
+     * @param containerId the target container (must be created, can be stopped)
+     * @param hostPath absolute path on the client's filesystem
+     * @param remotePath destination path inside the container
+     */
+    void copyHostDirectoryToContainer(String containerId, String hostPath, String remotePath);
+
+    /**
      * Copy files from a container as a tar archive.
      *
      * @param containerId the source container

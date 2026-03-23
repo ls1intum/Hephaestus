@@ -73,10 +73,12 @@ public class SandboxNetworkManager {
     public String connectAppServer(String networkId) {
         String containerId = resolveAppServerContainerId();
         if (containerId == null || containerId.isBlank()) {
-            throw new SandboxException(
-                "Cannot determine app-server container ID. Set hephaestus.sandbox.app-server-container-id " +
-                    "or ensure the HOSTNAME environment variable is set by Docker."
+            log.warn(
+                "Cannot determine app-server container ID — app server is likely running on the host, " +
+                    "not in Docker. Agent containers will use host.docker.internal to reach the LLM proxy. " +
+                    "Set hephaestus.sandbox.app-server-container-id to suppress this warning."
             );
+            return null;
         }
         String ip = networkOps.connectToNetwork(networkId, containerId);
         log.info("Connected app-server to network {}: containerId={}, ip={}", networkId, containerId, ip);
