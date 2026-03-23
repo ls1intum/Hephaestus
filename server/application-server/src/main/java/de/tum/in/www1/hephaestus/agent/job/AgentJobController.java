@@ -88,4 +88,23 @@ public class AgentJobController {
         AgentJob job = agentJobService.cancel(workspaceContext.id(), jobId);
         return ResponseEntity.ok(AgentJobDTO.from(job));
     }
+
+    @PostMapping("/{jobId}/delivery/retry")
+    @Operation(summary = "Retry delivery for a completed agent job")
+    @ApiResponse(responseCode = "200", description = "Delivery retried")
+    @ApiResponse(
+        responseCode = "404",
+        description = "Job not found in this workspace",
+        content = @Content(schema = @Schema(hidden = true))
+    )
+    @ApiResponse(
+        responseCode = "409",
+        description = "Job not in a retryable state",
+        content = @Content(schema = @Schema(hidden = true))
+    )
+    @RequireAtLeastWorkspaceAdmin
+    public ResponseEntity<AgentJobDTO> retryDelivery(WorkspaceContext workspaceContext, @PathVariable UUID jobId) {
+        AgentJob job = agentJobService.retryDelivery(workspaceContext.id(), jobId);
+        return ResponseEntity.ok(AgentJobDTO.from(job));
+    }
 }

@@ -25,6 +25,7 @@ import java.util.UUID;
  * @param securityProfile container hardening flags
  * @param inputFiles files to inject into /workspace (relative path → content)
  * @param outputPath container path to collect results from after execution
+ * @param volumeMounts host bind mounts (host path → container path); mounted read-only
  */
 public record SandboxSpec(
     UUID jobId,
@@ -35,7 +36,8 @@ public record SandboxSpec(
     ResourceLimits resourceLimits,
     SecurityProfile securityProfile,
     Map<String, byte[]> inputFiles,
-    String outputPath
+    String outputPath,
+    Map<String, String> volumeMounts
 ) {
     public SandboxSpec {
         Objects.requireNonNull(jobId, "jobId must not be null");
@@ -48,5 +50,6 @@ public record SandboxSpec(
         command = command != null ? command : List.of();
         environment = environment != null ? environment : Map.of();
         inputFiles = inputFiles != null ? inputFiles : Map.of();
+        volumeMounts = volumeMounts != null ? volumeMounts : Map.of();
     }
 }

@@ -447,6 +447,9 @@ public class GitHubPullRequestSyncService {
                     if (repo == null) {
                         return new PageSyncResult(0, 0, 0, 0);
                     }
+                    // Eagerly initialize the lazy provider proxy to prevent
+                    // LazyInitializationException when EventContext.from() accesses provider.getType()
+                    org.hibernate.Hibernate.initialize(repo.getProvider());
                     ProcessingContext context = ProcessingContext.forSync(scopeId, repo);
                     return processPullRequestPage(
                         connection,

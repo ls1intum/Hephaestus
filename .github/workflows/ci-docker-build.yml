@@ -30,6 +30,11 @@ on:
         required: false
         type: string
         default: "true"
+      agent_images_changed:
+        description: "Whether agent image files changed (or should build for other reasons)"
+        required: false
+        type: string
+        default: "true"
 
 jobs:
   webapp-build:
@@ -115,3 +120,45 @@ jobs:
         org.opencontainers.image.vendor=AET TUM
         org.opencontainers.image.licenses=MIT
         hephaestus.component=webhook-ingest
+
+  agent-claude-code-build:
+    name: "Agent: Claude Code"
+    if: inputs.should_skip != 'true' && inputs.agent_images_changed == 'true'
+    uses: ./.github/workflows/reusable-docker-build.yml
+    with:
+      image-name: "ls1intum/hephaestus/agent-claude-code"
+      docker-file: "./docker/agents/claude-code/Dockerfile"
+      docker-context: "./docker/agents/claude-code"
+      registry: "ghcr.io"
+      tags: |
+        ${{ github.ref_name }}
+        ${{ github.sha }}
+        ci-${{ github.run_number }}
+        ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'latest' }}
+      labels: |
+        org.opencontainers.image.title=Hephaestus Agent - Claude Code
+        org.opencontainers.image.description=Sandboxed Claude Code CLI agent for AI-powered code review
+        org.opencontainers.image.vendor=AET TUM
+        org.opencontainers.image.licenses=MIT
+        hephaestus.component=agent-claude-code
+
+  agent-opencode-build:
+    name: "Agent: OpenCode"
+    if: inputs.should_skip != 'true' && inputs.agent_images_changed == 'true'
+    uses: ./.github/workflows/reusable-docker-build.yml
+    with:
+      image-name: "ls1intum/hephaestus/agent-opencode"
+      docker-file: "./docker/agents/opencode/Dockerfile"
+      docker-context: "./docker/agents/opencode"
+      registry: "ghcr.io"
+      tags: |
+        ${{ github.ref_name }}
+        ${{ github.sha }}
+        ci-${{ github.run_number }}
+        ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'latest' }}
+      labels: |
+        org.opencontainers.image.title=Hephaestus Agent - OpenCode
+        org.opencontainers.image.description=Sandboxed OpenCode CLI agent for AI-powered code review
+        org.opencontainers.image.vendor=AET TUM
+        org.opencontainers.image.licenses=MIT
+        hephaestus.component=agent-opencode

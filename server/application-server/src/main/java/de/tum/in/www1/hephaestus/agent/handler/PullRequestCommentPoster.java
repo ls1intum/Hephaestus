@@ -45,9 +45,9 @@ class PullRequestCommentPoster {
 
     /** Matches @mentions (e.g., @username) — backtick-escaped to prevent notification spam.
      *  Lookbehind covers start-of-line, whitespace, punctuation, and markdown formatting chars
-     *  ({@code * _ ~ > |}) to prevent bypass via {@code *@user*} or {@code >@user}. */
+     *  ({@code * _ ~ > | -}) to prevent bypass via {@code *@user*}, {@code >@user}, or {@code - @user}. */
     private static final Pattern AT_MENTION = Pattern.compile(
-        "(?<=^|[\\s(\\[\"'*_~>|#!+={}])@([a-zA-Z0-9][-a-zA-Z0-9._]*)",
+        "(?<=^|[\\s(\\[\"'*_~>|#!+={}\\-])@([a-zA-Z0-9][-a-zA-Z0-9._]*)",
         Pattern.MULTILINE
     );
 
@@ -134,6 +134,13 @@ class PullRequestCommentPoster {
 
     /** Matches markdown autolinks: &lt;https://...&gt; — protected from HTML tag stripping. */
     private static final Pattern AUTOLINK = Pattern.compile("<(https?://[^>\\s]+)>");
+
+    /**
+     * Matches markdown links with non-http(s) URL schemes (e.g., javascript:, data:, vbscript:).
+     * These are stripped down to just the display text to prevent phishing/XSS vectors
+     * from untrusted agent output.
+     */
+    private static final Pattern UNSAFE_MARKDOWN_LINK = Pattern.compile("\\[([^\\]]*)\\]\\((?!(?i)https?://)[^)]*\\)");
 
     /** Matches 3+ consecutive newlines — collapsed to 2. */
     private static final Pattern EXCESSIVE_NEWLINES = Pattern.compile("\\n{3,}");
@@ -468,6 +475,10 @@ class PullRequestCommentPoster {
         // 5. Strip all markdown images (inline and reference-style)
         result = MARKDOWN_IMAGE_INLINE.matcher(result).replaceAll("");
         result = MARKDOWN_IMAGE_REF.matcher(result).replaceAll("");
+
+        // 5b. Strip markdown links with unsafe URL schemes (javascript:, data:, etc.)
+        //     Keeps the display text, removes only the link target.
+        result = UNSAFE_MARKDOWN_LINK.matcher(result).replaceAll("$1");
 
         // 6. Backtick-escape @mentions
         result = AT_MENTION.matcher(result).replaceAll("`@$1`");

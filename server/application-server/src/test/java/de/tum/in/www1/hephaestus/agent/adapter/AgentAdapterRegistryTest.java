@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test;
 class AgentAdapterRegistryTest extends BaseUnitTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final AgentAdapter claudeAdapter = new ClaudeCodeAgentAdapter();
+    private final AgentAdapter claudeAdapter = new ClaudeCodeAgentAdapter(objectMapper);
     private final AgentAdapter openCodeAdapter = new OpenCodeAgentAdapter(objectMapper);
 
     @Nested

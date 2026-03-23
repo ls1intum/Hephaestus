@@ -31,6 +31,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -45,7 +46,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.annotation.Order;
@@ -71,7 +72,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * </ul>
  */
 @Component
-@ConditionalOnBean(name = "agentNatsConnection")
+@ConditionalOnProperty(prefix = "hephaestus.agent.nats", name = "enabled", havingValue = "true")
 @WorkspaceAgnostic("NATS consumer processes jobs across all workspaces")
 public class AgentJobExecutor {
 
@@ -80,6 +81,7 @@ public class AgentJobExecutor {
     private static final String MDC_JOB_ID = "agent.jobId";
     private static final String MDC_JOB_TYPE = "agent.jobType";
     private static final int MAX_ERROR_MESSAGE_LENGTH = 4000;
+    private static final int MAX_CONTAINER_LOGS_CHARS = 65536; // 64KB
 
     private final Connection natsConnection;
     private final AgentNatsProperties natsProperties;
@@ -221,163 +223,271 @@ public class AgentJobExecutor {
     // ── Job execution ──
 
     void executeJob(Message msg) {
-        UUID jobId;
-        try {
-            jobId = UUID.fromString(new String(msg.getData(), StandardCharsets.UTF_8).trim());
-        } catch (Exception e) {
-            log.warn("Invalid NATS message payload, acking to discard: {}", e.getMessage());
+        Optional<UUID> parsed = parseJobId(msg);
+        if (parsed.isEmpty()) {
             msg.ack();
             return;
         }
 
+        UUID jobId = parsed.get();
         MDC.put(MDC_JOB_ID, jobId.toString());
-        Instant startTime = Instant.now();
-        ScheduledFuture<?> heartbeat = null;
-        boolean claimed = false;
-
         try {
-            // ── CLAIM (micro-transaction #1) ──
-            Object claimResult = claimJob(jobId);
-            if (claimResult == ClaimOutcome.ALREADY_CLAIMED) {
-                msg.ack();
-                return;
-            }
-            if (claimResult == ClaimOutcome.CONCURRENCY_FULL) {
-                // NAK outside transaction — avoids NAK before commit
-                msg.nakWithDelay(Duration.ofSeconds(30));
-                return;
-            }
-            if (!(claimResult instanceof ClaimResult claim)) {
-                log.warn("Unexpected claim result for job {}, leaving for redelivery", jobId);
-                return;
-            }
-            claimed = true;
+            claimAndExecute(jobId, msg);
+        } catch (SandboxCancelledException e) {
+            handleCancellation(jobId, msg);
+        } catch (CannotAcquireLockException e) {
+            msg.nakWithDelay(Duration.ofSeconds(5));
+            log.debug("Lock timeout during claim for job {}, NAK'd with 5s delay", jobId);
+        } catch (Exception e) {
+            handleExecutionFailure(jobId, msg, e);
+        } finally {
+            MDC.remove(MDC_JOB_ID);
+            MDC.remove(MDC_JOB_TYPE);
+        }
+    }
 
-            AgentJob job = claim.job;
-            ConfigSnapshot snapshot = claim.snapshot;
-            MDC.put(MDC_JOB_TYPE, job.getJobType().name());
+    /**
+     * Extract and validate a job UUID from the NATS message payload.
+     *
+     * @return the parsed UUID, or empty if the payload is invalid
+     */
+    private Optional<UUID> parseJobId(Message msg) {
+        try {
+            UUID jobId = UUID.fromString(new String(msg.getData(), StandardCharsets.UTF_8).trim());
+            return Optional.of(jobId);
+        } catch (Exception e) {
+            log.warn("Invalid NATS message payload, acking to discard: {}", e.getMessage());
+            return Optional.empty();
+        }
+    }
 
-            log.info("Executing agent job: jobId={}, jobType={}", jobId, job.getJobType());
+    /**
+     * Claim the job, set up heartbeat, prepare sandbox inputs, execute, and complete.
+     * Propagates exceptions to {@link #executeJob(Message)} for centralized error handling.
+     */
+    private void claimAndExecute(UUID jobId, Message msg) {
+        // ── CLAIM (micro-transaction #1) — may throw CannotAcquireLockException ──
+        Optional<ClaimResult> claimed;
+        try {
+            claimed = dispatchClaimResult(jobId, msg, claimJob(jobId));
+        } catch (CannotAcquireLockException | SandboxCancelledException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new ClaimFailedException(e);
+        }
+        if (claimed.isEmpty()) {
+            return; // Already ack'd / nak'd / left for redelivery
+        }
 
-            // ── HEARTBEAT — first beat immediate, then every heartbeatInterval ──
-            heartbeat = heartbeatScheduler.scheduleAtFixedRate(
-                () -> {
-                    try {
-                        msg.inProgress();
-                    } catch (Exception e) {
-                        log.debug("InProgress heartbeat failed: {}", e.getMessage());
-                    }
-                },
-                0,
-                natsProperties.heartbeatInterval().toSeconds(),
-                TimeUnit.SECONDS
-            );
+        ClaimResult claim = claimed.get();
+        AgentJob job = claim.job;
+        ConfigSnapshot snapshot = claim.snapshot;
+        MDC.put(MDC_JOB_TYPE, job.getJobType().name());
+        log.info("Executing agent job: jobId={}, jobType={}", jobId, job.getJobType());
 
-            // ── PREPARE ──
+        Instant startTime = Instant.now();
+        ScheduledFuture<?> heartbeat = startHeartbeat(msg);
+        try {
+            // ── PREPARE + EXECUTE + COMPLETE ──
+            SandboxResult result = prepareAndExecute(jobId, job, snapshot);
+            AgentResult agentResult = adapterRegistry.getAdapter(snapshot.agentType()).parseResult(result);
+
             JobTypeHandler handler = handlerRegistry.getHandler(job.getJobType());
-            AgentAdapter adapter = adapterRegistry.getAdapter(snapshot.agentType());
-
-            Map<String, byte[]> handlerFiles = handler.prepareInputFiles(job);
-            String prompt = handler.buildPrompt(job);
-
-            AgentAdapterRequest adapterRequest = new AgentAdapterRequest(
-                snapshot.agentType(),
-                snapshot.llmProvider(),
-                snapshot.credentialMode(),
-                snapshot.modelName(),
-                prompt,
-                job.getLlmApiKey(),
-                job.getJobToken(),
-                snapshot.allowInternet(),
-                snapshot.timeoutSeconds()
-            );
-
-            AgentSandboxSpec agentSpec = adapter.buildSandboxSpec(adapterRequest);
-
-            // Merge handler + adapter input files (adapter takes precedence on collision)
-            Map<String, byte[]> allInputFiles = new HashMap<>(handlerFiles);
-            allInputFiles.putAll(agentSpec.inputFiles());
-
-            ResourceLimits limits = new ResourceLimits(
-                ResourceLimits.DEFAULT.memoryBytes(),
-                ResourceLimits.DEFAULT.cpus(),
-                ResourceLimits.DEFAULT.pidsLimit(),
-                Duration.ofSeconds(snapshot.timeoutSeconds())
-            );
-
-            SandboxSpec sandboxSpec = new SandboxSpec(
-                jobId,
-                agentSpec.image(),
-                agentSpec.command(),
-                agentSpec.environment(),
-                agentSpec.networkPolicy(),
-                limits,
-                agentSpec.securityProfile(),
-                allInputFiles,
-                agentSpec.outputPath()
-            );
-
-            // ── EXECUTE ──
-            SandboxResult result = sandboxManager.execute(sandboxSpec);
-
-            // ── COLLECT + COMPLETE ──
-            AgentResult agentResult = adapter.parseResult(result);
-
             completeJob(jobId, agentResult, result, handler, job);
             msg.ack();
 
             Duration duration = Duration.between(startTime, Instant.now());
             executionDuration.record(duration);
             log.info("Agent job completed: jobId={}, duration={}", jobId, duration);
-        } catch (SandboxCancelledException e) {
-            // Job was cancelled — conditional update handles the race
-            transactionTemplate.executeWithoutResult(status -> {
-                jobRepository.transitionStatus(
-                    jobId,
-                    AgentJobStatus.CANCELLED,
-                    Instant.now(),
-                    "Cancelled during execution",
-                    Set.of(AgentJobStatus.RUNNING)
-                );
-            });
-            msg.ack();
-            log.info("Agent job cancelled: jobId={}", jobId);
-        } catch (CannotAcquireLockException e) {
-            // Config row lock timeout — NAK with delay for faster retry than ack_wait (70min)
-            msg.nakWithDelay(Duration.ofSeconds(5));
-            log.debug("Lock timeout during claim for job {}, NAK'd with 5s delay", jobId);
-        } catch (Exception e) {
-            if (e instanceof InterruptedException) {
-                Thread.currentThread().interrupt();
-            }
-
-            if (!claimed) {
-                // Claim failed (DB timeout, connection pool exhaustion) — don't ack,
-                // let NATS redeliver. Job is still QUEUED.
-                log.warn("Claim failed for job {}, will be redelivered: {}", jobId, e.getMessage());
-                return;
-            }
-
-            String errorMessage = truncateErrorMessage(e.getMessage());
-            log.error("Agent job failed: jobId={}, error={}", jobId, errorMessage, e);
-
-            transactionTemplate.executeWithoutResult(status -> {
-                jobRepository.transitionStatus(
-                    jobId,
-                    AgentJobStatus.FAILED,
-                    Instant.now(),
-                    errorMessage,
-                    Set.of(AgentJobStatus.RUNNING)
-                );
-            });
-            msg.ack();
         } finally {
-            if (heartbeat != null) {
-                heartbeat.cancel(false);
-            }
-            MDC.remove(MDC_JOB_ID);
-            MDC.remove(MDC_JOB_TYPE);
+            heartbeat.cancel(false);
         }
+    }
+
+    /**
+     * Dispatch the claim result: ack/nak the message for non-success outcomes,
+     * or return the {@link ClaimResult} for the caller to proceed with execution.
+     */
+    private Optional<ClaimResult> dispatchClaimResult(UUID jobId, Message msg, Object claimResult) {
+        if (claimResult == ClaimOutcome.ALREADY_CLAIMED) {
+            msg.ack();
+            return Optional.empty();
+        }
+        if (claimResult == ClaimOutcome.CONCURRENCY_FULL) {
+            msg.nakWithDelay(Duration.ofSeconds(30));
+            return Optional.empty();
+        }
+        if (claimResult instanceof ClaimResult claim) {
+            return Optional.of(claim);
+        }
+        log.warn("Unexpected claim result for job {}, leaving for redelivery", jobId);
+        return Optional.empty();
+    }
+
+    /** Schedule periodic NATS InProgress heartbeats for the given message. */
+    private ScheduledFuture<?> startHeartbeat(Message msg) {
+        return heartbeatScheduler.scheduleAtFixedRate(
+            () -> {
+                try {
+                    msg.inProgress();
+                } catch (Exception e) {
+                    log.debug("InProgress heartbeat failed: {}", e.getMessage());
+                }
+            },
+            0,
+            natsProperties.heartbeatInterval().toSeconds(),
+            TimeUnit.SECONDS
+        );
+    }
+
+    /**
+     * Prepare sandbox inputs (handler files + adapter spec) and execute in sandbox.
+     *
+     * @return the sandbox execution result
+     */
+    private SandboxResult prepareAndExecute(UUID jobId, AgentJob job, ConfigSnapshot snapshot) {
+        JobTypeHandler handler = handlerRegistry.getHandler(job.getJobType());
+        AgentAdapter adapter = adapterRegistry.getAdapter(snapshot.agentType());
+
+        // Wrap in a read-only transaction so prepareInputFiles/buildPrompt can
+        // resolve lazy JPA proxies (e.g. PullRequest.author) on this sandbox thread.
+        TransactionTemplate readOnlyTx = new TransactionTemplate(transactionTemplate.getTransactionManager());
+        readOnlyTx.setReadOnly(true);
+        record PrepareResult(Map<String, byte[]> files, String prompt, Map<String, String> volumeMounts) {}
+        PrepareResult prepared = readOnlyTx.execute(status -> {
+            Map<String, byte[]> files = handler.prepareInputFiles(job);
+            String p = handler.buildPrompt(job);
+            Map<String, String> volumes = handler.volumeMounts(job);
+            return new PrepareResult(files, p, volumes);
+        });
+
+        AgentAdapterRequest adapterRequest = new AgentAdapterRequest(
+            snapshot.agentType(),
+            snapshot.llmProvider(),
+            snapshot.credentialMode(),
+            snapshot.modelName(),
+            prepared.prompt(),
+            job.getLlmApiKey(),
+            job.getJobToken(),
+            snapshot.allowInternet(),
+            snapshot.timeoutSeconds()
+        );
+
+        AgentSandboxSpec agentSpec = adapter.buildSandboxSpec(adapterRequest);
+        SandboxSpec sandboxSpec = buildSandboxSpec(
+            jobId,
+            prepared.files(),
+            prepared.volumeMounts(),
+            agentSpec,
+            snapshot
+        );
+        return sandboxManager.execute(sandboxSpec);
+    }
+
+    /** Build the final {@link SandboxSpec} by merging handler and adapter inputs. */
+    private static SandboxSpec buildSandboxSpec(
+        UUID jobId,
+        Map<String, byte[]> handlerFiles,
+        Map<String, String> handlerVolumeMounts,
+        AgentSandboxSpec agentSpec,
+        ConfigSnapshot snapshot
+    ) {
+        // Merge handler + adapter input files (adapter takes precedence on collision)
+        Map<String, byte[]> allInputFiles = new HashMap<>(handlerFiles);
+        allInputFiles.putAll(agentSpec.inputFiles());
+
+        // Merge handler + adapter volume mounts with collision detection
+        Map<String, String> allVolumeMounts = new HashMap<>(handlerVolumeMounts);
+        for (var entry : agentSpec.volumeMounts().entrySet()) {
+            String existing = allVolumeMounts.put(entry.getKey(), entry.getValue());
+            if (existing != null && !existing.equals(entry.getValue())) {
+                log.warn(
+                    "Volume mount collision: hostPath={}, handler={}, adapter={} (using adapter)",
+                    entry.getKey(),
+                    existing,
+                    entry.getValue()
+                );
+            }
+        }
+        // Detect multiple host paths mapped to the same container path
+        Set<String> containerPaths = new HashSet<>(allVolumeMounts.values());
+        if (containerPaths.size() < allVolumeMounts.size()) {
+            log.warn("Multiple host paths mapped to the same container path: {}", allVolumeMounts);
+        }
+
+        ResourceLimits limits = new ResourceLimits(
+            ResourceLimits.DEFAULT.memoryBytes(),
+            ResourceLimits.DEFAULT.cpus(),
+            ResourceLimits.DEFAULT.pidsLimit(),
+            Duration.ofSeconds(snapshot.timeoutSeconds())
+        );
+
+        return new SandboxSpec(
+            jobId,
+            agentSpec.image(),
+            agentSpec.command(),
+            agentSpec.environment(),
+            agentSpec.networkPolicy(),
+            limits,
+            agentSpec.securityProfile(),
+            allInputFiles,
+            agentSpec.outputPath(),
+            allVolumeMounts
+        );
+    }
+
+    /** Wrapper that signals the claim phase failed — the job is still QUEUED. */
+    private static class ClaimFailedException extends RuntimeException {
+
+        ClaimFailedException(Exception cause) {
+            super(cause);
+        }
+    }
+
+    /** Handle a job cancelled during sandbox execution. */
+    private void handleCancellation(UUID jobId, Message msg) {
+        transactionTemplate.executeWithoutResult(status -> {
+            jobRepository.transitionStatus(
+                jobId,
+                AgentJobStatus.CANCELLED,
+                Instant.now(),
+                "Cancelled during execution",
+                Set.of(AgentJobStatus.RUNNING)
+            );
+        });
+        msg.ack();
+        log.info("Agent job cancelled: jobId={}", jobId);
+    }
+
+    /**
+     * Handle generic execution failures. If the job was never claimed (still QUEUED),
+     * the message is left for NATS redelivery. Otherwise the job is transitioned to FAILED.
+     */
+    private void handleExecutionFailure(UUID jobId, Message msg, Exception e) {
+        if (e instanceof InterruptedException) {
+            Thread.currentThread().interrupt();
+        }
+
+        if (e instanceof ClaimFailedException) {
+            // Claim failed (DB timeout, connection pool exhaustion) — don't ack,
+            // let NATS redeliver. Job is still QUEUED.
+            log.warn("Claim failed for job {}, will be redelivered: {}", jobId, e.getCause().getMessage());
+            return;
+        }
+
+        String errorMessage = truncateErrorMessage(e.getMessage());
+        log.error("Agent job failed: jobId={}, error={}", jobId, errorMessage, e);
+
+        transactionTemplate.executeWithoutResult(status -> {
+            jobRepository.transitionStatus(
+                jobId,
+                AgentJobStatus.FAILED,
+                Instant.now(),
+                errorMessage,
+                Set.of(AgentJobStatus.RUNNING)
+            );
+        });
+        msg.ack();
     }
 
     // ── Claim: micro-transaction #1 ──
@@ -451,28 +561,48 @@ public class AgentJobExecutor {
         JobTypeHandler handler,
         AgentJob job
     ) {
-        // Determine terminal status
-        AgentJobStatus terminalStatus;
-        String errorMessage = null;
-        if (sandboxResult.timedOut()) {
-            terminalStatus = AgentJobStatus.TIMED_OUT;
-            errorMessage = "Container timed out";
-        } else if (sandboxResult.exitCode() != 0) {
-            terminalStatus = AgentJobStatus.FAILED;
-            errorMessage = "Container exited with code " + sandboxResult.exitCode();
-        } else {
-            terminalStatus = AgentJobStatus.COMPLETED;
-        }
+        AgentJobStatus terminalStatus = determineTerminalStatus(sandboxResult);
+        persistTerminalState(jobId, agentResult, sandboxResult, terminalStatus);
+        deliverResults(jobId, terminalStatus, handler);
+    }
 
-        // Persist terminal status first, then output — ensures cancelled jobs don't get output
-        String finalErrorMessage = errorMessage;
-        AgentJobStatus finalStatus = terminalStatus;
+    /**
+     * Determine the terminal status based on sandbox execution outcome.
+     *
+     * @return TIMED_OUT, FAILED, or COMPLETED
+     */
+    private AgentJobStatus determineTerminalStatus(SandboxResult sandboxResult) {
+        if (sandboxResult.timedOut()) {
+            return AgentJobStatus.TIMED_OUT;
+        } else if (sandboxResult.exitCode() != 0) {
+            return AgentJobStatus.FAILED;
+        } else {
+            return AgentJobStatus.COMPLETED;
+        }
+    }
+
+    /**
+     * Persist terminal status and output within a single transaction.
+     * Ensures cancelled jobs don't get output persisted.
+     */
+    private void persistTerminalState(
+        UUID jobId,
+        AgentResult agentResult,
+        SandboxResult sandboxResult,
+        AgentJobStatus terminalStatus
+    ) {
+        String errorMessage = switch (terminalStatus) {
+            case TIMED_OUT -> "Container timed out";
+            case FAILED -> "Container exited with code " + sandboxResult.exitCode();
+            default -> null;
+        };
+
         transactionTemplate.executeWithoutResult(status -> {
             int updated = jobRepository.transitionStatus(
                 jobId,
-                finalStatus,
+                terminalStatus,
                 Instant.now(),
-                finalErrorMessage,
+                errorMessage,
                 Set.of(AgentJobStatus.RUNNING)
             );
 
@@ -486,7 +616,16 @@ public class AgentJobExecutor {
             if (freshJob != null) {
                 freshJob.setOutput(objectMapper.valueToTree(agentResult.output()));
                 freshJob.setExitCode(sandboxResult.exitCode());
-                if (finalStatus == AgentJobStatus.COMPLETED) {
+                // Persist container logs for introspection (truncate to limit to avoid bloat)
+                if (sandboxResult.logs() != null && !sandboxResult.logs().isBlank()) {
+                    String logs = sandboxResult.logs();
+                    freshJob.setContainerLogs(
+                        logs.length() > MAX_CONTAINER_LOGS_CHARS
+                            ? logs.substring(logs.length() - MAX_CONTAINER_LOGS_CHARS)
+                            : logs
+                    );
+                }
+                if (terminalStatus == AgentJobStatus.COMPLETED) {
                     // Mark delivery as PENDING so crash recovery can distinguish
                     // "delivery not attempted yet" from "no delivery needed"
                     freshJob.setDeliveryStatus(DeliveryStatus.PENDING);
@@ -494,25 +633,28 @@ public class AgentJobExecutor {
                 jobRepository.saveAndFlush(freshJob);
             }
         });
+    }
 
-        // Deliver results (outside transaction — may call external APIs)
-        if (terminalStatus == AgentJobStatus.COMPLETED) {
-            // Reload to get the freshly persisted output
-            AgentJob deliverJob = jobRepository.findById(jobId).orElse(null);
-            if (deliverJob != null) {
-                try {
-                    handler.deliver(deliverJob);
-                    persistDeliveryStatus(jobId, DeliveryStatus.DELIVERED, deliverJob.getDeliveryCommentId());
-                } catch (Exception e) {
-                    log.warn(
-                        "Delivery failed for job {} (output saved, job still COMPLETED): {}",
-                        jobId,
-                        e.getMessage()
-                    );
-                    // Preserve comment ID from partial delivery (e.g., comment posted but practice detection failed)
-                    persistDeliveryStatus(jobId, DeliveryStatus.FAILED, deliverJob.getDeliveryCommentId());
-                    meterRegistry.counter("agent.job.delivery.failure").increment();
-                }
+    /**
+     * Deliver results to external systems (outside transaction — may call external APIs).
+     * Only delivers if the job completed successfully.
+     */
+    private void deliverResults(UUID jobId, AgentJobStatus terminalStatus, JobTypeHandler handler) {
+        if (terminalStatus != AgentJobStatus.COMPLETED) {
+            return;
+        }
+
+        // Reload to get the freshly persisted output
+        AgentJob deliverJob = jobRepository.findById(jobId).orElse(null);
+        if (deliverJob != null) {
+            try {
+                handler.deliver(deliverJob);
+                persistDeliveryStatus(jobId, DeliveryStatus.DELIVERED, deliverJob.getDeliveryCommentId());
+            } catch (Exception e) {
+                log.warn("Delivery failed for job {} (output saved, job still COMPLETED): {}", jobId, e.getMessage());
+                // Preserve comment ID from partial delivery (e.g., comment posted but practice detection failed)
+                persistDeliveryStatus(jobId, DeliveryStatus.FAILED, deliverJob.getDeliveryCommentId());
+                meterRegistry.counter("agent.job.delivery.failure").increment();
             }
         }
     }

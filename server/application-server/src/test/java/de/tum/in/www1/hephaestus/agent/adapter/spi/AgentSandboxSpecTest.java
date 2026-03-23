@@ -20,24 +20,24 @@ class AgentSandboxSpecTest extends BaseUnitTest {
         @Test
         @DisplayName("should reject null image")
         void shouldRejectNullImage() {
-            assertThatThrownBy(() -> new AgentSandboxSpec(null, null, null, null, "/output", null, null)).isInstanceOf(
-                NullPointerException.class
-            );
+            assertThatThrownBy(() ->
+                new AgentSandboxSpec(null, null, null, null, "/output", null, null, null)
+            ).isInstanceOf(NullPointerException.class);
         }
 
         @Test
         @DisplayName("should reject blank image")
         void shouldRejectBlankImage() {
-            assertThatThrownBy(() -> new AgentSandboxSpec("  ", null, null, null, "/output", null, null)).isInstanceOf(
-                IllegalArgumentException.class
-            );
+            assertThatThrownBy(() ->
+                new AgentSandboxSpec("  ", null, null, null, "/output", null, null, null)
+            ).isInstanceOf(IllegalArgumentException.class);
         }
 
         @Test
         @DisplayName("should reject null outputPath")
         void shouldRejectNullOutputPath() {
             assertThatThrownBy(() ->
-                new AgentSandboxSpec("alpine:latest", null, null, null, null, null, null)
+                new AgentSandboxSpec("alpine:latest", null, null, null, null, null, null, null)
             ).isInstanceOf(NullPointerException.class);
         }
 
@@ -45,7 +45,7 @@ class AgentSandboxSpecTest extends BaseUnitTest {
         @DisplayName("should reject blank outputPath")
         void shouldRejectBlankOutputPath() {
             assertThatThrownBy(() ->
-                new AgentSandboxSpec("alpine:latest", null, null, null, "  ", null, null)
+                new AgentSandboxSpec("alpine:latest", null, null, null, "  ", null, null, null)
             ).isInstanceOf(IllegalArgumentException.class);
         }
     }
@@ -57,14 +57,14 @@ class AgentSandboxSpecTest extends BaseUnitTest {
         @Test
         @DisplayName("should default null command to empty list")
         void shouldDefaultNullCommandToEmptyList() {
-            var spec = new AgentSandboxSpec("alpine:latest", null, null, null, "/output", null, null);
+            var spec = new AgentSandboxSpec("alpine:latest", null, null, null, "/output", null, null, null);
             assertThat(spec.command()).isEmpty();
         }
 
         @Test
         @DisplayName("should default null environment to empty map")
         void shouldDefaultNullEnvironmentToEmptyMap() {
-            var spec = new AgentSandboxSpec("alpine:latest", List.of("echo"), null, null, "/output", null, null);
+            var spec = new AgentSandboxSpec("alpine:latest", List.of("echo"), null, null, "/output", null, null, null);
             assertThat(spec.environment()).isEmpty();
         }
 
@@ -78,6 +78,7 @@ class AgentSandboxSpecTest extends BaseUnitTest {
                 null,
                 "/output",
                 null,
+                null,
                 null
             );
             assertThat(spec.inputFiles()).isEmpty();
@@ -86,7 +87,7 @@ class AgentSandboxSpecTest extends BaseUnitTest {
         @Test
         @DisplayName("should accept null securityProfile and networkPolicy")
         void shouldAcceptNullSecurityProfileAndNetworkPolicy() {
-            var spec = new AgentSandboxSpec("alpine:latest", null, null, null, "/output", null, null);
+            var spec = new AgentSandboxSpec("alpine:latest", null, null, null, "/output", null, null, null);
             assertThat(spec.securityProfile()).isNull();
             assertThat(spec.networkPolicy()).isNull();
         }

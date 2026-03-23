@@ -44,6 +44,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.springframework.core.task.AsyncTaskExecutor;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -74,6 +75,9 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
     @Mock
     private TransactionTemplate transactionTemplate;
+
+    @Mock
+    private PlatformTransactionManager transactionManager;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private SimpleMeterRegistry meterRegistry;
@@ -161,6 +165,12 @@ class AgentJobExecutorTest extends BaseUnitTest {
             })
             .when(transactionTemplate)
             .executeWithoutResult(any());
+
+        // The production code creates a read-only TransactionTemplate from
+        // transactionTemplate.getTransactionManager() — stub it so the real
+        // TransactionTemplate.execute() works on the readOnlyTx.
+        lenient().when(transactionTemplate.getTransactionManager()).thenReturn(transactionManager);
+        lenient().when(transactionManager.getTransaction(any())).thenReturn(mock(TransactionStatus.class));
     }
 
     private Message createMessage(UUID id) {
@@ -408,7 +418,8 @@ class AgentJobExecutorTest extends BaseUnitTest {
             Map.of("config.json", "{}".getBytes()),
             "/output",
             SecurityProfile.DEFAULT,
-            new NetworkPolicy(false, null, "test-token", "anthropic")
+            new NetworkPolicy(false, null, "test-token", "anthropic"),
+            null
         );
         when(adapter.buildSandboxSpec(any())).thenReturn(agentSpec);
         when(adapter.parseResult(any())).thenReturn(new AgentResult(true, Map.of("review", "LGTM")));
@@ -431,6 +442,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
             Map.of(),
             Map.of(),
             "/output",
+            null,
             null,
             null
         );

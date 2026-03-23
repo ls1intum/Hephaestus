@@ -28,6 +28,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 public class AgentJobService {
@@ -42,6 +43,7 @@ public class AgentJobService {
     private final JobTypeHandlerRegistry handlerRegistry;
     private final ObjectMapper objectMapper;
     private final ApplicationEventPublisher eventPublisher;
+    private final TransactionTemplate transactionTemplate;
     private final @Nullable SandboxManager sandboxManager;
 
     public AgentJobService(
@@ -51,6 +53,7 @@ public class AgentJobService {
         JobTypeHandlerRegistry handlerRegistry,
         ObjectMapper objectMapper,
         ApplicationEventPublisher eventPublisher,
+        TransactionTemplate transactionTemplate,
         @Nullable SandboxManager sandboxManager
     ) {
         this.agentJobRepository = agentJobRepository;
@@ -59,6 +62,7 @@ public class AgentJobService {
         this.handlerRegistry = handlerRegistry;
         this.objectMapper = objectMapper;
         this.eventPublisher = eventPublisher;
+        this.transactionTemplate = transactionTemplate;
         this.sandboxManager = sandboxManager;
     }
 
@@ -141,8 +145,10 @@ public class AgentJobService {
         job.setIdempotencyKey(submission.idempotencyKey());
         job.setConfigSnapshot(ConfigSnapshot.from(config).toJson(objectMapper));
 
-        // Copy LLM API key for direct auth modes (not stored in snapshot JSONB)
-        if (config.getCredentialMode() != CredentialMode.PROXY && config.getLlmApiKey() != null) {
+        // Copy LLM API key — needed for all credential modes:
+        // PROXY mode: proxy controller reads it to forward to upstream provider
+        // API_KEY/OAUTH mode: adapter injects it as env var into the container
+        if (config.getLlmApiKey() != null) {
             job.setLlmApiKey(config.getLlmApiKey());
         }
 
@@ -168,6 +174,72 @@ public class AgentJobService {
         eventPublisher.publishEvent(new AgentJobCreatedEvent(job.getId(), workspaceId));
 
         return Optional.of(job);
+    }
+
+    // ── Retry delivery ──
+
+    /**
+     * Retry delivery for a completed agent job whose delivery failed or was never attempted.
+     *
+     * <p>Validates the job is COMPLETED and delivery is FAILED or PENDING, then re-runs
+     * the handler's deliver() method. This is the same delivery path used by
+     * {@link AgentJobExecutor#completeJob} after sandbox execution.
+     *
+     * @param workspaceId workspace ID
+     * @param jobId       job UUID
+     * @return the job after delivery attempt
+     */
+    public AgentJob retryDelivery(Long workspaceId, UUID jobId) {
+        // CAS: atomically transition FAILED → PENDING (prevents concurrent retry races).
+        // Only FAILED is allowed as source — including PENDING would let two concurrent retries
+        // both CAS successfully (PENDING→PENDING is a no-op that returns updated=1).
+        int updated = transactionTemplate.execute(status -> {
+            // Verify the job exists in this workspace first
+            agentJobRepository
+                .findByIdAndWorkspaceId(jobId, workspaceId)
+                .orElseThrow(() -> new EntityNotFoundException("AgentJob", jobId.toString()));
+
+            return agentJobRepository.transitionDeliveryStatus(
+                jobId,
+                DeliveryStatus.PENDING,
+                Set.of(DeliveryStatus.FAILED)
+            );
+        });
+
+        if (updated == 0) {
+            throw new AgentJobStateConflictException(
+                "Cannot retry delivery: job must be COMPLETED with delivery status FAILED"
+            );
+        }
+
+        // Reload the entity fresh for delivery (avoids stale detached entity issues)
+        AgentJob job = transactionTemplate.execute(status ->
+            agentJobRepository
+                .findById(jobId)
+                .orElseThrow(() -> new EntityNotFoundException("AgentJob", jobId.toString()))
+        );
+
+        // Deliver outside transaction (may call external APIs like GitHub)
+        JobTypeHandler handler = handlerRegistry.getHandler(job.getJobType());
+        try {
+            handler.deliver(job);
+            transactionTemplate.executeWithoutResult(tx ->
+                agentJobRepository.updateDeliveryStatus(jobId, DeliveryStatus.DELIVERED, job.getDeliveryCommentId())
+            );
+            log.info("Delivery retry succeeded: jobId={}", jobId);
+        } catch (Exception e) {
+            transactionTemplate.executeWithoutResult(tx ->
+                agentJobRepository.updateDeliveryStatus(jobId, DeliveryStatus.FAILED, job.getDeliveryCommentId())
+            );
+            log.warn("Delivery retry failed: jobId={}, error={}", jobId, e.getMessage(), e);
+            throw new AgentJobStateConflictException("Delivery retry failed: " + e.getMessage());
+        }
+
+        return transactionTemplate.execute(status ->
+            agentJobRepository
+                .findByIdAndWorkspaceId(jobId, workspaceId)
+                .orElseThrow(() -> new EntityNotFoundException("AgentJob", jobId.toString()))
+        );
     }
 
     // ── Cancel ──
@@ -198,8 +270,6 @@ public class AgentJobService {
         if (job.getStatus().isTerminal()) {
             throw new AgentJobStateConflictException("Cannot cancel job " + jobId + " in status " + job.getStatus());
         }
-
-        boolean wasRunning = job.getStatus() == AgentJobStatus.RUNNING;
 
         int updated = agentJobRepository.transitionStatus(
             jobId,

@@ -37,8 +37,8 @@
         <maven.test.skip>false</maven.test.skip>
         <hephaestus.surefire.timeout>300</hephaestus.surefire.timeout>
 
-        <!-- Server port for OpenAPI spec generation (overridable via -Dopenapi.server.port=38091) -->
-        <openapi.server.port>8080</openapi.server.port>
+        <!-- Server port for OpenAPI spec generation (overridable via -Dopenapi.server.port=PORT) -->
+        <openapi.server.port>38090</openapi.server.port>
 
         <!-- Tag filtering: unit tests by default, exclude live tests -->
         <surefire.excludedGroups>live</surefire.excludedGroups>
@@ -255,6 +255,11 @@
             <version>2.25.1</version>
         </dependency>
         <!-- Docker Java SDK for sandbox container management -->
+        <dependency>
+            <groupId>com.github.docker-java</groupId>
+            <artifactId>docker-java-api</artifactId>
+            <version>3.7.0</version>
+        </dependency>
         <dependency>
             <groupId>com.github.docker-java</groupId>
             <artifactId>docker-java-core</artifactId>
@@ -898,6 +903,7 @@
                             <profiles>specs</profiles>
                             <jvmArguments>-Dspring.application.admin.enabled=true -XX:+EnableDynamicAgentLoading
                                 --enable-native-access=ALL-UNNAMED -Dspring.devtools.restart.enabled=false
+                                -Dserver.port=${openapi.server.port}
                             </jvmArguments>
                         </configuration>
                     </execution>

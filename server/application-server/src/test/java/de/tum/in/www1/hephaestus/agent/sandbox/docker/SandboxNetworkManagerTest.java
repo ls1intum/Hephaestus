@@ -115,8 +115,8 @@ class SandboxNetworkManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should throw when container ID cannot be resolved")
-        void shouldThrowWhenNoContainerId() {
+        @DisplayName("should return null when container ID cannot be resolved")
+        void shouldReturnNullWhenNoContainerId() {
             SandboxProperties propsNoId = new SandboxProperties(
                 true,
                 "unix:///var/run/docker.sock",
@@ -132,14 +132,14 @@ class SandboxNetworkManagerTest extends BaseUnitTest {
             );
             SandboxNetworkManager mgr = new SandboxNetworkManager(networkOps, propsNoId, () -> null);
 
-            assertThatThrownBy(() -> mgr.connectAppServer(NETWORK_ID))
-                .isInstanceOf(SandboxException.class)
-                .hasMessageContaining("Cannot determine app-server container ID");
+            String ip = mgr.connectAppServer(NETWORK_ID);
+
+            assertThat(ip).isNull();
         }
 
         @Test
-        @DisplayName("should throw when hostname is blank")
-        void shouldThrowWhenHostnameBlank() {
+        @DisplayName("should return null when hostname is blank")
+        void shouldReturnNullWhenHostnameBlank() {
             SandboxProperties propsNoId = new SandboxProperties(
                 true,
                 "unix:///var/run/docker.sock",
@@ -155,9 +155,9 @@ class SandboxNetworkManagerTest extends BaseUnitTest {
             );
             SandboxNetworkManager mgr = new SandboxNetworkManager(networkOps, propsNoId, () -> "  ");
 
-            assertThatThrownBy(() -> mgr.connectAppServer(NETWORK_ID))
-                .isInstanceOf(SandboxException.class)
-                .hasMessageContaining("Cannot determine app-server container ID");
+            String ip = mgr.connectAppServer(NETWORK_ID);
+
+            assertThat(ip).isNull();
         }
 
         @Test

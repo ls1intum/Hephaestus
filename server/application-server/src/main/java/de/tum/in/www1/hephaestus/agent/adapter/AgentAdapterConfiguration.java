@@ -17,8 +17,8 @@ import org.springframework.context.annotation.Configuration;
 public class AgentAdapterConfiguration {
 
     @Bean
-    public AgentAdapter claudeCodeAgentAdapter() {
-        return new ClaudeCodeAgentAdapter();
+    public AgentAdapter claudeCodeAgentAdapter(ObjectMapper objectMapper) {
+        return new ClaudeCodeAgentAdapter(objectMapper);
     }
 
     @Bean

@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.practices.review;
 
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Pattern;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
@@ -38,5 +39,7 @@ public record PracticeReviewProperties(
     @Max(value = 50, message = "maxInlineNotes must be <= 50")
     @DefaultValue("5")
     int maxInlineNotes,
-    @DefaultValue("") String appBaseUrl
+    @Pattern(regexp = "^$|^https?://.*", message = "appBaseUrl must be empty or a valid http(s) URL")
+    @DefaultValue("")
+    String appBaseUrl
 ) {}

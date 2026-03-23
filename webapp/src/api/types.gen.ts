@@ -2049,6 +2049,39 @@ export type CancelJobResponses = {
 
 export type CancelJobResponse = CancelJobResponses[keyof CancelJobResponses];
 
+export type RetryDeliveryData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        jobId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/agent-jobs/{jobId}/delivery/retry';
+};
+
+export type RetryDeliveryErrors = {
+    /**
+     * Job not found in this workspace
+     */
+    404: unknown;
+    /**
+     * Job not in a retryable state
+     */
+    409: unknown;
+};
+
+export type RetryDeliveryResponses = {
+    /**
+     * Delivery retried
+     */
+    200: AgentJob;
+};
+
+export type RetryDeliveryResponse = RetryDeliveryResponses[keyof RetryDeliveryResponses];
+
 export type GetBadPracticeData = {
     body?: never;
     path: {

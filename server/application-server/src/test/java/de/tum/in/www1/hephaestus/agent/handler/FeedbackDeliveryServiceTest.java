@@ -447,6 +447,27 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         }
 
         @Test
+        @DisplayName("reaches EDIT_ALL_RESOLVED even when agent omits delivery content (null delivery)")
+        void editAllResolvedWithNullDelivery() {
+            AgentJob job = createJob();
+            stubOpenPr();
+            when(
+                agentJobRepository.findPreviousDeliveryCommentId(eq(WORKSPACE_ID), eq(PULL_REQUEST_ID), any())
+            ).thenReturn(Optional.of("IC_previous123"));
+            when(commentPoster.postFormattedBody(eq(job), any(String.class), eq("IC_previous123"))).thenReturn(
+                "IC_previous123"
+            );
+
+            // Agent prompt says: omit delivery when all positive → delivery=null, hasNegative=false
+            // The system must NOT short-circuit but must reach EDIT_ALL_RESOLVED
+            service.deliverFeedback(job, null, false);
+
+            // Should post the "all resolved" note
+            verify(commentPoster).postFormattedBody(eq(job), any(String.class), eq("IC_previous123"));
+            assertThat(job.getDeliveryCommentId()).isEqualTo("IC_previous123");
+        }
+
+        @Test
         @DisplayName("does not set commentId when all-resolved post returns null")
         void allResolvedReturnsNull() {
             AgentJob job = createJob();

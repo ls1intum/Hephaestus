@@ -34,6 +34,14 @@ jobs:
               name: "webhook-ingest",
               image: "ghcr.io/ls1intum/hephaestus/webhook-ingest",
             }
+          - {
+              name: "agent-claude-code",
+              image: "ghcr.io/ls1intum/hephaestus/agent-claude-code",
+            }
+          - {
+              name: "agent-opencode",
+              image: "ghcr.io/ls1intum/hephaestus/agent-opencode",
+            }
 
     steps:
       - name: Checkout code

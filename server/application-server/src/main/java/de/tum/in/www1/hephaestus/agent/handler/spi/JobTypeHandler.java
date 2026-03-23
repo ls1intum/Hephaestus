@@ -80,4 +80,20 @@ public interface JobTypeHandler {
     default void deliver(AgentJob job) {
         // No-op — overridden by handlers that need result delivery.
     }
+
+    /**
+     * Provide host volume mounts for the sandbox container.
+     *
+     * <p>Returns a map of host paths to container paths. All mounts are read-only
+     * (enforced by the sandbox security policy). This allows handlers to mount
+     * real git repositories into the container for rich context.
+     *
+     * <p>Default implementation returns an empty map (no volume mounts).
+     *
+     * @param job the persisted job
+     * @return volume mounts (host path → container path)
+     */
+    default Map<String, String> volumeMounts(AgentJob job) {
+        return Map.of();
+    }
 }

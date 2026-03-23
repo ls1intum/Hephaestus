@@ -190,6 +190,7 @@ export const agentJob = pgTable(
 		llmApiKey: text("llm_api_key"),
 		deliveryStatus: varchar("delivery_status", { length: 20 }),
 		deliveryCommentId: varchar("delivery_comment_id", { length: 255 }),
+		containerLogs: text("container_logs"),
 	},
 	(table) => [
 		index("idx_agent_job_delivery_dedup")

@@ -21,6 +21,7 @@ import org.springframework.lang.Nullable;
  * @param outputPath      container path to collect results from
  * @param securityProfile security hardening (null = use SecurityProfile.DEFAULT)
  * @param networkPolicy   network access and LLM proxy configuration
+ * @param volumeMounts    host bind mounts (host path → container path); mounted read-only
  */
 public record AgentSandboxSpec(
     String image,
@@ -29,7 +30,8 @@ public record AgentSandboxSpec(
     Map<String, byte[]> inputFiles,
     String outputPath,
     @Nullable SecurityProfile securityProfile,
-    @Nullable NetworkPolicy networkPolicy
+    @Nullable NetworkPolicy networkPolicy,
+    Map<String, String> volumeMounts
 ) {
     public AgentSandboxSpec {
         Objects.requireNonNull(image, "image must not be null");
@@ -43,5 +45,6 @@ public record AgentSandboxSpec(
         command = command != null ? List.copyOf(command) : List.of();
         environment = environment != null ? Map.copyOf(environment) : Map.of();
         inputFiles = inputFiles != null ? Map.copyOf(inputFiles) : Map.of();
+        volumeMounts = volumeMounts != null ? Map.copyOf(volumeMounts) : Map.of();
     }
 }

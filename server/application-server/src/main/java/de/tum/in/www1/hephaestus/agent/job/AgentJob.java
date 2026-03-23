@@ -131,6 +131,10 @@ public class AgentJob {
     @Column(name = "error_message", columnDefinition = "TEXT")
     private String errorMessage;
 
+    @Column(name = "container_logs", columnDefinition = "TEXT")
+    @ToString.Exclude
+    private String containerLogs;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "delivery_status", length = 20)
     private DeliveryStatus deliveryStatus;

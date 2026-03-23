@@ -147,7 +147,7 @@ public class ContainerSecurityPolicy {
             resources.memoryBytes(), // memory-swap = memory (no swap)
             (long) (resources.cpus() * NANO_CPUS_PER_CPU), // nanoCPUs
             resources.pidsLimit(),
-            true, // read-only rootfs always enforced
+            false, // read-only rootfs disabled: docker cp injects files before start (before tmpfs mounts exist)
             false, // never privileged
             dropCaps,
             securityOpts,

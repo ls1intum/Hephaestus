@@ -460,7 +460,8 @@ class DockerClientOperationsTest extends BaseUnitTest {
                     "none",
                     null,
                     Map.of()
-                )
+                ),
+                List.of()
             );
 
             String id = ops.createContainer(spec);
@@ -506,7 +507,8 @@ class DockerClientOperationsTest extends BaseUnitTest {
                     null,
                     null,
                     Map.of()
-                )
+                ),
+                List.of()
             );
 
             ops.createContainer(spec);

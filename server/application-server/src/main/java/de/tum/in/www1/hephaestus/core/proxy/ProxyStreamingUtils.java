@@ -92,8 +92,11 @@ public final class ProxyStreamingUtils {
         boolean isSse = ct != null && ct.isCompatibleWith(MediaType.TEXT_EVENT_STREAM);
 
         if (isSse) {
-            // SSE: return the Flux for streaming to HttpServletResponse.
-            return Mono.just(new UpstreamResult(status, rh, null, clientResp.bodyToFlux(DataBuffer.class)));
+            // SSE: eagerly subscribe to the body Flux via replay().autoConnect(0).
+            // Without this, Mono.just() completes immediately and WebClient's exchangeToMono
+            // auto-releases the unconsumed response body, causing empty SSE streams.
+            Flux<DataBuffer> replayed = clientResp.bodyToFlux(DataBuffer.class).replay().autoConnect(0);
+            return Mono.just(new UpstreamResult(status, rh, null, replayed));
         } else {
             // Non-SSE: consume body inside callback as required by WebClient contract.
             return clientResp

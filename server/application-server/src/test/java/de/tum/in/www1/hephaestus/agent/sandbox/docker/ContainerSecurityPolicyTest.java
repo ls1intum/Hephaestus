@@ -52,7 +52,7 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
                 new NetworkPolicy(false, null, null, null)
             );
 
-            assertThat(config.readonlyRootfs()).isTrue();
+            assertThat(config.readonlyRootfs()).isFalse();
             assertThat(config.privileged()).isFalse();
             assertThat(config.capDrop()).containsExactly("ALL");
             assertThat(config.securityOpts()).contains("no-new-privileges");
@@ -94,7 +94,7 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
                 new NetworkPolicy(false, null, null, null)
             );
 
-            assertThat(config.pidsLimit()).isEqualTo(256);
+            assertThat(config.pidsLimit()).isEqualTo(512);
         }
 
         @Test
@@ -347,7 +347,7 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should enforce read-only rootfs even when profile disables it")
+        @DisplayName("should disable read-only rootfs (docker cp injects files before start)")
         void shouldEnforceReadOnlyRootfs() {
             SecurityProfile laxProfile = new SecurityProfile(null, false, false, false, "host", List.of(), Map.of());
 
@@ -357,7 +357,7 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
                 new NetworkPolicy(false, null, null, null)
             );
 
-            assertThat(config.readonlyRootfs()).isTrue();
+            assertThat(config.readonlyRootfs()).isFalse();
         }
 
         @Test
@@ -536,8 +536,8 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
             );
 
             assertThat(config.ulimits()).containsKey("nproc");
-            assertThat(config.ulimits().get("nproc").soft()).isEqualTo(256);
-            assertThat(config.ulimits().get("nproc").hard()).isEqualTo(256);
+            assertThat(config.ulimits().get("nproc").soft()).isEqualTo(512);
+            assertThat(config.ulimits().get("nproc").hard()).isEqualTo(512);
         }
 
         @Test

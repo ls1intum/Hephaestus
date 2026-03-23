@@ -23,9 +23,10 @@ jobs:
       application-server: ${{ steps.filter.outputs.application-server }}
       intelligence-service: ${{ steps.filter.outputs.intelligence-service }}
       webhook-ingest: ${{ steps.filter.outputs.webhook-ingest }}
+      agent-images: ${{ steps.filter.outputs.agent-images }}
       docs: ${{ steps.filter.outputs.docs }}
       ci-config: ${{ steps.filter.outputs.ci-config }}
-      any-code: ${{ steps.filter.outputs.webapp == 'true' || steps.filter.outputs.application-server == 'true' || steps.filter.outputs.intelligence-service == 'true' || steps.filter.outputs.webhook-ingest == 'true' }}
+      any-code: ${{ steps.filter.outputs.webapp == 'true' || steps.filter.outputs.application-server == 'true' || steps.filter.outputs.intelligence-service == 'true' || steps.filter.outputs.webhook-ingest == 'true' || steps.filter.outputs.agent-images == 'true' }}
       should_skip: ${{ steps.skip_check.outputs.should_skip }}
     timeout-minutes: 5
     steps:
@@ -61,6 +62,8 @@ jobs:
               - 'server/webhook-ingest/**'
               - 'package.json'
               - 'package-lock.json'
+            agent-images:
+              - 'docker/agents/**'
             docs:
               - 'docs/**'
             ci-config:
@@ -154,6 +157,7 @@ jobs:
       application_server_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       intelligence_service_changed: ${{ (needs.detect-changes.outputs.intelligence-service == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       webhook_ingest_changed: ${{ (needs.detect-changes.outputs.webhook-ingest == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      agent_images_changed: ${{ (needs.detect-changes.outputs.agent-images == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
 
   all-ci-passed:
     name: "CI Status Gate"
@@ -239,6 +243,7 @@ jobs:
           echo "| Application Server | ${{ needs.detect-changes.outputs.application-server == 'true' && '✅ Yes' || '➖ No' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Intelligence Service | ${{ needs.detect-changes.outputs.intelligence-service == 'true' && '✅ Yes' || '➖ No' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Webhook Ingest | ${{ needs.detect-changes.outputs.webhook-ingest == 'true' && '✅ Yes' || '➖ No' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Agent Images | ${{ needs.detect-changes.outputs.agent-images == 'true' && '✅ Yes' || '➖ No' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| CI Config | ${{ needs.detect-changes.outputs.ci-config == 'true' && '⚙️ Yes' || '➖ No' }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
