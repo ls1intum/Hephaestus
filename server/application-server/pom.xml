@@ -37,7 +37,7 @@
         <maven.test.skip>false</maven.test.skip>
         <hephaestus.surefire.timeout>300</hephaestus.surefire.timeout>
 
-        <!-- Server port for OpenAPI spec generation — must match application-specs.yml's server.port -->
+        <!-- Server port for OpenAPI spec generation (overridable via -Dopenapi.server.port=PORT) -->
         <openapi.server.port>38090</openapi.server.port>
 
         <!-- Tag filtering: unit tests by default, exclude live tests -->
@@ -903,6 +903,7 @@
                             <profiles>specs</profiles>
                             <jvmArguments>-Dspring.application.admin.enabled=true -XX:+EnableDynamicAgentLoading
                                 --enable-native-access=ALL-UNNAMED -Dspring.devtools.restart.enabled=false
+                                -Dserver.port=${openapi.server.port}
                             </jvmArguments>
                         </configuration>
                     </execution>
