@@ -831,7 +831,8 @@ public class PullRequestReviewHandler implements JobTypeHandler {
                 });
             }
         }
-        int totalAdd = 0, totalDel = 0;
+        int totalAdd = 0,
+            totalDel = 0;
         StringBuilder sb = new StringBuilder();
         for (var entry : fileStats.entrySet()) {
             int[] stats = entry.getValue();
