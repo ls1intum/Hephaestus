@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.48.0](https://github.com/ls1intum/Hephaestus/compare/v0.47.0...v0.48.0) (2026-03-23)
+
+### 🚀 Features
+
+* **server:** production-harden practice detection with docker-cp, git security, and CI agent builds ([#892](https://github.com/ls1intum/Hephaestus/issues/892)) ([f7b95cc](https://github.com/ls1intum/Hephaestus/commit/f7b95cca683236eec311b7d5d29c5b1ca7bbe913))
+
 ## [0.47.0](https://github.com/ls1intum/Hephaestus/compare/v0.46.0...v0.47.0) (2026-03-21)
 
 ### 🚀 Features
