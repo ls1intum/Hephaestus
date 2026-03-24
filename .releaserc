@@ -156,42 +156,6 @@
       }
     ],
     [
-      "@semantic-release/changelog",
-      {
-        "changelogFile": "CHANGELOG.md",
-        "changelogTitle": "# Changelog"
-      }
-    ],
-    [
-      "@semantic-release/exec",
-      {
-        "prepareCmd": "./update_version.sh ${nextRelease.version}",
-        "publishCmd": "echo 'Version ${nextRelease.version} has been released'"
-      }
-    ],
-    [
-      "@semantic-release/git",
-      {
-        "assets": [
-          "CHANGELOG.md",
-          "package.json",
-          "package-lock.json",
-          "webapp/package.json",
-          "webapp/package-lock.json",
-          "webapp/src/api/**/*",
-          "server/application-server/pom.xml",
-          "server/application-server/src/main/java/de/tum/in/www1/hephaestus/OpenAPIConfiguration.java",
-          "server/application-server/src/main/java/de/tum/in/www1/hephaestus/intelligenceservice/**/*",
-          "server/application-server/src/main/resources/application.yml",
-          "server/application-server/openapi.yaml",
-          "server/intelligence-service/package.json",
-          "server/intelligence-service/openapi.yaml",
-          "server/webhook-ingest/package.json"
-        ],
-        "message": "chore(release): ${nextRelease.version} [skip ci]"
-      }
-    ],
-    [
       "@semantic-release/github",
       {
         "discussionCategoryName": "Announcements",

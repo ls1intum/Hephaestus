@@ -1,6 +1,6 @@
 {
   "name": "webhook-ingest",
-  "version": "0.3.0",
+  "version": "0.0.0-development",
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
