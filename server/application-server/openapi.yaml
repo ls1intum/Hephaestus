@@ -8,7 +8,7 @@ info:
     name: MIT License
     url: https://github.com/ls1intum/Hephaestus/blob/develop/LICENSE
   title: Hephaestus API
-  version: 0.0.0-development
+  version: 0.47.0
 servers:
 - description: Default Server URL
   url: /
@@ -24,8 +24,6 @@ tags:
      These routes stay under the classic /workspaces base path while slugged routes
      live in {@link WorkspaceController WorkspaceController} via <code>@WorkspaceScopedController</code>.
   name: workspace-registry-controller
-- description: Read-only access to practice evaluation findings
-  name: Practice Findings
 - description: Workspace-scoped agent configuration management
   name: Agent Config
 - description: |-
@@ -44,6 +42,8 @@ tags:
   name: Team Settings
 - description: Team management within workspace
   name: Teams
+- description: Contributor feedback on AI-generated practice findings
+  name: Finding Feedback
 - description: User profile and activity data
   name: Profile
 - description: Contributor rankings and league statistics
@@ -1825,96 +1825,11 @@ paths:
       summary: Create a new practice definition
       tags:
       - Practice Catalog
-  /workspaces/{workspaceSlug}/practices/findings:
+  /workspaces/{workspaceSlug}/practices/findings/engagement:
     get:
-      description: Paginated findings for the authenticated contributor with optional
-        filters
-      operationId: listFindings
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - description: Filter by practice slug
-        in: query
-        name: practiceSlug
-        required: false
-        schema:
-          type: string
-      - description: Filter by verdict
-        in: query
-        name: verdict
-        required: false
-        schema:
-          type: string
-          enum:
-          - POSITIVE
-          - NEGATIVE
-          - NOT_APPLICABLE
-          - NEEDS_REVIEW
-      - in: query
-        name: page
-        required: false
-        schema:
-          type: integer
-          format: int32
-          default: 0
-      - in: query
-        name: size
-        required: false
-        schema:
-          type: integer
-          format: int32
-          default: 20
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PagePracticeFindingList"
-          description: Paginated findings returned
-      security: []
-      summary: List findings for current user
-      tags:
-      - Practice Findings
-  /workspaces/{workspaceSlug}/practices/findings/pull-request/{prId}:
-    get:
-      description: All findings for a specific pull request within the workspace
-      operationId: getFindingsForPullRequest
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: prId
-        required: true
-        schema:
-          type: integer
-          format: int64
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/PracticeFindingList"
-          description: PR findings returned
-      security: []
-      summary: List findings for a pull request
-      tags:
-      - Practice Findings
-  /workspaces/{workspaceSlug}/practices/findings/summary:
-    get:
-      description: Aggregated verdict counts per practice for dashboard cards
-      operationId: getSummary
+      description: Returns the current user's feedback action counts across all findings
+        in this workspace.
+      operationId: getEngagement
       parameters:
       - description: Workspace slug
         in: path
@@ -1928,17 +1843,16 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/ContributorPracticeSummary"
-          description: Practice summaries returned
-      security: []
-      summary: Per-practice summary for current user
+                $ref: "#/components/schemas/FindingFeedbackEngagement"
+          description: Engagement statistics returned
+      summary: Get engagement statistics
       tags:
-      - Practice Findings
-  /workspaces/{workspaceSlug}/practices/findings/{findingId}:
+      - Finding Feedback
+  /workspaces/{workspaceSlug}/practices/findings/{findingId}/feedback:
     get:
-      operationId: getFinding
+      description: "Returns the current user's most recent feedback on the specified\
+        \ finding, or 204 if none exists."
+      operationId: getLatestFeedback
       parameters:
       - description: Workspace slug
         in: path
@@ -1958,14 +1872,56 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PracticeFindingDetail"
-          description: Finding detail returned
+                $ref: "#/components/schemas/FindingFeedback"
+          description: Latest feedback returned
+        "204":
+          description: No feedback exists for this finding
         "404":
-          description: Finding not found or not owned by current user
-      security: []
-      summary: Get finding detail
+          description: Finding not found in this workspace
+      summary: Get latest feedback for a finding
       tags:
-      - Practice Findings
+      - Finding Feedback
+    post:
+      description: "Records the contributor's reaction (APPLIED, DISPUTED, NOT_APPLICABLE)\
+        \ to an AI-generated finding. Append-only: submitting again creates a new\
+        \ record, preserving temporal history."
+      operationId: submitFeedback
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: findingId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateFindingFeedback"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FindingFeedback"
+          description: Feedback recorded
+        "400":
+          description: "Invalid request (e.g., DISPUTED without explanation)"
+        "403":
+          description: Current user is not the finding's contributor
+        "404":
+          description: Finding not found in this workspace
+      summary: Submit feedback on a practice finding
+      tags:
+      - Finding Feedback
   /workspaces/{workspaceSlug}/practices/{practiceSlug}:
     delete:
       operationId: deletePractice
@@ -3330,41 +3286,6 @@ components:
       - id
       - login
       - name
-    ContributorPracticeSummary:
-      type: object
-      description: Per-practice finding summary for a contributor
-      properties:
-        category:
-          type: string
-          description: Practice category
-        lastFindingAt:
-          type: string
-          format: date-time
-          description: Timestamp of most recent finding
-        negativeCount:
-          type: integer
-          format: int64
-          description: Number of NEGATIVE findings
-        positiveCount:
-          type: integer
-          format: int64
-          description: Number of POSITIVE findings
-        practiceName:
-          type: string
-          description: Practice name
-        practiceSlug:
-          type: string
-          description: Practice slug
-        totalFindings:
-          type: integer
-          format: int64
-          description: Total number of findings
-      required:
-      - negativeCount
-      - positiveCount
-      - practiceName
-      - practiceSlug
-      - totalFindings
     CreateAgentConfigRequest:
       type: object
       description: Request to create a new agent configuration for a workspace
@@ -3447,6 +3368,24 @@ components:
       - title
       x-hephaestus:
         export: true
+    CreateFindingFeedback:
+      type: object
+      description: Submit feedback on an AI-generated practice finding
+      properties:
+        action:
+          type: string
+          description: The feedback action to record
+          enum:
+          - APPLIED
+          - DISPUTED
+          - NOT_APPLICABLE
+        explanation:
+          type: string
+          description: Explanation for the feedback. Required when action is DISPUTED.
+          maxLength: 2000
+          minLength: 0
+      required:
+      - action
     CreatePracticeRequest:
       type: object
       description: Request to create a new practice definition
@@ -3655,6 +3594,57 @@ components:
         RUN_PRACTICE_REVIEW:
           type: boolean
           description: User's PRs trigger practice review
+    FindingFeedback:
+      type: object
+      description: Contributor feedback on an AI-generated practice finding
+      properties:
+        action:
+          type: string
+          description: The feedback action taken
+          enum:
+          - APPLIED
+          - DISPUTED
+          - NOT_APPLICABLE
+        createdAt:
+          type: string
+          format: date-time
+          description: When the feedback was submitted
+        explanation:
+          type: string
+          description: Optional explanation for the feedback
+        findingId:
+          type: string
+          format: uuid
+          description: ID of the finding this feedback is about
+        id:
+          type: string
+          format: uuid
+          description: Unique feedback ID
+      required:
+      - action
+      - createdAt
+      - findingId
+      - id
+    FindingFeedbackEngagement:
+      type: object
+      description: Feedback engagement statistics for a contributor in a workspace
+      properties:
+        applied:
+          type: integer
+          format: int64
+          description: Number of findings marked as applied/fixed
+        disputed:
+          type: integer
+          format: int64
+          description: Number of findings disputed as incorrect
+        notApplicable:
+          type: integer
+          format: int64
+          description: Number of findings marked as not applicable
+      required:
+      - applied
+      - disputed
+      - notApplicable
     GitLabGroup:
       type: object
       description: GitLab group accessible to the provided PAT
@@ -3868,38 +3858,6 @@ components:
         totalPages:
           type: integer
           format: int32
-    PagePracticeFindingList:
-      type: object
-      properties:
-        content:
-          type: array
-          items:
-            $ref: "#/components/schemas/PracticeFindingList"
-        empty:
-          type: boolean
-        first:
-          type: boolean
-        last:
-          type: boolean
-        number:
-          type: integer
-          format: int32
-        numberOfElements:
-          type: integer
-          format: int32
-        pageable:
-          $ref: "#/components/schemas/PageableObject"
-        size:
-          type: integer
-          format: int32
-        sort:
-          $ref: "#/components/schemas/SortObject"
-        totalElements:
-          type: integer
-          format: int64
-        totalPages:
-          type: integer
-          format: int32
     PageableObject:
       type: object
       properties:
@@ -3966,158 +3924,6 @@ components:
       - slug
       - triggerEvents
       - updatedAt
-    PracticeFindingDetail:
-      type: object
-      description: Full practice finding detail including guidance and evidence
-      properties:
-        category:
-          type: string
-          description: Practice category
-        confidence:
-          type: number
-          format: float
-          description: AI confidence score (0.0–1.0)
-        detectedAt:
-          type: string
-          format: date-time
-          description: When the finding was detected
-        evidence:
-          description: "Structured evidence (locations, snippets, references)"
-        guidance:
-          type: string
-          description: Actionable guidance for the contributor
-        guidanceMethod:
-          type: string
-          description: Cognitive apprenticeship guidance method
-          enum:
-          - MODELING
-          - COACHING
-          - SCAFFOLDING
-          - ARTICULATION
-          - REFLECTION
-          - EXPLORATION
-        id:
-          type: string
-          format: uuid
-          description: Finding ID
-        practiceName:
-          type: string
-          description: Practice name
-        practiceSlug:
-          type: string
-          description: Practice slug
-        reasoning:
-          type: string
-          description: AI reasoning behind the verdict
-        severity:
-          type: string
-          description: Severity level
-          enum:
-          - CRITICAL
-          - MAJOR
-          - MINOR
-          - INFO
-        targetId:
-          type: integer
-          format: int64
-          description: Target entity ID
-        targetType:
-          type: string
-          description: "Target type (e.g. pull_request, review)"
-        title:
-          type: string
-          description: Finding title
-        verdict:
-          type: string
-          description: "Verdict: POSITIVE, NEGATIVE, NOT_APPLICABLE, or NEEDS_REVIEW"
-          enum:
-          - POSITIVE
-          - NEGATIVE
-          - NOT_APPLICABLE
-          - NEEDS_REVIEW
-      required:
-      - confidence
-      - detectedAt
-      - id
-      - practiceName
-      - practiceSlug
-      - severity
-      - targetId
-      - targetType
-      - title
-      - verdict
-    PracticeFindingList:
-      type: object
-      description: Practice finding summary for list views
-      properties:
-        category:
-          type: string
-          description: Practice category
-        confidence:
-          type: number
-          format: float
-          description: AI confidence score (0.0–1.0)
-        detectedAt:
-          type: string
-          format: date-time
-          description: When the finding was detected
-        guidanceMethod:
-          type: string
-          description: Cognitive apprenticeship guidance method
-          enum:
-          - MODELING
-          - COACHING
-          - SCAFFOLDING
-          - ARTICULATION
-          - REFLECTION
-          - EXPLORATION
-        id:
-          type: string
-          format: uuid
-          description: Finding ID
-        practiceName:
-          type: string
-          description: Practice name
-        practiceSlug:
-          type: string
-          description: Practice slug
-        severity:
-          type: string
-          description: Severity level
-          enum:
-          - CRITICAL
-          - MAJOR
-          - MINOR
-          - INFO
-        targetId:
-          type: integer
-          format: int64
-          description: Target entity ID
-        targetType:
-          type: string
-          description: "Target type (e.g. pull_request, review)"
-        title:
-          type: string
-          description: Finding title
-        verdict:
-          type: string
-          description: "Verdict: POSITIVE, NEGATIVE, NOT_APPLICABLE, or NEEDS_REVIEW"
-          enum:
-          - POSITIVE
-          - NEGATIVE
-          - NOT_APPLICABLE
-          - NEEDS_REVIEW
-      required:
-      - confidence
-      - detectedAt
-      - id
-      - practiceName
-      - practiceSlug
-      - severity
-      - targetId
-      - targetType
-      - title
-      - verdict
     Profile:
       type: object
       description: Complete user profile including contribution history and activity

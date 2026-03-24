@@ -27,6 +27,13 @@ import org.springframework.transaction.annotation.Transactional;
 @WorkspaceAgnostic("Findings scoped through Practice.workspace relationship")
 public interface PracticeFindingRepository extends JpaRepository<PracticeFinding, UUID> {
     /**
+     * Finds a practice finding by ID, scoped to a specific workspace.
+     * Used to validate that a finding belongs to the caller's workspace before allowing operations on it.
+     */
+    @Query("SELECT f FROM PracticeFinding f JOIN f.practice p WHERE f.id = :id AND p.workspace.id = :workspaceId")
+    Optional<PracticeFinding> findByIdAndWorkspaceId(@Param("id") UUID id, @Param("workspaceId") Long workspaceId);
+
+    /**
      * Atomically inserts a practice finding if absent (race-condition safe).
      *
      * <p>Uses PostgreSQL's ON CONFLICT DO NOTHING to handle concurrent inserts.

@@ -982,126 +982,6 @@ export type Profile = {
 };
 
 /**
- * Practice finding summary for list views
- */
-export type PracticeFindingList = {
-    /**
-     * Practice category
-     */
-    category?: string;
-    /**
-     * AI confidence score (0.0–1.0)
-     */
-    confidence: number;
-    /**
-     * When the finding was detected
-     */
-    detectedAt: Date;
-    /**
-     * Cognitive apprenticeship guidance method
-     */
-    guidanceMethod?: 'MODELING' | 'COACHING' | 'SCAFFOLDING' | 'ARTICULATION' | 'REFLECTION' | 'EXPLORATION';
-    /**
-     * Finding ID
-     */
-    id: string;
-    /**
-     * Practice name
-     */
-    practiceName: string;
-    /**
-     * Practice slug
-     */
-    practiceSlug: string;
-    /**
-     * Severity level
-     */
-    severity: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
-    /**
-     * Target entity ID
-     */
-    targetId: number;
-    /**
-     * Target type (e.g. pull_request, review)
-     */
-    targetType: string;
-    /**
-     * Finding title
-     */
-    title: string;
-    /**
-     * Verdict: POSITIVE, NEGATIVE, NOT_APPLICABLE, or NEEDS_REVIEW
-     */
-    verdict: 'POSITIVE' | 'NEGATIVE' | 'NOT_APPLICABLE' | 'NEEDS_REVIEW';
-};
-
-/**
- * Full practice finding detail including guidance and evidence
- */
-export type PracticeFindingDetail = {
-    /**
-     * Practice category
-     */
-    category?: string;
-    /**
-     * AI confidence score (0.0–1.0)
-     */
-    confidence: number;
-    /**
-     * When the finding was detected
-     */
-    detectedAt: Date;
-    /**
-     * Structured evidence (locations, snippets, references)
-     */
-    evidence?: unknown;
-    /**
-     * Actionable guidance for the contributor
-     */
-    guidance?: string;
-    /**
-     * Cognitive apprenticeship guidance method
-     */
-    guidanceMethod?: 'MODELING' | 'COACHING' | 'SCAFFOLDING' | 'ARTICULATION' | 'REFLECTION' | 'EXPLORATION';
-    /**
-     * Finding ID
-     */
-    id: string;
-    /**
-     * Practice name
-     */
-    practiceName: string;
-    /**
-     * Practice slug
-     */
-    practiceSlug: string;
-    /**
-     * AI reasoning behind the verdict
-     */
-    reasoning?: string;
-    /**
-     * Severity level
-     */
-    severity: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
-    /**
-     * Target entity ID
-     */
-    targetId: number;
-    /**
-     * Target type (e.g. pull_request, review)
-     */
-    targetType: string;
-    /**
-     * Finding title
-     */
-    title: string;
-    /**
-     * Verdict: POSITIVE, NEGATIVE, NOT_APPLICABLE, or NEEDS_REVIEW
-     */
-    verdict: 'POSITIVE' | 'NEGATIVE' | 'NOT_APPLICABLE' | 'NEEDS_REVIEW';
-};
-
-/**
  * Practice definition for evaluating developer contributions
  */
 export type Practice = {
@@ -1154,20 +1034,6 @@ export type PageableObject = {
     paged?: boolean;
     sort?: SortObject;
     unpaged?: boolean;
-};
-
-export type PagePracticeFindingList = {
-    content?: Array<PracticeFindingList>;
-    empty?: boolean;
-    first?: boolean;
-    last?: boolean;
-    number?: number;
-    numberOfElements?: number;
-    pageable?: PageableObject;
-    size?: number;
-    sort?: SortObject;
-    totalElements?: number;
-    totalPages?: number;
 };
 
 export type PageAgentJob = {
@@ -1392,6 +1258,50 @@ export type GitLabGroup = {
 };
 
 /**
+ * Feedback engagement statistics for a contributor in a workspace
+ */
+export type FindingFeedbackEngagement = {
+    /**
+     * Number of findings marked as applied/fixed
+     */
+    applied: number;
+    /**
+     * Number of findings disputed as incorrect
+     */
+    disputed: number;
+    /**
+     * Number of findings marked as not applicable
+     */
+    notApplicable: number;
+};
+
+/**
+ * Contributor feedback on an AI-generated practice finding
+ */
+export type FindingFeedback = {
+    /**
+     * The feedback action taken
+     */
+    action: 'APPLIED' | 'DISPUTED' | 'NOT_APPLICABLE';
+    /**
+     * When the feedback was submitted
+     */
+    createdAt: Date;
+    /**
+     * Optional explanation for the feedback
+     */
+    explanation?: string;
+    /**
+     * ID of the finding this feedback is about
+     */
+    findingId: string;
+    /**
+     * Unique feedback ID
+     */
+    id: string;
+};
+
+/**
  * Feature flags evaluated for the current user
  */
 export type FeatureFlags = {
@@ -1531,6 +1441,20 @@ export type CreatePracticeRequest = {
     triggerEvents: Array<string>;
 };
 
+/**
+ * Submit feedback on an AI-generated practice finding
+ */
+export type CreateFindingFeedback = {
+    /**
+     * The feedback action to record
+     */
+    action: 'APPLIED' | 'DISPUTED' | 'NOT_APPLICABLE';
+    /**
+     * Explanation for the feedback. Required when action is DISPUTED.
+     */
+    explanation?: string;
+};
+
 export type CreateDocumentRequest = {
     content: string;
     kind: DocumentKind;
@@ -1581,40 +1505,6 @@ export type CreateAgentConfigRequest = {
      * Job timeout in seconds
      */
     timeoutSeconds?: number;
-};
-
-/**
- * Per-practice finding summary for a contributor
- */
-export type ContributorPracticeSummary = {
-    /**
-     * Practice category
-     */
-    category?: string;
-    /**
-     * Timestamp of most recent finding
-     */
-    lastFindingAt?: Date;
-    /**
-     * Number of NEGATIVE findings
-     */
-    negativeCount: number;
-    /**
-     * Number of POSITIVE findings
-     */
-    positiveCount: number;
-    /**
-     * Practice name
-     */
-    practiceName: string;
-    /**
-     * Practice slug
-     */
-    practiceSlug: string;
-    /**
-     * Total number of findings
-     */
-    totalFindings: number;
 };
 
 /**
@@ -3160,61 +3050,7 @@ export type CreatePracticeResponses = {
 
 export type CreatePracticeResponse = CreatePracticeResponses[keyof CreatePracticeResponses];
 
-export type ListFindingsData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query?: {
-        /**
-         * Filter by practice slug
-         */
-        practiceSlug?: string;
-        /**
-         * Filter by verdict
-         */
-        verdict?: 'POSITIVE' | 'NEGATIVE' | 'NOT_APPLICABLE' | 'NEEDS_REVIEW';
-        page?: number;
-        size?: number;
-    };
-    url: '/workspaces/{workspaceSlug}/practices/findings';
-};
-
-export type ListFindingsResponses = {
-    /**
-     * Paginated findings returned
-     */
-    200: PagePracticeFindingList;
-};
-
-export type ListFindingsResponse = ListFindingsResponses[keyof ListFindingsResponses];
-
-export type GetFindingsForPullRequestData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        prId: number;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/findings/pull-request/{prId}';
-};
-
-export type GetFindingsForPullRequestResponses = {
-    /**
-     * PR findings returned
-     */
-    200: Array<PracticeFindingList>;
-};
-
-export type GetFindingsForPullRequestResponse = GetFindingsForPullRequestResponses[keyof GetFindingsForPullRequestResponses];
-
-export type GetSummaryData = {
+export type GetEngagementData = {
     body?: never;
     path: {
         /**
@@ -3223,19 +3059,19 @@ export type GetSummaryData = {
         workspaceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/findings/summary';
+    url: '/workspaces/{workspaceSlug}/practices/findings/engagement';
 };
 
-export type GetSummaryResponses = {
+export type GetEngagementResponses = {
     /**
-     * Practice summaries returned
+     * Engagement statistics returned
      */
-    200: Array<ContributorPracticeSummary>;
+    200: FindingFeedbackEngagement;
 };
 
-export type GetSummaryResponse = GetSummaryResponses[keyof GetSummaryResponses];
+export type GetEngagementResponse = GetEngagementResponses[keyof GetEngagementResponses];
 
-export type GetFindingData = {
+export type GetLatestFeedbackData = {
     body?: never;
     path: {
         /**
@@ -3245,24 +3081,65 @@ export type GetFindingData = {
         findingId: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/findings/{findingId}';
+    url: '/workspaces/{workspaceSlug}/practices/findings/{findingId}/feedback';
 };
 
-export type GetFindingErrors = {
+export type GetLatestFeedbackErrors = {
     /**
-     * Finding not found or not owned by current user
+     * Finding not found in this workspace
      */
     404: unknown;
 };
 
-export type GetFindingResponses = {
+export type GetLatestFeedbackResponses = {
     /**
-     * Finding detail returned
+     * Latest feedback returned
      */
-    200: PracticeFindingDetail;
+    200: FindingFeedback;
+    /**
+     * No feedback exists for this finding
+     */
+    204: void;
 };
 
-export type GetFindingResponse = GetFindingResponses[keyof GetFindingResponses];
+export type GetLatestFeedbackResponse = GetLatestFeedbackResponses[keyof GetLatestFeedbackResponses];
+
+export type SubmitFeedbackData = {
+    body: CreateFindingFeedback;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        findingId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/findings/{findingId}/feedback';
+};
+
+export type SubmitFeedbackErrors = {
+    /**
+     * Invalid request (e.g., DISPUTED without explanation)
+     */
+    400: unknown;
+    /**
+     * Current user is not the finding's contributor
+     */
+    403: unknown;
+    /**
+     * Finding not found in this workspace
+     */
+    404: unknown;
+};
+
+export type SubmitFeedbackResponses = {
+    /**
+     * Feedback recorded
+     */
+    201: FindingFeedback;
+};
+
+export type SubmitFeedbackResponse = SubmitFeedbackResponses[keyof SubmitFeedbackResponses];
 
 export type DeletePracticeData = {
     body?: never;
