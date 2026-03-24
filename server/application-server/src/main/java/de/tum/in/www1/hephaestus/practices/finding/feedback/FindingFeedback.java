@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.practices.finding.feedback;
 
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.practices.model.PracticeFinding;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -78,12 +79,24 @@ public class FindingFeedback {
     private UUID findingId;
 
     /**
-     * The contributor who submitted this feedback. Stored as a raw column (no {@code @ManyToOne})
-     * because feedback only needs the ID for authorization checks — no navigation to User is needed.
-     * The FK constraint {@code fk_finding_feedback_contributor} is managed by Liquibase.
+     * The contributor who submitted this feedback. No cascade — users are long-lived
+     * and feedback must survive independently; deleting a user with existing feedback
+     * is blocked by the FK constraint (RESTRICT).
      */
     @NotNull
-    @Column(name = "contributor_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(
+        name = "contributor_id",
+        nullable = false,
+        foreignKey = @ForeignKey(name = "fk_finding_feedback_contributor")
+    )
+    private User contributor;
+
+    /**
+     * Direct access to the contributor ID without triggering a lazy load on the {@link #contributor} proxy.
+     * Read-only: mapped to the same column as the {@code @ManyToOne} relationship.
+     */
+    @Column(name = "contributor_id", insertable = false, updatable = false)
     private Long contributorId;
 
     @NotNull

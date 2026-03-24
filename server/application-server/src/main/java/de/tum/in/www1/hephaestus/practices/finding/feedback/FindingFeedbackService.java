@@ -79,6 +79,7 @@ public class FindingFeedbackService {
         FindingFeedback feedback = FindingFeedback.builder()
             .finding(finding)
             .findingId(findingId)
+            .contributor(currentUser)
             .contributorId(currentUser.getId())
             .action(request.action())
             .explanation(request.explanation())
