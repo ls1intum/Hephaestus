@@ -25,6 +25,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -32,8 +33,14 @@ import org.springframework.stereotype.Component;
 /**
  * Scheduler for bad practice detection tasks.
  * Schedules detection based on PR events (opened, labeled, closed) and user roles.
+ *
+ * @deprecated Legacy detection system — disabled by default. Use the agent-based practice
+ *     review system ({@link de.tum.in.www1.hephaestus.agent.job.AgentJobEventListener}) instead.
+ *     Re-enable via {@code hephaestus.detection.legacy.enabled=true}.
  */
+@Deprecated(forRemoval = true)
 @Component
+@ConditionalOnProperty(prefix = "hephaestus.detection.legacy", name = "enabled", havingValue = "true")
 @WorkspaceAgnostic(
     "Scheduled cleanup of completed detection tasks is system-wide infrastructure, not workspace-specific"
 )
