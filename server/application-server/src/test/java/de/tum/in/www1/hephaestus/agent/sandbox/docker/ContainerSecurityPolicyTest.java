@@ -34,6 +34,8 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
             null,
             8080,
             null,
+            209_715_200L,
+            500_000,
             null
         );
         securityPolicy = new ContainerSecurityPolicy(properties, null);
@@ -205,6 +207,8 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
                 "runsc",
                 8080,
                 null,
+                209_715_200L,
+                500_000,
                 null
             );
             ContainerSecurityPolicy policyWithRuntime = new ContainerSecurityPolicy(propsWithRuntime, null);
@@ -265,6 +269,8 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
                     null,
                     8080,
                     null,
+                    209_715_200L,
+                    500_000,
                     null
                 ),
                 "{\"defaultAction\":\"SCMP_ACT_ERRNO\"}"
@@ -497,6 +503,8 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
                 "runsc",
                 8080,
                 null,
+                209_715_200L,
+                500_000,
                 null
             );
             ContainerSecurityPolicy policyWithRuntime = new ContainerSecurityPolicy(propsWithRuntime, null);

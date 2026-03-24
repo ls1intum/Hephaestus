@@ -1,14 +1,18 @@
 package de.tum.in.www1.hephaestus.agent.sandbox.docker;
 
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.SandboxException;
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.stream.Stream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
@@ -34,19 +38,38 @@ public class SandboxWorkspaceManager {
     /** Maximum total size of injected input files (50 MB). */
     static final long MAX_INPUT_BYTES = 50L * 1024 * 1024;
 
+    /** Maximum total size of a directory injected via tar (1 GB). */
+    static final long MAX_DIRECTORY_BYTES = 1024L * 1024 * 1024;
+
+    /** Maximum number of entries (files + directories) in a directory injection. */
+    static final int MAX_DIRECTORY_ENTRIES = 500_000;
+
+    /** Maximum directory tree depth for walk operations. */
+    static final int MAX_WALK_DEPTH = 50;
+
     private final DockerFileOperations fileOps;
     private final long maxOutputBytes;
     private final long maxSingleFileBytes;
+    private final long maxDirectoryBytes;
+    private final int maxDirectoryEntries;
 
     public SandboxWorkspaceManager(DockerFileOperations fileOps) {
-        this(fileOps, MAX_OUTPUT_BYTES, MAX_SINGLE_FILE_BYTES);
+        this(fileOps, MAX_OUTPUT_BYTES, MAX_SINGLE_FILE_BYTES, MAX_DIRECTORY_BYTES, MAX_DIRECTORY_ENTRIES);
     }
 
-    /** Package-private constructor for testing with smaller limits. */
-    SandboxWorkspaceManager(DockerFileOperations fileOps, long maxOutputBytes, long maxSingleFileBytes) {
+    /** Package-private constructor for testing with custom limits. */
+    SandboxWorkspaceManager(
+        DockerFileOperations fileOps,
+        long maxOutputBytes,
+        long maxSingleFileBytes,
+        long maxDirectoryBytes,
+        int maxDirectoryEntries
+    ) {
         this.fileOps = fileOps;
         this.maxOutputBytes = maxOutputBytes;
         this.maxSingleFileBytes = maxSingleFileBytes;
+        this.maxDirectoryBytes = maxDirectoryBytes;
+        this.maxDirectoryEntries = maxDirectoryEntries;
     }
 
     /**
@@ -93,29 +116,78 @@ public class SandboxWorkspaceManager {
     }
 
     /**
-     * Walk a host directory, create a tar archive, and copy it into the container.
-     * The tar entries are prefixed with the final path component so that extracting at
-     * the parent of containerPath produces the correct layout.
+     * Walk a host directory, create a tar archive on a temp file, and stream it into the container.
+     *
+     * <p>Uses a temporary file instead of {@link ByteArrayOutputStream} to avoid loading the entire
+     * archive into JVM heap. Memory usage is O(buffer_size) regardless of directory size, since each
+     * file is streamed through a fixed buffer. The docker-java transport streams the tar lazily via
+     * chunked transfer encoding — no additional buffering occurs downstream.
+     *
+     * <p>The tar entries are prefixed with the final path component so that extracting at the parent
+     * of containerPath produces the correct layout.
      */
     private void injectDirectoryViaTar(String containerId, String hostPath, String containerPath) {
         Path hostDir = Path.of(hostPath);
-        // Container path parent is where we extract; the tar has the dir name as prefix
         Path containerParent = Path.of(containerPath).getParent();
         String dirName = Path.of(containerPath).getFileName().toString();
         if (containerParent == null) {
             containerParent = Path.of("/");
         }
 
+        Path tempTar = null;
+        try {
+            tempTar = Files.createTempFile("hephaestus-inject-", ".tar");
+
+            // Phase 1: Walk directory and write tar to temp file.
+            // Memory: O(COPY_BUFFER_SIZE) — each file is streamed, never loaded whole.
+            writeTarToFile(tempTar, hostDir, dirName, hostPath);
+
+            // Phase 2: Stream tar from disk to Docker daemon.
+            // docker-java wraps this in InputStreamEntity (chunked transfer) — no heap copy.
+            try (InputStream tarStream = new BufferedInputStream(Files.newInputStream(tempTar))) {
+                fileOps.copyArchiveToContainer(containerId, containerParent.toString(), tarStream);
+            }
+        } catch (IOException e) {
+            throw new SandboxException("Failed to inject directory " + hostPath + " into container " + containerId, e);
+        } finally {
+            if (tempTar != null) {
+                try {
+                    Files.deleteIfExists(tempTar);
+                } catch (IOException e) {
+                    log.warn("Failed to delete temp tar file {}: {}", tempTar, e.getMessage());
+                }
+            }
+        }
+    }
+
+    /** Buffer size for streaming file contents into the tar archive (64 KB). */
+    private static final int COPY_BUFFER_SIZE = 64 * 1024;
+
+    /**
+     * Write a tar archive of the given directory to a file on disk. Files are streamed through a
+     * fixed-size buffer rather than loaded entirely into memory.
+     */
+    private void writeTarToFile(Path tarFile, Path hostDir, String dirName, String hostPath) throws IOException {
+        long[] totalBytes = { 0 };
+        int[] entryCount = { 0 };
+
         try (
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            TarArchiveOutputStream tar = new TarArchiveOutputStream(baos)
+            OutputStream fileOut = new BufferedOutputStream(Files.newOutputStream(tarFile), COPY_BUFFER_SIZE);
+            TarArchiveOutputStream tar = new TarArchiveOutputStream(fileOut);
+            Stream<Path> paths = Files.walk(hostDir, MAX_WALK_DEPTH)
         ) {
             tar.setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
             tar.setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_POSIX);
 
-            // Walk the directory tree and add each file/directory
-            Files.walk(hostDir).forEach(path -> {
+            paths.forEach(path -> {
                 try {
+                    entryCount[0]++;
+                    if (entryCount[0] > maxDirectoryEntries) {
+                        throw new SandboxException(
+                            "Directory injection exceeds entry count limit (" + maxDirectoryEntries + "): " + hostPath
+                        );
+                    }
+
                     String relativePath = hostDir.relativize(path).toString();
                     String entryName = relativePath.isEmpty() ? dirName : dirName + "/" + relativePath;
 
@@ -125,27 +197,33 @@ public class SandboxWorkspaceManager {
                         tar.putArchiveEntry(dirEntry);
                         tar.closeArchiveEntry();
                     } else if (Files.isRegularFile(path)) {
-                        byte[] content = Files.readAllBytes(path);
+                        long fileSize = Files.size(path);
+                        totalBytes[0] += fileSize;
+                        if (totalBytes[0] > maxDirectoryBytes) {
+                            throw new SandboxException(
+                                "Directory injection exceeds size limit (" + maxDirectoryBytes + " bytes): " + hostPath
+                            );
+                        }
+
                         TarArchiveEntry fileEntry = new TarArchiveEntry(entryName);
-                        fileEntry.setSize(content.length);
+                        fileEntry.setSize(fileSize);
                         fileEntry.setModTime(Files.getLastModifiedTime(path).toMillis());
                         tar.putArchiveEntry(fileEntry);
-                        tar.write(content);
+
+                        // Stream file through fixed buffer — not Files.readAllBytes()
+                        try (InputStream fileIn = Files.newInputStream(path)) {
+                            fileIn.transferTo(tar);
+                        }
                         tar.closeArchiveEntry();
                     }
-                    // Skip symlinks for security (already validated above)
+                    // Symlinks are silently skipped: Files.walk() does not follow them by default,
+                    // and Files.isRegularFile/isDirectory return false for unresolved symlinks.
                 } catch (IOException e) {
                     throw new SandboxException("Failed to add file to tar: " + path, e);
                 }
             });
 
             tar.finish();
-
-            try (InputStream tarStream = new ByteArrayInputStream(baos.toByteArray())) {
-                fileOps.copyArchiveToContainer(containerId, containerParent.toString(), tarStream);
-            }
-        } catch (IOException e) {
-            throw new SandboxException("Failed to inject directory " + hostPath + " into container " + containerId, e);
         }
     }
 

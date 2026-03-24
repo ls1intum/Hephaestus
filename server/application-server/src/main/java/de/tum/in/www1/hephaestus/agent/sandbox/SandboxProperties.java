@@ -41,6 +41,8 @@ import org.springframework.validation.annotation.Validated;
  * @param llmProxyPort port on which the LLM proxy listens (inside the app-server container)
  * @param appServerContainerId Docker container ID of the app-server (null=auto-detect from
  *     HOSTNAME)
+ * @param maxDirectoryBytes maximum total bytes for directory injection via tar (default 1 GB)
+ * @param maxDirectoryEntries maximum entry count for directory injection (default 500,000)
  * @param defaultResourceLimits default resource constraints for containers
  */
 @Validated
@@ -56,6 +58,8 @@ public record SandboxProperties(
     @Nullable String containerRuntime,
     @DefaultValue("8080") @Min(1) int llmProxyPort,
     @Nullable String appServerContainerId,
+    @DefaultValue("1073741824") @Min(1) long maxDirectoryBytes, // 1 GB
+    @DefaultValue("500000") @Min(1) int maxDirectoryEntries,
     @Valid DefaultResourceLimits defaultResourceLimits
 ) {
     public SandboxProperties {

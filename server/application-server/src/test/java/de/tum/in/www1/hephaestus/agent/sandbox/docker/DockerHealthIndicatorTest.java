@@ -34,6 +34,8 @@ class DockerHealthIndicatorTest extends BaseUnitTest {
             null,
             8080,
             null,
+            209_715_200L,
+            500_000,
             null
         );
         indicator = new DockerHealthIndicator(containerManager, properties);
