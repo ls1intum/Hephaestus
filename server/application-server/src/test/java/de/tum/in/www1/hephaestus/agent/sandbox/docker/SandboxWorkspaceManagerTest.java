@@ -14,6 +14,9 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
@@ -21,6 +24,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mock;
 
 @DisplayName("SandboxWorkspaceManager")
@@ -240,6 +244,114 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
 
             assertThat(output).containsKey("result.json");
             assertThat(output).hasSize(1);
+        }
+    }
+
+    @Nested
+    @DisplayName("injectDirectories")
+    class InjectDirectories {
+
+        @TempDir
+        Path tempDir;
+
+        @Test
+        @DisplayName("should skip injection when directory mounts is null")
+        void shouldSkipWhenDirectoryMountsNull() {
+            manager.injectDirectories(CONTAINER_ID, null);
+
+            verify(fileOps, never()).copyArchiveToContainer(any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("should reject null host path")
+        void shouldRejectNullHostPath() {
+            Map<String, String> mounts = new HashMap<>();
+            mounts.put(null, "/container/path");
+
+            assertThatThrownBy(() -> manager.injectDirectories(CONTAINER_ID, mounts))
+                .isInstanceOf(SandboxException.class)
+                .hasMessageContaining("Host path must not be empty");
+        }
+
+        @Test
+        @DisplayName("should reject empty host path")
+        void shouldRejectEmptyHostPath() {
+            assertThatThrownBy(() -> manager.injectDirectories(CONTAINER_ID, Map.of("", "/container/path")))
+                .isInstanceOf(SandboxException.class)
+                .hasMessageContaining("Host path must not be empty");
+        }
+
+        @Test
+        @DisplayName("should reject relative host path")
+        void shouldRejectRelativeHostPath() {
+            assertThatThrownBy(() ->
+                manager.injectDirectories(CONTAINER_ID, Map.of("relative/path", "/container/path"))
+            )
+                .isInstanceOf(SandboxException.class)
+                .hasMessageContaining("Host path must be absolute");
+        }
+
+        @Test
+        @DisplayName("should reject non-existent host path")
+        void shouldRejectNonExistentHostPath() {
+            String nonExistent = tempDir.resolve("does-not-exist").toString();
+
+            assertThatThrownBy(() -> manager.injectDirectories(CONTAINER_ID, Map.of(nonExistent, "/container/path")))
+                .isInstanceOf(SandboxException.class)
+                .hasMessageContaining("Host path does not exist");
+        }
+
+        @Test
+        @DisplayName("should reject symlink host path")
+        void shouldRejectSymlinkHostPath() throws Exception {
+            Path realDir = Files.createDirectory(tempDir.resolve("real-dir"));
+            Path symlink = Files.createSymbolicLink(tempDir.resolve("symlink-dir"), realDir);
+
+            assertThatThrownBy(() ->
+                manager.injectDirectories(CONTAINER_ID, Map.of(symlink.toString(), "/container/path"))
+            )
+                .isInstanceOf(SandboxException.class)
+                .hasMessageContaining("Host path must not be a symlink");
+        }
+
+        @Test
+        @DisplayName("should reject null container path")
+        void shouldRejectNullContainerPath() {
+            Map<String, String> mounts = new HashMap<>();
+            mounts.put(tempDir.toString(), null);
+
+            assertThatThrownBy(() -> manager.injectDirectories(CONTAINER_ID, mounts))
+                .isInstanceOf(SandboxException.class)
+                .hasMessageContaining("Container path must not be empty");
+        }
+
+        @Test
+        @DisplayName("should reject empty container path")
+        void shouldRejectEmptyContainerPath() {
+            assertThatThrownBy(() -> manager.injectDirectories(CONTAINER_ID, Map.of(tempDir.toString(), "")))
+                .isInstanceOf(SandboxException.class)
+                .hasMessageContaining("Container path must not be empty");
+        }
+
+        @Test
+        @DisplayName("should reject relative container path")
+        void shouldRejectRelativeContainerPath() {
+            assertThatThrownBy(() ->
+                manager.injectDirectories(CONTAINER_ID, Map.of(tempDir.toString(), "relative/container"))
+            )
+                .isInstanceOf(SandboxException.class)
+                .hasMessageContaining("Container path must be absolute");
+        }
+
+        @Test
+        @DisplayName("should inject valid directory via tar")
+        void shouldInjectValidDirectory() throws Exception {
+            Path subDir = Files.createDirectory(tempDir.resolve("src"));
+            Files.writeString(subDir.resolve("main.py"), "print('hello')");
+
+            manager.injectDirectories(CONTAINER_ID, Map.of(tempDir.toString(), "/workspace/repo"));
+
+            verify(fileOps).copyArchiveToContainer(eq(CONTAINER_ID), eq("/workspace"), any(InputStream.class));
         }
     }
 
