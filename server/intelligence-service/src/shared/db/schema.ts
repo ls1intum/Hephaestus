@@ -720,7 +720,7 @@ export const document = pgTable(
 export const findingFeedback = pgTable(
 	"finding_feedback",
 	{
-		id: uuid().defaultRandom().primaryKey().notNull(),
+		id: uuid().primaryKey().notNull(),
 		findingId: uuid("finding_id").notNull(),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		contributorId: bigint("contributor_id", { mode: "number" }).notNull(),
@@ -738,7 +738,6 @@ export const findingFeedback = pgTable(
 			table.contributorId.asc().nullsLast(),
 			table.createdAt.desc().nullsFirst(),
 		),
-		index("idx_finding_feedback_finding").using("btree", table.findingId.asc().nullsLast()),
 		index("idx_finding_feedback_finding_contributor").using(
 			"btree",
 			table.findingId.asc().nullsLast(),
@@ -758,6 +757,10 @@ export const findingFeedback = pgTable(
 		check(
 			"chk_finding_feedback_action",
 			sql`(action)::text = ANY ((ARRAY['APPLIED'::character varying, 'DISPUTED'::character varying, 'NOT_APPLICABLE'::character varying])::text[])`,
+		),
+		check(
+			"chk_finding_feedback_disputed_explanation",
+			sql`((action)::text <> 'DISPUTED'::text) OR ((explanation IS NOT NULL) AND (length(TRIM(BOTH FROM explanation)) > 0))`,
 		),
 	],
 );
