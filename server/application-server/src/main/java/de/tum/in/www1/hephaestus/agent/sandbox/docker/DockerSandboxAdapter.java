@@ -66,7 +66,7 @@ public class DockerSandboxAdapter implements SandboxManager {
 
     /**
      * Exact environment variable names that must never be set by callers. Covers library injection,
-     * path manipulation, and proxy hijacking vectors.
+     * path manipulation, proxy hijacking, and git code-execution vectors.
      *
      * @see #BLOCKED_ENV_PREFIXES
      * @see #isBlockedEnvVar(String)
@@ -77,18 +77,35 @@ public class DockerSandboxAdapter implements SandboxManager {
         TreeSet<String> vars = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
         vars.addAll(
             List.of(
+                // Library injection & path manipulation
                 "LD_PRELOAD",
                 "LD_LIBRARY_PATH",
                 "PATH",
                 "HOME",
                 "SHELL",
                 "USER",
+                // Proxy hijacking
                 "http_proxy",
                 "https_proxy",
                 "HTTP_PROXY",
                 "HTTPS_PROXY",
                 "no_proxy",
-                "NO_PROXY"
+                "NO_PROXY",
+                // Git env vars that allow arbitrary command execution.
+                // These override git-config equivalents and must be blocked independently.
+                "GIT_SSH",
+                "GIT_SSH_COMMAND",
+                "GIT_ASKPASS",
+                "GIT_EDITOR",
+                "GIT_EXEC_PATH",
+                "GIT_TEMPLATE_DIR",
+                "GIT_EXTERNAL_DIFF",
+                "GIT_PROXY_COMMAND",
+                "GIT_SEQUENCE_EDITOR",
+                "GIT_PAGER",
+                // Git env vars that control security-relevant behaviour
+                "GIT_TERMINAL_PROMPT",
+                "GIT_ATTR_NOSYSTEM"
             )
         );
         BLOCKED_ENV_VARS = vars;
@@ -97,7 +114,8 @@ public class DockerSandboxAdapter implements SandboxManager {
     /**
      * Environment variable prefixes that must never be set by callers. Blocks entire credential
      * families (AWS, GCP, Azure, Docker) rather than individual keys — catches new credential vars
-     * automatically (e.g. {@code AWS_ROLE_ARN}, {@code GOOGLE_CLOUD_PROJECT}).
+     * automatically (e.g. {@code AWS_ROLE_ARN}, {@code GOOGLE_CLOUD_PROJECT}). Also blocks
+     * {@code GIT_CONFIG_*} to prevent callers from overriding git security settings.
      *
      * @see #BLOCKED_ENV_VARS
      * @see #isBlockedEnvVar(String)
@@ -108,7 +126,34 @@ public class DockerSandboxAdapter implements SandboxManager {
         "GCP_",
         "AZURE_",
         "DOCKER_",
-        "ALIBABA_CLOUD_"
+        "ALIBABA_CLOUD_",
+        "GIT_CONFIG_"
+    );
+
+    /**
+     * Git config key-value pairs injected via {@code GIT_CONFIG_COUNT}/{@code GIT_CONFIG_KEY_*}/
+     * {@code GIT_CONFIG_VALUE_*} env vars to neutralise code-execution vectors in
+     * {@code .git/config}. Env-based config has the <em>highest</em> precedence in git, so these
+     * override any local, global, or system settings.
+     *
+     * <p>Each entry maps a dangerous git config key to a safe value: empty string disables the
+     * feature, {@code /nonexistent} redirects to a path that does not exist, and {@code cat} is the
+     * canonical no-op pager.
+     *
+     * @see <a href="https://git-scm.com/docs/git-config#_environment">git-config environment</a>
+     */
+    static final List<Map.Entry<String, String>> GIT_SECURITY_CONFIGS = List.of(
+        Map.entry("core.hooksPath", "/nonexistent"),
+        Map.entry("core.fsmonitor", "false"),
+        Map.entry("core.sshCommand", ""),
+        Map.entry("core.askPass", ""),
+        Map.entry("core.editor", ""),
+        Map.entry("core.pager", "cat"),
+        Map.entry("core.gitProxy", ""),
+        Map.entry("sequence.editor", ""),
+        Map.entry("credential.helper", ""),
+        Map.entry("diff.external", ""),
+        Map.entry("protocol.ext.allow", "never")
     );
 
     private final SandboxNetworkManager networkManager;
@@ -362,7 +407,11 @@ public class DockerSandboxAdapter implements SandboxManager {
     private Map<String, String> buildEnvironment(SandboxSpec spec, String appServerIp) {
         Map<String, String> env = new HashMap<>();
 
-        // Copy user-provided environment, filtering out blocked variables
+        // ── User environment ──
+        // User env vars are copied first; security values are injected below and will
+        // overwrite any collisions. This is defense-in-depth — most dangerous vars are
+        // already blocked by isBlockedEnvVar(), but the ordering ensures new security
+        // vars added below always win even if the blocklist isn't updated simultaneously.
         for (var entry : spec.environment().entrySet()) {
             if (isBlockedEnvVar(entry.getKey())) {
                 log.warn("Blocked dangerous environment variable: {}", entry.getKey());
@@ -371,23 +420,27 @@ public class DockerSandboxAdapter implements SandboxManager {
             }
         }
 
-        // Git security: env-based config has HIGHEST precedence — overrides .git/config in mounted repos.
-        // This prevents malicious repos from re-enabling hooks or fsmonitor via local config.
-        if (spec.volumeMounts() != null && !spec.volumeMounts().isEmpty()) {
-            int idx = 0;
-            for (String containerPath : spec.volumeMounts().values()) {
-                env.put("GIT_CONFIG_KEY_" + idx, "safe.directory");
-                env.put("GIT_CONFIG_VALUE_" + idx, containerPath);
-                idx++;
-            }
-            env.put("GIT_CONFIG_KEY_" + idx, "core.hooksPath");
-            env.put("GIT_CONFIG_VALUE_" + idx, "/nonexistent");
+        // ── Git security ──
+        // Env-based config has HIGHEST precedence in git — overrides .git/config in any repo
+        // the agent clones or that was injected via volume mounts. Always injected regardless of
+        // whether volume mounts are present, since the agent can git-clone repos at runtime.
+        int idx = 0;
+        for (String containerPath : spec.volumeMounts().values()) {
+            env.put("GIT_CONFIG_KEY_" + idx, "safe.directory");
+            env.put("GIT_CONFIG_VALUE_" + idx, containerPath);
             idx++;
-            env.put("GIT_CONFIG_KEY_" + idx, "core.fsmonitor");
-            env.put("GIT_CONFIG_VALUE_" + idx, "false");
-            idx++;
-            env.put("GIT_CONFIG_COUNT", String.valueOf(idx));
         }
+        for (var gitConfig : GIT_SECURITY_CONFIGS) {
+            env.put("GIT_CONFIG_KEY_" + idx, gitConfig.getKey());
+            env.put("GIT_CONFIG_VALUE_" + idx, gitConfig.getValue());
+            idx++;
+        }
+        env.put("GIT_CONFIG_COUNT", String.valueOf(idx));
+
+        // Prevent git from prompting interactively (would hang the agent)
+        env.put("GIT_TERMINAL_PROMPT", "0");
+        // Prevent system-wide gitattributes from being loaded
+        env.put("GIT_ATTR_NOSYSTEM", "1");
 
         // Inject LLM proxy configuration
         if (spec.networkPolicy() != null) {
