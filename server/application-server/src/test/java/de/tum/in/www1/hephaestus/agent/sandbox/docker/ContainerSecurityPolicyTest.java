@@ -180,15 +180,7 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
         @Test
         @DisplayName("should use gVisor runtime when configured in security profile")
         void shouldUseGvisorFromProfile() {
-            SecurityProfile gvisorProfile = new SecurityProfile(
-                "runsc",
-                true,
-                true,
-                true,
-                "none",
-                List.of("ALL"),
-                Map.of()
-            );
+            SecurityProfile gvisorProfile = new SecurityProfile("runsc", "none", List.of("ALL"), Map.of());
 
             DockerOperations.HostConfigSpec config = securityPolicy.buildHostConfig(
                 gvisorProfile,
@@ -333,9 +325,9 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
     class EnforcementFloors {
 
         @Test
-        @DisplayName("should enforce no-new-privileges even when profile disables it")
+        @DisplayName("should always enforce no-new-privileges")
         void shouldEnforceNoNewPrivileges() {
-            SecurityProfile laxProfile = new SecurityProfile(null, false, false, false, "host", List.of(), Map.of());
+            SecurityProfile laxProfile = new SecurityProfile(null, "none", List.of(), Map.of());
 
             DockerOperations.HostConfigSpec config = securityPolicy.buildHostConfig(
                 laxProfile,
@@ -347,23 +339,9 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should disable read-only rootfs (docker cp injects files before start)")
-        void shouldEnforceReadOnlyRootfs() {
-            SecurityProfile laxProfile = new SecurityProfile(null, false, false, false, "host", List.of(), Map.of());
-
-            DockerOperations.HostConfigSpec config = securityPolicy.buildHostConfig(
-                laxProfile,
-                ResourceLimits.DEFAULT,
-                new NetworkPolicy(false, null, null, null)
-            );
-
-            assertThat(config.readonlyRootfs()).isFalse();
-        }
-
-        @Test
         @DisplayName("should enforce cap-drop ALL even when profile drops nothing")
         void shouldEnforceCapDropAll() {
-            SecurityProfile laxProfile = new SecurityProfile(null, true, true, true, "none", List.of(), Map.of());
+            SecurityProfile laxProfile = new SecurityProfile(null, "none", List.of(), Map.of());
 
             DockerOperations.HostConfigSpec config = securityPolicy.buildHostConfig(
                 laxProfile,
@@ -375,9 +353,28 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should enforce private cgroup namespace even when profile disables it")
+        @DisplayName("should enforce cap-drop ALL when profile drops only specific capabilities")
+        void shouldEnforceCapDropAllOverPartialList() {
+            SecurityProfile partialCapProfile = new SecurityProfile(
+                null,
+                "none",
+                List.of("NET_RAW", "SYS_ADMIN"),
+                Map.of()
+            );
+
+            DockerOperations.HostConfigSpec config = securityPolicy.buildHostConfig(
+                partialCapProfile,
+                ResourceLimits.DEFAULT,
+                new NetworkPolicy(false, null, null, null)
+            );
+
+            assertThat(config.capDrop()).containsExactly("ALL");
+        }
+
+        @Test
+        @DisplayName("should always enforce private cgroup namespace")
         void shouldEnforcePrivateCgroupns() {
-            SecurityProfile laxProfile = new SecurityProfile(null, true, true, false, "none", List.of("ALL"), Map.of());
+            SecurityProfile laxProfile = new SecurityProfile(null, "none", List.of("ALL"), Map.of());
 
             DockerOperations.HostConfigSpec config = securityPolicy.buildHostConfig(
                 laxProfile,
@@ -391,15 +388,7 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
         @Test
         @DisplayName("should reject ipc mode 'host' and force 'none'")
         void shouldRejectHostIpcMode() {
-            SecurityProfile hostIpcProfile = new SecurityProfile(
-                null,
-                true,
-                true,
-                true,
-                "host",
-                List.of("ALL"),
-                Map.of()
-            );
+            SecurityProfile hostIpcProfile = new SecurityProfile(null, "host", List.of("ALL"), Map.of());
 
             DockerOperations.HostConfigSpec config = securityPolicy.buildHostConfig(
                 hostIpcProfile,
@@ -411,17 +400,23 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
         }
 
         @Test
+        @DisplayName("should reject ipc mode 'shareable' and force 'none'")
+        void shouldRejectShareableIpcMode() {
+            SecurityProfile shareableIpcProfile = new SecurityProfile(null, "shareable", List.of("ALL"), Map.of());
+
+            DockerOperations.HostConfigSpec config = securityPolicy.buildHostConfig(
+                shareableIpcProfile,
+                ResourceLimits.DEFAULT,
+                new NetworkPolicy(false, null, null, null)
+            );
+
+            assertThat(config.ipcMode()).isEqualTo("none");
+        }
+
+        @Test
         @DisplayName("should default ipc mode to none when profile sets null")
         void shouldDefaultIpcToNone() {
-            SecurityProfile nullIpcProfile = new SecurityProfile(
-                null,
-                true,
-                true,
-                true,
-                null,
-                List.of("ALL"),
-                Map.of()
-            );
+            SecurityProfile nullIpcProfile = new SecurityProfile(null, null, List.of("ALL"), Map.of());
 
             DockerOperations.HostConfigSpec config = securityPolicy.buildHostConfig(
                 nullIpcProfile,
@@ -435,15 +430,7 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
         @Test
         @DisplayName("should allow ipc mode 'private'")
         void shouldAllowPrivateIpcMode() {
-            SecurityProfile privateIpcProfile = new SecurityProfile(
-                null,
-                true,
-                true,
-                true,
-                "private",
-                List.of("ALL"),
-                Map.of()
-            );
+            SecurityProfile privateIpcProfile = new SecurityProfile(null, "private", List.of("ALL"), Map.of());
 
             DockerOperations.HostConfigSpec config = securityPolicy.buildHostConfig(
                 privateIpcProfile,
@@ -459,9 +446,6 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
         void shouldEnforceMandatoryTmpfs() {
             SecurityProfile weakTmpfsProfile = new SecurityProfile(
                 null,
-                true,
-                true,
-                true,
                 "none",
                 List.of("ALL"),
                 Map.of("/tmp", "rw,exec,size=100g", "/custom", "rw,size=512m")
@@ -483,6 +467,23 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
         }
 
         @Test
+        @DisplayName("should apply mandatory tmpfs mounts when profile has null tmpfs")
+        void shouldHandleNullTmpfsMounts() {
+            SecurityProfile nullTmpfsProfile = new SecurityProfile(null, "none", List.of("ALL"), null);
+
+            DockerOperations.HostConfigSpec config = securityPolicy.buildHostConfig(
+                nullTmpfsProfile,
+                ResourceLimits.DEFAULT,
+                new NetworkPolicy(false, null, null, null)
+            );
+
+            assertThat(config.tmpfsMounts()).containsKey("/tmp");
+            assertThat(config.tmpfsMounts()).containsKey("/run");
+            assertThat(config.tmpfsMounts()).containsKey("/home/agent/.local");
+            assertThat(config.tmpfsMounts().get("/tmp")).contains("noexec");
+        }
+
+        @Test
         @DisplayName("should prevent runtime downgrade when global is configured")
         void shouldPreventRuntimeDowngrade() {
             SandboxProperties propsWithRuntime = new SandboxProperties(
@@ -501,15 +502,7 @@ class ContainerSecurityPolicyTest extends BaseUnitTest {
             ContainerSecurityPolicy policyWithRuntime = new ContainerSecurityPolicy(propsWithRuntime, null);
 
             // Caller tries to downgrade to runc
-            SecurityProfile runcProfile = new SecurityProfile(
-                "runc",
-                true,
-                true,
-                true,
-                "none",
-                List.of("ALL"),
-                Map.of()
-            );
+            SecurityProfile runcProfile = new SecurityProfile("runc", "none", List.of("ALL"), Map.of());
 
             DockerOperations.HostConfigSpec config = policyWithRuntime.buildHostConfig(
                 runcProfile,

@@ -122,18 +122,8 @@ class DockerSandboxLiveTest {
         } catch (Exception ignored) {}
     }
 
-    // Use a relaxed security profile for integration tests (no read-only rootfs)
-    // because alpine needs write access for some operations
     private SecurityProfile testSecurityProfile() {
-        return new SecurityProfile(
-            null,
-            false, // need writable rootfs for tests
-            true,
-            false, // skip cgroupns in tests
-            "private",
-            List.of("ALL"),
-            Map.of()
-        );
+        return new SecurityProfile(null, "private", List.of("ALL"), Map.of());
     }
 
     @Nested
