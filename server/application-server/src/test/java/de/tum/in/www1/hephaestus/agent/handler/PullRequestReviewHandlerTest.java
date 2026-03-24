@@ -29,12 +29,14 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullReques
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewCommentRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.practices.PracticeRepository;
+import de.tum.in.www1.hephaestus.practices.finding.ContributorHistoryProvider;
 import de.tum.in.www1.hephaestus.practices.model.CaMethod;
 import de.tum.in.www1.hephaestus.practices.model.Practice;
 import de.tum.in.www1.hephaestus.practices.model.Severity;
 import de.tum.in.www1.hephaestus.practices.model.Verdict;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -64,6 +66,9 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
     private PracticeRepository practiceRepository;
 
     @Mock
+    private ContributorHistoryProvider contributorHistoryProvider;
+
+    @Mock
     private PracticeDetectionDeliveryService deliveryService;
 
     private static final Long WORKSPACE_ID = 99L;
@@ -83,6 +88,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             pullRequestRepository,
             reviewCommentRepository,
             practiceRepository,
+            contributorHistoryProvider,
             resultParser,
             deliveryService,
             feedbackService
@@ -439,6 +445,99 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             assertThat(metadataJson.get("state").asText()).isEqualTo("OPEN");
             assertThat(metadataJson.has("author")).isFalse();
         }
+
+        @Test
+        @DisplayName("should include contributor_history.json when provider returns data")
+        void shouldIncludeContributorHistory() throws Exception {
+            PullRequest pullRequest = new PullRequest();
+            pullRequest.setTitle("Fix bug");
+            User author = new User();
+            author.setId(42L);
+            author.setLogin("alice");
+            pullRequest.setAuthor(author);
+
+            stubDefaults();
+            when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.of(pullRequest));
+
+            byte[] historyJson = "[{\"practice\":\"error-handling\",\"negative\":3}]".getBytes(StandardCharsets.UTF_8);
+            when(contributorHistoryProvider.buildHistoryJson(42L, WORKSPACE_ID)).thenReturn(Optional.of(historyJson));
+
+            Map<String, byte[]> files = handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata()));
+
+            assertThat(files).containsKey(".context/contributor_history.json");
+            assertThat(files.get(".context/contributor_history.json")).isEqualTo(historyJson);
+            verify(contributorHistoryProvider).buildHistoryJson(42L, WORKSPACE_ID);
+        }
+
+        @Test
+        @DisplayName("should not include contributor_history.json when provider returns empty")
+        void shouldOmitContributorHistoryWhenEmpty() throws Exception {
+            PullRequest pullRequest = new PullRequest();
+            pullRequest.setTitle("New PR");
+            User author = new User();
+            author.setId(42L);
+            author.setLogin("alice");
+            pullRequest.setAuthor(author);
+
+            stubDefaults();
+            when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.of(pullRequest));
+            when(contributorHistoryProvider.buildHistoryJson(42L, WORKSPACE_ID)).thenReturn(Optional.empty());
+
+            Map<String, byte[]> files = handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata()));
+
+            assertThat(files).doesNotContainKey(".context/contributor_history.json");
+            verify(contributorHistoryProvider).buildHistoryJson(42L, WORKSPACE_ID);
+        }
+
+        @Test
+        @DisplayName("should gracefully continue when contributor history provider throws")
+        void shouldContinueWhenHistoryProviderThrows() throws Exception {
+            PullRequest pullRequest = new PullRequest();
+            pullRequest.setTitle("PR with broken history");
+            User author = new User();
+            author.setId(42L);
+            author.setLogin("alice");
+            pullRequest.setAuthor(author);
+
+            stubDefaults();
+            when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.of(pullRequest));
+            when(contributorHistoryProvider.buildHistoryJson(42L, WORKSPACE_ID)).thenThrow(
+                new RuntimeException("DB connection timeout")
+            );
+
+            Map<String, byte[]> files = handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata()));
+
+            assertThat(files).doesNotContainKey(".context/contributor_history.json");
+            assertThat(files).containsKey(".context/metadata.json");
+        }
+
+        @Test
+        @DisplayName("should not include contributor_history.json when PR has no author")
+        void shouldOmitContributorHistoryWhenNoAuthor() throws Exception {
+            PullRequest pullRequest = new PullRequest();
+            pullRequest.setTitle("Orphan PR");
+            pullRequest.setAuthor(null);
+
+            stubDefaults();
+            when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.of(pullRequest));
+
+            Map<String, byte[]> files = handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata()));
+
+            assertThat(files).doesNotContainKey(".context/contributor_history.json");
+            verifyNoInteractions(contributorHistoryProvider);
+        }
+
+        @Test
+        @DisplayName("should not include contributor_history.json when PR not found")
+        void shouldOmitContributorHistoryWhenPrNotFound() throws Exception {
+            stubDefaults();
+            // stubDefaults already returns Optional.empty() for the PR
+
+            Map<String, byte[]> files = handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata()));
+
+            assertThat(files).doesNotContainKey(".context/contributor_history.json");
+            verifyNoInteractions(contributorHistoryProvider);
+        }
     }
 
     @Nested
@@ -684,6 +783,20 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             // Severity semantics are disambiguated with a concrete example
             assertThat(prompt).contains("verdict=POSITIVE severity=MAJOR");
             assertThat(prompt).contains("verdict=NEGATIVE severity=MINOR");
+        }
+
+        @Test
+        @DisplayName("should include contributor history reference with CA method guidance")
+        void shouldIncludeContributorHistoryReference() {
+            when(practiceRepository.findByWorkspaceIdAndActiveTrue(WORKSPACE_ID)).thenReturn(samplePractices());
+
+            String prompt = handler.buildPrompt(jobWithMetadata(sampleJobMetadata()));
+
+            assertThat(prompt).contains("contributor_history.json");
+            assertThat(prompt).contains("guidanceMethod");
+            assertThat(prompt).contains("COACHING");
+            assertThat(prompt).contains("SCAFFOLDING");
+            assertThat(prompt).contains("new contributor");
         }
     }
 

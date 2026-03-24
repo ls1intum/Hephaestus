@@ -10,7 +10,9 @@ import de.tum.in.www1.hephaestus.gitprovider.git.GitRepositoryManager;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewCommentRepository;
 import de.tum.in.www1.hephaestus.practices.PracticeRepository;
+import de.tum.in.www1.hephaestus.practices.finding.ContributorHistoryProvider;
 import de.tum.in.www1.hephaestus.practices.finding.PracticeDetectionProperties;
+import de.tum.in.www1.hephaestus.practices.finding.PracticeFindingRepository;
 import de.tum.in.www1.hephaestus.practices.review.PracticeReviewDeliveryGate;
 import de.tum.in.www1.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
@@ -33,17 +35,20 @@ public class JobTypeHandlerConfiguration {
 
     private final ObjectMapper objectMapper;
     private final GitRepositoryManager gitRepositoryManager;
+    private final PracticeFindingRepository practiceFindingRepository;
     private final PracticeReviewDeliveryGate deliveryGate;
     private final PracticeReviewProperties reviewProperties;
 
     JobTypeHandlerConfiguration(
         ObjectMapper objectMapper,
         GitRepositoryManager gitRepositoryManager,
+        PracticeFindingRepository practiceFindingRepository,
         PracticeReviewDeliveryGate deliveryGate,
         PracticeReviewProperties reviewProperties
     ) {
         this.objectMapper = objectMapper;
         this.gitRepositoryManager = gitRepositoryManager;
+        this.practiceFindingRepository = practiceFindingRepository;
         this.deliveryGate = deliveryGate;
         this.reviewProperties = reviewProperties;
     }
@@ -51,6 +56,11 @@ public class JobTypeHandlerConfiguration {
     @Bean
     public PracticeDetectionResultParser practiceDetectionResultParser(PracticeDetectionProperties properties) {
         return new PracticeDetectionResultParser(objectMapper, properties.maxFindingsPerJob());
+    }
+
+    @Bean
+    ContributorHistoryProvider contributorHistoryProvider() {
+        return new ContributorHistoryProvider(practiceFindingRepository, objectMapper);
     }
 
     @Bean
@@ -106,6 +116,9 @@ public class JobTypeHandlerConfiguration {
             pullRequestRepository,
             reviewCommentRepository,
             practiceRepository,
+            // CGLIB proxy call: returns the singleton bean. Not a @Bean parameter to stay
+            // within the architecture test limit of 6 parameters per @Bean method.
+            contributorHistoryProvider(),
             resultParser,
             deliveryService,
             feedbackService
