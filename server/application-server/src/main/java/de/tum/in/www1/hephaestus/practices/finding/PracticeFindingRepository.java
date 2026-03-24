@@ -1,9 +1,15 @@
 package de.tum.in.www1.hephaestus.practices.finding;
 
 import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
+import de.tum.in.www1.hephaestus.practices.finding.dto.ContributorPracticeSummaryProjection;
 import de.tum.in.www1.hephaestus.practices.model.PracticeFinding;
+import de.tum.in.www1.hephaestus.practices.model.Verdict;
 import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -77,4 +83,105 @@ public interface PracticeFindingRepository extends JpaRepository<PracticeFinding
         nativeQuery = true
     )
     void deleteAllByPracticeWorkspaceId(@Param("workspaceId") Long workspaceId);
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // Read queries for the contributor dashboard (Issue #896)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Paginated findings for a contributor within a workspace, with optional filters.
+     *
+     * <p>Workspace scoping is done via the {@code Practice.workspace} join.
+     * Uses a separate {@code countQuery} because {@code JOIN FETCH} is incompatible
+     * with count projections in Hibernate.
+     */
+    @Query(
+        value = """
+        SELECT f FROM PracticeFinding f
+        JOIN FETCH f.practice p
+        WHERE f.contributor.id = :contributorId
+        AND p.workspace.id = :workspaceId
+        AND (:practiceSlug IS NULL OR p.slug = :practiceSlug)
+        AND (:verdict IS NULL OR f.verdict = :verdict)
+        """,
+        countQuery = """
+        SELECT COUNT(f) FROM PracticeFinding f
+        JOIN f.practice p
+        WHERE f.contributor.id = :contributorId
+        AND p.workspace.id = :workspaceId
+        AND (:practiceSlug IS NULL OR p.slug = :practiceSlug)
+        AND (:verdict IS NULL OR f.verdict = :verdict)
+        """
+    )
+    Page<PracticeFinding> findByContributorAndWorkspace(
+        @Param("contributorId") Long contributorId,
+        @Param("workspaceId") Long workspaceId,
+        @Param("practiceSlug") String practiceSlug,
+        @Param("verdict") Verdict verdict,
+        Pageable pageable
+    );
+
+    /**
+     * Per-practice aggregation: verdict counts and last finding date for a contributor.
+     */
+    @Query(
+        """
+        SELECT p.slug AS practiceSlug,
+               p.name AS practiceName,
+               p.category AS category,
+               COUNT(f) AS totalFindings,
+               SUM(CASE WHEN f.verdict = de.tum.in.www1.hephaestus.practices.model.Verdict.POSITIVE THEN 1L ELSE 0L END) AS positiveCount,
+               SUM(CASE WHEN f.verdict = de.tum.in.www1.hephaestus.practices.model.Verdict.NEGATIVE THEN 1L ELSE 0L END) AS negativeCount,
+               MAX(f.detectedAt) AS lastFindingAt
+        FROM PracticeFinding f
+        JOIN f.practice p
+        WHERE f.contributor.id = :contributorId
+        AND p.workspace.id = :workspaceId
+        GROUP BY p.slug, p.name, p.category
+        ORDER BY p.name ASC
+        """
+    )
+    List<ContributorPracticeSummaryProjection> findSummaryByContributorAndWorkspace(
+        @Param("contributorId") Long contributorId,
+        @Param("workspaceId") Long workspaceId
+    );
+
+    /**
+     * Single finding by ID within a workspace, restricted to a specific contributor.
+     *
+     * <p>Ownership is enforced in the query (not in Java) to avoid lazy-load
+     * fragility and to keep the auth check atomic with the fetch.
+     */
+    @Query(
+        """
+        SELECT f FROM PracticeFinding f
+        JOIN FETCH f.practice p
+        WHERE f.id = :findingId
+        AND f.contributor.id = :contributorId
+        AND p.workspace.id = :workspaceId
+        """
+    )
+    Optional<PracticeFinding> findByIdAndContributorAndWorkspace(
+        @Param("findingId") UUID findingId,
+        @Param("contributorId") Long contributorId,
+        @Param("workspaceId") Long workspaceId
+    );
+
+    /**
+     * All findings for a specific pull request within a workspace.
+     */
+    @Query(
+        """
+        SELECT f FROM PracticeFinding f
+        JOIN FETCH f.practice p
+        WHERE f.targetType = 'pull_request'
+        AND f.targetId = :pullRequestId
+        AND p.workspace.id = :workspaceId
+        ORDER BY f.detectedAt DESC
+        """
+    )
+    List<PracticeFinding> findByPullRequestAndWorkspace(
+        @Param("pullRequestId") Long pullRequestId,
+        @Param("workspaceId") Long workspaceId
+    );
 }
