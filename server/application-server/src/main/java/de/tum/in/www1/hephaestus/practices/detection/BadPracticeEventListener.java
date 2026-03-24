@@ -10,6 +10,7 @@ import java.time.Duration;
 import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
@@ -26,8 +27,14 @@ import org.springframework.transaction.event.TransactionalEventListener;
  *   <li>Email notifications when bad practices are detected</li>
  *   <li>Task cancellation when PR is updated (resets the delay)</li>
  * </ul>
+ *
+ * @deprecated Legacy detection system — disabled by default. Use the agent-based practice
+ *     review system ({@link de.tum.in.www1.hephaestus.agent.job.AgentJobEventListener}) instead.
+ *     Re-enable via {@code hephaestus.detection.legacy.enabled=true}.
  */
+@Deprecated(forRemoval = true)
 @Component
+@ConditionalOnProperty(prefix = "hephaestus.detection.legacy", name = "enabled", havingValue = "true")
 public class BadPracticeEventListener {
 
     private static final Logger log = LoggerFactory.getLogger(BadPracticeEventListener.class);

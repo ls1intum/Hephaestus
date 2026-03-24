@@ -58,6 +58,8 @@ hephaestus:
         sender: ${MAIL_SENDER:hephaestus@aet.cit.tum.de}
 
     detection:
+        legacy:
+            enabled: ${LEGACY_DETECTION_ENABLED:false}
         run-automatic-detection-for-all: ${RUN_AUTOMATIC_DETECTION_FOR_ALL:false}
         tracing:
             enabled: true
