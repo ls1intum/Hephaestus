@@ -75,7 +75,7 @@ public class FindingFeedback {
      * Direct access to the finding ID without triggering a lazy load on the {@link #finding} proxy.
      * Read-only: mapped to the same column as the {@code @ManyToOne} relationship.
      */
-    @Column(name = "finding_id", insertable = false, updatable = false)
+    @Column(name = "finding_id", nullable = false, insertable = false, updatable = false)
     private UUID findingId;
 
     /**
@@ -96,7 +96,7 @@ public class FindingFeedback {
      * Direct access to the contributor ID without triggering a lazy load on the {@link #contributor} proxy.
      * Read-only: mapped to the same column as the {@code @ManyToOne} relationship.
      */
-    @Column(name = "contributor_id", insertable = false, updatable = false)
+    @Column(name = "contributor_id", nullable = false, insertable = false, updatable = false)
     private Long contributorId;
 
     @NotNull
