@@ -42,6 +42,8 @@ class SandboxNetworkManagerTest extends BaseUnitTest {
             null,
             8080,
             "app-server-id",
+            209_715_200L,
+            500_000,
             null
         );
         manager = new SandboxNetworkManager(networkOps, properties);
@@ -102,6 +104,8 @@ class SandboxNetworkManagerTest extends BaseUnitTest {
                 null,
                 8080,
                 null,
+                209_715_200L,
+                500_000,
                 null
             );
             SandboxNetworkManager mgr = new SandboxNetworkManager(networkOps, propsNoId, () -> "hostname-container-id");
@@ -128,6 +132,8 @@ class SandboxNetworkManagerTest extends BaseUnitTest {
                 null,
                 8080,
                 null,
+                209_715_200L,
+                500_000,
                 null
             );
             SandboxNetworkManager mgr = new SandboxNetworkManager(networkOps, propsNoId, () -> null);
@@ -151,6 +157,8 @@ class SandboxNetworkManagerTest extends BaseUnitTest {
                 null,
                 8080,
                 null,
+                209_715_200L,
+                500_000,
                 null
             );
             SandboxNetworkManager mgr = new SandboxNetworkManager(networkOps, propsNoId, () -> "  ");
@@ -175,6 +183,8 @@ class SandboxNetworkManagerTest extends BaseUnitTest {
                 null,
                 8080,
                 null,
+                209_715_200L,
+                500_000,
                 null
             );
             SandboxNetworkManager mgr = new SandboxNetworkManager(networkOps, propsNoId, () -> {
@@ -217,6 +227,8 @@ class SandboxNetworkManagerTest extends BaseUnitTest {
                 null,
                 8080,
                 null,
+                209_715_200L,
+                500_000,
                 null
             );
             SandboxNetworkManager mgr = new SandboxNetworkManager(networkOps, propsNoId, () -> null);

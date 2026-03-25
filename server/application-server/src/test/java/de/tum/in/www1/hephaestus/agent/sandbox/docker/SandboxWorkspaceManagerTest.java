@@ -141,7 +141,9 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
             var limitedManager = new SandboxWorkspaceManager(
                 fileOps,
                 1024,
-                SandboxWorkspaceManager.MAX_SINGLE_FILE_BYTES
+                SandboxWorkspaceManager.MAX_SINGLE_FILE_BYTES,
+                SandboxWorkspaceManager.MAX_DIRECTORY_BYTES,
+                SandboxWorkspaceManager.MAX_DIRECTORY_ENTRIES
             );
 
             byte[] largeContent = new byte[800]; // 800 bytes
@@ -213,7 +215,13 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         @DisplayName("should skip single files exceeding per-file size limit")
         void shouldSkipOversizedSingleFile() throws Exception {
             // Use a manager with a 10-byte per-file limit to avoid allocating megabytes in tests
-            var limitedManager = new SandboxWorkspaceManager(fileOps, 10_000, 10);
+            var limitedManager = new SandboxWorkspaceManager(
+                fileOps,
+                10_000,
+                10,
+                SandboxWorkspaceManager.MAX_DIRECTORY_BYTES,
+                SandboxWorkspaceManager.MAX_DIRECTORY_ENTRIES
+            );
 
             byte[] smallContent = "small".getBytes(); // 5 bytes — under limit
             byte[] oversizedContent = "this is way too big".getBytes(); // 19 bytes — over 10-byte limit
@@ -254,10 +262,121 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         @TempDir
         Path tempDir;
 
+        // ---- Size limit tests (from this PR) ----
+
+        @Test
+        @DisplayName("should reject directory exceeding size limit")
+        void shouldRejectDirectoryExceedingSizeLimit() throws Exception {
+            // Use a tiny limit (1 KB) to avoid allocating megabytes in CI
+            var limitedManager = new SandboxWorkspaceManager(
+                fileOps,
+                50L * 1024 * 1024,
+                10L * 1024 * 1024,
+                1024,
+                SandboxWorkspaceManager.MAX_DIRECTORY_ENTRIES
+            );
+
+            // Create two files totaling > 1024 bytes
+            Files.write(tempDir.resolve("file1.txt"), new byte[600]);
+            Files.write(tempDir.resolve("file2.txt"), new byte[600]);
+
+            assertThatThrownBy(() ->
+                limitedManager.injectDirectories(
+                    CONTAINER_ID,
+                    Map.of(tempDir.toAbsolutePath().toString(), "/workspace/repo")
+                )
+            )
+                .isInstanceOf(SandboxException.class)
+                .hasMessageContaining("size limit");
+        }
+
+        @Test
+        @DisplayName("should accept directory at exact size limit (inclusive)")
+        void shouldAcceptDirectoryAtExactSizeLimit() throws Exception {
+            // Exactly 100 bytes of content — limit is 100
+            var limitedManager = new SandboxWorkspaceManager(
+                fileOps,
+                50L * 1024 * 1024,
+                10L * 1024 * 1024,
+                100,
+                SandboxWorkspaceManager.MAX_DIRECTORY_ENTRIES
+            );
+
+            Files.write(tempDir.resolve("exact.txt"), new byte[100]);
+
+            limitedManager.injectDirectories(
+                CONTAINER_ID,
+                Map.of(tempDir.toAbsolutePath().toString(), "/workspace/repo")
+            );
+
+            verify(fileOps).copyArchiveToContainer(eq(CONTAINER_ID), eq("/workspace"), any(InputStream.class));
+        }
+
+        @Test
+        @DisplayName("should accept directory within size limit")
+        void shouldAcceptDirectoryWithinSizeLimit() throws Exception {
+            var limitedManager = new SandboxWorkspaceManager(
+                fileOps,
+                50L * 1024 * 1024,
+                10L * 1024 * 1024,
+                4096,
+                SandboxWorkspaceManager.MAX_DIRECTORY_ENTRIES
+            );
+
+            Files.write(tempDir.resolve("small.txt"), "hello".getBytes());
+
+            limitedManager.injectDirectories(
+                CONTAINER_ID,
+                Map.of(tempDir.toAbsolutePath().toString(), "/workspace/repo")
+            );
+
+            verify(fileOps).copyArchiveToContainer(eq(CONTAINER_ID), eq("/workspace"), any(InputStream.class));
+        }
+
+        @Test
+        @DisplayName("should inject nested subdirectories correctly")
+        void shouldInjectNestedSubdirectories() throws Exception {
+            var limitedManager = new SandboxWorkspaceManager(
+                fileOps,
+                50L * 1024 * 1024,
+                10L * 1024 * 1024,
+                4096,
+                SandboxWorkspaceManager.MAX_DIRECTORY_ENTRIES
+            );
+
+            // Create a nested directory structure: sub/nested.txt
+            Path subDir = Files.createDirectory(tempDir.resolve("sub"));
+            Files.write(subDir.resolve("nested.txt"), "nested content".getBytes());
+            Files.write(tempDir.resolve("root.txt"), "root content".getBytes());
+
+            limitedManager.injectDirectories(
+                CONTAINER_ID,
+                Map.of(tempDir.toAbsolutePath().toString(), "/workspace/repo")
+            );
+
+            verify(fileOps).copyArchiveToContainer(eq(CONTAINER_ID), eq("/workspace"), any(InputStream.class));
+        }
+
+        @Test
+        @DisplayName("should have reasonable entry count limit constant")
+        void shouldHaveReasonableEntryCountLimit() {
+            assertThat(SandboxWorkspaceManager.MAX_DIRECTORY_ENTRIES).isEqualTo(500_000);
+        }
+
+        // ---- Validation tests (from main) ----
+
         @Test
         @DisplayName("should skip injection when directory mounts is null")
         void shouldSkipWhenDirectoryMountsNull() {
             manager.injectDirectories(CONTAINER_ID, null);
+
+            verify(fileOps, never()).copyArchiveToContainer(any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("should skip injection when mounts map is empty")
+        void shouldSkipWhenMountsMapIsEmpty() {
+            manager.injectDirectories(CONTAINER_ID, Map.of());
 
             verify(fileOps, never()).copyArchiveToContainer(any(), any(), any());
         }

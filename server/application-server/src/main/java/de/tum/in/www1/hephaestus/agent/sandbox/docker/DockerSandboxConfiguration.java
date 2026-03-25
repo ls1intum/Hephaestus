@@ -96,8 +96,14 @@ public class DockerSandboxConfiguration {
     }
 
     @Bean
-    public SandboxWorkspaceManager sandboxWorkspaceManager(DockerClientOperations ops) {
-        return new SandboxWorkspaceManager(ops);
+    public SandboxWorkspaceManager sandboxWorkspaceManager(DockerClientOperations ops, SandboxProperties properties) {
+        return new SandboxWorkspaceManager(
+            ops,
+            SandboxWorkspaceManager.MAX_OUTPUT_BYTES,
+            SandboxWorkspaceManager.MAX_SINGLE_FILE_BYTES,
+            properties.maxDirectoryBytes(),
+            properties.maxDirectoryEntries()
+        );
     }
 
     /**
