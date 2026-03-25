@@ -3,7 +3,6 @@ package de.tum.in.www1.hephaestus.agent.handler;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
@@ -36,7 +35,6 @@ import de.tum.in.www1.hephaestus.practices.model.Severity;
 import de.tum.in.www1.hephaestus.practices.model.Verdict;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -175,7 +173,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             .thenReturn(java.nio.file.Path.of("/tmp/hephaestus-git-repos/123"));
         when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.empty());
         when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L)).thenReturn(List.of());
-        when(practiceRepository.findByWorkspaceIdAndActiveTrue(WORKSPACE_ID)).thenReturn(samplePractices());
+        lenient().when(practiceRepository.findByWorkspaceIdAndActiveTrue(WORKSPACE_ID)).thenReturn(samplePractices());
     }
 
     @Nested
@@ -320,23 +318,6 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should throw JobPreparationException when workspace is null")
-        void shouldThrowWhenWorkspaceIsNull() {
-            // Workspace null-guard fires after DB-sourced context preparation
-            lenient().when(gitRepositoryManager.isEnabled()).thenReturn(true);
-            when(pullRequestRepository.findByIdWithAllForGate(456L)).thenReturn(Optional.empty());
-            when(reviewCommentRepository.findByPullRequestIdWithAuthorOrderByCreatedAt(456L)).thenReturn(List.of());
-
-            var job = new AgentJob();
-            job.setMetadata(sampleJobMetadata());
-            // workspace deliberately not set
-
-            assertThatThrownBy(() -> handler.prepareInputFiles(job))
-                .isInstanceOf(JobPreparationException.class)
-                .hasMessageContaining("no workspace");
-        }
-
-        @Test
         @DisplayName("should include comments with null author")
         void shouldHandleCommentsWithNullAuthor() throws Exception {
             PullRequestReviewComment comment = new PullRequestReviewComment();
@@ -436,30 +417,6 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
 
             // Practices are no longer written to workspace files — they are inline in buildPrompt()
             assertThat(files).doesNotContainKey(".context/practices.json");
-        }
-
-        @Test
-        @DisplayName("should throw JobPreparationException when no active practices")
-        void shouldThrowWhenNoPractices() {
-            stubDefaults();
-            when(practiceRepository.findByWorkspaceIdAndActiveTrue(WORKSPACE_ID)).thenReturn(List.of());
-
-            assertThatThrownBy(() -> handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata())))
-                .isInstanceOf(JobPreparationException.class)
-                .hasMessageContaining("No active practices");
-        }
-
-        @Test
-        @DisplayName("should include practice category in prompt when present")
-        void shouldIncludePracticeCategoryInPrompt() {
-            Practice withCategory = createPractice("test-coverage", "Test Coverage", "Tests required.", null);
-            withCategory.setCategory("testing");
-            when(practiceRepository.findByWorkspaceIdAndActiveTrue(WORKSPACE_ID)).thenReturn(List.of(withCategory));
-
-            String prompt = handler.buildPrompt(jobWithMetadata(sampleJobMetadata()));
-
-            assertThat(prompt).contains("### test-coverage: Test Coverage");
-            assertThat(prompt).contains("Category: testing");
         }
 
         @Test

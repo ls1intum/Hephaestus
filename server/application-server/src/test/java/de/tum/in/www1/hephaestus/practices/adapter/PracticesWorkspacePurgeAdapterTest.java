@@ -94,6 +94,28 @@ class PracticesWorkspacePurgeAdapterTest extends BaseUnitTest {
     }
 
     @Test
+    @DisplayName("deletes findings and practices when legacy scheduler is disabled (null)")
+    void deleteWorkspaceData_withNullScheduler_stillDeletesFindingsAndPractices() {
+        // Given — legacy detection disabled, scheduler bean absent
+        var adapterWithoutScheduler = new PracticesWorkspacePurgeAdapter(
+            pullRequestQueryRepository,
+            null,
+            practiceFindingRepository,
+            practiceRepository
+        );
+        Long workspaceId = 321L;
+        List<Long> prIds = List.of(1L, 2L);
+        when(pullRequestQueryRepository.findPullRequestIdsByWorkspaceId(workspaceId)).thenReturn(prIds);
+
+        // When — completes without NPE despite non-empty prIds
+        adapterWithoutScheduler.deleteWorkspaceData(workspaceId);
+
+        // Then — findings and practices still cleaned up
+        verify(practiceFindingRepository).deleteAllByPracticeWorkspaceId(workspaceId);
+        verify(practiceRepository).deleteAllByWorkspaceId(workspaceId);
+    }
+
+    @Test
     @DisplayName("runs before default-order contributors")
     void getOrder_returnsNegativeValue() {
         // The adapter should run early, before other contributors

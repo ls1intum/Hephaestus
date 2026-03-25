@@ -1,7 +1,7 @@
 spring:
     application:
         name: Hephaestus
-        version: "0.47.0"
+        version: "${APP_VERSION:0.0.0-development}"
 
     config:
         import: optional:file:.env[.properties]
@@ -350,6 +350,9 @@ hephaestus:
         sender: ${MAIL_SENDER:hephaestus@gmail.com} # use gmail email address for local testing
 
     detection:
+        legacy:
+            # Deprecated — re-enable as escape hatch while agent-based reviews stabilize
+            enabled: false
         run-automatic-detection-for-all: false
         tracing:
             enabled: false
