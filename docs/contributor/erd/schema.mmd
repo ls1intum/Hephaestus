@@ -213,6 +213,15 @@ erDiagram
         BIGINT workspace_id FK "NOT NULL"
     }
 
+    FindingFeedback {
+        UUID id PK
+        UUID finding_id FK "NOT NULL"
+        BIGINT contributor_id FK "NOT NULL"
+        VARCHAR(16) action "NOT NULL"
+        TEXT explanation
+        TIMESTAMPTZ created_at "NOT NULL"
+    }
+
     GitCommit {
         BIGINT id PK
         VARCHAR(40) sha UK "NOT NULL"
@@ -820,6 +829,8 @@ erDiagram
     DiscussionComment ||--o{ DiscussionComment : commented_on
     User ||--o{ Document : has
     Workspace ||--o{ Document : has
+    User ||--o{ FindingFeedback : references
+    PracticeFinding ||--o{ FindingFeedback : has
     User ||--o{ GitCommit : authored_by
     User ||--o{ GitCommit : references
     User ||--o{ Issue : authored_by

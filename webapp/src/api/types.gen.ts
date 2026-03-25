@@ -1392,6 +1392,50 @@ export type GitLabGroup = {
 };
 
 /**
+ * Feedback engagement statistics for a contributor in a workspace
+ */
+export type FindingFeedbackEngagement = {
+    /**
+     * Number of findings marked as applied/fixed
+     */
+    applied: number;
+    /**
+     * Number of findings disputed as incorrect
+     */
+    disputed: number;
+    /**
+     * Number of findings marked as not applicable
+     */
+    notApplicable: number;
+};
+
+/**
+ * Contributor feedback on an AI-generated practice finding
+ */
+export type FindingFeedback = {
+    /**
+     * The feedback action taken
+     */
+    action: 'APPLIED' | 'DISPUTED' | 'NOT_APPLICABLE';
+    /**
+     * When the feedback was submitted
+     */
+    createdAt: Date;
+    /**
+     * Optional explanation for the feedback
+     */
+    explanation?: string;
+    /**
+     * ID of the finding this feedback is about
+     */
+    findingId: string;
+    /**
+     * Unique feedback ID
+     */
+    id: string;
+};
+
+/**
  * Feature flags evaluated for the current user
  */
 export type FeatureFlags = {
@@ -1529,6 +1573,20 @@ export type CreatePracticeRequest = {
      * Domain events that trigger detection
      */
     triggerEvents: Array<string>;
+};
+
+/**
+ * Submit feedback on an AI-generated practice finding
+ */
+export type CreateFindingFeedback = {
+    /**
+     * The feedback action to record
+     */
+    action: 'APPLIED' | 'DISPUTED' | 'NOT_APPLICABLE';
+    /**
+     * Explanation for the feedback. Required when action is DISPUTED.
+     */
+    explanation?: string;
 };
 
 export type CreateDocumentRequest = {
@@ -3192,6 +3250,27 @@ export type ListFindingsResponses = {
 
 export type ListFindingsResponse = ListFindingsResponses[keyof ListFindingsResponses];
 
+export type GetEngagementData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/findings/engagement';
+};
+
+export type GetEngagementResponses = {
+    /**
+     * Engagement statistics returned
+     */
+    200: FindingFeedbackEngagement;
+};
+
+export type GetEngagementResponse = GetEngagementResponses[keyof GetEngagementResponses];
+
 export type GetFindingsForPullRequestData = {
     body?: never;
     path: {
@@ -3263,6 +3342,76 @@ export type GetFindingResponses = {
 };
 
 export type GetFindingResponse = GetFindingResponses[keyof GetFindingResponses];
+
+export type GetLatestFeedbackData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        findingId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/findings/{findingId}/feedback';
+};
+
+export type GetLatestFeedbackErrors = {
+    /**
+     * Finding not found in this workspace
+     */
+    404: unknown;
+};
+
+export type GetLatestFeedbackResponses = {
+    /**
+     * Latest feedback returned
+     */
+    200: FindingFeedback;
+    /**
+     * No feedback exists for this finding
+     */
+    204: void;
+};
+
+export type GetLatestFeedbackResponse = GetLatestFeedbackResponses[keyof GetLatestFeedbackResponses];
+
+export type SubmitFeedbackData = {
+    body: CreateFindingFeedback;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        findingId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/findings/{findingId}/feedback';
+};
+
+export type SubmitFeedbackErrors = {
+    /**
+     * Invalid request (e.g., DISPUTED without explanation)
+     */
+    400: unknown;
+    /**
+     * Current user is not the finding's contributor
+     */
+    403: unknown;
+    /**
+     * Finding not found in this workspace
+     */
+    404: unknown;
+};
+
+export type SubmitFeedbackResponses = {
+    /**
+     * Feedback recorded
+     */
+    201: FindingFeedback;
+};
+
+export type SubmitFeedbackResponse = SubmitFeedbackResponses[keyof SubmitFeedbackResponses];
 
 export type DeletePracticeData = {
     body?: never;

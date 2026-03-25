@@ -717,6 +717,54 @@ export const document = pgTable(
 	],
 );
 
+export const findingFeedback = pgTable(
+	"finding_feedback",
+	{
+		id: uuid().primaryKey().notNull(),
+		findingId: uuid("finding_id").notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		contributorId: bigint("contributor_id", { mode: "number" }).notNull(),
+		action: varchar({ length: 16 }).notNull(),
+		explanation: text(),
+		createdAt: timestamp("created_at", {
+			precision: 6,
+			withTimezone: true,
+			mode: "string",
+		}).notNull(),
+	},
+	(table) => [
+		index("idx_finding_feedback_contributor_created").using(
+			"btree",
+			table.contributorId.asc().nullsLast(),
+			table.createdAt.desc().nullsFirst(),
+		),
+		index("idx_finding_feedback_finding_contributor").using(
+			"btree",
+			table.findingId.asc().nullsLast(),
+			table.contributorId.asc().nullsLast(),
+			table.createdAt.desc().nullsFirst(),
+		),
+		foreignKey({
+			columns: [table.findingId],
+			foreignColumns: [practiceFinding.id],
+			name: "fk_finding_feedback_finding",
+		}).onDelete("cascade"),
+		foreignKey({
+			columns: [table.contributorId],
+			foreignColumns: [user.id],
+			name: "fk_finding_feedback_contributor",
+		}),
+		check(
+			"chk_finding_feedback_action",
+			sql`(action)::text = ANY ((ARRAY['APPLIED'::character varying, 'DISPUTED'::character varying, 'NOT_APPLICABLE'::character varying])::text[])`,
+		),
+		check(
+			"chk_finding_feedback_disputed_explanation",
+			sql`((action)::text <> 'DISPUTED'::text) OR ((explanation IS NOT NULL) AND (length(TRIM(BOTH FROM explanation)) > 0))`,
+		),
+	],
+);
+
 export const gitCommit = pgTable(
 	"git_commit",
 	{
