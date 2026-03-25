@@ -57,6 +57,7 @@ services:
     ports:
       - "8080"
     environment:
+      APP_VERSION: ${IMAGE_TAG}
       SPRING_PROFILES_ACTIVE: prod
       APPLICATION_HOST_URL: https://${APP_HOSTNAME}
       DATABASE_URL: postgresql://postgres:5432/hephaestus
@@ -139,6 +140,7 @@ services:
   intelligence-service:
     image: "ghcr.io/ls1intum/hephaestus/intelligence-service:${IMAGE_TAG}"
     environment:
+      APP_VERSION: ${IMAGE_TAG}
       NODE_ENV: production
       PORT: 8000
       LOG_LEVEL: info
