@@ -27,6 +27,7 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springdoc.core.customizers.OpenApiCustomizer;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -44,7 +45,7 @@ import org.springframework.context.annotation.Configuration;
     info = @Info(
         title = "Hephaestus API",
         description = "API documentation for the Hephaestus application server.",
-        version = "0.48.0",
+        version = "0.0.0-development",
         contact = @Contact(name = "Felix T.J. Dietrich", email = "felixtj.dietrich@tum.de"),
         license = @License(name = "MIT License", url = "https://github.com/ls1intum/Hephaestus/blob/develop/LICENSE")
     ),
@@ -74,8 +75,12 @@ public class OpenAPIConfiguration {
     private static final List<String> SAFE_DOMAIN_SUFFIXES = List.of("AchievementProgress");
 
     @Bean
-    public OpenApiCustomizer schemaCustomizer(AchievementRegistry registry) {
+    public OpenApiCustomizer schemaCustomizer(
+        AchievementRegistry registry,
+        @Value("${spring.application.version:0.0.0-development}") String appVersion
+    ) {
         return openApi -> {
+            openApi.getInfo().setVersion(appVersion);
             processApplicationServerSchemas(openApi);
             importIntelligenceServiceSpec(openApi);
             processAllPaths(openApi);
