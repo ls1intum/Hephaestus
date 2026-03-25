@@ -18,7 +18,6 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewCommentRepository;
 import de.tum.in.www1.hephaestus.practices.PracticeRepository;
 import de.tum.in.www1.hephaestus.practices.model.Practice;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
@@ -137,7 +136,6 @@ public class PullRequestReviewHandler implements JobTypeHandler {
 
         // Only inject DB-sourced context (metadata + comments)
         storeMetadataAndComments(files, pullRequestId, metadata);
-        verifyActivePractices(job);
 
         long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
         log.info(
@@ -577,26 +575,6 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         } catch (JsonProcessingException e) {
             throw new JobPreparationException("Failed to serialize review comments", e);
         }
-    }
-
-    /** Verify the job's workspace has active practices. */
-    private void verifyActivePractices(AgentJob job) {
-        if (job.getWorkspace() == null) {
-            throw new JobPreparationException("Job has no workspace: jobId=" + job.getId());
-        }
-        Long workspaceId = job.getWorkspace().getId();
-        List<Practice> practices = practiceRepository.findByWorkspaceIdAndActiveTrue(workspaceId);
-        if (practices.isEmpty()) {
-            throw new JobPreparationException(
-                "No active practices for workspace: workspaceId=" + workspaceId + ", jobId=" + job.getId()
-            );
-        }
-        log.info(
-            "Verified {} active practices for workspace: workspaceId={}, jobId={}",
-            practices.size(),
-            workspaceId,
-            job.getId()
-        );
     }
 
     // -------------------------------------------------------------------------
