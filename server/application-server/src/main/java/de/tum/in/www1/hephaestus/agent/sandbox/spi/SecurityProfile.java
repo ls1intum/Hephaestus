@@ -6,14 +6,15 @@ import java.util.Map;
 /**
  * Security hardening profile for a sandboxed container.
  *
+ * <p>Only includes settings that callers can actually influence. Fixed invariants (no-new-privileges,
+ * private cgroup namespace, writable rootfs) are hardcoded in {@code ContainerSecurityPolicy} and
+ * cannot be changed — they are intentionally absent from this record.
+ *
  * <p>The seccomp profile is an infrastructure concern loaded once at startup by {@code
  * DockerSandboxConfiguration} — it is NOT configurable per-execution. All containers share the same
  * seccomp profile for consistent security posture.
  *
  * @param runtime OCI runtime ({@code null} = default runc, {@code "runsc"} = gVisor)
- * @param readOnlyRootfs mount root filesystem as read-only
- * @param noNewPrivileges prevent privilege escalation via setuid/setgid
- * @param cgroupnsPrivate use private cgroup namespace
  * @param ipcMode IPC namespace mode ({@code "none"} or {@code "private"})
  * @param dropCapabilities Linux capabilities to drop (typically {@code ["ALL"]})
  * @param tmpfsMounts writable tmpfs mounts: path → options (e.g. {@code
@@ -21,9 +22,6 @@ import java.util.Map;
  */
 public record SecurityProfile(
     String runtime,
-    boolean readOnlyRootfs,
-    boolean noNewPrivileges,
-    boolean cgroupnsPrivate,
     String ipcMode,
     List<String> dropCapabilities,
     Map<String, String> tmpfsMounts
@@ -31,9 +29,6 @@ public record SecurityProfile(
     /** Production defaults: maximum hardening with standard tmpfs layout. */
     public static final SecurityProfile DEFAULT = new SecurityProfile(
         null,
-        true,
-        true,
-        true,
         "none",
         List.of("ALL"),
         Map.of(

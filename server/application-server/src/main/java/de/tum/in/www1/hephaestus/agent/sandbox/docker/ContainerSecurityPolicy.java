@@ -12,23 +12,28 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Translates {@link SecurityProfile} and {@link ResourceLimits} into a {@link
- * DockerOperations.HostConfigSpec} for container creation.
+ * Translates {@link SecurityProfile}, {@link ResourceLimits}, and {@link NetworkPolicy} into a
+ * {@link DockerOperations.HostConfigSpec} for container creation.
  *
- * <p>Applies defense-in-depth hardening:
+ * <p>Applies defense-in-depth hardening with enforcement floors — the following invariants are
+ * always applied regardless of the caller-supplied {@link SecurityProfile}:
  *
  * <ul>
- *   <li>{@code --cap-drop=ALL} — drop all Linux capabilities
+ *   <li>{@code --cap-drop=ALL} — drop all Linux capabilities (floor: must include "ALL")
  *   <li>{@code --security-opt=no-new-privileges} — prevent setuid/setgid escalation
- *   <li>{@code --read-only} — immutable root filesystem
- *   <li>{@code --user 1000:1000} — non-root execution
  *   <li>{@code --cgroupns=private} — prevent cgroup hierarchy leaks
- *   <li>{@code --ipc=none} — close IPC vectors
- *   <li>{@code --dns 0.0.0.0} — block DNS (prevents exfiltration, CVE-2024-29018)
- *   <li>tmpfs with {@code noexec} on /tmp and /run
+ *   <li>{@code --ipc=none|private} — close IPC vectors ("host"/"shareable" always rejected)
+ *   <li>{@code --dns 0.0.0.0} — block DNS when internet is disabled (CVE-2024-29018)
+ *   <li>Mandatory tmpfs with {@code noexec,nosuid,nodev} on /tmp, /run, and /home/agent/.local
+ *   <li>Ulimits: nofile={@value #NOFILE_LIMIT}, nproc=pidsLimit, core=0 (no core dumps)
  *   <li>Custom seccomp profile (loaded once at startup)
  *   <li>Optional gVisor runtime ({@code --runtime=runsc})
  * </ul>
+ *
+ * <p><strong>Root filesystem is writable.</strong> {@code --read-only} is intentionally disabled
+ * because the agent process writes to {@code /workspace} at runtime, and {@code docker cp} injects
+ * files there before container start. Compensating controls: no-new-privileges, non-root user,
+ * dropped capabilities, noexec tmpfs, seccomp.
  */
 public class ContainerSecurityPolicy {
 
