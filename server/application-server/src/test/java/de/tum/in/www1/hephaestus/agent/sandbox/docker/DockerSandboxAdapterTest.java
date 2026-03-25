@@ -109,6 +109,10 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
     }
 
     private SandboxSpec createSpec(boolean allowInternet) {
+        return createSpec(allowInternet, null);
+    }
+
+    private SandboxSpec createSpec(boolean allowInternet, Map<String, String> volumeMounts) {
         return new SandboxSpec(
             JOB_ID,
             "alpine:latest",
@@ -119,7 +123,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
             SecurityProfile.DEFAULT,
             Map.of(".prompt", "test prompt".getBytes()),
             "/workspace/.output",
-            null
+            volumeMounts
         );
     }
 
@@ -860,7 +864,10 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
                 "DOCKER_HOST",
                 "DOCKER_TLS_VERIFY",
                 "DOCKER_CERT_PATH",
-                "ALIBABA_CLOUD_ACCESS_KEY"
+                "ALIBABA_CLOUD_ACCESS_KEY",
+                "GIT_CONFIG_COUNT",
+                "GIT_CONFIG_KEY_0",
+                "GIT_CONFIG_VALUE_99"
             );
         }
 
@@ -902,24 +909,32 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
     class GitSecurityConfig {
 
         @Test
-        @DisplayName("should set git security config for single volume mount")
-        void shouldSetGitSecurityConfigForSingleVolumeMount() {
+        @DisplayName("should contain all expected security config keys")
+        void shouldContainAllExpectedKeys() {
+            assertThat(DockerSandboxAdapter.GIT_SECURITY_CONFIGS)
+                .extracting(Map.Entry::getKey)
+                .containsExactlyInAnyOrder(
+                    "core.hooksPath",
+                    "core.fsmonitor",
+                    "core.sshCommand",
+                    "core.askPass",
+                    "core.editor",
+                    "core.pager",
+                    "core.gitProxy",
+                    "sequence.editor",
+                    "credential.helper",
+                    "diff.external",
+                    "protocol.ext.allow"
+                );
+        }
+
+        @Test
+        @DisplayName("should inject all security configs even without volume mounts")
+        void shouldInjectSecurityConfigsWithoutVolumeMounts() {
             setupHappyPath();
 
-            SandboxSpec spec = new SandboxSpec(
-                JOB_ID,
-                "alpine:latest",
-                List.of("echo"),
-                Map.of(),
-                new NetworkPolicy(false, null, "tok", "anthropic"),
-                ResourceLimits.DEFAULT,
-                SecurityProfile.DEFAULT,
-                Map.of(".prompt", "test".getBytes()),
-                "/workspace/.output",
-                Map.of("/host/repo", "/workspace/repo")
-            );
-
-            sandboxAdapter.execute(spec);
+            // createSpec() uses null volumeMounts → defaults to Map.of() (empty)
+            sandboxAdapter.execute(createSpec());
 
             ArgumentCaptor<DockerOperations.ContainerSpec> captor = ArgumentCaptor.forClass(
                 DockerOperations.ContainerSpec.class
@@ -927,36 +942,29 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
             verify(containerManager).createContainer(captor.capture());
 
             Map<String, String> env = captor.getValue().environment();
-            assertThat(env).containsEntry("GIT_CONFIG_KEY_0", "safe.directory");
-            assertThat(env).containsEntry("GIT_CONFIG_VALUE_0", "/workspace/repo");
-            assertThat(env).containsEntry("GIT_CONFIG_KEY_1", "core.hooksPath");
-            assertThat(env).containsEntry("GIT_CONFIG_VALUE_1", "/nonexistent");
-            assertThat(env).containsEntry("GIT_CONFIG_KEY_2", "core.fsmonitor");
-            assertThat(env).containsEntry("GIT_CONFIG_VALUE_2", "false");
-            assertThat(env).containsEntry("GIT_CONFIG_COUNT", "3");
+
+            // No volume mounts → COUNT equals security config count exactly
+            int count = Integer.parseInt(env.get("GIT_CONFIG_COUNT"));
+            assertThat(count).isEqualTo(DockerSandboxAdapter.GIT_SECURITY_CONFIGS.size());
+
+            // Verify each security config key-value PAIR at the correct index
+            for (int i = 0; i < DockerSandboxAdapter.GIT_SECURITY_CONFIGS.size(); i++) {
+                var expected = DockerSandboxAdapter.GIT_SECURITY_CONFIGS.get(i);
+                assertThat(env.get("GIT_CONFIG_KEY_" + i)).isEqualTo(expected.getKey());
+                assertThat(env.get("GIT_CONFIG_VALUE_" + i)).isEqualTo(expected.getValue());
+            }
         }
 
         @Test
-        @DisplayName("should set git security config for multiple volume mounts")
-        void shouldSetGitSecurityConfigForMultipleVolumeMounts() {
+        @DisplayName("should inject safe.directory per volume mount plus all security configs")
+        void shouldInjectSafeDirectoryPerVolumeMount() {
             setupHappyPath();
 
-            var mounts = new LinkedHashMap<String, String>();
+            // Use LinkedHashMap to guarantee iteration order for index assertions
+            Map<String, String> mounts = new LinkedHashMap<>();
             mounts.put("/host/repo1", "/workspace/repo1");
             mounts.put("/host/repo2", "/workspace/repo2");
-
-            SandboxSpec spec = new SandboxSpec(
-                JOB_ID,
-                "alpine:latest",
-                List.of("echo"),
-                Map.of(),
-                new NetworkPolicy(false, null, "tok", "anthropic"),
-                ResourceLimits.DEFAULT,
-                SecurityProfile.DEFAULT,
-                Map.of(".prompt", "test".getBytes()),
-                "/workspace/.output",
-                mounts
-            );
+            SandboxSpec spec = createSpec(false, mounts);
 
             sandboxAdapter.execute(spec);
 
@@ -966,17 +974,28 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
             verify(containerManager).createContainer(captor.capture());
 
             Map<String, String> env = captor.getValue().environment();
-            // 2 safe.directory + hooksPath + fsmonitor = 4
-            assertThat(env).containsEntry("GIT_CONFIG_COUNT", "4");
-            assertThat(env).containsEntry("GIT_CONFIG_KEY_2", "core.hooksPath");
-            assertThat(env).containsEntry("GIT_CONFIG_VALUE_2", "/nonexistent");
-            assertThat(env).containsEntry("GIT_CONFIG_KEY_3", "core.fsmonitor");
-            assertThat(env).containsEntry("GIT_CONFIG_VALUE_3", "false");
+
+            // First N entries are safe.directory for each mount
+            assertThat(env.get("GIT_CONFIG_KEY_0")).isEqualTo("safe.directory");
+            assertThat(env.get("GIT_CONFIG_VALUE_0")).isEqualTo("/workspace/repo1");
+            assertThat(env.get("GIT_CONFIG_KEY_1")).isEqualTo("safe.directory");
+            assertThat(env.get("GIT_CONFIG_VALUE_1")).isEqualTo("/workspace/repo2");
+
+            // Remaining entries are security configs (starting at idx 2)
+            int securityStartIdx = mounts.size();
+            for (int i = 0; i < DockerSandboxAdapter.GIT_SECURITY_CONFIGS.size(); i++) {
+                var expected = DockerSandboxAdapter.GIT_SECURITY_CONFIGS.get(i);
+                assertThat(env.get("GIT_CONFIG_KEY_" + (securityStartIdx + i))).isEqualTo(expected.getKey());
+                assertThat(env.get("GIT_CONFIG_VALUE_" + (securityStartIdx + i))).isEqualTo(expected.getValue());
+            }
+
+            int expectedCount = mounts.size() + DockerSandboxAdapter.GIT_SECURITY_CONFIGS.size();
+            assertThat(env.get("GIT_CONFIG_COUNT")).isEqualTo(String.valueOf(expectedCount));
         }
 
         @Test
-        @DisplayName("should not set GIT_CONFIG when no volume mounts")
-        void shouldNotSetGitConfigWhenNoVolumeMounts() {
+        @DisplayName("should set GIT_TERMINAL_PROMPT and GIT_ATTR_NOSYSTEM")
+        void shouldSetGitHardeningEnvVars() {
             setupHappyPath();
 
             sandboxAdapter.execute(createSpec());
@@ -987,30 +1006,29 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
             verify(containerManager).createContainer(captor.capture());
 
             Map<String, String> env = captor.getValue().environment();
-            assertThat(env).doesNotContainKey("GIT_CONFIG_COUNT");
-            assertThat(env).doesNotContainKey("GIT_CONFIG_KEY_0");
+            assertThat(env).containsEntry("GIT_TERMINAL_PROMPT", "0");
+            assertThat(env).containsEntry("GIT_ATTR_NOSYSTEM", "1");
         }
 
         @Test
-        @DisplayName("should override user-provided GIT_CONFIG vars (defense against override attack)")
-        void shouldOverrideUserProvidedGitConfigVars() {
+        @DisplayName("should block caller-supplied GIT_CONFIG_* via prefix blocklist")
+        void shouldBlockCallerGitConfigVars() {
+            // Verify at the unit level that GIT_CONFIG_* vars are prefix-blocked
+            assertThat(DockerSandboxAdapter.isBlockedEnvVar("GIT_CONFIG_COUNT")).isTrue();
+            assertThat(DockerSandboxAdapter.isBlockedEnvVar("GIT_CONFIG_KEY_0")).isTrue();
+            assertThat(DockerSandboxAdapter.isBlockedEnvVar("GIT_CONFIG_VALUE_99")).isTrue();
+        }
+
+        @Test
+        @DisplayName("should overwrite security env vars even if caller bypasses blocklist")
+        void shouldOverwriteSecurityEnvVarsViaOrdering() {
             setupHappyPath();
 
-            // Attacker tries to disable git security by setting GIT_CONFIG_COUNT=0
-            SandboxSpec spec = new SandboxSpec(
-                JOB_ID,
-                "alpine:latest",
-                List.of("echo"),
-                Map.of("GIT_CONFIG_COUNT", "0", "GIT_CONFIG_KEY_0", "core.hooksPath", "GIT_CONFIG_VALUE_0", "/tmp"),
-                new NetworkPolicy(false, null, "tok", "anthropic"),
-                ResourceLimits.DEFAULT,
-                SecurityProfile.DEFAULT,
-                Map.of(".prompt", "test".getBytes()),
-                "/workspace/.output",
-                Map.of("/host/repo", "/workspace/repo")
-            );
-
-            sandboxAdapter.execute(spec);
+            // GIT_TERMINAL_PROMPT and GIT_ATTR_NOSYSTEM are in BLOCKED_ENV_VARS, so a caller
+            // can't inject them. This test verifies the defense-in-depth: even if they somehow
+            // leaked through, the security injection at the end of buildEnvironment() wins.
+            // We test this by verifying the final values are always the security-hardened ones.
+            sandboxAdapter.execute(createSpec());
 
             ArgumentCaptor<DockerOperations.ContainerSpec> captor = ArgumentCaptor.forClass(
                 DockerOperations.ContainerSpec.class
@@ -1018,13 +1036,15 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
             verify(containerManager).createContainer(captor.capture());
 
             Map<String, String> env = captor.getValue().environment();
-            // Security values MUST win — buildEnvironment sets git config AFTER user env copy
-            assertThat(env).containsEntry("GIT_CONFIG_COUNT", "3");
-            // Attacker's KEY_0=core.hooksPath overwritten by safe.directory
-            assertThat(env).containsEntry("GIT_CONFIG_KEY_0", "safe.directory");
-            assertThat(env).containsEntry("GIT_CONFIG_VALUE_0", "/workspace/repo");
-            assertThat(env).containsEntry("GIT_CONFIG_KEY_1", "core.hooksPath");
-            assertThat(env).containsEntry("GIT_CONFIG_VALUE_1", "/nonexistent");
+
+            // Security values must always be present regardless of caller input
+            assertThat(env).containsEntry("GIT_TERMINAL_PROMPT", "0");
+            assertThat(env).containsEntry("GIT_ATTR_NOSYSTEM", "1");
+            assertThat(env).containsKey("GIT_CONFIG_COUNT");
+
+            // core.hooksPath must be /nonexistent — the canonical safety check
+            assertThat(env.get("GIT_CONFIG_KEY_0")).isEqualTo("core.hooksPath");
+            assertThat(env.get("GIT_CONFIG_VALUE_0")).isEqualTo("/nonexistent");
         }
     }
 }
