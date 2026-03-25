@@ -5,6 +5,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -34,6 +37,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -42,6 +46,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @DisplayName("AgentJobService")
@@ -480,6 +486,118 @@ class AgentJobServiceTest extends BaseUnitTest {
                 .hasMessageContaining("COMPLETED");
 
             verify(sandboxManager, never()).cancel(any());
+        }
+    }
+
+    @Nested
+    @DisplayName("retryDelivery()")
+    class RetryDelivery {
+
+        private static final Long WORKSPACE_ID = 1L;
+
+        private AgentJob completedJob;
+        private UUID jobId;
+        private JobTypeHandler handler;
+
+        @BeforeEach
+        @SuppressWarnings("unchecked")
+        void setUpRetryDelivery() {
+            // Make transactionTemplate.execute() actually invoke the callback
+            when(transactionTemplate.execute(any())).thenAnswer(inv -> {
+                TransactionCallback<?> callback = inv.getArgument(0);
+                return callback.doInTransaction(mock(TransactionStatus.class));
+            });
+
+            // Make transactionTemplate.executeWithoutResult() invoke the consumer (lenient:
+            // not all tests reach the delivery path that calls executeWithoutResult)
+            lenient()
+                .doAnswer(inv -> {
+                    Consumer<TransactionStatus> action = inv.getArgument(0);
+                    action.accept(mock(TransactionStatus.class));
+                    return null;
+                })
+                .when(transactionTemplate)
+                .executeWithoutResult(any());
+
+            completedJob = new AgentJob();
+            completedJob.prePersist();
+            completedJob.setWorkspace(workspace);
+            completedJob.setStatus(AgentJobStatus.COMPLETED);
+            completedJob.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
+
+            jobId = completedJob.getId();
+
+            handler = mock(JobTypeHandler.class);
+            // Lenient: not all tests reach the delivery path that calls getHandler
+            lenient().when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
+        }
+
+        @Test
+        @DisplayName("should throw 404 when job not found in workspace")
+        void shouldThrow404WhenJobNotFound() {
+            when(agentJobRepository.findByIdAndWorkspaceId(jobId, WORKSPACE_ID)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> service.retryDelivery(WORKSPACE_ID, jobId))
+                .isInstanceOf(EntityNotFoundException.class)
+                .hasMessageContaining("AgentJob");
+        }
+
+        @Test
+        @DisplayName("should throw 409 without calling deliver when CAS transition returns zero")
+        void shouldThrow409WhenCasTransitionReturnsZero() {
+            when(agentJobRepository.findByIdAndWorkspaceId(jobId, WORKSPACE_ID)).thenReturn(Optional.of(completedJob));
+            when(agentJobRepository.transitionDeliveryStatus(eq(jobId), eq(DeliveryStatus.PENDING), any())).thenReturn(
+                0
+            );
+
+            assertThatThrownBy(() -> service.retryDelivery(WORKSPACE_ID, jobId))
+                .isInstanceOf(AgentJobStateConflictException.class)
+                .hasMessageContaining("delivery status FAILED");
+
+            verify(handler, never()).deliver(any());
+        }
+
+        @Test
+        @DisplayName("should deliver and update status to DELIVERED on success")
+        void shouldDeliverAndUpdateStatusOnSuccess() {
+            when(agentJobRepository.findByIdAndWorkspaceId(jobId, WORKSPACE_ID)).thenReturn(Optional.of(completedJob));
+            when(agentJobRepository.transitionDeliveryStatus(eq(jobId), eq(DeliveryStatus.PENDING), any())).thenReturn(
+                1
+            );
+            when(agentJobRepository.findById(jobId)).thenReturn(Optional.of(completedJob));
+
+            AgentJob result = service.retryDelivery(WORKSPACE_ID, jobId);
+
+            verify(handler).deliver(completedJob);
+            verify(agentJobRepository).updateDeliveryStatus(
+                eq(jobId),
+                eq(DeliveryStatus.DELIVERED),
+                eq(completedJob.getDeliveryCommentId())
+            );
+            assertThat(result.getId()).isEqualTo(jobId);
+        }
+
+        @Test
+        @DisplayName("should revert to FAILED and throw on delivery exception")
+        void shouldRevertToFailedOnDeliveryException() {
+            when(agentJobRepository.findByIdAndWorkspaceId(jobId, WORKSPACE_ID)).thenReturn(Optional.of(completedJob));
+            when(agentJobRepository.transitionDeliveryStatus(eq(jobId), eq(DeliveryStatus.PENDING), any())).thenReturn(
+                1
+            );
+            when(agentJobRepository.findById(jobId)).thenReturn(Optional.of(completedJob));
+
+            doThrow(new RuntimeException("GitHub API rate limited")).when(handler).deliver(completedJob);
+
+            assertThatThrownBy(() -> service.retryDelivery(WORKSPACE_ID, jobId))
+                .isInstanceOf(AgentJobStateConflictException.class)
+                .hasMessageContaining("Delivery retry failed")
+                .hasMessageContaining("GitHub API rate limited");
+
+            verify(agentJobRepository).updateDeliveryStatus(
+                eq(jobId),
+                eq(DeliveryStatus.FAILED),
+                eq(completedJob.getDeliveryCommentId())
+            );
         }
     }
 }

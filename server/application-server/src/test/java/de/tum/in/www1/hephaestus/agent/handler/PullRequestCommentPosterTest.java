@@ -278,6 +278,72 @@ class PullRequestCommentPosterTest extends BaseUnitTest {
             String result = PullRequestCommentPoster.sanitize("Great work! " + emoji);
             assertThat(result).contains("\u200D");
         }
+
+        @Test
+        @DisplayName("should strip javascript: scheme from markdown links")
+        void shouldStripJavascriptSchemeLinks() {
+            String result = PullRequestCommentPoster.sanitize("[click me](javascript:document.cookie)");
+            assertThat(result).isEqualTo("click me");
+            assertThat(result).doesNotContain("javascript:");
+        }
+
+        @Test
+        @DisplayName("should strip data: scheme from markdown links")
+        void shouldStripDataSchemeLinks() {
+            String result = PullRequestCommentPoster.sanitize("[click me](data:text/html,payload)");
+            assertThat(result).isEqualTo("click me");
+            assertThat(result).doesNotContain("data:");
+        }
+
+        @Test
+        @DisplayName("should strip vbscript: scheme from markdown links")
+        void shouldStripVbscriptSchemeLinks() {
+            String result = PullRequestCommentPoster.sanitize("[click me](vbscript:MsgBox)");
+            assertThat(result).isEqualTo("click me");
+            assertThat(result).doesNotContain("vbscript:");
+        }
+
+        @Test
+        @DisplayName("should preserve safe https:// markdown links")
+        void shouldPreserveSafeHttpsLinks() {
+            String result = PullRequestCommentPoster.sanitize("[click me](https://example.com)");
+            assertThat(result).isEqualTo("[click me](https://example.com)");
+        }
+
+        @Test
+        @DisplayName("should preserve safe http:// markdown links")
+        void shouldPreserveSafeHttpLinks() {
+            String result = PullRequestCommentPoster.sanitize("[click me](http://example.com)");
+            assertThat(result).isEqualTo("[click me](http://example.com)");
+        }
+
+        @Test
+        @DisplayName("should preserve case-insensitive HTTPS links")
+        void shouldPreserveCaseInsensitiveHttpsLinks() {
+            String result = PullRequestCommentPoster.sanitize("[click me](HTTPS://example.com)");
+            assertThat(result).isEqualTo("[click me](HTTPS://example.com)");
+        }
+
+        @Test
+        @DisplayName("should strip protocol-relative links")
+        void shouldStripProtocolRelativeLinks() {
+            String result = PullRequestCommentPoster.sanitize("[click me](//evil.com)");
+            assertThat(result).isEqualTo("click me");
+        }
+
+        @Test
+        @DisplayName("should strip ftp: scheme from markdown links")
+        void shouldStripFtpSchemeLinks() {
+            String result = PullRequestCommentPoster.sanitize("[click me](ftp://server/file)");
+            assertThat(result).isEqualTo("click me");
+        }
+
+        @Test
+        @DisplayName("should strip markdown links with empty URL")
+        void shouldStripEmptyUrlLinks() {
+            String result = PullRequestCommentPoster.sanitize("[click me]()");
+            assertThat(result).isEqualTo("click me");
+        }
     }
 
     // ── Formatting Tests ──
