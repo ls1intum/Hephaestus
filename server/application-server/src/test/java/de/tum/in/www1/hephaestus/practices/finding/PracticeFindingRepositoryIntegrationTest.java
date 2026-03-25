@@ -14,6 +14,7 @@ import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.practices.PracticeRepository;
 import de.tum.in.www1.hephaestus.practices.model.Practice;
 import de.tum.in.www1.hephaestus.practices.model.PracticeFinding;
+import de.tum.in.www1.hephaestus.practices.model.Verdict;
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.in.www1.hephaestus.testconfig.TestUserFactory;
 import de.tum.in.www1.hephaestus.testconfig.WorkspaceTestFactory;
@@ -381,6 +382,232 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
             List<PracticeFinding> remaining = practiceFindingRepository.findAll();
             assertThat(remaining).hasSize(1);
             assertThat(remaining.get(0).getIdempotencyKey()).isEqualTo("cascade-key-2");
+        }
+    }
+
+    @Nested
+    @DisplayName("findContributorPracticeSummary")
+    class FindContributorPracticeSummaryTests {
+
+        @Test
+        @DisplayName("returns empty list for contributor with no findings")
+        void returnsEmptyForNoFindings() {
+            List<ContributorPracticeSummary> result = practiceFindingRepository.findContributorPracticeSummary(
+                contributor.getId(),
+                workspace.getId()
+            );
+
+            assertThat(result).isEmpty();
+        }
+
+        @Test
+        @DisplayName("aggregates verdict counts for a single practice")
+        void aggregatesSinglePractice() {
+            // Insert 3 NEGATIVE and 1 POSITIVE for the same practice
+            insertFinding("sum-1", practice, "NEGATIVE", Instant.parse("2026-03-18T10:00:00Z"));
+            insertFinding("sum-2", practice, "NEGATIVE", Instant.parse("2026-03-19T10:00:00Z"));
+            insertFinding("sum-3", practice, "NEGATIVE", Instant.parse("2026-03-20T14:30:00Z"));
+            insertFinding("sum-4", practice, "POSITIVE", Instant.parse("2026-03-17T08:00:00Z"));
+
+            List<ContributorPracticeSummary> result = practiceFindingRepository.findContributorPracticeSummary(
+                contributor.getId(),
+                workspace.getId()
+            );
+
+            assertThat(result).hasSize(2); // One row per (slug, verdict) combination
+
+            ContributorPracticeSummary negative = result
+                .stream()
+                .filter(s -> s.getVerdict() == Verdict.NEGATIVE)
+                .findFirst()
+                .orElseThrow();
+            assertThat(negative.getPracticeSlug()).isEqualTo("test-practice");
+            assertThat(negative.getCount()).isEqualTo(3);
+            assertThat(negative.getLastDetectedAt()).isEqualTo(Instant.parse("2026-03-20T14:30:00Z"));
+
+            ContributorPracticeSummary positive = result
+                .stream()
+                .filter(s -> s.getVerdict() == Verdict.POSITIVE)
+                .findFirst()
+                .orElseThrow();
+            assertThat(positive.getCount()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("groups by practice slug across multiple practices")
+        void groupsByPracticeSlug() {
+            Practice secondPractice = new Practice();
+            secondPractice.setWorkspace(workspace);
+            secondPractice.setSlug("error-handling");
+            secondPractice.setName("Error Handling");
+            secondPractice.setCategory("test");
+            secondPractice.setDescription("Handle errors");
+            secondPractice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
+            secondPractice = practiceRepository.save(secondPractice);
+
+            insertFinding("multi-1", practice, "POSITIVE", Instant.parse("2026-03-20T10:00:00Z"));
+            insertFinding("multi-2", secondPractice, "NEGATIVE", Instant.parse("2026-03-19T10:00:00Z"));
+
+            List<ContributorPracticeSummary> result = practiceFindingRepository.findContributorPracticeSummary(
+                contributor.getId(),
+                workspace.getId()
+            );
+
+            assertThat(result).hasSize(2);
+            assertThat(result)
+                .extracting(ContributorPracticeSummary::getPracticeSlug)
+                .containsExactlyInAnyOrder("test-practice", "error-handling");
+        }
+
+        @Test
+        @DisplayName("workspace isolation: excludes findings from other workspaces")
+        void workspaceIsolation() {
+            Workspace otherWorkspace = workspaceRepository.save(WorkspaceTestFactory.activeWorkspace("other-ws"));
+            Practice otherPractice = new Practice();
+            otherPractice.setWorkspace(otherWorkspace);
+            otherPractice.setSlug("test-practice"); // Same slug, different workspace
+            otherPractice.setName("Test Practice");
+            otherPractice.setCategory("test");
+            otherPractice.setDescription("Other workspace practice");
+            otherPractice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
+            otherPractice = practiceRepository.save(otherPractice);
+
+            AgentJob otherJob = new AgentJob();
+            otherJob.setWorkspace(otherWorkspace);
+            otherJob.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
+            otherJob.setConfigSnapshot(OBJECT_MAPPER.valueToTree(Map.of("model", "test")));
+            otherJob = agentJobRepository.save(otherJob);
+
+            // Finding in target workspace
+            insertFinding("iso-1", practice, "NEGATIVE", Instant.parse("2026-03-20T10:00:00Z"));
+            // Finding in other workspace (same contributor)
+            practiceFindingRepository.insertIfAbsent(
+                UUID.randomUUID(),
+                "iso-2",
+                otherJob.getId(),
+                otherPractice.getId(),
+                "pull_request",
+                2L,
+                contributor.getId(),
+                "Other WS finding",
+                "NEGATIVE",
+                "MAJOR",
+                0.8f,
+                null,
+                null,
+                null,
+                null,
+                Instant.parse("2026-03-20T10:00:00Z")
+            );
+
+            List<ContributorPracticeSummary> result = practiceFindingRepository.findContributorPracticeSummary(
+                contributor.getId(),
+                workspace.getId()
+            );
+
+            assertThat(result).hasSize(1);
+            assertThat(result.get(0).getPracticeSlug()).isEqualTo("test-practice");
+            assertThat(result.get(0).getCount()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("returns correct MAX(detectedAt) as lastDetectedAt")
+        void correctLastDetectedAt() {
+            Instant earliest = Instant.parse("2026-03-15T08:00:00Z");
+            Instant latest = Instant.parse("2026-03-20T14:30:00Z");
+            Instant middle = Instant.parse("2026-03-18T12:00:00Z");
+
+            insertFinding("time-1", practice, "NEGATIVE", earliest);
+            insertFinding("time-2", practice, "NEGATIVE", latest);
+            insertFinding("time-3", practice, "NEGATIVE", middle);
+
+            List<ContributorPracticeSummary> result = practiceFindingRepository.findContributorPracticeSummary(
+                contributor.getId(),
+                workspace.getId()
+            );
+
+            assertThat(result).hasSize(1);
+            assertThat(result.get(0).getLastDetectedAt()).isEqualTo(latest);
+        }
+
+        @Test
+        @DisplayName("contributor isolation: excludes findings from other contributors")
+        void contributorIsolation() {
+            GitProvider provider = gitProviderRepository
+                .findByTypeAndServerUrl(GitProviderType.GITHUB, "https://github.com")
+                .orElseThrow();
+            User otherContributor = TestUserFactory.createUser(200L, "other-contributor", provider);
+            otherContributor = userRepository.save(otherContributor);
+
+            // Finding for target contributor
+            insertFinding("contrib-iso-1", practice, "NEGATIVE", Instant.parse("2026-03-20T10:00:00Z"));
+            // Finding for other contributor (same practice, same workspace)
+            practiceFindingRepository.insertIfAbsent(
+                UUID.randomUUID(),
+                "contrib-iso-2",
+                agentJob.getId(),
+                practice.getId(),
+                "pull_request",
+                2L,
+                otherContributor.getId(),
+                "Other contributor finding",
+                "NEGATIVE",
+                "MAJOR",
+                0.8f,
+                null,
+                null,
+                null,
+                null,
+                Instant.parse("2026-03-20T10:00:00Z")
+            );
+
+            List<ContributorPracticeSummary> result = practiceFindingRepository.findContributorPracticeSummary(
+                contributor.getId(),
+                workspace.getId()
+            );
+
+            assertThat(result).hasSize(1);
+            assertThat(result.get(0).getCount()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("includes NOT_APPLICABLE verdict rows in query results")
+        void includesNotApplicableVerdict() {
+            insertFinding("na-1", practice, "NOT_APPLICABLE", Instant.parse("2026-03-20T10:00:00Z"));
+            insertFinding("na-2", practice, "NEGATIVE", Instant.parse("2026-03-19T10:00:00Z"));
+
+            List<ContributorPracticeSummary> result = practiceFindingRepository.findContributorPracticeSummary(
+                contributor.getId(),
+                workspace.getId()
+            );
+
+            // Query returns all verdicts — filtering is the caller's responsibility
+            assertThat(result).hasSize(2);
+            assertThat(result)
+                .extracting(ContributorPracticeSummary::getVerdict)
+                .containsExactlyInAnyOrder(Verdict.NOT_APPLICABLE, Verdict.NEGATIVE);
+        }
+
+        /** Helper to insert a finding with minimal boilerplate. */
+        private void insertFinding(String idempotencyKey, Practice targetPractice, String verdict, Instant detectedAt) {
+            practiceFindingRepository.insertIfAbsent(
+                UUID.randomUUID(),
+                idempotencyKey,
+                agentJob.getId(),
+                targetPractice.getId(),
+                "pull_request",
+                1L,
+                contributor.getId(),
+                "Test finding",
+                verdict,
+                "INFO",
+                0.9f,
+                null,
+                null,
+                null,
+                null,
+                detectedAt
+            );
         }
     }
 }

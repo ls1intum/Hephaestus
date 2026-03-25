@@ -12,6 +12,7 @@ import de.tum.in.www1.hephaestus.gitprovider.git.GitRepositoryManager;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewCommentRepository;
 import de.tum.in.www1.hephaestus.practices.PracticeRepository;
+import de.tum.in.www1.hephaestus.practices.finding.ContributorHistoryProvider;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -35,6 +36,9 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
     private PracticeRepository practiceRepository;
 
     @Mock
+    private ContributorHistoryProvider contributorHistoryProvider;
+
+    @Mock
     private PracticeDetectionDeliveryService deliveryService;
 
     @Mock
@@ -50,6 +54,7 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
             pullRequestRepository,
             reviewCommentRepository,
             practiceRepository,
+            contributorHistoryProvider,
             parser,
             deliveryService,
             feedbackService

@@ -17,11 +17,13 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewCommentRepository;
 import de.tum.in.www1.hephaestus.practices.PracticeRepository;
+import de.tum.in.www1.hephaestus.practices.finding.ContributorHistoryProvider;
 import de.tum.in.www1.hephaestus.practices.model.Practice;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,12 +37,13 @@ import org.slf4j.LoggerFactory;
  * <p>Container workspace layout:
  * <pre>
  * /workspace/
- * ├── repo/                  # Real git repo (read-only bind mount)
+ * ├── repo/                           # Real git repo (read-only bind mount)
  * ├── .context/
- * │   ├── metadata.json      # Title, body, author, branches, stats
- * │   └── comments.json      # Review comments (ordered by creation time)
- * ├── .prompt                # Written by executor from buildPrompt()
- * └── .output/               # Agent writes results here
+ * │   ├── metadata.json               # Title, body, author, branches, stats
+ * │   ├── comments.json               # Review comments (ordered by creation time)
+ * │   └── contributor_history.json    # Aggregated practice verdict history (optional)
+ * ├── .prompt                         # Written by executor from buildPrompt()
+ * └── .output/                        # Agent writes results here
  * </pre>
  */
 public class PullRequestReviewHandler implements JobTypeHandler {
@@ -55,6 +58,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
     private final PullRequestRepository pullRequestRepository;
     private final PullRequestReviewCommentRepository reviewCommentRepository;
     private final PracticeRepository practiceRepository;
+    private final ContributorHistoryProvider contributorHistoryProvider;
     private final PracticeDetectionResultParser resultParser;
     private final PracticeDetectionDeliveryService deliveryService;
     private final FeedbackDeliveryService feedbackService;
@@ -65,6 +69,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         PullRequestRepository pullRequestRepository,
         PullRequestReviewCommentRepository reviewCommentRepository,
         PracticeRepository practiceRepository,
+        ContributorHistoryProvider contributorHistoryProvider,
         PracticeDetectionResultParser resultParser,
         PracticeDetectionDeliveryService deliveryService,
         FeedbackDeliveryService feedbackService
@@ -74,6 +79,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         this.pullRequestRepository = pullRequestRepository;
         this.reviewCommentRepository = reviewCommentRepository;
         this.practiceRepository = practiceRepository;
+        this.contributorHistoryProvider = contributorHistoryProvider;
         this.resultParser = resultParser;
         this.deliveryService = deliveryService;
         this.feedbackService = feedbackService;
@@ -134,8 +140,13 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         // Ensure repo is cloned/fetched before volumeMounts() resolves the path
         ensureRepositoryCloned(metadata, repositoryId);
 
-        // Only inject DB-sourced context (metadata + comments)
-        storeMetadataAndComments(files, pullRequestId, metadata);
+        // Load PR entity once — shared by metadata, comments, and contributor history
+        PullRequest pullRequest = pullRequestRepository.findByIdWithAllForGate(pullRequestId).orElse(null);
+
+        // Inject DB-sourced context (metadata + comments + contributor history)
+        storeMetadataAndComments(files, pullRequest, pullRequestId, metadata);
+        storeContributorHistory(files, pullRequest, job);
+        verifyActivePractices(job);
 
         long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
         log.info(
@@ -311,6 +322,13 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         sb.append("You are working in a git repository at `/workspace/repo/`.\n");
         sb.append("PR metadata and review comments are at `/workspace/.context/metadata.json` ");
         sb.append("and `/workspace/.context/comments.json`.\n");
+        sb.append('\n');
+        sb.append("**Contributor history:** If `/workspace/.context/contributor_history.json` exists, ");
+        sb.append("it contains aggregated practice verdict counts from this contributor's prior PRs. ");
+        sb.append("Use this to calibrate your `guidanceMethod`: if a contributor has repeated NEGATIVE ");
+        sb.append("findings for a practice, escalate from MODELING to COACHING or SCAFFOLDING. ");
+        sb.append("If they show sustained POSITIVE verdicts, use REFLECTION or EXPLORATION. ");
+        sb.append("If the file is absent, this is a new contributor — default to COACHING.\n");
         sb.append('\n');
         sb.append("Write your final findings to `/workspace/.output/result.json`.\n");
         sb.append('\n');
@@ -555,8 +573,13 @@ public class PullRequestReviewHandler implements JobTypeHandler {
     }
 
     /** Build and store pull request metadata and review comments as context JSON files. */
-    private void storeMetadataAndComments(Map<String, byte[]> files, long pullRequestId, JsonNode metadata) {
-        ObjectNode pullRequestMetadata = buildPullRequestMetadata(pullRequestId, metadata);
+    private void storeMetadataAndComments(
+        Map<String, byte[]> files,
+        PullRequest pullRequest,
+        long pullRequestId,
+        JsonNode metadata
+    ) {
+        ObjectNode pullRequestMetadata = buildPullRequestMetadata(pullRequest, metadata);
         try {
             files.put(
                 ".context/metadata.json",
@@ -577,11 +600,71 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         }
     }
 
+    /**
+     * Build and store aggregated contributor practice history as a context JSON file.
+     *
+     * <p>Skips silently if the PR has no author or the contributor has no prior findings —
+     * the absence of the file signals a first-time contributor to the agent.
+     *
+     * <p>Note: the contributor is always the PR author for PULL_REQUEST_REVIEW jobs.
+     * If a future job type evaluates reviewers, this lookup must change.
+     */
+    private void storeContributorHistory(Map<String, byte[]> files, PullRequest pullRequest, AgentJob job) {
+        if (pullRequest == null || pullRequest.getAuthor() == null || job.getWorkspace() == null) {
+            if (pullRequest != null && pullRequest.getAuthor() == null) {
+                log.debug("Skipping contributor history: PR has no author, pullRequestId={}", pullRequest.getId());
+            }
+            return;
+        }
+        Long contributorId = pullRequest.getAuthor().getId();
+        Long workspaceId = job.getWorkspace().getId();
+
+        try {
+            Optional<byte[]> historyJson = contributorHistoryProvider.buildHistoryJson(contributorId, workspaceId);
+            historyJson.ifPresent(json -> {
+                files.put(".context/contributor_history.json", json);
+                log.info(
+                    "Injected contributor history: {} bytes, contributorId={}, workspaceId={}",
+                    json.length,
+                    contributorId,
+                    workspaceId
+                );
+            });
+        } catch (Exception e) {
+            log.warn(
+                "Failed to build contributor history, continuing without it: contributorId={}, workspaceId={}",
+                contributorId,
+                workspaceId,
+                e
+            );
+        }
+    }
+
+    /** Verify the job's workspace has active practices. */
+    private void verifyActivePractices(AgentJob job) {
+        if (job.getWorkspace() == null) {
+            throw new JobPreparationException("Job has no workspace: jobId=" + job.getId());
+        }
+        Long workspaceId = job.getWorkspace().getId();
+        List<Practice> practices = practiceRepository.findByWorkspaceIdAndActiveTrue(workspaceId);
+        if (practices.isEmpty()) {
+            throw new JobPreparationException(
+                "No active practices for workspace: workspaceId=" + workspaceId + ", jobId=" + job.getId()
+            );
+        }
+        log.info(
+            "Verified {} active practices for workspace: workspaceId={}, jobId={}",
+            practices.size(),
+            workspaceId,
+            job.getId()
+        );
+    }
+
     // -------------------------------------------------------------------------
     // Internal helpers
     // -------------------------------------------------------------------------
 
-    private ObjectNode buildPullRequestMetadata(long pullRequestId, JsonNode jobMetadata) {
+    private ObjectNode buildPullRequestMetadata(PullRequest pullRequest, JsonNode jobMetadata) {
         ObjectNode result = objectMapper.createObjectNode();
 
         // Copy routing fields from job metadata (always present — validated in prepareInputFiles)
@@ -593,9 +676,8 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         result.put("commit_sha", requireText(jobMetadata, "commit_sha"));
 
         // Enrich from current DB state (title, body, author, etc.)
-        PullRequest pullRequest = pullRequestRepository.findByIdWithAllForGate(pullRequestId).orElse(null);
         if (pullRequest == null) {
-            log.warn("Pull request not found in database during context preparation: pullRequestId={}", pullRequestId);
+            log.warn("Pull request not found in database during context preparation");
             result.put("enriched", false);
             return result;
         }

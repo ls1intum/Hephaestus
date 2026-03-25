@@ -191,4 +191,38 @@ public interface PracticeFindingRepository extends JpaRepository<PracticeFinding
         @Param("pullRequestId") Long pullRequestId,
         @Param("workspaceId") Long workspaceId
     );
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // Aggregation for agent context (Issue #895)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Returns aggregated verdict counts per practice for a contributor within a workspace.
+     *
+     * <p>Each row is one (practice slug, verdict) combination with the total count and the
+     * most recent detection timestamp. Callers group results by slug to build a per-practice
+     * history summary. The {@code idx_practice_finding_contributor_detected} index on
+     * {@code (contributor_id, detected_at DESC)} narrows the initial scan by contributor.
+     *
+     * @param contributorId the contributor whose history to aggregate
+     * @param workspaceId   the workspace scope (via practice → workspace relationship)
+     * @return aggregated summary rows ordered by slug then verdict, empty if no findings exist
+     */
+    @Query(
+        """
+        SELECT pf.practice.slug AS practiceSlug,
+               pf.verdict AS verdict,
+               COUNT(pf) AS count,
+               MAX(pf.detectedAt) AS lastDetectedAt
+        FROM PracticeFinding pf
+        WHERE pf.contributor.id = :contributorId
+          AND pf.practice.workspace.id = :workspaceId
+        GROUP BY pf.practice.slug, pf.verdict
+        ORDER BY pf.practice.slug, pf.verdict
+        """
+    )
+    List<ContributorPracticeSummary> findContributorPracticeSummary(
+        @Param("contributorId") Long contributorId,
+        @Param("workspaceId") Long workspaceId
+    );
 }
