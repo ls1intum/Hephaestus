@@ -80,6 +80,9 @@ hephaestus:
     git:
         enabled: false
         storage-path: /tmp/hephaestus-test-git-repos
+    detection:
+        legacy:
+            enabled: false
 
 # Logging configuration for tests
 logging:

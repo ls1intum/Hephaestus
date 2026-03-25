@@ -42,7 +42,7 @@ graph TD
 | Quality gates         | ~3 min                     | Parallel with tests         |
 | Tests                 | ~3 min                     | Parallel with gates         |
 | Docker builds         | ~3 min (cached)            | Registry cache, ~7 min cold |
-| semantic-release      | ~1 min                     | Creates tag + changelog     |
+| semantic-release      | ~1 min                     | Creates tag + GitHub Release |
 | Staging deploy        | ~2 min                     | Automatic                   |
 | **Your verification** | You decide                 | Check staging               |
 | Production deploy     | ~2 min                     | After approval              |
@@ -123,7 +123,7 @@ Coolify handles PR previews:
 | `ci-tests.yml`         | Called by cicd.yml    | Unit, integration, visual tests                    |
 | `ci-docker-build.yml`  | Called by cicd.yml    | Docker image builds per component                  |
 | `ci-security-scan.yml` | Called by cicd.yml    | Dependency scanning (Trivy), secret detection      |
-| `release.yml`          | On CI/CD Success      | Creates tag, deploys staging, gates production     |
+| `release.yml`          | On CI/CD Success      | Creates tag + GitHub Release, deploys staging, gates production |
 | `deploy-staging.yml`   | Called by release.yml | Deploys to staging                                 |
 | `deploy-prod.yml`      | workflow_dispatch     | Deploys to production (manual trigger)             |
 

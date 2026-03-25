@@ -8,6 +8,7 @@ import de.tum.in.www1.hephaestus.workspace.spi.WorkspacePurgeContributor;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
@@ -30,13 +31,13 @@ public class PracticesWorkspacePurgeAdapter implements WorkspacePurgeContributor
     private static final Logger log = LoggerFactory.getLogger(PracticesWorkspacePurgeAdapter.class);
 
     private final PracticesPullRequestQueryRepository pullRequestQueryRepository;
-    private final BadPracticeDetectorScheduler detectorScheduler;
+    private final @Nullable BadPracticeDetectorScheduler detectorScheduler;
     private final PracticeFindingRepository practiceFindingRepository;
     private final PracticeRepository practiceRepository;
 
     public PracticesWorkspacePurgeAdapter(
         PracticesPullRequestQueryRepository pullRequestQueryRepository,
-        BadPracticeDetectorScheduler detectorScheduler,
+        @Nullable BadPracticeDetectorScheduler detectorScheduler,
         PracticeFindingRepository practiceFindingRepository,
         PracticeRepository practiceRepository
     ) {
@@ -51,7 +52,7 @@ public class PracticesWorkspacePurgeAdapter implements WorkspacePurgeContributor
         // Cancel scheduled bad practice detection tasks
         List<Long> pullRequestIds = pullRequestQueryRepository.findPullRequestIdsByWorkspaceId(workspaceId);
 
-        if (!pullRequestIds.isEmpty()) {
+        if (detectorScheduler != null && !pullRequestIds.isEmpty()) {
             int cancelledCount = detectorScheduler.cancelScheduledTasksForPullRequests(pullRequestIds);
             log.debug(
                 "Cancelled scheduled bad practice detection tasks for workspace: workspaceId={}, prCount={}, cancelledCount={}",
