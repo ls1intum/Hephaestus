@@ -42,7 +42,7 @@ export function NotificationsSection({
 						Email notifications
 					</Label>
 					<p className="text-sm text-muted-foreground leading-relaxed">
-						Receive email notifications for newly detected bad practices and reminders.
+						Receive email notifications for practice review findings and team updates.
 					</p>
 				</div>
 				<Switch

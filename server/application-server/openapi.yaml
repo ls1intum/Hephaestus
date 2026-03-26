@@ -4699,7 +4699,7 @@ components:
           description: Enable the leaderboard ranking page
         practicesEnabled:
           type: boolean
-          description: Enable best practices detection and tracking
+          description: Enable the practice review feature
         progressionEnabled:
           type: boolean
           description: Enable the league/progression system
@@ -4938,7 +4938,7 @@ components:
           example: 09:00
         practicesEnabled:
           type: boolean
-          description: Whether best practices detection is enabled
+          description: Whether the practice review feature is enabled
         progressionEnabled:
           type: boolean
           description: Whether the league/progression system is enabled
@@ -5009,7 +5009,7 @@ components:
           description: Whether the leaderboard is enabled
         practicesEnabled:
           type: boolean
-          description: Whether best practices detection is enabled
+          description: Whether the practice review feature is enabled
         progressionEnabled:
           type: boolean
           description: Whether the league/progression system is enabled

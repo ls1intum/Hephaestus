@@ -4,9 +4,9 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 
 const featureFlags = {
+	practicesEnabled: true,
 	achievementsEnabled: true,
 	leaderboardEnabled: true,
-	practicesEnabled: true,
 	progressionEnabled: false,
 } as const;
 

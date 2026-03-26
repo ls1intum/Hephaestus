@@ -65,7 +65,7 @@ src/main/java/de/tum/in/www1/hephaestus/
 │   ├── team/                     # Team management
 │   └── sync/                     # Data synchronization orchestration
 ├── leaderboard/                  # Scoring, rankings, league points
-├── activity/                     # Activity tracking, bad practice detection
+├── activity/                     # Activity tracking (XP, leaderboard gamification)
 ├── mentor/                       # AI mentor proxy to intelligence-service
 ├── profile/                      # User profiles
 ├── notification/                 # Email and Slack messaging

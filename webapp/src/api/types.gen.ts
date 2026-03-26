@@ -103,7 +103,7 @@ export type WorkspaceListItem = {
      */
     leaderboardEnabled: boolean;
     /**
-     * Whether best practices detection is enabled
+     * Whether the practice review feature is enabled
      */
     practicesEnabled: boolean;
     /**
@@ -205,7 +205,7 @@ export type Workspace = {
      */
     leaderboardScheduleTime?: string;
     /**
-     * Whether best practices detection is enabled
+     * Whether the practice review feature is enabled
      */
     practicesEnabled: boolean;
     /**
@@ -426,7 +426,7 @@ export type UpdateWorkspaceFeaturesRequest = {
      */
     leaderboardEnabled?: boolean;
     /**
-     * Enable best practices detection and tracking
+     * Enable the practice review feature
      */
     practicesEnabled?: boolean;
     /**

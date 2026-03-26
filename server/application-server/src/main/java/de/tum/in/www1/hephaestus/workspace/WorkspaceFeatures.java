@@ -29,7 +29,7 @@ import lombok.Setter;
 @Setter
 public class WorkspaceFeatures {
 
-    /** Whether the best practices detection and tracking feature is enabled */
+    /** Whether the agent-based practice review feature is enabled */
     @Column(name = "practices_enabled", nullable = false)
     @NotNull(message = "Practices enabled flag is required")
     private Boolean practicesEnabled = false;

@@ -17,8 +17,8 @@ export interface AdminFeaturesSettingsProps {
 const FEATURES: ReadonlyArray<{ key: FeatureKey; label: string; description: string }> = [
 	{
 		key: "practicesEnabled",
-		label: "Best Practices",
-		description: "Enable best practice detection and tracking for contributors.",
+		label: "Practice Review",
+		description: "Enable agent-based practice review for contributors.",
 	},
 	{
 		key: "achievementsEnabled",

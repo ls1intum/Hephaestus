@@ -42,7 +42,7 @@ public record WorkspaceDTO(
     @NonNull
     @Schema(description = "Whether a GitLab webhook has been auto-registered for this workspace")
     Boolean gitlabWebhookRegistered,
-    @NonNull @Schema(description = "Whether best practices detection is enabled") Boolean practicesEnabled,
+    @NonNull @Schema(description = "Whether the practice review feature is enabled") Boolean practicesEnabled,
     @NonNull @Schema(description = "Whether the achievements system is enabled") Boolean achievementsEnabled,
     @NonNull @Schema(description = "Whether the leaderboard is enabled") Boolean leaderboardEnabled,
     @NonNull @Schema(description = "Whether the league/progression system is enabled") Boolean progressionEnabled
