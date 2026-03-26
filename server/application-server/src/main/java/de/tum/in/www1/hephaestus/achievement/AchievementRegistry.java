@@ -102,23 +102,29 @@ public class AchievementRegistry {
                 for (AchievementDefinition definition : tempIdMap.values()) {
                     String parentId = definition.parent();
 
-                    // Cycle detection (walk the parent chain, max depth = total achievements)
-                    if (parentId != null && !parentId.isEmpty() && !parentId.equals(definition.id())) {
-                        Set<String> visited = new HashSet<>();
-                        visited.add(definition.id());
+                    // Parent resolution and cycle detection
+                    if (parentId != null && !parentId.isEmpty()) {
+                        Set<String> visiting = new HashSet<>();
+                        visiting.add(definition.id());
                         String current = parentId;
                         while (current != null && !current.isEmpty()) {
-                            if (!visited.add(current)) {
+                            if (!visiting.add(current)) {
                                 log.error(
-                                    "Achievement '{}' has parent chain that reaches a cycle: {}",
+                                    "Achievement '{}' has a circular dependency in its parent chain: {}",
                                     definition.id(),
-                                    visited
+                                    visiting
                                 );
                                 hasErrors = true;
                                 break;
                             }
+
                             AchievementDefinition parentDef = tempIdMap.get(current);
-                            current = parentDef != null ? parentDef.parent() : null;
+                            if (parentDef == null) {
+                                log.error("Achievement '{}' references unknown parent '{}'", definition.id(), current);
+                                hasErrors = true;
+                                break;
+                            }
+                            current = parentDef.parent();
                         }
                     }
 
