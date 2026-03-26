@@ -30,7 +30,7 @@ public final class TestUserFactory {
         user.setHtmlUrl("https://github.com/" + login);
         user.setType(User.Type.USER);
         user.setEmail(login + "@example.com");
-        // Note: User preferences (notificationsEnabled, participateInResearch) are now
+        // Note: User preferences (participateInResearch, aiReviewEnabled) are now
         // stored in the UserPreferences entity in the account module.
         // Note: leaguePoints is set on WorkspaceMembership, not User
         return user;

@@ -58,10 +58,6 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
         "Repository",
         "Team",
         "TeamMembership",
-        // Bad practice entities through PR
-        "BadPracticeDetection",
-        "PullRequestBadPractice",
-        "BadPracticeFeedback",
         // Practice catalog entities
         "Practice", // has direct Workspace field
         "PracticeFinding", // through Practice.workspace

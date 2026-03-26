@@ -36,8 +36,6 @@ tags:
   name: Agent Jobs
 - description: "User account management (settings, deletion)"
   name: Account
-- description: "Legacy bad practice detection — deprecated, scheduled for removal"
-  name: Bad Practices (Deprecated)
 - description: Manage practice definitions
   name: Practice Catalog
 - description: Workspace-scoped team settings management
@@ -526,237 +524,6 @@ paths:
       summary: Retry delivery for a completed agent job
       tags:
       - Agent Jobs
-  /workspaces/{workspaceSlug}/bad-practices/badpractice/{id}:
-    get:
-      deprecated: true
-      description: Retrieves details of a specific bad practice by ID
-      operationId: getBadPractice
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: integer
-          format: int64
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PullRequestBadPractice"
-          description: Bad practice returned
-      security: []
-      summary: Get a specific bad practice
-      tags:
-      - Bad Practices (Deprecated)
-  /workspaces/{workspaceSlug}/bad-practices/badpractice/{id}/feedback:
-    post:
-      deprecated: true
-      description: Submits user feedback for a detected bad practice
-      operationId: provideFeedback
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: integer
-          format: int64
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/BadPracticeFeedback"
-        required: true
-      responses:
-        "200":
-          description: Feedback submitted successfully
-        "403":
-          description: User is not an assignee of the pull request
-      summary: Provide feedback for a bad practice
-      tags:
-      - Bad Practices (Deprecated)
-  /workspaces/{workspaceSlug}/bad-practices/badpractice/{id}/resolve:
-    post:
-      deprecated: true
-      description: "Updates the state of a bad practice to FIXED, WONT_FIX, or WRONG"
-      operationId: resolve
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: integer
-          format: int64
-      - in: query
-        name: state
-        required: true
-        schema:
-          type: string
-          enum:
-          - GOOD_PRACTICE
-          - MINOR_ISSUE
-          - NORMAL_ISSUE
-          - CRITICAL_ISSUE
-          - FIXED
-          - WONT_FIX
-          - WRONG
-      responses:
-        "200":
-          description: Bad practice resolved successfully
-      summary: Resolve a bad practice
-      tags:
-      - Bad Practices (Deprecated)
-  /workspaces/{workspaceSlug}/bad-practices/pullrequest/{pullRequestId}:
-    get:
-      deprecated: true
-      description: Retrieves all detected bad practices for a specific pull request
-      operationId: getBadPracticesForPullRequest
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: pullRequestId
-        required: true
-        schema:
-          type: integer
-          format: int64
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PullRequestWithBadPractices"
-          description: Bad practices returned
-      security: []
-      summary: Get bad practices for a pull request
-      tags:
-      - Bad Practices (Deprecated)
-  /workspaces/{workspaceSlug}/bad-practices/pullrequest/{pullRequestId}/detect:
-    post:
-      deprecated: true
-      description: Triggers bad practice detection for a specific pull request
-      operationId: detectForPullRequest
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: pullRequestId
-        required: true
-        schema:
-          type: integer
-          format: int64
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/DetectionResult"
-          description: Detection completed successfully
-        "400":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/DetectionResult"
-          description: Detection failed due to no updates on pull request
-      summary: Detect bad practices for a pull request
-      tags:
-      - Bad Practices (Deprecated)
-  /workspaces/{workspaceSlug}/bad-practices/user/{login}:
-    get:
-      deprecated: true
-      description: Retrieves all detected bad practices for pull requests assigned
-        to the user
-      operationId: getBadPracticesForUser
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: login
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/UserPractices"
-          description: Bad practices returned
-      security: []
-      summary: Get bad practices for a user
-      tags:
-      - Bad Practices (Deprecated)
-  /workspaces/{workspaceSlug}/bad-practices/user/{login}/detect:
-    post:
-      deprecated: true
-      description: Triggers bad practice detection for all pull requests of the specified
-        user
-      operationId: detectForUser
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: login
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/DetectionResult"
-          description: Detection completed successfully
-        "400":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/DetectionResult"
-          description: Detection failed due to no updates on pull requests
-      summary: Detect bad practices for a user
-      tags:
-      - Bad Practices (Deprecated)
   /workspaces/{workspaceSlug}/features:
     patch:
       operationId: updateFeatures
@@ -3345,25 +3112,6 @@ components:
       required:
       - role
       - userId
-    BadPracticeFeedback:
-      type: object
-      description: User feedback on a detected bad practice
-      properties:
-        explanation:
-          type: string
-          description: User's explanation for the feedback
-          maxLength: 2000
-          minLength: 0
-        type:
-          type: string
-          description: "Type of feedback (e.g., 'false_positive', 'not_applicable')"
-          example: false_positive
-          maxLength: 64
-          minLength: 0
-          pattern: "^[a-zA-Z0-9_-]+$"
-      required:
-      - explanation
-      - type
     BinaryAchievementProgress:
       allOf:
       - $ref: "#/components/schemas/AchievementProgress"
@@ -3693,16 +3441,6 @@ components:
       - displayName
       - ownerUserId
       - workspaceSlug
-    DetectionResult:
-      type: object
-      description: Response for detection operations
-      properties:
-        result:
-          type: string
-          enum:
-          - BAD_PRACTICES_DETECTED
-          - NO_BAD_PRACTICES_DETECTED
-          - ERROR_NO_UPDATE_ON_PULLREQUEST
     Document:
       type: object
       properties:
@@ -3778,9 +3516,6 @@ components:
         ADMIN:
           type: boolean
           description: User has admin privileges
-        DETECTION_FOR_ALL:
-          type: boolean
-          description: Automatic detection runs for all users regardless of role
         GITLAB_WORKSPACE_CREATION:
           type: boolean
           description: GitLab workspace creation feature is enabled
@@ -3793,9 +3528,6 @@ components:
         PRACTICE_REVIEW_FOR_ALL:
           type: boolean
           description: Practice review runs for all users regardless of role
-        RUN_AUTOMATIC_DETECTION:
-          type: boolean
-          description: User's PRs trigger automatic detection
         RUN_PRACTICE_REVIEW:
           type: boolean
           description: User's PRs trigger practice review
@@ -4478,37 +4210,6 @@ components:
       - currentLevelXP
       - totalXP
       - xpNeeded
-    PullRequestBadPractice:
-      type: object
-      description: A detected bad practice in a pull request
-      properties:
-        description:
-          type: string
-          description: Detailed explanation and remediation guidance
-        id:
-          type: integer
-          format: int64
-          description: Unique identifier of the bad practice
-        state:
-          type: string
-          description: "Current state of the bad practice (DETECTED, RESOLVED, DISMISSED,\
-            \ etc.)"
-          enum:
-          - GOOD_PRACTICE
-          - MINOR_ISSUE
-          - NORMAL_ISSUE
-          - CRITICAL_ISSUE
-          - FIXED
-          - WONT_FIX
-          - WRONG
-        title:
-          type: string
-          description: Short description of the bad practice
-      required:
-      - description
-      - id
-      - state
-      - title
     PullRequestBaseInfo:
       type: object
       description: Basic information about a pull request
@@ -4642,94 +4343,6 @@ components:
       - number
       - state
       - title
-    PullRequestWithBadPractices:
-      type: object
-      description: Pull request with associated bad practice detection results
-      properties:
-        additions:
-          type: integer
-          format: int32
-          description: Number of lines added
-          example: 150
-        badPracticeSummary:
-          type: string
-          description: AI-generated summary of detected bad practices
-        badPractices:
-          type: array
-          description: Currently active bad practices
-          items:
-            $ref: "#/components/schemas/PullRequestBadPractice"
-        createdAt:
-          type: string
-          format: date-time
-          description: Timestamp when the pull request was created
-        deletions:
-          type: integer
-          format: int32
-          description: Number of lines deleted
-          example: 50
-        htmlUrl:
-          type: string
-          description: URL to the pull request on the git provider
-        id:
-          type: integer
-          format: int64
-          description: Unique identifier of the pull request
-        isDraft:
-          type: boolean
-          description: Whether the pull request is in draft mode
-        isMerged:
-          type: boolean
-          description: Whether the pull request has been merged
-        labels:
-          type: array
-          description: Labels applied to the pull request
-          items:
-            $ref: "#/components/schemas/LabelInfo"
-        number:
-          type: integer
-          format: int32
-          description: Pull request number within the repository
-          example: 42
-        oldBadPractices:
-          type: array
-          description: Previously resolved or dismissed bad practices
-          items:
-            $ref: "#/components/schemas/PullRequestBadPractice"
-        repository:
-          $ref: "#/components/schemas/RepositoryInfo"
-          description: Repository the pull request belongs to
-        state:
-          type: string
-          description: "Current state of the pull request (OPEN, CLOSED)"
-          enum:
-          - OPEN
-          - CLOSED
-          - MERGED
-        title:
-          type: string
-          description: Title of the pull request
-        updatedAt:
-          type: string
-          format: date-time
-          description: Timestamp when the pull request was last updated
-      required:
-      - additions
-      - badPracticeSummary
-      - badPractices
-      - createdAt
-      - deletions
-      - htmlUrl
-      - id
-      - isDraft
-      - isMerged
-      - labels
-      - number
-      - oldBadPractices
-      - repository
-      - state
-      - title
-      - updatedAt
     RenameWorkspaceSlugRequest:
       type: object
       description: Request to rename a workspace's URL slug
@@ -5086,7 +4699,7 @@ components:
           description: Enable the leaderboard ranking page
         practicesEnabled:
           type: boolean
-          description: Enable best practices detection and tracking
+          description: Enable the practice review feature
         progressionEnabled:
           type: boolean
           description: Enable the league/progression system
@@ -5202,16 +4815,6 @@ components:
       - id
       - login
       - name
-    UserPractices:
-      type: object
-      description: Response for user bad practices listing
-      properties:
-        login:
-          type: string
-        pullRequests:
-          type: array
-          items:
-            $ref: "#/components/schemas/PullRequestWithBadPractices"
     UserSettings:
       type: object
       description: User preferences and settings
@@ -5223,13 +4826,9 @@ components:
         participateInResearch:
           type: boolean
           description: Whether the user consents to participate in research studies
-        receiveNotifications:
-          type: boolean
-          description: Whether the user wants to receive notifications
       required:
       - aiReviewEnabled
       - participateInResearch
-      - receiveNotifications
     UserTeams:
       type: object
       properties:
@@ -5335,7 +4934,7 @@ components:
           example: 09:00
         practicesEnabled:
           type: boolean
-          description: Whether best practices detection is enabled
+          description: Whether the practice review feature is enabled
         progressionEnabled:
           type: boolean
           description: Whether the league/progression system is enabled
@@ -5406,7 +5005,7 @@ components:
           description: Whether the leaderboard is enabled
         practicesEnabled:
           type: boolean
-          description: Whether best practices detection is enabled
+          description: Whether the practice review feature is enabled
         progressionEnabled:
           type: boolean
           description: Whether the league/progression system is enabled

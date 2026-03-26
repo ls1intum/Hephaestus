@@ -11,9 +11,9 @@ const mockWorkspace = {
 	status: "ACTIVE",
 	providerType: "GITHUB",
 	createdAt: new Date("2025-01-15T00:00:00Z"),
+	practicesEnabled: true,
 	achievementsEnabled: true,
 	leaderboardEnabled: true,
-	practicesEnabled: true,
 	progressionEnabled: false,
 } as const;
 
@@ -155,14 +155,12 @@ export const AllFeaturesDisabled: Story = {
 			...mockWorkspace,
 			achievementsEnabled: false,
 			leaderboardEnabled: false,
-			practicesEnabled: false,
 		},
 		workspaces: [
 			{
 				...mockWorkspace,
 				achievementsEnabled: false,
 				leaderboardEnabled: false,
-				practicesEnabled: false,
 			},
 		],
 	},

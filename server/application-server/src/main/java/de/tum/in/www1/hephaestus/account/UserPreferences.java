@@ -26,7 +26,6 @@ import lombok.ToString;
  * <p>
  * Preferences include:
  * <ul>
- *   <li>{@link #notificationsEnabled} - Whether the user wants to receive platform notifications</li>
  *   <li>{@link #participateInResearch} - Whether the user consents to analytics/research data collection</li>
  *   <li>{@link #aiReviewEnabled} - Whether the user wants AI-generated practice review comments on PRs</li>
  * </ul>
@@ -60,13 +59,6 @@ public class UserPreferences {
     )
     @ToString.Exclude
     private User user;
-
-    /**
-     * Whether the user wants to receive platform notifications.
-     * Defaults to true for new users.
-     */
-    @Column(name = "notifications_enabled", nullable = false)
-    private boolean notificationsEnabled = true;
 
     /**
      * Whether the user consents to analytics and research data collection.

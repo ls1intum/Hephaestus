@@ -23,7 +23,6 @@ const meta = {
 		workspaceSlug: "aet",
 		achievementsEnabled: true,
 		leaderboardEnabled: true,
-		practicesEnabled: true,
 	},
 	argTypes: {
 		username: {
@@ -41,10 +40,6 @@ const meta = {
 		leaderboardEnabled: {
 			control: "boolean",
 			description: "Whether leaderboard sidebar item is visible",
-		},
-		practicesEnabled: {
-			control: "boolean",
-			description: "Whether best practices sidebar item is visible",
 		},
 	},
 	decorators: [
@@ -81,17 +76,5 @@ export const AllFeaturesDisabled: Story = {
 	args: {
 		achievementsEnabled: false,
 		leaderboardEnabled: false,
-		practicesEnabled: false,
-	},
-};
-
-/**
- * Practices-only workspace — no gamification features.
- */
-export const PracticesOnly: Story = {
-	args: {
-		achievementsEnabled: false,
-		leaderboardEnabled: false,
-		practicesEnabled: true,
 	},
 };

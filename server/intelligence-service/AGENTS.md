@@ -1,6 +1,6 @@
 # Intelligence Service
 
-TypeScript/Hono microservice providing AI-powered features: mentor chat and bad practice detection.
+TypeScript/Hono microservice providing AI-powered features: mentor chat.
 
 ## Commands
 
@@ -56,11 +56,6 @@ src/
 ├── index.ts              # Entry point, server lifecycle
 ├── app.ts                # Hono app assembly, routes
 ├── env.ts                # Zod environment validation
-├── detector/             # Bad practice detector
-│   ├── bad-practice.prompt.ts
-│   ├── detector.handler.ts
-│   ├── detector.routes.ts
-│   └── detector.schema.ts
 ├── mentor/               # AI mentor (Heph)
 │   ├── chat.prompt.ts    # System prompt
 │   ├── chat/             # Chat handling (SSE streaming)
@@ -84,7 +79,6 @@ src/
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/health` | GET | Health check |
-| `/detector` | POST | Bad practice detection |
 | `/mentor/chat` | POST | AI chat (SSE streaming) |
 | `/mentor/threads/grouped` | GET | List threads by time bucket |
 | `/mentor/threads/{id}` | GET | Get thread with messages |
@@ -137,12 +131,12 @@ Register in `src/mentor/tools/registry.ts`.
 Prompts follow local-first, sync-to-Langfuse pattern:
 
 ```typescript
-// src/detector/bad-practice.prompt.ts
-export const badPracticePrompt: PromptDefinition = {
-  name: "bad-practice-detector",
-  type: "text",
-  prompt: `You are a PR quality analyzer...`,
-  config: { temperature: 0.3 },
+// src/mentor/chat.prompt.ts
+export const mentorChatPrompt: PromptDefinition = {
+  name: "mentor-chat",
+  type: "chat",
+  prompt: [...],
+  config: { temperature: 0.7 },
 };
 ```
 
@@ -173,7 +167,6 @@ The service shares the same database as application-server (read-only for activi
 |----------|----------|-------------|
 | `DATABASE_URL` | Yes | PostgreSQL connection string |
 | `MODEL_NAME` | No | Default model (e.g., `openai:gpt-4o-mini`) |
-| `DETECTION_MODEL_NAME` | No | Model for bad practice detector |
 | `OPENAI_API_KEY` | If OpenAI | OpenAI API key |
 | `AZURE_RESOURCE_NAME` | If Azure | Azure resource name |
 | `AZURE_API_KEY` | If Azure | Azure API key |

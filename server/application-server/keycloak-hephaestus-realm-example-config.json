@@ -91,15 +91,6 @@
               "attributes": {}
             },
             {
-                "id": "af3b75a2-9733-44e5-bdc3-1e3e32459743",
-                "name": "run_automatic_detection",
-                "description": "",
-                "composite": false,
-                "clientRole": false,
-                "containerId": "69732d45-1431-4909-9335-9f39e304f823",
-                "attributes": {}
-            },
-            {
               "id": "59cbfc3d-69c8-4284-b4ae-b5a00c9e9b35",
               "name": "run_practice_review",
               "description": "",
@@ -126,7 +117,6 @@
                 "realm": [
                   "mentor_access",
                   "notification_access",
-                  "run_automatic_detection",
                   "run_practice_review"
                 ],
                 "client": {

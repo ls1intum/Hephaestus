@@ -35,7 +35,6 @@ Hephaestus /hɪˈfɛstəs/ is the Greek god of blacksmiths, craftsmen, and artis
 
 ## Roadmap
 
-- **Short Term:** Implement AI-based bad practices detection for pull request descriptions to ensure quality before merging by notifying the author of potential issues via email or GitHub comments.
 - **Short Term:** Develop initial workspace support by moving environment variable configuration into a user-friendly workspace settings UI for setting up API credentials, webhooks, etc.
 - **Short Term:** Streamline project setup and improve contributor accessibility by enhancing documentation and onboarding resources.
 - **Medium Term:** Expand multi-workspace capabilities to allow configuration of multiple organizations and selected open-source repositories, enabling seamless integration into diverse GitHub projects.

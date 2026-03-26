@@ -44,7 +44,7 @@ class KeycloakUserRoleCheckerTest extends BaseUnitTest {
     private static final String TEST_REALM = "test-realm";
     private static final String TEST_USERNAME = "test-user";
     private static final String TEST_USER_ID = "user-123";
-    private static final String TEST_ROLE = "run_automatic_detection";
+    private static final String TEST_ROLE = "run_practice_review";
 
     @Mock
     private Keycloak keycloak;
