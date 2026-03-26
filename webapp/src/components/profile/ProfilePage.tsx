@@ -65,7 +65,6 @@ export function ProfilePage({
 				username={username}
 				displayName={profileData?.userInfo?.name}
 				currUserIsDashboardUser={currUserIsDashboardUser}
-				workspaceSlug={workspaceSlug}
 				afterDate={after}
 				beforeDate={before}
 				onTimeframeChange={onTimeframeChange}

@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { CheckCheck, Sparkles, Trophy, User, Users } from "lucide-react";
+import { Sparkles, Trophy, User, Users } from "lucide-react";
 import {
 	SidebarGroup,
 	SidebarGroupLabel,
@@ -58,20 +58,6 @@ export function NavDashboards({
 					>
 						<Users />
 						<span>Teams</span>
-					</SidebarMenuButton>
-				</SidebarMenuItem>
-				<SidebarMenuItem>
-					<SidebarMenuButton
-						tooltip="Best practices"
-						render={
-							<Link
-								to="/w/$workspaceSlug/user/$username/best-practices"
-								params={{ workspaceSlug, username }}
-							/>
-						}
-					>
-						<CheckCheck />
-						<span>Best practices</span>
 					</SidebarMenuButton>
 				</SidebarMenuItem>
 			</SidebarMenu>

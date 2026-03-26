@@ -78,7 +78,7 @@ public class ActivityEvent {
     @Column(name = "event_key", nullable = false)
     private String eventKey;
 
-    /** What happened: pr.opened, review.submitted, bad_practice.detected, etc. */
+    /** What happened: pr.opened, review.submitted, etc. */
     @NotNull
     @Enumerated(EnumType.STRING)
     @Column(name = "event_type", length = 64, nullable = false)

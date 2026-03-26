@@ -43,8 +43,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * latency, {@code @Async} prevents blocking the webhook thread, and {@code runForAllUsers=true}
  * skips Keycloak entirely. See {@link PracticeReviewDetectionGate} for the standalone contract.
  *
- * <p>Coexists with {@code BadPracticeEventListener} — they are independent systems listening
- * to the same events. Only active when the NATS submitter is available.
+ * <p>Only active when the NATS submitter is available.
  */
 @Component
 @ConditionalOnProperty(prefix = "hephaestus.agent.nats", name = "enabled", havingValue = "true")

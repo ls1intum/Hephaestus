@@ -349,20 +349,6 @@ hephaestus:
         enabled: ${MAIL_ENABLED:false}
         sender: ${MAIL_SENDER:hephaestus@gmail.com} # use gmail email address for local testing
 
-    detection:
-        legacy:
-            # Deprecated — re-enable as escape hatch while agent-based reviews stabilize
-            enabled: false
-        run-automatic-detection-for-all: false
-        tracing:
-            enabled: false
-            # The host of the langfuse server
-            host: ${LANGFUSE_BASE_URL:}
-            # The public key of the langfuse server
-            public-key: ${LANGFUSE_PUBLIC_KEY:}
-            # The secret key of the langfuse server
-            secret-key: ${LANGFUSE_SECRET_KEY:}
-
     # ═══════════════════════════════════════════════════════════════════════════
     # FEATURE FLAGS (operational / development toggles)
     # ═══════════════════════════════════════════════════════════════════════════
@@ -371,7 +357,6 @@ hephaestus:
     features:
         flags:
             practice-review-for-all: false
-            detection-for-all: false
             gitlab-workspace-creation: false
 
     # ═══════════════════════════════════════════════════════════════════════════

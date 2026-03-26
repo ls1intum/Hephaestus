@@ -9,7 +9,7 @@
  *   <li>Providing data for leaderboard aggregation</li>
  * </ul>
  *
- * <p><strong>Note:</strong> Bad practice detection is a separate bounded context in the
+ * <p><strong>Note:</strong> Practice detection is a separate bounded context in the
  * {@link de.tum.in.www1.hephaestus.practices} module. This separation follows DDD principles
  * where "activity tracking" and "code health analysis" are distinct domain concerns.
  *
@@ -72,7 +72,7 @@
  * <h2>Event Types</h2>
  * <p>See {@link de.tum.in.www1.hephaestus.activity.ActivityEventType} for supported types.
  *
- * @see de.tum.in.www1.hephaestus.practices Code Health module (AI-powered bad practice detection)
+ * @see de.tum.in.www1.hephaestus.practices Code Health module (AI-powered practice detection)
  * @see <a href="https://cloudevents.io/">CloudEvents Specification</a>
  * @see <a href="https://www.w3.org/TR/activitystreams-core/">ActivityStreams 2.0</a>
  */

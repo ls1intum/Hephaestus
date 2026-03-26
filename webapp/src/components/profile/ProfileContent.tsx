@@ -1,5 +1,4 @@
 import { CodeReviewIcon } from "@primer/octicons-react";
-import { Link } from "@tanstack/react-router";
 import type {
 	ProfileActivityStats,
 	ProfileReviewActivity,
@@ -7,7 +6,6 @@ import type {
 	PullRequestInfo,
 } from "@/api/types.gen";
 import { ActivityBadges } from "@/components/leaderboard/ActivityBadges";
-import { Button } from "@/components/ui/button";
 import { getProviderTerms, getPullRequestStateIcon, type ProviderType } from "@/lib/provider";
 import type { LeaderboardSchedule } from "@/lib/timeframe";
 import type { ReviewedPullRequest } from "../leaderboard/ReviewsPopover";
@@ -28,7 +26,6 @@ export interface ProfileContentProps {
 	username: string;
 	displayName?: string;
 	currUserIsDashboardUser: boolean;
-	workspaceSlug: string;
 	afterDate?: string;
 	beforeDate?: string;
 	onTimeframeChange?: (afterDate: string, beforeDate?: string) => void;
@@ -46,7 +43,6 @@ export function ProfileContent({
 	username,
 	displayName,
 	currUserIsDashboardUser,
-	workspaceSlug,
 	afterDate,
 	beforeDate,
 	onTimeframeChange,
@@ -176,20 +172,7 @@ export function ProfileContent({
 
 				{/* Open Pull Requests / Merge Requests */}
 				<div className="flex flex-col gap-2">
-					<span className="flex justify-between items-center">
-						<h3 className="text-lg font-semibold">Open {terms.pullRequests.toLowerCase()}</h3>
-						<Button
-							variant="secondary"
-							render={
-								<Link
-									to="/w/$workspaceSlug/user/$username/best-practices"
-									params={{ username, workspaceSlug }}
-								/>
-							}
-						>
-							Best practices
-						</Button>
-					</span>
+					<h3 className="text-lg font-semibold">Open {terms.pullRequests.toLowerCase()}</h3>
 					<div className="flex flex-col gap-2 m-1">
 						{displayPullRequests.length > 0 ? (
 							(displayPullRequests as PullRequestInfo[]).map((pullRequest) => (

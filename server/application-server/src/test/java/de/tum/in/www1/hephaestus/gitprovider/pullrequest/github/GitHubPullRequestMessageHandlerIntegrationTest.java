@@ -21,7 +21,6 @@ import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
-import de.tum.in.www1.hephaestus.practices.detection.BadPracticeDetectorScheduler;
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.in.www1.hephaestus.workspace.AccountType;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
@@ -41,7 +40,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -158,16 +156,12 @@ class GitHubPullRequestMessageHandlerIntegrationTest extends BaseIntegrationTest
     @Autowired
     private TestPullRequestEventListener eventListener;
 
-    @MockitoBean
-    private BadPracticeDetectorScheduler badPracticeDetectorScheduler;
-
     private Repository testRepository;
     private GitProvider testProvider;
 
     @BeforeEach
     void setUp() {
         databaseTestUtils.cleanDatabase();
-        reset(badPracticeDetectorScheduler);
         eventListener.clear();
         setupTestData();
     }

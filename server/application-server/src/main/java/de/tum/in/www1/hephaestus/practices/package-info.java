@@ -1,52 +1,43 @@
 /**
- * Code Health Module - AI-powered detection and analysis of code quality issues.
+ * Code Health Module - AI-powered practice detection and contributor feedback.
  *
  * <h2>Bounded Context</h2>
  * <p>This module represents a distinct bounded context from the activity module. While activity
  * focuses on <em>recording developer actions</em> for gamification, code health focuses on
- * <em>analyzing code quality</em> through AI-powered detection.
+ * <em>analyzing code quality</em> through agent-based practice detection.
  *
  * <h2>Architecture</h2>
  * <pre>
- * ┌─────────────────────────────────────────────────────────────────────────────┐
- * │                          CODE HEALTH MODULE                                  │
- * │                                                                              │
- * │  Domain Events → BadPracticeEventListener → PullRequestBadPracticeDetector  │
- * │                        ↓                              ↓                      │
- * │              BadPracticeDetectorScheduler    intelligence-service (AI)      │
- * │                                                       ↓                      │
- * │                              ┌────────────────────────────────────┐          │
- * │                              │    BadPracticeDetection (Model)    │          │
- * │                              │    PullRequestBadPractice (Model)  │          │
- * │                              └────────────────────────────────────┘          │
- * │                                           ↓                                  │
- * │                    BadPracticeNotificationSender (SPI) → notification module │
- * │                                           ↓                                  │
- * │                    BadPracticeFeedbackService → Langfuse (LLM observability) │
- * └─────────────────────────────────────────────────────────────────────────────┘
+ * ┌──────────────────────────────────────────────────────────────────────────┐
+ * │                        CODE HEALTH MODULE                               │
+ * │                                                                         │
+ * │  PR Events → AgentJobEventListener → NATS → intelligence-service (AI)  │
+ * │                                                       ↓                 │
+ * │              PracticeDetectionDeliveryService ← agent result            │
+ * │                          ↓                                              │
+ * │              ┌──────────────────────────────────┐                       │
+ * │              │  Practice (catalog definition)   │                       │
+ * │              │  PracticeFinding (per-PR result)  │                       │
+ * │              │  FindingFeedback (contributor)    │                       │
+ * │              └──────────────────────────────────┘                       │
+ * │                          ↓                                              │
+ * │              PracticeReviewDeliveryGate → PR comment feedback           │
+ * └──────────────────────────────────────────────────────────────────────────┘
  * </pre>
  *
  * <h2>Key Components</h2>
  * <ul>
- *   <li>{@link de.tum.in.www1.hephaestus.practices.detection.PullRequestBadPracticeDetector} - Core detection logic using AI</li>
- *   <li>{@link de.tum.in.www1.hephaestus.practices.detection.BadPracticeDetectorScheduler} - Scheduled detection for all workspaces</li>
- *   <li>{@link de.tum.in.www1.hephaestus.practices.detection.BadPracticeEventListener} - Listens to PR events for real-time detection</li>
- *   <li>{@link de.tum.in.www1.hephaestus.practices.feedback.BadPracticeFeedbackService} - User feedback collection with Langfuse integration</li>
- *   <li>{@link de.tum.in.www1.hephaestus.practices.model.PullRequestBadPractice} - Detection result entity</li>
+ *   <li>{@link de.tum.in.www1.hephaestus.practices.PracticeCatalogController} - CRUD for practice definitions</li>
+ *   <li>{@link de.tum.in.www1.hephaestus.practices.finding.PracticeFindingController} - Contributor findings API</li>
+ *   <li>{@link de.tum.in.www1.hephaestus.practices.finding.feedback.FindingFeedbackController} - Contributor feedback</li>
+ *   <li>{@link de.tum.in.www1.hephaestus.practices.review.PracticeReviewDetectionGate} - Controls when agent jobs are submitted</li>
+ *   <li>{@link de.tum.in.www1.hephaestus.practices.review.PracticeReviewDeliveryGate} - Controls when PR comments are posted</li>
  * </ul>
  *
  * <h2>SPI (Service Provider Interfaces)</h2>
  * <ul>
- *   <li>{@link de.tum.in.www1.hephaestus.practices.spi.BadPracticeNotificationSender} - Notification sending abstraction</li>
  *   <li>{@link de.tum.in.www1.hephaestus.practices.spi.UserRoleChecker} - User role verification abstraction</li>
- * </ul>
- *
- * <h2>Design Principles</h2>
- * <ul>
- *   <li><strong>Bounded Context Isolation</strong>: Separate from activity module (event log vs. analysis)</li>
- *   <li><strong>Infrastructure Abstraction</strong>: AI service calls via anti-corruption layer</li>
- *   <li><strong>SPI Pattern</strong>: Decoupled from notification infrastructure</li>
- *   <li><strong>Feedback Loop</strong>: User feedback improves AI model via Langfuse</li>
+ *   <li>{@link de.tum.in.www1.hephaestus.practices.spi.AgentConfigChecker} - Agent configuration validation</li>
  * </ul>
  *
  * @see de.tum.in.www1.hephaestus.activity Activity module (event log for gamification)

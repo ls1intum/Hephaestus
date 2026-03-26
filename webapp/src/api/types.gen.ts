@@ -272,162 +272,6 @@ export type UserSettings = {
 };
 
 /**
- * Response for user bad practices listing
- */
-export type UserPractices = {
-    login?: string;
-    pullRequests?: Array<PullRequestWithBadPractices>;
-};
-
-/**
- * Information about a git repository
- */
-export type RepositoryInfo = {
-    /**
-     * Description of the repository
-     */
-    description?: string;
-    /**
-     * Whether contributions from this repository are hidden from leaderboard calculations
-     */
-    hiddenFromContributions: boolean;
-    /**
-     * URL to the repository on the git provider
-     */
-    htmlUrl: string;
-    /**
-     * Unique identifier of the repository
-     */
-    id: number;
-    /**
-     * Labels defined in the repository
-     */
-    labels?: Array<LabelInfo>;
-    /**
-     * Name of the repository
-     */
-    name: string;
-    /**
-     * Full name including owner (e.g., 'owner/repo')
-     */
-    nameWithOwner: string;
-};
-
-/**
- * Information about a label from a repository
- */
-export type LabelInfo = {
-    /**
-     * Hex color code of the label (without #)
-     */
-    color: string;
-    /**
-     * Unique identifier of the label
-     */
-    id: number;
-    /**
-     * Name of the label
-     */
-    name: string;
-    /**
-     * Repository the label belongs to
-     */
-    repository?: RepositoryInfo;
-};
-
-/**
- * A detected bad practice in a pull request
- */
-export type PullRequestBadPractice = {
-    /**
-     * Detailed explanation and remediation guidance
-     */
-    description: string;
-    /**
-     * Unique identifier of the bad practice
-     */
-    id: number;
-    /**
-     * Current state of the bad practice (DETECTED, RESOLVED, DISMISSED, etc.)
-     */
-    state: 'GOOD_PRACTICE' | 'MINOR_ISSUE' | 'NORMAL_ISSUE' | 'CRITICAL_ISSUE' | 'FIXED' | 'WONT_FIX' | 'WRONG';
-    /**
-     * Short description of the bad practice
-     */
-    title: string;
-};
-
-/**
- * Pull request with associated bad practice detection results
- */
-export type PullRequestWithBadPractices = {
-    /**
-     * Number of lines added
-     */
-    additions: number;
-    /**
-     * AI-generated summary of detected bad practices
-     */
-    badPracticeSummary: string;
-    /**
-     * Currently active bad practices
-     */
-    badPractices: Array<PullRequestBadPractice>;
-    /**
-     * Timestamp when the pull request was created
-     */
-    createdAt: Date;
-    /**
-     * Number of lines deleted
-     */
-    deletions: number;
-    /**
-     * URL to the pull request on the git provider
-     */
-    htmlUrl: string;
-    /**
-     * Unique identifier of the pull request
-     */
-    id: number;
-    /**
-     * Whether the pull request is in draft mode
-     */
-    isDraft: boolean;
-    /**
-     * Whether the pull request has been merged
-     */
-    isMerged: boolean;
-    /**
-     * Labels applied to the pull request
-     */
-    labels: Array<LabelInfo>;
-    /**
-     * Pull request number within the repository
-     */
-    number: number;
-    /**
-     * Previously resolved or dismissed bad practices
-     */
-    oldBadPractices: Array<PullRequestBadPractice>;
-    /**
-     * Repository the pull request belongs to
-     */
-    repository: RepositoryInfo;
-    /**
-     * Current state of the pull request (OPEN, CLOSED)
-     */
-    state: 'OPEN' | 'CLOSED' | 'MERGED';
-    /**
-     * Title of the pull request
-     */
-    title: string;
-    /**
-     * Timestamp when the pull request was last updated
-     */
-    updatedAt: Date;
-};
-
-/**
  * Information about a user from the git provider
  */
 export type UserInfo = {
@@ -707,6 +551,62 @@ export type TeamInfo = {
      * Repositories the team has access to
      */
     repositories: Array<RepositoryInfo>;
+};
+
+/**
+ * Information about a git repository
+ */
+export type RepositoryInfo = {
+    /**
+     * Description of the repository
+     */
+    description?: string;
+    /**
+     * Whether contributions from this repository are hidden from leaderboard calculations
+     */
+    hiddenFromContributions: boolean;
+    /**
+     * URL to the repository on the git provider
+     */
+    htmlUrl: string;
+    /**
+     * Unique identifier of the repository
+     */
+    id: number;
+    /**
+     * Labels defined in the repository
+     */
+    labels?: Array<LabelInfo>;
+    /**
+     * Name of the repository
+     */
+    name: string;
+    /**
+     * Full name including owner (e.g., 'owner/repo')
+     */
+    nameWithOwner: string;
+};
+
+/**
+ * Information about a label from a repository
+ */
+export type LabelInfo = {
+    /**
+     * Hex color code of the label (without #)
+     */
+    color: string;
+    /**
+     * Unique identifier of the label
+     */
+    id: number;
+    /**
+     * Name of the label
+     */
+    name: string;
+    /**
+     * Repository the label belongs to
+     */
+    repository?: RepositoryInfo;
 };
 
 export type SortObject = {
@@ -1444,10 +1344,6 @@ export type FeatureFlags = {
      */
     ADMIN?: boolean;
     /**
-     * Automatic detection runs for all users regardless of role
-     */
-    DETECTION_FOR_ALL?: boolean;
-    /**
      * GitLab workspace creation feature is enabled
      */
     GITLAB_WORKSPACE_CREATION?: boolean;
@@ -1463,10 +1359,6 @@ export type FeatureFlags = {
      * Practice review runs for all users regardless of role
      */
     PRACTICE_REVIEW_FOR_ALL?: boolean;
-    /**
-     * User's PRs trigger automatic detection
-     */
-    RUN_AUTOMATIC_DETECTION?: boolean;
     /**
      * User's PRs trigger practice review
      */
@@ -1498,13 +1390,6 @@ export type Document = {
     title: string;
     userId: number;
     versionNumber: number;
-};
-
-/**
- * Response for detection operations
- */
-export type DetectionResult = {
-    result?: 'BAD_PRACTICES_DETECTED' | 'NO_BAD_PRACTICES_DETECTED' | 'ERROR_NO_UPDATE_ON_PULLREQUEST';
 };
 
 /**
@@ -1729,20 +1614,6 @@ export type ChatMessageVote = {
 export type BinaryAchievementProgress = Omit<AchievementProgress, 'type'> & {
     unlocked: boolean;
     type: 'BinaryAchievementProgress';
-};
-
-/**
- * User feedback on a detected bad practice
- */
-export type BadPracticeFeedback = {
-    /**
-     * User's explanation for the feedback
-     */
-    explanation: string;
-    /**
-     * Type of feedback (e.g., 'false_positive', 'not_applicable')
-     */
-    type: string;
 };
 
 /**
@@ -2307,183 +2178,6 @@ export type RetryDeliveryResponses = {
 };
 
 export type RetryDeliveryResponse = RetryDeliveryResponses[keyof RetryDeliveryResponses];
-
-export type GetBadPracticeData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        id: number;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/bad-practices/badpractice/{id}';
-};
-
-export type GetBadPracticeResponses = {
-    /**
-     * Bad practice returned
-     */
-    200: PullRequestBadPractice;
-};
-
-export type GetBadPracticeResponse = GetBadPracticeResponses[keyof GetBadPracticeResponses];
-
-export type ProvideFeedbackData = {
-    body: BadPracticeFeedback;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        id: number;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/bad-practices/badpractice/{id}/feedback';
-};
-
-export type ProvideFeedbackErrors = {
-    /**
-     * User is not an assignee of the pull request
-     */
-    403: unknown;
-};
-
-export type ProvideFeedbackResponses = {
-    /**
-     * Feedback submitted successfully
-     */
-    200: unknown;
-};
-
-export type ResolveData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        id: number;
-    };
-    query: {
-        state: 'GOOD_PRACTICE' | 'MINOR_ISSUE' | 'NORMAL_ISSUE' | 'CRITICAL_ISSUE' | 'FIXED' | 'WONT_FIX' | 'WRONG';
-    };
-    url: '/workspaces/{workspaceSlug}/bad-practices/badpractice/{id}/resolve';
-};
-
-export type ResolveResponses = {
-    /**
-     * Bad practice resolved successfully
-     */
-    200: unknown;
-};
-
-export type GetBadPracticesForPullRequestData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        pullRequestId: number;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/bad-practices/pullrequest/{pullRequestId}';
-};
-
-export type GetBadPracticesForPullRequestResponses = {
-    /**
-     * Bad practices returned
-     */
-    200: PullRequestWithBadPractices;
-};
-
-export type GetBadPracticesForPullRequestResponse = GetBadPracticesForPullRequestResponses[keyof GetBadPracticesForPullRequestResponses];
-
-export type DetectForPullRequestData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        pullRequestId: number;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/bad-practices/pullrequest/{pullRequestId}/detect';
-};
-
-export type DetectForPullRequestErrors = {
-    /**
-     * Detection failed due to no updates on pull request
-     */
-    400: DetectionResult;
-};
-
-export type DetectForPullRequestError = DetectForPullRequestErrors[keyof DetectForPullRequestErrors];
-
-export type DetectForPullRequestResponses = {
-    /**
-     * Detection completed successfully
-     */
-    200: DetectionResult;
-};
-
-export type DetectForPullRequestResponse = DetectForPullRequestResponses[keyof DetectForPullRequestResponses];
-
-export type GetBadPracticesForUserData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        login: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/bad-practices/user/{login}';
-};
-
-export type GetBadPracticesForUserResponses = {
-    /**
-     * Bad practices returned
-     */
-    200: UserPractices;
-};
-
-export type GetBadPracticesForUserResponse = GetBadPracticesForUserResponses[keyof GetBadPracticesForUserResponses];
-
-export type DetectForUserData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        login: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/bad-practices/user/{login}/detect';
-};
-
-export type DetectForUserErrors = {
-    /**
-     * Detection failed due to no updates on pull requests
-     */
-    400: DetectionResult;
-};
-
-export type DetectForUserError = DetectForUserErrors[keyof DetectForUserErrors];
-
-export type DetectForUserResponses = {
-    /**
-     * Detection completed successfully
-     */
-    200: DetectionResult;
-};
-
-export type DetectForUserResponse = DetectForUserResponses[keyof DetectForUserResponses];
 
 export type GetLeaderboardData = {
     body?: never;

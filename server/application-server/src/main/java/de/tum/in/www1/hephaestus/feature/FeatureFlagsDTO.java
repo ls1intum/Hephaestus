@@ -25,13 +25,11 @@ public record FeatureFlagsDTO(
     // ── Authorization flags (Keycloak realm roles) ──────────────────────
     @Schema(description = "User has access to the AI Mentor feature") boolean MENTOR_ACCESS,
     @Schema(description = "User can receive notifications") boolean NOTIFICATION_ACCESS,
-    @Schema(description = "User's PRs trigger automatic detection") boolean RUN_AUTOMATIC_DETECTION,
     @Schema(description = "User's PRs trigger practice review") boolean RUN_PRACTICE_REVIEW,
     @Schema(description = "User has admin privileges") boolean ADMIN,
 
     // ── Operational/development flags (Spring Boot config) ──────────────
     @Schema(description = "Practice review runs for all users regardless of role") boolean PRACTICE_REVIEW_FOR_ALL,
-    @Schema(description = "Automatic detection runs for all users regardless of role") boolean DETECTION_FOR_ALL,
     @Schema(description = "GitLab workspace creation feature is enabled") boolean GITLAB_WORKSPACE_CREATION
 ) {
     /**
@@ -44,11 +42,9 @@ public record FeatureFlagsDTO(
         return new FeatureFlagsDTO(
             service.isEnabled(FeatureFlag.MENTOR_ACCESS),
             service.isEnabled(FeatureFlag.NOTIFICATION_ACCESS),
-            service.isEnabled(FeatureFlag.RUN_AUTOMATIC_DETECTION),
             service.isEnabled(FeatureFlag.RUN_PRACTICE_REVIEW),
             service.isEnabled(FeatureFlag.ADMIN),
             service.isEnabled(FeatureFlag.PRACTICE_REVIEW_FOR_ALL),
-            service.isEnabled(FeatureFlag.DETECTION_FOR_ALL),
             service.isEnabled(FeatureFlag.GITLAB_WORKSPACE_CREATION)
         );
     }
