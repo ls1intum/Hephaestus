@@ -4,29 +4,40 @@
  * Path data is copied from the installed `@gitlab/svgs` dist so we avoid
  * adding an SVGR build plugin for just a handful of icons.  All source SVGs
  * use `viewBox="0 0 16 16"` and a single `<path>` element.
+ *
+ * The factory mirrors the API surface of `@primer/octicons-react`:
+ * - `forwardRef` for DOM access
+ * - rest-prop spreading for native SVG attributes
+ * - conditional `aria-hidden` based on `aria-label` / `aria-labelledby`
  */
 
-interface GitLabIconProps {
+import { forwardRef, type SVGProps } from "react";
+
+export interface GitLabIconProps extends Omit<SVGProps<SVGSVGElement>, "children"> {
+	/** Icon size in pixels. Defaults to 16. */
 	size?: number;
-	className?: string;
 }
 
 function createGitLabIcon(pathData: string, displayName: string) {
-	function Icon({ size = 16, className }: GitLabIconProps) {
+	const Icon = forwardRef<SVGSVGElement, GitLabIconProps>(({ size = 16, ...rest }, ref) => {
+		const labelled = rest["aria-label"] || rest["aria-labelledby"];
 		return (
+			// biome-ignore lint/a11y/noSvgWithoutTitle: accessibility handled conditionally — aria-hidden for decorative, role="img" + aria-label for labelled
 			<svg
+				ref={ref}
 				width={size}
 				height={size}
 				viewBox="0 0 16 16"
 				fill="currentColor"
-				className={className}
-				aria-hidden="true"
+				{...rest}
+				aria-hidden={labelled ? undefined : "true"}
+				role={labelled ? "img" : undefined}
 				focusable="false"
 			>
 				<path fillRule="evenodd" clipRule="evenodd" d={pathData} />
 			</svg>
 		);
-	}
+	});
 	Icon.displayName = displayName;
 	return Icon;
 }
