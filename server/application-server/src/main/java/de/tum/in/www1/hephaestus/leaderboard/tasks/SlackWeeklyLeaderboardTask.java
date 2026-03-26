@@ -83,13 +83,14 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
     /**
      * Gets the Slack handles of the top 3 reviewers in the given time frame.
      *
-     * @return
+     * @param allSlackUsers pre-fetched Slack user list (avoids repeated API calls per workspace)
      */
     private List<User> getTop3SlackReviewers(
         Workspace workspace,
         Instant after,
         Instant before,
-        Optional<String> team
+        Optional<String> team,
+        List<User> allSlackUsers
     ) {
         if (workspace == null || workspace.getId() == null) {
             return List.of();
@@ -114,7 +115,6 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
                 .toList()
         );
 
-        List<User> allSlackUsers = slackMessageService != null ? slackMessageService.getAllMembers() : List.of();
         return top3
             .stream()
             .map(mapToSlackUser(allSlackUsers))
@@ -170,11 +170,14 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
             return;
         }
 
-        List<Workspace> workspaces = workspaceRepository.findAll();
+        List<Workspace> workspaces = workspaceRepository.findByStatus(Workspace.WorkspaceStatus.ACTIVE);
         if (workspaces.isEmpty()) {
-            log.info("Skipped Slack notification: reason=noWorkspacesConfigured");
+            log.info("Skipped Slack notification: reason=noActiveWorkspaces");
             return;
         }
+
+        // Fetch Slack members once (shared across workspaces using global token)
+        List<User> allSlackUsers = slackMessageService.getAllMembers();
 
         long currentDate = Instant.now().getEpochSecond();
         String[] timeParts = leaderboardProperties.schedule().time().split(":");
@@ -188,22 +191,67 @@ public class SlackWeeklyLeaderboardTask implements Runnable {
         Instant before = zonedBefore.toInstant();
         Instant after = zonedBefore.minusWeeks(1).toInstant();
 
-        String team = leaderboardProperties.notification().team();
-        String channelId = leaderboardProperties.notification().channelId();
-
         for (Workspace workspace : workspaces) {
-            var topReviewers = getTop3SlackReviewers(workspace, after, before, Optional.ofNullable(team));
-            if (topReviewers.isEmpty()) {
-                log.info("Skipped Slack notification: reason=noQualifiedReviewers, workspaceId={}", workspace.getId());
-                continue;
-            }
+            processWorkspaceNotification(workspace, after, before, currentDate, allSlackUsers);
+        }
+    }
 
-            List<LayoutBlock> blocks = buildBlocks(workspace, topReviewers, currentDate, after, before, team);
-            try {
-                slackMessageService.sendMessage(channelId, blocks, "Weekly review highlights");
-            } catch (IOException | SlackApiException e) {
-                log.error("Failed to send scheduled Slack message: workspaceId={}", workspace.getId(), e);
-            }
+    private void processWorkspaceNotification(
+        Workspace workspace,
+        Instant after,
+        Instant before,
+        long currentDate,
+        List<User> allSlackUsers
+    ) {
+        // Resolve per-workspace settings with fallback to global config
+        boolean effectiveEnabled =
+            workspace.getLeaderboardNotificationEnabled() != null
+                ? workspace.getLeaderboardNotificationEnabled()
+                : leaderboardProperties.notification().enabled();
+
+        if (!effectiveEnabled) {
+            log.debug("Skipped Slack notification: reason=notificationsDisabled, workspaceId={}", workspace.getId());
+            return;
+        }
+
+        String effectiveChannelId =
+            workspace.getLeaderboardNotificationChannelId() != null
+                ? workspace.getLeaderboardNotificationChannelId()
+                : leaderboardProperties.notification().channelId();
+
+        if (effectiveChannelId == null || effectiveChannelId.isBlank()) {
+            log.warn("Skipped Slack notification: reason=noChannelConfigured, workspaceId={}", workspace.getId());
+            return;
+        }
+
+        String effectiveTeam =
+            workspace.getLeaderboardNotificationTeam() != null
+                ? workspace.getLeaderboardNotificationTeam()
+                : leaderboardProperties.notification().team();
+
+        var topReviewers = getTop3SlackReviewers(
+            workspace,
+            after,
+            before,
+            Optional.ofNullable(effectiveTeam),
+            allSlackUsers
+        );
+        if (topReviewers.isEmpty()) {
+            log.info("Skipped Slack notification: reason=noQualifiedReviewers, workspaceId={}", workspace.getId());
+            return;
+        }
+
+        List<LayoutBlock> blocks = buildBlocks(workspace, topReviewers, currentDate, after, before, effectiveTeam);
+        try {
+            slackMessageService.sendMessage(effectiveChannelId, blocks, "Weekly review highlights");
+            log.info("Sent Slack notification: workspaceId={}, channelId={}", workspace.getId(), effectiveChannelId);
+        } catch (IOException | SlackApiException e) {
+            log.error(
+                "Failed to send scheduled Slack message: workspaceId={}, channelId={}",
+                workspace.getId(),
+                effectiveChannelId,
+                e
+            );
         }
     }
 
