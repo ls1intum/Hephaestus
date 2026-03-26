@@ -13,7 +13,8 @@ export interface EngagementOverviewProps {
 
 export function EngagementOverview({ engagement, totalFindings }: EngagementOverviewProps) {
 	const totalResponded = engagement.applied + engagement.disputed + engagement.notApplicable;
-	const engagementRate = totalFindings > 0 ? Math.round((totalResponded / totalFindings) * 100) : 0;
+	const engagementRate =
+		totalFindings > 0 ? Math.min(Math.round((totalResponded / totalFindings) * 100), 100) : 0;
 	const offset = CIRCUMFERENCE - (engagementRate / 100) * CIRCUMFERENCE;
 
 	return (

@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Sparkles, Trophy, User, Users } from "lucide-react";
+import { ClipboardCheck, Sparkles, Trophy, User, Users } from "lucide-react";
 import {
 	SidebarGroup,
 	SidebarGroupLabel,
@@ -13,11 +13,13 @@ export function NavDashboards({
 	workspaceSlug,
 	achievementsEnabled = true,
 	leaderboardEnabled = true,
+	practicesEnabled = false,
 }: {
 	username: string;
 	workspaceSlug: string;
 	achievementsEnabled?: boolean;
 	leaderboardEnabled?: boolean;
+	practicesEnabled?: boolean;
 }) {
 	return (
 		<SidebarGroup>
@@ -37,6 +39,22 @@ export function NavDashboards({
 						<span>Profile</span>
 					</SidebarMenuButton>
 				</SidebarMenuItem>
+				{practicesEnabled && (
+					<SidebarMenuItem>
+						<SidebarMenuButton
+							tooltip="Practices"
+							render={
+								<Link
+									to="/w/$workspaceSlug/user/$username"
+									params={{ username: username ?? "", workspaceSlug }}
+								/>
+							}
+						>
+							<ClipboardCheck />
+							<span>Practices</span>
+						</SidebarMenuButton>
+					</SidebarMenuItem>
+				)}
 				{achievementsEnabled && (
 					<SidebarMenuItem>
 						<SidebarMenuButton

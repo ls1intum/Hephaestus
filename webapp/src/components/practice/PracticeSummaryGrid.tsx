@@ -25,7 +25,7 @@ export function PracticeSummaryGrid({
 }: PracticeSummaryGridProps) {
 	if (isLoading) {
 		return (
-			<div className="flex flex-col gap-3" aria-busy="true">
+			<div className="flex flex-col gap-3" aria-busy={true}>
 				<h3 className="text-lg font-semibold">Practice overview</h3>
 				<ul
 					aria-label="Practice summaries loading"

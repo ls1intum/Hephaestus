@@ -26,7 +26,7 @@ const SKELETON_FINDING: PracticeFindingList = {
 	verdict: "POSITIVE",
 	severity: "INFO",
 	confidence: 0,
-	detectedAt: new Date(0),
+	detectedAt: new Date("2025-01-01T00:00:00Z"),
 	practiceName: "",
 	practiceSlug: "",
 	targetId: 0,
@@ -66,7 +66,7 @@ export function FindingsList({
 
 	if (isLoading) {
 		return (
-			<div className="flex flex-col gap-3" aria-busy="true">
+			<div className="flex flex-col gap-3" aria-busy={true}>
 				<h3 className="text-lg font-semibold">Findings</h3>
 				<ul aria-label="Findings loading" className="flex flex-col gap-2">
 					{Array.from({ length: 3 }, (_, i) => (

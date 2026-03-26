@@ -98,7 +98,6 @@ function PracticeSectionStory({
 }
 
 const meta = {
-	title: "Components/Practice/PracticeSection",
 	component: PracticeSectionStory,
 	parameters: {
 		layout: "padded",
