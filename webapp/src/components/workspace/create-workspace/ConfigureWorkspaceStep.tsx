@@ -1,26 +1,28 @@
 import { useState } from "react";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { workspaceDetailsSchema } from "./schemas";
+import { type WorkspaceDetailsData, workspaceDetailsSchema } from "./schemas";
 import { generateSlug } from "./slug-utils";
 import { useWizard } from "./wizard-context";
 
 export function ConfigureWorkspaceStep() {
 	const { state, dispatch } = useWizard();
-	const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-	const [touched, setTouched] = useState<Record<string, boolean>>({});
+	const [fieldErrors, setFieldErrors] = useState<
+		Partial<Record<keyof WorkspaceDetailsData, string>>
+	>({});
+	const [touched, setTouched] = useState<Partial<Record<keyof WorkspaceDetailsData, boolean>>>({});
 
 	// Focus is managed by the parent page via headingRef on step change.
 
-	const validate = (overrides: Partial<{ displayName: string; workspaceSlug: string }> = {}) => {
+	const validate = (overrides: Partial<Record<keyof WorkspaceDetailsData, string>> = {}) => {
 		const result = workspaceDetailsSchema.safeParse({
 			displayName: overrides.displayName ?? state.displayName,
 			workspaceSlug: overrides.workspaceSlug ?? state.workspaceSlug,
 		});
 		if (!result.success) {
-			const errors: Record<string, string> = {};
+			const errors: Partial<Record<keyof WorkspaceDetailsData, string>> = {};
 			for (const issue of result.error.issues) {
-				const key = issue.path[0] as string;
+				const key = issue.path[0] as keyof WorkspaceDetailsData;
 				errors[key] = issue.message;
 			}
 			setFieldErrors(errors);
@@ -48,7 +50,7 @@ export function ConfigureWorkspaceStep() {
 		}
 	};
 
-	const handleBlur = (field: string) => {
+	const handleBlur = (field: keyof WorkspaceDetailsData) => {
 		setTouched((prev) => ({ ...prev, [field]: true }));
 		validate();
 	};
@@ -104,14 +106,16 @@ export function ConfigureWorkspaceStep() {
 			</Field>
 
 			{/* Summary */}
-			<div className="rounded-lg border bg-muted/30 p-3 text-sm space-y-1.5">
-				<h2 className="font-medium text-xs text-muted-foreground uppercase tracking-wider">
+			<div className="rounded-lg border bg-muted/30 p-3 text-sm">
+				<h2 className="font-medium text-xs text-muted-foreground uppercase tracking-wider mb-1.5">
 					Summary
 				</h2>
-				<SummaryRow label="Provider" value="GitLab" />
-				<SummaryRow label="Instance" value={state.serverUrl || "https://gitlab.com"} />
-				<SummaryRow label="Group" value={state.selectedGroup?.fullPath ?? "—"} />
-				<SummaryRow label="Token owner" value={state.preflightResult?.username ?? "—"} />
+				<dl className="space-y-1.5">
+					<SummaryRow label="Provider" value="GitLab" />
+					<SummaryRow label="Instance" value={state.serverUrl || "https://gitlab.com"} />
+					<SummaryRow label="Group" value={state.selectedGroup?.fullPath ?? "—"} />
+					<SummaryRow label="Token owner" value={state.preflightResult?.username ?? "—"} />
+				</dl>
 			</div>
 		</div>
 	);
@@ -120,8 +124,8 @@ export function ConfigureWorkspaceStep() {
 function SummaryRow({ label, value }: { label: string; value: string }) {
 	return (
 		<div className="flex justify-between">
-			<span className="text-muted-foreground">{label}</span>
-			<span className="font-medium truncate ml-4">{value}</span>
+			<dt className="text-muted-foreground">{label}</dt>
+			<dd className="font-medium truncate ml-4">{value}</dd>
 		</div>
 	);
 }
