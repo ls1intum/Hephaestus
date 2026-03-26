@@ -52,6 +52,29 @@ const meta = {
 		onResetLeagues: {
 			description: "Function called when resetting leagues",
 		},
+		practicesEnabled: {
+			control: "boolean",
+			description: "Whether best practices feature is enabled",
+		},
+		achievementsEnabled: {
+			control: "boolean",
+			description: "Whether achievements feature is enabled",
+		},
+		leaderboardEnabled: {
+			control: "boolean",
+			description: "Whether leaderboard feature is enabled",
+		},
+		progressionEnabled: {
+			control: "boolean",
+			description: "Whether progression/leagues feature is enabled",
+		},
+		isSavingFeatures: {
+			control: "boolean",
+			description: "Whether feature toggles are being saved",
+		},
+		onToggleFeature: {
+			description: "Function called when toggling a feature",
+		},
 	},
 	args: {
 		repositories: [
@@ -69,6 +92,12 @@ const meta = {
 		onAddRepository: fn(),
 		onRemoveRepository: fn(),
 		onResetLeagues: fn(),
+		practicesEnabled: false,
+		achievementsEnabled: false,
+		leaderboardEnabled: false,
+		progressionEnabled: false,
+		isSavingFeatures: false,
+		onToggleFeature: fn(),
 	},
 } satisfies Meta<typeof AdminSettingsPage>;
 

@@ -10,6 +10,7 @@ import de.tum.in.www1.hephaestus.testconfig.TestAuthUtils;
 import de.tum.in.www1.hephaestus.testconfig.WithAdminUser;
 import de.tum.in.www1.hephaestus.testconfig.WithMentorUser;
 import de.tum.in.www1.hephaestus.workspace.dto.CreateWorkspaceRequestDTO;
+import de.tum.in.www1.hephaestus.workspace.dto.UpdateWorkspaceFeaturesRequestDTO;
 import de.tum.in.www1.hephaestus.workspace.dto.UpdateWorkspaceNotificationsRequestDTO;
 import de.tum.in.www1.hephaestus.workspace.dto.UpdateWorkspaceScheduleRequestDTO;
 import de.tum.in.www1.hephaestus.workspace.dto.UpdateWorkspaceStatusRequestDTO;
@@ -755,5 +756,231 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
         assertThat(problem.getProperties().get("errors"))
             .asInstanceOf(InstanceOfAssertFactories.map(String.class, Object.class))
             .containsKey("workspaceSlug");
+    }
+
+    // ========================================================================
+    // Feature Flags
+    // ========================================================================
+
+    @Test
+    @WithAdminUser
+    void newWorkspaceHasAllFeatureFlagsDisabledByDefault() {
+        User owner = persistUser("feature-owner");
+        Workspace workspace = createWorkspace("feature-defaults", "Defaults", "defaults", AccountType.ORG, owner);
+        ensureAdminMembership(workspace);
+
+        WorkspaceDTO dto = webTestClient
+            .get()
+            .uri("/workspaces/{workspaceSlug}", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody(WorkspaceDTO.class)
+            .returnResult()
+            .getResponseBody();
+
+        assertThat(dto).isNotNull();
+        assertThat(dto.practicesEnabled()).isFalse();
+        assertThat(dto.achievementsEnabled()).isFalse();
+        assertThat(dto.leaderboardEnabled()).isFalse();
+        assertThat(dto.progressionEnabled()).isFalse();
+    }
+
+    @Test
+    @WithAdminUser
+    void updateFeaturesRoundTripEnablesAllFlags() {
+        User owner = persistUser("feature-roundtrip-owner");
+        Workspace workspace = createWorkspace("feature-roundtrip", "Roundtrip", "roundtrip", AccountType.ORG, owner);
+        ensureAdminMembership(workspace);
+
+        // PATCH to enable all flags — verify response body
+        WorkspaceDTO patchResponse = webTestClient
+            .patch()
+            .uri("/workspaces/{workspaceSlug}/features", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(true, true, true, true))
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody(WorkspaceDTO.class)
+            .returnResult()
+            .getResponseBody();
+
+        assertThat(patchResponse).isNotNull();
+        assertThat(patchResponse.practicesEnabled()).isTrue();
+        assertThat(patchResponse.achievementsEnabled()).isTrue();
+        assertThat(patchResponse.leaderboardEnabled()).isTrue();
+        assertThat(patchResponse.progressionEnabled()).isTrue();
+
+        // Verify via GET (true round-trip through the read path)
+        WorkspaceDTO getResponse = webTestClient
+            .get()
+            .uri("/workspaces/{workspaceSlug}", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody(WorkspaceDTO.class)
+            .returnResult()
+            .getResponseBody();
+
+        assertThat(getResponse).isNotNull();
+        assertThat(getResponse.practicesEnabled()).isTrue();
+        assertThat(getResponse.achievementsEnabled()).isTrue();
+        assertThat(getResponse.leaderboardEnabled()).isTrue();
+        assertThat(getResponse.progressionEnabled()).isTrue();
+    }
+
+    @Test
+    @WithAdminUser
+    void updateFeaturesPartialUpdateOnlyChangesSpecifiedFlags() {
+        User owner = persistUser("feature-partial-owner");
+        Workspace workspace = createWorkspace("feature-partial", "Partial", "partial", AccountType.ORG, owner);
+        ensureAdminMembership(workspace);
+
+        // Enable leaderboard only — verify response body
+        WorkspaceDTO afterFirst = webTestClient
+            .patch()
+            .uri("/workspaces/{workspaceSlug}/features", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(null, null, true, null))
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody(WorkspaceDTO.class)
+            .returnResult()
+            .getResponseBody();
+
+        assertThat(afterFirst).isNotNull();
+        assertThat(afterFirst.leaderboardEnabled()).isTrue();
+        assertThat(afterFirst.practicesEnabled()).isFalse();
+        assertThat(afterFirst.achievementsEnabled()).isFalse();
+        assertThat(afterFirst.progressionEnabled()).isFalse();
+
+        // Now enable practices — leaderboard should remain true
+        WorkspaceDTO afterSecond = webTestClient
+            .patch()
+            .uri("/workspaces/{workspaceSlug}/features", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(true, null, null, null))
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody(WorkspaceDTO.class)
+            .returnResult()
+            .getResponseBody();
+
+        assertThat(afterSecond).isNotNull();
+        assertThat(afterSecond.practicesEnabled()).isTrue();
+        assertThat(afterSecond.leaderboardEnabled()).isTrue();
+        assertThat(afterSecond.achievementsEnabled()).isFalse();
+        assertThat(afterSecond.progressionEnabled()).isFalse();
+    }
+
+    @Test
+    @WithAdminUser
+    void updateFeaturesExplicitFalseDisablesPreviouslyEnabledFlag() {
+        User owner = persistUser("feature-disable-owner");
+        Workspace workspace = createWorkspace("feature-disable", "Disable", "disable", AccountType.ORG, owner);
+        ensureAdminMembership(workspace);
+
+        // Enable all flags first
+        webTestClient
+            .patch()
+            .uri("/workspaces/{workspaceSlug}/features", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(true, true, true, true))
+            .exchange()
+            .expectStatus()
+            .isOk();
+
+        // Explicitly disable achievements — others should remain true
+        WorkspaceDTO afterDisable = webTestClient
+            .patch()
+            .uri("/workspaces/{workspaceSlug}/features", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(null, false, null, null))
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody(WorkspaceDTO.class)
+            .returnResult()
+            .getResponseBody();
+
+        assertThat(afterDisable).isNotNull();
+        assertThat(afterDisable.practicesEnabled()).isTrue();
+        assertThat(afterDisable.achievementsEnabled()).isFalse();
+        assertThat(afterDisable.leaderboardEnabled()).isTrue();
+        assertThat(afterDisable.progressionEnabled()).isTrue();
+    }
+
+    @Test
+    @WithMentorUser
+    void updateFeaturesRequiresWorkspaceAdmin() {
+        // Create the mentor user to match @WithMentorUser's default username
+        persistUser("mentor");
+
+        User owner = persistUser("feature-auth-owner");
+        Workspace workspace = createWorkspace("feature-auth", "Auth", "auth", AccountType.ORG, owner);
+        // Mentor is intentionally NOT added as a workspace member
+
+        webTestClient
+            .patch()
+            .uri("/workspaces/{workspaceSlug}/features", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(true, true, true, true))
+            .exchange()
+            .expectStatus()
+            .isForbidden();
+    }
+
+    @Test
+    @WithAdminUser
+    void featureFlagsAreIncludedInWorkspaceListItems() {
+        User owner = persistUser("feature-list-owner");
+        Workspace workspace = createWorkspace("feature-list", "FeatureList", "feature-list", AccountType.ORG, owner);
+        ensureAdminMembership(workspace);
+
+        // Enable some features
+        webTestClient
+            .patch()
+            .uri("/workspaces/{workspaceSlug}/features", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(true, false, true, false))
+            .exchange()
+            .expectStatus()
+            .isOk();
+
+        // Verify list endpoint includes feature flags
+        List<WorkspaceListItemDTO> workspaces = webTestClient
+            .get()
+            .uri("/workspaces")
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBodyList(WorkspaceListItemDTO.class)
+            .returnResult()
+            .getResponseBody();
+
+        assertThat(workspaces).isNotNull();
+        WorkspaceListItemDTO item = workspaces
+            .stream()
+            .filter(ws -> "feature-list".equals(ws.workspaceSlug()))
+            .findFirst()
+            .orElseThrow();
+
+        assertThat(item.practicesEnabled()).isTrue();
+        assertThat(item.achievementsEnabled()).isFalse();
+        assertThat(item.leaderboardEnabled()).isTrue();
+        assertThat(item.progressionEnabled()).isFalse();
     }
 }

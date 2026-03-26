@@ -136,6 +136,51 @@ public class WorkspaceSettingsService {
         return workspaceRepository.save(workspace);
     }
 
+    /**
+     * Update workspace feature flags.
+     * Null parameters are ignored (PATCH semantics).
+     *
+     * @param workspaceId the workspace ID
+     * @param practicesEnabled whether practices feature is enabled
+     * @param achievementsEnabled whether achievements feature is enabled
+     * @param leaderboardEnabled whether leaderboard feature is enabled
+     * @param progressionEnabled whether progression feature is enabled
+     * @return the updated workspace
+     */
+    @Transactional
+    public Workspace updateFeatures(
+        Long workspaceId,
+        Boolean practicesEnabled,
+        Boolean achievementsEnabled,
+        Boolean leaderboardEnabled,
+        Boolean progressionEnabled
+    ) {
+        Workspace workspace = requireWorkspace(workspaceId);
+
+        if (practicesEnabled != null) {
+            workspace.setPracticesEnabled(practicesEnabled);
+        }
+        if (achievementsEnabled != null) {
+            workspace.setAchievementsEnabled(achievementsEnabled);
+        }
+        if (leaderboardEnabled != null) {
+            workspace.setLeaderboardEnabled(leaderboardEnabled);
+        }
+        if (progressionEnabled != null) {
+            workspace.setProgressionEnabled(progressionEnabled);
+        }
+
+        log.info(
+            "Updated workspace features: workspaceId={}, practices={}, achievements={}, leaderboard={}, progression={}",
+            workspaceId,
+            practicesEnabled,
+            achievementsEnabled,
+            leaderboardEnabled,
+            progressionEnabled
+        );
+        return workspaceRepository.save(workspace);
+    }
+
     private Workspace requireWorkspace(Long workspaceId) {
         return workspaceRepository
             .findById(workspaceId)

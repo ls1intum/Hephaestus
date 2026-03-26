@@ -303,6 +303,39 @@ public class WorkspaceService {
         return updatePublicVisibility(requireSlug(workspaceContext), isPubliclyViewable);
     }
 
+    public Workspace updateFeatures(
+        String slug,
+        Boolean practicesEnabled,
+        Boolean achievementsEnabled,
+        Boolean leaderboardEnabled,
+        Boolean progressionEnabled
+    ) {
+        Workspace workspace = requireWorkspace(slug);
+        return workspaceSettingsService.updateFeatures(
+            workspace.getId(),
+            practicesEnabled,
+            achievementsEnabled,
+            leaderboardEnabled,
+            progressionEnabled
+        );
+    }
+
+    public Workspace updateFeatures(
+        WorkspaceContext workspaceContext,
+        Boolean practicesEnabled,
+        Boolean achievementsEnabled,
+        Boolean leaderboardEnabled,
+        Boolean progressionEnabled
+    ) {
+        return updateFeatures(
+            requireSlug(workspaceContext),
+            practicesEnabled,
+            achievementsEnabled,
+            leaderboardEnabled,
+            progressionEnabled
+        );
+    }
+
     // ========================================================================
     // Slug Renaming
     // ========================================================================

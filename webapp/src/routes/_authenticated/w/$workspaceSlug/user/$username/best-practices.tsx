@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { toast } from "sonner";
 import {
 	detectForPullRequestMutation,
@@ -12,8 +13,10 @@ import {
 } from "@/api/@tanstack/react-query.gen";
 import type { BadPracticeFeedback } from "@/api/types.gen";
 import { PracticesPage } from "@/components/practices/PracticesPage";
+import { Spinner } from "@/components/ui/spinner";
 import { NoWorkspace } from "@/components/workspace/NoWorkspace";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
+import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
 import { useAuth } from "@/integrations/auth/AuthContext";
 import { getProviderTerms } from "@/lib/provider";
 
@@ -27,7 +30,9 @@ export function BestPracticesContainer() {
 	const { username } = Route.useParams();
 	const { isCurrentUser } = useAuth();
 	const queryClient = useQueryClient();
+	const navigate = useNavigate();
 	const { workspaceSlug, providerType } = useActiveWorkspaceSlug();
+	const { practicesEnabled, isLoading: featuresLoading } = useWorkspaceFeatures();
 	const terms = getProviderTerms(providerType);
 	const slug = workspaceSlug ?? "";
 	const hasWorkspace = Boolean(workspaceSlug);
@@ -116,6 +121,26 @@ export function BestPracticesContainer() {
 			);
 		},
 	});
+
+	// Feature guard — redirect to profile when practices are disabled
+	useEffect(() => {
+		if (!featuresLoading && !practicesEnabled && workspaceSlug) {
+			toast.error("Best practices are not enabled for this workspace");
+			navigate({
+				to: "/w/$workspaceSlug/user/$username",
+				params: { workspaceSlug, username },
+				replace: true,
+			});
+		}
+	}, [featuresLoading, practicesEnabled, workspaceSlug, username, navigate]);
+
+	if (featuresLoading || !practicesEnabled) {
+		return (
+			<div className="flex items-center justify-center h-96">
+				<Spinner className="size-8" />
+			</div>
+		);
+	}
 
 	if (showNoWorkspace) {
 		return <NoWorkspace />;

@@ -307,6 +307,30 @@ public class Workspace {
     @ToString.Exclude
     private String slackSigningSecret;
 
+    // ========================================================================
+    // Feature Flags
+    // ========================================================================
+
+    /** Whether the best practices detection and tracking feature is enabled for this workspace */
+    @Column(name = "practices_enabled", nullable = false)
+    @NotNull(message = "Practices enabled flag is required")
+    private Boolean practicesEnabled = false;
+
+    /** Whether the achievements system (badges, skill trees) is enabled for this workspace */
+    @Column(name = "achievements_enabled", nullable = false)
+    @NotNull(message = "Achievements enabled flag is required")
+    private Boolean achievementsEnabled = false;
+
+    /** Whether the leaderboard ranking page is enabled for this workspace */
+    @Column(name = "leaderboard_enabled", nullable = false)
+    @NotNull(message = "Leaderboard enabled flag is required")
+    private Boolean leaderboardEnabled = false;
+
+    /** Whether the league/progression system is enabled for this workspace */
+    @Column(name = "progression_enabled", nullable = false)
+    @NotNull(message = "Progression enabled flag is required")
+    private Boolean progressionEnabled = false;
+
     /**
      * Returns the high-level provider type (GITHUB or GITLAB) derived from the authentication mode.
      *

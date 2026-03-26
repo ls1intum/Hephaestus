@@ -728,6 +728,10 @@ erDiagram
         VARCHAR(512) server_url
         BIGINT gitlab_group_id
         BIGINT gitlab_webhook_id
+        BOOLEAN practices_enabled "NOT NULL"
+        BOOLEAN achievements_enabled "NOT NULL"
+        BOOLEAN leaderboard_enabled "NOT NULL"
+        BOOLEAN progression_enabled "NOT NULL"
     }
 
     WorkspaceMembership {

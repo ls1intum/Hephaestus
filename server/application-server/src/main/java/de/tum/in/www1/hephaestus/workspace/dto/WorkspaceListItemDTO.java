@@ -18,7 +18,11 @@ public record WorkspaceListItemDTO(
     String status,
     @NonNull @Schema(description = "Git provider account login associated with this workspace") String accountLogin,
     @NonNull @Schema(description = "High-level git provider type (GITHUB or GITLAB)") GitProviderType providerType,
-    @NonNull @Schema(description = "Timestamp when the workspace was created") Instant createdAt
+    @NonNull @Schema(description = "Timestamp when the workspace was created") Instant createdAt,
+    @NonNull @Schema(description = "Whether best practices detection is enabled") Boolean practicesEnabled,
+    @NonNull @Schema(description = "Whether the achievements system is enabled") Boolean achievementsEnabled,
+    @NonNull @Schema(description = "Whether the leaderboard is enabled") Boolean leaderboardEnabled,
+    @NonNull @Schema(description = "Whether the league/progression system is enabled") Boolean progressionEnabled
 ) {
     public static WorkspaceListItemDTO from(Workspace workspace) {
         return new WorkspaceListItemDTO(
@@ -28,7 +32,11 @@ public record WorkspaceListItemDTO(
             workspace.getStatus() != null ? workspace.getStatus().name() : null,
             workspace.getAccountLogin(),
             workspace.getProviderType(),
-            workspace.getCreatedAt()
+            workspace.getCreatedAt(),
+            workspace.getPracticesEnabled(),
+            workspace.getAchievementsEnabled(),
+            workspace.getLeaderboardEnabled(),
+            workspace.getProgressionEnabled()
         );
     }
 }
