@@ -99,34 +99,19 @@ public class AchievementRegistry {
 
                 // Validate deduplicated achievement definitions
                 boolean hasErrors = false;
-                for (AchievementDefinition record : tempIdMap.values()) {
-                    String parentId = record.parent();
-                    if (parentId != null && !parentId.isEmpty()) {
-                        // Self-reference check
-                        if (parentId.equals(record.id())) {
-                            log.error(
-                                "Achievement '{}' references ITSELF as parent — it will be permanently locked",
-                                record.id()
-                            );
-                            hasErrors = true;
-                        }
-                        // Unknown parent check
-                        if (!tempIdMap.containsKey(parentId)) {
-                            log.error("Achievement '{}' references unknown parent: '{}'", record.id(), parentId);
-                            hasErrors = true;
-                        }
-                    }
+                for (AchievementDefinition definition : tempIdMap.values()) {
+                    String parentId = definition.parent();
 
                     // Cycle detection (walk the parent chain, max depth = total achievements)
-                    if (parentId != null && !parentId.isEmpty() && !parentId.equals(record.id())) {
+                    if (parentId != null && !parentId.isEmpty() && !parentId.equals(definition.id())) {
                         Set<String> visited = new HashSet<>();
-                        visited.add(record.id());
+                        visited.add(definition.id());
                         String current = parentId;
                         while (current != null && !current.isEmpty()) {
                             if (!visited.add(current)) {
                                 log.error(
                                     "Achievement '{}' has parent chain that reaches a cycle: {}",
-                                    record.id(),
+                                    definition.id(),
                                     visited
                                 );
                                 hasErrors = true;
@@ -138,7 +123,7 @@ public class AchievementRegistry {
                     }
 
                     // Validate evaluatorClass resolves to a real class
-                    String evalClass = record.evaluatorClass();
+                    String evalClass = definition.evaluatorClass();
                     if (evalClass != null && !evalClass.isEmpty()) {
                         String fqn = evalClass.contains(".")
                             ? evalClass
@@ -148,7 +133,7 @@ public class AchievementRegistry {
                         } catch (ClassNotFoundException e) {
                             log.error(
                                 "Achievement '{}' references unknown evaluator class: '{}'",
-                                record.id(),
+                                definition.id(),
                                 evalClass
                             );
                             hasErrors = true;
@@ -156,16 +141,16 @@ public class AchievementRegistry {
                     }
 
                     // Normalize evaluator class name for DummyEvaluator check
-                    boolean isDummy = isDummyEvaluator(record.evaluatorClass());
-                    boolean hasTriggers = record.triggerEvents() != null && !record.triggerEvents().isEmpty();
+                    boolean isDummy = isDummyEvaluator(definition.evaluatorClass());
+                    boolean hasTriggers = definition.triggerEvents() != null && !definition.triggerEvents().isEmpty();
 
                     // Non-DummyEvaluator with empty triggerEvents = achievement can never be evaluated
                     if (!isDummy && !hasTriggers) {
                         log.error(
                             "Achievement '{}' uses evaluator {} but has no triggerEvents — " +
                                 "it will never be evaluated",
-                            record.id(),
-                            record.evaluatorClass()
+                            definition.id(),
+                            definition.evaluatorClass()
                         );
                         hasErrors = true;
                     }
@@ -175,8 +160,8 @@ public class AchievementRegistry {
                         log.warn(
                             "Achievement '{}' uses DummyEvaluator but has active triggerEvents {} — " +
                                 "this causes wasted DB work on every qualifying event",
-                            record.id(),
-                            record.triggerEvents()
+                            definition.id(),
+                            definition.triggerEvents()
                         );
                     }
                 }
