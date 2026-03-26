@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { BookUser, Map as MapIcon, Settings2, Trophy, Users } from "lucide-react";
+import { BookUser, ClipboardCheck, Map as MapIcon, Settings2, Trophy, Users } from "lucide-react";
 import {
 	SidebarGroup,
 	SidebarGroupLabel,
@@ -8,7 +8,12 @@ import {
 	SidebarMenuItem,
 } from "@/components/ui/sidebar";
 
-export function NavAdmin({ workspaceSlug }: { workspaceSlug: string }) {
+export interface NavAdminProps {
+	workspaceSlug: string;
+	practicesEnabled?: boolean;
+}
+
+export function NavAdmin({ workspaceSlug, practicesEnabled = true }: NavAdminProps) {
 	return (
 		<SidebarGroup>
 			<SidebarGroupLabel>Administration</SidebarGroupLabel>
@@ -49,6 +54,17 @@ export function NavAdmin({ workspaceSlug }: { workspaceSlug: string }) {
 						<span>Manage achievements</span>
 					</SidebarMenuButton>
 				</SidebarMenuItem>
+				{practicesEnabled && (
+					<SidebarMenuItem>
+						<SidebarMenuButton
+							tooltip="Manage practices"
+							render={<Link to="/w/$workspaceSlug/admin/practices" params={{ workspaceSlug }} />}
+						>
+							<ClipboardCheck />
+							<span>Manage practices</span>
+						</SidebarMenuButton>
+					</SidebarMenuItem>
+				)}
 				<SidebarMenuItem>
 					<SidebarMenuButton
 						tooltip="Achievement Designer"

@@ -111,7 +111,12 @@ export function AppSidebar({
 					leaderboardEnabled={activeWorkspace.leaderboardEnabled}
 				/>
 				{hasMentorAccess && <NavMentor workspaceSlug={activeWorkspace.workspaceSlug} />}
-				{isAdmin && <NavAdmin workspaceSlug={activeWorkspace.workspaceSlug} />}
+				{isAdmin && (
+					<NavAdmin
+						workspaceSlug={activeWorkspace.workspaceSlug}
+						practicesEnabled={activeWorkspace.practicesEnabled}
+					/>
+				)}
 			</>
 		);
 	}

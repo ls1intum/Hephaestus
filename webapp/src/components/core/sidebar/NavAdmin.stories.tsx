@@ -20,11 +20,16 @@ const meta = {
 	tags: ["autodocs"],
 	args: {
 		workspaceSlug: "aet",
+		practicesEnabled: true,
 	},
 	argTypes: {
 		workspaceSlug: {
 			control: "text",
 			description: "Active workspace slug",
+		},
+		practicesEnabled: {
+			control: "boolean",
+			description: "Whether practice management is available",
 		},
 	},
 	decorators: [
@@ -40,6 +45,13 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * Default view of the administration navigation sidebar.
+ * Default view of the administration navigation sidebar with all features enabled.
  */
 export const Default: Story = {};
+
+/** Admin navigation with practices feature disabled. */
+export const PracticesDisabled: Story = {
+	args: {
+		practicesEnabled: false,
+	},
+};
