@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, Navigate, useNavigate } from "@tanstack/react-router";
 import { ArrowLeftIcon, OctagonXIcon } from "lucide-react";
-import { useEffect, useReducer, useRef, useState } from "react";
+import { useEffect, useMemo, useReducer, useRef } from "react";
 import { toast } from "sonner";
 import {
 	createWorkspaceMutation,
@@ -50,13 +50,15 @@ function GitLabWizardPage() {
 	const { setSelectedSlug } = useWorkspaceStore();
 	const headingRef = useRef<HTMLHeadingElement>(null);
 
-	// Visually hidden live region for step change announcements
-	const [announcement, setAnnouncement] = useState("");
+	const stepAnnouncement = `Step ${state.step} of 3: ${STEP_META[state.step - 1].title}`;
 
 	const listGroups = useMutation({
 		...listGitLabGroupsMutation(),
 		onError: (error) => {
-			console.error("Failed to load GitLab groups:", { serverUrl: state.serverUrl }, error);
+			console.error("Failed to load GitLab groups:", {
+				serverUrl: state.serverUrl,
+				message: error instanceof Error ? error.message : "Unknown error",
+			});
 		},
 	});
 
@@ -71,11 +73,11 @@ function GitLabWizardPage() {
 			});
 		},
 		onError: (error) => {
-			console.error(
-				"Workspace creation failed:",
-				{ step: state.step, serverUrl: state.serverUrl },
-				error,
-			);
+			console.error("Workspace creation failed:", {
+				step: state.step,
+				serverUrl: state.serverUrl,
+				message: error instanceof Error ? error.message : "Unknown error",
+			});
 			const rawError =
 				typeof error === "object" && error !== null && "error" in error
 					? (error as Record<string, unknown>).error
@@ -91,18 +93,19 @@ function GitLabWizardPage() {
 
 	const canAdvanceFromStep1 = state.preflightResult?.valid === true;
 	const canAdvanceFromStep2 = state.selectedGroup !== null;
-	const canSubmit =
-		state.step === 3 &&
-		state.selectedGroup !== null &&
-		workspaceDetailsSchema.safeParse({
-			displayName: state.displayName,
-			workspaceSlug: state.workspaceSlug,
-		}).success;
+	const canSubmit = useMemo(
+		() =>
+			state.step === 3 &&
+			state.selectedGroup !== null &&
+			workspaceDetailsSchema.safeParse({
+				displayName: state.displayName,
+				workspaceSlug: state.workspaceSlug,
+			}).success,
+		[state.step, state.selectedGroup, state.displayName, state.workspaceSlug],
+	);
 
-	// Announce step changes to screen readers and manage focus
+	// biome-ignore lint/correctness/useExhaustiveDependencies: state.step is an intentional trigger to refocus heading on step change
 	useEffect(() => {
-		const stepMeta = STEP_META[state.step - 1];
-		setAnnouncement(`Step ${state.step} of 3: ${stepMeta.title}`);
 		headingRef.current?.focus();
 	}, [state.step]);
 
@@ -179,7 +182,7 @@ function GitLabWizardPage() {
 		<div className="mx-auto max-w-lg px-4 py-8">
 			{/* Visually hidden live region for screen reader step announcements */}
 			<div aria-live="polite" aria-atomic="true" className="sr-only">
-				{announcement}
+				{stepAnnouncement}
 			</div>
 
 			<Link

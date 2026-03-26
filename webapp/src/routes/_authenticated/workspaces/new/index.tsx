@@ -52,6 +52,7 @@ function ProviderSelectionPage() {
 			<Link
 				to="/"
 				className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-6"
+				aria-label="Back to dashboard"
 			>
 				<ArrowLeftIcon className="size-3.5" />
 				Back
@@ -80,7 +81,11 @@ function ProviderSelectionPage() {
 			) : (
 				<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 					{providers.map((provider) => (
-						<Link key={provider.id} to={provider.to}>
+						<Link
+							key={provider.id}
+							to={provider.to}
+							aria-label={`Set up workspace with ${provider.name}`}
+						>
 							<Card className="h-full cursor-pointer transition-colors hover:bg-muted/50 hover:border-foreground/20">
 								<CardHeader>
 									<div className="flex items-center gap-3 mb-1">
