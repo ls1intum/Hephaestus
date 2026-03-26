@@ -1,0 +1,160 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                   http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        Standardize organization login uniqueness to case-insensitive (matches User table pattern).
+
+        The User table already uses LOWER(login) in its unique index (uk_user_provider_login,
+        created in 1772284124265). The Organization table still uses a case-sensitive constraint.
+        Under concurrent webhook load, two threads could insert the same org with different casings
+        ("MyOrg" / "myorg") and the case-sensitive constraint would allow both.
+
+        This migration:
+          1. Reassigns FK references from duplicate orgs to the canonical (lowest-id) row
+          2. Deletes duplicate organization rows that differ only in login casing
+          3. Replaces the case-sensitive unique constraint with a functional index on LOWER(login)
+
+        FK references to organization.id exist in:
+          - repository.organization_id       (fk_repository_organization)
+          - workspace.organization_id        (fk_workspace_organization)
+          - issue_type.organization_id       (fk_issue_type_organization)
+          - organization_membership          (composite PK: organization_id, user_id)
+    -->
+
+    <!-- Step 1: Reassign FK references and delete case-variant duplicate organizations -->
+    <changeSet id="1774558928650-1" author="issue-404">
+        <comment>Deduplicate organization rows that differ only in login casing.
+            Reassigns all FK references (repository, workspace, issue_type, organization_membership)
+            from duplicate rows to the canonical row (lowest id per provider_id + LOWER(login) group),
+            then deletes the duplicates. This is irreversible — deleted rows cannot be restored.</comment>
+        <sql>
+            -- Identify canonical (surviving) row per case-insensitive group
+            WITH canonical AS (
+                SELECT MIN(id) AS keep_id, provider_id, LOWER(login) AS login_lower
+                FROM organization
+                GROUP BY provider_id, LOWER(login)
+            ),
+            dupes AS (
+                SELECT o.id AS dupe_id, c.keep_id
+                FROM organization o
+                JOIN canonical c ON o.provider_id = c.provider_id
+                    AND LOWER(o.login) = c.login_lower
+                    AND o.id != c.keep_id
+            )
+            -- Reassign repository FK references
+            UPDATE repository SET organization_id = d.keep_id
+            FROM dupes d WHERE repository.organization_id = d.dupe_id;
+        </sql>
+        <sql>
+            WITH canonical AS (
+                SELECT MIN(id) AS keep_id, provider_id, LOWER(login) AS login_lower
+                FROM organization
+                GROUP BY provider_id, LOWER(login)
+            ),
+            dupes AS (
+                SELECT o.id AS dupe_id, c.keep_id
+                FROM organization o
+                JOIN canonical c ON o.provider_id = c.provider_id
+                    AND LOWER(o.login) = c.login_lower
+                    AND o.id != c.keep_id
+            )
+            -- Reassign workspace FK references
+            UPDATE workspace SET organization_id = d.keep_id
+            FROM dupes d WHERE workspace.organization_id = d.dupe_id;
+        </sql>
+        <sql>
+            WITH canonical AS (
+                SELECT MIN(id) AS keep_id, provider_id, LOWER(login) AS login_lower
+                FROM organization
+                GROUP BY provider_id, LOWER(login)
+            ),
+            dupes AS (
+                SELECT o.id AS dupe_id, c.keep_id
+                FROM organization o
+                JOIN canonical c ON o.provider_id = c.provider_id
+                    AND LOWER(o.login) = c.login_lower
+                    AND o.id != c.keep_id
+            )
+            -- Reassign issue_type FK references
+            UPDATE issue_type SET organization_id = d.keep_id
+            FROM dupes d WHERE issue_type.organization_id = d.dupe_id;
+        </sql>
+        <sql>
+            -- Reassign organization_membership rows from duplicate orgs to canonical orgs.
+            -- INSERT...ON CONFLICT handles cases where the canonical org already has a membership
+            -- for the same user (keep the existing one, skip the duplicate's membership).
+            WITH canonical AS (
+                SELECT MIN(id) AS keep_id, provider_id, LOWER(login) AS login_lower
+                FROM organization
+                GROUP BY provider_id, LOWER(login)
+            ),
+            dupes AS (
+                SELECT o.id AS dupe_id, c.keep_id
+                FROM organization o
+                JOIN canonical c ON o.provider_id = c.provider_id
+                    AND LOWER(o.login) = c.login_lower
+                    AND o.id != c.keep_id
+            )
+            INSERT INTO organization_membership (organization_id, user_id, role)
+            SELECT d.keep_id, om.user_id, om.role
+            FROM organization_membership om
+            JOIN dupes d ON om.organization_id = d.dupe_id
+            ON CONFLICT (organization_id, user_id) DO NOTHING;
+        </sql>
+        <sql>
+            -- Delete membership rows that still reference duplicate orgs (already reassigned above)
+            WITH canonical AS (
+                SELECT MIN(id) AS keep_id, provider_id, LOWER(login) AS login_lower
+                FROM organization
+                GROUP BY provider_id, LOWER(login)
+            ),
+            dupes AS (
+                SELECT o.id AS dupe_id, c.keep_id
+                FROM organization o
+                JOIN canonical c ON o.provider_id = c.provider_id
+                    AND LOWER(o.login) = c.login_lower
+                    AND o.id != c.keep_id
+            )
+            DELETE FROM organization_membership
+            WHERE organization_id IN (SELECT dupe_id FROM dupes);
+        </sql>
+        <sql>
+            -- Now delete the duplicate organization rows (all FK references already reassigned)
+            DELETE FROM organization
+            WHERE id NOT IN (
+                SELECT MIN(id) FROM organization GROUP BY provider_id, LOWER(login)
+            );
+        </sql>
+        <rollback>
+            <!-- Data deletion is irreversible. This changeset cannot be rolled back.
+                 Restore from backup if needed. -->
+        </rollback>
+    </changeSet>
+
+    <!-- Step 2: Replace case-sensitive constraint with case-insensitive functional index.
+         No preCondition needed: the old constraint and new index share the same name
+         (uq_organization_provider_login), making indexExists indistinguishable between the two.
+         The DROP CONSTRAINT IF EXISTS + DROP INDEX IF EXISTS guards handle both cases safely. -->
+    <changeSet id="1774558928650-2" author="issue-404">
+        <comment>Replace case-sensitive uq_organization_provider_login with case-insensitive
+            functional index, matching the User table pattern (uk_user_provider_login).</comment>
+        <sql>
+            ALTER TABLE organization DROP CONSTRAINT IF EXISTS uq_organization_provider_login;
+            DROP INDEX IF EXISTS uq_organization_provider_login;
+        </sql>
+        <sql>
+            CREATE UNIQUE INDEX uq_organization_provider_login ON organization (provider_id, LOWER(login));
+        </sql>
+        <rollback>
+            <sql>DROP INDEX IF EXISTS uq_organization_provider_login;</sql>
+            <sql>
+                ALTER TABLE organization
+                ADD CONSTRAINT uq_organization_provider_login UNIQUE (provider_id, login);
+            </sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>
