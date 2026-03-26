@@ -91,6 +91,8 @@ export function FindingsListItem({
 									<Skeleton className="h-4 w-5/6" />
 									<Skeleton className="h-4 w-2/3" />
 								</div>
+							) : detailQuery.isError ? (
+								<p className="text-sm text-muted-foreground pt-2">Failed to load details.</p>
 							) : (
 								<FindingDetail
 									detail={detailQuery.data}

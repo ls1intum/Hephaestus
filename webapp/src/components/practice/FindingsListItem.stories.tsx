@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { subDays, subHours } from "date-fns";
 import { mockFindings } from "./__fixtures__/mock-data";
 import { FindingsListItem } from "./FindingsListItem";
 
@@ -55,7 +54,7 @@ export const Negative: Story = {
 			title: "Missing error handling in async operation",
 			verdict: "NEGATIVE",
 			severity: "MAJOR",
-			detectedAt: subHours(new Date(), 5),
+			detectedAt: new Date("2025-06-15T07:00:00Z"),
 			practiceName: "Error Handling",
 			practiceSlug: "error-handling",
 		},
@@ -73,7 +72,7 @@ export const NeedsReview: Story = {
 			title: "Complex logic pattern detected — review recommended",
 			verdict: "NEEDS_REVIEW",
 			severity: "INFO",
-			detectedAt: subDays(new Date(), 1),
+			detectedAt: new Date("2025-06-14T12:00:00Z"),
 			practiceName: "Code Complexity",
 			practiceSlug: "code-complexity",
 		},
@@ -91,7 +90,7 @@ export const NotApplicable: Story = {
 			title: "Practice not applicable to this repository configuration",
 			verdict: "NOT_APPLICABLE",
 			severity: "INFO",
-			detectedAt: subDays(new Date(), 4),
+			detectedAt: new Date("2025-06-11T12:00:00Z"),
 			practiceName: "Naming Conventions",
 			practiceSlug: "naming-conventions",
 		},
@@ -110,7 +109,7 @@ export const CriticalNegative: Story = {
 			verdict: "NEGATIVE",
 			severity: "CRITICAL",
 			confidence: 0.97,
-			detectedAt: subHours(new Date(), 1),
+			detectedAt: new Date("2025-06-15T11:00:00Z"),
 			practiceName: "Error Handling",
 			practiceSlug: "error-handling",
 			category: "Reliability",

@@ -65,7 +65,7 @@ export const ManyPractices: Story = {
 				positiveCount: 9,
 				negativeCount: 1,
 				totalFindings: 10,
-				lastFindingAt: new Date(),
+				lastFindingAt: new Date("2025-06-15T10:00:00Z"),
 			},
 		],
 	},

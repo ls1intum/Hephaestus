@@ -1,8 +1,13 @@
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { getSummaryOptions, listFindingsInfiniteOptions } from "@/api/@tanstack/react-query.gen";
+import {
+	getEngagementOptions,
+	getSummaryOptions,
+	listFindingsInfiniteOptions,
+} from "@/api/@tanstack/react-query.gen";
 import type {
 	ContributorPracticeSummary,
+	FindingFeedbackEngagement,
 	ListFindingsData,
 	PracticeFindingList,
 } from "@/api/types.gen";
@@ -18,7 +23,6 @@ const FINDINGS_THRESHOLD = 3;
 export interface UsePracticeFindingsReturn {
 	practicesEnabled: boolean;
 	isFeaturesLoading: boolean;
-	allSummaries: ContributorPracticeSummary[];
 	visibleSummaries: ContributorPracticeSummary[];
 	findings: PracticeFindingList[];
 	practiceOptions: Array<{ value: string; label: string }>;
@@ -34,6 +38,8 @@ export interface UsePracticeFindingsReturn {
 	isFetchingMore: boolean;
 	fetchMore: () => void;
 	retry: () => void;
+	totalFindings: number;
+	engagement: FindingFeedbackEngagement | undefined;
 }
 
 /**
@@ -85,10 +91,21 @@ export function usePracticeFindings(workspaceSlug: string): UsePracticeFindingsR
 		placeholderData: (previousData) => previousData,
 	});
 
+	// Engagement query — feedback stats across all findings
+	const engagementQueryOpts = getEngagementOptions({
+		path: { workspaceSlug },
+	});
+	const engagementQuery = useQuery({
+		...engagementQueryOpts,
+		enabled: practicesEnabled && !featuresLoading && (summaryQuery.data ?? []).length > 0,
+		staleTime: STALE_TIME,
+	});
+
 	// Derived state
 	const allSummaries = summaryQuery.data ?? [];
 	const visibleSummaries = allSummaries.filter((s) => s.totalFindings >= FINDINGS_THRESHOLD);
 	const findings = findingsQuery.data?.pages.flatMap((p) => p.content ?? []) ?? [];
+	const totalFindings = allSummaries.reduce((sum, s) => sum + s.totalFindings, 0);
 
 	const handlePracticeSelect = (practiceSlug: string | null) => {
 		setSelectedPracticeSlug(practiceSlug);
@@ -97,15 +114,13 @@ export function usePracticeFindings(workspaceSlug: string): UsePracticeFindingsR
 
 	const retry = () => {
 		queryClient.invalidateQueries({ queryKey: summaryQueryOpts.queryKey });
-		queryClient.invalidateQueries({
-			queryKey: findingsInfiniteOpts.queryKey,
-		});
+		queryClient.invalidateQueries({ queryKey: findingsInfiniteOpts.queryKey });
+		queryClient.invalidateQueries({ queryKey: engagementQueryOpts.queryKey });
 	};
 
 	return {
 		practicesEnabled,
 		isFeaturesLoading: featuresLoading,
-		allSummaries,
 		visibleSummaries,
 		findings,
 		practiceOptions: allSummaries.map((s) => ({
@@ -124,5 +139,7 @@ export function usePracticeFindings(workspaceSlug: string): UsePracticeFindingsR
 		isFetchingMore: findingsQuery.isFetchingNextPage,
 		fetchMore: findingsQuery.fetchNextPage,
 		retry,
+		totalFindings,
+		engagement: engagementQuery.data,
 	};
 }

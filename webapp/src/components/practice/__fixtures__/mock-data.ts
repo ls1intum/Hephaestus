@@ -1,5 +1,7 @@
-import { subDays, subHours } from "date-fns";
 import type { ContributorPracticeSummary, PracticeFindingList } from "@/api/types.gen";
+
+/** Fixed reference date for deterministic Storybook snapshots. */
+const REFERENCE_DATE = new Date("2025-06-15T12:00:00Z");
 
 export const mockSummaries: ContributorPracticeSummary[] = [
 	{
@@ -9,7 +11,7 @@ export const mockSummaries: ContributorPracticeSummary[] = [
 		positiveCount: 15,
 		negativeCount: 3,
 		totalFindings: 18,
-		lastFindingAt: new Date(),
+		lastFindingAt: REFERENCE_DATE,
 	},
 	{
 		practiceName: "Test Coverage",
@@ -18,7 +20,7 @@ export const mockSummaries: ContributorPracticeSummary[] = [
 		positiveCount: 5,
 		negativeCount: 8,
 		totalFindings: 13,
-		lastFindingAt: new Date(),
+		lastFindingAt: new Date("2025-06-14T10:00:00Z"),
 	},
 	{
 		practiceName: "Error Handling",
@@ -27,7 +29,7 @@ export const mockSummaries: ContributorPracticeSummary[] = [
 		positiveCount: 7,
 		negativeCount: 4,
 		totalFindings: 11,
-		lastFindingAt: new Date(),
+		lastFindingAt: new Date("2025-06-13T08:00:00Z"),
 	},
 	{
 		practiceName: "Documentation Standards",
@@ -36,7 +38,7 @@ export const mockSummaries: ContributorPracticeSummary[] = [
 		positiveCount: 10,
 		negativeCount: 2,
 		totalFindings: 12,
-		lastFindingAt: new Date(),
+		lastFindingAt: new Date("2025-06-12T15:00:00Z"),
 	},
 ];
 
@@ -47,7 +49,7 @@ export const mockFindings: PracticeFindingList[] = [
 		verdict: "POSITIVE",
 		severity: "MINOR",
 		confidence: 0.92,
-		detectedAt: subHours(new Date(), 3),
+		detectedAt: new Date("2025-06-15T09:00:00Z"),
 		practiceName: "Code Review Thoroughness",
 		practiceSlug: "code-review-thoroughness",
 		category: "Code Quality",
@@ -60,7 +62,7 @@ export const mockFindings: PracticeFindingList[] = [
 		verdict: "NEGATIVE",
 		severity: "MAJOR",
 		confidence: 0.88,
-		detectedAt: subHours(new Date(), 8),
+		detectedAt: new Date("2025-06-15T04:00:00Z"),
 		practiceName: "Error Handling",
 		practiceSlug: "error-handling",
 		category: "Reliability",
@@ -73,7 +75,7 @@ export const mockFindings: PracticeFindingList[] = [
 		verdict: "POSITIVE",
 		severity: "INFO",
 		confidence: 0.95,
-		detectedAt: subDays(new Date(), 1),
+		detectedAt: new Date("2025-06-14T12:00:00Z"),
 		practiceName: "Test Coverage",
 		practiceSlug: "test-coverage",
 		category: "Testing",
@@ -86,7 +88,7 @@ export const mockFindings: PracticeFindingList[] = [
 		verdict: "POSITIVE",
 		severity: "MINOR",
 		confidence: 0.85,
-		detectedAt: subDays(new Date(), 2),
+		detectedAt: new Date("2025-06-13T12:00:00Z"),
 		practiceName: "Code Review Thoroughness",
 		practiceSlug: "code-review-thoroughness",
 		category: "Code Quality",
@@ -99,7 +101,7 @@ export const mockFindings: PracticeFindingList[] = [
 		verdict: "NEGATIVE",
 		severity: "CRITICAL",
 		confidence: 0.91,
-		detectedAt: subDays(new Date(), 3),
+		detectedAt: new Date("2025-06-12T12:00:00Z"),
 		practiceName: "Error Handling",
 		practiceSlug: "error-handling",
 		category: "Reliability",
