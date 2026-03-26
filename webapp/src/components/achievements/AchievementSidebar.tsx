@@ -1,3 +1,4 @@
+import { Progress as ProgressRoot } from "@base-ui/react/progress";
 import { useReactFlow } from "@xyflow/react";
 import {
 	CircleDot,
@@ -26,7 +27,6 @@ import {
 import type { AchievementCategory, UIAchievement, ViewMode } from "@/components/achievements/types";
 import { calculateStats } from "@/components/achievements/utils";
 import { Button } from "@/components/ui/button";
-import { Progress as ProgressRoot } from "@base-ui/react/progress";
 import { ProgressIndicator, ProgressTrack } from "@/components/ui/progress";
 import {
 	Sheet,
@@ -135,7 +135,8 @@ function SidebarBody({
 								value={[viewMode]}
 								onValueChange={(value) => {
 									// Ensure at least one value is selected (last one clicked wins)
-									const newValue = value.length > 0 ? (value[value.length - 1] as ViewMode) : viewMode;
+									const newValue =
+										value.length > 0 ? (value[value.length - 1] as ViewMode) : viewMode;
 									if (newValue !== viewMode) onViewModeChange(newValue);
 								}}
 								aria-label="View mode"
