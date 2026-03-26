@@ -130,7 +130,7 @@ public class AchievementRegistry {
 
                     // Validate evaluatorClass resolves to a real class
                     String evalClass = definition.evaluatorClass();
-                    if (evalClass != null && !evalClass.isEmpty()) {
+                    if (!evalClass.isEmpty()) {
                         String fqn = evalClass.contains(".")
                             ? evalClass
                             : "de.tum.in.www1.hephaestus.achievement.evaluator." + evalClass;
@@ -153,7 +153,7 @@ public class AchievementRegistry {
                     // Non-DummyEvaluator with empty triggerEvents = achievement can never be evaluated
                     if (!isDummy && !hasTriggers) {
                         log.error(
-                            "Achievement '{}' uses evaluator {} but has no triggerEvents — " +
+                            "Achievement '{}' uses evaluator {} but has no triggerEvents - " +
                                 "it will never be evaluated",
                             definition.id(),
                             definition.evaluatorClass()
@@ -164,7 +164,7 @@ public class AchievementRegistry {
                     // DummyEvaluator with non-empty triggerEvents = wasted work on every event
                     if (isDummy && hasTriggers) {
                         log.warn(
-                            "Achievement '{}' uses DummyEvaluator but has active triggerEvents {} — " +
+                            "Achievement '{}' uses DummyEvaluator but has active triggerEvents {} - " +
                                 "this causes wasted DB work on every qualifying event",
                             definition.id(),
                             definition.triggerEvents()
@@ -238,9 +238,6 @@ public class AchievementRegistry {
      * handling both short names and fully-qualified class names.
      */
     private static boolean isDummyEvaluator(String evaluatorClass) {
-        if (evaluatorClass == null) {
-            return false;
-        }
         return "DummyEvaluator".equals(evaluatorClass) || evaluatorClass.endsWith(".DummyEvaluator");
     }
 }
