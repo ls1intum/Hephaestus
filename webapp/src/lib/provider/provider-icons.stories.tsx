@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
+import { GitLabMergeRequestIcon } from "./gitlab-icons";
 import type { PullRequestState } from "./provider-icons";
 import { getPullRequestStateIcon } from "./provider-icons";
 import type { ProviderType } from "./provider-terms";
@@ -230,6 +231,54 @@ export const Sizes: Story = {
 		docs: {
 			description: {
 				story: "Icons at different sizes to verify rendering quality across scales.",
+			},
+		},
+	},
+};
+
+/**
+ * Demonstrates the accessibility behavior of GitLab icons.
+ * Decorative icons (no label) get `aria-hidden="true"`.
+ * Labelled icons get `role="img"` and the provided `aria-label`.
+ */
+export const Accessibility: Story = {
+	render: () => (
+		<div className="flex flex-col gap-6" data-provider={getProviderSlug("GITLAB")}>
+			<div className="flex items-center gap-3">
+				<GitLabMergeRequestIcon size={20} className="text-provider-open-foreground" />
+				<span className="text-sm text-muted-foreground">
+					Decorative — <code>aria-hidden=&quot;true&quot;</code>, no role
+				</span>
+			</div>
+			<div className="flex items-center gap-3">
+				<GitLabMergeRequestIcon
+					size={20}
+					className="text-provider-open-foreground"
+					aria-label="Open merge request"
+				/>
+				<span className="text-sm text-muted-foreground">
+					Labelled — <code>role=&quot;img&quot;</code>, <code>aria-label</code> set
+				</span>
+			</div>
+			<div className="flex items-center gap-3">
+				<button
+					type="button"
+					className="inline-flex items-center gap-1.5 rounded border px-2 py-1 text-sm"
+				>
+					<GitLabMergeRequestIcon size={16} className="text-provider-open-foreground" />
+					Open
+				</button>
+				<span className="text-sm text-muted-foreground">
+					Inside a labelled button — icon is decorative, button provides the label
+				</span>
+			</div>
+		</div>
+	),
+	parameters: {
+		docs: {
+			description: {
+				story:
+					'GitLab icons support conditional accessibility: decorative icons get aria-hidden, labelled icons get role="img". When used inside buttons, the icon should remain decorative and the button provides the accessible name.',
 			},
 		},
 	},
