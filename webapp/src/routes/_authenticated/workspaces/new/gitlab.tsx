@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, Navigate, useNavigate } from "@tanstack/react-router";
 import { ArrowLeftIcon, OctagonXIcon } from "lucide-react";
-import { useReducer, useRef, useState } from "react";
+import { useEffect, useReducer, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
 	createWorkspaceMutation,
@@ -38,9 +38,11 @@ const STEP_META = [
 ] as const;
 
 function GitLabWizardPage() {
-	const { enabled: gitlabEnabled, isLoading: flagLoading } = useFeatureFlag(
-		"GITLAB_WORKSPACE_CREATION",
-	);
+	const {
+		enabled: gitlabEnabled,
+		isLoading: flagLoading,
+		isError: flagError,
+	} = useFeatureFlag("GITLAB_WORKSPACE_CREATION");
 
 	const [state, dispatch] = useReducer(wizardReducer, initialWizardState);
 	const queryClient = useQueryClient();
@@ -51,7 +53,6 @@ function GitLabWizardPage() {
 	// Visually hidden live region for step change announcements
 	const [announcement, setAnnouncement] = useState("");
 
-	const submittingRef = useRef(false);
 	const listGroups = useMutation({
 		...listGitLabGroupsMutation(),
 		onError: (error) => {
@@ -75,14 +76,15 @@ function GitLabWizardPage() {
 				{ step: state.step, serverUrl: state.serverUrl },
 				error,
 			);
-			const message =
+			const rawError =
 				typeof error === "object" && error !== null && "error" in error
-					? (error as { error: string }).error
-					: "Failed to create workspace. Please try again.";
-			toast.error(message);
+					? (error as Record<string, unknown>).error
+					: undefined;
+			toast.error(
+				typeof rawError === "string" ? rawError : "Failed to create workspace. Please try again.",
+			);
 		},
 		onSettled: () => {
-			submittingRef.current = false;
 			queryClient.invalidateQueries({ queryKey: listWorkspacesQueryKey() });
 		},
 	});
@@ -97,12 +99,12 @@ function GitLabWizardPage() {
 			workspaceSlug: state.workspaceSlug,
 		}).success;
 
-	const announceStep = (step: number) => {
-		const stepMeta = STEP_META[step - 1];
-		setAnnouncement(`Step ${step} of 3: ${stepMeta.title}`);
-		// Focus the heading after step change
-		requestAnimationFrame(() => headingRef.current?.focus());
-	};
+	// Announce step changes to screen readers and manage focus
+	useEffect(() => {
+		const stepMeta = STEP_META[state.step - 1];
+		setAnnouncement(`Step ${state.step} of 3: ${stepMeta.title}`);
+		headingRef.current?.focus();
+	}, [state.step]);
 
 	const handleNext = () => {
 		if (state.step === 1 && canAdvanceFromStep1) {
@@ -117,27 +119,22 @@ function GitLabWizardPage() {
 				{
 					onSuccess: (data) => {
 						dispatch({ type: "ADVANCE_TO_GROUPS", groups: data });
-						announceStep(2);
 					},
 				},
 			);
 		} else if (state.step === 2 && canAdvanceFromStep2) {
 			dispatch({ type: "ADVANCE_TO_CONFIGURE" });
-			announceStep(3);
 		}
 	};
 
 	const handleBack = () => {
-		const prevStep = state.step - 1;
 		// Reset stale mutation state so old errors don't persist after back-navigation
 		if (state.step === 2) listGroups.reset();
 		dispatch({ type: "GO_BACK" });
-		if (prevStep >= 1) announceStep(prevStep);
 	};
 
 	const handleSubmit = () => {
-		if (!canSubmit || !state.selectedGroup || submittingRef.current) return;
-		submittingRef.current = true;
+		if (!canSubmit || !state.selectedGroup || createWorkspace.isPending) return;
 		createWorkspace.mutate({
 			body: {
 				workspaceSlug: state.workspaceSlug,
@@ -154,12 +151,23 @@ function GitLabWizardPage() {
 	const meta = STEP_META[state.step - 1];
 	const isTransitioning = listGroups.isPending;
 	const isCreating = createWorkspace.isPending;
-	const stepKey = `step-${state.step}`;
-
 	if (flagLoading) {
 		return (
 			<div className="flex justify-center py-16">
 				<Spinner />
+			</div>
+		);
+	}
+	if (flagError) {
+		return (
+			<div className="mx-auto max-w-lg px-4 py-8">
+				<Alert variant="destructive">
+					<OctagonXIcon aria-hidden="true" />
+					<AlertTitle>Unable to load</AlertTitle>
+					<AlertDescription>
+						Could not check feature availability. Please refresh the page.
+					</AlertDescription>
+				</Alert>
 			</div>
 		);
 	}
@@ -199,9 +207,9 @@ function GitLabWizardPage() {
 
 			<div className="mt-6" role="region" aria-labelledby="wizard-heading">
 				<WizardContext.Provider value={{ state, dispatch }}>
-					{state.step === 1 && <ConnectGitLabStep key={stepKey} />}
-					{state.step === 2 && <SelectGroupStep key={stepKey} />}
-					{state.step === 3 && <ConfigureWorkspaceStep key={stepKey} />}
+					{state.step === 1 && <ConnectGitLabStep />}
+					{state.step === 2 && <SelectGroupStep />}
+					{state.step === 3 && <ConfigureWorkspaceStep />}
 				</WizardContext.Provider>
 			</div>
 
