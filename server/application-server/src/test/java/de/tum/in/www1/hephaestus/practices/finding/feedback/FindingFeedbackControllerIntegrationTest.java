@@ -14,6 +14,7 @@ import de.tum.in.www1.hephaestus.practices.finding.feedback.dto.FindingFeedbackD
 import de.tum.in.www1.hephaestus.practices.finding.feedback.dto.FindingFeedbackEngagementDTO;
 import de.tum.in.www1.hephaestus.practices.model.Practice;
 import de.tum.in.www1.hephaestus.practices.model.PracticeFinding;
+import de.tum.in.www1.hephaestus.practices.model.PracticeFindingTargetType;
 import de.tum.in.www1.hephaestus.practices.model.Severity;
 import de.tum.in.www1.hephaestus.practices.model.Verdict;
 import de.tum.in.www1.hephaestus.testconfig.TestAuthUtils;
@@ -94,7 +95,7 @@ class FindingFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegrat
             .idempotencyKey("test-key-" + UUID.randomUUID())
             .agentJobId(agentJob.getId())
             .practice(practice)
-            .targetType("PULL_REQUEST")
+            .targetType(PracticeFindingTargetType.PULL_REQUEST)
             .targetId(42L)
             .contributor(adminUser)
             .title("Missing error handling")

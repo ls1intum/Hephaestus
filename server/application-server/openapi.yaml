@@ -3950,7 +3950,9 @@ components:
           description: Target entity ID
         targetType:
           type: string
-          description: "Target type (e.g. pull_request, review)"
+          description: Target type (e.g. PULL_REQUEST)
+          enum:
+          - PULL_REQUEST
         title:
           type: string
           description: Finding title
@@ -4022,7 +4024,9 @@ components:
           description: Target entity ID
         targetType:
           type: string
-          description: "Target type (e.g. pull_request, review)"
+          description: Target type (e.g. PULL_REQUEST)
+          enum:
+          - PULL_REQUEST
         title:
           type: string
           description: Finding title

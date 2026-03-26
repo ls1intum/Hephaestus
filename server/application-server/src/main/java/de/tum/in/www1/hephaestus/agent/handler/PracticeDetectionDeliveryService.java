@@ -13,6 +13,7 @@ import de.tum.in.www1.hephaestus.practices.finding.PracticeDetectionCompletedEve
 import de.tum.in.www1.hephaestus.practices.finding.PracticeDetectionProperties;
 import de.tum.in.www1.hephaestus.practices.finding.PracticeFindingRepository;
 import de.tum.in.www1.hephaestus.practices.model.Practice;
+import de.tum.in.www1.hephaestus.practices.model.PracticeFindingTargetType;
 import de.tum.in.www1.hephaestus.practices.model.Verdict;
 import java.time.Instant;
 import java.util.HashMap;
@@ -107,7 +108,7 @@ public class PracticeDetectionDeliveryService {
             );
         }
         Long contributorId = pullRequest.getAuthor().getId();
-        String targetType = "pull_request";
+        PracticeFindingTargetType targetType = PracticeFindingTargetType.PULL_REQUEST;
         Long targetId = pullRequestId;
 
         // Persist findings
@@ -152,7 +153,7 @@ public class PracticeDetectionDeliveryService {
 
             // Build idempotency key — index disambiguates multiple findings for the same practice
             String idempotencyKey =
-                finding.practiceSlug() + ":" + targetType + ":" + targetId + ":" + job.getId() + ":" + i;
+                finding.practiceSlug() + ":" + targetType.name() + ":" + targetId + ":" + job.getId() + ":" + i;
 
             // Serialize evidence
             String evidenceJson = null;
@@ -170,7 +171,7 @@ public class PracticeDetectionDeliveryService {
                 idempotencyKey,
                 job.getId(),
                 practice.getId(),
-                targetType,
+                targetType.name(),
                 targetId,
                 contributorId,
                 finding.title(),
