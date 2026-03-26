@@ -1,4 +1,4 @@
-import { ClipboardCheck, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useState } from "react";
 import type { CreatePracticeRequest, Practice, UpdatePracticeRequest } from "@/api/types.gen";
 import {
@@ -16,7 +16,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { AdminPracticesTable } from "./AdminPracticesTable";
 import { PracticeFormDialog } from "./PracticeFormDialog";
 
-export interface AdminPracticesPageProps {
+interface AdminPracticesPageProps {
 	practices: Practice[];
 	isLoading: boolean;
 	isCreating: boolean;
@@ -67,12 +67,9 @@ export function AdminPracticesPage({
 
 	return (
 		<div className="container mx-auto py-6">
-			<div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+			<div className="flex items-center justify-between mb-6">
 				<div>
-					<h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-						<ClipboardCheck className="h-8 w-8" />
-						Manage Practices
-					</h1>
+					<h1 className="text-3xl font-bold tracking-tight">Manage Practices</h1>
 					<p className="text-muted-foreground">
 						Configure practice definitions for evaluating developer contributions.
 					</p>

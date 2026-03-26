@@ -112,6 +112,8 @@ function AdminPracticesContainer() {
 		return <NoWorkspace />;
 	}
 
+	const isLoading = isWorkspaceLoading || isPracticesLoading || !workspaceSlug;
+
 	if (workspaceError || practicesError) {
 		const errorMessage = (workspaceError as Error)?.message || (practicesError as Error)?.message;
 		toast.error(`Failed to load data: ${errorMessage}`);
@@ -152,7 +154,7 @@ function AdminPracticesContainer() {
 	return (
 		<AdminPracticesPage
 			practices={practices ?? []}
-			isLoading={isWorkspaceLoading || isPracticesLoading || !workspaceSlug}
+			isLoading={isLoading}
 			isCreating={createPractice.isPending}
 			isUpdating={updatePractice.isPending}
 			isDeleting={deletePractice.isPending}

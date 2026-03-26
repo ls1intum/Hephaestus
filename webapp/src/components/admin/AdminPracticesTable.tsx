@@ -52,9 +52,9 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { TRIGGER_EVENT_OPTIONS, TRIGGER_EVENT_SHORT_LABELS } from "./practice-constants";
 
-export interface AdminPracticesTableProps {
+interface AdminPracticesTableProps {
 	practices: Practice[];
-	isLoading: boolean;
+	isLoading?: boolean;
 	togglingPractices: Set<string>;
 	onEdit: (practice: Practice) => void;
 	onDelete: (practice: Practice) => void;
@@ -64,7 +64,7 @@ export interface AdminPracticesTableProps {
 
 export function AdminPracticesTable({
 	practices,
-	isLoading,
+	isLoading = false,
 	togglingPractices,
 	onEdit,
 	onDelete,
@@ -87,7 +87,7 @@ export function AdminPracticesTable({
 						className="h-auto p-0 font-semibold"
 					>
 						Name
-						<ArrowUpDown className="ml-2 h-4 w-4" />
+						<ArrowUpDown className="ml-2 h-4 w-4" aria-hidden="true" />
 					</Button>
 				),
 				cell: ({ row }) => (
@@ -106,7 +106,7 @@ export function AdminPracticesTable({
 						className="h-auto p-0 font-semibold"
 					>
 						Category
-						<ArrowUpDown className="ml-2 h-4 w-4" />
+						<ArrowUpDown className="ml-2 h-4 w-4" aria-hidden="true" />
 					</Button>
 				),
 				cell: ({ row }) =>
@@ -130,7 +130,8 @@ export function AdminPracticesTable({
 					const visible = events.slice(0, maxVisible);
 					const overflowCount = events.length - maxVisible;
 
-					const getShortLabel = (event: string) => TRIGGER_EVENT_SHORT_LABELS[event] ?? event;
+					const getShortLabel = (event: string) =>
+						(TRIGGER_EVENT_SHORT_LABELS as Record<string, string>)[event] ?? event;
 					const getFullLabel = (event: string) =>
 						TRIGGER_EVENT_OPTIONS.find((o) => o.value === event)?.label ?? event;
 
@@ -145,6 +146,10 @@ export function AdminPracticesTable({
 								<Tooltip>
 									<TooltipTrigger
 										render={<Badge variant="secondary" className="text-xs cursor-default" />}
+										aria-label={`${overflowCount} more trigger events: ${events
+											.slice(maxVisible)
+											.map((e) => getFullLabel(e))
+											.join(", ")}`}
 									>
 										+{overflowCount} more
 									</TooltipTrigger>
@@ -258,12 +263,16 @@ export function AdminPracticesTable({
 		<div className="w-full space-y-4">
 			<div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
 				<div className="relative w-full sm:w-auto">
-					<Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+					<Search
+						className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground"
+						aria-hidden="true"
+					/>
 					<Input
 						placeholder="Search practices..."
 						value={globalFilter}
 						onChange={(event) => setGlobalFilter(event.target.value)}
 						className="pl-9 w-full sm:w-75"
+						aria-label="Search practices"
 					/>
 				</div>
 				<div className="flex items-center space-x-2">
@@ -281,7 +290,7 @@ export function AdminPracticesTable({
 						<DropdownMenuTrigger
 							render={<Button variant="outline" size="sm" className="ml-auto" />}
 						>
-							Columns <ChevronDown className="ml-2 h-4 w-4" />
+							Columns <ChevronDown className="ml-2 h-4 w-4" aria-hidden="true" />
 						</DropdownMenuTrigger>
 						<DropdownMenuContent align="end">
 							<DropdownMenuGroup>
@@ -305,17 +314,29 @@ export function AdminPracticesTable({
 			</div>
 
 			<div className="rounded-md border">
-				<Table>
+				<Table aria-label="Practices">
 					<TableHeader>
 						{table.getHeaderGroups().map((headerGroup) => (
 							<TableRow key={headerGroup.id}>
-								{headerGroup.headers.map((header) => (
-									<TableHead key={header.id}>
-										{header.isPlaceholder
-											? null
-											: flexRender(header.column.columnDef.header, header.getContext())}
-									</TableHead>
-								))}
+								{headerGroup.headers.map((header) => {
+									const sorted = header.column.getIsSorted();
+									return (
+										<TableHead
+											key={header.id}
+											aria-sort={
+												sorted === "asc"
+													? "ascending"
+													: sorted === "desc"
+														? "descending"
+														: undefined
+											}
+										>
+											{header.isPlaceholder
+												? null
+												: flexRender(header.column.columnDef.header, header.getContext())}
+										</TableHead>
+									);
+								})}
 							</TableRow>
 						))}
 					</TableHeader>
@@ -347,12 +368,12 @@ export function AdminPracticesTable({
 							<TableRow>
 								<TableCell colSpan={columns.length} className="h-32 text-center">
 									<div className="flex flex-col items-center justify-center space-y-2">
-										<ClipboardList className="h-8 w-8 text-muted-foreground" />
+										<ClipboardList className="h-8 w-8 text-muted-foreground" aria-hidden="true" />
 										<p className="text-sm font-medium">No practices found</p>
 										<p className="text-xs text-muted-foreground">
 											{globalFilter
 												? "Try adjusting your search criteria"
-												: "Get started by creating your first practice definition."}
+												: "Get started by creating your first practice definition"}
 										</p>
 										{!globalFilter && onCreateClick && (
 											<Button variant="outline" size="sm" onClick={onCreateClick} className="mt-2">
@@ -369,13 +390,17 @@ export function AdminPracticesTable({
 
 			<div className="flex flex-col sm:flex-row items-center justify-between space-y-4 sm:space-y-0 sm:space-x-2 py-4">
 				<div className="flex-1 text-sm text-muted-foreground order-2 sm:order-1">
-					<span>
-						Showing {table.getRowModel().rows.length} of {practices.length} practices
-					</span>
+					<div className="flex flex-col sm:flex-row gap-1 sm:gap-4">
+						<span>
+							Showing {table.getRowModel().rows.length} of {practices.length} practices
+						</span>
+					</div>
 				</div>
 				<div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-6 lg:space-x-8 order-1 sm:order-2">
 					<div className="flex items-center space-x-2">
-						<p className="text-sm font-medium whitespace-nowrap">Rows per page</p>
+						<p id="rows-per-page-label" className="text-sm font-medium whitespace-nowrap">
+							Rows per page
+						</p>
 						<Select
 							value={`${table.getState().pagination.pageSize}`}
 							onValueChange={(value) => {
@@ -383,7 +408,7 @@ export function AdminPracticesTable({
 							}}
 							items={pageSizeItems}
 						>
-							<SelectTrigger className="h-8 w-17.5">
+							<SelectTrigger className="h-8 w-17.5" aria-labelledby="rows-per-page-label">
 								<SelectValue />
 							</SelectTrigger>
 							<SelectContent side="top">
@@ -401,7 +426,11 @@ export function AdminPracticesTable({
 							<PaginationContent>
 								<PaginationItem>
 									<PaginationPrevious
-										onClick={() => table.previousPage()}
+										onClick={() => {
+											if (table.getCanPreviousPage()) table.previousPage();
+										}}
+										aria-disabled={!table.getCanPreviousPage()}
+										tabIndex={!table.getCanPreviousPage() ? -1 : undefined}
 										className={
 											!table.getCanPreviousPage()
 												? "pointer-events-none opacity-50"
@@ -428,7 +457,11 @@ export function AdminPracticesTable({
 
 								<PaginationItem>
 									<PaginationNext
-										onClick={() => table.nextPage()}
+										onClick={() => {
+											if (table.getCanNextPage()) table.nextPage();
+										}}
+										aria-disabled={!table.getCanNextPage()}
+										tabIndex={!table.getCanNextPage() ? -1 : undefined}
 										className={
 											!table.getCanNextPage() ? "pointer-events-none opacity-50" : "cursor-pointer"
 										}
