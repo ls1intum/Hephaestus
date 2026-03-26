@@ -152,8 +152,8 @@ export function PracticeFormDialog({
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
-				<form onSubmit={handleSubmit}>
+			<DialogContent className="sm:max-w-lg max-h-[85vh] flex flex-col gap-0">
+				<form onSubmit={handleSubmit} className="flex flex-col min-h-0 gap-0">
 					<DialogHeader>
 						<DialogTitle>{mode === "create" ? "Create Practice" : "Edit Practice"}</DialogTitle>
 						<DialogDescription>
@@ -163,138 +163,142 @@ export function PracticeFormDialog({
 						</DialogDescription>
 					</DialogHeader>
 
-					<div className="grid gap-4 py-4">
-						{/* Name */}
-						<div className="grid gap-2">
-							<Label htmlFor="practice-name">Name *</Label>
-							<Input
-								id="practice-name"
-								placeholder="e.g. PR Description Quality"
-								value={form.name}
-								onChange={(e) => handleNameChange(e.target.value)}
-								aria-invalid={!!nameError}
-								aria-describedby={nameError ? "name-error" : undefined}
-							/>
-							{nameError && (
-								<p id="name-error" className="text-sm text-destructive">
-									{nameError}
-								</p>
-							)}
-						</div>
-
-						{/* Slug */}
-						<div className="grid gap-2">
-							<Label htmlFor="practice-slug">Slug *</Label>
-							<div className="flex items-center gap-2">
+					<div className="flex-1 overflow-y-auto min-h-0">
+						<div className="grid gap-4 py-4">
+							{/* Name */}
+							<div className="grid gap-2">
+								<Label htmlFor="practice-name">Name *</Label>
 								<Input
-									id="practice-slug"
-									placeholder="e.g. pr-description-quality"
-									value={form.slug}
-									onChange={(e) => {
-										slugManuallyEdited.current = true;
-										setForm((prev) => ({ ...prev, slug: e.target.value }));
-									}}
-									disabled={mode === "edit"}
-									aria-invalid={!!slugError}
-									aria-describedby={slugError ? "slug-error" : undefined}
+									id="practice-name"
+									placeholder="e.g. PR Description Quality"
+									value={form.name}
+									onChange={(e) => handleNameChange(e.target.value)}
+									aria-invalid={!!nameError}
+									aria-describedby={nameError ? "name-error" : undefined}
 								/>
-								{mode === "create" && slugManuallyEdited.current && (
-									<Button
-										type="button"
-										variant="ghost"
-										size="icon-sm"
-										onClick={() => {
-											slugManuallyEdited.current = false;
-											setForm((prev) => ({ ...prev, slug: generateSlug(prev.name) }));
-										}}
-										aria-label="Reset to auto-generated slug"
-									>
-										<Pencil className="h-3.5 w-3.5" />
-									</Button>
+								{nameError && (
+									<p id="name-error" className="text-sm text-destructive">
+										{nameError}
+									</p>
 								)}
 							</div>
-							{mode === "edit" && (
-								<p className="text-xs text-muted-foreground">
-									Slug cannot be changed after creation.
-								</p>
-							)}
-							{slugError && (
-								<p id="slug-error" className="text-sm text-destructive">
-									{slugError}
-								</p>
-							)}
-						</div>
 
-						{/* Category */}
-						<div className="grid gap-2">
-							<Label htmlFor="practice-category">Category</Label>
-							<Input
-								id="practice-category"
-								placeholder="e.g. code-quality"
-								value={form.category}
-								onChange={(e) => setForm((prev) => ({ ...prev, category: e.target.value }))}
-								maxLength={64}
-							/>
-						</div>
-
-						{/* Description */}
-						<div className="grid gap-2">
-							<Label htmlFor="practice-description">Description *</Label>
-							<Textarea
-								id="practice-description"
-								placeholder="Describe what this practice evaluates..."
-								value={form.description}
-								onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
-								className="min-h-20"
-								aria-invalid={!!descriptionError}
-								aria-describedby={descriptionError ? "description-error" : undefined}
-							/>
-							{descriptionError && (
-								<p id="description-error" className="text-sm text-destructive">
-									{descriptionError}
-								</p>
-							)}
-						</div>
-
-						{/* Trigger Events */}
-						<fieldset className="grid gap-2">
-							<legend className="text-sm font-medium leading-none mb-1">Trigger Events *</legend>
-							<div className="grid grid-cols-2 gap-3">
-								{TRIGGER_EVENT_OPTIONS.map((option) => (
-									<Label
-										key={option.value}
-										htmlFor={`trigger-${option.value}`}
-										className="flex items-center gap-2 text-sm font-normal cursor-pointer"
-									>
-										<Checkbox
-											id={`trigger-${option.value}`}
-											checked={form.triggerEvents.includes(option.value)}
-											onCheckedChange={(checked) =>
-												handleToggleEvent(option.value, checked === true)
-											}
-										/>
-										{option.label}
-									</Label>
-								))}
+							{/* Slug */}
+							<div className="grid gap-2">
+								<Label htmlFor="practice-slug">Slug *</Label>
+								<div className="flex items-center gap-2">
+									<Input
+										id="practice-slug"
+										placeholder="e.g. pr-description-quality"
+										value={form.slug}
+										onChange={(e) => {
+											slugManuallyEdited.current = true;
+											setForm((prev) => ({ ...prev, slug: e.target.value }));
+										}}
+										disabled={mode === "edit"}
+										aria-invalid={!!slugError}
+										aria-describedby={slugError ? "slug-error" : undefined}
+									/>
+									{mode === "create" && slugManuallyEdited.current && (
+										<Button
+											type="button"
+											variant="ghost"
+											size="icon-sm"
+											onClick={() => {
+												slugManuallyEdited.current = false;
+												setForm((prev) => ({ ...prev, slug: generateSlug(prev.name) }));
+											}}
+											aria-label="Reset to auto-generated slug"
+										>
+											<Pencil className="h-3.5 w-3.5" />
+										</Button>
+									)}
+								</div>
+								{mode === "edit" && (
+									<p className="text-xs text-muted-foreground">
+										Slug cannot be changed after creation.
+									</p>
+								)}
+								{slugError && (
+									<p id="slug-error" className="text-sm text-destructive">
+										{slugError}
+									</p>
+								)}
 							</div>
-							{triggerError && form.name.length > 0 && (
-								<p className="text-sm text-destructive">{triggerError}</p>
-							)}
-						</fieldset>
 
-						{/* Detection Prompt */}
-						<div className="grid gap-2">
-							<Label htmlFor="practice-detection-prompt">Detection Prompt</Label>
-							<Textarea
-								id="practice-detection-prompt"
-								placeholder="AI prompt template for detecting this practice..."
-								value={form.detectionPrompt}
-								onChange={(e) => setForm((prev) => ({ ...prev, detectionPrompt: e.target.value }))}
-								className="min-h-24"
-							/>
-							<p className="text-xs text-muted-foreground">
-								Optional. The prompt template used by the AI agent to detect this practice.
-							</p>
+							{/* Category */}
+							<div className="grid gap-2">
+								<Label htmlFor="practice-category">Category</Label>
+								<Input
+									id="practice-category"
+									placeholder="e.g. code-quality"
+									value={form.category}
+									onChange={(e) => setForm((prev) => ({ ...prev, category: e.target.value }))}
+									maxLength={64}
+								/>
+							</div>
+
+							{/* Description */}
+							<div className="grid gap-2">
+								<Label htmlFor="practice-description">Description *</Label>
+								<Textarea
+									id="practice-description"
+									placeholder="Describe what this practice evaluates..."
+									value={form.description}
+									onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
+									className="min-h-20"
+									aria-invalid={!!descriptionError}
+									aria-describedby={descriptionError ? "description-error" : undefined}
+								/>
+								{descriptionError && (
+									<p id="description-error" className="text-sm text-destructive">
+										{descriptionError}
+									</p>
+								)}
+							</div>
+
+							{/* Trigger Events */}
+							<fieldset className="grid gap-2">
+								<legend className="text-sm font-medium leading-none mb-1">Trigger Events *</legend>
+								<div className="grid grid-cols-2 gap-3">
+									{TRIGGER_EVENT_OPTIONS.map((option) => (
+										<Label
+											key={option.value}
+											htmlFor={`trigger-${option.value}`}
+											className="flex items-center gap-2 text-sm font-normal cursor-pointer"
+										>
+											<Checkbox
+												id={`trigger-${option.value}`}
+												checked={form.triggerEvents.includes(option.value)}
+												onCheckedChange={(checked) =>
+													handleToggleEvent(option.value, checked === true)
+												}
+											/>
+											{option.label}
+										</Label>
+									))}
+								</div>
+								{triggerError && form.name.length > 0 && (
+									<p className="text-sm text-destructive">{triggerError}</p>
+								)}
+							</fieldset>
+
+							{/* Detection Prompt */}
+							<div className="grid gap-2">
+								<Label htmlFor="practice-detection-prompt">Detection Prompt</Label>
+								<Textarea
+									id="practice-detection-prompt"
+									placeholder="AI prompt template for detecting this practice..."
+									value={form.detectionPrompt}
+									onChange={(e) =>
+										setForm((prev) => ({ ...prev, detectionPrompt: e.target.value }))
+									}
+									className="min-h-24"
+								/>
+								<p className="text-xs text-muted-foreground">
+									Optional. The prompt template used by the AI agent to detect this practice.
+								</p>
+							</div>
 						</div>
 					</div>
 

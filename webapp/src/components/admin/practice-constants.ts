@@ -10,6 +10,14 @@ export const TRIGGER_EVENT_OPTIONS = [
 	{ value: "ReviewSubmitted", label: "Review Submitted" },
 ] as const;
 
+/** Short labels for inline badge display in the table. */
+export const TRIGGER_EVENT_SHORT_LABELS: Record<string, string> = {
+	PullRequestCreated: "PR Created",
+	PullRequestReady: "PR Ready",
+	PullRequestSynchronized: "PR Synced",
+	ReviewSubmitted: "Review",
+};
+
 /** Generate a URL-safe slug from a human-readable name. */
 export function generateSlug(name: string): string {
 	return name
