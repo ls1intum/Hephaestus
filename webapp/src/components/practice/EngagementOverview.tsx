@@ -1,6 +1,5 @@
 import type { FindingFeedbackEngagement } from "@/api/types.gen";
 import { Card } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 
 const RING_SIZE = 80;
 const STROKE_WIDTH = 8;
@@ -10,30 +9,9 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 export interface EngagementOverviewProps {
 	engagement: FindingFeedbackEngagement;
 	totalFindings: number;
-	isLoading?: boolean;
 }
 
-export function EngagementOverview({
-	engagement,
-	totalFindings,
-	isLoading = false,
-}: EngagementOverviewProps) {
-	if (isLoading) {
-		return (
-			<Card className="p-4 flex items-center gap-6">
-				<Skeleton className="h-20 w-20 rounded-full shrink-0" />
-				<div className="flex flex-col gap-2 flex-1">
-					<Skeleton className="h-4 w-32" />
-					<div className="flex gap-4">
-						<Skeleton className="h-6 w-20" />
-						<Skeleton className="h-6 w-20" />
-						<Skeleton className="h-6 w-20" />
-					</div>
-				</div>
-			</Card>
-		);
-	}
-
+export function EngagementOverview({ engagement, totalFindings }: EngagementOverviewProps) {
 	const totalResponded = engagement.applied + engagement.disputed + engagement.notApplicable;
 	const engagementRate = totalFindings > 0 ? Math.round((totalResponded / totalFindings) * 100) : 0;
 	const offset = CIRCUMFERENCE - (engagementRate / 100) * CIRCUMFERENCE;

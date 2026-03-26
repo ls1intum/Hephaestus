@@ -85,11 +85,7 @@ export function PracticeSection({ workspaceSlug }: PracticeSectionProps) {
 			<h2 className="text-xl font-semibold">Practices</h2>
 
 			{engagementQuery.data && totalFindings > 0 && (
-				<EngagementOverview
-					engagement={engagementQuery.data}
-					totalFindings={totalFindings}
-					isLoading={engagementQuery.isPending}
-				/>
+				<EngagementOverview engagement={engagementQuery.data} totalFindings={totalFindings} />
 			)}
 
 			<PracticeSummaryGrid

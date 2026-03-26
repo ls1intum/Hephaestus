@@ -1,124 +1,13 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { subDays, subHours } from "date-fns";
 import { RefreshCw, Search, XCircleIcon } from "lucide-react";
-import type {
-	ContributorPracticeSummary,
-	FindingFeedbackEngagement,
-	PracticeFindingList,
-} from "@/api/types.gen";
+import type { FindingFeedbackEngagement } from "@/api/types.gen";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { mockFindings, mockSummaries } from "./__fixtures__/mock-data";
 import { EngagementOverview } from "./EngagementOverview";
 import { FindingsList } from "./FindingsList";
 import { PracticeSummaryGrid } from "./PracticeSummaryGrid";
-
-const mockSummaries: ContributorPracticeSummary[] = [
-	{
-		practiceName: "Code Review Thoroughness",
-		practiceSlug: "code-review-thoroughness",
-		category: "Code Quality",
-		positiveCount: 15,
-		negativeCount: 3,
-		totalFindings: 18,
-		lastFindingAt: new Date(),
-	},
-	{
-		practiceName: "Test Coverage",
-		practiceSlug: "test-coverage",
-		category: "Testing",
-		positiveCount: 5,
-		negativeCount: 8,
-		totalFindings: 13,
-		lastFindingAt: new Date(),
-	},
-	{
-		practiceName: "Error Handling",
-		practiceSlug: "error-handling",
-		category: "Reliability",
-		positiveCount: 7,
-		negativeCount: 4,
-		totalFindings: 11,
-		lastFindingAt: new Date(),
-	},
-	{
-		practiceName: "Documentation Standards",
-		practiceSlug: "documentation-standards",
-		category: "Documentation",
-		positiveCount: 10,
-		negativeCount: 2,
-		totalFindings: 12,
-		lastFindingAt: new Date(),
-	},
-];
-
-const mockFindings: PracticeFindingList[] = [
-	{
-		id: "f1",
-		title: "Reviewer provided thorough inline feedback on error handling paths",
-		verdict: "POSITIVE",
-		severity: "MINOR",
-		confidence: 0.92,
-		detectedAt: subHours(new Date(), 3),
-		practiceName: "Code Review Thoroughness",
-		practiceSlug: "code-review-thoroughness",
-		category: "Code Quality",
-		targetId: 42,
-		targetType: "pull_request",
-	},
-	{
-		id: "f2",
-		title: "Missing error handling in async database operation",
-		verdict: "NEGATIVE",
-		severity: "MAJOR",
-		confidence: 0.88,
-		detectedAt: subHours(new Date(), 8),
-		practiceName: "Error Handling",
-		practiceSlug: "error-handling",
-		category: "Reliability",
-		targetId: 43,
-		targetType: "pull_request",
-	},
-	{
-		id: "f3",
-		title: "Comprehensive test suite added for authentication module",
-		verdict: "POSITIVE",
-		severity: "INFO",
-		confidence: 0.95,
-		detectedAt: subDays(new Date(), 1),
-		practiceName: "Test Coverage",
-		practiceSlug: "test-coverage",
-		category: "Testing",
-		targetId: 44,
-		targetType: "pull_request",
-	},
-	{
-		id: "f4",
-		title: "Review comment addressed edge case in payment processing",
-		verdict: "POSITIVE",
-		severity: "MINOR",
-		confidence: 0.85,
-		detectedAt: subDays(new Date(), 2),
-		practiceName: "Code Review Thoroughness",
-		practiceSlug: "code-review-thoroughness",
-		category: "Code Quality",
-		targetId: 45,
-		targetType: "review",
-	},
-	{
-		id: "f5",
-		title: "Unhandled promise rejection in event listener cleanup",
-		verdict: "NEGATIVE",
-		severity: "CRITICAL",
-		confidence: 0.91,
-		detectedAt: subDays(new Date(), 3),
-		practiceName: "Error Handling",
-		practiceSlug: "error-handling",
-		category: "Reliability",
-		targetId: 46,
-		targetType: "pull_request",
-	},
-];
 
 /**
  * PracticeSection is a container that calls usePracticeFindings internally.
@@ -129,8 +18,8 @@ const mockFindings: PracticeFindingList[] = [
  */
 
 interface PracticeSectionStoryProps {
-	summaries: ContributorPracticeSummary[];
-	findings: PracticeFindingList[];
+	summaries: typeof mockSummaries;
+	findings: typeof mockFindings;
 	engagement?: FindingFeedbackEngagement;
 	isLoading?: boolean;
 	isEmpty?: boolean;
@@ -186,11 +75,7 @@ function PracticeSectionStory({
 		<div className="flex flex-col gap-6">
 			<h2 className="text-xl font-semibold">Practices</h2>
 			{engagement && totalFindings > 0 && (
-				<EngagementOverview
-					engagement={engagement}
-					totalFindings={totalFindings}
-					isLoading={isLoading}
-				/>
+				<EngagementOverview engagement={engagement} totalFindings={totalFindings} />
 			)}
 			<PracticeSummaryGrid
 				summaries={summaries}

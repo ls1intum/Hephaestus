@@ -1,55 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "storybook/test";
-import type { ContributorPracticeSummary } from "@/api/types.gen";
+import { mockSummaries } from "./__fixtures__/mock-data";
 import { PracticeSummaryGrid } from "./PracticeSummaryGrid";
-
-const mockSummaries: ContributorPracticeSummary[] = [
-	{
-		practiceName: "Code Review Thoroughness",
-		practiceSlug: "code-review-thoroughness",
-		category: "Code Quality",
-		positiveCount: 15,
-		negativeCount: 3,
-		totalFindings: 18,
-		lastFindingAt: new Date(),
-	},
-	{
-		practiceName: "Test Coverage",
-		practiceSlug: "test-coverage",
-		category: "Testing",
-		positiveCount: 5,
-		negativeCount: 8,
-		totalFindings: 13,
-		lastFindingAt: new Date(),
-	},
-	{
-		practiceName: "Error Handling",
-		practiceSlug: "error-handling",
-		category: "Reliability",
-		positiveCount: 7,
-		negativeCount: 4,
-		totalFindings: 11,
-		lastFindingAt: new Date(),
-	},
-	{
-		practiceName: "Documentation Standards",
-		practiceSlug: "documentation-standards",
-		category: "Documentation",
-		positiveCount: 10,
-		negativeCount: 2,
-		totalFindings: 12,
-		lastFindingAt: new Date(),
-	},
-	{
-		practiceName: "Naming Conventions",
-		practiceSlug: "naming-conventions",
-		category: "Code Quality",
-		positiveCount: 6,
-		negativeCount: 6,
-		totalFindings: 12,
-		lastFindingAt: new Date(),
-	},
-];
 
 /**
  * Responsive grid of practice summary cards.

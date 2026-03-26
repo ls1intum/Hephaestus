@@ -1,19 +1,24 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { FeedbackButtons } from "./FeedbackButtons";
+import { FeedbackBadge } from "./FeedbackBadge";
 
 const queryClient = new QueryClient({
 	defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
 });
 
+/**
+ * Read-only badge showing the latest feedback status for a finding.
+ * Feedback is created automatically when users respond to finding guidance
+ * (e.g., implementing a suggestion marks it as "Applied").
+ */
 const meta = {
-	component: FeedbackButtons,
+	component: FeedbackBadge,
 	parameters: {
 		layout: "padded",
 		docs: {
 			description: {
 				component:
-					"Feedback buttons for practice findings. Users can mark findings as Applied, Disputed, or N/A.",
+					"Read-only badge showing feedback status. Feedback is recorded automatically when users act on findings.",
 			},
 		},
 	},
@@ -27,13 +32,13 @@ const meta = {
 			</QueryClientProvider>
 		),
 	],
-} satisfies Meta<typeof FeedbackButtons>;
+} satisfies Meta<typeof FeedbackBadge>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * Default state with no existing feedback.
+ * Default state — fetches latest feedback for the given finding.
  */
 export const Default: Story = {
 	args: {

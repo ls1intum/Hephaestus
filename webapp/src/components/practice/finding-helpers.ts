@@ -1,6 +1,6 @@
-import type { PracticeFindingDetail, PracticeFindingList } from "@/api/types.gen";
+import type { PracticeFindingDetail } from "@/api/types.gen";
 
-type GuidanceMethod = NonNullable<PracticeFindingList["guidanceMethod"]>;
+type GuidanceMethod = NonNullable<PracticeFindingDetail["guidanceMethod"]>;
 
 export interface EvidenceLocation {
 	path: string;

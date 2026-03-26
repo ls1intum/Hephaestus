@@ -64,14 +64,3 @@ export const ZeroEngagement: Story = {
 		totalFindings: 10,
 	},
 };
-
-/**
- * Loading skeleton state.
- */
-export const Loading: Story = {
-	args: {
-		engagement: { applied: 0, disputed: 0, notApplicable: 0 },
-		totalFindings: 0,
-		isLoading: true,
-	},
-};

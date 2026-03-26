@@ -1,17 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "storybook/test";
-import type { ContributorPracticeSummary } from "@/api/types.gen";
+import { mockSummaries } from "./__fixtures__/mock-data";
 import { PracticeSummaryCard } from "./PracticeSummaryCard";
 
-const baseSummary: ContributorPracticeSummary = {
-	practiceName: "Code Review Thoroughness",
-	practiceSlug: "code-review-thoroughness",
-	category: "Code Quality",
-	positiveCount: 15,
-	negativeCount: 2,
-	totalFindings: 17,
-	lastFindingAt: new Date(),
-};
+const baseSummary = mockSummaries[0];
 
 /**
  * Summary card for a single practice, showing positive/negative counts

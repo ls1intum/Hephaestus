@@ -86,7 +86,6 @@ export function FindingsList({
 				<Select
 					value={selectedPracticeSlug ?? "all"}
 					onValueChange={(value) => value && onPracticeSelect(value === "all" ? null : value)}
-					items={selectItems}
 				>
 					<SelectTrigger size="sm">
 						<SelectValue placeholder="All practices" />

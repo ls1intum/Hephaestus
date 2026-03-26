@@ -1,21 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { subDays, subHours } from "date-fns";
-import type { PracticeFindingList } from "@/api/types.gen";
+import { mockFindings } from "./__fixtures__/mock-data";
 import { FindingsListItem } from "./FindingsListItem";
 
-const baseFinding: PracticeFindingList = {
-	id: "f1a2b3c4-d5e6-7890-abcd-ef1234567890",
-	title: "Reviewer provided thorough inline feedback on error handling",
-	verdict: "POSITIVE",
-	severity: "MINOR",
-	confidence: 0.92,
-	detectedAt: subDays(new Date(), 2),
-	practiceName: "Code Review Thoroughness",
-	practiceSlug: "code-review-thoroughness",
-	category: "Code Quality",
-	targetId: 42,
-	targetType: "pull_request",
-};
+const baseFinding = mockFindings[0];
 
 /**
  * Individual finding row with left border accent indicating verdict.
