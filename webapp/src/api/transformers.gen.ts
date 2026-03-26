@@ -97,6 +97,11 @@ export const retryDeliveryResponseTransformer = async (data: any): Promise<Retry
     return data;
 };
 
+export const updateFeaturesResponseTransformer = async (data: any): Promise<UpdateFeaturesResponse> => {
+    data = workspaceSchemaResponseTransformer(data);
+    return data;
+};
+
 const repositoryInfoSchemaResponseTransformer = (data: any) => {
     if (data.labels) {
         data.labels = data.labels.map((item: any) => labelInfoSchemaResponseTransformer(item));
@@ -110,12 +115,6 @@ const labelInfoSchemaResponseTransformer = (data: any) => {
     }
     return data;
 };
-
-export const updateFeaturesResponseTransformer = async (data: any): Promise<UpdateFeaturesResponse> => {
-    data = workspaceSchemaResponseTransformer(data);
-    return data;
-};
-
 
 const pullRequestInfoSchemaResponseTransformer = (data: any) => {
     if (data.closedAt) {

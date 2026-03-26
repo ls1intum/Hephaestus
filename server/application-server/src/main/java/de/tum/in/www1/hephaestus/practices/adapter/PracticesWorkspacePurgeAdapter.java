@@ -16,8 +16,6 @@ import org.springframework.stereotype.Component;
  *   <li>Deletes practice definitions for the workspace</li>
  * </ul>
  *
- * <p>Note: Legacy bad practice tables still exist in the database but have no code
- * reading or writing them. They will be dropped in a future migration (see #937).
  */
 @Component
 public class PracticesWorkspacePurgeAdapter implements WorkspacePurgeContributor {

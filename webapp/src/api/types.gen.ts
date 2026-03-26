@@ -2254,7 +2254,6 @@ export type UpdateFeaturesResponses = {
 
 export type UpdateFeaturesResponse = UpdateFeaturesResponses[keyof UpdateFeaturesResponses];
 
-
 export type GetLeaderboardData = {
     body?: never;
     path: {

@@ -471,7 +471,6 @@ export const updateFeaturesMutation = (options?: Partial<Options<UpdateFeaturesD
     return mutationOptions;
 };
 
-
 export const getLeaderboardQueryKey = (options: Options<GetLeaderboardData>) => createQueryKey('getLeaderboard', options);
 
 /**
