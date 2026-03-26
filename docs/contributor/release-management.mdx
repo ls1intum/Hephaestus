@@ -13,11 +13,10 @@ Hephaestus uses **trunk-based development** with continuous deployment. Every me
 
 ```mermaid
 gitGraph
-    commit id: "feat: feature A"
-    commit id: "fix: bug fix"
-    commit id: "v1.2.0" tag: "v1.2.0"
-    commit id: "feat: feature B"
-    commit id: "v1.3.0" tag: "v1.3.0"
+    commit id: "feat: feature A" tag: "v1.2.0"
+    commit id: "fix: bug fix" tag: "v1.2.1"
+    commit id: "feat: feature B" tag: "v1.3.0"
+    commit id: "refactor: cleanup"
 ```
 
 | Branch | Purpose |
@@ -41,7 +40,7 @@ sequenceDiagram
     PR->>M: Merge (squash)
     M->>CI: Push triggers CI
     CI->>CI: Tests & Quality Gates
-    CI->>CI: semantic-release creates tag
+    CI->>CI: semantic-release creates tag + GitHub Release
     CI->>S: Auto-deploy to Staging
     Note over S: You verify staging
     S->>P: Approve → Deploy to Production
@@ -144,15 +143,17 @@ Dependencies are automatically updated via [Renovate Bot](https://docs.renovateb
 - Patches/minors automerge after 3 days
 - Majors require manual review
 
-## Version synchronization
+## Version management
 
-`semantic-release` automatically updates version numbers in:
+Version numbers in source files use `0.0.0-development` as a placeholder. The **real version** comes from git tags created by `semantic-release`. No release commits are added to `main`.
 
-- `package.json` files
-- `pom.xml` files  
-- OpenAPI specs
+At deploy time, the `APP_VERSION` environment variable is set to the release version (e.g., `0.49.0`) via Docker Compose. Services read this at runtime:
 
-Run `./update_version.sh <version>` to update versions manually if needed.
+- **Application server**: `spring.application.version` resolves from `APP_VERSION`
+- **Intelligence service**: reads `process.env.APP_VERSION`
+- **Webapp**: receives `APPLICATION_VERSION` (set to the Docker image tag)
+
+To check the current version: `git describe --tags --abbrev=0` or see [GitHub Releases](https://github.com/ls1intum/Hephaestus/releases).
 
 ## Best practices
 

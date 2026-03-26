@@ -3,11 +3,9 @@
  *
  * Prompts are COLOCATED with their features:
  * - src/mentor/chat.prompt.ts - Mentor chat system prompt
- * - src/detector/bad-practice.prompt.ts - Bad practice detector
  */
 
 // Prompt definitions (re-exported from feature modules)
-export { badPracticeDetectorPrompt } from "@/detector/bad-practice.prompt";
 export {
 	greetingContinuePrompt,
 	greetingFirstMessagePrompt,

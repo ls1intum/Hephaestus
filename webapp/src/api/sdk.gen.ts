@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddLabelFilterData, AddLabelFilterErrors, AddLabelFilterResponses, AddLabelToTeamData, AddLabelToTeamResponses, AddRepositoryToMonitorData, AddRepositoryToMonitorResponses, AssignRoleData, AssignRoleResponses, ComputeUserLeagueStatsData, ComputeUserLeagueStatsResponses, CreateDocumentData, CreateDocumentErrors, CreateDocumentResponses, CreateWorkspaceData, CreateWorkspaceResponses, DeleteDocumentData, DeleteDocumentErrors, DeleteDocumentResponses, DeleteDocumentVersionsAfterData, DeleteDocumentVersionsAfterErrors, DeleteDocumentVersionsAfterResponses, DeleteUserData, DeleteUserResponses, DetectForPullRequestData, DetectForPullRequestErrors, DetectForPullRequestResponses, DetectForUserData, DetectForUserErrors, DetectForUserResponses, GetAllAchievementDefinitionsData, GetAllAchievementDefinitionsResponses, GetAllTeamsData, GetAllTeamsResponses, GetBadPracticeData, GetBadPracticeResponses, GetBadPracticesForPullRequestData, GetBadPracticesForPullRequestResponses, GetBadPracticesForUserData, GetBadPracticesForUserResponses, GetCurrentUserMembershipData, GetCurrentUserMembershipResponses, GetDocumentData, GetDocumentErrors, GetDocumentResponses, GetGroupedThreadsData, GetGroupedThreadsErrors, GetGroupedThreadsResponses, GetLabelFiltersData, GetLabelFiltersResponses, GetLeaderboardData, GetLeaderboardResponses, GetMemberData, GetMemberResponses, GetRepositoriesToMonitorData, GetRepositoriesToMonitorResponses, GetRepositorySettingsData, GetRepositorySettingsResponses, GetTeamSettingsData, GetTeamSettingsResponses, GetThreadData, GetThreadErrors, GetThreadResponses, GetUserAchievementsData, GetUserAchievementsResponses, GetUserProfileData, GetUserProfileResponses, GetUserSettingsData, GetUserSettingsResponses, GetUsersWithTeamsData, GetUsersWithTeamsResponses, GetVersionData, GetVersionErrors, GetVersionResponses, GetWorkspaceData, GetWorkspaceResponses, GitLabPreflightData, GitLabPreflightResponses, ListDocumentsData, ListDocumentsErrors, ListDocumentsResponses, ListGitLabGroupsData, ListGitLabGroupsResponses, ListGlobalContributorsData, ListGlobalContributorsResponses, ListMembersData, ListMembersResponses, ListVersionsData, ListVersionsErrors, ListVersionsResponses, ListWorkspacesData, ListWorkspacesResponses, ProvideFeedbackData, ProvideFeedbackErrors, ProvideFeedbackResponses, PurgeWorkspaceData, PurgeWorkspaceResponses, RecalculateUserAchievementsData, RecalculateUserAchievementsResponses, ReloadAchievementsData, ReloadAchievementsResponses, RemoveLabelFilterData, RemoveLabelFilterErrors, RemoveLabelFilterResponses, RemoveLabelFromTeamData, RemoveLabelFromTeamResponses, RemoveMemberData, RemoveMemberResponses, RemoveRepositoryToMonitorData, RemoveRepositoryToMonitorResponses, RenameSlugData, RenameSlugResponses, ResetAndRecalculateLeaguesData, ResetAndRecalculateLeaguesResponses, ResolveData, ResolveResponses, UpdateDocumentData, UpdateDocumentErrors, UpdateDocumentResponses, UpdateNotificationsData, UpdateNotificationsResponses, UpdatePublicVisibilityData, UpdatePublicVisibilityResponses, UpdateRepositorySettingsData, UpdateRepositorySettingsErrors, UpdateRepositorySettingsResponses, UpdateRepositoryVisibilityData, UpdateRepositoryVisibilityResponses, UpdateScheduleData, UpdateScheduleResponses, UpdateSlackCredentialsData, UpdateSlackCredentialsResponses, UpdateStatusData, UpdateStatusResponses, UpdateTeamSettingsData, UpdateTeamSettingsErrors, UpdateTeamSettingsResponses, UpdateTeamVisibilityData, UpdateTeamVisibilityResponses, UpdateTokenData, UpdateTokenResponses, UpdateUserSettingsData, UpdateUserSettingsResponses, VoteMessageData, VoteMessageErrors, VoteMessageResponses } from './types.gen';
+import type { AddLabelFilterData, AddLabelFilterErrors, AddLabelFilterResponses, AddLabelToTeamData, AddLabelToTeamResponses, AddRepositoryToMonitorData, AddRepositoryToMonitorResponses, AssignRoleData, AssignRoleResponses, CancelJobData, CancelJobErrors, CancelJobResponses, ComputeUserLeagueStatsData, ComputeUserLeagueStatsResponses, CreateConfigData, CreateConfigErrors, CreateConfigResponses, CreateDocumentData, CreateDocumentErrors, CreateDocumentResponses, CreatePracticeData, CreatePracticeErrors, CreatePracticeResponses, CreateWorkspaceData, CreateWorkspaceResponses, DeleteConfigData, DeleteConfigErrors, DeleteConfigResponses, DeleteDocumentData, DeleteDocumentErrors, DeleteDocumentResponses, DeleteDocumentVersionsAfterData, DeleteDocumentVersionsAfterErrors, DeleteDocumentVersionsAfterResponses, DeletePracticeData, DeletePracticeErrors, DeletePracticeResponses, DeleteUserData, DeleteUserResponses, GetAllAchievementDefinitionsData, GetAllAchievementDefinitionsResponses, GetAllTeamsData, GetAllTeamsResponses, GetConfigData, GetConfigErrors, GetConfigResponses, GetConfigsData, GetConfigsResponses, GetCurrentUserMembershipData, GetCurrentUserMembershipResponses, GetDocumentData, GetDocumentErrors, GetDocumentResponses, GetEngagementData, GetEngagementResponses, GetFindingData, GetFindingErrors, GetFindingResponses, GetFindingsForPullRequestData, GetFindingsForPullRequestResponses, GetGroupedThreadsData, GetGroupedThreadsErrors, GetGroupedThreadsResponses, GetJobData, GetJobErrors, GetJobResponses, GetLabelFiltersData, GetLabelFiltersResponses, GetLatestFeedbackData, GetLatestFeedbackErrors, GetLatestFeedbackResponses, GetLeaderboardData, GetLeaderboardResponses, GetMemberData, GetMemberResponses, GetPracticeData, GetPracticeErrors, GetPracticeResponses, GetRepositoriesToMonitorData, GetRepositoriesToMonitorResponses, GetRepositorySettingsData, GetRepositorySettingsResponses, GetSummaryData, GetSummaryResponses, GetTeamSettingsData, GetTeamSettingsResponses, GetThreadData, GetThreadErrors, GetThreadResponses, GetUserAchievementsData, GetUserAchievementsResponses, GetUserFeaturesData, GetUserFeaturesResponses, GetUserProfileData, GetUserProfileResponses, GetUserSettingsData, GetUserSettingsResponses, GetUsersWithTeamsData, GetUsersWithTeamsResponses, GetVersionData, GetVersionErrors, GetVersionResponses, GetWorkspaceData, GetWorkspaceResponses, GitLabPreflightData, GitLabPreflightResponses, ListDocumentsData, ListDocumentsErrors, ListDocumentsResponses, ListFindingsData, ListFindingsResponses, ListGitLabGroupsData, ListGitLabGroupsResponses, ListGlobalContributorsData, ListGlobalContributorsResponses, ListJobsData, ListJobsResponses, ListMembersData, ListMembersResponses, ListPracticesData, ListPracticesResponses, ListVersionsData, ListVersionsErrors, ListVersionsResponses, ListWorkspacesData, ListWorkspacesResponses, PurgeWorkspaceData, PurgeWorkspaceResponses, RecalculateUserAchievementsData, RecalculateUserAchievementsResponses, ReloadAchievementsData, ReloadAchievementsResponses, RemoveLabelFilterData, RemoveLabelFilterErrors, RemoveLabelFilterResponses, RemoveLabelFromTeamData, RemoveLabelFromTeamResponses, RemoveMemberData, RemoveMemberResponses, RemoveRepositoryToMonitorData, RemoveRepositoryToMonitorResponses, RenameSlugData, RenameSlugResponses, ResetAndRecalculateLeaguesData, ResetAndRecalculateLeaguesResponses, RetryDeliveryData, RetryDeliveryErrors, RetryDeliveryResponses, SetActiveData, SetActiveErrors, SetActiveResponses, SubmitFeedbackData, SubmitFeedbackErrors, SubmitFeedbackResponses, UpdateConfigData, UpdateConfigErrors, UpdateConfigResponses, UpdateDocumentData, UpdateDocumentErrors, UpdateDocumentResponses, UpdateFeaturesData, UpdateFeaturesResponses, UpdateNotificationsData, UpdateNotificationsResponses, UpdatePracticeData, UpdatePracticeErrors, UpdatePracticeResponses, UpdatePublicVisibilityData, UpdatePublicVisibilityResponses, UpdateRepositorySettingsData, UpdateRepositorySettingsErrors, UpdateRepositorySettingsResponses, UpdateRepositoryVisibilityData, UpdateRepositoryVisibilityResponses, UpdateScheduleData, UpdateScheduleResponses, UpdateSlackCredentialsData, UpdateSlackCredentialsResponses, UpdateStatusData, UpdateStatusResponses, UpdateTeamSettingsData, UpdateTeamSettingsErrors, UpdateTeamSettingsResponses, UpdateTeamVisibilityData, UpdateTeamVisibilityResponses, UpdateTokenData, UpdateTokenResponses, UpdateUserSettingsData, UpdateUserSettingsResponses, VoteMessageData, VoteMessageErrors, VoteMessageResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean> = Options2<TData, ThrowOnError> & {
     /**
@@ -37,9 +37,20 @@ export const deleteUser = <ThrowOnError extends boolean = false>(options?: Optio
 });
 
 /**
+ * Get feature flags for the current user
+ *
+ * Returns all feature flags evaluated for the authenticated user. Combines Keycloak role checks and server-side config toggles.
+ */
+export const getUserFeatures = <ThrowOnError extends boolean = false>(options?: Options<GetUserFeaturesData, ThrowOnError>) => (options?.client ?? client).get<GetUserFeaturesResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/user/features',
+    ...options
+});
+
+/**
  * Get user settings
  *
- * Get the current user's notification and research participation preferences
+ * Get the current user's notification, research participation, and AI review preferences
  */
 export const getUserSettings = <ThrowOnError extends boolean = false>(options?: Options<GetUserSettingsData, ThrowOnError>) => (options?.client ?? client).get<GetUserSettingsResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -50,7 +61,7 @@ export const getUserSettings = <ThrowOnError extends boolean = false>(options?: 
 /**
  * Update user settings
  *
- * Update the current user's notification and research participation preferences
+ * Update the current user's notification, research participation, and AI review preferences
  */
 export const updateUserSettings = <ThrowOnError extends boolean = false>(options: Options<UpdateUserSettingsData, ThrowOnError>) => (options.client ?? client).post<UpdateUserSettingsResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -123,6 +134,108 @@ export const purgeWorkspace = <ThrowOnError extends boolean = false>(options: Op
  * Fetch a workspace by slug
  */
 export const getWorkspace = <ThrowOnError extends boolean = false>(options: Options<GetWorkspaceData, ThrowOnError>) => (options.client ?? client).get<GetWorkspaceResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}', ...options });
+
+/**
+ * List agent configurations for a workspace
+ */
+export const getConfigs = <ThrowOnError extends boolean = false>(options: Options<GetConfigsData, ThrowOnError>) => (options.client ?? client).get<GetConfigsResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/agent-configs',
+    ...options
+});
+
+/**
+ * Create a new agent configuration
+ */
+export const createConfig = <ThrowOnError extends boolean = false>(options: Options<CreateConfigData, ThrowOnError>) => (options.client ?? client).post<CreateConfigResponses, CreateConfigErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/agent-configs',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Delete an agent configuration
+ */
+export const deleteConfig = <ThrowOnError extends boolean = false>(options: Options<DeleteConfigData, ThrowOnError>) => (options.client ?? client).delete<DeleteConfigResponses, DeleteConfigErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/agent-configs/{configId}',
+    ...options
+});
+
+/**
+ * Get a specific agent configuration
+ */
+export const getConfig = <ThrowOnError extends boolean = false>(options: Options<GetConfigData, ThrowOnError>) => (options.client ?? client).get<GetConfigResponses, GetConfigErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/agent-configs/{configId}',
+    ...options
+});
+
+/**
+ * Update an existing agent configuration
+ */
+export const updateConfig = <ThrowOnError extends boolean = false>(options: Options<UpdateConfigData, ThrowOnError>) => (options.client ?? client).patch<UpdateConfigResponses, UpdateConfigErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/agent-configs/{configId}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * List agent jobs for a workspace
+ */
+export const listJobs = <ThrowOnError extends boolean = false>(options: Options<ListJobsData, ThrowOnError>) => (options.client ?? client).get<ListJobsResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/agent-jobs',
+    ...options
+});
+
+/**
+ * Get agent job details
+ */
+export const getJob = <ThrowOnError extends boolean = false>(options: Options<GetJobData, ThrowOnError>) => (options.client ?? client).get<GetJobResponses, GetJobErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/agent-jobs/{jobId}',
+    ...options
+});
+
+/**
+ * Cancel an agent job
+ */
+export const cancelJob = <ThrowOnError extends boolean = false>(options: Options<CancelJobData, ThrowOnError>) => (options.client ?? client).post<CancelJobResponses, CancelJobErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/agent-jobs/{jobId}/cancel',
+    ...options
+});
+
+/**
+ * Retry delivery for a completed agent job
+ */
+export const retryDelivery = <ThrowOnError extends boolean = false>(options: Options<RetryDeliveryData, ThrowOnError>) => (options.client ?? client).post<RetryDeliveryResponses, RetryDeliveryErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/agent-jobs/{jobId}/delivery/retry',
+    ...options
+});
+
+/**
+ * Update workspace feature flags
+ */
+export const updateFeatures = <ThrowOnError extends boolean = false>(options: Options<UpdateFeaturesData, ThrowOnError>) => (options.client ?? client).patch<UpdateFeaturesResponses, unknown, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/features',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 /**
  * Generate leaderboard
@@ -327,20 +440,18 @@ export const updateNotifications = <ThrowOnError extends boolean = false>(option
 });
 
 /**
- * Get a specific bad practice
+ * List practice definitions
  *
- * Retrieves details of a specific bad practice by ID
+ * Returns all practice definitions for the workspace, optionally filtered by category and/or active state
  */
-export const getBadPractice = <ThrowOnError extends boolean = false>(options: Options<GetBadPracticeData, ThrowOnError>) => (options.client ?? client).get<GetBadPracticeResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practices/badpractice/{id}', ...options });
+export const listPractices = <ThrowOnError extends boolean = false>(options: Options<ListPracticesData, ThrowOnError>) => (options.client ?? client).get<ListPracticesResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practices', ...options });
 
 /**
- * Provide feedback for a bad practice
- *
- * Submits user feedback for a detected bad practice
+ * Create a new practice definition
  */
-export const provideFeedback = <ThrowOnError extends boolean = false>(options: Options<ProvideFeedbackData, ThrowOnError>) => (options.client ?? client).post<ProvideFeedbackResponses, ProvideFeedbackErrors, ThrowOnError>({
+export const createPractice = <ThrowOnError extends boolean = false>(options: Options<CreatePracticeData, ThrowOnError>) => (options.client ?? client).post<CreatePracticeResponses, CreatePracticeErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/workspaces/{workspaceSlug}/practices/badpractice/{id}/feedback',
+    url: '/workspaces/{workspaceSlug}/practices',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -349,50 +460,106 @@ export const provideFeedback = <ThrowOnError extends boolean = false>(options: O
 });
 
 /**
- * Resolve a bad practice
+ * List findings for current user
  *
- * Updates the state of a bad practice to FIXED, WONT_FIX, or WRONG
+ * Paginated findings for the authenticated contributor with optional filters
  */
-export const resolve = <ThrowOnError extends boolean = false>(options: Options<ResolveData, ThrowOnError>) => (options.client ?? client).post<ResolveResponses, unknown, ThrowOnError>({
+export const listFindings = <ThrowOnError extends boolean = false>(options: Options<ListFindingsData, ThrowOnError>) => (options.client ?? client).get<ListFindingsResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practices/findings', ...options });
+
+/**
+ * Get engagement statistics
+ *
+ * Returns the current user's feedback action counts across all findings in this workspace.
+ */
+export const getEngagement = <ThrowOnError extends boolean = false>(options: Options<GetEngagementData, ThrowOnError>) => (options.client ?? client).get<GetEngagementResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/workspaces/{workspaceSlug}/practices/badpractice/{id}/resolve',
+    url: '/workspaces/{workspaceSlug}/practices/findings/engagement',
     ...options
 });
 
 /**
- * Get bad practices for a pull request
+ * List findings for a pull request
  *
- * Retrieves all detected bad practices for a specific pull request
+ * All findings for a specific pull request within the workspace
  */
-export const getBadPracticesForPullRequest = <ThrowOnError extends boolean = false>(options: Options<GetBadPracticesForPullRequestData, ThrowOnError>) => (options.client ?? client).get<GetBadPracticesForPullRequestResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practices/pullrequest/{pullRequestId}', ...options });
+export const getFindingsForPullRequest = <ThrowOnError extends boolean = false>(options: Options<GetFindingsForPullRequestData, ThrowOnError>) => (options.client ?? client).get<GetFindingsForPullRequestResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practices/findings/pull-request/{prId}', ...options });
 
 /**
- * Detect bad practices for a pull request
+ * Per-practice summary for current user
  *
- * Triggers bad practice detection for a specific pull request
+ * Aggregated verdict counts per practice for dashboard cards
  */
-export const detectForPullRequest = <ThrowOnError extends boolean = false>(options: Options<DetectForPullRequestData, ThrowOnError>) => (options.client ?? client).post<DetectForPullRequestResponses, DetectForPullRequestErrors, ThrowOnError>({
+export const getSummary = <ThrowOnError extends boolean = false>(options: Options<GetSummaryData, ThrowOnError>) => (options.client ?? client).get<GetSummaryResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practices/findings/summary', ...options });
+
+/**
+ * Get finding detail
+ */
+export const getFinding = <ThrowOnError extends boolean = false>(options: Options<GetFindingData, ThrowOnError>) => (options.client ?? client).get<GetFindingResponses, GetFindingErrors, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practices/findings/{findingId}', ...options });
+
+/**
+ * Get latest feedback for a finding
+ *
+ * Returns the current user's most recent feedback on the specified finding, or 204 if none exists.
+ */
+export const getLatestFeedback = <ThrowOnError extends boolean = false>(options: Options<GetLatestFeedbackData, ThrowOnError>) => (options.client ?? client).get<GetLatestFeedbackResponses, GetLatestFeedbackErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/workspaces/{workspaceSlug}/practices/pullrequest/{pullRequestId}/detect',
+    url: '/workspaces/{workspaceSlug}/practices/findings/{findingId}/feedback',
     ...options
 });
 
 /**
- * Get bad practices for a user
+ * Submit feedback on a practice finding
  *
- * Retrieves all detected bad practices for pull requests assigned to the user
+ * Records the contributor's reaction (APPLIED, DISPUTED, NOT_APPLICABLE) to an AI-generated finding. Append-only: submitting again creates a new record, preserving temporal history.
  */
-export const getBadPracticesForUser = <ThrowOnError extends boolean = false>(options: Options<GetBadPracticesForUserData, ThrowOnError>) => (options.client ?? client).get<GetBadPracticesForUserResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practices/user/{login}', ...options });
+export const submitFeedback = <ThrowOnError extends boolean = false>(options: Options<SubmitFeedbackData, ThrowOnError>) => (options.client ?? client).post<SubmitFeedbackResponses, SubmitFeedbackErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/practices/findings/{findingId}/feedback',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 /**
- * Detect bad practices for a user
- *
- * Triggers bad practice detection for all pull requests of the specified user
+ * Delete a practice definition
  */
-export const detectForUser = <ThrowOnError extends boolean = false>(options: Options<DetectForUserData, ThrowOnError>) => (options.client ?? client).post<DetectForUserResponses, DetectForUserErrors, ThrowOnError>({
+export const deletePractice = <ThrowOnError extends boolean = false>(options: Options<DeletePracticeData, ThrowOnError>) => (options.client ?? client).delete<DeletePracticeResponses, DeletePracticeErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/workspaces/{workspaceSlug}/practices/user/{login}/detect',
+    url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}',
     ...options
+});
+
+/**
+ * Get a practice definition
+ */
+export const getPractice = <ThrowOnError extends boolean = false>(options: Options<GetPracticeData, ThrowOnError>) => (options.client ?? client).get<GetPracticeResponses, GetPracticeErrors, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}', ...options });
+
+/**
+ * Update a practice definition
+ */
+export const updatePractice = <ThrowOnError extends boolean = false>(options: Options<UpdatePracticeData, ThrowOnError>) => (options.client ?? client).patch<UpdatePracticeResponses, UpdatePracticeErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Set practice active state
+ */
+export const setActive = <ThrowOnError extends boolean = false>(options: Options<SetActiveData, ThrowOnError>) => (options.client ?? client).patch<SetActiveResponses, SetActiveErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}/active',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });
 
 /**

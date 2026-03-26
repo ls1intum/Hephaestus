@@ -23,20 +23,47 @@ erDiagram
         TIMESTAMPTZ ingested_at "NOT NULL"
     }
 
-    BadPracticeDetection {
+    AgentConfig {
         BIGINT id PK
-        TIMESTAMPTZ detected_at
-        VARCHAR(255) trace_id
-        BIGINT pullrequest_id FK
-        TEXT summary
+        BIGINT workspace_id FK,UK "NOT NULL"
+        VARCHAR(100) name UK "NOT NULL"
+        BOOLEAN enabled "NOT NULL"
+        VARCHAR(32) agent_type "NOT NULL"
+        VARCHAR(128) model_name
+        TEXT llm_api_key
+        VARCHAR(32) llm_provider "NOT NULL"
+        INTEGER timeout_seconds "NOT NULL"
+        INTEGER max_concurrent_jobs "NOT NULL"
+        BOOLEAN allow_internet "NOT NULL"
+        TIMESTAMPTZ created_at "NOT NULL"
+        TIMESTAMPTZ updated_at
+        VARCHAR(16) credential_mode "NOT NULL"
     }
 
-    BadPracticeFeedback {
-        BIGINT id PK
-        VARCHAR(255) type
-        BIGINT pull_request_bad_practice_id FK
-        TIMESTAMPTZ created_at
-        TEXT explanation
+    AgentJob {
+        UUID id PK
+        BIGINT workspace_id FK "NOT NULL"
+        BIGINT config_id FK
+        VARCHAR(50) job_type "NOT NULL"
+        VARCHAR(20) status "NOT NULL"
+        JSONB metadata
+        JSONB output
+        JSONB config_snapshot "NOT NULL"
+        TEXT job_token UK "NOT NULL"
+        VARCHAR(255) idempotency_key
+        VARCHAR(64) container_id
+        INTEGER exit_code
+        TEXT error_message
+        INTEGER retry_count "NOT NULL"
+        TIMESTAMPTZ created_at "NOT NULL"
+        TIMESTAMPTZ started_at
+        TIMESTAMPTZ completed_at
+        VARCHAR(64) network_id
+        VARCHAR(64) job_token_hash
+        TEXT llm_api_key
+        VARCHAR(20) delivery_status
+        VARCHAR(255) delivery_comment_id
+        TEXT container_logs
     }
 
     ChatMessage {
@@ -168,6 +195,15 @@ erDiagram
         VARCHAR(255) title "NOT NULL"
         BIGINT user_id FK "NOT NULL"
         BIGINT workspace_id FK "NOT NULL"
+    }
+
+    FindingFeedback {
+        UUID id PK
+        UUID finding_id FK "NOT NULL"
+        BIGINT contributor_id FK "NOT NULL"
+        VARCHAR(16) action "NOT NULL"
+        TEXT explanation
+        TIMESTAMPTZ created_at "NOT NULL"
     }
 
     GitCommit {
@@ -340,6 +376,39 @@ erDiagram
         VARCHAR(32) role
     }
 
+    Practice {
+        BIGINT id PK
+        BIGINT workspace_id FK,UK "NOT NULL"
+        VARCHAR(64) slug UK "NOT NULL"
+        VARCHAR(128) name "NOT NULL"
+        VARCHAR(64) category
+        TEXT description "NOT NULL"
+        JSONB trigger_events "NOT NULL"
+        TEXT detection_prompt
+        BOOLEAN is_active "NOT NULL"
+        TIMESTAMPTZ created_at "NOT NULL"
+        TIMESTAMPTZ updated_at
+    }
+
+    PracticeFinding {
+        UUID id PK
+        VARCHAR(255) idempotency_key UK "NOT NULL"
+        UUID agent_job_id "NOT NULL"
+        BIGINT practice_id FK "NOT NULL"
+        VARCHAR(32) target_type "NOT NULL"
+        BIGINT target_id "NOT NULL"
+        BIGINT contributor_id FK "NOT NULL"
+        VARCHAR(255) title "NOT NULL"
+        VARCHAR(16) verdict "NOT NULL"
+        VARCHAR(16) severity "NOT NULL"
+        REAL confidence "NOT NULL"
+        JSONB evidence
+        TEXT reasoning
+        TEXT guidance
+        VARCHAR(16) guidance_method
+        TIMESTAMPTZ detected_at "NOT NULL"
+    }
+
     Project {
         BIGINT id PK
         VARCHAR(64) node_id UK
@@ -421,20 +490,6 @@ erDiagram
         TIMESTAMPTZ updated_at
         BIGINT native_id UK "NOT NULL"
         BIGINT provider_id FK,UK "NOT NULL"
-    }
-
-    PullRequestBadPractice {
-        BIGINT id PK
-        VARCHAR(255) title
-        BIGINT pullrequest_id FK
-        VARCHAR(32) state
-        TIMESTAMPTZ detected_at
-        TIMESTAMPTZ updated_at
-        VARCHAR(32) user_state
-        VARCHAR(32) detection_pullrequest_lifecycle_state
-        VARCHAR(255) detection_trace_id
-        BIGINT bad_practice_detection_id FK
-        TEXT description
     }
 
     PullRequestRequestedReviewer {
@@ -606,8 +661,8 @@ erDiagram
     UserPreference {
         BIGINT id PK
         BIGINT user_id FK,UK "NOT NULL"
-        BOOLEAN notifications_enabled "NOT NULL"
         BOOLEAN participate_in_research "NOT NULL"
+        BOOLEAN ai_review_enabled "NOT NULL"
     }
 
     Workspace {
@@ -642,6 +697,10 @@ erDiagram
         VARCHAR(512) server_url
         BIGINT gitlab_group_id
         BIGINT gitlab_webhook_id
+        BOOLEAN practices_enabled "NOT NULL"
+        BOOLEAN achievements_enabled "NOT NULL"
+        BOOLEAN leaderboard_enabled "NOT NULL"
+        BOOLEAN progression_enabled "NOT NULL"
     }
 
     WorkspaceMembership {
@@ -683,6 +742,7 @@ erDiagram
     %% Relationships
     %% One-to-One relationships
     Workspace ||--|| ActivityEvent : has
+    Workspace ||--|| AgentConfig : has
     ChatMessage ||--|| ChatMessagePart : has
     ChatMessage ||--|| ChatThread : references
     GitCommit ||--|| CommitContributor : has
@@ -700,6 +760,7 @@ erDiagram
     GitProvider ||--|| Milestone : references
     Repository ||--|| Milestone : has
     GitProvider ||--|| Organization : references
+    Workspace ||--|| Practice : has
     GitProvider ||--|| Project : references
     Project ||--|| ProjectField : has
     ProjectField ||--|| ProjectFieldValue : has
@@ -723,8 +784,8 @@ erDiagram
     %% One-to-Many relationships
     User ||--o{ ActivityEvent : references
     Repository ||--o{ ActivityEvent : has
-    Issue ||--o{ BadPracticeDetection : references
-    PullRequestBadPractice ||--o{ BadPracticeFeedback : has
+    AgentConfig ||--o{ AgentJob : has
+    Workspace ||--o{ AgentJob : has
     ChatMessage ||--o{ ChatMessage : references
     ChatThread ||--o{ ChatMessage : has
     User ||--o{ ChatThread : has
@@ -739,6 +800,8 @@ erDiagram
     DiscussionComment ||--o{ DiscussionComment : commented_on
     User ||--o{ Document : has
     Workspace ||--o{ Document : has
+    User ||--o{ FindingFeedback : references
+    PracticeFinding ||--o{ FindingFeedback : has
     User ||--o{ GitCommit : authored_by
     User ||--o{ GitCommit : references
     User ||--o{ Issue : authored_by
@@ -750,13 +813,13 @@ erDiagram
     Issue ||--o{ IssueComment : commented_on
     Organization ||--o{ IssueType : has
     User ||--o{ Milestone : created_by
+    User ||--o{ PracticeFinding : references
+    Practice ||--o{ PracticeFinding : has
     User ||--o{ Project : created_by
     User ||--o{ ProjectItem : created_by
     Issue ||--o{ ProjectItem : has
     User ||--o{ ProjectStatusUpdate : created_by
     Project ||--o{ ProjectStatusUpdate : has
-    BadPracticeDetection ||--o{ PullRequestBadPractice : has
-    Issue ||--o{ PullRequestBadPractice : references
     User ||--o{ PullRequestReview : reviewed
     Issue ||--o{ PullRequestReview : reviewed
     User ||--o{ PullRequestReviewComment : commented_on

@@ -3,6 +3,13 @@ import { fn } from "storybook/test";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 
+const featureFlags = {
+	practicesEnabled: true,
+	achievementsEnabled: true,
+	leaderboardEnabled: true,
+	progressionEnabled: false,
+} as const;
+
 /**
  * UI component for switching between different workspaces, displaying the
  * current workspace and allowing selection of others. Supports keyboard shortcuts
@@ -29,7 +36,8 @@ const meta = {
 				id: 1,
 				status: "ACTIVE",
 				providerType: "GITHUB",
-				createdAt: new Date(),
+				createdAt: new Date("2025-01-15T00:00:00Z"),
+				...featureFlags,
 			},
 		],
 		activeWorkspace: {
@@ -39,7 +47,8 @@ const meta = {
 			id: 1,
 			status: "ACTIVE",
 			providerType: "GITHUB",
-			createdAt: new Date(),
+			createdAt: new Date("2025-01-15T00:00:00Z"),
+			...featureFlags,
 		},
 		onWorkspaceChange: fn(),
 		onAddWorkspace: fn(),
@@ -106,7 +115,8 @@ export const MultipleWorkspaces: Story = {
 				id: 1,
 				status: "ACTIVE",
 				providerType: "GITHUB",
-				createdAt: new Date(),
+				createdAt: new Date("2025-01-15T00:00:00Z"),
+				...featureFlags,
 			},
 			{
 				displayName: "Personal",
@@ -115,7 +125,8 @@ export const MultipleWorkspaces: Story = {
 				id: 2,
 				status: "ACTIVE",
 				providerType: "GITHUB",
-				createdAt: new Date(),
+				createdAt: new Date("2025-01-15T00:00:00Z"),
+				...featureFlags,
 			},
 			{
 				displayName: "Team B",
@@ -124,7 +135,8 @@ export const MultipleWorkspaces: Story = {
 				id: 3,
 				status: "ACTIVE",
 				providerType: "GITHUB",
-				createdAt: new Date(),
+				createdAt: new Date("2025-01-15T00:00:00Z"),
+				...featureFlags,
 			},
 		],
 		activeWorkspace: {
@@ -134,7 +146,8 @@ export const MultipleWorkspaces: Story = {
 			id: 1,
 			status: "ACTIVE",
 			providerType: "GITHUB",
-			createdAt: new Date(),
+			createdAt: new Date("2025-01-15T00:00:00Z"),
+			...featureFlags,
 		},
 	},
 	parameters: {

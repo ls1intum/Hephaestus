@@ -21,6 +21,8 @@ const meta = {
 	args: {
 		username: "johnDoe",
 		workspaceSlug: "aet",
+		achievementsEnabled: true,
+		leaderboardEnabled: true,
 	},
 	argTypes: {
 		username: {
@@ -30,6 +32,14 @@ const meta = {
 		workspaceSlug: {
 			control: "text",
 			description: "Active workspace slug",
+		},
+		achievementsEnabled: {
+			control: "boolean",
+			description: "Whether achievements sidebar item is visible",
+		},
+		leaderboardEnabled: {
+			control: "boolean",
+			description: "Whether leaderboard sidebar item is visible",
 		},
 	},
 	decorators: [
@@ -56,5 +66,15 @@ export const DifferentUser: Story = {
 	args: {
 		username: "janeDoe",
 		workspaceSlug: "aet",
+	},
+};
+
+/**
+ * All optional features disabled — only Profile and Teams remain.
+ */
+export const AllFeaturesDisabled: Story = {
+	args: {
+		achievementsEnabled: false,
+		leaderboardEnabled: false,
 	},
 };

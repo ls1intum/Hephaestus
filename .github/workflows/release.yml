@@ -42,17 +42,10 @@ jobs:
           extra_plugins: |
             @semantic-release/commit-analyzer
             @semantic-release/release-notes-generator
-            @semantic-release/changelog
-            @semantic-release/exec
-            @semantic-release/git
             @semantic-release/github
             conventional-changelog-conventionalcommits
         env:
           GITHUB_TOKEN: ${{ secrets.GH_PAT }}
-          GIT_AUTHOR_NAME: "github-actions[bot]"
-          GIT_AUTHOR_EMAIL: "github-actions[bot]@users.noreply.github.com"
-          GIT_COMMITTER_NAME: "github-actions[bot]"
-          GIT_COMMITTER_EMAIL: "github-actions[bot]@users.noreply.github.com"
 
       - name: Summary
         if: steps.release.outputs.new_release_published == 'true'
@@ -79,7 +72,7 @@ jobs:
         run: |
           VERSION="${{ needs.release.outputs.new_version }}"
           SHA="${{ github.event.workflow_run.head_sha }}"
-          IMAGES=("webapp" "application-server" "intelligence-service" "webhook-ingest")
+          IMAGES=("webapp" "application-server" "intelligence-service" "webhook-ingest" "agent-claude-code" "agent-opencode")
 
           for img in "${IMAGES[@]}"; do
             FULL_IMAGE="ghcr.io/ls1intum/hephaestus/$img"

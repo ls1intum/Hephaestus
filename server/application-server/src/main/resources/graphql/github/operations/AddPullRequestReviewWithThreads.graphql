@@ -1,0 +1,23 @@
+# Posts a pull request review with inline thread comments.
+# Used by agent feedback delivery to post diff-level practice findings.
+# Uses COMMENT event for a neutral review (no approval/rejection).
+
+mutation AddPullRequestReviewWithThreads(
+    $pullRequestId: ID!,
+    $body: String,
+    $event: PullRequestReviewEvent!,
+    $commitOID: GitObjectID,
+    $threads: [DraftPullRequestReviewThread!]
+) {
+    addPullRequestReview(input: {
+        pullRequestId: $pullRequestId,
+        body: $body,
+        event: $event,
+        commitOID: $commitOID,
+        threads: $threads
+    }) {
+        pullRequestReview {
+            id
+        }
+    }
+}

@@ -1,0 +1,57 @@
+{
+  "findings": [
+    {
+      "practiceSlug": "pr-description-quality",
+      "title": "Well-structured PR description with context",
+      "verdict": "POSITIVE",
+      "severity": "INFO",
+      "confidence": 0.92,
+      "evidence": {
+        "locations": [],
+        "snippets": ["## Summary\nThis PR implements..."]
+      },
+      "reasoning": "The PR description clearly explains the motivation, changes made, and testing approach.",
+      "guidance": "Keep up the excellent documentation practices.",
+      "guidanceMethod": "COACHING"
+    },
+    {
+      "practiceSlug": "error-handling",
+      "title": "Missing error handling in Main.java",
+      "verdict": "NEGATIVE",
+      "severity": "MAJOR",
+      "confidence": 0.85,
+      "evidence": {
+        "locations": [{"path": "src/Main.java", "startLine": 42, "endLine": 50}],
+        "snippets": ["try { connect(); } catch (Exception e) {}"]
+      },
+      "reasoning": "Empty catch block swallows exceptions silently, making debugging difficult.",
+      "guidance": "Log the exception or rethrow as a domain-specific exception.",
+      "guidanceMethod": "SCAFFOLDING"
+    },
+    {
+      "practiceSlug": "commit-message-quality",
+      "title": "Commit messages follow conventional format",
+      "verdict": "POSITIVE",
+      "severity": "INFO",
+      "confidence": 0.88,
+      "reasoning": "All commits follow the conventional commit format (feat:, fix:, etc.)."
+    },
+    {
+      "practiceSlug": "pr-scope",
+      "title": "PR scope is appropriately sized",
+      "verdict": "NOT_APPLICABLE",
+      "severity": "INFO",
+      "confidence": 0.70,
+      "reasoning": "Single-file documentation change — scope assessment not meaningful."
+    },
+    {
+      "practiceSlug": "review-thoroughness",
+      "title": "Insufficient test coverage for new feature",
+      "verdict": "NEEDS_REVIEW",
+      "severity": "MINOR",
+      "confidence": 0.55,
+      "reasoning": "New utility class has no unit tests, but the change is small and well-understood.",
+      "guidance": "Consider adding a basic smoke test for the utility method."
+    }
+  ]
+}

@@ -1,11 +1,10 @@
-# Intelligence Service — AI-Powered Mentor and Detection API
+# Intelligence Service — AI-Powered Mentor API
 
-This service provides the AI-powered mentor chat functionality and bad practice detection for Hephaestus. It uses Hono with Zod OpenAPI for type-safe routing and AI SDK v6 for LLM interactions.
+This service provides the AI-powered mentor chat functionality for Hephaestus. It uses Hono with Zod OpenAPI for type-safe routing and AI SDK v6 for LLM interactions.
 
 ## Features
 
 - **Mentor Chat**: AI-powered conversational assistant with tool calling capabilities
-- **Bad Practice Detection**: Automated detection of development anti-patterns
 - **Document Artifacts**: Create and update rich documents within chat
 - **Database Integration**: Direct access to Hephaestus data via Drizzle ORM
 

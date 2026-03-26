@@ -15,6 +15,7 @@ import type {
 } from "@/api/types.gen";
 import { SettingsPage } from "@/components/settings/SettingsPage";
 import { useAuth } from "@/integrations/auth/AuthContext";
+import { isPosthogEnabled } from "@/integrations/posthog/config";
 
 export const Route = createFileRoute("/_authenticated/settings")({
 	component: RouteComponent,
@@ -23,8 +24,11 @@ export const Route = createFileRoute("/_authenticated/settings")({
 function RouteComponent() {
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
-	const { logout } = useAuth();
+	const { logout, hasRole } = useAuth();
 	const userSettingsQueryKey = getUserSettingsQueryKey();
+
+	// Feature flag: AI review section visible only for users with the practice review role
+	const showAiReviewSection = hasRole("run_practice_review");
 
 	// Query for user settings
 	const { data: settings, isLoading } = useQuery({
@@ -80,30 +84,19 @@ function RouteComponent() {
 		},
 	});
 
-	// Handle toggle change for notifications
-	const handleNotificationToggle = (checked: boolean) => {
-		if (!settings) {
-			return;
-		}
+	// Spread-based helper: reads latest cache to avoid stale-closure race under rapid toggling
+	const updateSetting = (patch: Partial<UserSettings>) => {
+		const current = queryClient.getQueryData<UserSettings>(userSettingsQueryKey);
+		if (!current) return;
 		updateSettingsMutation.mutate({
-			body: {
-				receiveNotifications: checked,
-				participateInResearch: settings.participateInResearch,
-			},
+			body: { ...current, ...patch },
 		});
 	};
 
-	const handleResearchToggle = (checked: boolean) => {
-		if (!settings) {
-			return;
-		}
-		updateSettingsMutation.mutate({
-			body: {
-				participateInResearch: checked,
-				receiveNotifications: settings.receiveNotifications,
-			},
-		});
-	};
+	const handleAiReviewToggle = (checked: boolean) => updateSetting({ aiReviewEnabled: checked });
+
+	const handleResearchToggle = (checked: boolean) =>
+		updateSetting({ participateInResearch: checked });
 
 	// Handle account deletion
 	const handleDeleteAccount = () => {
@@ -113,11 +106,13 @@ function RouteComponent() {
 	return (
 		<SettingsPage
 			isLoading={isLoading}
-			notificationsProps={{
-				receiveNotifications: settings?.receiveNotifications ?? false,
-				onToggleNotifications: handleNotificationToggle,
+			aiReviewProps={{
+				aiReviewEnabled: settings?.aiReviewEnabled ?? true,
+				onToggleAiReview: handleAiReviewToggle,
 				isLoading: updateSettingsMutation.isPending,
 			}}
+			showAiReviewSection={showAiReviewSection}
+			showResearchSection={isPosthogEnabled}
 			researchProps={{
 				participateInResearch: settings?.participateInResearch ?? true,
 				onToggleResearch: handleResearchToggle,

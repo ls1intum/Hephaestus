@@ -44,24 +44,20 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - test-type: application-server-unit
-            display-name: "App Server: Unit"
+          - test-type: application-server-unit-arch
+            display-name: "App Server: Unit + Arch"
           - test-type: application-server-integration
             display-name: "App Server: Integration"
-          - test-type: application-server-architecture
-            display-name: "App Server: Architecture"
           - test-type: webapp-unit
             display-name: "Webapp: Unit"
           - test-type: webapp-storybook
             display-name: "Webapp: Storybook"
           - test-type: webapp-visual
             display-name: "Webapp: Visual"
-          - test-type: intelligence-service-unit
-            display-name: "Intelligence: Unit"
+          - test-type: intelligence-service-unit-arch
+            display-name: "Intelligence: Unit + Arch"
           - test-type: intelligence-service-integration
             display-name: "Intelligence: Integration"
-          - test-type: intelligence-service-architecture
-            display-name: "Intelligence: Architecture"
           - test-type: webhook-ingest-unit
             display-name: "Webhook: Unit"
 
@@ -73,10 +69,10 @@ jobs:
             "webapp-unit"|"webapp-storybook"|"webapp-visual")
               echo "run=${{ inputs.webapp_changed }}" >> $GITHUB_OUTPUT
               ;;
-            "application-server-unit"|"application-server-integration"|"application-server-architecture")
+            "application-server-unit-arch"|"application-server-integration")
               echo "run=${{ inputs.application_server_changed }}" >> $GITHUB_OUTPUT
               ;;
-            "intelligence-service-unit"|"intelligence-service-integration"|"intelligence-service-architecture")
+            "intelligence-service-unit-arch"|"intelligence-service-integration")
               echo "run=${{ inputs.intelligence_service_changed }}" >> $GITHUB_OUTPUT
               ;;
             "webhook-ingest-unit")
@@ -127,11 +123,10 @@ jobs:
           rm -rf target/surefire-reports/*
           # Use -Dsurefire.includedGroups to override the property defined in pom.xml
           # The pom.xml configures <groups>${surefire.includedGroups}</groups>
-          # -Dmaven.test.skip=false overrides the quick profile (auto-activated when target/classes exists from cache)
+          # -Dmaven.test.skip=false overrides the quick profile (auto-activated when target/generated-sources exists from cache)
           case "${{ matrix.test-type }}" in
-            "application-server-unit") ./mvnw test -Dsurefire.includedGroups="unit" -Dmaven.test.skip=false -T 2C --batch-mode -Dmaven.build.cache.enabled=true ;;
-            "application-server-integration") ./mvnw test -Dsurefire.includedGroups="integration" -Dparallel=none -Dmaven.test.skip=false -T 2C --batch-mode -Dmaven.build.cache.enabled=true ;;
-            "application-server-architecture") ./mvnw test -Dsurefire.includedGroups="architecture" -Dmaven.test.skip=false -T 2C --batch-mode -Dmaven.build.cache.enabled=true ;;
+            "application-server-unit-arch") ./mvnw test -Dsurefire.includedGroups="unit | architecture" -DskipAfterFailureCount=10 -Dmaven.test.skip=false -T 2C --batch-mode -Dmaven.build.cache.enabled=true ;;
+            "application-server-integration") ./mvnw test -Dsurefire.includedGroups="integration" -Dparallel=none -Dhephaestus.surefire.timeout=600 -Dmaven.test.skip=false -T 2C --batch-mode -Dmaven.build.cache.enabled=true ;;
           esac
 
       - name: Run tests
@@ -166,9 +161,25 @@ jobs:
           cd server/intelligence-service
 
           case "${{ matrix.test-type }}" in
-            "intelligence-service-unit") npm run test:unit ;;
+            "intelligence-service-unit-arch")
+              FAILURES=()
+              npm run test:unit || FAILURES+=("Unit tests failed. Run: cd server/intelligence-service && npm run test:unit")
+              npm run test:arch || FAILURES+=("Architecture tests failed. Run: cd server/intelligence-service && npm run test:arch")
+
+              if [ ${#FAILURES[@]} -gt 0 ]; then
+                echo "### Intelligence Service Tests" >> $GITHUB_STEP_SUMMARY
+                echo "| Suite | Status | Fix |" >> $GITHUB_STEP_SUMMARY
+                echo "|-------|--------|-----|" >> $GITHUB_STEP_SUMMARY
+                for f in "${FAILURES[@]}"; do
+                  echo "::error::$f"
+                  if [[ "$f" == *"Run:"* ]]; then
+                    echo "| ${f%%.*} | :x: Failed | \`${f##*Run: }\` |" >> $GITHUB_STEP_SUMMARY
+                  fi
+                done
+                exit 1
+              fi
+              ;;
             "intelligence-service-integration") npm run test:integration ;;
-            "intelligence-service-architecture") npm run test:arch ;;
           esac
 
       - name: Run tests

@@ -17,12 +17,12 @@ import org.junit.jupiter.api.Test;
  *   <li><b>activity.scoring</b> - XP/scoring calculations</li>
  * </ul>
  *
- * <p>Note: Bad practice detection is in the separate <b>practices</b> module:
+ * <p>Note: Code health analysis is in the separate <b>practices</b> module:
  * <ul>
- *   <li><b>practices.model</b> - Bad practice entities (BadPracticeDetection, PullRequestBadPractice, etc.)</li>
- *   <li><b>practices.detection</b> - Detection logic (scheduler, detector, event listeners)</li>
- *   <li><b>practices.spi</b> - Service provider interfaces (BadPracticeNotificationSender, UserRoleChecker)</li>
- *   <li><b>practices.feedback</b> - Feedback handling</li>
+ *   <li><b>practices.model</b> - Practice and PracticeFinding entities</li>
+ *   <li><b>practices.spi</b> - Service provider interfaces (UserRoleChecker)</li>
+ *   <li><b>practices.finding</b> - Contributor findings, detection events, and finding API</li>
+ *   <li><b>practices.review</b> - Detection and delivery gate decisions</li>
  * </ul>
  *
  * <p>These tests enforce proper separation of concerns within the activity module and practices module.
@@ -148,75 +148,22 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
     class PracticesModuleTests {
 
         /**
-         * practices.model package (persistence) should not depend on practices.detection (logic).
+         * practices.model package (persistence) should not depend on practices.review (logic).
          *
          * <p>The practices.model package contains entities and repositories.
-         * The practices.detection package contains detection logic and schedulers.
+         * The practices.review package contains agent-based detection gate and delivery.
          * Model/persistence layer should not depend on detection logic.
          */
         @Test
-        @DisplayName("practices.model does not depend on practices.detection")
-        void practicesModelDoesNotDependOnDetection() {
+        @DisplayName("practices.model does not depend on practices.review")
+        void practicesModelDoesNotDependOnReview() {
             ArchRule rule = noClasses()
                 .that()
                 .resideInAPackage("..practices.model..")
                 .should()
                 .dependOnClassesThat()
-                .resideInAPackage("..practices.detection..")
-                .because("Model layer (practices.model) should not depend on detection logic (practices.detection)");
-            rule.check(classes);
-        }
-
-        /**
-         * practices.detection can depend on practices.model and practices.spi.
-         *
-         * <p>The detector uses model entities and SPI interfaces.
-         * This is the expected direction of dependency.
-         */
-        @Test
-        @DisplayName("practices.detection may depend on practices.model (verify direction)")
-        void verifyDetectorDependencyDirection() {
-            // This test documents the expected dependency direction.
-            // practices.detection → practices.model is allowed
-            // practices.model → practices.detection is NOT allowed (tested above)
-            ArchRule rule = classes()
-                .that()
-                .resideInAPackage("..practices.detection..")
-                .should()
-                .onlyDependOnClassesThat()
-                .resideInAnyPackage(
-                    "..practices..",
-                    "..gitprovider..",
-                    "..workspace..",
-                    "..intelligenceservice..",
-                    "..core..",
-                    "..shared..",
-                    "java..",
-                    "jakarta..",
-                    "org.springframework..",
-                    "org.slf4j..",
-                    "org.hibernate..",
-                    "lombok..",
-                    "io.github.resilience4j..", // Circuit breaker for resilient external calls
-                    "" // primitives
-                )
-                .because("practices.detection should only depend on allowed packages");
-            rule.check(classes);
-        }
-
-        /**
-         * Practices detection should not depend on leaderboard.
-         */
-        @Test
-        @DisplayName("practices.detection does not depend on leaderboard")
-        void practicesDetectionDoesNotDependOnLeaderboard() {
-            ArchRule rule = noClasses()
-                .that()
-                .resideInAPackage("..practices.detection..")
-                .should()
-                .dependOnClassesThat()
-                .resideInAPackage("..leaderboard..")
-                .because("Practices detection is independent of leaderboard");
+                .resideInAPackage("..practices.review..")
+                .because("Model layer (practices.model) should not depend on review logic (practices.review)");
             rule.check(classes);
         }
     }
@@ -274,13 +221,12 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
     class PracticesControllerTests {
 
         /**
-         * PracticesController should be the only entry point for practices-related API.
-         *
-         * <p>All bad practice detection, resolution, and feedback endpoints should be
-         * consolidated in PracticesController, not scattered across other controllers.
+         * Only PracticeCatalogController (CRUD), PracticeFindingController (contributor findings API),
+         * and FindingFeedbackController (contributor feedback) are allowed as REST entry points
+         * in the practices module.
          */
         @Test
-        @DisplayName("Practices has a dedicated controller")
+        @DisplayName("Practices has dedicated controllers")
         void practicesHasDedicatedController() {
             ArchRule rule = classes()
                 .that()
@@ -288,8 +234,14 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
                 .and()
                 .haveSimpleNameEndingWith("Controller")
                 .should()
-                .haveSimpleName("PracticesController")
-                .because("All practices endpoints should be in PracticesController");
+                .haveSimpleName("PracticeCatalogController")
+                .orShould()
+                .haveSimpleName("PracticeFindingController")
+                .orShould()
+                .haveSimpleName("FindingFeedbackController")
+                .because(
+                    "Only PracticeCatalogController, PracticeFindingController, and FindingFeedbackController are allowed REST entry points"
+                );
             rule.check(classes);
         }
     }

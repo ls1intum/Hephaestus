@@ -1,0 +1,11 @@
+# Posts a note (comment) on a merge request.
+# Used by agent feedback delivery to post review results.
+
+mutation CreateMergeRequestNote($noteableId: NoteableID!, $body: String!) {
+    createNote(input: {noteableId: $noteableId, body: $body}) {
+        note {
+            id
+        }
+        errors
+    }
+}

@@ -17,7 +17,6 @@ The production stack consists of:
 - **React webapp** (served via nginx)
 - **PostgreSQL 16**
 - **Keycloak** (with GitHub as identity provider)
-- **Mail relay** (Postfix)
 
 ## Environment variables
 
@@ -32,7 +31,6 @@ Set the following secrets before starting the stack:
 | `KC_BOOTSTRAP_ADMIN_USERNAME` | Keycloak bootstrap admin username |
 | `KC_BOOTSTRAP_ADMIN_PASSWORD` | Keycloak bootstrap admin password (`openssl rand -base64 32`) |
 | `KEYCLOAK_HEPHAESTUS_CONFIDENTIAL_CLIENT_SECRET` | Secret used by the app server to call Keycloak |
-| `POSTFIX_USERNAME` / `POSTFIX_PASSWORD` | Credentials for production SMTP relay |
 | `SLACK_WEBHOOK_URL` | Optional: webhook for weekly leaderboard posts |
 
 ### GitHub integration
@@ -80,7 +78,6 @@ The sync scheduler fetches recent GitHub activity (issues, PRs, reviews) for mon
    - Sign in via GitHub with the account configured in `KEYCLOAK_GITHUB_ADMIN_USERNAME` and confirm it lands in Keycloak with both the `admin` realm role and the `realm-management` → `realm-admin` client role automatically applied.
    - Verify that the super admin user can access workspace admin endpoints for workspaces where they have membership (they are automatically elevated to workspace ADMIN level for those workspaces).
    - Trigger a test webhook from GitHub to validate the ingest pipeline.
-   - Send a test best-practice email using the application server.
 
 ## Global admin privileges
 

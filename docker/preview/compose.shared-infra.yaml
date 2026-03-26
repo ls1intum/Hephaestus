@@ -9,7 +9,6 @@
 #   - nats-server: Message queue for GitHub webhook events
 #   - webhook-ingest: Receives GitHub webhooks, publishes to NATS
 #   - keycloak + keycloak-db: Authentication (wildcard redirect URIs)
-#   - postfix: Email relay
 #
 # Coolify Setup:
 #   1. Create new Service → Docker Compose
@@ -151,19 +150,6 @@ services:
       options:
         max-size: "50m"
         max-file: "5"
-
-  # ---------------------------------------------------------------------------
-  # Postfix - Email relay (internal only)
-  # ---------------------------------------------------------------------------
-  postfix:
-    image: ghcr.io/ls1admin/postfix:latest
-    restart: unless-stopped
-    hostname: ${PREVIEW_DOMAIN:?Required}
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
 
 # =============================================================================
 # VOLUMES
@@ -315,9 +301,10 @@ configs:
         ],
         "roles": {
           "realm": [
-            {"name": "admin", "description": "Administrator privileges", "composites": {"realm": ["mentor_access", "notification_access"]}},
+            {"name": "admin", "description": "Administrator privileges", "composites": {"realm": ["mentor_access", "notification_access", "run_practice_review"]}},
             {"name": "mentor_access", "description": "Access to AI Mentor"},
             {"name": "notification_access", "description": "Get notification emails"},
+            {"name": "run_practice_review", "description": "Trigger practice-aware PR review"},
             {"name": "offline_access", "description": "Offline access", "composite": false, "clientRole": false},
             {"name": "uma_authorization", "description": "UMA authorization", "composite": false, "clientRole": false},
             {"name": "default-roles-hephaestus", "description": "Default roles", "composite": true, "composites": {"realm": ["offline_access", "uma_authorization"], "client": {"account": ["view-profile", "manage-account"]}}, "clientRole": false}

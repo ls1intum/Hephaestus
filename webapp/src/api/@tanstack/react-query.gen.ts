@@ -3,8 +3,8 @@
 import { type DefaultError, type InfiniteData, infiniteQueryOptions, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { addLabelFilter, addLabelToTeam, addRepositoryToMonitor, assignRole, computeUserLeagueStats, createDocument, createWorkspace, deleteDocument, deleteDocumentVersionsAfter, deleteUser, detectForPullRequest, detectForUser, getAllAchievementDefinitions, getAllTeams, getBadPractice, getBadPracticesForPullRequest, getBadPracticesForUser, getCurrentUserMembership, getDocument, getGroupedThreads, getLabelFilters, getLeaderboard, getMember, getRepositoriesToMonitor, getRepositorySettings, getTeamSettings, getThread, getUserAchievements, getUserProfile, getUserSettings, getUsersWithTeams, getVersion, getWorkspace, gitLabPreflight, listDocuments, listGitLabGroups, listGlobalContributors, listMembers, listVersions, listWorkspaces, type Options, provideFeedback, purgeWorkspace, recalculateUserAchievements, reloadAchievements, removeLabelFilter, removeLabelFromTeam, removeMember, removeRepositoryToMonitor, renameSlug, resetAndRecalculateLeagues, resolve, updateDocument, updateNotifications, updatePublicVisibility, updateRepositorySettings, updateRepositoryVisibility, updateSchedule, updateSlackCredentials, updateStatus, updateTeamSettings, updateTeamVisibility, updateToken, updateUserSettings, voteMessage } from '../sdk.gen';
-import type { AddLabelFilterData, AddLabelToTeamData, AddLabelToTeamResponse, AddRepositoryToMonitorData, AssignRoleData, AssignRoleResponse, ComputeUserLeagueStatsData, ComputeUserLeagueStatsResponse, CreateDocumentData, CreateDocumentError, CreateDocumentResponse, CreateWorkspaceData, CreateWorkspaceResponse, DeleteDocumentData, DeleteDocumentError, DeleteDocumentResponse, DeleteDocumentVersionsAfterData, DeleteDocumentVersionsAfterError, DeleteDocumentVersionsAfterResponse, DeleteUserData, DetectForPullRequestData, DetectForPullRequestError, DetectForPullRequestResponse, DetectForUserData, DetectForUserError, DetectForUserResponse, GetAllAchievementDefinitionsData, GetAllAchievementDefinitionsResponse, GetAllTeamsData, GetAllTeamsResponse, GetBadPracticeData, GetBadPracticeResponse, GetBadPracticesForPullRequestData, GetBadPracticesForPullRequestResponse, GetBadPracticesForUserData, GetBadPracticesForUserResponse, GetCurrentUserMembershipData, GetCurrentUserMembershipResponse, GetDocumentData, GetDocumentError, GetDocumentResponse, GetGroupedThreadsData, GetGroupedThreadsError, GetGroupedThreadsResponse, GetLabelFiltersData, GetLabelFiltersResponse, GetLeaderboardData, GetLeaderboardResponse, GetMemberData, GetMemberResponse, GetRepositoriesToMonitorData, GetRepositoriesToMonitorResponse, GetRepositorySettingsData, GetRepositorySettingsResponse, GetTeamSettingsData, GetTeamSettingsResponse, GetThreadData, GetThreadError, GetThreadResponse, GetUserAchievementsData, GetUserAchievementsResponse, GetUserProfileData, GetUserProfileResponse, GetUserSettingsData, GetUserSettingsResponse, GetUsersWithTeamsData, GetUsersWithTeamsResponse, GetVersionData, GetVersionError, GetVersionResponse, GetWorkspaceData, GetWorkspaceResponse, GitLabPreflightData, GitLabPreflightResponse2, ListDocumentsData, ListDocumentsError, ListDocumentsResponse, ListGitLabGroupsData, ListGitLabGroupsResponse, ListGlobalContributorsData, ListGlobalContributorsResponse, ListMembersData, ListMembersResponse, ListVersionsData, ListVersionsError, ListVersionsResponse, ListWorkspacesData, ListWorkspacesResponse, ProvideFeedbackData, PurgeWorkspaceData, PurgeWorkspaceResponse, RecalculateUserAchievementsData, ReloadAchievementsData, RemoveLabelFilterData, RemoveLabelFilterResponse, RemoveLabelFromTeamData, RemoveLabelFromTeamResponse, RemoveMemberData, RemoveRepositoryToMonitorData, RenameSlugData, RenameSlugResponse, ResetAndRecalculateLeaguesData, ResolveData, UpdateDocumentData, UpdateDocumentError, UpdateDocumentResponse, UpdateNotificationsData, UpdateNotificationsResponse, UpdatePublicVisibilityData, UpdatePublicVisibilityResponse, UpdateRepositorySettingsData, UpdateRepositorySettingsError, UpdateRepositorySettingsResponse, UpdateRepositoryVisibilityData, UpdateScheduleData, UpdateScheduleResponse, UpdateSlackCredentialsData, UpdateSlackCredentialsResponse, UpdateStatusData, UpdateStatusResponse, UpdateTeamSettingsData, UpdateTeamSettingsError, UpdateTeamSettingsResponse, UpdateTeamVisibilityData, UpdateTokenData, UpdateTokenResponse, UpdateUserSettingsData, UpdateUserSettingsResponse, VoteMessageData, VoteMessageError, VoteMessageResponse } from '../types.gen';
+import { addLabelFilter, addLabelToTeam, addRepositoryToMonitor, assignRole, cancelJob, computeUserLeagueStats, createConfig, createDocument, createPractice, createWorkspace, deleteConfig, deleteDocument, deleteDocumentVersionsAfter, deletePractice, deleteUser, getAllAchievementDefinitions, getAllTeams, getConfig, getConfigs, getCurrentUserMembership, getDocument, getEngagement, getFinding, getFindingsForPullRequest, getGroupedThreads, getJob, getLabelFilters, getLatestFeedback, getLeaderboard, getMember, getPractice, getRepositoriesToMonitor, getRepositorySettings, getSummary, getTeamSettings, getThread, getUserAchievements, getUserFeatures, getUserProfile, getUserSettings, getUsersWithTeams, getVersion, getWorkspace, gitLabPreflight, listDocuments, listFindings, listGitLabGroups, listGlobalContributors, listJobs, listMembers, listPractices, listVersions, listWorkspaces, type Options, purgeWorkspace, recalculateUserAchievements, reloadAchievements, removeLabelFilter, removeLabelFromTeam, removeMember, removeRepositoryToMonitor, renameSlug, resetAndRecalculateLeagues, retryDelivery, setActive, submitFeedback, updateConfig, updateDocument, updateFeatures, updateNotifications, updatePractice, updatePublicVisibility, updateRepositorySettings, updateRepositoryVisibility, updateSchedule, updateSlackCredentials, updateStatus, updateTeamSettings, updateTeamVisibility, updateToken, updateUserSettings, voteMessage } from '../sdk.gen';
+import type { AddLabelFilterData, AddLabelToTeamData, AddLabelToTeamResponse, AddRepositoryToMonitorData, AssignRoleData, AssignRoleResponse, CancelJobData, CancelJobResponse, ComputeUserLeagueStatsData, ComputeUserLeagueStatsResponse, CreateConfigData, CreateConfigResponse, CreateDocumentData, CreateDocumentError, CreateDocumentResponse, CreatePracticeData, CreatePracticeResponse, CreateWorkspaceData, CreateWorkspaceResponse, DeleteConfigData, DeleteConfigResponse, DeleteDocumentData, DeleteDocumentError, DeleteDocumentResponse, DeleteDocumentVersionsAfterData, DeleteDocumentVersionsAfterError, DeleteDocumentVersionsAfterResponse, DeletePracticeData, DeletePracticeResponse, DeleteUserData, GetAllAchievementDefinitionsData, GetAllAchievementDefinitionsResponse, GetAllTeamsData, GetAllTeamsResponse, GetConfigData, GetConfigResponse, GetConfigsData, GetConfigsResponse, GetCurrentUserMembershipData, GetCurrentUserMembershipResponse, GetDocumentData, GetDocumentError, GetDocumentResponse, GetEngagementData, GetEngagementResponse, GetFindingData, GetFindingResponse, GetFindingsForPullRequestData, GetFindingsForPullRequestResponse, GetGroupedThreadsData, GetGroupedThreadsError, GetGroupedThreadsResponse, GetJobData, GetJobResponse, GetLabelFiltersData, GetLabelFiltersResponse, GetLatestFeedbackData, GetLatestFeedbackResponse, GetLeaderboardData, GetLeaderboardResponse, GetMemberData, GetMemberResponse, GetPracticeData, GetPracticeResponse, GetRepositoriesToMonitorData, GetRepositoriesToMonitorResponse, GetRepositorySettingsData, GetRepositorySettingsResponse, GetSummaryData, GetSummaryResponse, GetTeamSettingsData, GetTeamSettingsResponse, GetThreadData, GetThreadError, GetThreadResponse, GetUserAchievementsData, GetUserAchievementsResponse, GetUserFeaturesData, GetUserFeaturesResponse, GetUserProfileData, GetUserProfileResponse, GetUserSettingsData, GetUserSettingsResponse, GetUsersWithTeamsData, GetUsersWithTeamsResponse, GetVersionData, GetVersionError, GetVersionResponse, GetWorkspaceData, GetWorkspaceResponse, GitLabPreflightData, GitLabPreflightResponse2, ListDocumentsData, ListDocumentsError, ListDocumentsResponse, ListFindingsData, ListFindingsResponse, ListGitLabGroupsData, ListGitLabGroupsResponse, ListGlobalContributorsData, ListGlobalContributorsResponse, ListJobsData, ListJobsResponse, ListMembersData, ListMembersResponse, ListPracticesData, ListPracticesResponse, ListVersionsData, ListVersionsError, ListVersionsResponse, ListWorkspacesData, ListWorkspacesResponse, PurgeWorkspaceData, PurgeWorkspaceResponse, RecalculateUserAchievementsData, ReloadAchievementsData, RemoveLabelFilterData, RemoveLabelFilterResponse, RemoveLabelFromTeamData, RemoveLabelFromTeamResponse, RemoveMemberData, RemoveRepositoryToMonitorData, RenameSlugData, RenameSlugResponse, ResetAndRecalculateLeaguesData, RetryDeliveryData, RetryDeliveryResponse, SetActiveData, SetActiveResponse, SubmitFeedbackData, SubmitFeedbackResponse, UpdateConfigData, UpdateConfigResponse, UpdateDocumentData, UpdateDocumentError, UpdateDocumentResponse, UpdateFeaturesData, UpdateFeaturesResponse, UpdateNotificationsData, UpdateNotificationsResponse, UpdatePracticeData, UpdatePracticeResponse, UpdatePublicVisibilityData, UpdatePublicVisibilityResponse, UpdateRepositorySettingsData, UpdateRepositorySettingsError, UpdateRepositorySettingsResponse, UpdateRepositoryVisibilityData, UpdateScheduleData, UpdateScheduleResponse, UpdateSlackCredentialsData, UpdateSlackCredentialsResponse, UpdateStatusData, UpdateStatusResponse, UpdateTeamSettingsData, UpdateTeamSettingsError, UpdateTeamSettingsResponse, UpdateTeamVisibilityData, UpdateTokenData, UpdateTokenResponse, UpdateUserSettingsData, UpdateUserSettingsResponse, VoteMessageData, VoteMessageError, VoteMessageResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -78,12 +78,32 @@ export const deleteUserMutation = (options?: Partial<Options<DeleteUserData>>): 
     return mutationOptions;
 };
 
+export const getUserFeaturesQueryKey = (options?: Options<GetUserFeaturesData>) => createQueryKey('getUserFeatures', options);
+
+/**
+ * Get feature flags for the current user
+ *
+ * Returns all feature flags evaluated for the authenticated user. Combines Keycloak role checks and server-side config toggles.
+ */
+export const getUserFeaturesOptions = (options?: Options<GetUserFeaturesData>) => queryOptions<GetUserFeaturesResponse, DefaultError, GetUserFeaturesResponse, ReturnType<typeof getUserFeaturesQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getUserFeatures({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getUserFeaturesQueryKey(options)
+});
+
 export const getUserSettingsQueryKey = (options?: Options<GetUserSettingsData>) => createQueryKey('getUserSettings', options);
 
 /**
  * Get user settings
  *
- * Get the current user's notification and research participation preferences
+ * Get the current user's notification, research participation, and AI review preferences
  */
 export const getUserSettingsOptions = (options?: Options<GetUserSettingsData>) => queryOptions<GetUserSettingsResponse, DefaultError, GetUserSettingsResponse, ReturnType<typeof getUserSettingsQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
@@ -101,7 +121,7 @@ export const getUserSettingsOptions = (options?: Options<GetUserSettingsData>) =
 /**
  * Update user settings
  *
- * Update the current user's notification and research participation preferences
+ * Update the current user's notification, research participation, and AI review preferences
  */
 export const updateUserSettingsMutation = (options?: Partial<Options<UpdateUserSettingsData>>): UseMutationOptions<UpdateUserSettingsResponse, DefaultError, Options<UpdateUserSettingsData>> => {
     const mutationOptions: UseMutationOptions<UpdateUserSettingsResponse, DefaultError, Options<UpdateUserSettingsData>> = {
@@ -221,16 +241,14 @@ export const getWorkspaceOptions = (options: Options<GetWorkspaceData>) => query
     queryKey: getWorkspaceQueryKey(options)
 });
 
-export const getLeaderboardQueryKey = (options: Options<GetLeaderboardData>) => createQueryKey('getLeaderboard', options);
+export const getConfigsQueryKey = (options: Options<GetConfigsData>) => createQueryKey('getConfigs', options);
 
 /**
- * Generate leaderboard
- *
- * Creates a ranked contributor list for the specified time range
+ * List agent configurations for a workspace
  */
-export const getLeaderboardOptions = (options: Options<GetLeaderboardData>) => queryOptions<GetLeaderboardResponse, DefaultError, GetLeaderboardResponse, ReturnType<typeof getLeaderboardQueryKey>>({
+export const getConfigsOptions = (options: Options<GetConfigsData>) => queryOptions<GetConfigsResponse, DefaultError, GetConfigsResponse, ReturnType<typeof getConfigsQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
-        const { data } = await getLeaderboard({
+        const { data } = await getConfigs({
             ...options,
             ...queryKey[0],
             signal,
@@ -238,7 +256,94 @@ export const getLeaderboardOptions = (options: Options<GetLeaderboardData>) => q
         });
         return data;
     },
-    queryKey: getLeaderboardQueryKey(options)
+    queryKey: getConfigsQueryKey(options)
+});
+
+/**
+ * Create a new agent configuration
+ */
+export const createConfigMutation = (options?: Partial<Options<CreateConfigData>>): UseMutationOptions<CreateConfigResponse, DefaultError, Options<CreateConfigData>> => {
+    const mutationOptions: UseMutationOptions<CreateConfigResponse, DefaultError, Options<CreateConfigData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await createConfig({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Delete an agent configuration
+ */
+export const deleteConfigMutation = (options?: Partial<Options<DeleteConfigData>>): UseMutationOptions<DeleteConfigResponse, DefaultError, Options<DeleteConfigData>> => {
+    const mutationOptions: UseMutationOptions<DeleteConfigResponse, DefaultError, Options<DeleteConfigData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await deleteConfig({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const getConfigQueryKey = (options: Options<GetConfigData>) => createQueryKey('getConfig', options);
+
+/**
+ * Get a specific agent configuration
+ */
+export const getConfigOptions = (options: Options<GetConfigData>) => queryOptions<GetConfigResponse, DefaultError, GetConfigResponse, ReturnType<typeof getConfigQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getConfig({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getConfigQueryKey(options)
+});
+
+/**
+ * Update an existing agent configuration
+ */
+export const updateConfigMutation = (options?: Partial<Options<UpdateConfigData>>): UseMutationOptions<UpdateConfigResponse, DefaultError, Options<UpdateConfigData>> => {
+    const mutationOptions: UseMutationOptions<UpdateConfigResponse, DefaultError, Options<UpdateConfigData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await updateConfig({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const listJobsQueryKey = (options: Options<ListJobsData>) => createQueryKey('listJobs', options);
+
+/**
+ * List agent jobs for a workspace
+ */
+export const listJobsOptions = (options: Options<ListJobsData>) => queryOptions<ListJobsResponse, DefaultError, ListJobsResponse, ReturnType<typeof listJobsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listJobs({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listJobsQueryKey(options)
 });
 
 const createInfiniteParams = <K extends Pick<QueryKey<Options>[0], 'body' | 'headers' | 'path' | 'query'>>(queryKey: QueryKey<Options>, page: K) => {
@@ -269,6 +374,122 @@ const createInfiniteParams = <K extends Pick<QueryKey<Options>[0], 'body' | 'hea
     }
     return params as unknown as typeof page;
 };
+
+export const listJobsInfiniteQueryKey = (options: Options<ListJobsData>): QueryKey<Options<ListJobsData>> => createQueryKey('listJobs', options, true);
+
+/**
+ * List agent jobs for a workspace
+ */
+export const listJobsInfiniteOptions = (options: Options<ListJobsData>) => infiniteQueryOptions<ListJobsResponse, DefaultError, InfiniteData<ListJobsResponse>, QueryKey<Options<ListJobsData>>, number | Pick<QueryKey<Options<ListJobsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
+// @ts-ignore
+{
+    queryFn: async ({ pageParam, queryKey, signal }) => {
+        // @ts-ignore
+        const page: Pick<QueryKey<Options<ListJobsData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
+            query: {
+                page: pageParam
+            }
+        };
+        const params = createInfiniteParams(queryKey, page);
+        const { data } = await listJobs({
+            ...options,
+            ...params,
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listJobsInfiniteQueryKey(options)
+});
+
+export const getJobQueryKey = (options: Options<GetJobData>) => createQueryKey('getJob', options);
+
+/**
+ * Get agent job details
+ */
+export const getJobOptions = (options: Options<GetJobData>) => queryOptions<GetJobResponse, DefaultError, GetJobResponse, ReturnType<typeof getJobQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getJob({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getJobQueryKey(options)
+});
+
+/**
+ * Cancel an agent job
+ */
+export const cancelJobMutation = (options?: Partial<Options<CancelJobData>>): UseMutationOptions<CancelJobResponse, DefaultError, Options<CancelJobData>> => {
+    const mutationOptions: UseMutationOptions<CancelJobResponse, DefaultError, Options<CancelJobData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await cancelJob({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Retry delivery for a completed agent job
+ */
+export const retryDeliveryMutation = (options?: Partial<Options<RetryDeliveryData>>): UseMutationOptions<RetryDeliveryResponse, DefaultError, Options<RetryDeliveryData>> => {
+    const mutationOptions: UseMutationOptions<RetryDeliveryResponse, DefaultError, Options<RetryDeliveryData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await retryDelivery({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Update workspace feature flags
+ */
+export const updateFeaturesMutation = (options?: Partial<Options<UpdateFeaturesData>>): UseMutationOptions<UpdateFeaturesResponse, DefaultError, Options<UpdateFeaturesData>> => {
+    const mutationOptions: UseMutationOptions<UpdateFeaturesResponse, DefaultError, Options<UpdateFeaturesData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await updateFeatures({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const getLeaderboardQueryKey = (options: Options<GetLeaderboardData>) => createQueryKey('getLeaderboard', options);
+
+/**
+ * Generate leaderboard
+ *
+ * Creates a ranked contributor list for the specified time range
+ */
+export const getLeaderboardOptions = (options: Options<GetLeaderboardData>) => queryOptions<GetLeaderboardResponse, DefaultError, GetLeaderboardResponse, ReturnType<typeof getLeaderboardQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getLeaderboard({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getLeaderboardQueryKey(options)
+});
 
 export const getLeaderboardInfiniteQueryKey = (options: Options<GetLeaderboardData>): QueryKey<Options<GetLeaderboardData>> => createQueryKey('getLeaderboard', options, true);
 
@@ -765,16 +986,16 @@ export const updateNotificationsMutation = (options?: Partial<Options<UpdateNoti
     return mutationOptions;
 };
 
-export const getBadPracticeQueryKey = (options: Options<GetBadPracticeData>) => createQueryKey('getBadPractice', options);
+export const listPracticesQueryKey = (options: Options<ListPracticesData>) => createQueryKey('listPractices', options);
 
 /**
- * Get a specific bad practice
+ * List practice definitions
  *
- * Retrieves details of a specific bad practice by ID
+ * Returns all practice definitions for the workspace, optionally filtered by category and/or active state
  */
-export const getBadPracticeOptions = (options: Options<GetBadPracticeData>) => queryOptions<GetBadPracticeResponse, DefaultError, GetBadPracticeResponse, ReturnType<typeof getBadPracticeQueryKey>>({
+export const listPracticesOptions = (options: Options<ListPracticesData>) => queryOptions<ListPracticesResponse, DefaultError, ListPracticesResponse, ReturnType<typeof listPracticesQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
-        const { data } = await getBadPractice({
+        const { data } = await listPractices({
             ...options,
             ...queryKey[0],
             signal,
@@ -782,18 +1003,182 @@ export const getBadPracticeOptions = (options: Options<GetBadPracticeData>) => q
         });
         return data;
     },
-    queryKey: getBadPracticeQueryKey(options)
+    queryKey: listPracticesQueryKey(options)
 });
 
 /**
- * Provide feedback for a bad practice
- *
- * Submits user feedback for a detected bad practice
+ * Create a new practice definition
  */
-export const provideFeedbackMutation = (options?: Partial<Options<ProvideFeedbackData>>): UseMutationOptions<unknown, DefaultError, Options<ProvideFeedbackData>> => {
-    const mutationOptions: UseMutationOptions<unknown, DefaultError, Options<ProvideFeedbackData>> = {
+export const createPracticeMutation = (options?: Partial<Options<CreatePracticeData>>): UseMutationOptions<CreatePracticeResponse, DefaultError, Options<CreatePracticeData>> => {
+    const mutationOptions: UseMutationOptions<CreatePracticeResponse, DefaultError, Options<CreatePracticeData>> = {
         mutationFn: async (fnOptions) => {
-            const { data } = await provideFeedback({
+            const { data } = await createPractice({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const listFindingsQueryKey = (options: Options<ListFindingsData>) => createQueryKey('listFindings', options);
+
+/**
+ * List findings for current user
+ *
+ * Paginated findings for the authenticated contributor with optional filters
+ */
+export const listFindingsOptions = (options: Options<ListFindingsData>) => queryOptions<ListFindingsResponse, DefaultError, ListFindingsResponse, ReturnType<typeof listFindingsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listFindings({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listFindingsQueryKey(options)
+});
+
+export const listFindingsInfiniteQueryKey = (options: Options<ListFindingsData>): QueryKey<Options<ListFindingsData>> => createQueryKey('listFindings', options, true);
+
+/**
+ * List findings for current user
+ *
+ * Paginated findings for the authenticated contributor with optional filters
+ */
+export const listFindingsInfiniteOptions = (options: Options<ListFindingsData>) => infiniteQueryOptions<ListFindingsResponse, DefaultError, InfiniteData<ListFindingsResponse>, QueryKey<Options<ListFindingsData>>, number | Pick<QueryKey<Options<ListFindingsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
+// @ts-ignore
+{
+    queryFn: async ({ pageParam, queryKey, signal }) => {
+        // @ts-ignore
+        const page: Pick<QueryKey<Options<ListFindingsData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
+            query: {
+                page: pageParam
+            }
+        };
+        const params = createInfiniteParams(queryKey, page);
+        const { data } = await listFindings({
+            ...options,
+            ...params,
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listFindingsInfiniteQueryKey(options)
+});
+
+export const getEngagementQueryKey = (options: Options<GetEngagementData>) => createQueryKey('getEngagement', options);
+
+/**
+ * Get engagement statistics
+ *
+ * Returns the current user's feedback action counts across all findings in this workspace.
+ */
+export const getEngagementOptions = (options: Options<GetEngagementData>) => queryOptions<GetEngagementResponse, DefaultError, GetEngagementResponse, ReturnType<typeof getEngagementQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getEngagement({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getEngagementQueryKey(options)
+});
+
+export const getFindingsForPullRequestQueryKey = (options: Options<GetFindingsForPullRequestData>) => createQueryKey('getFindingsForPullRequest', options);
+
+/**
+ * List findings for a pull request
+ *
+ * All findings for a specific pull request within the workspace
+ */
+export const getFindingsForPullRequestOptions = (options: Options<GetFindingsForPullRequestData>) => queryOptions<GetFindingsForPullRequestResponse, DefaultError, GetFindingsForPullRequestResponse, ReturnType<typeof getFindingsForPullRequestQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getFindingsForPullRequest({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getFindingsForPullRequestQueryKey(options)
+});
+
+export const getSummaryQueryKey = (options: Options<GetSummaryData>) => createQueryKey('getSummary', options);
+
+/**
+ * Per-practice summary for current user
+ *
+ * Aggregated verdict counts per practice for dashboard cards
+ */
+export const getSummaryOptions = (options: Options<GetSummaryData>) => queryOptions<GetSummaryResponse, DefaultError, GetSummaryResponse, ReturnType<typeof getSummaryQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getSummary({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getSummaryQueryKey(options)
+});
+
+export const getFindingQueryKey = (options: Options<GetFindingData>) => createQueryKey('getFinding', options);
+
+/**
+ * Get finding detail
+ */
+export const getFindingOptions = (options: Options<GetFindingData>) => queryOptions<GetFindingResponse, DefaultError, GetFindingResponse, ReturnType<typeof getFindingQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getFinding({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getFindingQueryKey(options)
+});
+
+export const getLatestFeedbackQueryKey = (options: Options<GetLatestFeedbackData>) => createQueryKey('getLatestFeedback', options);
+
+/**
+ * Get latest feedback for a finding
+ *
+ * Returns the current user's most recent feedback on the specified finding, or 204 if none exists.
+ */
+export const getLatestFeedbackOptions = (options: Options<GetLatestFeedbackData>) => queryOptions<GetLatestFeedbackResponse, DefaultError, GetLatestFeedbackResponse, ReturnType<typeof getLatestFeedbackQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getLatestFeedback({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getLatestFeedbackQueryKey(options)
+});
+
+/**
+ * Submit feedback on a practice finding
+ *
+ * Records the contributor's reaction (APPLIED, DISPUTED, NOT_APPLICABLE) to an AI-generated finding. Append-only: submitting again creates a new record, preserving temporal history.
+ */
+export const submitFeedbackMutation = (options?: Partial<Options<SubmitFeedbackData>>): UseMutationOptions<SubmitFeedbackResponse, DefaultError, Options<SubmitFeedbackData>> => {
+    const mutationOptions: UseMutationOptions<SubmitFeedbackResponse, DefaultError, Options<SubmitFeedbackData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await submitFeedback({
                 ...options,
                 ...fnOptions,
                 throwOnError: true
@@ -805,14 +1190,12 @@ export const provideFeedbackMutation = (options?: Partial<Options<ProvideFeedbac
 };
 
 /**
- * Resolve a bad practice
- *
- * Updates the state of a bad practice to FIXED, WONT_FIX, or WRONG
+ * Delete a practice definition
  */
-export const resolveMutation = (options?: Partial<Options<ResolveData>>): UseMutationOptions<unknown, DefaultError, Options<ResolveData>> => {
-    const mutationOptions: UseMutationOptions<unknown, DefaultError, Options<ResolveData>> = {
+export const deletePracticeMutation = (options?: Partial<Options<DeletePracticeData>>): UseMutationOptions<DeletePracticeResponse, DefaultError, Options<DeletePracticeData>> => {
+    const mutationOptions: UseMutationOptions<DeletePracticeResponse, DefaultError, Options<DeletePracticeData>> = {
         mutationFn: async (fnOptions) => {
-            const { data } = await resolve({
+            const { data } = await deletePractice({
                 ...options,
                 ...fnOptions,
                 throwOnError: true
@@ -823,16 +1206,14 @@ export const resolveMutation = (options?: Partial<Options<ResolveData>>): UseMut
     return mutationOptions;
 };
 
-export const getBadPracticesForPullRequestQueryKey = (options: Options<GetBadPracticesForPullRequestData>) => createQueryKey('getBadPracticesForPullRequest', options);
+export const getPracticeQueryKey = (options: Options<GetPracticeData>) => createQueryKey('getPractice', options);
 
 /**
- * Get bad practices for a pull request
- *
- * Retrieves all detected bad practices for a specific pull request
+ * Get a practice definition
  */
-export const getBadPracticesForPullRequestOptions = (options: Options<GetBadPracticesForPullRequestData>) => queryOptions<GetBadPracticesForPullRequestResponse, DefaultError, GetBadPracticesForPullRequestResponse, ReturnType<typeof getBadPracticesForPullRequestQueryKey>>({
+export const getPracticeOptions = (options: Options<GetPracticeData>) => queryOptions<GetPracticeResponse, DefaultError, GetPracticeResponse, ReturnType<typeof getPracticeQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
-        const { data } = await getBadPracticesForPullRequest({
+        const { data } = await getPractice({
             ...options,
             ...queryKey[0],
             signal,
@@ -840,18 +1221,16 @@ export const getBadPracticesForPullRequestOptions = (options: Options<GetBadPrac
         });
         return data;
     },
-    queryKey: getBadPracticesForPullRequestQueryKey(options)
+    queryKey: getPracticeQueryKey(options)
 });
 
 /**
- * Detect bad practices for a pull request
- *
- * Triggers bad practice detection for a specific pull request
+ * Update a practice definition
  */
-export const detectForPullRequestMutation = (options?: Partial<Options<DetectForPullRequestData>>): UseMutationOptions<DetectForPullRequestResponse, DetectForPullRequestError, Options<DetectForPullRequestData>> => {
-    const mutationOptions: UseMutationOptions<DetectForPullRequestResponse, DetectForPullRequestError, Options<DetectForPullRequestData>> = {
+export const updatePracticeMutation = (options?: Partial<Options<UpdatePracticeData>>): UseMutationOptions<UpdatePracticeResponse, DefaultError, Options<UpdatePracticeData>> => {
+    const mutationOptions: UseMutationOptions<UpdatePracticeResponse, DefaultError, Options<UpdatePracticeData>> = {
         mutationFn: async (fnOptions) => {
-            const { data } = await detectForPullRequest({
+            const { data } = await updatePractice({
                 ...options,
                 ...fnOptions,
                 throwOnError: true
@@ -862,35 +1241,13 @@ export const detectForPullRequestMutation = (options?: Partial<Options<DetectFor
     return mutationOptions;
 };
 
-export const getBadPracticesForUserQueryKey = (options: Options<GetBadPracticesForUserData>) => createQueryKey('getBadPracticesForUser', options);
-
 /**
- * Get bad practices for a user
- *
- * Retrieves all detected bad practices for pull requests assigned to the user
+ * Set practice active state
  */
-export const getBadPracticesForUserOptions = (options: Options<GetBadPracticesForUserData>) => queryOptions<GetBadPracticesForUserResponse, DefaultError, GetBadPracticesForUserResponse, ReturnType<typeof getBadPracticesForUserQueryKey>>({
-    queryFn: async ({ queryKey, signal }) => {
-        const { data } = await getBadPracticesForUser({
-            ...options,
-            ...queryKey[0],
-            signal,
-            throwOnError: true
-        });
-        return data;
-    },
-    queryKey: getBadPracticesForUserQueryKey(options)
-});
-
-/**
- * Detect bad practices for a user
- *
- * Triggers bad practice detection for all pull requests of the specified user
- */
-export const detectForUserMutation = (options?: Partial<Options<DetectForUserData>>): UseMutationOptions<DetectForUserResponse, DetectForUserError, Options<DetectForUserData>> => {
-    const mutationOptions: UseMutationOptions<DetectForUserResponse, DetectForUserError, Options<DetectForUserData>> = {
+export const setActiveMutation = (options?: Partial<Options<SetActiveData>>): UseMutationOptions<SetActiveResponse, DefaultError, Options<SetActiveData>> => {
+    const mutationOptions: UseMutationOptions<SetActiveResponse, DefaultError, Options<SetActiveData>> = {
         mutationFn: async (fnOptions) => {
-            const { data } = await detectForUser({
+            const { data } = await setActive({
                 ...options,
                 ...fnOptions,
                 throwOnError: true

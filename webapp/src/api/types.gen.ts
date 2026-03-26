@@ -83,6 +83,10 @@ export type WorkspaceListItem = {
      */
     accountLogin: string;
     /**
+     * Whether the achievements system is enabled
+     */
+    achievementsEnabled: boolean;
+    /**
      * Timestamp when the workspace was created
      */
     createdAt: Date;
@@ -94,6 +98,18 @@ export type WorkspaceListItem = {
      * Unique identifier of the workspace
      */
     id: number;
+    /**
+     * Whether the leaderboard is enabled
+     */
+    leaderboardEnabled: boolean;
+    /**
+     * Whether the practice review feature is enabled
+     */
+    practicesEnabled: boolean;
+    /**
+     * Whether the league/progression system is enabled
+     */
+    progressionEnabled: boolean;
     /**
      * High-level git provider type (GITHUB or GITLAB)
      */
@@ -116,6 +132,10 @@ export type Workspace = {
      * Git provider account login associated with this workspace
      */
     accountLogin: string;
+    /**
+     * Whether the achievements system is enabled
+     */
+    achievementsEnabled: boolean;
     /**
      * Timestamp when the workspace was created
      */
@@ -161,6 +181,10 @@ export type Workspace = {
      */
     isPubliclyViewable: boolean;
     /**
+     * Whether the leaderboard is enabled
+     */
+    leaderboardEnabled: boolean;
+    /**
      * Slack channel ID for leaderboard notifications
      */
     leaderboardNotificationChannelId?: string;
@@ -180,6 +204,14 @@ export type Workspace = {
      * Time for leaderboard notifications in HH:mm format
      */
     leaderboardScheduleTime?: string;
+    /**
+     * Whether the practice review feature is enabled
+     */
+    practicesEnabled: boolean;
+    /**
+     * Whether the league/progression system is enabled
+     */
+    progressionEnabled: boolean;
     /**
      * High-level git provider type derived from the authentication mode
      */
@@ -258,169 +290,13 @@ export type TeamSummary = {
  */
 export type UserSettings = {
     /**
+     * Whether the user wants to receive AI-generated practice review comments on pull requests
+     */
+    aiReviewEnabled: boolean;
+    /**
      * Whether the user consents to participate in research studies
      */
     participateInResearch: boolean;
-    /**
-     * Whether the user wants to receive notifications
-     */
-    receiveNotifications: boolean;
-};
-
-/**
- * Response for user bad practices listing
- */
-export type UserPractices = {
-    login?: string;
-    pullRequests?: Array<PullRequestWithBadPractices>;
-};
-
-/**
- * Information about a git repository
- */
-export type RepositoryInfo = {
-    /**
-     * Description of the repository
-     */
-    description?: string;
-    /**
-     * Whether contributions from this repository are hidden from leaderboard calculations
-     */
-    hiddenFromContributions: boolean;
-    /**
-     * URL to the repository on the git provider
-     */
-    htmlUrl: string;
-    /**
-     * Unique identifier of the repository
-     */
-    id: number;
-    /**
-     * Labels defined in the repository
-     */
-    labels?: Array<LabelInfo>;
-    /**
-     * Name of the repository
-     */
-    name: string;
-    /**
-     * Full name including owner (e.g., 'owner/repo')
-     */
-    nameWithOwner: string;
-};
-
-/**
- * Information about a label from a repository
- */
-export type LabelInfo = {
-    /**
-     * Hex color code of the label (without #)
-     */
-    color: string;
-    /**
-     * Unique identifier of the label
-     */
-    id: number;
-    /**
-     * Name of the label
-     */
-    name: string;
-    /**
-     * Repository the label belongs to
-     */
-    repository?: RepositoryInfo;
-};
-
-/**
- * A detected bad practice in a pull request
- */
-export type PullRequestBadPractice = {
-    /**
-     * Detailed explanation and remediation guidance
-     */
-    description: string;
-    /**
-     * Unique identifier of the bad practice
-     */
-    id: number;
-    /**
-     * Current state of the bad practice (DETECTED, RESOLVED, DISMISSED, etc.)
-     */
-    state: 'GOOD_PRACTICE' | 'MINOR_ISSUE' | 'NORMAL_ISSUE' | 'CRITICAL_ISSUE' | 'FIXED' | 'WONT_FIX' | 'WRONG';
-    /**
-     * Short description of the bad practice
-     */
-    title: string;
-};
-
-/**
- * Pull request with associated bad practice detection results
- */
-export type PullRequestWithBadPractices = {
-    /**
-     * Number of lines added
-     */
-    additions: number;
-    /**
-     * AI-generated summary of detected bad practices
-     */
-    badPracticeSummary: string;
-    /**
-     * Currently active bad practices
-     */
-    badPractices: Array<PullRequestBadPractice>;
-    /**
-     * Timestamp when the pull request was created
-     */
-    createdAt: Date;
-    /**
-     * Number of lines deleted
-     */
-    deletions: number;
-    /**
-     * URL to the pull request on the git provider
-     */
-    htmlUrl: string;
-    /**
-     * Unique identifier of the pull request
-     */
-    id: number;
-    /**
-     * Whether the pull request is in draft mode
-     */
-    isDraft: boolean;
-    /**
-     * Whether the pull request has been merged
-     */
-    isMerged: boolean;
-    /**
-     * Labels applied to the pull request
-     */
-    labels: Array<LabelInfo>;
-    /**
-     * Pull request number within the repository
-     */
-    number: number;
-    /**
-     * Previously resolved or dismissed bad practices
-     */
-    oldBadPractices: Array<PullRequestBadPractice>;
-    /**
-     * Repository the pull request belongs to
-     */
-    repository: RepositoryInfo;
-    /**
-     * Current state of the pull request (OPEN, CLOSED)
-     */
-    state: 'OPEN' | 'CLOSED' | 'MERGED';
-    /**
-     * Title of the pull request
-     */
-    title: string;
-    /**
-     * Timestamp when the pull request was last updated
-     */
-    updatedAt: Date;
 };
 
 /**
@@ -534,6 +410,28 @@ export type UpdateWorkspaceNotificationsRequest = {
 };
 
 /**
+ * Request to update workspace feature flags. Null fields are left unchanged.
+ */
+export type UpdateWorkspaceFeaturesRequest = {
+    /**
+     * Enable the achievements system
+     */
+    achievementsEnabled?: boolean;
+    /**
+     * Enable the leaderboard ranking page
+     */
+    leaderboardEnabled?: boolean;
+    /**
+     * Enable the practice review feature
+     */
+    practicesEnabled?: boolean;
+    /**
+     * Enable the league/progression system
+     */
+    progressionEnabled?: boolean;
+};
+
+/**
  * Request to update team visibility settings in a workspace
  */
 export type UpdateTeamSettingsRequest = {
@@ -551,6 +449,84 @@ export type UpdateRepositorySettingsRequest = {
      * Whether contributions from this repository should be hidden from leaderboard calculations
      */
     hiddenFromContributions: boolean;
+};
+
+/**
+ * Request to update an existing practice definition (PATCH — only non-null fields applied)
+ */
+export type UpdatePracticeRequest = {
+    /**
+     * Practice category
+     */
+    category?: string;
+    /**
+     * Practice description
+     */
+    description?: string;
+    /**
+     * AI detection prompt template
+     */
+    detectionPrompt?: string;
+    /**
+     * Human-readable name
+     */
+    name?: string;
+    /**
+     * Domain events that trigger detection
+     */
+    triggerEvents?: Array<string>;
+};
+
+/**
+ * Request to set a practice's active state
+ */
+export type UpdatePracticeActiveRequest = {
+    /**
+     * Whether the practice should be active
+     */
+    active: boolean;
+};
+
+/**
+ * Request to update an existing agent configuration (all fields optional — null fields are not changed)
+ */
+export type UpdateAgentConfigRequest = {
+    /**
+     * Type of coding agent
+     */
+    agentType?: 'CLAUDE_CODE' | 'OPENCODE';
+    /**
+     * Whether agent containers have internet access
+     */
+    allowInternet?: boolean;
+    /**
+     * Authentication mode: PROXY (internal proxy), API_KEY (direct), or OAUTH (direct OAuth)
+     */
+    credentialMode?: 'PROXY' | 'API_KEY' | 'OAUTH';
+    /**
+     * Whether the agent is enabled
+     */
+    enabled?: boolean;
+    /**
+     * LLM API key (omit or null to keep existing key)
+     */
+    llmApiKey?: string;
+    /**
+     * LLM provider
+     */
+    llmProvider?: 'ANTHROPIC' | 'OPENAI';
+    /**
+     * Maximum concurrent jobs
+     */
+    maxConcurrentJobs?: number;
+    /**
+     * LLM model name
+     */
+    modelName?: string;
+    /**
+     * Job timeout in seconds
+     */
+    timeoutSeconds?: number;
 };
 
 export type ThreadDetail = {
@@ -625,6 +601,68 @@ export type TeamInfo = {
      * Repositories the team has access to
      */
     repositories: Array<RepositoryInfo>;
+};
+
+/**
+ * Information about a git repository
+ */
+export type RepositoryInfo = {
+    /**
+     * Description of the repository
+     */
+    description?: string;
+    /**
+     * Whether contributions from this repository are hidden from leaderboard calculations
+     */
+    hiddenFromContributions: boolean;
+    /**
+     * URL to the repository on the git provider
+     */
+    htmlUrl: string;
+    /**
+     * Unique identifier of the repository
+     */
+    id: number;
+    /**
+     * Labels defined in the repository
+     */
+    labels?: Array<LabelInfo>;
+    /**
+     * Name of the repository
+     */
+    name: string;
+    /**
+     * Full name including owner (e.g., 'owner/repo')
+     */
+    nameWithOwner: string;
+};
+
+/**
+ * Information about a label from a repository
+ */
+export type LabelInfo = {
+    /**
+     * Hex color code of the label (without #)
+     */
+    color: string;
+    /**
+     * Unique identifier of the label
+     */
+    id: number;
+    /**
+     * Name of the label
+     */
+    name: string;
+    /**
+     * Repository the label belongs to
+     */
+    repository?: RepositoryInfo;
+};
+
+export type SortObject = {
+    empty?: boolean;
+    sorted?: boolean;
+    unsorted?: boolean;
 };
 
 /**
@@ -894,6 +932,275 @@ export type Profile = {
 };
 
 /**
+ * Practice finding summary for list views
+ */
+export type PracticeFindingList = {
+    /**
+     * Practice category
+     */
+    category?: string;
+    /**
+     * AI confidence score (0.0–1.0)
+     */
+    confidence: number;
+    /**
+     * When the finding was detected
+     */
+    detectedAt: Date;
+    /**
+     * Cognitive apprenticeship guidance method
+     */
+    guidanceMethod?: 'MODELING' | 'COACHING' | 'SCAFFOLDING' | 'ARTICULATION' | 'REFLECTION' | 'EXPLORATION';
+    /**
+     * Finding ID
+     */
+    id: string;
+    /**
+     * Practice name
+     */
+    practiceName: string;
+    /**
+     * Practice slug
+     */
+    practiceSlug: string;
+    /**
+     * Severity level
+     */
+    severity: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
+    /**
+     * Target entity ID
+     */
+    targetId: number;
+    /**
+     * Target type (e.g. pull_request, review)
+     */
+    targetType: string;
+    /**
+     * Finding title
+     */
+    title: string;
+    /**
+     * Verdict: POSITIVE, NEGATIVE, NOT_APPLICABLE, or NEEDS_REVIEW
+     */
+    verdict: 'POSITIVE' | 'NEGATIVE' | 'NOT_APPLICABLE' | 'NEEDS_REVIEW';
+};
+
+/**
+ * Full practice finding detail including guidance and evidence
+ */
+export type PracticeFindingDetail = {
+    /**
+     * Practice category
+     */
+    category?: string;
+    /**
+     * AI confidence score (0.0–1.0)
+     */
+    confidence: number;
+    /**
+     * When the finding was detected
+     */
+    detectedAt: Date;
+    /**
+     * Structured evidence (locations, snippets, references)
+     */
+    evidence?: unknown;
+    /**
+     * Actionable guidance for the contributor
+     */
+    guidance?: string;
+    /**
+     * Cognitive apprenticeship guidance method
+     */
+    guidanceMethod?: 'MODELING' | 'COACHING' | 'SCAFFOLDING' | 'ARTICULATION' | 'REFLECTION' | 'EXPLORATION';
+    /**
+     * Finding ID
+     */
+    id: string;
+    /**
+     * Practice name
+     */
+    practiceName: string;
+    /**
+     * Practice slug
+     */
+    practiceSlug: string;
+    /**
+     * AI reasoning behind the verdict
+     */
+    reasoning?: string;
+    /**
+     * Severity level
+     */
+    severity: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
+    /**
+     * Target entity ID
+     */
+    targetId: number;
+    /**
+     * Target type (e.g. pull_request, review)
+     */
+    targetType: string;
+    /**
+     * Finding title
+     */
+    title: string;
+    /**
+     * Verdict: POSITIVE, NEGATIVE, NOT_APPLICABLE, or NEEDS_REVIEW
+     */
+    verdict: 'POSITIVE' | 'NEGATIVE' | 'NOT_APPLICABLE' | 'NEEDS_REVIEW';
+};
+
+/**
+ * Practice definition for evaluating developer contributions
+ */
+export type Practice = {
+    /**
+     * Whether this practice is actively being detected
+     */
+    active: boolean;
+    /**
+     * Practice category
+     */
+    category?: string;
+    /**
+     * Timestamp when the practice was created
+     */
+    createdAt: Date;
+    /**
+     * Practice description
+     */
+    description: string;
+    /**
+     * AI detection prompt template
+     */
+    detectionPrompt?: string;
+    /**
+     * Practice ID
+     */
+    id: number;
+    /**
+     * Human-readable name
+     */
+    name: string;
+    /**
+     * URL-safe identifier unique within workspace
+     */
+    slug: string;
+    /**
+     * Domain events that trigger detection
+     */
+    triggerEvents: Array<string>;
+    /**
+     * Timestamp when the practice was last updated
+     */
+    updatedAt: Date;
+};
+
+export type PageableObject = {
+    offset?: number;
+    pageNumber?: number;
+    pageSize?: number;
+    paged?: boolean;
+    sort?: SortObject;
+    unpaged?: boolean;
+};
+
+export type PagePracticeFindingList = {
+    content?: Array<PracticeFindingList>;
+    empty?: boolean;
+    first?: boolean;
+    last?: boolean;
+    number?: number;
+    numberOfElements?: number;
+    pageable?: PageableObject;
+    size?: number;
+    sort?: SortObject;
+    totalElements?: number;
+    totalPages?: number;
+};
+
+export type PageAgentJob = {
+    content?: Array<AgentJob>;
+    empty?: boolean;
+    first?: boolean;
+    last?: boolean;
+    number?: number;
+    numberOfElements?: number;
+    pageable?: PageableObject;
+    size?: number;
+    sort?: SortObject;
+    totalElements?: number;
+    totalPages?: number;
+};
+
+/**
+ * Agent job execution record (job_token intentionally omitted)
+ */
+export type AgentJob = {
+    /**
+     * Timestamp when the job completed
+     */
+    completedAt?: Date;
+    /**
+     * Frozen agent config at submit time
+     */
+    configSnapshot: unknown;
+    /**
+     * Docker container ID
+     */
+    containerId?: string;
+    /**
+     * Timestamp when the job was created
+     */
+    createdAt: Date;
+    /**
+     * Git provider comment/note ID for posted feedback
+     */
+    deliveryCommentId?: string;
+    /**
+     * Delivery status: null = not applicable, PENDING = awaiting delivery, DELIVERED = posted, FAILED = delivery error
+     */
+    deliveryStatus?: 'PENDING' | 'DELIVERED' | 'FAILED';
+    /**
+     * Human-readable error message
+     */
+    errorMessage?: string;
+    /**
+     * Container exit code
+     */
+    exitCode?: number;
+    /**
+     * Job ID
+     */
+    id: string;
+    /**
+     * Job type
+     */
+    jobType: 'PULL_REQUEST_REVIEW';
+    /**
+     * Job metadata (routing/display info)
+     */
+    metadata?: unknown;
+    /**
+     * Job output (agent results)
+     */
+    output?: unknown;
+    /**
+     * Number of retry attempts
+     */
+    retryCount: number;
+    /**
+     * Timestamp when the job started running
+     */
+    startedAt?: Date;
+    /**
+     * Current job status
+     */
+    status: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'TIMED_OUT' | 'CANCELLED';
+};
+
+/**
  * Linear progress with current and target counts
  */
 export type LinearAchievementProgress = Omit<AchievementProgress, 'type'> & {
@@ -1034,6 +1341,80 @@ export type GitLabGroup = {
     webUrl?: string;
 };
 
+/**
+ * Feedback engagement statistics for a contributor in a workspace
+ */
+export type FindingFeedbackEngagement = {
+    /**
+     * Number of findings marked as applied/fixed
+     */
+    applied: number;
+    /**
+     * Number of findings disputed as incorrect
+     */
+    disputed: number;
+    /**
+     * Number of findings marked as not applicable
+     */
+    notApplicable: number;
+};
+
+/**
+ * Contributor feedback on an AI-generated practice finding
+ */
+export type FindingFeedback = {
+    /**
+     * The feedback action taken
+     */
+    action: 'APPLIED' | 'DISPUTED' | 'NOT_APPLICABLE';
+    /**
+     * When the feedback was submitted
+     */
+    createdAt: Date;
+    /**
+     * Optional explanation for the feedback
+     */
+    explanation?: string;
+    /**
+     * ID of the finding this feedback is about
+     */
+    findingId: string;
+    /**
+     * Unique feedback ID
+     */
+    id: string;
+};
+
+/**
+ * Feature flags evaluated for the current user
+ */
+export type FeatureFlags = {
+    /**
+     * User has admin privileges
+     */
+    ADMIN?: boolean;
+    /**
+     * GitLab workspace creation feature is enabled
+     */
+    GITLAB_WORKSPACE_CREATION?: boolean;
+    /**
+     * User has access to the AI Mentor feature
+     */
+    MENTOR_ACCESS?: boolean;
+    /**
+     * User can receive notifications
+     */
+    NOTIFICATION_ACCESS?: boolean;
+    /**
+     * Practice review runs for all users regardless of role
+     */
+    PRACTICE_REVIEW_FOR_ALL?: boolean;
+    /**
+     * User's PRs trigger practice review
+     */
+    RUN_PRACTICE_REVIEW?: boolean;
+};
+
 export type ErrorResponse = {
     /**
      * Human-readable error message
@@ -1059,13 +1440,6 @@ export type Document = {
     title: string;
     userId: number;
     versionNumber: number;
-};
-
-/**
- * Response for detection operations
- */
-export type DetectionResult = {
-    result?: 'BAD_PRACTICES_DETECTED' | 'NO_BAD_PRACTICES_DETECTED' | 'ERROR_NO_UPDATE_ON_PULLREQUEST';
 };
 
 /**
@@ -1106,10 +1480,134 @@ export type CreateWorkspaceRequest = {
     workspaceSlug: string;
 };
 
+/**
+ * Request to create a new practice definition
+ */
+export type CreatePracticeRequest = {
+    /**
+     * Practice category
+     */
+    category?: string;
+    /**
+     * Practice description
+     */
+    description: string;
+    /**
+     * AI detection prompt template
+     */
+    detectionPrompt?: string;
+    /**
+     * Human-readable name
+     */
+    name: string;
+    /**
+     * URL-safe identifier unique within the workspace
+     */
+    slug: string;
+    /**
+     * Domain events that trigger detection
+     */
+    triggerEvents: Array<string>;
+};
+
+/**
+ * Submit feedback on an AI-generated practice finding
+ */
+export type CreateFindingFeedback = {
+    /**
+     * The feedback action to record
+     */
+    action: 'APPLIED' | 'DISPUTED' | 'NOT_APPLICABLE';
+    /**
+     * Explanation for the feedback. Required when action is DISPUTED.
+     */
+    explanation?: string;
+};
+
 export type CreateDocumentRequest = {
     content: string;
     kind: DocumentKind;
     title: string;
+};
+
+/**
+ * Request to create a new agent configuration for a workspace
+ */
+export type CreateAgentConfigRequest = {
+    /**
+     * Type of coding agent
+     */
+    agentType: 'CLAUDE_CODE' | 'OPENCODE';
+    /**
+     * Whether agent containers have internet access
+     */
+    allowInternet?: boolean;
+    /**
+     * Authentication mode: PROXY (internal proxy), API_KEY (direct), or OAUTH (direct OAuth)
+     */
+    credentialMode?: 'PROXY' | 'API_KEY' | 'OAUTH';
+    /**
+     * Whether the agent is enabled
+     */
+    enabled?: boolean;
+    /**
+     * LLM API key
+     */
+    llmApiKey?: string;
+    /**
+     * LLM provider
+     */
+    llmProvider: 'ANTHROPIC' | 'OPENAI';
+    /**
+     * Maximum concurrent jobs
+     */
+    maxConcurrentJobs?: number;
+    /**
+     * LLM model name
+     */
+    modelName?: string;
+    /**
+     * Unique name within the workspace
+     */
+    name: string;
+    /**
+     * Job timeout in seconds
+     */
+    timeoutSeconds?: number;
+};
+
+/**
+ * Per-practice finding summary for a contributor
+ */
+export type ContributorPracticeSummary = {
+    /**
+     * Practice category
+     */
+    category?: string;
+    /**
+     * Timestamp of most recent finding
+     */
+    lastFindingAt?: Date;
+    /**
+     * Number of NEGATIVE findings
+     */
+    negativeCount: number;
+    /**
+     * Number of POSITIVE findings
+     */
+    positiveCount: number;
+    /**
+     * Practice name
+     */
+    practiceName: string;
+    /**
+     * Practice slug
+     */
+    practiceSlug: string;
+    /**
+     * Total number of findings
+     */
+    totalFindings: number;
 };
 
 /**
@@ -1169,20 +1667,6 @@ export type BinaryAchievementProgress = Omit<AchievementProgress, 'type'> & {
 };
 
 /**
- * User feedback on a detected bad practice
- */
-export type BadPracticeFeedback = {
-    /**
-     * User's explanation for the feedback
-     */
-    explanation: string;
-    /**
-     * Type of feedback (e.g., 'false_positive', 'not_applicable')
-     */
-    type: string;
-};
-
-/**
  * Request to assign or update a user's role in a workspace
  */
 export type AssignRoleRequest = {
@@ -1194,6 +1678,64 @@ export type AssignRoleRequest = {
      * User ID of the member to update
      */
     userId: number;
+};
+
+/**
+ * Agent configuration for a workspace (API key redacted)
+ */
+export type AgentConfig = {
+    /**
+     * Type of coding agent
+     */
+    agentType: 'CLAUDE_CODE' | 'OPENCODE';
+    /**
+     * Whether agent containers have internet access
+     */
+    allowInternet: boolean;
+    /**
+     * Timestamp when the config was created
+     */
+    createdAt: Date;
+    /**
+     * Authentication mode
+     */
+    credentialMode: 'PROXY' | 'API_KEY' | 'OAUTH';
+    /**
+     * Whether the agent is enabled
+     */
+    enabled: boolean;
+    /**
+     * Whether an LLM API key is configured
+     */
+    hasLlmApiKey: boolean;
+    /**
+     * Configuration ID
+     */
+    id: number;
+    /**
+     * LLM provider
+     */
+    llmProvider: 'ANTHROPIC' | 'OPENAI';
+    /**
+     * Maximum concurrent jobs
+     */
+    maxConcurrentJobs: number;
+    /**
+     * LLM model name
+     */
+    modelName?: string;
+    /**
+     * Unique name within the workspace
+     */
+    name: string;
+    /**
+     * Job timeout in seconds
+     */
+    timeoutSeconds: number;
+    /**
+     * Timestamp when the config was last updated
+     */
+    updatedAt?: Date;
 };
 
 export type AchievementId = 'commit.common.1' | 'commit.common.2' | 'commit.epic' | 'commit.legendary' | 'commit.mythic' | 'commit.rare' | 'commit.special.atomic_changes' | 'commit.special.brute_force' | 'commit.special.cross_boundary' | 'commit.special.itsy_bitsy' | 'commit.uncommon.1' | 'commit.uncommon.2' | 'issue.close.common.1' | 'issue.close.common.2' | 'issue.close.epic' | 'issue.close.legendary' | 'issue.close.rare' | 'issue.close.uncommon' | 'issue.open.common.1' | 'issue.open.common.2' | 'issue.open.epic' | 'issue.open.legendary' | 'issue.open.rare' | 'issue.open.uncommon' | 'issue.special.hive_mind' | 'issue.special.necromancer' | 'issue.special.oracle' | 'milestone.all_epic' | 'milestone.all_legendary' | 'milestone.all_rare' | 'milestone.first_action' | 'milestone.long_time_return' | 'milestone.night_owl' | 'milestone.polyglot' | 'pr.merged.common.1' | 'pr.merged.common.2' | 'pr.merged.epic' | 'pr.merged.legendary' | 'pr.merged.rare' | 'pr.merged.uncommon' | 'pr.special.speedster' | 'review.common.1' | 'review.common.2' | 'review.epic' | 'review.legendary' | 'review.mythic' | 'review.rare' | 'review.uncommon.1' | 'review.uncommon.2';
@@ -1265,6 +1807,22 @@ export type DeleteUserResponses = {
      */
     200: unknown;
 };
+
+export type GetUserFeaturesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/user/features';
+};
+
+export type GetUserFeaturesResponses = {
+    /**
+     * Feature flags evaluated successfully
+     */
+    200: FeatureFlags;
+};
+
+export type GetUserFeaturesResponse = GetUserFeaturesResponses[keyof GetUserFeaturesResponses];
 
 export type GetUserSettingsData = {
     body?: never;
@@ -1403,6 +1961,294 @@ export type GetWorkspaceResponses = {
 };
 
 export type GetWorkspaceResponse = GetWorkspaceResponses[keyof GetWorkspaceResponses];
+
+export type GetConfigsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/agent-configs';
+};
+
+export type GetConfigsResponses = {
+    /**
+     * Agent configs returned
+     */
+    200: Array<AgentConfig>;
+};
+
+export type GetConfigsResponse = GetConfigsResponses[keyof GetConfigsResponses];
+
+export type CreateConfigData = {
+    body: CreateAgentConfigRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/agent-configs';
+};
+
+export type CreateConfigErrors = {
+    /**
+     * Config name already exists in this workspace
+     */
+    409: unknown;
+};
+
+export type CreateConfigResponses = {
+    /**
+     * Agent config created
+     */
+    201: AgentConfig;
+};
+
+export type CreateConfigResponse = CreateConfigResponses[keyof CreateConfigResponses];
+
+export type DeleteConfigData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        configId: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/agent-configs/{configId}';
+};
+
+export type DeleteConfigErrors = {
+    /**
+     * Agent config not found
+     */
+    404: unknown;
+    /**
+     * Cannot delete config with active jobs
+     */
+    409: unknown;
+};
+
+export type DeleteConfigResponses = {
+    /**
+     * Agent config deleted
+     */
+    204: void;
+};
+
+export type DeleteConfigResponse = DeleteConfigResponses[keyof DeleteConfigResponses];
+
+export type GetConfigData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        configId: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/agent-configs/{configId}';
+};
+
+export type GetConfigErrors = {
+    /**
+     * Agent config not found
+     */
+    404: unknown;
+};
+
+export type GetConfigResponses = {
+    /**
+     * Agent config returned
+     */
+    200: AgentConfig;
+};
+
+export type GetConfigResponse = GetConfigResponses[keyof GetConfigResponses];
+
+export type UpdateConfigData = {
+    body: UpdateAgentConfigRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        configId: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/agent-configs/{configId}';
+};
+
+export type UpdateConfigErrors = {
+    /**
+     * Agent config not found
+     */
+    404: unknown;
+};
+
+export type UpdateConfigResponses = {
+    /**
+     * Agent config updated
+     */
+    200: AgentConfig;
+};
+
+export type UpdateConfigResponse = UpdateConfigResponses[keyof UpdateConfigResponses];
+
+export type ListJobsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: {
+        /**
+         * Filter by job status
+         */
+        status?: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'TIMED_OUT' | 'CANCELLED';
+        /**
+         * Filter by config ID
+         */
+        configId?: number;
+        page?: number;
+        size?: number;
+    };
+    url: '/workspaces/{workspaceSlug}/agent-jobs';
+};
+
+export type ListJobsResponses = {
+    /**
+     * Paginated job list
+     */
+    200: PageAgentJob;
+};
+
+export type ListJobsResponse = ListJobsResponses[keyof ListJobsResponses];
+
+export type GetJobData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        jobId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/agent-jobs/{jobId}';
+};
+
+export type GetJobErrors = {
+    /**
+     * Job not found in this workspace
+     */
+    404: unknown;
+};
+
+export type GetJobResponses = {
+    /**
+     * Job detail returned
+     */
+    200: AgentJob;
+};
+
+export type GetJobResponse = GetJobResponses[keyof GetJobResponses];
+
+export type CancelJobData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        jobId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/agent-jobs/{jobId}/cancel';
+};
+
+export type CancelJobErrors = {
+    /**
+     * Job not found in this workspace
+     */
+    404: unknown;
+    /**
+     * Job already in terminal state
+     */
+    409: unknown;
+};
+
+export type CancelJobResponses = {
+    /**
+     * Job cancelled
+     */
+    200: AgentJob;
+};
+
+export type CancelJobResponse = CancelJobResponses[keyof CancelJobResponses];
+
+export type RetryDeliveryData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        jobId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/agent-jobs/{jobId}/delivery/retry';
+};
+
+export type RetryDeliveryErrors = {
+    /**
+     * Job not found in this workspace
+     */
+    404: unknown;
+    /**
+     * Job not in a retryable state
+     */
+    409: unknown;
+};
+
+export type RetryDeliveryResponses = {
+    /**
+     * Delivery retried
+     */
+    200: AgentJob;
+};
+
+export type RetryDeliveryResponse = RetryDeliveryResponses[keyof RetryDeliveryResponses];
+
+export type UpdateFeaturesData = {
+    body: UpdateWorkspaceFeaturesRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/features';
+};
+
+export type UpdateFeaturesResponses = {
+    /**
+     * Workspace updated
+     */
+    200: Workspace;
+};
+
+export type UpdateFeaturesResponse = UpdateFeaturesResponses[keyof UpdateFeaturesResponses];
 
 export type GetLeaderboardData = {
     body?: never;
@@ -2079,182 +2925,374 @@ export type UpdateNotificationsResponses = {
 
 export type UpdateNotificationsResponse = UpdateNotificationsResponses[keyof UpdateNotificationsResponses];
 
-export type GetBadPracticeData = {
+export type ListPracticesData = {
     body?: never;
     path: {
         /**
          * Workspace slug
          */
         workspaceSlug: string;
-        id: number;
     };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/badpractice/{id}';
+    query?: {
+        /**
+         * Filter by practice category
+         */
+        category?: string;
+        /**
+         * Filter by active state
+         */
+        active?: boolean;
+    };
+    url: '/workspaces/{workspaceSlug}/practices';
 };
 
-export type GetBadPracticeResponses = {
+export type ListPracticesResponses = {
     /**
-     * Bad practice returned
+     * Practices returned
      */
-    200: PullRequestBadPractice;
+    200: Array<Practice>;
 };
 
-export type GetBadPracticeResponse = GetBadPracticeResponses[keyof GetBadPracticeResponses];
+export type ListPracticesResponse = ListPracticesResponses[keyof ListPracticesResponses];
 
-export type ProvideFeedbackData = {
-    body: BadPracticeFeedback;
+export type CreatePracticeData = {
+    body: CreatePracticeRequest;
     path: {
         /**
          * Workspace slug
          */
         workspaceSlug: string;
-        id: number;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/badpractice/{id}/feedback';
+    url: '/workspaces/{workspaceSlug}/practices';
 };
 
-export type ProvideFeedbackErrors = {
+export type CreatePracticeErrors = {
     /**
-     * User is not an assignee of the pull request
+     * Practice slug already exists in this workspace
+     */
+    409: unknown;
+};
+
+export type CreatePracticeResponses = {
+    /**
+     * Practice created
+     */
+    201: Practice;
+};
+
+export type CreatePracticeResponse = CreatePracticeResponses[keyof CreatePracticeResponses];
+
+export type ListFindingsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: {
+        /**
+         * Filter by practice slug
+         */
+        practiceSlug?: string;
+        /**
+         * Filter by verdict
+         */
+        verdict?: 'POSITIVE' | 'NEGATIVE' | 'NOT_APPLICABLE' | 'NEEDS_REVIEW';
+        page?: number;
+        size?: number;
+    };
+    url: '/workspaces/{workspaceSlug}/practices/findings';
+};
+
+export type ListFindingsResponses = {
+    /**
+     * Paginated findings returned
+     */
+    200: PagePracticeFindingList;
+};
+
+export type ListFindingsResponse = ListFindingsResponses[keyof ListFindingsResponses];
+
+export type GetEngagementData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/findings/engagement';
+};
+
+export type GetEngagementResponses = {
+    /**
+     * Engagement statistics returned
+     */
+    200: FindingFeedbackEngagement;
+};
+
+export type GetEngagementResponse = GetEngagementResponses[keyof GetEngagementResponses];
+
+export type GetFindingsForPullRequestData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        prId: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/findings/pull-request/{prId}';
+};
+
+export type GetFindingsForPullRequestResponses = {
+    /**
+     * PR findings returned
+     */
+    200: Array<PracticeFindingList>;
+};
+
+export type GetFindingsForPullRequestResponse = GetFindingsForPullRequestResponses[keyof GetFindingsForPullRequestResponses];
+
+export type GetSummaryData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/findings/summary';
+};
+
+export type GetSummaryResponses = {
+    /**
+     * Practice summaries returned
+     */
+    200: Array<ContributorPracticeSummary>;
+};
+
+export type GetSummaryResponse = GetSummaryResponses[keyof GetSummaryResponses];
+
+export type GetFindingData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        findingId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/findings/{findingId}';
+};
+
+export type GetFindingErrors = {
+    /**
+     * Finding not found or not owned by current user
+     */
+    404: unknown;
+};
+
+export type GetFindingResponses = {
+    /**
+     * Finding detail returned
+     */
+    200: PracticeFindingDetail;
+};
+
+export type GetFindingResponse = GetFindingResponses[keyof GetFindingResponses];
+
+export type GetLatestFeedbackData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        findingId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/findings/{findingId}/feedback';
+};
+
+export type GetLatestFeedbackErrors = {
+    /**
+     * Finding not found in this workspace
+     */
+    404: unknown;
+};
+
+export type GetLatestFeedbackResponses = {
+    /**
+     * Latest feedback returned
+     */
+    200: FindingFeedback;
+    /**
+     * No feedback exists for this finding
+     */
+    204: void;
+};
+
+export type GetLatestFeedbackResponse = GetLatestFeedbackResponses[keyof GetLatestFeedbackResponses];
+
+export type SubmitFeedbackData = {
+    body: CreateFindingFeedback;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        findingId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/findings/{findingId}/feedback';
+};
+
+export type SubmitFeedbackErrors = {
+    /**
+     * Invalid request (e.g., DISPUTED without explanation)
+     */
+    400: unknown;
+    /**
+     * Current user is not the finding's contributor
      */
     403: unknown;
-};
-
-export type ProvideFeedbackResponses = {
     /**
-     * Feedback submitted successfully
+     * Finding not found in this workspace
      */
-    200: unknown;
+    404: unknown;
 };
 
-export type ResolveData = {
+export type SubmitFeedbackResponses = {
+    /**
+     * Feedback recorded
+     */
+    201: FindingFeedback;
+};
+
+export type SubmitFeedbackResponse = SubmitFeedbackResponses[keyof SubmitFeedbackResponses];
+
+export type DeletePracticeData = {
     body?: never;
     path: {
         /**
          * Workspace slug
          */
         workspaceSlug: string;
-        id: number;
-    };
-    query: {
-        state: 'GOOD_PRACTICE' | 'MINOR_ISSUE' | 'NORMAL_ISSUE' | 'CRITICAL_ISSUE' | 'FIXED' | 'WONT_FIX' | 'WRONG';
-    };
-    url: '/workspaces/{workspaceSlug}/practices/badpractice/{id}/resolve';
-};
-
-export type ResolveResponses = {
-    /**
-     * Bad practice resolved successfully
-     */
-    200: unknown;
-};
-
-export type GetBadPracticesForPullRequestData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        pullRequestId: number;
+        practiceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/pullrequest/{pullRequestId}';
+    url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}';
 };
 
-export type GetBadPracticesForPullRequestResponses = {
+export type DeletePracticeErrors = {
     /**
-     * Bad practices returned
+     * Practice not found
      */
-    200: PullRequestWithBadPractices;
+    404: unknown;
 };
 
-export type GetBadPracticesForPullRequestResponse = GetBadPracticesForPullRequestResponses[keyof GetBadPracticesForPullRequestResponses];
+export type DeletePracticeResponses = {
+    /**
+     * Practice deleted
+     */
+    204: void;
+};
 
-export type DetectForPullRequestData = {
+export type DeletePracticeResponse = DeletePracticeResponses[keyof DeletePracticeResponses];
+
+export type GetPracticeData = {
     body?: never;
     path: {
         /**
          * Workspace slug
          */
         workspaceSlug: string;
-        pullRequestId: number;
+        practiceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/pullrequest/{pullRequestId}/detect';
+    url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}';
 };
 
-export type DetectForPullRequestErrors = {
+export type GetPracticeErrors = {
     /**
-     * Detection failed due to no updates on pull request
+     * Practice not found
      */
-    400: DetectionResult;
+    404: unknown;
 };
 
-export type DetectForPullRequestError = DetectForPullRequestErrors[keyof DetectForPullRequestErrors];
-
-export type DetectForPullRequestResponses = {
+export type GetPracticeResponses = {
     /**
-     * Detection completed successfully
+     * Practice returned
      */
-    200: DetectionResult;
+    200: Practice;
 };
 
-export type DetectForPullRequestResponse = DetectForPullRequestResponses[keyof DetectForPullRequestResponses];
+export type GetPracticeResponse = GetPracticeResponses[keyof GetPracticeResponses];
 
-export type GetBadPracticesForUserData = {
-    body?: never;
+export type UpdatePracticeData = {
+    body: UpdatePracticeRequest;
     path: {
         /**
          * Workspace slug
          */
         workspaceSlug: string;
-        login: string;
+        practiceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/user/{login}';
+    url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}';
 };
 
-export type GetBadPracticesForUserResponses = {
+export type UpdatePracticeErrors = {
     /**
-     * Bad practices returned
+     * Practice not found
      */
-    200: UserPractices;
+    404: unknown;
 };
 
-export type GetBadPracticesForUserResponse = GetBadPracticesForUserResponses[keyof GetBadPracticesForUserResponses];
+export type UpdatePracticeResponses = {
+    /**
+     * Practice updated
+     */
+    200: Practice;
+};
 
-export type DetectForUserData = {
-    body?: never;
+export type UpdatePracticeResponse = UpdatePracticeResponses[keyof UpdatePracticeResponses];
+
+export type SetActiveData = {
+    body: UpdatePracticeActiveRequest;
     path: {
         /**
          * Workspace slug
          */
         workspaceSlug: string;
-        login: string;
+        practiceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/user/{login}/detect';
+    url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}/active';
 };
 
-export type DetectForUserErrors = {
+export type SetActiveErrors = {
     /**
-     * Detection failed due to no updates on pull requests
+     * Practice not found
      */
-    400: DetectionResult;
+    404: unknown;
 };
 
-export type DetectForUserError = DetectForUserErrors[keyof DetectForUserErrors];
-
-export type DetectForUserResponses = {
+export type SetActiveResponses = {
     /**
-     * Detection completed successfully
+     * Active state updated
      */
-    200: DetectionResult;
+    200: Practice;
 };
 
-export type DetectForUserResponse = DetectForUserResponses[keyof DetectForUserResponses];
+export type SetActiveResponse = SetActiveResponses[keyof SetActiveResponses];
 
 export type GetUserProfileData = {
     body?: never;

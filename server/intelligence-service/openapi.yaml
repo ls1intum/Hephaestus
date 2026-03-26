@@ -1,91 +1,9 @@
 openapi: 3.1.0
 info:
-  version: 0.30.0
+  version: 0.0.0-development
   title: Hephaestus Intelligence Service API
 components:
   schemas:
-    DetectorResponse:
-      allOf:
-        - $ref: "#/components/schemas/BadPracticeResult"
-        - type: object
-          properties:
-            traceId:
-              type: string
-          required:
-            - traceId
-    BadPractice:
-      type: object
-      properties:
-        title:
-          type: string
-        description:
-          type: string
-        status:
-          type: string
-          enum:
-            - Good Practice
-            - Fixed
-            - Critical Issue
-            - Normal Issue
-            - Minor Issue
-            - Won't Fix
-            - Wrong
-      required:
-        - title
-        - description
-        - status
-    BadPracticeResult:
-      type: object
-      properties:
-        badPracticeSummary:
-          type: string
-        badPractices:
-          type: array
-          items:
-            $ref: "#/components/schemas/BadPractice"
-      required:
-        - badPracticeSummary
-        - badPractices
-    ErrorResponse:
-      type: object
-      properties:
-        error:
-          type: string
-          description: Human-readable error message
-      required:
-        - error
-      x-hephaestus: &a1
-        export: true
-    DetectorRequest:
-      type: object
-      properties:
-        title:
-          type: string
-        description:
-          type: string
-        lifecycleState:
-          type: string
-        repositoryName:
-          type: string
-        pullRequestNumber:
-          type: number
-        badPracticeSummary:
-          type: string
-        badPractices:
-          type: array
-          items:
-            $ref: "#/components/schemas/BadPractice"
-        pullRequestTemplate:
-          type: string
-      required:
-        - title
-        - description
-        - lifecycleState
-        - repositoryName
-        - pullRequestNumber
-        - badPracticeSummary
-        - badPractices
-        - pullRequestTemplate
     ChatThreadGroup:
       type: object
       properties:
@@ -98,7 +16,8 @@ components:
       required:
         - groupName
         - threads
-      x-hephaestus: *a1
+      x-hephaestus: &a1
+        export: true
     ChatThreadSummary:
       type: object
       properties:
@@ -113,6 +32,15 @@ components:
       required:
         - id
         - title
+      x-hephaestus: *a1
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Human-readable error message
+      required:
+        - error
       x-hephaestus: *a1
     ThreadDetail:
       type: object
@@ -280,32 +208,6 @@ components:
       x-hephaestus: *a1
   parameters: {}
 paths:
-  /detector:
-    post:
-      operationId: detectBadPractices
-      tags:
-        - Detector
-      summary: Detect bad practices for a pull request
-      requestBody:
-        description: Detector request
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/DetectorRequest"
-      responses:
-        "200":
-          description: Detection response
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/DetectorResponse"
-        "500":
-          description: Internal server error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
   /mentor/threads/grouped:
     get:
       tags:

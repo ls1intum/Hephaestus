@@ -4,30 +4,47 @@ Spring Boot 3.5 backend providing the REST API for Hephaestus.
 
 ## Commands
 
-| Task | Command |
-|------|---------|
-| Run locally | `mvn spring-boot:run` |
-| Unit tests | `mvn test` |
-| Integration tests | `mvn verify` |
-| Live GitHub tests | `mvn test -Plive-tests` |
-| Format | `npm run format:java` |
-| Generate OpenAPI | `npm run generate:api:application-server:specs` |
+| Task              | Command                                         |
+| ----------------- | ----------------------------------------------- |
+| Run locally       | `mvn spring-boot:run`                           |
+| Unit tests        | `mvn test`                                      |
+| Integration tests | `mvn verify`                                    |
+| Live GitHub tests | `mvn test -Plive-tests`                         |
+| Format            | `npm run format:java`                           |
+| Generate OpenAPI  | `npm run generate:api:application-server:specs` |
+
+### Port Conflicts (OpenAPI Generation)
+
+The `generate:api:application-server:specs` script (springdoc) starts the app on port **8080** to download the spec. If port 8080 is occupied (e.g. by Coolify proxy), override with environment variables — **never stop other services**:
+
+```bash
+SERVER_PORT=8090 MANAGEMENT_SERVER_PORT=8092 mvn verify -DskipTests=true -Dapp.profiles=specs
+```
+
+Then regenerate the client:
+
+```bash
+npm run generate:api:application-server:client
+```
 
 ## Boundaries
 
 ### Always
+
 - Run `mvn test` before committing
 - Use constructor injection (via `@RequiredArgsConstructor`)
 - Return `ResponseEntity` with proper status codes
 - Tag tests appropriately (`@Tag("unit")`, etc.)
 
 ### Ask First
+
 - Database schema changes (migrations)
 - Security configuration changes
 - Adding new dependencies to `pom.xml`
 - Modifying workspace authorization logic
 
 ### Never
+
 - Commit credentials or API keys
 - Use `System.out.println()` (use `@Slf4j` logging)
 - Skip tests without documented reason
@@ -48,7 +65,7 @@ src/main/java/de/tum/in/www1/hephaestus/
 │   ├── team/                     # Team management
 │   └── sync/                     # Data synchronization orchestration
 ├── leaderboard/                  # Scoring, rankings, league points
-├── activity/                     # Activity tracking, bad practice detection
+├── activity/                     # Activity tracking (XP, leaderboard gamification)
 ├── mentor/                       # AI mentor proxy to intelligence-service
 ├── profile/                      # User profiles
 ├── notification/                 # Email and Slack messaging
@@ -63,8 +80,9 @@ All workspace-scoped controllers use `@WorkspaceScopedController`:
 
 ```java
 @WorkspaceScopedController
-@RequireAtLeastWorkspaceAdmin  // or @RequireWorkspaceOwner
+@RequireAtLeastWorkspaceAdmin // or @RequireWorkspaceOwner
 public class MyController {
+
     @GetMapping("/my-resource")
     public ResponseEntity<MyDTO> get(WorkspaceContext ctx) {
         // ctx.workspace(), ctx.slug() available
@@ -97,7 +115,7 @@ public class PullRequest extends Issue { ... }
 public record UserDTO(
     @NonNull Long id,
     @NonNull String login,
-    String avatarUrl  // optional - no annotation
+    String avatarUrl // optional - no annotation
 ) {
     public static UserDTO from(User entity) {
         return new UserDTO(entity.getId(), entity.getLogin(), entity.getAvatarUrl());
@@ -109,11 +127,11 @@ public record UserDTO(
 
 ### Test Tiers (JUnit 5 Tags)
 
-| Tag | Purpose | Base Class | Command |
-|-----|---------|------------|---------|
-| `@Tag("unit")` | Fast, no Spring context | `BaseUnitTest` | `mvn test` |
-| `@Tag("integration")` | Full Spring Boot + Testcontainers | `BaseIntegrationTest` | `mvn verify` |
-| `@Tag("live")` | Real GitHub API calls | - | `mvn test -Plive-tests` |
+| Tag                   | Purpose                           | Base Class            | Command                 |
+| --------------------- | --------------------------------- | --------------------- | ----------------------- |
+| `@Tag("unit")`        | Fast, no Spring context           | `BaseUnitTest`        | `mvn test`              |
+| `@Tag("integration")` | Full Spring Boot + Testcontainers | `BaseIntegrationTest` | `mvn verify`            |
+| `@Tag("live")`        | Real GitHub API calls             | -                     | `mvn test -Plive-tests` |
 
 ### Test Structure (AAA Pattern)
 
@@ -136,6 +154,7 @@ void shouldReturnUserWhenValidIdProvided() {
 ### Test Naming
 
 Use `should[ExpectedBehavior]When[Condition]`:
+
 - `shouldReturnUserWhenValidIdProvided`
 - `shouldThrowExceptionWhenUserNotFound`
 - `shouldCreateWorkspaceWhenValidRequest`
@@ -146,13 +165,16 @@ Use `should[ExpectedBehavior]When[Condition]`:
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
 class MyControllerIntegrationTest extends BaseIntegrationTest {
+
     @Test
     void shouldReturn200WhenAuthorized() {
-        webTestClient.get()
+        webTestClient
+            .get()
             .uri("/workspaces/{slug}/resource", "test-workspace")
             .headers(TestAuthUtils.withAdminUser())
             .exchange()
-            .expectStatus().isOk();
+            .expectStatus()
+            .isOk();
     }
 }
 ```
@@ -169,23 +191,24 @@ class MyControllerIntegrationTest extends BaseIntegrationTest {
 
 ### Annotations
 
-| Annotation | Use For |
-|------------|---------|
-| `@Service` | Business logic |
-| `@Repository` | Data access (extends JpaRepository) |
-| `@RestController` | REST endpoints |
-| `@WorkspaceScopedController` | Workspace-scoped REST endpoints |
-| `@Transactional` | Service layer only (never controllers) |
-| `@ConfigurationProperties` | Type-safe configuration |
+| Annotation                   | Use For                                |
+| ---------------------------- | -------------------------------------- |
+| `@Service`                   | Business logic                         |
+| `@Repository`                | Data access (extends JpaRepository)    |
+| `@RestController`            | REST endpoints                         |
+| `@WorkspaceScopedController` | Workspace-scoped REST endpoints        |
+| `@Transactional`             | Service layer only (never controllers) |
+| `@ConfigurationProperties`   | Type-safe configuration                |
 
 ### Lombok
 
 ```java
 @Service
-@RequiredArgsConstructor  // Constructor injection
-@Slf4j                    // Logging
+@RequiredArgsConstructor // Constructor injection
+@Slf4j // Logging
 public class UserService {
-    private final UserRepository userRepository;  // injected via constructor
+
+    private final UserRepository userRepository; // injected via constructor
 }
 ```
 
@@ -205,6 +228,7 @@ Avoid: `@Data` (use granular annotations instead)
 @Slf4j
 @Service
 public class SyncService {
+
     public void syncRepository(String repoName) {
         log.info("Starting sync for repository: {}", repoName);
         // ... work ...
@@ -276,9 +300,9 @@ public ProblemDetail handleNotFound(EntityNotFoundException ex) {
 
 ## Common Mistakes
 
-| Mistake | Fix |
-|---------|-----|
-| `@Transactional` on controller | Move to service layer |
-| Missing test tag | Add `@Tag("unit")` or `@Tag("integration")` |
-| N+1 query | Use `JOIN FETCH` in `@Query` |
-| Edited generated client | Discard, run `npm run generate:api:intelligence-service:client` |
+| Mistake                        | Fix                                                             |
+| ------------------------------ | --------------------------------------------------------------- |
+| `@Transactional` on controller | Move to service layer                                           |
+| Missing test tag               | Add `@Tag("unit")` or `@Tag("integration")`                     |
+| N+1 query                      | Use `JOIN FETCH` in `@Query`                                    |
+| Edited generated client        | Discard, run `npm run generate:api:intelligence-service:client` |

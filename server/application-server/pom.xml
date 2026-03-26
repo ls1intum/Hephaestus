@@ -12,7 +12,7 @@
     </parent>
     <groupId>de.tum.in.www1</groupId>
     <artifactId>hephaestus</artifactId>
-    <version>0.30.0</version>
+    <version>0.0.0-development</version>
     <name>Hephaestus</name>
     <description>AI-driven learning for better software development</description>
     <url/>
@@ -37,13 +37,16 @@
         <maven.test.skip>false</maven.test.skip>
         <hephaestus.surefire.timeout>300</hephaestus.surefire.timeout>
 
+        <!-- Server port for OpenAPI spec generation (overridable via -Dopenapi.server.port=PORT) -->
+        <openapi.server.port>38090</openapi.server.port>
+
         <!-- Tag filtering: unit tests by default, exclude live tests -->
         <surefire.excludedGroups>live</surefire.excludedGroups>
         <surefire.includedGroups>unit</surefire.includedGroups>
         <failsafe.excludedGroups>live</failsafe.excludedGroups>
         <failsafe.includedGroups>integration</failsafe.includedGroups>
 
-        <!-- GraphQL Codegen Skip (auto-set by 'quick' profile when target/classes exists) -->
+        <!-- GraphQL Codegen Skip (auto-set by 'quick' profile when target/generated-sources exists) -->
         <graphql.codegen.skip>false</graphql.codegen.skip>
 
         <!-- Coverage Configuration (disabled by default) -->
@@ -251,6 +254,22 @@
             <artifactId>jnats</artifactId>
             <version>2.25.1</version>
         </dependency>
+        <!-- Docker Java SDK for sandbox container management -->
+        <dependency>
+            <groupId>com.github.docker-java</groupId>
+            <artifactId>docker-java-api</artifactId>
+            <version>3.7.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.github.docker-java</groupId>
+            <artifactId>docker-java-core</artifactId>
+            <version>3.7.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.github.docker-java</groupId>
+            <artifactId>docker-java-transport-httpclient5</artifactId>
+            <version>3.7.0</version>
+        </dependency>
         <dependency>
             <groupId>com.slack.api</groupId>
             <artifactId>bolt</artifactId>
@@ -311,6 +330,12 @@
             <groupId>com.squareup.okhttp3</groupId>
             <artifactId>logging-interceptor</artifactId>
             <version>4.12.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>mockwebserver</artifactId>
+            <version>4.12.0</version>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>com.google.code.gson</groupId>
@@ -416,13 +441,8 @@
     </dependencyManagement>
     <build>
         <plugins>
-            <!--
-                Clean compiled classes before compilation to prevent orphaned .class files
-                from deleted/moved source files (e.g., CI cache restoring stale classes).
-                Only target/classes and target/test-classes are cleaned; generated-sources
-                and other cached artifacts are preserved.
-                Skipped by the quick profile for fast local development.
-            -->
+            <!-- Clean compiled classes to prevent orphaned .class files from deleted/moved sources.
+                 Skipped by the 'quick' profile (skipCleanStaleClasses=true) for incremental builds. -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-clean-plugin</artifactId>
@@ -451,6 +471,11 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
+                <!-- Override Spring Boot parent (3.14.1) to fix MCOMPILER-540: generated sources
+                     incorrectly added to compilation with useIncrementalCompilation=false.
+                     TODO: Remove when Spring Boot parent ships >= 3.15.0.
+                     See: https://issues.apache.org/jira/browse/MCOMPILER-540 -->
+                <version>3.15.0</version>
                 <configuration>
                     <source>${java.version}</source>
                     <target>${java.version}</target>
@@ -878,6 +903,7 @@
                             <profiles>specs</profiles>
                             <jvmArguments>-Dspring.application.admin.enabled=true -XX:+EnableDynamicAgentLoading
                                 --enable-native-access=ALL-UNNAMED -Dspring.devtools.restart.enabled=false
+                                -Dserver.port=${openapi.server.port}
                             </jvmArguments>
                         </configuration>
                     </execution>
@@ -903,7 +929,7 @@
                     </execution>
                 </executions>
                 <configuration>
-                    <apiDocsUrl>http://localhost:8080/v3/api-docs.yaml</apiDocsUrl>
+                    <apiDocsUrl>http://localhost:${openapi.server.port}/v3/api-docs.yaml</apiDocsUrl>
                     <outputFileName>openapi.yaml</outputFileName>
                     <outputDir>.</outputDir>
                 </configuration>
@@ -1050,44 +1076,28 @@
         <!--
             Quick Development Profile (Auto-Activated)
 
-            Skips GraphQL code regeneration for fast incremental builds (~2-3s vs ~40s).
-            Java compilation remains ENABLED - only GraphQL codegen is skipped.
+            Skips GraphQL codegen and stale-class cleanup for fast incremental builds
+            (~2-3s vs ~40s). Without this, codegen regenerates thousands of files with
+            new timestamps, and clean-stale-classes deletes all .class files — both
+            force full recompilation on every build.
 
-            WHY THIS EXISTS:
-            - GraphQL codegen regenerates 3711 files (~6s) even if schema unchanged
-            - Regenerated files get new timestamps, triggering Java to recompile ALL of them (~30s)
-            - Skipping codegen when generated sources exist = fast incremental builds
-
-            IMPORTANT - SCHEMA CHANGES:
-            ⚠️  When you modify .graphql schema files, run: mvn clean compile
-            ⚠️  The quick profile cannot detect schema changes (plugin limitation)
-            ⚠️  Stale generated code will cause compile errors or runtime bugs
-
-            Auto-activation:
-            - Activates when target/classes exists (already compiled once)
-            - Does NOT activate after `mvn clean` (forces full rebuild)
-
-            Manual override:
-              mvn compile -Dgraphql.codegen.skip=false    (force GraphQL regen)
-              mvn compile -P!quick                        (disable quick profile)
-
-            CI/CD: Always use `mvn clean compile` to ensure fresh generation.
+            Run 'mvn clean compile' after modifying .graphql schemas or deleting source files.
+            Override: mvn compile -Dgraphql.codegen.skip=false  |  mvn compile -P!quick
         -->
         <profile>
             <id>quick</id>
             <activation>
-                <!-- Auto-activate when compiled classes exist -->
+                <!-- Uses generated-sources dir, not target/classes, because <exists> matches
+                     empty dirs and clean-stale-classes can leave target/classes empty. -->
                 <file>
-                    <exists>${basedir}/target/classes</exists>
+                    <exists>${basedir}/target/generated-sources/graphql-github</exists>
                 </file>
             </activation>
             <properties>
-                <!-- Skip GraphQL codegen - regenerated sources already exist
-                     ⚠️ Run 'mvn clean' when schema files change! -->
                 <graphql.codegen.skip>true</graphql.codegen.skip>
-                <!-- Keep Java compilation enabled for incremental development -->
-                <!-- maven.main.skip deliberately NOT set - we want incremental compile -->
-                <!-- Skip test compilation for faster spring-boot:run -->
+                <!-- Preserve .class files for incremental compilation -->
+                <skipCleanStaleClasses>true</skipCleanStaleClasses>
+                <!-- maven.main.skip deliberately NOT set — we want incremental compile -->
                 <maven.test.skip>true</maven.test.skip>
             </properties>
         </profile>

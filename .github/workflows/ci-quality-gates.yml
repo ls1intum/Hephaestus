@@ -35,7 +35,7 @@ jobs:
     name: "${{ matrix.display-name }}"
     runs-on: ubuntu-latest
     if: inputs.should_skip != 'true'
-    timeout-minutes: ${{ contains(fromJSON('["database-schema-validation", "database-documentation-validation", "database-models-validation"]'), matrix.check) && 20 || 15 }}
+    timeout-minutes: ${{ matrix.check == 'database-validation' && 20 || 15 }}
     strategy:
       fail-fast: false
       matrix:
@@ -50,12 +50,8 @@ jobs:
             display-name: "Webhook"
           - check: openapi-validation
             display-name: "OpenAPI"
-          - check: database-schema-validation
-            display-name: "Database: Schema"
-          - check: database-documentation-validation
-            display-name: "Database: ERD"
-          - check: database-models-validation
-            display-name: "Database: Models"
+          - check: database-validation
+            display-name: "Database"
     steps:
       - name: Determine if check should run
         id: should_run
@@ -64,12 +60,20 @@ jobs:
             "webapp-quality")
               echo "run=${{ inputs.webapp_changed }}" >> $GITHUB_OUTPUT
               ;;
-            "application-server-quality"|"database-schema-validation"|"database-documentation-validation"|"openapi-validation")
+            "application-server-quality"|"openapi-validation")
               echo "run=${{ inputs.application_server_changed }}" >> $GITHUB_OUTPUT
               ;;
-            "intelligence-service-quality"|"database-models-validation")
+            "intelligence-service-quality")
               # intelligence-service depends on application-server schema for DB models
               if [[ "${{ inputs.intelligence_service_changed }}" == "true" || "${{ inputs.application_server_changed }}" == "true" ]]; then
+                echo "run=true" >> $GITHUB_OUTPUT
+              else
+                echo "run=false" >> $GITHUB_OUTPUT
+              fi
+              ;;
+            "database-validation")
+              # DB validation covers schema, ERD, and models - depends on both app-server and intelligence-service
+              if [[ "${{ inputs.application_server_changed }}" == "true" || "${{ inputs.intelligence_service_changed }}" == "true" ]]; then
                 echo "run=true" >> $GITHUB_OUTPUT
               else
                 echo "run=false" >> $GITHUB_OUTPUT
@@ -97,7 +101,7 @@ jobs:
         with:
           # Database checks need full history for git diff on schema/migrations
           # Other quality checks only need HEAD for faster checkout
-          fetch-depth: ${{ contains(matrix.check, 'database') && 0 || 1 }}
+          fetch-depth: ${{ matrix.check == 'database-validation' && 0 || 1 }}
 
       - name: Setup Node.js
         if: steps.should_run.outputs.run == 'true'
@@ -122,7 +126,11 @@ jobs:
         run: |
           npm ci --prefer-offline --no-audit
           if ! npm run format:java:check; then
-            echo "❌ Formatting failed. Run: npm run format:java"
+            echo "::error::Java formatting failed. Run: npm run format:java"
+            echo "### App Server Quality" >> $GITHUB_STEP_SUMMARY
+            echo "| Check | Status | Fix |" >> $GITHUB_STEP_SUMMARY
+            echo "|-------|--------|-----|" >> $GITHUB_STEP_SUMMARY
+            echo "| Java formatting | :x: Failed | \`npm run format:java\` |" >> $GITHUB_STEP_SUMMARY
             exit 1
           fi
 
@@ -135,19 +143,22 @@ jobs:
           node scripts/install-platform-binaries.mjs
           cd webapp
 
-          # Run Biome check (includes formatting and linting)
-          if ! npm run check; then
-            echo "❌ Biome checks failed. Run: npm run check -- --write"
+          ISSUES_FOUND=()
+          BIOME_OK=true
+          TYPES_OK=true
+
+          npm run check || { BIOME_OK=false; ISSUES_FOUND+=("Biome checks failed. Run: cd webapp && npm run check -- --write"); }
+          npm run typecheck || { TYPES_OK=false; ISSUES_FOUND+=("TypeScript errors found. Run: cd webapp && npm run typecheck"); }
+
+          if [ ${#ISSUES_FOUND[@]} -gt 0 ]; then
+            echo "### Webapp Quality" >> $GITHUB_STEP_SUMMARY
+            echo "| Check | Status | Fix |" >> $GITHUB_STEP_SUMMARY
+            echo "|-------|--------|-----|" >> $GITHUB_STEP_SUMMARY
+            [[ "$BIOME_OK" == "false" ]] && echo "| Biome (lint + format) | :x: Failed | \`cd webapp && npm run check -- --write\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$TYPES_OK" == "false" ]] && echo "| TypeScript | :x: Failed | \`cd webapp && npm run typecheck\` |" >> $GITHUB_STEP_SUMMARY
+            for issue in "${ISSUES_FOUND[@]}"; do echo "::error::$issue"; done
             exit 1
           fi
-
-          # Run TypeScript type checking
-          if ! npm run typecheck; then
-            echo "❌ TypeScript errors found"
-            exit 1
-          fi
-
-          # Note: Build is tested in Docker build workflow, not needed here
 
       - name: Intelligence-service quality
         if: steps.should_run.outputs.run == 'true' && matrix.check == 'intelligence-service-quality'
@@ -157,12 +168,20 @@ jobs:
           node scripts/install-platform-binaries.mjs
 
           ISSUES_FOUND=()
-          npm -w server/intelligence-service run check || ISSUES_FOUND+=("Biome check failed")
-          npm -w server/intelligence-service run typecheck || ISSUES_FOUND+=("TypeScript failed")
-          npm -w server/intelligence-service run build || ISSUES_FOUND+=("Build failed")
+          CHECK_OK=true; TYPES_OK=true; BUILD_OK=true
+
+          npm -w server/intelligence-service run check || { CHECK_OK=false; ISSUES_FOUND+=("Biome check failed. Run: npm -w server/intelligence-service run check"); }
+          npm -w server/intelligence-service run typecheck || { TYPES_OK=false; ISSUES_FOUND+=("TypeScript failed. Run: npm run typecheck:intelligence-service"); }
+          npm -w server/intelligence-service run build || { BUILD_OK=false; ISSUES_FOUND+=("Build failed. Run: npm run build:intelligence-service"); }
 
           if [ ${#ISSUES_FOUND[@]} -gt 0 ]; then
-            for issue in "${ISSUES_FOUND[@]}"; do echo "❌ $issue"; done
+            echo "### Intelligence Service Quality" >> $GITHUB_STEP_SUMMARY
+            echo "| Check | Status | Fix |" >> $GITHUB_STEP_SUMMARY
+            echo "|-------|--------|-----|" >> $GITHUB_STEP_SUMMARY
+            [[ "$CHECK_OK" == "false" ]] && echo "| Biome (lint + format) | :x: Failed | \`npm -w server/intelligence-service run check\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$TYPES_OK" == "false" ]] && echo "| TypeScript | :x: Failed | \`npm run typecheck:intelligence-service\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$BUILD_OK" == "false" ]] && echo "| Build | :x: Failed | \`npm run build:intelligence-service\` |" >> $GITHUB_STEP_SUMMARY
+            for issue in "${ISSUES_FOUND[@]}"; do echo "::error::$issue"; done
             exit 1
           fi
 
@@ -174,13 +193,22 @@ jobs:
           node scripts/install-platform-binaries.mjs
 
           ISSUES_FOUND=()
-          npm -w server/webhook-ingest run check || ISSUES_FOUND+=("Biome check failed")
-          npm -w server/webhook-ingest run typecheck || ISSUES_FOUND+=("TypeScript failed")
-          npm -w server/webhook-ingest run test || ISSUES_FOUND+=("Tests failed")
-          npm -w server/webhook-ingest run build || ISSUES_FOUND+=("Build failed")
+          CHECK_OK=true; TYPES_OK=true; TEST_OK=true; BUILD_OK=true
+
+          npm -w server/webhook-ingest run check || { CHECK_OK=false; ISSUES_FOUND+=("Biome check failed. Run: npm -w server/webhook-ingest run check"); }
+          npm -w server/webhook-ingest run typecheck || { TYPES_OK=false; ISSUES_FOUND+=("TypeScript failed. Run: npm run typecheck:webhook-ingest"); }
+          npm -w server/webhook-ingest run test || { TEST_OK=false; ISSUES_FOUND+=("Tests failed. Run: npm run test:webhook-ingest"); }
+          npm -w server/webhook-ingest run build || { BUILD_OK=false; ISSUES_FOUND+=("Build failed. Run: npm run build:webhook-ingest"); }
 
           if [ ${#ISSUES_FOUND[@]} -gt 0 ]; then
-            for issue in "${ISSUES_FOUND[@]}"; do echo "❌ $issue"; done
+            echo "### Webhook Ingest Quality" >> $GITHUB_STEP_SUMMARY
+            echo "| Check | Status | Fix |" >> $GITHUB_STEP_SUMMARY
+            echo "|-------|--------|-----|" >> $GITHUB_STEP_SUMMARY
+            [[ "$CHECK_OK" == "false" ]] && echo "| Biome (lint + format) | :x: Failed | \`npm -w server/webhook-ingest run check\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$TYPES_OK" == "false" ]] && echo "| TypeScript | :x: Failed | \`npm run typecheck:webhook-ingest\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$TEST_OK" == "false" ]] && echo "| Tests | :x: Failed | \`npm run test:webhook-ingest\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$BUILD_OK" == "false" ]] && echo "| Build | :x: Failed | \`npm run build:webhook-ingest\` |" >> $GITHUB_STEP_SUMMARY
+            for issue in "${ISSUES_FOUND[@]}"; do echo "::error::$issue"; done
             exit 1
           fi
 
@@ -189,7 +217,6 @@ jobs:
         env:
           DATABASE_URL: postgresql://fake:fake@localhost:5432/fake
           MODEL_NAME: fake:model
-          DETECTION_MODEL_NAME: fake:model
         run: |
           npm ci --prefer-offline --no-audit
           cd server/application-server
@@ -199,78 +226,82 @@ jobs:
           npm run generate:api
           git add .
           if ! git diff --cached --quiet; then
-            echo "❌ OpenAPI out of sync. Run: npm run generate:api"
+            echo "::error::OpenAPI out of sync. Run: npm run generate:api"
+            echo "### OpenAPI Validation" >> $GITHUB_STEP_SUMMARY
+            echo "| Check | Status | Fix |" >> $GITHUB_STEP_SUMMARY
+            echo "|-------|--------|-----|" >> $GITHUB_STEP_SUMMARY
+            echo "| API specs sync | :x: Out of sync | \`npm run generate:api\` |" >> $GITHUB_STEP_SUMMARY
             exit 1
           fi
 
-      - name: Database schema validation
-        if: steps.should_run.outputs.run == 'true' && matrix.check == 'database-schema-validation'
+      - name: Database validation (schema + ERD + models)
+        if: steps.should_run.outputs.run == 'true' && matrix.check == 'database-validation'
         run: |
-          docker run -d --name postgres-schema \
-            -e POSTGRES_DB=hephaestus -e POSTGRES_PASSWORD=root -e POSTGRES_USER=root \
-            -p 5432:5432 postgres:16
-          until docker exec postgres-schema pg_isready -U root -d hephaestus; do sleep 2; done
-
-          export SPRING_DATASOURCE_URL="jdbc:postgresql://localhost:5432/hephaestus"
-          export SPRING_DATASOURCE_USERNAME="root"
-          export SPRING_DATASOURCE_PASSWORD="root"
-
-          npm ci --prefer-offline --no-audit
-          cd server/application-server && mvn compile -DskipTests --quiet -Dmaven.build.cache.enabled=true && cd ../..
-          scripts/db-utils.sh draft-changelog || { docker stop postgres-schema && docker rm postgres-schema; exit 1; }
-          docker stop postgres-schema && docker rm postgres-schema
-
-          if [ -f "server/application-server/src/main/resources/db/changelog_new.xml" ]; then
-            echo "❌ Schema drift detected. Run: npm run db:draft-changelog"
-            cat server/application-server/src/main/resources/db/changelog_new.xml
-            exit 1
-          fi
-
-      - name: Database documentation validation
-        if: steps.should_run.outputs.run == 'true' && matrix.check == 'database-documentation-validation'
-        run: |
-          docker run -d --name postgres-erd \
-            -e POSTGRES_DB=hephaestus -e POSTGRES_PASSWORD=root -e POSTGRES_USER=root \
-            -p 5432:5432 postgres:16
-          until docker exec postgres-erd pg_isready -U root -d hephaestus; do sleep 2; done
-
-          export SPRING_DATASOURCE_URL="jdbc:postgresql://localhost:5432/hephaestus"
-          export SPRING_DATASOURCE_USERNAME="root"
-          export SPRING_DATASOURCE_PASSWORD="root"
-
-          npm ci --prefer-offline --no-audit
-          cd server/application-server && mvn compile -DskipTests --quiet -Dmaven.build.cache.enabled=true && cd ../..
-          scripts/db-utils.sh generate-erd || { docker stop postgres-erd && docker rm postgres-erd; exit 1; }
-          docker stop postgres-erd && docker rm postgres-erd
-
-          git add docs/contributor/erd/schema.mmd
-          if ! git diff --cached --quiet docs/contributor/erd/schema.mmd; then
-            echo "❌ ERD outdated. Run: npm run db:generate-erd-docs"
-            exit 1
-          fi
-
-      - name: Database models validation
-        if: steps.should_run.outputs.run == 'true' && matrix.check == 'database-models-validation'
-        run: |
+          # Install dependencies (npm + platform binaries needed for models check)
           npm ci --prefer-offline --no-audit
           node scripts/install-platform-binaries.mjs
 
-          docker run -d --name postgres-models \
+          # Start a single shared Postgres instance for all DB checks
+          docker run -d --name postgres-db \
             -e POSTGRES_DB=hephaestus -e POSTGRES_PASSWORD=root -e POSTGRES_USER=root \
             -p 5432:5432 postgres:16
-          until docker exec postgres-models pg_isready -U root -d hephaestus; do sleep 2; done
+          # Guarantee cleanup regardless of how the step exits
+          trap 'docker stop postgres-db 2>/dev/null; docker rm postgres-db 2>/dev/null' EXIT
+          until docker exec postgres-db pg_isready -U root -d hephaestus; do sleep 2; done
 
           export SPRING_DATASOURCE_URL="jdbc:postgresql://localhost:5432/hephaestus"
           export SPRING_DATASOURCE_USERNAME="root"
           export SPRING_DATASOURCE_PASSWORD="root"
 
-          cd server/application-server && mvn compile -DskipTests --quiet -Dmaven.build.cache.enabled=true && cd ../..
-          scripts/db-utils.sh generate-models-intelligence-service || { docker stop postgres-models && docker rm postgres-models; exit 1; }
-          docker stop postgres-models && docker rm postgres-models
+          # Compile application-server once (shared across all checks)
+          if ! (cd server/application-server && mvn compile -DskipTests --quiet -Dmaven.build.cache.enabled=true); then
+            echo "::error::Maven compilation failed. This blocks all database validation checks. Fix compilation errors first."
+            echo "### Database Validation" >> $GITHUB_STEP_SUMMARY
+            echo "| Check | Status | Fix |" >> $GITHUB_STEP_SUMMARY
+            echo "|-------|--------|-----|" >> $GITHUB_STEP_SUMMARY
+            echo "| Maven compile | :x: Failed | Fix compilation errors in \`server/application-server\` |" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
 
+          ISSUES_FOUND=()
+
+          # Check 1: Schema drift
+          scripts/db-utils.sh draft-changelog || ISSUES_FOUND+=("Schema check script failed. Run: npm run db:draft-changelog")
+          if [ -f "server/application-server/src/main/resources/db/changelog_new.xml" ]; then
+            echo "::error::Schema drift detected. Run: npm run db:draft-changelog"
+            cat server/application-server/src/main/resources/db/changelog_new.xml
+            ISSUES_FOUND+=("Schema drift detected")
+          fi
+
+          # Check 2: ERD documentation
+          scripts/db-utils.sh generate-erd || ISSUES_FOUND+=("ERD generation failed. Run: npm run db:generate-erd-docs")
+          git add docs/contributor/erd/schema.mmd
+          if ! git diff --cached --quiet docs/contributor/erd/schema.mmd; then
+            echo "::error::ERD outdated. Run: npm run db:generate-erd-docs"
+            ISSUES_FOUND+=("ERD outdated")
+          fi
+
+          # Check 3: Drizzle models for intelligence-service
+          scripts/db-utils.sh generate-models-intelligence-service || ISSUES_FOUND+=("Models generation failed. Run: npm run db:generate-models:intelligence-service")
           git add server/intelligence-service/src/shared/db/schema.ts
           if ! git diff --cached --quiet server/intelligence-service/src/shared/db/schema.ts; then
-            echo "❌ DB models out of sync. Run: npm run db:generate-models:intelligence-service"
+            echo "::error::DB models out of sync. Run: npm run db:generate-models:intelligence-service"
             git diff --cached server/intelligence-service/src/shared/db/schema.ts
+            ISSUES_FOUND+=("DB models out of sync")
+          fi
+
+          if [ ${#ISSUES_FOUND[@]} -gt 0 ]; then
+            echo "### Database Validation" >> $GITHUB_STEP_SUMMARY
+            echo "| Check | Status | Fix |" >> $GITHUB_STEP_SUMMARY
+            echo "|-------|--------|-----|" >> $GITHUB_STEP_SUMMARY
+            for issue in "${ISSUES_FOUND[@]}"; do
+              echo "::error::$issue"
+              # Extract fix command from "...Run: <command>" format, or show issue directly
+              if [[ "$issue" == *"Run:"* ]]; then
+                echo "| ${issue%%.*} | :x: Failed | \`${issue##*Run: }\` |" >> $GITHUB_STEP_SUMMARY
+              else
+                echo "| $issue | :x: Failed | See logs |" >> $GITHUB_STEP_SUMMARY
+              fi
+            done
             exit 1
           fi

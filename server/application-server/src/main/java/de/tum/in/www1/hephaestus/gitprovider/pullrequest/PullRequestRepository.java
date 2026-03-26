@@ -65,8 +65,8 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
 
     /**
      * Finds a pull request by ID with assignees and repository eagerly fetched.
-     * Used by the bad practice detection pipeline where the PR entity is accessed
-     * outside the original Hibernate session (async event listeners, scheduled tasks).
+     * Useful when the PR entity is accessed outside the original Hibernate session
+     * (e.g. async event listeners, scheduled tasks).
      *
      * @param id the pull request ID
      * @return the pull request with assignees and repository loaded, or empty if not found
@@ -99,6 +99,51 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
         """
     )
     Optional<PullRequest> findByIdWithRepository(@Param("id") Long id);
+
+    /**
+     * Finds a pull request by ID with author eagerly fetched.
+     * Used by the practice detection delivery pipeline where the PR author
+     * (contributor) is needed for finding attribution.
+     *
+     * @param id the pull request ID
+     * @return the pull request with author loaded, or empty if not found
+     */
+    @Query(
+        """
+        SELECT p FROM PullRequest p
+        LEFT JOIN FETCH p.author
+        WHERE p.id = :id
+        """
+    )
+    Optional<PullRequest> findByIdWithAuthor(@Param("id") Long id);
+
+    /**
+     * Finds a pull request by ID with all associations needed by the practice review detection gate.
+     * <p>
+     * Eagerly fetches labels, assignees, repository, author, and mergedBy in a single query.
+     * The gate requires labels (step 1: no-ai-review label check), assignees (step 7: assignee gate),
+     * and repository (step 3: workspace resolution). Author and mergedBy are needed by
+     * {@link de.tum.in.www1.hephaestus.gitprovider.common.events.EventPayload.PullRequestData#from(PullRequest)}
+     * for the ReviewSubmitted path.
+     * <p>
+     * Uses {@code DISTINCT} because the Cartesian product of two {@code @ManyToMany} collections
+     * (labels × assignees) produces duplicate root rows that Hibernate de-duplicates.
+     *
+     * @param id the pull request ID
+     * @return the pull request with all gate associations loaded, or empty if not found
+     */
+    @Query(
+        """
+        SELECT DISTINCT p FROM PullRequest p
+        LEFT JOIN FETCH p.labels
+        LEFT JOIN FETCH p.assignees
+        LEFT JOIN FETCH p.repository
+        LEFT JOIN FETCH p.author
+        LEFT JOIN FETCH p.mergedBy
+        WHERE p.id = :id
+        """
+    )
+    Optional<PullRequest> findByIdWithAllForGate(@Param("id") Long id);
 
     /**
      * Finds all pull requests belonging to a repository.

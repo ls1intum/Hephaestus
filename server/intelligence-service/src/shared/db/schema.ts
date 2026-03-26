@@ -14,6 +14,7 @@ import {
 	jsonb,
 	pgTable,
 	primaryKey,
+	real,
 	text,
 	timestamp,
 	unique,
@@ -119,53 +120,123 @@ export const activityEvent = pgTable(
 	],
 );
 
-export const badPracticeDetection = pgTable(
-	"bad_practice_detection",
+export const agentConfig = pgTable(
+	"agent_config",
 	{
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({
-			name: "bad_practice_detection_id_seq",
+			name: "agent_config_id_seq",
 			startWith: 1,
 			increment: 1,
 			cache: 1,
 		}),
-		detectedAt: timestamp("detected_at", { precision: 6, withTimezone: true, mode: "string" }),
-		traceId: varchar("trace_id", { length: 255 }),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		pullrequestId: bigint("pullrequest_id", { mode: "number" }),
-		summary: text(),
+		workspaceId: bigint("workspace_id", { mode: "number" }).notNull(),
+		name: varchar({ length: 100 }).notNull(),
+		enabled: boolean().default(false).notNull(),
+		agentType: varchar("agent_type", { length: 32 }).notNull(),
+		modelName: varchar("model_name", { length: 128 }),
+		llmApiKey: text("llm_api_key"),
+		llmProvider: varchar("llm_provider", { length: 32 }).notNull(),
+		timeoutSeconds: integer("timeout_seconds").default(600).notNull(),
+		maxConcurrentJobs: integer("max_concurrent_jobs").default(3).notNull(),
+		allowInternet: boolean("allow_internet").default(false).notNull(),
+		createdAt: timestamp("created_at", {
+			precision: 6,
+			withTimezone: true,
+			mode: "string",
+		}).notNull(),
+		updatedAt: timestamp("updated_at", { precision: 6, withTimezone: true, mode: "string" }),
+		credentialMode: varchar("credential_mode", { length: 16 }).default("PROXY").notNull(),
 	},
 	(table) => [
 		foreignKey({
-			columns: [table.pullrequestId],
-			foreignColumns: [issue.id],
-			name: "FKhk2vrsr2rdq2gb3cjnvieh3nw",
+			columns: [table.workspaceId],
+			foreignColumns: [workspace.id],
+			name: "fk_agent_config_workspace",
 		}),
+		unique("uk_agent_config_workspace_name").on(table.workspaceId, table.name),
 	],
 );
 
-export const badPracticeFeedback = pgTable(
-	"bad_practice_feedback",
+export const agentJob = pgTable(
+	"agent_job",
 	{
+		id: uuid().primaryKey().notNull(),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({
-			name: "bad_practice_feedback_id_seq",
-			startWith: 1,
-			increment: 1,
-			cache: 1,
-		}),
-		type: varchar({ length: 255 }),
+		workspaceId: bigint("workspace_id", { mode: "number" }).notNull(),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		pullRequestBadPracticeId: bigint("pull_request_bad_practice_id", { mode: "number" }),
-		createdAt: timestamp("created_at", { precision: 6, withTimezone: true, mode: "string" }),
-		explanation: text(),
+		configId: bigint("config_id", { mode: "number" }),
+		jobType: varchar("job_type", { length: 50 }).notNull(),
+		status: varchar({ length: 20 }).default("QUEUED").notNull(),
+		metadata: jsonb(),
+		output: jsonb(),
+		configSnapshot: jsonb("config_snapshot").notNull(),
+		jobToken: text("job_token").notNull(),
+		idempotencyKey: varchar("idempotency_key", { length: 255 }),
+		containerId: varchar("container_id", { length: 64 }),
+		exitCode: integer("exit_code"),
+		errorMessage: text("error_message"),
+		retryCount: integer("retry_count").default(0).notNull(),
+		createdAt: timestamp("created_at", {
+			precision: 6,
+			withTimezone: true,
+			mode: "string",
+		}).notNull(),
+		startedAt: timestamp("started_at", { precision: 6, withTimezone: true, mode: "string" }),
+		completedAt: timestamp("completed_at", { precision: 6, withTimezone: true, mode: "string" }),
+		networkId: varchar("network_id", { length: 64 }),
+		jobTokenHash: varchar("job_token_hash", { length: 64 }),
+		llmApiKey: text("llm_api_key"),
+		deliveryStatus: varchar("delivery_status", { length: 20 }),
+		deliveryCommentId: varchar("delivery_comment_id", { length: 255 }),
+		containerLogs: text("container_logs"),
 	},
 	(table) => [
+		index("idx_agent_job_delivery_dedup")
+			.using(
+				"btree",
+				sql`workspace_id`,
+				sql`((metadata ->> 'pull_request_id'::text))`,
+				sql`completed_at`,
+			)
+			.where(
+				sql`(((delivery_status)::text = 'DELIVERED'::text) AND ((job_type)::text = 'PULL_REQUEST_REVIEW'::text) AND (delivery_comment_id IS NOT NULL))`,
+			),
+		index("idx_agent_job_status_started")
+			.using("btree", table.status.asc().nullsLast(), table.startedAt.asc().nullsLast())
+			.where(sql`((status)::text = 'RUNNING'::text)`),
+		index("idx_agent_job_workspace_config").using(
+			"btree",
+			table.workspaceId.asc().nullsLast(),
+			table.configId.asc().nullsLast(),
+		),
+		index("idx_agent_job_workspace_status").using(
+			"btree",
+			table.workspaceId.asc().nullsLast(),
+			table.status.asc().nullsLast(),
+		),
+		uniqueIndex("uk_agent_job_idempotency")
+			.using("btree", table.workspaceId.asc().nullsLast(), table.idempotencyKey.asc().nullsLast())
+			.where(
+				sql`(((status)::text = ANY ((ARRAY['QUEUED'::character varying, 'RUNNING'::character varying])::text[])) AND (idempotency_key IS NOT NULL))`,
+			),
+		uniqueIndex("uk_agent_job_token_hash").using("btree", table.jobTokenHash.asc().nullsLast()),
 		foreignKey({
-			columns: [table.pullRequestBadPracticeId],
-			foreignColumns: [pullRequestBadPractice.id],
-			name: "FK34k5tg4qb6gy4g7tn9q8uhogl",
+			columns: [table.workspaceId],
+			foreignColumns: [workspace.id],
+			name: "fk_agent_job_workspace",
 		}),
+		foreignKey({
+			columns: [table.configId],
+			foreignColumns: [agentConfig.id],
+			name: "fk_agent_job_config",
+		}).onDelete("set null"),
+		unique("uk_agent_job_token").on(table.jobToken),
+		check(
+			"chk_agent_job_delivery_status",
+			sql`(delivery_status IS NULL) OR ((delivery_status)::text = ANY ((ARRAY['PENDING'::character varying, 'DELIVERED'::character varying, 'FAILED'::character varying])::text[]))`,
+		),
 	],
 );
 
@@ -593,6 +664,54 @@ export const document = pgTable(
 			name: "fk_document_workspace",
 		}).onDelete("cascade"),
 		primaryKey({ columns: [table.id, table.versionNumber], name: "documentPK" }),
+	],
+);
+
+export const findingFeedback = pgTable(
+	"finding_feedback",
+	{
+		id: uuid().primaryKey().notNull(),
+		findingId: uuid("finding_id").notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		contributorId: bigint("contributor_id", { mode: "number" }).notNull(),
+		action: varchar({ length: 16 }).notNull(),
+		explanation: text(),
+		createdAt: timestamp("created_at", {
+			precision: 6,
+			withTimezone: true,
+			mode: "string",
+		}).notNull(),
+	},
+	(table) => [
+		index("idx_finding_feedback_contributor_created").using(
+			"btree",
+			table.contributorId.asc().nullsLast(),
+			table.createdAt.desc().nullsFirst(),
+		),
+		index("idx_finding_feedback_finding_contributor").using(
+			"btree",
+			table.findingId.asc().nullsLast(),
+			table.contributorId.asc().nullsLast(),
+			table.createdAt.desc().nullsFirst(),
+		),
+		foreignKey({
+			columns: [table.findingId],
+			foreignColumns: [practiceFinding.id],
+			name: "fk_finding_feedback_finding",
+		}).onDelete("cascade"),
+		foreignKey({
+			columns: [table.contributorId],
+			foreignColumns: [user.id],
+			name: "fk_finding_feedback_contributor",
+		}),
+		check(
+			"chk_finding_feedback_action",
+			sql`(action)::text = ANY ((ARRAY['APPLIED'::character varying, 'DISPUTED'::character varying, 'NOT_APPLICABLE'::character varying])::text[])`,
+		),
+		check(
+			"chk_finding_feedback_disputed_explanation",
+			sql`((action)::text <> 'DISPUTED'::text) OR ((explanation IS NOT NULL) AND (length(TRIM(BOTH FROM explanation)) > 0))`,
+		),
 	],
 );
 
@@ -1073,6 +1192,121 @@ export const organizationMembership = pgTable(
 	],
 );
 
+export const practice = pgTable(
+	"practice",
+	{
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({
+			name: "practice_id_seq",
+			startWith: 1,
+			increment: 1,
+			cache: 1,
+		}),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		workspaceId: bigint("workspace_id", { mode: "number" }).notNull(),
+		slug: varchar({ length: 64 }).notNull(),
+		name: varchar({ length: 128 }).notNull(),
+		category: varchar({ length: 64 }),
+		description: text().notNull(),
+		triggerEvents: jsonb("trigger_events").default([]).notNull(),
+		detectionPrompt: text("detection_prompt"),
+		isActive: boolean("is_active").default(true).notNull(),
+		createdAt: timestamp("created_at", {
+			precision: 6,
+			withTimezone: true,
+			mode: "string",
+		}).notNull(),
+		updatedAt: timestamp("updated_at", { precision: 6, withTimezone: true, mode: "string" }),
+	},
+	(table) => [
+		index("idx_practice_workspace_active").using(
+			"btree",
+			table.workspaceId.asc().nullsLast(),
+			table.isActive.asc().nullsLast(),
+		),
+		foreignKey({
+			columns: [table.workspaceId],
+			foreignColumns: [workspace.id],
+			name: "fk_practice_workspace",
+		}),
+		unique("uk_practice_workspace_slug").on(table.workspaceId, table.slug),
+	],
+);
+
+export const practiceFinding = pgTable(
+	"practice_finding",
+	{
+		id: uuid().primaryKey().notNull(),
+		idempotencyKey: varchar("idempotency_key", { length: 255 }).notNull(),
+		agentJobId: uuid("agent_job_id").notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		practiceId: bigint("practice_id", { mode: "number" }).notNull(),
+		targetType: varchar("target_type", { length: 32 }).notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		targetId: bigint("target_id", { mode: "number" }).notNull(),
+		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+		contributorId: bigint("contributor_id", { mode: "number" }).notNull(),
+		title: varchar({ length: 255 }).notNull(),
+		verdict: varchar({ length: 16 }).notNull(),
+		severity: varchar({ length: 16 }).notNull(),
+		confidence: real().notNull(),
+		evidence: jsonb(),
+		reasoning: text(),
+		guidance: text(),
+		guidanceMethod: varchar("guidance_method", { length: 16 }),
+		detectedAt: timestamp("detected_at", {
+			precision: 6,
+			withTimezone: true,
+			mode: "string",
+		}).notNull(),
+	},
+	(table) => [
+		index("idx_practice_finding_agent_job").using("btree", table.agentJobId.asc().nullsLast()),
+		index("idx_practice_finding_contributor_detected").using(
+			"btree",
+			table.contributorId.asc().nullsLast(),
+			table.detectedAt.desc().nullsFirst(),
+		),
+		index("idx_practice_finding_practice_detected").using(
+			"btree",
+			table.practiceId.asc().nullsLast(),
+			table.detectedAt.desc().nullsFirst(),
+		),
+		index("idx_practice_finding_target").using(
+			"btree",
+			table.targetType.asc().nullsLast(),
+			table.targetId.asc().nullsLast(),
+		),
+		foreignKey({
+			columns: [table.practiceId],
+			foreignColumns: [practice.id],
+			name: "fk_practice_finding_practice",
+		}).onDelete("cascade"),
+		foreignKey({
+			columns: [table.contributorId],
+			foreignColumns: [user.id],
+			name: "fk_practice_finding_contributor",
+		}),
+		unique("uk_practice_finding_idempotency").on(table.idempotencyKey),
+		check(
+			"chk_practice_finding_verdict",
+			sql`(verdict)::text = ANY ((ARRAY['POSITIVE'::character varying, 'NEGATIVE'::character varying, 'NOT_APPLICABLE'::character varying, 'NEEDS_REVIEW'::character varying])::text[])`,
+		),
+		check(
+			"chk_practice_finding_severity",
+			sql`(severity)::text = ANY ((ARRAY['CRITICAL'::character varying, 'MAJOR'::character varying, 'MINOR'::character varying, 'INFO'::character varying])::text[])`,
+		),
+		check(
+			"chk_practice_finding_confidence",
+			sql`(confidence >= (0)::double precision) AND (confidence <= (1)::double precision)`,
+		),
+		check(
+			"chk_practice_finding_guidance_method",
+			sql`(guidance_method IS NULL) OR ((guidance_method)::text = ANY ((ARRAY['MODELING'::character varying, 'COACHING'::character varying, 'SCAFFOLDING'::character varying, 'ARTICULATION'::character varying, 'REFLECTION'::character varying, 'EXPLORATION'::character varying])::text[]))`,
+		),
+	],
+);
+
 export const project = pgTable(
 	"project",
 	{
@@ -1323,45 +1557,6 @@ export const projectStatusUpdate = pgTable(
 		}),
 		unique("uk_project_status_update_node_id").on(table.nodeId),
 		unique("uq_project_status_update_provider_native_id").on(table.nativeId, table.providerId),
-	],
-);
-
-export const pullRequestBadPractice = pgTable(
-	"pull_request_bad_practice",
-	{
-		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({
-			name: "pullrequestbadpractice_id_seq",
-			startWith: 1,
-			increment: 1,
-			cache: 1,
-		}),
-		title: varchar({ length: 255 }),
-		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		pullrequestId: bigint("pullrequest_id", { mode: "number" }),
-		state: varchar({ length: 32 }).default(0),
-		detectedAt: timestamp("detected_at", { precision: 6, withTimezone: true, mode: "string" }),
-		updatedAt: timestamp("updated_at", { precision: 6, withTimezone: true, mode: "string" }),
-		userState: varchar("user_state", { length: 32 }),
-		detectionPullrequestLifecycleState: varchar("detection_pullrequest_lifecycle_state", {
-			length: 32,
-		}),
-		detectionTraceId: varchar("detection_trace_id", { length: 255 }),
-		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		badPracticeDetectionId: bigint("bad_practice_detection_id", { mode: "number" }),
-		description: text(),
-	},
-	(table) => [
-		foreignKey({
-			columns: [table.pullrequestId],
-			foreignColumns: [issue.id],
-			name: "FK1m1jhw92ublt7ya0d557sg5j",
-		}),
-		foreignKey({
-			columns: [table.badPracticeDetectionId],
-			foreignColumns: [badPracticeDetection.id],
-			name: "FKdn50l1oul09kq3142ku39gnlp",
-		}),
 	],
 );
 
@@ -1868,8 +2063,8 @@ export const userPreferences = pgTable(
 		}),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		userId: bigint("user_id", { mode: "number" }).notNull(),
-		notificationsEnabled: boolean("notifications_enabled").default(true).notNull(),
 		participateInResearch: boolean("participate_in_research").default(true).notNull(),
+		aiReviewEnabled: boolean("ai_review_enabled").default(true).notNull(),
 	},
 	(table) => [
 		foreignKey({
@@ -1944,6 +2139,10 @@ export const workspace = pgTable(
 		gitlabGroupId: bigint("gitlab_group_id", { mode: "number" }),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		gitlabWebhookId: bigint("gitlab_webhook_id", { mode: "number" }),
+		practicesEnabled: boolean("practices_enabled").default(false).notNull(),
+		achievementsEnabled: boolean("achievements_enabled").default(false).notNull(),
+		leaderboardEnabled: boolean("leaderboard_enabled").default(false).notNull(),
+		progressionEnabled: boolean("progression_enabled").default(false).notNull(),
 	},
 	(table) => [
 		foreignKey({

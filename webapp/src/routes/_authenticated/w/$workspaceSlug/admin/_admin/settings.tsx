@@ -1,12 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
+import { toast } from "sonner";
 import {
 	addRepositoryToMonitorMutation,
 	getRepositoriesToMonitorOptions,
 	getWorkspaceOptions,
+	listWorkspacesQueryKey,
 	removeRepositoryToMonitorMutation,
 	resetAndRecalculateLeaguesMutation,
+	updateFeaturesMutation,
 } from "@/api/@tanstack/react-query.gen";
+import type { FeatureKey } from "@/components/admin/AdminFeaturesSettings";
 import { AdminSettingsPage } from "@/components/admin/AdminSettingsPage";
 import { NoWorkspace } from "@/components/workspace/NoWorkspace";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
@@ -92,6 +96,26 @@ function AdminSettings() {
 		},
 	});
 
+	// Update features mutation
+	const updateFeatures = useMutation({
+		...updateFeaturesMutation(),
+		onSuccess: () => {
+			if (!workspaceSlug) {
+				return;
+			}
+			queryClient.invalidateQueries({
+				queryKey: workspaceQueryOptions.queryKey,
+			});
+			queryClient.invalidateQueries({
+				queryKey: listWorkspacesQueryKey(),
+			});
+			toast.success("Feature settings updated");
+		},
+		onError: () => {
+			toast.error("Failed to update feature settings");
+		},
+	});
+
 	if (!workspaceSlug && !isWorkspaceLoading) {
 		return <NoWorkspace />;
 	}
@@ -126,6 +150,17 @@ function AdminSettings() {
 		});
 	};
 
+	// Handle feature toggle
+	const handleToggleFeature = (feature: FeatureKey, enabled: boolean) => {
+		if (!workspaceSlug) {
+			return;
+		}
+		updateFeatures.mutate({
+			path: { workspaceSlug },
+			body: { [feature]: enabled },
+		});
+	};
+
 	// Format repositories data for the UI component
 	const formattedRepositories: RepositoryItem[] = (repositories || []).map((repo: string) => ({
 		nameWithOwner: repo,
@@ -149,6 +184,12 @@ function AdminSettings() {
 				}
 				resetLeagues.mutate({ path: { workspaceSlug } });
 			}}
+			practicesEnabled={workspaceData?.practicesEnabled ?? false}
+			achievementsEnabled={workspaceData?.achievementsEnabled ?? false}
+			leaderboardEnabled={workspaceData?.leaderboardEnabled ?? false}
+			progressionEnabled={workspaceData?.progressionEnabled ?? false}
+			isSavingFeatures={updateFeatures.isPending}
+			onToggleFeature={handleToggleFeature}
 		/>
 	);
 }

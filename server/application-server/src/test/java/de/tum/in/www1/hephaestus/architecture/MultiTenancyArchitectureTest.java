@@ -595,6 +595,7 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                                 "Commit", // Through repository.organization.workspaceId
                                 "Project", // Through organization.workspaceId
                                 "ActivitySavedEvent", // Carries user context for achievement evaluation
+                                "AgentJob", // AgentJobCreatedEvent carries workspaceId directly
                                 "ApplicationReadyEvent", // Spring lifecycle, no workspace needed
                                 "ContextRefreshedEvent", // Spring lifecycle, no workspace needed
                                 "WorkspacesInitializedEvent" // Startup lifecycle, signals all workspaces ready
@@ -641,10 +642,12 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
         static final Set<String> ASYNC_LISTENERS_WITH_PAYLOAD_CONTEXT = Set.of(
             // ActivityEventListener handles CommentCreated, ReviewSubmitted events which carry full entity graphs
             "ActivityEventListener",
-            // BadPracticeEventListener handles PullRequestUpdated events which carry full entity graphs
-            "BadPracticeEventListener",
             // AchievementEventListener handles ActivitySavedEvent which carries workspaceId context
-            "AchievementEventListener"
+            "AchievementEventListener",
+            // AgentJobSubmitter handles AgentJobCreatedEvent which directly carries workspaceId
+            "AgentJobSubmitter",
+            // AgentJobEventListener handles AgentJobCreatedEvent which directly carries workspaceId
+            "AgentJobEventListener"
         );
 
         /**
@@ -893,7 +896,7 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
 
                     // Skip user account operations - these are USER-scoped, not WORKSPACE-scoped.
                     // Users can access their account settings regardless of workspace context.
-                    if (controllerName.contains("Account")) {
+                    if (controllerName.contains("Account") || controllerName.contains("FeatureFlag")) {
                         return;
                     }
 

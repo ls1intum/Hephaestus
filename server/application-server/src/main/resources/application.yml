@@ -1,7 +1,7 @@
 spring:
     application:
         name: Hephaestus
-        version: "0.30.0"
+        version: "${APP_VERSION:0.0.0-development}"
 
     config:
         import: optional:file:.env[.properties]
@@ -56,24 +56,6 @@ spring:
             resourceserver:
                 jwt:
                     issuer-uri: http://localhost:${KEYCLOAK_PORT:8081}/realms/hephaestus
-
-    thymeleaf:
-        prefix: ${MAIL_TEMPLATE_FOLDER:classpath:/mail-templates/}
-        suffix: .html
-
-    mail:
-        host: ${MAIL_HOST:smtp.gmail.com}
-        port: ${MAIL_PORT:587}
-        username: ${POSTFIX_USERNAME:} # gmail email address e.g hephaestus@gmail.com
-        password: ${POSTFIX_PASSWORD:} # app code password from gmail. how to: https://support.google.com/mail/answer/185833?hl=en
-        properties:
-            mail:
-                transport:
-                    protocol: smtp
-                smtp:
-                    starttls:
-                        enable: true
-                debug: ${MAIL_DEBUG:false}
 
     # Disable Mustache template location check as we don't use Mustache templates
     mustache:
@@ -345,26 +327,90 @@ hephaestus:
         leaderboard-xp:
             # Eviction rate in milliseconds (60 seconds - leaderboard data is moderately hot)
             evict-rate: 60000
-    mail:
-        enabled: ${MAIL_ENABLED:false}
-        sender: ${MAIL_SENDER:hephaestus@gmail.com} # use gmail email address for local testing
 
-    detection:
-        run-automatic-detection-for-all: false
-        tracing:
-            enabled: false
-            # The host of the langfuse server
-            host: ${LANGFUSE_BASE_URL:}
-            # The public key of the langfuse server
-            public-key: ${LANGFUSE_PUBLIC_KEY:}
-            # The secret key of the langfuse server
-            secret-key: ${LANGFUSE_SECRET_KEY:}
+    # ═══════════════════════════════════════════════════════════════════════════
+    # FEATURE FLAGS (operational / development toggles)
+    # ═══════════════════════════════════════════════════════════════════════════
+    # CONFIG-backed feature flags evaluated by FeatureFlagService.
+    # ROLE-backed flags (mentor_access, admin, etc.) are managed in Keycloak.
+    features:
+        flags:
+            practice-review-for-all: false
+            gitlab-workspace-creation: false
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # PRACTICE REVIEW GATE
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Controls the detection gate for the practice-aware PR review agent.
+    # The gate decides whether to submit an agent job for a PR event.
+    practice-review:
+        # true = run for ALL users (bypass Keycloak role check); false = require run_practice_review role
+        run-for-all-users: false
+        # true = skip practice review for draft PRs
+        skip-drafts: true
+        # Maximum number of inline diff comments per review (0-50)
+        max-inline-notes: 5
 
     posthog:
         enabled: ${POSTHOG_ENABLED:false}
         api-host: ${POSTHOG_API_HOST:https://app.posthog.com}
         project-id: ${POSTHOG_PROJECT_ID:}
         personal-api-key: ${POSTHOG_PERSONAL_API_KEY:}
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # SANDBOX CONFIGURATION
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Docker sandbox for running coding agent containers in isolation.
+    # Disabled by default — requires a reachable Docker daemon.
+    # Deployment requirements:
+    #   - Docker Engine >= 25.0.5 (CVE-2024-29018 fix)
+    #   - iptables -I DOCKER-USER -d 169.254.0.0/16 -j DROP (cloud metadata blocking)
+    #   - Recommended: Tecnativa docker-socket-proxy with EXEC=0
+    # ═══════════════════════════════════════════════════════════════════════════
+    # LLM PROXY CONFIGURATION
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Upstream provider URLs for the LLM proxy. Override these for Azure OpenAI,
+    # testing with WireMock, or alternative API-compatible endpoints.
+    llm-proxy:
+        anthropic-upstream-url: ${LLM_PROXY_ANTHROPIC_URL:https://api.anthropic.com}
+        openai-upstream-url: ${LLM_PROXY_OPENAI_URL:https://api.openai.com}
+        # For Azure OpenAI, set openai-auth-header=api-key and openai-use-bearer-prefix=false
+        openai-auth-header: ${LLM_PROXY_OPENAI_AUTH_HEADER:Authorization}
+        openai-use-bearer-prefix: ${LLM_PROXY_OPENAI_USE_BEARER:true}
+
+    sandbox:
+        enabled: ${SANDBOX_ENABLED:false}
+        docker-host: ${SANDBOX_DOCKER_HOST:unix:///var/run/docker.sock}
+        tls-verify: ${SANDBOX_TLS_VERIFY:false}
+        max-concurrent-containers: ${SANDBOX_MAX_CONCURRENT:5}
+        container-stop-timeout-seconds: ${SANDBOX_STOP_TIMEOUT:10}
+        reconciliation-interval-seconds: ${SANDBOX_RECONCILIATION_INTERVAL:60}
+        # OCI runtime: null=runc (default), "runsc"=gVisor (recommended for production)
+        container-runtime: ${SANDBOX_CONTAINER_RUNTIME:}
+        llm-proxy-port: ${SANDBOX_LLM_PROXY_PORT:8080}
+        max-directory-bytes: ${SANDBOX_MAX_DIRECTORY_BYTES:1073741824}  # 1 GB
+        max-directory-entries: ${SANDBOX_MAX_DIRECTORY_ENTRIES:500000}
+        default-resource-limits:
+            memory-bytes: ${SANDBOX_MEMORY_BYTES:4294967296}  # 4 GB (includes tmpfs)
+            cpus: ${SANDBOX_CPUS:2.0}
+            pids-limit: ${SANDBOX_PIDS_LIMIT:256}
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # AGENT JOB NATS CONFIGURATION
+    # ═══════════════════════════════════════════════════════════════════════════
+    # NATS stream and consumer for agent job execution pipeline.
+    # Disabled by default — requires a reachable NATS server.
+    agent:
+        nats:
+            enabled: ${AGENT_NATS_ENABLED:false}
+            server: ${NATS_SERVER:nats://localhost:4222}
+            stream-name: AGENT
+            consumer-name: hephaestus-agent-executor
+            # Must exceed max container timeout (1hr) + buffer
+            ack-wait: 70m
+            max-deliver: 5
+            max-ack-pending: 5
+            heartbeat-interval: 25s
 
     # ═══════════════════════════════════════════════════════════════════════════
     # GITLAB CONFIGURATION

@@ -60,7 +60,6 @@ const EnvSchema = z
 
 		// Models
 		MODEL_NAME: z.string().min(1).default("openai:gpt-4o-mini"),
-		DETECTION_MODEL_NAME: z.string().min(1).default("openai:gpt-4o-mini"),
 
 		// LangFuse (optional)
 		LANGFUSE_SECRET_KEY: optionalString,
@@ -68,56 +67,46 @@ const EnvSchema = z
 		LANGFUSE_BASE_URL: optionalUrl,
 	})
 	.superRefine((val, ctx) => {
-		const parseProvider = (modelName: string) => {
-			const colonIndex = modelName.indexOf(":");
-			if (colonIndex === -1) {
-				return { provider: undefined, model: undefined };
-			}
-			return {
-				provider: modelName.slice(0, colonIndex),
-				model: modelName.slice(colonIndex + 1),
-			};
-		};
-
-		const modelPairs = [
-			["MODEL_NAME", val.MODEL_NAME],
-			["DETECTION_MODEL_NAME", val.DETECTION_MODEL_NAME],
-		] as const;
-
-		for (const [field, modelName] of modelPairs) {
-			const { provider, model } = parseProvider(modelName);
-
-			if (!(provider && model)) {
-				ctx.addIssue({
-					code: z.ZodIssueCode.custom,
-					message: `Invalid model format: ${modelName}. Expected <provider>:<model>`,
-					path: [field],
-				});
-				continue;
-			}
-
-			if (!SUPPORTED_PROVIDERS.includes(provider as (typeof SUPPORTED_PROVIDERS)[number])) {
-				ctx.addIssue({
-					code: z.ZodIssueCode.custom,
-					message: `Unsupported provider: ${provider}. Supported providers: ${SUPPORTED_PROVIDERS.join(", ")}`,
-					path: [field],
-				});
-			}
+		const colonIndex = val.MODEL_NAME.indexOf(":");
+		if (colonIndex === -1) {
+			ctx.addIssue({
+				code: z.ZodIssueCode.custom,
+				message: `Invalid model format: ${val.MODEL_NAME}. Expected <provider>:<model>`,
+				path: ["MODEL_NAME"],
+			});
+			return;
 		}
 
-		const modelValues = modelPairs.map(([, v]) => v);
-		const usesOpenAI = modelValues.some((m) => m.startsWith("openai:"));
-		const usesAzure = modelValues.some(
-			(m) => m.startsWith("azure:") || m.startsWith("azure_openai:"),
-		);
+		const provider = val.MODEL_NAME.slice(0, colonIndex);
+		const model = val.MODEL_NAME.slice(colonIndex + 1);
 
-		if (usesOpenAI && !val.OPENAI_API_KEY) {
+		if (!model) {
+			ctx.addIssue({
+				code: z.ZodIssueCode.custom,
+				message: `Invalid model format: ${val.MODEL_NAME}. Expected <provider>:<model>`,
+				path: ["MODEL_NAME"],
+			});
+			return;
+		}
+
+		if (!SUPPORTED_PROVIDERS.includes(provider as (typeof SUPPORTED_PROVIDERS)[number])) {
+			ctx.addIssue({
+				code: z.ZodIssueCode.custom,
+				message: `Unsupported provider: ${provider}. Supported providers: ${SUPPORTED_PROVIDERS.join(", ")}`,
+				path: ["MODEL_NAME"],
+			});
+		}
+
+		if (val.MODEL_NAME.startsWith("openai:") && !val.OPENAI_API_KEY) {
 			ctx.addIssue({
 				code: z.ZodIssueCode.custom,
 				message: "OPENAI_API_KEY is required when using an OpenAI model",
 				path: ["OPENAI_API_KEY"],
 			});
 		}
+
+		const usesAzure =
+			val.MODEL_NAME.startsWith("azure:") || val.MODEL_NAME.startsWith("azure_openai:");
 
 		if (usesAzure && !val.AZURE_API_KEY) {
 			ctx.addIssue({
@@ -160,13 +149,11 @@ const wrapWithDevTools = (model: ReturnType<typeof getModel>): LanguageModel =>
 
 interface EnvWithModels extends Env {
 	defaultModel: LanguageModel;
-	detectionModel: LanguageModel;
 }
 
 const env: EnvWithModels = {
 	...envData,
 	defaultModel: wrapWithDevTools(getModel(envData.MODEL_NAME)),
-	detectionModel: wrapWithDevTools(getModel(envData.DETECTION_MODEL_NAME)),
 };
 
 export default env;

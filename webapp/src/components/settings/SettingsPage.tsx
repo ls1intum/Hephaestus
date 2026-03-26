@@ -1,7 +1,6 @@
 import { Separator } from "@/components/ui/separator";
-import { isPosthogEnabled } from "@/integrations/posthog/config";
 import { AccountSection, type AccountSectionProps } from "./AccountSection";
-import { NotificationsSection, type NotificationsSectionProps } from "./NotificationsSection";
+import { AiReviewSection, type AiReviewSectionProps } from "./AiReviewSection";
 import {
 	ResearchParticipationSection,
 	type ResearchParticipationSectionProps,
@@ -9,13 +8,21 @@ import {
 
 export interface SettingsPageProps {
 	/**
-	 * Props for the NotificationsSection component
+	 * Props for the AiReviewSection component (only rendered when showAiReviewSection is true)
 	 */
-	notificationsProps: NotificationsSectionProps;
+	aiReviewProps: AiReviewSectionProps;
+	/**
+	 * Whether to show the AI review section (feature-flagged via Keycloak role)
+	 */
+	showAiReviewSection: boolean;
 	/**
 	 * Props for the ResearchParticipationSection component
 	 */
 	researchProps: ResearchParticipationSectionProps;
+	/**
+	 * Whether to show the research participation section (requires PostHog)
+	 */
+	showResearchSection: boolean;
 	/**
 	 * Props for the AccountSection component
 	 */
@@ -31,19 +38,20 @@ export interface SettingsPageProps {
  * Provides a consistent layout for the settings page
  */
 export function SettingsPage({
-	notificationsProps,
+	aiReviewProps,
+	showAiReviewSection,
 	researchProps,
+	showResearchSection,
 	accountProps,
 	isLoading = false,
 }: SettingsPageProps) {
-	const { isLoading: notificationsLoading = false, ...notificationsRest } = notificationsProps;
+	const { isLoading: aiReviewLoading = false, ...aiReviewRest } = aiReviewProps;
 	const { isLoading: researchLoading = false, ...researchRest } = researchProps;
 	const { isLoading: accountLoading = false, ...accountRest } = accountProps;
 
-	const notificationsPending = isLoading || notificationsLoading;
+	const aiReviewPending = isLoading || aiReviewLoading;
 	const researchPending = isLoading || researchLoading;
 	const accountPending = isLoading || accountLoading;
-	const showResearchSection = isPosthogEnabled;
 
 	return (
 		<div className="w-full max-w-3xl mx-auto space-y-8">
@@ -54,9 +62,12 @@ export function SettingsPage({
 				</p>
 			</div>
 
-			<Separator />
-
-			<NotificationsSection {...notificationsRest} isLoading={notificationsPending} />
+			{showAiReviewSection && (
+				<>
+					<Separator />
+					<AiReviewSection {...aiReviewRest} isLoading={aiReviewPending} />
+				</>
+			)}
 
 			{showResearchSection && (
 				<>

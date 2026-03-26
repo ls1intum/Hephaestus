@@ -48,4 +48,18 @@
     <include file="./changelog/1773005067843_changelog.xml" relativeToChangelogFile="true"/>
     <include file="./changelog/1773036684768_changelog.xml" relativeToChangelogFile="true"/>
     <include file="./changelog/1770916408627_changelog.xml" relativeToChangelogFile="true"/>
+    <include file="./changelog/1773354889621_changelog.xml" relativeToChangelogFile="true"/>
+    <include file="./changelog/1773500736939_changelog.xml" relativeToChangelogFile="true"/>
+    <include file="./changelog/1773621672006_changelog.xml" relativeToChangelogFile="true"/>
+    <include file="./changelog/1773623726144_changelog.xml" relativeToChangelogFile="true"/>
+    <include file="./changelog/1773730203444_changelog.xml" relativeToChangelogFile="true"/>
+    <include file="./changelog/1773913964834_changelog.xml" relativeToChangelogFile="true"/>
+    <include file="./changelog/1773949109590_changelog.xml" relativeToChangelogFile="true"/>
+    <include file="./changelog/1773944819806_changelog.xml" relativeToChangelogFile="true"/>
+    <include file="./changelog/1774049866764_changelog.xml" relativeToChangelogFile="true"/>
+    <include file="./changelog/1774212869787_changelog.xml" relativeToChangelogFile="true"/>
+    <include file="./changelog/1774335316041_changelog.xml" relativeToChangelogFile="true"/>
+    <include file="./changelog/1774472313956_changelog.xml" relativeToChangelogFile="true"/>
+    <include file="./changelog/1774600000000_changelog.xml" relativeToChangelogFile="true"/>
+    <include file="./changelog/1774528639746_changelog.xml" relativeToChangelogFile="true"/>
 </databaseChangeLog>

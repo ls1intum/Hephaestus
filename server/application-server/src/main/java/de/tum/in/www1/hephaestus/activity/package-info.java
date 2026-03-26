@@ -72,7 +72,7 @@
  * <h2>Event Types</h2>
  * <p>See {@link de.tum.in.www1.hephaestus.activity.ActivityEventType} for supported types.
  *
- * @see de.tum.in.www1.hephaestus.practices Code Health module (AI-powered bad practice detection)
+ * @see de.tum.in.www1.hephaestus.practices Code Health module (agent-based practice review)
  * @see <a href="https://cloudevents.io/">CloudEvents Specification</a>
  * @see <a href="https://www.w3.org/TR/activitystreams-core/">ActivityStreams 2.0</a>
  */

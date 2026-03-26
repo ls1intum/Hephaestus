@@ -8,7 +8,7 @@ info:
     name: MIT License
     url: https://github.com/ls1intum/Hephaestus/blob/develop/LICENSE
   title: Hephaestus API
-  version: 0.30.0
+  version: 0.0.0-development
 servers:
 - description: Default Server URL
   url: /
@@ -24,22 +24,30 @@ tags:
      These routes stay under the classic /workspaces base path while slugged routes
      live in {@link WorkspaceController WorkspaceController} via <code>@WorkspaceScopedController</code>.
   name: workspace-registry-controller
-- description: Workspace-scoped team settings management
-  name: Team Settings
-- description: Team management within workspace
-  name: Teams
-- description: Bad practice detection and resolution
-  name: Code Practices
-- description: User profile and activity data
-  name: Profile
+- description: Read-only access to practice evaluation findings
+  name: Practice Findings
+- description: Workspace-scoped agent configuration management
+  name: Agent Config
 - description: |-
     Controller for managing workspace memberships and roles.
      Handles CRUD operations for workspace members and role assignments.
   name: workspace-membership-controller
-- description: Contributor rankings and league statistics
-  name: Leaderboard
+- description: Workspace-scoped agent job monitoring
+  name: Agent Jobs
 - description: "User account management (settings, deletion)"
   name: Account
+- description: Manage practice definitions
+  name: Practice Catalog
+- description: Workspace-scoped team settings management
+  name: Team Settings
+- description: Team management within workspace
+  name: Teams
+- description: Contributor feedback on AI-generated practice findings
+  name: Finding Feedback
+- description: User profile and activity data
+  name: Profile
+- description: Contributor rankings and league statistics
+  name: Leaderboard
 paths:
   /contributors:
     get:
@@ -69,10 +77,25 @@ paths:
       summary: Delete user account
       tags:
       - Account
+  /user/features:
+    get:
+      description: Returns all feature flags evaluated for the authenticated user.
+        Combines Keycloak role checks and server-side config toggles.
+      operationId: getUserFeatures
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeatureFlags"
+          description: Feature flags evaluated successfully
+      summary: Get feature flags for the current user
+      tags:
+      - Account
   /user/settings:
     get:
-      description: Get the current user's notification and research participation
-        preferences
+      description: "Get the current user's notification, research participation, and\
+        \ AI review preferences"
       operationId: getUserSettings
       responses:
         "200":
@@ -85,8 +108,8 @@ paths:
       tags:
       - Account
     post:
-      description: Update the current user's notification and research participation
-        preferences
+      description: "Update the current user's notification, research participation,\
+        \ and AI review preferences"
       operationId: updateUserSettings
       requestBody:
         content:
@@ -213,6 +236,319 @@ paths:
           description: Workspace returned
       security: []
       summary: Fetch a workspace by slug
+      tags:
+      - workspace
+  /workspaces/{workspaceSlug}/agent-configs:
+    get:
+      operationId: getConfigs
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AgentConfig"
+          description: Agent configs returned
+      summary: List agent configurations for a workspace
+      tags:
+      - Agent Config
+    post:
+      operationId: createConfig
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAgentConfigRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentConfig"
+          description: Agent config created
+        "409":
+          description: Config name already exists in this workspace
+      summary: Create a new agent configuration
+      tags:
+      - Agent Config
+  /workspaces/{workspaceSlug}/agent-configs/{configId}:
+    delete:
+      operationId: deleteConfig
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: configId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "204":
+          description: Agent config deleted
+        "404":
+          description: Agent config not found
+        "409":
+          description: Cannot delete config with active jobs
+      summary: Delete an agent configuration
+      tags:
+      - Agent Config
+    get:
+      operationId: getConfig
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: configId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentConfig"
+          description: Agent config returned
+        "404":
+          description: Agent config not found
+      summary: Get a specific agent configuration
+      tags:
+      - Agent Config
+    patch:
+      operationId: updateConfig
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: configId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAgentConfigRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentConfig"
+          description: Agent config updated
+        "404":
+          description: Agent config not found
+      summary: Update an existing agent configuration
+      tags:
+      - Agent Config
+  /workspaces/{workspaceSlug}/agent-jobs:
+    get:
+      operationId: listJobs
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - description: Filter by job status
+        in: query
+        name: status
+        required: false
+        schema:
+          type: string
+          enum:
+          - QUEUED
+          - RUNNING
+          - COMPLETED
+          - FAILED
+          - TIMED_OUT
+          - CANCELLED
+      - description: Filter by config ID
+        in: query
+        name: configId
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageAgentJob"
+          description: Paginated job list
+      summary: List agent jobs for a workspace
+      tags:
+      - Agent Jobs
+  /workspaces/{workspaceSlug}/agent-jobs/{jobId}:
+    get:
+      operationId: getJob
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: jobId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentJob"
+          description: Job detail returned
+        "404":
+          description: Job not found in this workspace
+      summary: Get agent job details
+      tags:
+      - Agent Jobs
+  /workspaces/{workspaceSlug}/agent-jobs/{jobId}/cancel:
+    post:
+      operationId: cancelJob
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: jobId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentJob"
+          description: Job cancelled
+        "404":
+          description: Job not found in this workspace
+        "409":
+          description: Job already in terminal state
+      summary: Cancel an agent job
+      tags:
+      - Agent Jobs
+  /workspaces/{workspaceSlug}/agent-jobs/{jobId}/delivery/retry:
+    post:
+      operationId: retryDelivery
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: jobId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentJob"
+          description: Delivery retried
+        "404":
+          description: Job not found in this workspace
+        "409":
+          description: Job not in a retryable state
+      summary: Retry delivery for a completed agent job
+      tags:
+      - Agent Jobs
+  /workspaces/{workspaceSlug}/features:
+    patch:
+      operationId: updateFeatures
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateWorkspaceFeaturesRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Workspace"
+          description: Workspace updated
+      summary: Update workspace feature flags
       tags:
       - workspace
   /workspaces/{workspaceSlug}/leaderboard:
@@ -1219,10 +1555,11 @@ paths:
       summary: Update leaderboard notification preferences
       tags:
       - workspace
-  /workspaces/{workspaceSlug}/practices/badpractice/{id}:
+  /workspaces/{workspaceSlug}/practices:
     get:
-      description: Retrieves details of a specific bad practice by ID
-      operationId: getBadPractice
+      description: "Returns all practice definitions for the workspace, optionally\
+        \ filtered by category and/or active state"
+      operationId: listPractices
       parameters:
       - description: Workspace slug
         in: path
@@ -1231,27 +1568,33 @@ paths:
         schema:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: id
-        required: true
+      - description: Filter by practice category
+        in: query
+        name: category
+        required: false
         schema:
-          type: integer
-          format: int64
+          type: string
+      - description: Filter by active state
+        in: query
+        name: active
+        required: false
+        schema:
+          type: boolean
       responses:
         "200":
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PullRequestBadPractice"
-          description: Bad practice returned
+                type: array
+                items:
+                  $ref: "#/components/schemas/Practice"
+          description: Practices returned
       security: []
-      summary: Get a specific bad practice
+      summary: List practice definitions
       tags:
-      - Code Practices
-  /workspaces/{workspaceSlug}/practices/badpractice/{id}/feedback:
+      - Practice Catalog
     post:
-      description: Submits user feedback for a detected bad practice
-      operationId: provideFeedback
+      operationId: createPractice
       parameters:
       - description: Workspace slug
         in: path
@@ -1260,30 +1603,29 @@ paths:
         schema:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: id
-        required: true
-        schema:
-          type: integer
-          format: int64
       requestBody:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/BadPracticeFeedback"
+              $ref: "#/components/schemas/CreatePracticeRequest"
         required: true
       responses:
-        "200":
-          description: Feedback submitted successfully
-        "403":
-          description: User is not an assignee of the pull request
-      summary: Provide feedback for a bad practice
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Practice"
+          description: Practice created
+        "409":
+          description: Practice slug already exists in this workspace
+      summary: Create a new practice definition
       tags:
-      - Code Practices
-  /workspaces/{workspaceSlug}/practices/badpractice/{id}/resolve:
-    post:
-      description: "Updates the state of a bad practice to FIXED, WONT_FIX, or WRONG"
-      operationId: resolve
+      - Practice Catalog
+  /workspaces/{workspaceSlug}/practices/findings:
+    get:
+      description: Paginated findings for the authenticated contributor with optional
+        filters
+      operationId: listFindings
       parameters:
       - description: Workspace slug
         in: path
@@ -1292,35 +1634,75 @@ paths:
         schema:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: id
-        required: true
+      - description: Filter by practice slug
+        in: query
+        name: practiceSlug
+        required: false
         schema:
-          type: integer
-          format: int64
-      - in: query
-        name: state
-        required: true
+          type: string
+      - description: Filter by verdict
+        in: query
+        name: verdict
+        required: false
         schema:
           type: string
           enum:
-          - GOOD_PRACTICE
-          - MINOR_ISSUE
-          - NORMAL_ISSUE
-          - CRITICAL_ISSUE
-          - FIXED
-          - WONT_FIX
-          - WRONG
+          - POSITIVE
+          - NEGATIVE
+          - NOT_APPLICABLE
+          - NEEDS_REVIEW
+      - in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 20
       responses:
         "200":
-          description: Bad practice resolved successfully
-      summary: Resolve a bad practice
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagePracticeFindingList"
+          description: Paginated findings returned
+      security: []
+      summary: List findings for current user
       tags:
-      - Code Practices
-  /workspaces/{workspaceSlug}/practices/pullrequest/{pullRequestId}:
+      - Practice Findings
+  /workspaces/{workspaceSlug}/practices/findings/engagement:
     get:
-      description: Retrieves all detected bad practices for a specific pull request
-      operationId: getBadPracticesForPullRequest
+      description: Returns the current user's feedback action counts across all findings
+        in this workspace.
+      operationId: getEngagement
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FindingFeedbackEngagement"
+          description: Engagement statistics returned
+      summary: Get engagement statistics
+      tags:
+      - Finding Feedback
+  /workspaces/{workspaceSlug}/practices/findings/pull-request/{prId}:
+    get:
+      description: All findings for a specific pull request within the workspace
+      operationId: getFindingsForPullRequest
       parameters:
       - description: Workspace slug
         in: path
@@ -1330,7 +1712,7 @@ paths:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       - in: path
-        name: pullRequestId
+        name: prId
         required: true
         schema:
           type: integer
@@ -1340,51 +1722,18 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PullRequestWithBadPractices"
-          description: Bad practices returned
+                type: array
+                items:
+                  $ref: "#/components/schemas/PracticeFindingList"
+          description: PR findings returned
       security: []
-      summary: Get bad practices for a pull request
+      summary: List findings for a pull request
       tags:
-      - Code Practices
-  /workspaces/{workspaceSlug}/practices/pullrequest/{pullRequestId}/detect:
-    post:
-      description: Triggers bad practice detection for a specific pull request
-      operationId: detectForPullRequest
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: pullRequestId
-        required: true
-        schema:
-          type: integer
-          format: int64
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/DetectionResult"
-          description: Detection completed successfully
-        "400":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/DetectionResult"
-          description: Detection failed due to no updates on pull request
-      summary: Detect bad practices for a pull request
-      tags:
-      - Code Practices
-  /workspaces/{workspaceSlug}/practices/user/{login}:
+      - Practice Findings
+  /workspaces/{workspaceSlug}/practices/findings/summary:
     get:
-      description: Retrieves all detected bad practices for pull requests assigned
-        to the user
-      operationId: getBadPracticesForUser
+      description: Aggregated verdict counts per practice for dashboard cards
+      operationId: getSummary
       parameters:
       - description: Workspace slug
         in: path
@@ -1393,27 +1742,22 @@ paths:
         schema:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: login
-        required: true
-        schema:
-          type: string
       responses:
         "200":
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/UserPractices"
-          description: Bad practices returned
+                type: array
+                items:
+                  $ref: "#/components/schemas/ContributorPracticeSummary"
+          description: Practice summaries returned
       security: []
-      summary: Get bad practices for a user
+      summary: Per-practice summary for current user
       tags:
-      - Code Practices
-  /workspaces/{workspaceSlug}/practices/user/{login}/detect:
-    post:
-      description: Triggers bad practice detection for all pull requests of the specified
-        user
-      operationId: detectForUser
+      - Practice Findings
+  /workspaces/{workspaceSlug}/practices/findings/{findingId}:
+    get:
+      operationId: getFinding
       parameters:
       - description: Workspace slug
         in: path
@@ -1423,7 +1767,134 @@ paths:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       - in: path
-        name: login
+        name: findingId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PracticeFindingDetail"
+          description: Finding detail returned
+        "404":
+          description: Finding not found or not owned by current user
+      security: []
+      summary: Get finding detail
+      tags:
+      - Practice Findings
+  /workspaces/{workspaceSlug}/practices/findings/{findingId}/feedback:
+    get:
+      description: "Returns the current user's most recent feedback on the specified\
+        \ finding, or 204 if none exists."
+      operationId: getLatestFeedback
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: findingId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FindingFeedback"
+          description: Latest feedback returned
+        "204":
+          description: No feedback exists for this finding
+        "404":
+          description: Finding not found in this workspace
+      summary: Get latest feedback for a finding
+      tags:
+      - Finding Feedback
+    post:
+      description: "Records the contributor's reaction (APPLIED, DISPUTED, NOT_APPLICABLE)\
+        \ to an AI-generated finding. Append-only: submitting again creates a new\
+        \ record, preserving temporal history."
+      operationId: submitFeedback
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: findingId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateFindingFeedback"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FindingFeedback"
+          description: Feedback recorded
+        "400":
+          description: "Invalid request (e.g., DISPUTED without explanation)"
+        "403":
+          description: Current user is not the finding's contributor
+        "404":
+          description: Finding not found in this workspace
+      summary: Submit feedback on a practice finding
+      tags:
+      - Finding Feedback
+  /workspaces/{workspaceSlug}/practices/{practiceSlug}:
+    delete:
+      operationId: deletePractice
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: practiceSlug
+        required: true
+        schema:
+          type: string
+      responses:
+        "204":
+          description: Practice deleted
+        "404":
+          description: Practice not found
+      summary: Delete a practice definition
+      tags:
+      - Practice Catalog
+    get:
+      operationId: getPractice
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: practiceSlug
         required: true
         schema:
           type: string
@@ -1432,17 +1903,81 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/DetectionResult"
-          description: Detection completed successfully
-        "400":
+                $ref: "#/components/schemas/Practice"
+          description: Practice returned
+        "404":
+          description: Practice not found
+      security: []
+      summary: Get a practice definition
+      tags:
+      - Practice Catalog
+    patch:
+      operationId: updatePractice
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: practiceSlug
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePracticeRequest"
+        required: true
+      responses:
+        "200":
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/DetectionResult"
-          description: Detection failed due to no updates on pull requests
-      summary: Detect bad practices for a user
+                $ref: "#/components/schemas/Practice"
+          description: Practice updated
+        "404":
+          description: Practice not found
+      summary: Update a practice definition
       tags:
-      - Code Practices
+      - Practice Catalog
+  /workspaces/{workspaceSlug}/practices/{practiceSlug}/active:
+    patch:
+      operationId: setActive
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: practiceSlug
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePracticeActiveRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Practice"
+          description: Active state updated
+        "404":
+          description: Practice not found
+      summary: Set practice active state
+      tags:
+      - Practice Catalog
   /workspaces/{workspaceSlug}/profile/{login}:
     get:
       description: "Returns user profile with workspace-scoped activity data including\
@@ -2415,6 +2950,150 @@ components:
           type: string
       required:
       - type
+    AgentConfig:
+      type: object
+      description: Agent configuration for a workspace (API key redacted)
+      properties:
+        agentType:
+          type: string
+          description: Type of coding agent
+          enum:
+          - CLAUDE_CODE
+          - OPENCODE
+        allowInternet:
+          type: boolean
+          description: Whether agent containers have internet access
+        createdAt:
+          type: string
+          format: date-time
+          description: Timestamp when the config was created
+        credentialMode:
+          type: string
+          description: Authentication mode
+          enum:
+          - PROXY
+          - API_KEY
+          - OAUTH
+        enabled:
+          type: boolean
+          description: Whether the agent is enabled
+        hasLlmApiKey:
+          type: boolean
+          description: Whether an LLM API key is configured
+        id:
+          type: integer
+          format: int64
+          description: Configuration ID
+        llmProvider:
+          type: string
+          description: LLM provider
+          enum:
+          - ANTHROPIC
+          - OPENAI
+        maxConcurrentJobs:
+          type: integer
+          format: int32
+          description: Maximum concurrent jobs
+        modelName:
+          type: string
+          description: LLM model name
+          example: claude-sonnet-4-20250514
+        name:
+          type: string
+          description: Unique name within the workspace
+        timeoutSeconds:
+          type: integer
+          format: int32
+          description: Job timeout in seconds
+        updatedAt:
+          type: string
+          format: date-time
+          description: Timestamp when the config was last updated
+      required:
+      - agentType
+      - allowInternet
+      - createdAt
+      - credentialMode
+      - enabled
+      - hasLlmApiKey
+      - id
+      - llmProvider
+      - maxConcurrentJobs
+      - name
+      - timeoutSeconds
+    AgentJob:
+      type: object
+      description: Agent job execution record (job_token intentionally omitted)
+      properties:
+        completedAt:
+          type: string
+          format: date-time
+          description: Timestamp when the job completed
+        configSnapshot:
+          description: Frozen agent config at submit time
+        containerId:
+          type: string
+          description: Docker container ID
+        createdAt:
+          type: string
+          format: date-time
+          description: Timestamp when the job was created
+        deliveryCommentId:
+          type: string
+          description: Git provider comment/note ID for posted feedback
+        deliveryStatus:
+          type: string
+          description: "Delivery status: null = not applicable, PENDING = awaiting\
+            \ delivery, DELIVERED = posted, FAILED = delivery error"
+          enum:
+          - PENDING
+          - DELIVERED
+          - FAILED
+        errorMessage:
+          type: string
+          description: Human-readable error message
+        exitCode:
+          type: integer
+          format: int32
+          description: Container exit code
+        id:
+          type: string
+          format: uuid
+          description: Job ID
+        jobType:
+          type: string
+          description: Job type
+          enum:
+          - PULL_REQUEST_REVIEW
+        metadata:
+          description: Job metadata (routing/display info)
+        output:
+          description: Job output (agent results)
+        retryCount:
+          type: integer
+          format: int32
+          description: Number of retry attempts
+        startedAt:
+          type: string
+          format: date-time
+          description: Timestamp when the job started running
+        status:
+          type: string
+          description: Current job status
+          enum:
+          - QUEUED
+          - RUNNING
+          - COMPLETED
+          - FAILED
+          - TIMED_OUT
+          - CANCELLED
+      required:
+      - configSnapshot
+      - createdAt
+      - id
+      - jobType
+      - retryCount
+      - status
     AssignRoleRequest:
       type: object
       description: Request to assign or update a user's role in a workspace
@@ -2433,25 +3112,6 @@ components:
       required:
       - role
       - userId
-    BadPracticeFeedback:
-      type: object
-      description: User feedback on a detected bad practice
-      properties:
-        explanation:
-          type: string
-          description: User's explanation for the feedback
-          maxLength: 2000
-          minLength: 0
-        type:
-          type: string
-          description: "Type of feedback (e.g., 'false_positive', 'not_applicable')"
-          example: false_positive
-          maxLength: 64
-          minLength: 0
-          pattern: "^[a-zA-Z0-9_-]+$"
-      required:
-      - explanation
-      - type
     BinaryAchievementProgress:
       allOf:
       - $ref: "#/components/schemas/AchievementProgress"
@@ -2544,6 +3204,105 @@ components:
       - id
       - login
       - name
+    ContributorPracticeSummary:
+      type: object
+      description: Per-practice finding summary for a contributor
+      properties:
+        category:
+          type: string
+          description: Practice category
+        lastFindingAt:
+          type: string
+          format: date-time
+          description: Timestamp of most recent finding
+        negativeCount:
+          type: integer
+          format: int64
+          description: Number of NEGATIVE findings
+        positiveCount:
+          type: integer
+          format: int64
+          description: Number of POSITIVE findings
+        practiceName:
+          type: string
+          description: Practice name
+        practiceSlug:
+          type: string
+          description: Practice slug
+        totalFindings:
+          type: integer
+          format: int64
+          description: Total number of findings
+      required:
+      - negativeCount
+      - positiveCount
+      - practiceName
+      - practiceSlug
+      - totalFindings
+    CreateAgentConfigRequest:
+      type: object
+      description: Request to create a new agent configuration for a workspace
+      properties:
+        agentType:
+          type: string
+          description: Type of coding agent
+          enum:
+          - CLAUDE_CODE
+          - OPENCODE
+        allowInternet:
+          type: boolean
+          description: Whether agent containers have internet access
+        credentialMode:
+          type: string
+          default: PROXY
+          description: "Authentication mode: PROXY (internal proxy), API_KEY (direct),\
+            \ or OAUTH (direct OAuth)"
+          enum:
+          - PROXY
+          - API_KEY
+          - OAUTH
+        enabled:
+          type: boolean
+          description: Whether the agent is enabled
+        llmApiKey:
+          type: string
+          description: LLM API key
+        llmProvider:
+          type: string
+          description: LLM provider
+          enum:
+          - ANTHROPIC
+          - OPENAI
+        maxConcurrentJobs:
+          type: integer
+          format: int32
+          description: Maximum concurrent jobs
+          example: 3
+          maximum: 10
+          minimum: 1
+        modelName:
+          type: string
+          description: LLM model name
+          example: claude-sonnet-4-20250514
+          maxLength: 128
+          minLength: 0
+        name:
+          type: string
+          description: Unique name within the workspace
+          example: claude-pr-reviewer
+          maxLength: 100
+          minLength: 0
+        timeoutSeconds:
+          type: integer
+          format: int32
+          description: Job timeout in seconds
+          example: 600
+          maximum: 3600
+          minimum: 30
+      required:
+      - agentType
+      - llmProvider
+      - name
     CreateDocumentRequest:
       type: object
       properties:
@@ -2562,6 +3321,73 @@ components:
       - title
       x-hephaestus:
         export: true
+    CreateFindingFeedback:
+      type: object
+      description: Submit feedback on an AI-generated practice finding
+      properties:
+        action:
+          type: string
+          description: The feedback action to record
+          enum:
+          - APPLIED
+          - DISPUTED
+          - NOT_APPLICABLE
+        explanation:
+          type: string
+          description: Explanation for the feedback. Required when action is DISPUTED.
+          maxLength: 2000
+          minLength: 0
+      required:
+      - action
+    CreatePracticeRequest:
+      type: object
+      description: Request to create a new practice definition
+      properties:
+        category:
+          type: string
+          description: Practice category
+          example: code-quality
+          maxLength: 64
+          minLength: 0
+        description:
+          type: string
+          description: Practice description
+          example: Ensures pull request descriptions are detailed and informative
+          maxLength: 10000
+          minLength: 0
+        detectionPrompt:
+          type: string
+          description: AI detection prompt template
+          maxLength: 50000
+          minLength: 0
+        name:
+          type: string
+          description: Human-readable name
+          example: PR Description Quality
+          maxLength: 128
+          minLength: 3
+        slug:
+          type: string
+          description: URL-safe identifier unique within the workspace
+          example: pr-description-quality
+          maxLength: 64
+          minLength: 3
+          pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        triggerEvents:
+          type: array
+          description: Domain events that trigger detection
+          example:
+          - PullRequestCreated
+          - ReviewSubmitted
+          items:
+            type: string
+          maxItems: 10
+          minItems: 1
+      required:
+      - description
+      - name
+      - slug
+      - triggerEvents
     CreateWorkspaceRequest:
       type: object
       description: Request to create a new workspace
@@ -2615,16 +3441,6 @@ components:
       - displayName
       - ownerUserId
       - workspaceSlug
-    DetectionResult:
-      type: object
-      description: Response for detection operations
-      properties:
-        result:
-          type: string
-          enum:
-          - BAD_PRACTICES_DETECTED
-          - NO_BAD_PRACTICES_DETECTED
-          - ERROR_NO_UPDATE_ON_PULLREQUEST
     Document:
       type: object
       properties:
@@ -2693,6 +3509,79 @@ components:
       - error
       x-hephaestus:
         export: true
+    FeatureFlags:
+      type: object
+      description: Feature flags evaluated for the current user
+      properties:
+        ADMIN:
+          type: boolean
+          description: User has admin privileges
+        GITLAB_WORKSPACE_CREATION:
+          type: boolean
+          description: GitLab workspace creation feature is enabled
+        MENTOR_ACCESS:
+          type: boolean
+          description: User has access to the AI Mentor feature
+        NOTIFICATION_ACCESS:
+          type: boolean
+          description: User can receive notifications
+        PRACTICE_REVIEW_FOR_ALL:
+          type: boolean
+          description: Practice review runs for all users regardless of role
+        RUN_PRACTICE_REVIEW:
+          type: boolean
+          description: User's PRs trigger practice review
+    FindingFeedback:
+      type: object
+      description: Contributor feedback on an AI-generated practice finding
+      properties:
+        action:
+          type: string
+          description: The feedback action taken
+          enum:
+          - APPLIED
+          - DISPUTED
+          - NOT_APPLICABLE
+        createdAt:
+          type: string
+          format: date-time
+          description: When the feedback was submitted
+        explanation:
+          type: string
+          description: Optional explanation for the feedback
+        findingId:
+          type: string
+          format: uuid
+          description: ID of the finding this feedback is about
+        id:
+          type: string
+          format: uuid
+          description: Unique feedback ID
+      required:
+      - action
+      - createdAt
+      - findingId
+      - id
+    FindingFeedbackEngagement:
+      type: object
+      description: Feedback engagement statistics for a contributor in a workspace
+      properties:
+        applied:
+          type: integer
+          format: int64
+          description: Number of findings marked as applied/fixed
+        disputed:
+          type: integer
+          format: int64
+          description: Number of findings disputed as incorrect
+        notApplicable:
+          type: integer
+          format: int64
+          description: Number of findings marked as not applicable
+      required:
+      - applied
+      - disputed
+      - notApplicable
     GitLabGroup:
       type: object
       description: GitLab group accessible to the provided PAT
@@ -2874,6 +3763,288 @@ components:
       required:
       - current
       - target
+    PageAgentJob:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgentJob"
+        empty:
+          type: boolean
+        first:
+          type: boolean
+        last:
+          type: boolean
+        number:
+          type: integer
+          format: int32
+        numberOfElements:
+          type: integer
+          format: int32
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
+        size:
+          type: integer
+          format: int32
+        sort:
+          $ref: "#/components/schemas/SortObject"
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+    PagePracticeFindingList:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/PracticeFindingList"
+        empty:
+          type: boolean
+        first:
+          type: boolean
+        last:
+          type: boolean
+        number:
+          type: integer
+          format: int32
+        numberOfElements:
+          type: integer
+          format: int32
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
+        size:
+          type: integer
+          format: int32
+        sort:
+          $ref: "#/components/schemas/SortObject"
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+    PageableObject:
+      type: object
+      properties:
+        offset:
+          type: integer
+          format: int64
+        pageNumber:
+          type: integer
+          format: int32
+        pageSize:
+          type: integer
+          format: int32
+        paged:
+          type: boolean
+        sort:
+          $ref: "#/components/schemas/SortObject"
+        unpaged:
+          type: boolean
+    Practice:
+      type: object
+      description: Practice definition for evaluating developer contributions
+      properties:
+        active:
+          type: boolean
+          description: Whether this practice is actively being detected
+        category:
+          type: string
+          description: Practice category
+        createdAt:
+          type: string
+          format: date-time
+          description: Timestamp when the practice was created
+        description:
+          type: string
+          description: Practice description
+        detectionPrompt:
+          type: string
+          description: AI detection prompt template
+        id:
+          type: integer
+          format: int64
+          description: Practice ID
+        name:
+          type: string
+          description: Human-readable name
+        slug:
+          type: string
+          description: URL-safe identifier unique within workspace
+        triggerEvents:
+          type: array
+          description: Domain events that trigger detection
+          items:
+            type: string
+        updatedAt:
+          type: string
+          format: date-time
+          description: Timestamp when the practice was last updated
+      required:
+      - active
+      - createdAt
+      - description
+      - id
+      - name
+      - slug
+      - triggerEvents
+      - updatedAt
+    PracticeFindingDetail:
+      type: object
+      description: Full practice finding detail including guidance and evidence
+      properties:
+        category:
+          type: string
+          description: Practice category
+        confidence:
+          type: number
+          format: float
+          description: AI confidence score (0.0–1.0)
+        detectedAt:
+          type: string
+          format: date-time
+          description: When the finding was detected
+        evidence:
+          description: "Structured evidence (locations, snippets, references)"
+        guidance:
+          type: string
+          description: Actionable guidance for the contributor
+        guidanceMethod:
+          type: string
+          description: Cognitive apprenticeship guidance method
+          enum:
+          - MODELING
+          - COACHING
+          - SCAFFOLDING
+          - ARTICULATION
+          - REFLECTION
+          - EXPLORATION
+        id:
+          type: string
+          format: uuid
+          description: Finding ID
+        practiceName:
+          type: string
+          description: Practice name
+        practiceSlug:
+          type: string
+          description: Practice slug
+        reasoning:
+          type: string
+          description: AI reasoning behind the verdict
+        severity:
+          type: string
+          description: Severity level
+          enum:
+          - CRITICAL
+          - MAJOR
+          - MINOR
+          - INFO
+        targetId:
+          type: integer
+          format: int64
+          description: Target entity ID
+        targetType:
+          type: string
+          description: "Target type (e.g. pull_request, review)"
+        title:
+          type: string
+          description: Finding title
+        verdict:
+          type: string
+          description: "Verdict: POSITIVE, NEGATIVE, NOT_APPLICABLE, or NEEDS_REVIEW"
+          enum:
+          - POSITIVE
+          - NEGATIVE
+          - NOT_APPLICABLE
+          - NEEDS_REVIEW
+      required:
+      - confidence
+      - detectedAt
+      - id
+      - practiceName
+      - practiceSlug
+      - severity
+      - targetId
+      - targetType
+      - title
+      - verdict
+    PracticeFindingList:
+      type: object
+      description: Practice finding summary for list views
+      properties:
+        category:
+          type: string
+          description: Practice category
+        confidence:
+          type: number
+          format: float
+          description: AI confidence score (0.0–1.0)
+        detectedAt:
+          type: string
+          format: date-time
+          description: When the finding was detected
+        guidanceMethod:
+          type: string
+          description: Cognitive apprenticeship guidance method
+          enum:
+          - MODELING
+          - COACHING
+          - SCAFFOLDING
+          - ARTICULATION
+          - REFLECTION
+          - EXPLORATION
+        id:
+          type: string
+          format: uuid
+          description: Finding ID
+        practiceName:
+          type: string
+          description: Practice name
+        practiceSlug:
+          type: string
+          description: Practice slug
+        severity:
+          type: string
+          description: Severity level
+          enum:
+          - CRITICAL
+          - MAJOR
+          - MINOR
+          - INFO
+        targetId:
+          type: integer
+          format: int64
+          description: Target entity ID
+        targetType:
+          type: string
+          description: "Target type (e.g. pull_request, review)"
+        title:
+          type: string
+          description: Finding title
+        verdict:
+          type: string
+          description: "Verdict: POSITIVE, NEGATIVE, NOT_APPLICABLE, or NEEDS_REVIEW"
+          enum:
+          - POSITIVE
+          - NEGATIVE
+          - NOT_APPLICABLE
+          - NEEDS_REVIEW
+      required:
+      - confidence
+      - detectedAt
+      - id
+      - practiceName
+      - practiceSlug
+      - severity
+      - targetId
+      - targetType
+      - title
+      - verdict
     Profile:
       type: object
       description: Complete user profile including contribution history and activity
@@ -3039,37 +4210,6 @@ components:
       - currentLevelXP
       - totalXP
       - xpNeeded
-    PullRequestBadPractice:
-      type: object
-      description: A detected bad practice in a pull request
-      properties:
-        description:
-          type: string
-          description: Detailed explanation and remediation guidance
-        id:
-          type: integer
-          format: int64
-          description: Unique identifier of the bad practice
-        state:
-          type: string
-          description: "Current state of the bad practice (DETECTED, RESOLVED, DISMISSED,\
-            \ etc.)"
-          enum:
-          - GOOD_PRACTICE
-          - MINOR_ISSUE
-          - NORMAL_ISSUE
-          - CRITICAL_ISSUE
-          - FIXED
-          - WONT_FIX
-          - WRONG
-        title:
-          type: string
-          description: Short description of the bad practice
-      required:
-      - description
-      - id
-      - state
-      - title
     PullRequestBaseInfo:
       type: object
       description: Basic information about a pull request
@@ -3203,94 +4343,6 @@ components:
       - number
       - state
       - title
-    PullRequestWithBadPractices:
-      type: object
-      description: Pull request with associated bad practice detection results
-      properties:
-        additions:
-          type: integer
-          format: int32
-          description: Number of lines added
-          example: 150
-        badPracticeSummary:
-          type: string
-          description: AI-generated summary of detected bad practices
-        badPractices:
-          type: array
-          description: Currently active bad practices
-          items:
-            $ref: "#/components/schemas/PullRequestBadPractice"
-        createdAt:
-          type: string
-          format: date-time
-          description: Timestamp when the pull request was created
-        deletions:
-          type: integer
-          format: int32
-          description: Number of lines deleted
-          example: 50
-        htmlUrl:
-          type: string
-          description: URL to the pull request on the git provider
-        id:
-          type: integer
-          format: int64
-          description: Unique identifier of the pull request
-        isDraft:
-          type: boolean
-          description: Whether the pull request is in draft mode
-        isMerged:
-          type: boolean
-          description: Whether the pull request has been merged
-        labels:
-          type: array
-          description: Labels applied to the pull request
-          items:
-            $ref: "#/components/schemas/LabelInfo"
-        number:
-          type: integer
-          format: int32
-          description: Pull request number within the repository
-          example: 42
-        oldBadPractices:
-          type: array
-          description: Previously resolved or dismissed bad practices
-          items:
-            $ref: "#/components/schemas/PullRequestBadPractice"
-        repository:
-          $ref: "#/components/schemas/RepositoryInfo"
-          description: Repository the pull request belongs to
-        state:
-          type: string
-          description: "Current state of the pull request (OPEN, CLOSED)"
-          enum:
-          - OPEN
-          - CLOSED
-          - MERGED
-        title:
-          type: string
-          description: Title of the pull request
-        updatedAt:
-          type: string
-          format: date-time
-          description: Timestamp when the pull request was last updated
-      required:
-      - additions
-      - badPracticeSummary
-      - badPractices
-      - createdAt
-      - deletions
-      - htmlUrl
-      - id
-      - isDraft
-      - isMerged
-      - labels
-      - number
-      - oldBadPractices
-      - repository
-      - state
-      - title
-      - updatedAt
     RenameWorkspaceSlugRequest:
       type: object
       description: Request to rename a workspace's URL slug
@@ -3337,6 +4389,15 @@ components:
       - id
       - name
       - nameWithOwner
+    SortObject:
+      type: object
+      properties:
+        empty:
+          type: boolean
+        sorted:
+          type: boolean
+        unsorted:
+          type: boolean
     StreamPart:
       type: object
       additionalProperties: {}
@@ -3506,6 +4567,105 @@ components:
       - messages
       x-hephaestus:
         export: true
+    UpdateAgentConfigRequest:
+      type: object
+      description: Request to update an existing agent configuration (all fields optional
+        — null fields are not changed)
+      properties:
+        agentType:
+          type: string
+          description: Type of coding agent
+          enum:
+          - CLAUDE_CODE
+          - OPENCODE
+        allowInternet:
+          type: boolean
+          description: Whether agent containers have internet access
+        credentialMode:
+          type: string
+          description: "Authentication mode: PROXY (internal proxy), API_KEY (direct),\
+            \ or OAUTH (direct OAuth)"
+          enum:
+          - PROXY
+          - API_KEY
+          - OAUTH
+        enabled:
+          type: boolean
+          description: Whether the agent is enabled
+        llmApiKey:
+          type: string
+          description: LLM API key (omit or null to keep existing key)
+        llmProvider:
+          type: string
+          description: LLM provider
+          enum:
+          - ANTHROPIC
+          - OPENAI
+        maxConcurrentJobs:
+          type: integer
+          format: int32
+          description: Maximum concurrent jobs
+          example: 3
+          maximum: 10
+          minimum: 1
+        modelName:
+          type: string
+          description: LLM model name
+          example: claude-sonnet-4-20250514
+          maxLength: 128
+          minLength: 0
+        timeoutSeconds:
+          type: integer
+          format: int32
+          description: Job timeout in seconds
+          example: 600
+          maximum: 3600
+          minimum: 30
+    UpdatePracticeActiveRequest:
+      type: object
+      description: Request to set a practice's active state
+      properties:
+        active:
+          type: boolean
+          description: Whether the practice should be active
+      required:
+      - active
+    UpdatePracticeRequest:
+      type: object
+      description: Request to update an existing practice definition (PATCH — only
+        non-null fields applied)
+      properties:
+        category:
+          type: string
+          description: Practice category
+          example: code-quality
+          maxLength: 64
+          minLength: 0
+        description:
+          type: string
+          description: Practice description
+          maxLength: 10000
+          minLength: 0
+          pattern: .*\S.*
+        detectionPrompt:
+          type: string
+          description: AI detection prompt template
+          maxLength: 50000
+          minLength: 0
+        name:
+          type: string
+          description: Human-readable name
+          example: PR Description Quality
+          maxLength: 128
+          minLength: 3
+          pattern: .*\S.*
+        triggerEvents:
+          type: array
+          description: Domain events that trigger detection
+          items:
+            type: string
+          maxItems: 10
+          minItems: 1
     UpdateRepositorySettingsRequest:
       type: object
       description: Request to update repository contribution visibility settings in
@@ -3526,6 +4686,23 @@ components:
           description: Whether the team should be hidden from the leaderboard
       required:
       - hidden
+    UpdateWorkspaceFeaturesRequest:
+      type: object
+      description: Request to update workspace feature flags. Null fields are left
+        unchanged.
+      properties:
+        achievementsEnabled:
+          type: boolean
+          description: Enable the achievements system
+        leaderboardEnabled:
+          type: boolean
+          description: Enable the leaderboard ranking page
+        practicesEnabled:
+          type: boolean
+          description: Enable the practice review feature
+        progressionEnabled:
+          type: boolean
+          description: Enable the league/progression system
     UpdateWorkspaceNotificationsRequest:
       type: object
       description: Request to update leaderboard notification settings
@@ -3638,29 +4815,20 @@ components:
       - id
       - login
       - name
-    UserPractices:
-      type: object
-      description: Response for user bad practices listing
-      properties:
-        login:
-          type: string
-        pullRequests:
-          type: array
-          items:
-            $ref: "#/components/schemas/PullRequestWithBadPractices"
     UserSettings:
       type: object
       description: User preferences and settings
       properties:
+        aiReviewEnabled:
+          type: boolean
+          description: Whether the user wants to receive AI-generated practice review
+            comments on pull requests
         participateInResearch:
           type: boolean
           description: Whether the user consents to participate in research studies
-        receiveNotifications:
-          type: boolean
-          description: Whether the user wants to receive notifications
       required:
+      - aiReviewEnabled
       - participateInResearch
-      - receiveNotifications
     UserTeams:
       type: object
       properties:
@@ -3702,6 +4870,9 @@ components:
         accountLogin:
           type: string
           description: Git provider account login associated with this workspace
+        achievementsEnabled:
+          type: boolean
+          description: Whether the achievements system is enabled
         createdAt:
           type: string
           format: date-time
@@ -3740,6 +4911,9 @@ components:
         isPubliclyViewable:
           type: boolean
           description: Whether the workspace is publicly viewable without authentication
+        leaderboardEnabled:
+          type: boolean
+          description: Whether the leaderboard is enabled
         leaderboardNotificationChannelId:
           type: string
           description: Slack channel ID for leaderboard notifications
@@ -3758,6 +4932,12 @@ components:
           type: string
           description: Time for leaderboard notifications in HH:mm format
           example: 09:00
+        practicesEnabled:
+          type: boolean
+          description: Whether the practice review feature is enabled
+        progressionEnabled:
+          type: boolean
+          description: Whether the league/progression system is enabled
         providerType:
           type: string
           description: High-level git provider type derived from the authentication
@@ -3783,6 +4963,7 @@ components:
           example: my-workspace
       required:
       - accountLogin
+      - achievementsEnabled
       - createdAt
       - displayName
       - gitlabWebhookRegistered
@@ -3791,6 +4972,9 @@ components:
       - hasSlackToken
       - id
       - isPubliclyViewable
+      - leaderboardEnabled
+      - practicesEnabled
+      - progressionEnabled
       - providerType
       - status
       - updatedAt
@@ -3802,6 +4986,9 @@ components:
         accountLogin:
           type: string
           description: Git provider account login associated with this workspace
+        achievementsEnabled:
+          type: boolean
+          description: Whether the achievements system is enabled
         createdAt:
           type: string
           format: date-time
@@ -3813,6 +5000,15 @@ components:
           type: integer
           format: int64
           description: Unique identifier of the workspace
+        leaderboardEnabled:
+          type: boolean
+          description: Whether the leaderboard is enabled
+        practicesEnabled:
+          type: boolean
+          description: Whether the practice review feature is enabled
+        progressionEnabled:
+          type: boolean
+          description: Whether the league/progression system is enabled
         providerType:
           type: string
           description: High-level git provider type (GITHUB or GITLAB)
@@ -3829,9 +5025,13 @@ components:
           example: my-workspace
       required:
       - accountLogin
+      - achievementsEnabled
       - createdAt
       - displayName
       - id
+      - leaderboardEnabled
+      - practicesEnabled
+      - progressionEnabled
       - providerType
       - status
       - workspaceSlug

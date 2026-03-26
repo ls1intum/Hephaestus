@@ -141,16 +141,6 @@ services:
       timeout: 20s
       retries: 10
 
-  postfix:
-    image: ghcr.io/ls1admin/postfix:latest
-    container_name: hephaestus-postfix
-    restart: unless-stopped
-    volumes:
-      - ./postfix-config:/config # See https://github.com/ls1admin/postfix-container-tum-mailrelay/tree/main for details
-    hostname: aet.cit.tum.de
-    networks:
-      - shared-network
-
 networks:
   shared-network:
     name: shared-network
@@ -372,7 +362,8 @@ configs:
               "composites": {
                 "realm": [
                   "mentor_access",
-                  "notification_access"
+                  "notification_access",
+                  "run_practice_review"
                 ]
               }
             },
@@ -382,6 +373,10 @@ configs:
             },
             { "name": "notification_access",
               "description": "Get notification emails"
+            },
+            {
+              "name": "run_practice_review",
+              "description": "Trigger practice-aware PR review"
             },
             {
               "name": "offline_access",
