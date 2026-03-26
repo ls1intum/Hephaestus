@@ -13,10 +13,6 @@
       "description": "GitHub API authentication and App configuration"
     },
     {
-      "name": "hephaestus.detection",
-      "description": "Detection tracing settings for Langfuse observability"
-    },
-    {
       "name": "hephaestus.posthog",
       "description": "PostHog analytics integration"
     },
@@ -56,26 +52,6 @@
       "name": "hephaestus.activity.self-review-author-logins",
       "type": "java.util.List",
       "description": "List of bot logins whose PRs are excluded from self-review scoring"
-    },
-    {
-      "name": "hephaestus.detection.tracing.enabled",
-      "type": "java.lang.Boolean",
-      "description": "Whether Langfuse tracing is enabled for detection operations"
-    },
-    {
-      "name": "hephaestus.detection.tracing.host",
-      "type": "java.lang.String",
-      "description": "Langfuse server host URL"
-    },
-    {
-      "name": "hephaestus.detection.tracing.public-key",
-      "type": "java.lang.String",
-      "description": "Langfuse public key for authentication"
-    },
-    {
-      "name": "hephaestus.detection.tracing.secret-key",
-      "type": "java.lang.String",
-      "description": "Langfuse secret key for authentication (use environment variable in production)"
     },
     {
       "name": "hephaestus.sync.graphql-timeout",

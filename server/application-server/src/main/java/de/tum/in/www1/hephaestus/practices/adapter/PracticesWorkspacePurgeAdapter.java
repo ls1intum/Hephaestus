@@ -16,9 +16,8 @@ import org.springframework.stereotype.Component;
  *   <li>Deletes practice definitions for the workspace</li>
  * </ul>
  *
- * <p>Note: The persisted bad practice detections (PullRequestBadPractice entities) are
- * cleaned up via cascade delete from the PullRequest entities, which are in turn
- * cleaned up when Repository entities are deleted.
+ * <p>Note: Legacy bad practice tables still exist in the database but have no code
+ * reading or writing them. They will be dropped in a future migration.
  */
 @Component
 public class PracticesWorkspacePurgeAdapter implements WorkspacePurgeContributor {

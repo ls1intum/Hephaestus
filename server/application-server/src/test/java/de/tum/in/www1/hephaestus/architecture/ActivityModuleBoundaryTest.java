@@ -17,12 +17,11 @@ import org.junit.jupiter.api.Test;
  *   <li><b>activity.scoring</b> - XP/scoring calculations</li>
  * </ul>
  *
- * <p>Note: Bad practice analysis is in the separate <b>practices</b> module:
+ * <p>Note: Code health analysis is in the separate <b>practices</b> module:
  * <ul>
- *   <li><b>practices.model</b> - Bad practice entities (BadPracticeDetection, PullRequestBadPractice, etc.)</li>
+ *   <li><b>practices.model</b> - Practice and PracticeFinding entities</li>
  *   <li><b>practices.spi</b> - Service provider interfaces (UserRoleChecker)</li>
- *   <li><b>practices.feedback</b> - Feedback handling</li>
- *   <li><b>practices.review</b> - Agent-based detection gate and delivery</li>
+ *   <li><b>practices.finding</b> - Agent-based detection delivery and contributor findings</li>
  * </ul>
  *
  * <p>These tests enforce proper separation of concerns within the activity module and practices module.
@@ -221,9 +220,9 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
     class PracticesControllerTests {
 
         /**
-         * Only PracticesController (bad practice queries/feedback), PracticeCatalogController (CRUD),
-         * PracticeFindingController (contributor findings API), and FindingFeedbackController
-         * (contributor feedback) are allowed as REST entry points in the practices module.
+         * Only PracticeCatalogController (CRUD), PracticeFindingController (contributor findings API),
+         * and FindingFeedbackController (contributor feedback) are allowed as REST entry points
+         * in the practices module.
          */
         @Test
         @DisplayName("Practices has dedicated controllers")
@@ -234,15 +233,13 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
                 .and()
                 .haveSimpleNameEndingWith("Controller")
                 .should()
-                .haveSimpleName("PracticesController")
-                .orShould()
                 .haveSimpleName("PracticeCatalogController")
                 .orShould()
                 .haveSimpleName("PracticeFindingController")
                 .orShould()
                 .haveSimpleName("FindingFeedbackController")
                 .because(
-                    "Only PracticesController, PracticeCatalogController, PracticeFindingController, and FindingFeedbackController are allowed REST entry points"
+                    "Only PracticeCatalogController, PracticeFindingController, and FindingFeedbackController are allowed REST entry points"
                 );
             rule.check(classes);
         }

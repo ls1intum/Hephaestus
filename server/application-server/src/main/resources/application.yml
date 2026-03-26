@@ -328,16 +328,6 @@ hephaestus:
             # Eviction rate in milliseconds (60 seconds - leaderboard data is moderately hot)
             evict-rate: 60000
 
-    detection:
-        tracing:
-            enabled: false
-            # The host of the langfuse server
-            host: ${LANGFUSE_BASE_URL:}
-            # The public key of the langfuse server
-            public-key: ${LANGFUSE_PUBLIC_KEY:}
-            # The secret key of the langfuse server
-            secret-key: ${LANGFUSE_SECRET_KEY:}
-
     # ═══════════════════════════════════════════════════════════════════════════
     # FEATURE FLAGS (operational / development toggles)
     # ═══════════════════════════════════════════════════════════════════════════

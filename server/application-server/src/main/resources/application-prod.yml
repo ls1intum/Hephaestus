@@ -39,16 +39,6 @@ hephaestus:
     intelligence-service:
         url: ${INTELLIGENCE_SERVICE_URL}
 
-    detection:
-        tracing:
-            enabled: true
-            # The host of the langfuse server
-            host: ${LANGFUSE_BASE_URL}
-            # The public key of the langfuse server
-            public-key: ${LANGFUSE_PUBLIC_KEY}
-            # The secret key of the langfuse server
-            secret-key: ${LANGFUSE_SECRET_KEY}
-
     posthog:
         enabled: ${POSTHOG_ENABLED:false}
         api-host: ${POSTHOG_API_HOST:https://app.posthog.com}

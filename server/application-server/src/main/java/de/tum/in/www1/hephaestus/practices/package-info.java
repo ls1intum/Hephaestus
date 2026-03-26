@@ -15,19 +15,15 @@
  * │                                                       ↓                      │
  * │                    PracticeDetectionDeliveryService → PracticeFinding        │
  * │                                                       ↓                      │
- * │                              ┌────────────────────────────────────┐          │
- * │                              │    BadPracticeDetection (Model)    │          │
- * │                              │    PullRequestBadPractice (Model)  │          │
- * │                              └────────────────────────────────────┘          │
- * │                                           ↓                                  │
- * │                    BadPracticeFeedbackService → Langfuse (LLM observability) │
+ * │                    FindingFeedbackController → FindingFeedback               │
  * └─────────────────────────────────────────────────────────────────────────────┘
  * </pre>
  *
  * <h2>Key Components</h2>
  * <ul>
- *   <li>{@link de.tum.in.www1.hephaestus.practices.feedback.BadPracticeFeedbackService} - User feedback collection with Langfuse integration</li>
- *   <li>{@link de.tum.in.www1.hephaestus.practices.model.PullRequestBadPractice} - Detection result entity</li>
+ *   <li>{@link de.tum.in.www1.hephaestus.practices.finding.PracticeFindingController} - Contributor findings API</li>
+ *   <li>{@link de.tum.in.www1.hephaestus.practices.finding.FindingFeedbackController} - Contributor feedback API</li>
+ *   <li>{@link de.tum.in.www1.hephaestus.practices.PracticeCatalogController} - Practice catalog CRUD</li>
  * </ul>
  *
  * <h2>SPI (Service Provider Interfaces)</h2>
@@ -40,7 +36,6 @@
  *   <li><strong>Bounded Context Isolation</strong>: Separate from activity module (event log vs. analysis)</li>
  *   <li><strong>Infrastructure Abstraction</strong>: AI service calls via anti-corruption layer</li>
  *   <li><strong>SPI Pattern</strong>: Decoupled via service provider interfaces (e.g. UserRoleChecker)</li>
- *   <li><strong>Feedback Loop</strong>: User feedback improves AI model via Langfuse</li>
  * </ul>
  *
  * @see de.tum.in.www1.hephaestus.activity Activity module (event log for gamification)
