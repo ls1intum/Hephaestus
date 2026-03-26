@@ -1,5 +1,5 @@
 import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
-import { join, basename } from 'node:path';
+import { basename } from 'node:path';
 
 const SCHEMA_PATH = 'server/application-server/src/main/resources/achievements/achievements-schema.json';
 const EVALUATOR_PKG_PATH = 'server/application-server/src/main/java/de/tum/in/www1/hephaestus/achievement/evaluator';
