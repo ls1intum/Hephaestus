@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import type { LucideIcon } from "lucide-react";
 import { ArrowLeftIcon, GithubIcon, GitlabIcon } from "lucide-react";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Spinner } from "@/components/ui/spinner";
 import environment from "@/environment";
 import { useFeatureFlag } from "@/integrations/feature-flags";
 
@@ -18,7 +19,9 @@ interface Provider {
 }
 
 function ProviderSelectionPage() {
-	const { enabled: gitlabEnabled } = useFeatureFlag("GITLAB_WORKSPACE_CREATION");
+	const { enabled: gitlabEnabled, isLoading: flagLoading } = useFeatureFlag(
+		"GITLAB_WORKSPACE_CREATION",
+	);
 
 	const providers: Provider[] = [];
 	if (environment.github.appUrl) {
@@ -54,21 +57,31 @@ function ProviderSelectionPage() {
 				<h1 className="text-2xl font-semibold tracking-tight">Create Workspace</h1>
 				<p className="text-muted-foreground">Choose your Git provider to get started.</p>
 			</div>
-			<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-				{providers.map((provider) => (
-					<Link key={provider.id} to={provider.to}>
-						<Card className="h-full cursor-pointer transition-colors hover:bg-muted/50 hover:border-foreground/20">
-							<CardHeader>
-								<div className="flex items-center gap-3 mb-1">
-									<provider.icon className="size-6" />
-									<CardTitle className="text-lg">{provider.name}</CardTitle>
-								</div>
-								<CardDescription>{provider.description}</CardDescription>
-							</CardHeader>
-						</Card>
-					</Link>
-				))}
-			</div>
+			{flagLoading ? (
+				<div className="flex justify-center py-12">
+					<Spinner />
+				</div>
+			) : providers.length === 0 ? (
+				<p className="text-center text-muted-foreground py-12">
+					No providers are currently available. Contact your administrator.
+				</p>
+			) : (
+				<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+					{providers.map((provider) => (
+						<Link key={provider.id} to={provider.to}>
+							<Card className="h-full cursor-pointer transition-colors hover:bg-muted/50 hover:border-foreground/20">
+								<CardHeader>
+									<div className="flex items-center gap-3 mb-1">
+										<provider.icon className="size-6" />
+										<CardTitle className="text-lg">{provider.name}</CardTitle>
+									</div>
+									<CardDescription>{provider.description}</CardDescription>
+								</CardHeader>
+							</Card>
+						</Link>
+					))}
+				</div>
+			)}
 		</div>
 	);
 }
