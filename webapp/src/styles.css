@@ -71,22 +71,22 @@ code {
   --mentor-foreground: oklch(0.97 0.014 254.604);
 
   /* Achievement skill tree node states (Light Mode) */
-  --node-locked: oklch(0.9 0 0);
-  --node-available: oklch(0.6 0 0);
-  --node-unlocked: oklch(0.2 0 0);
-  --edge-inactive: oklch(0.75 0 0);
-  --edge-active: oklch(0.4 0 0);
-  --edge-glow: oklch(0 0 0 / 0.1);
+  --node-locked: oklch(0.92 0.005 250); 
+  --node-available: oklch(0.65 0.01 250);
+  --node-unlocked: oklch(0.25 0.01 250);
+  --edge-inactive: oklch(0.8 0.005 250);
+  --edge-active: oklch(0.45 0.01 250);
+  --edge-glow: oklch(0.2 0.02 250 / 0.1);
   --shadow-rgb: 0 0 0;
 
   /* Rarity border colors (Light Mode) — monochromatic low tiers, chromatic high tiers */
-  --rarity-common: oklch(0.75 0 0);
-  --rarity-uncommon: oklch(0.55 0.12 145);
-  --rarity-rare: oklch(0.55 0.1 250);
-  --rarity-epic: oklch(0.5 0.18 300);
-  --rarity-legendary: oklch(0.65 0.2 80);
+  --rarity-common: oklch(0.8 0.015 250);
+  --rarity-uncommon: oklch(0.6 0.14 150);
+  --rarity-rare: oklch(0.6 0.12 260);
+  --rarity-epic: oklch(0.55 0.18 300);
+  --rarity-legendary: oklch(0.7 0.2 85);
   --rarity-legendary-from: var(--rarity-legendary);
-  --rarity-legendary-to: oklch(0.9 0.1 95);
+  --rarity-legendary-to: oklch(0.92 0.1 95);
   --rarity-mythic-from: oklch(0.55 0.22 290);
   --rarity-mythic-to: oklch(0.55 0.18 250);
 }
@@ -136,20 +136,20 @@ code {
   --mentor-foreground: oklch(0.379 0.146 265.522);
 
   /* Achievement skill tree node states (Dark Mode) */
-  --node-locked: oklch(0.18 0 0);
-  --node-available: oklch(0.35 0 0);
-  --node-unlocked: oklch(0.95 0 0);
-  --edge-inactive: oklch(0.25 0 0);
-  --edge-active: oklch(0.85 0 0);
-  --edge-glow: oklch(1 0 0 / 0.3);
+  --node-locked: oklch(0.25 0.01 250);
+  --node-available: oklch(0.42 0.02 250);
+  --node-unlocked: oklch(0.95 0.01 250);
+  --edge-inactive: oklch(0.3 0.015 250);
+  --edge-active: oklch(0.85 0.02 250);
+  --edge-glow: oklch(1 0.02 250 / 0.3);
   --shadow-rgb: 255 255 255;
 
   /* Rarity border colors (Dark Mode) — brighter to pop on dark backgrounds */
-  --rarity-common: oklch(0.4 0 0);
-  --rarity-uncommon: oklch(0.65 0.14 145);
-  --rarity-rare: oklch(0.7 0.12 250);
-  --rarity-epic: oklch(0.72 0.18 300);
-  --rarity-legendary: oklch(0.82 0.18 80);
+  --rarity-common: oklch(0.55 0.02 250);
+  --rarity-uncommon: oklch(0.7 0.16 150);
+  --rarity-rare: oklch(0.75 0.14 260);
+  --rarity-epic: oklch(0.75 0.18 300);
+  --rarity-legendary: oklch(0.85 0.2 85);
   --rarity-legendary-from: var(--rarity-legendary);
   --rarity-legendary-to: oklch(0.95 0.08 95);
   --rarity-mythic-from: oklch(0.75 0.22 290);
