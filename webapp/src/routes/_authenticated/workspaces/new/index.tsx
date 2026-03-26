@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import type { LucideIcon } from "lucide-react";
-import { ArrowLeftIcon, GithubIcon, GitlabIcon } from "lucide-react";
+import { ArrowLeftIcon, GithubIcon, GitlabIcon, OctagonXIcon } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import environment from "@/environment";
@@ -19,9 +20,11 @@ interface Provider {
 }
 
 function ProviderSelectionPage() {
-	const { enabled: gitlabEnabled, isLoading: flagLoading } = useFeatureFlag(
-		"GITLAB_WORKSPACE_CREATION",
-	);
+	const {
+		enabled: gitlabEnabled,
+		isLoading: flagLoading,
+		isError: flagError,
+	} = useFeatureFlag("GITLAB_WORKSPACE_CREATION");
 
 	const providers: Provider[] = [];
 	if (environment.github.appUrl) {
@@ -57,11 +60,20 @@ function ProviderSelectionPage() {
 				<h1 className="text-2xl font-semibold tracking-tight">Create Workspace</h1>
 				<p className="text-muted-foreground">Choose your Git provider to get started.</p>
 			</div>
+			{flagError && (
+				<Alert variant="destructive" className="mb-4">
+					<OctagonXIcon aria-hidden="true" />
+					<AlertTitle>Partial load failure</AlertTitle>
+					<AlertDescription>
+						Some provider options could not be loaded. Try refreshing the page.
+					</AlertDescription>
+				</Alert>
+			)}
 			{flagLoading ? (
 				<div className="flex justify-center py-12">
 					<Spinner />
 				</div>
-			) : providers.length === 0 ? (
+			) : providers.length === 0 && !flagError ? (
 				<p className="text-center text-muted-foreground py-12">
 					No providers are currently available. Contact your administrator.
 				</p>

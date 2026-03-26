@@ -7,13 +7,15 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
-import { connectionSchema } from "./schemas";
+import { type ConnectionFormData, connectionSchema } from "./schemas";
 import { useWizard } from "./wizard-context";
 
 export function ConnectGitLabStep() {
 	const { state, dispatch } = useWizard();
 	const [showToken, setShowToken] = useState(false);
-	const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+	const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof ConnectionFormData, string>>>(
+		{},
+	);
 
 	const preflight = useMutation({
 		...gitLabPreflightMutation(),
@@ -32,9 +34,9 @@ export function ConnectGitLabStep() {
 			personalAccessToken: state.personalAccessToken,
 		});
 		if (!result.success) {
-			const errors: Record<string, string> = {};
+			const errors: Partial<Record<keyof ConnectionFormData, string>> = {};
 			for (const issue of result.error.issues) {
-				const key = issue.path[0] as string;
+				const key = issue.path[0] as keyof ConnectionFormData;
 				errors[key] = issue.message;
 			}
 			setFieldErrors(errors);
