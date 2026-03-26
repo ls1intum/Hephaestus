@@ -100,12 +100,12 @@ export const rarityTitleColors = {
  * tier. Colors are the `--rarity-*` tokens at a toned-down opacity.
  */
 export const rarityAccentBackgrounds = {
-	common: "bg-rarity-common/40",
-	uncommon: "bg-rarity-uncommon/60",
-	rare: "bg-rarity-rare/60",
-	epic: "bg-rarity-epic/70",
-	legendary: "bg-rarity-legendary/80",
-	mythic: "bg-rarity-mythic-from/80",
+	common: "bg-rarity-common",
+	uncommon: "bg-rarity-uncommon/80",
+	rare: "bg-rarity-rare/80",
+	epic: "bg-rarity-epic/90",
+	legendary: "bg-rarity-legendary",
+	mythic: "bg-rarity-mythic-from",
 } as const satisfies Record<AchievementRarity, string>;
 
 export const rarityIconSizes = {

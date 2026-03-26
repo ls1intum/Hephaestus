@@ -134,8 +134,9 @@ function SidebarBody({
 							<ToggleGroup
 								value={[viewMode]}
 								onValueChange={(value) => {
-									const newValue = value[value.length - 1] as ViewMode | undefined;
-									if (newValue) onViewModeChange(newValue);
+									// Ensure at least one value is selected (last one clicked wins)
+									const newValue = value.length > 0 ? (value[value.length - 1] as ViewMode) : viewMode;
+									if (newValue !== viewMode) onViewModeChange(newValue);
 								}}
 								aria-label="View mode"
 								className="bg-secondary/50 rounded-lg p-1 flex-1"
