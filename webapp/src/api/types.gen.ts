@@ -297,10 +297,6 @@ export type UserSettings = {
      * Whether the user consents to participate in research studies
      */
     participateInResearch: boolean;
-    /**
-     * Whether the user wants to receive notifications
-     */
-    receiveNotifications: boolean;
 };
 
 /**

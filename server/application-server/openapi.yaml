@@ -4826,13 +4826,9 @@ components:
         participateInResearch:
           type: boolean
           description: Whether the user consents to participate in research studies
-        receiveNotifications:
-          type: boolean
-          description: Whether the user wants to receive notifications
       required:
       - aiReviewEnabled
       - participateInResearch
-      - receiveNotifications
     UserTeams:
       type: object
       properties:

@@ -126,7 +126,6 @@ export async function createTestFixtures(): Promise<TestFixtures> {
 	}
 
 	// Insert user - include all NOT NULL columns (native_id and provider_id are required)
-	// Note: notifications_enabled and participate_in_research moved to user_preferences table
 	const userResult = await db.execute(sql`
 		INSERT INTO "user" (id, created_at, updated_at, login, name, type, native_id, provider_id)
 		VALUES (${userId}, NOW(), NOW(), ${userLogin}, 'Test User', 'USER', ${userId}, ${gitProviderId})

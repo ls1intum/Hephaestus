@@ -2063,7 +2063,6 @@ export const userPreferences = pgTable(
 		}),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		userId: bigint("user_id", { mode: "number" }).notNull(),
-		notificationsEnabled: boolean("notifications_enabled").default(true).notNull(),
 		participateInResearch: boolean("participate_in_research").default(true).notNull(),
 		aiReviewEnabled: boolean("ai_review_enabled").default(true).notNull(),
 	},

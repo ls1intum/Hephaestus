@@ -93,9 +93,6 @@ function RouteComponent() {
 		});
 	};
 
-	const handleNotificationToggle = (checked: boolean) =>
-		updateSetting({ receiveNotifications: checked });
-
 	const handleAiReviewToggle = (checked: boolean) => updateSetting({ aiReviewEnabled: checked });
 
 	const handleResearchToggle = (checked: boolean) =>
@@ -109,11 +106,6 @@ function RouteComponent() {
 	return (
 		<SettingsPage
 			isLoading={isLoading}
-			notificationsProps={{
-				receiveNotifications: settings?.receiveNotifications ?? false,
-				onToggleNotifications: handleNotificationToggle,
-				isLoading: updateSettingsMutation.isPending,
-			}}
 			aiReviewProps={{
 				aiReviewEnabled: settings?.aiReviewEnabled ?? true,
 				onToggleAiReview: handleAiReviewToggle,

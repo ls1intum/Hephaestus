@@ -1,17 +1,12 @@
 import { Separator } from "@/components/ui/separator";
 import { AccountSection, type AccountSectionProps } from "./AccountSection";
 import { AiReviewSection, type AiReviewSectionProps } from "./AiReviewSection";
-import { NotificationsSection, type NotificationsSectionProps } from "./NotificationsSection";
 import {
 	ResearchParticipationSection,
 	type ResearchParticipationSectionProps,
 } from "./ResearchParticipationSection";
 
 export interface SettingsPageProps {
-	/**
-	 * Props for the NotificationsSection component
-	 */
-	notificationsProps: NotificationsSectionProps;
 	/**
 	 * Props for the AiReviewSection component (only rendered when showAiReviewSection is true)
 	 */
@@ -43,7 +38,6 @@ export interface SettingsPageProps {
  * Provides a consistent layout for the settings page
  */
 export function SettingsPage({
-	notificationsProps,
 	aiReviewProps,
 	showAiReviewSection,
 	researchProps,
@@ -51,12 +45,10 @@ export function SettingsPage({
 	accountProps,
 	isLoading = false,
 }: SettingsPageProps) {
-	const { isLoading: notificationsLoading = false, ...notificationsRest } = notificationsProps;
 	const { isLoading: aiReviewLoading = false, ...aiReviewRest } = aiReviewProps;
 	const { isLoading: researchLoading = false, ...researchRest } = researchProps;
 	const { isLoading: accountLoading = false, ...accountRest } = accountProps;
 
-	const notificationsPending = isLoading || notificationsLoading;
 	const aiReviewPending = isLoading || aiReviewLoading;
 	const researchPending = isLoading || researchLoading;
 	const accountPending = isLoading || accountLoading;
@@ -69,10 +61,6 @@ export function SettingsPage({
 					Manage your account preferences and settings
 				</p>
 			</div>
-
-			<Separator />
-
-			<NotificationsSection {...notificationsRest} isLoading={notificationsPending} />
 
 			{showAiReviewSection && (
 				<>

@@ -67,14 +67,12 @@ class AccountServiceTest extends BaseUnitTest {
         void returnsAllFields() {
             User user = createUser();
             UserPreferences prefs = createPreferences(user);
-            prefs.setNotificationsEnabled(false);
             prefs.setParticipateInResearch(true);
             prefs.setAiReviewEnabled(false);
             when(userPreferencesRepository.findByUserId(USER_ID)).thenReturn(Optional.of(prefs));
 
             UserSettingsDTO result = accountService.getUserSettings(user);
 
-            assertThat(result.receiveNotifications()).isFalse();
             assertThat(result.participateInResearch()).isTrue();
             assertThat(result.aiReviewEnabled()).isFalse();
         }
@@ -88,7 +86,6 @@ class AccountServiceTest extends BaseUnitTest {
 
             UserSettingsDTO result = accountService.getUserSettings(user);
 
-            assertThat(result.receiveNotifications()).isTrue();
             assertThat(result.participateInResearch()).isTrue();
             assertThat(result.aiReviewEnabled()).isTrue();
         }
@@ -108,7 +105,7 @@ class AccountServiceTest extends BaseUnitTest {
             when(userPreferencesRepository.findByUserId(USER_ID)).thenReturn(Optional.of(prefs));
             when(userPreferencesRepository.save(any(UserPreferences.class))).thenAnswer(inv -> inv.getArgument(0));
 
-            UserSettingsDTO dto = new UserSettingsDTO(true, true, true);
+            UserSettingsDTO dto = new UserSettingsDTO(true, true);
             UserSettingsDTO result = accountService.updateUserSettings(user, dto, KEYCLOAK_USER_ID);
 
             assertThat(result.aiReviewEnabled()).isTrue();
@@ -125,7 +122,7 @@ class AccountServiceTest extends BaseUnitTest {
             when(userPreferencesRepository.findByUserId(USER_ID)).thenReturn(Optional.of(prefs));
             when(userPreferencesRepository.save(any(UserPreferences.class))).thenAnswer(inv -> inv.getArgument(0));
 
-            UserSettingsDTO dto = new UserSettingsDTO(true, true, false);
+            UserSettingsDTO dto = new UserSettingsDTO(true, false);
             UserSettingsDTO result = accountService.updateUserSettings(user, dto, KEYCLOAK_USER_ID);
 
             assertThat(result.aiReviewEnabled()).isFalse();
@@ -141,7 +138,7 @@ class AccountServiceTest extends BaseUnitTest {
             UserPreferences prefs = createPreferences(user);
             when(userPreferencesRepository.findByUserId(USER_ID)).thenReturn(Optional.of(prefs));
 
-            UserSettingsDTO dto = new UserSettingsDTO(true, true, null);
+            UserSettingsDTO dto = new UserSettingsDTO(true, null);
 
             assertThatThrownBy(() -> accountService.updateUserSettings(user, dto, KEYCLOAK_USER_ID))
                 .isInstanceOf(NullPointerException.class)
@@ -157,7 +154,7 @@ class AccountServiceTest extends BaseUnitTest {
             when(userPreferencesRepository.findByUserId(USER_ID)).thenReturn(Optional.of(prefs));
             when(userPreferencesRepository.save(any(UserPreferences.class))).thenAnswer(inv -> inv.getArgument(0));
 
-            UserSettingsDTO dto = new UserSettingsDTO(true, true, false);
+            UserSettingsDTO dto = new UserSettingsDTO(true, false);
             accountService.updateUserSettings(user, dto, KEYCLOAK_USER_ID);
 
             verify(posthogClient, never()).deletePersonData(any());
@@ -240,7 +237,7 @@ class AccountServiceTest extends BaseUnitTest {
             when(userPreferencesRepository.save(any(UserPreferences.class))).thenAnswer(inv -> inv.getArgument(0));
             when(posthogClient.deletePersonData(any())).thenReturn(true);
 
-            UserSettingsDTO dto = new UserSettingsDTO(true, false, false);
+            UserSettingsDTO dto = new UserSettingsDTO(false, false);
             accountService.updateUserSettings(user, dto, KEYCLOAK_USER_ID);
 
             verify(posthogClient).deletePersonData(KEYCLOAK_USER_ID);
@@ -254,13 +251,12 @@ class AccountServiceTest extends BaseUnitTest {
             when(userPreferencesRepository.findByUserId(USER_ID)).thenReturn(Optional.of(prefs));
             when(userPreferencesRepository.save(any(UserPreferences.class))).thenAnswer(inv -> inv.getArgument(0));
 
-            UserSettingsDTO updateDto = new UserSettingsDTO(false, true, false);
+            UserSettingsDTO updateDto = new UserSettingsDTO(true, false);
             UserSettingsDTO updated = accountService.updateUserSettings(user, updateDto, KEYCLOAK_USER_ID);
 
             UserSettingsDTO fetched = accountService.getUserSettings(user);
 
             assertThat(fetched).isEqualTo(updated);
-            assertThat(fetched.receiveNotifications()).isFalse();
             assertThat(fetched.participateInResearch()).isTrue();
             assertThat(fetched.aiReviewEnabled()).isFalse();
         }
