@@ -1,10 +1,15 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { subDays, subHours } from "date-fns";
 import { RefreshCw, Search, XCircleIcon } from "lucide-react";
-import type { ContributorPracticeSummary, PracticeFindingList } from "@/api/types.gen";
+import type {
+	ContributorPracticeSummary,
+	FindingFeedbackEngagement,
+	PracticeFindingList,
+} from "@/api/types.gen";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { EngagementOverview } from "./EngagementOverview";
 import { FindingsList } from "./FindingsList";
 import { PracticeSummaryGrid } from "./PracticeSummaryGrid";
 
@@ -126,6 +131,7 @@ const mockFindings: PracticeFindingList[] = [
 interface PracticeSectionStoryProps {
 	summaries: ContributorPracticeSummary[];
 	findings: PracticeFindingList[];
+	engagement?: FindingFeedbackEngagement;
 	isLoading?: boolean;
 	isEmpty?: boolean;
 	isError?: boolean;
@@ -134,6 +140,7 @@ interface PracticeSectionStoryProps {
 function PracticeSectionStory({
 	summaries,
 	findings,
+	engagement,
 	isLoading = false,
 	isEmpty = false,
 	isError = false,
@@ -173,9 +180,18 @@ function PracticeSectionStory({
 		label: s.practiceName,
 	}));
 
+	const totalFindings = summaries.reduce((sum, s) => sum + s.totalFindings, 0);
+
 	return (
 		<div className="flex flex-col gap-6">
 			<h2 className="text-xl font-semibold">Practices</h2>
+			{engagement && totalFindings > 0 && (
+				<EngagementOverview
+					engagement={engagement}
+					totalFindings={totalFindings}
+					isLoading={isLoading}
+				/>
+			)}
 			<PracticeSummaryGrid
 				summaries={summaries}
 				selectedPracticeSlug={null}
@@ -226,6 +242,7 @@ export const WithFindings: Story = {
 	args: {
 		summaries: mockSummaries,
 		findings: mockFindings,
+		engagement: { applied: 8, disputed: 2, notApplicable: 1 },
 	},
 };
 

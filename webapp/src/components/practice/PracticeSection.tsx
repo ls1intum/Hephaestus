@@ -1,8 +1,11 @@
+import { useQuery } from "@tanstack/react-query";
 import { RefreshCw, Search, XCircleIcon } from "lucide-react";
+import { getEngagementOptions } from "@/api/@tanstack/react-query.gen";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { usePracticeFindings } from "@/hooks/use-practice-findings";
+import { EngagementOverview } from "./EngagementOverview";
 import { FindingsList } from "./FindingsList";
 import { PracticeSummaryGrid } from "./PracticeSummaryGrid";
 
@@ -29,7 +32,16 @@ export function PracticeSection({ workspaceSlug }: PracticeSectionProps) {
 		isFetchingMore,
 		fetchMore,
 		retry,
+		allSummaries,
 	} = usePracticeFindings(workspaceSlug);
+
+	const totalFindings = allSummaries.reduce((sum, s) => sum + s.totalFindings, 0);
+
+	const engagementQuery = useQuery({
+		...getEngagementOptions({ path: { workspaceSlug } }),
+		enabled: practicesEnabled && !isFeaturesLoading && totalFindings > 0,
+		staleTime: 30_000,
+	});
 
 	// Don't render anything while checking feature flag or if disabled
 	if (isFeaturesLoading || !practicesEnabled) {
@@ -71,6 +83,15 @@ export function PracticeSection({ workspaceSlug }: PracticeSectionProps) {
 	return (
 		<div className="flex flex-col gap-6" aria-busy={isInitialLoading}>
 			<h2 className="text-xl font-semibold">Practices</h2>
+
+			{engagementQuery.data && totalFindings > 0 && (
+				<EngagementOverview
+					engagement={engagementQuery.data}
+					totalFindings={totalFindings}
+					isLoading={engagementQuery.isPending}
+				/>
+			)}
+
 			<PracticeSummaryGrid
 				summaries={visibleSummaries}
 				selectedPracticeSlug={selectedPracticeSlug}
@@ -84,6 +105,7 @@ export function PracticeSection({ workspaceSlug }: PracticeSectionProps) {
 				selectedVerdict={selectedVerdict}
 				onPracticeSelect={onPracticeSelect}
 				onVerdictChange={onVerdictChange}
+				workspaceSlug={workspaceSlug}
 				hasMore={hasMore}
 				onLoadMore={fetchMore}
 				isLoading={isInitialLoading}

@@ -27,7 +27,7 @@ const meta = {
 		docs: {
 			description: {
 				component:
-					"Displays a single practice finding with verdict-colored left border, verdict badge, severity badge, and relative date.",
+					"Expandable practice finding card with verdict-colored left border. Click to reveal guidance, evidence, reasoning, and feedback controls.",
 			},
 		},
 	},

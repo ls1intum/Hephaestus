@@ -40,6 +40,7 @@ export interface FindingsListProps {
 	selectedVerdict: VerdictFilter;
 	onPracticeSelect: (practiceSlug: string | null) => void;
 	onVerdictChange: (verdict: VerdictFilter) => void;
+	workspaceSlug?: string;
 	hasMore?: boolean;
 	onLoadMore?: () => void;
 	isLoading?: boolean;
@@ -53,6 +54,7 @@ export function FindingsList({
 	selectedVerdict,
 	onPracticeSelect,
 	onVerdictChange,
+	workspaceSlug,
 	hasMore = false,
 	onLoadMore,
 	isLoading = false,
@@ -136,7 +138,7 @@ export function FindingsList({
 			) : (
 				<ul aria-label="Practice findings" className="flex flex-col gap-2">
 					{findings.map((finding) => (
-						<FindingsListItem key={finding.id} finding={finding} />
+						<FindingsListItem key={finding.id} finding={finding} workspaceSlug={workspaceSlug} />
 					))}
 				</ul>
 			)}
