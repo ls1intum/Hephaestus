@@ -34,7 +34,6 @@
 # Connects to shared infrastructure services (from compose.shared-infra.yaml):
 #   - nats-server: Message queue
 #   - keycloak: Authentication
-#   - postfix: Email relay
 #
 # =============================================================================
 

@@ -20,7 +20,7 @@ const sidebars: SidebarsConfig = {
     {
       type: 'category',
       label: 'Operations',
-      items: ['release-management', 'mail-notifications'],
+      items: ['release-management'],
     },
     {
       type: 'category',

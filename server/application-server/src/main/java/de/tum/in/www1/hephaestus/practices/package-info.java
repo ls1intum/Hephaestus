@@ -22,7 +22,7 @@
  * <h2>Key Components</h2>
  * <ul>
  *   <li>{@link de.tum.in.www1.hephaestus.practices.finding.PracticeFindingController} - Contributor findings API</li>
- *   <li>{@link de.tum.in.www1.hephaestus.practices.finding.FindingFeedbackController} - Contributor feedback API</li>
+ *   <li>{@link de.tum.in.www1.hephaestus.practices.finding.feedback.FindingFeedbackController} - Contributor feedback API</li>
  *   <li>{@link de.tum.in.www1.hephaestus.practices.PracticeCatalogController} - Practice catalog CRUD</li>
  * </ul>
  *
