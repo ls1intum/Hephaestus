@@ -49,6 +49,8 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { TRIGGER_EVENT_OPTIONS, TRIGGER_EVENT_SHORT_LABELS } from "./practice-constants";
 
 export interface AdminPracticesTableProps {
 	practices: Practice[];
@@ -116,11 +118,48 @@ export function AdminPracticesTable({
 			},
 			{
 				id: "triggerEvents",
-				accessorFn: (row) => row.triggerEvents.length,
+				accessorFn: (row) => row.triggerEvents.join(","),
 				header: "Triggers",
-				cell: ({ row }) => (
-					<Badge variant="outline">{row.original.triggerEvents.length} event(s)</Badge>
-				),
+				cell: ({ row }) => {
+					const events = row.original.triggerEvents;
+					if (events.length === 0) {
+						return <span className="text-muted-foreground text-xs">None</span>;
+					}
+
+					const maxVisible = 2;
+					const visible = events.slice(0, maxVisible);
+					const overflowCount = events.length - maxVisible;
+
+					const getShortLabel = (event: string) => TRIGGER_EVENT_SHORT_LABELS[event] ?? event;
+					const getFullLabel = (event: string) =>
+						TRIGGER_EVENT_OPTIONS.find((o) => o.value === event)?.label ?? event;
+
+					return (
+						<div className="flex flex-wrap items-center gap-1">
+							{visible.map((event) => (
+								<Badge key={event} variant="outline" className="text-xs">
+									{getShortLabel(event)}
+								</Badge>
+							))}
+							{overflowCount > 0 && (
+								<Tooltip>
+									<TooltipTrigger
+										render={<Badge variant="secondary" className="text-xs cursor-default" />}
+									>
+										+{overflowCount} more
+									</TooltipTrigger>
+									<TooltipContent side="top">
+										<div className="flex flex-col gap-1">
+											{events.slice(maxVisible).map((event) => (
+												<span key={event}>{getFullLabel(event)}</span>
+											))}
+										</div>
+									</TooltipContent>
+								</Tooltip>
+							)}
+						</div>
+					);
+				},
 			},
 			{
 				accessorKey: "active",
