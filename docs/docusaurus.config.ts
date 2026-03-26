@@ -149,16 +149,16 @@ const config: Config = {
       {
         name: 'description',
         content:
-          'Hephaestus — open-source practice analytics platform that coaches contributors on how they collaborate, with AI-powered feedback, leaderboards, and an AI mentor.',
+          'Hephaestus — open-source practice-aware guidance for software projects. Define your practices, evaluate contributions, and coach each contributor based on their track record.',
       },
-      {name: 'keywords', content: 'Hephaestus, practice analytics, developer coaching, code review, GitHub, AI mentor, contributor engagement, Cognitive Apprenticeship, software engineering education, open source, TUM'},
+      {name: 'keywords', content: 'Hephaestus, practice-aware guidance, practice detection, adaptive coaching, code review, AI mentor, Cognitive Apprenticeship, software engineering education, open source, TUM'},
       {name: 'twitter:card', content: 'summary_large_image'},
       {name: 'twitter:site', content: '@ls1intum'},
       {name: 'twitter:title', content: 'Hephaestus Documentation'},
       {
         name: 'twitter:description',
         content:
-          'Hephaestus — open-source practice analytics platform that coaches contributors on how they collaborate, with AI-powered feedback, leaderboards, and an AI mentor.',
+          'Hephaestus — open-source practice-aware guidance for software projects. Define your practices, evaluate contributions, and coach each contributor based on their track record.',
       },
     ],
     navbar: {

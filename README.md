@@ -7,42 +7,89 @@
   [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/ls1intum/Hephaestus/blob/main/CONTRIBUTING.md)
 </div>
 
-# Hephaestus — Process-Aware Mentoring for Agile Software Teams
+# Hephaestus — How You Build Matters
 
-Hephaestus is an open-source platform for process-aware mentoring that scaffolds self-regulated learning and onboarding for agile software teams. The platform focuses on the software process — from issues to pull requests and team rituals — to bridge the theory–practice gap and help novices adopt industry best practices faster with less struggle. Heph is the platform’s conversational AI mentor that delivers repo-grounded guidance.
+Hephaestus is an open-source platform for **practice-aware guidance**. You define the practices that matter for your project — what good collaboration looks like — and Hephaestus evaluates every contribution against them. When something needs attention, it tells the contributor directly, adapting its guidance based on their track record. Grounded in Cognitive Apprenticeship theory (Collins et al., 1989).
 
 <img alt="Agile Hephaestus" height="200px" src="./docs/user/img/overview/agile_hephaestus.png">
 
 Hephaestus /hɪˈfɛstəs/ is the Greek god of blacksmiths, craftsmen, and artisans, symbolizing the fusion of creativity and technical skill.
 
-## Main Features
+> Currently deployed for software engineering teams using GitHub and GitLab, with a domain model designed for cross-domain extension.
 
-1. **Code Review Gamification**
+## How It Works
 
-   - **Weekly Leaderboard:** Stay motivated with a dynamic leaderboard that updates in real time via GitHub integration. Earn points for review activity, view detailed stats, and easily copy pull request links.
+1. **Define practices** — Admins curate a catalog of engineering practices per workspace (e.g., PR description quality, review thoroughness, error handling standards). Each practice has a detection prompt that tells the AI what to look for.
 
-   - **Team Competitions:** Foster a collaborative spirit with team leaderboards spanning multiple repositories and options to filter the associated activities via labels.
+2. **Evaluate contributions** — When a PR is opened or updated, Hephaestus runs an AI agent in a sandboxed container with full repository access. The agent evaluates the contribution against each relevant practice and produces structured findings with a verdict (positive, negative, or not applicable), severity, and tailored guidance.
 
-   - **Leagues:** Engage in a structured league system where consistent review efforts build an Elo-like ranking — adding a competitive edge to your code reviews.
+3. **Adapt guidance** — The system tracks each contributor's history per practice. New contributors get concrete examples (modeling). Repeat issues get direct coaching. Contributors who've improved get prompts for reflection. This follows Cognitive Apprenticeship: guidance fades as competence grows.
 
-   - **Automated Recognition:** Celebrate excellence with weekly Slack notifications that honor the top three reviewers and link directly to the previous week's leaderboard.
+4. **Deliver feedback** — Findings appear as PR comments and inline code annotations, so feedback lives where the work happens. Contributors can mark findings as applied, disputed, or not applicable.
 
-2. **Heph (Conversational AI Mentor)**
+### Four Health Dimensions
 
-   - **SRL-guided reflection:** Run structured, AI-assisted sessions that support self-regulated learning (goals → strategies → reflection) tailored to agile project work.
-   - **Automated standups:** Turn weekly insights into a concise standup table to streamline team communication and accountability.
-   - **Repo context awareness:** Ground guidance in actual activity (issues, commits, reviews, PRs) to deliver objective, data-informed feedback and next steps.
+Practices are organized into four dimensions so no single area dominates:
+
+| Dimension | What it covers | Example question |
+|-----------|---------------|-----------------|
+| **Technical** | Code and review quality | Are reviews substantive? Are known anti-patterns declining? |
+| **Process** | Workflow effectiveness | Are PRs well-scoped? Is work-in-progress manageable? |
+| **Social** | Collaboration patterns | Is review load shared? Do people work across team boundaries? |
+| **Cognitive** | Understanding and growth | Are contributors building understanding, not just shipping faster? |
+
+## Features
+
+### Practice Detection
+
+The core of the platform. An AI agent evaluates each contribution against your workspace's practice catalog. Findings include a verdict, severity, evidence, and guidance text — each tagged with a Cognitive Apprenticeship method (modeling, coaching, scaffolding, articulation, reflection, or exploration) selected based on the contributor's history with that practice.
+
+Contributors stay in control: mark any finding as applied, disputed, or not applicable.
+
+### AI Mentor (Heph)
+
+A conversational AI mentor grounded in your actual project activity. Heph helps contributors reflect on their work, set goals, and plan next steps. Generates shareable session summaries.
+
+### Engagement & Recognition
+
+Leaderboards, leagues, and achievements make good practices visible across the team. Weekly Slack digests highlight standout contributors.
+
+### Agent Orchestration
+
+Run AI coding agents (Claude Code, Codex, OpenCode) in sandboxed Docker containers with configurable LLM providers, resource limits, and concurrency caps. Agents participate in the same activity stream as other contributors.
+
+## Domain Model
+
+Eight domain-independent concepts form the analytical pipeline — **Observe → Detect → Guide → Grow**:
+
+```
+Participant → performs → Activity → on → Artifact
+                              ↓
+                     aggregates into → Signal ← detects ← Practice
+                                                              ↓
+                                                    informs → Guidance → shapes → Trajectory
+```
+
+| Concept | What it represents | Software engineering example |
+|---------|-------------------|---------------------------|
+| **Project** | Scope of observation | GitHub organization or course workspace |
+| **Participant** | Person contributing to the project | Developer, teaching assistant |
+| **Artifact** | Tangible output of collaboration | PR, review, issue, commit |
+| **Activity** | Observable event in the project | Review submitted, PR opened, comment posted |
+| **Practice** | A standard or pattern to evaluate | "PRs should have descriptive titles and context" |
+| **Signal** | Aggregated measure derived from activity | Review count per week, average PR size |
+| **Guidance** | Feedback delivered to a participant | AI mentor session, PR comment, achievement unlock |
+| **Trajectory** | A participant's development arc over time | Solo contributor → collaborative practitioner |
 
 ## Roadmap
 
-- **Short Term:** Develop initial workspace support by moving environment variable configuration into a user-friendly workspace settings UI for setting up API credentials, webhooks, etc.
-- **Short Term:** Streamline project setup and improve contributor accessibility by enhancing documentation and onboarding resources.
-- **Medium Term:** Expand multi-workspace capabilities to allow configuration of multiple organizations and selected open-source repositories, enabling seamless integration into diverse GitHub projects.
-- **Medium Term:** Integrate GitLab support to cater to self-hosted Git platforms, particularly for educational contexts.
-- **Medium Term:** Develop an advanced mentor prompt scheduler tailored for project-based courses, enabling daily reflective sessions and guided adaptation to evolving project requirements.
-- **Medium Term:** Enhance the gamification system with additional features and further expand Heph's capabilities.
-- **Long Term:** Proactively integrate with GitHub and GitLab to deliver feedback directly via comments on issues or pull requests.
-- **Long Term:** Launch a peer-to-peer recognition system to reward high-quality reviews and establish a review quality assurance mechanism.
+- **Practice Detection**: Broaden practice coverage to include review depth, commit patterns, and issue management
+- **Good Practice Recognition**: Detect and reinforce beneficial patterns, not just flag anti-patterns
+- **PR Comments**: Inline coaching feedback directly on pull requests *(shipped)*
+- **Health Signals**: Explicit multi-dimensional health model with confidence scores
+- **Trajectories**: Track developmental arcs with phase detection and adaptive fading
+- **GitLab Integration**: Full parity with GitHub for self-hosted educational deployments
+- **Generalization**: Validate the framework beyond software engineering (design, research, course projects)
 
 ## Documentation
 

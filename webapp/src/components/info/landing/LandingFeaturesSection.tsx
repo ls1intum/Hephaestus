@@ -11,11 +11,11 @@ export function LandingFeaturesSection() {
 						Key Features
 					</Badge>
 					<h2 className="text-3xl font-bold tracking-tighter sm:text-4xl mb-4">
-						What Hephaestus Does
+						Practice-Aware Guidance
 					</h2>
 					<p className="text-muted-foreground text-lg">
-						Detects anti-patterns in how your team works. Delivers feedback via AI mentor, Slack, or
-						in-app. Tracks engagement with leaderboards.
+						You define what good looks like. Hephaestus evaluates every contribution against your
+						practices and gives each contributor personalized feedback.
 					</p>
 				</div>
 
@@ -27,26 +27,22 @@ export function LandingFeaturesSection() {
 							</div>
 							<CardTitle>Practice Detection</CardTitle>
 							<CardDescription>
-								Identify what's working and what's not — before it becomes habit
+								Evaluate contributions against your project's practice catalog
 							</CardDescription>
 						</CardHeader>
 						<CardContent>
 							<ul className="space-y-2">
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>
-										Catches anti-patterns in collaboration — across PRs, reviews, and commits
-									</span>
+									<span>AI agent evaluates each PR against workspace-defined practices</span>
 								</li>
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>
-										Adapts to context — early work gets coaching, finished work gets rigor
-									</span>
+									<span>Structured findings with verdict, severity, evidence, and guidance</span>
 								</li>
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>You stay in control — accept, dismiss, or challenge any finding</span>
+									<span>You stay in control — mark findings as applied, disputed, or N/A</span>
 								</li>
 							</ul>
 						</CardContent>
@@ -57,26 +53,24 @@ export function LandingFeaturesSection() {
 							<div className="flex items-center gap-2 mb-2">
 								<MessageCircle className="h-5 w-5 text-primary" />
 							</div>
-							<CardTitle>Multi-Channel Guidance</CardTitle>
-							<CardDescription>
-								Feedback via AI mentor, Slack, and in-app notifications
-							</CardDescription>
+							<CardTitle>Adaptive Coaching</CardTitle>
+							<CardDescription>Guidance adapts to each contributor's track record</CardDescription>
 						</CardHeader>
 						<CardContent>
 							<ul className="space-y-2">
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>AI mentor (Heph) helps you reflect on your work and plan next steps</span>
-								</li>
-								<li className="flex gap-2 items-start">
-									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>Notifications via Slack, email, or in-app</span>
-								</li>
-								<li className="flex gap-2 items-start">
-									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
 									<span>
-										Achievements unlock for consistent engagement (e.g., reviewing weekly)
+										New to a practice? Get concrete examples. Repeat issue? Direct coaching.
 									</span>
+								</li>
+								<li className="flex gap-2 items-start">
+									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
+									<span>Findings appear as PR comments and inline code annotations</span>
+								</li>
+								<li className="flex gap-2 items-start">
+									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
+									<span>AI mentor (Heph) for reflection, goal-setting, and session summaries</span>
 								</li>
 							</ul>
 						</CardContent>
@@ -87,27 +81,22 @@ export function LandingFeaturesSection() {
 							<div className="flex items-center gap-2 mb-2">
 								<TrendingUp className="h-5 w-5 text-green-500" />
 							</div>
-							<CardTitle>Growth Tracking</CardTitle>
-							<CardDescription>See development trajectories, not just snapshots</CardDescription>
+							<CardTitle>Engagement & Recognition</CardTitle>
+							<CardDescription>Make good practices visible across the team</CardDescription>
 						</CardHeader>
 						<CardContent>
 							<ul className="space-y-2">
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>Achievement tiers reflect increasing engagement and consistency</span>
+									<span>Leaderboards and leagues track contribution quality over time</span>
 								</li>
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>
-										A league system ranks contributors by engagement and practice quality, updated
-										weekly
-									</span>
+									<span>Achievements recognize sustained good practices</span>
 								</li>
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>
-										Weekly digests and leaderboards make great work visible to the whole team
-									</span>
+									<span>Weekly Slack digests highlight standout contributors</span>
 								</li>
 							</ul>
 						</CardContent>

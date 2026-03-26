@@ -7,25 +7,25 @@ const FEATURES_DATA: FeatureData[] = [
 		icon: ScanSearch,
 		badge: "Detect",
 		title: "Practice Detection",
-		description: "Identify what's working and what's not — before it becomes habit",
+		description: "Evaluate contributions against your project's practice catalog",
 		content:
-			"Analyzes how your team works — across pull requests, reviews, and commits — to catch bad practices before they become habits. Early work gets coaching. Finished work gets rigor.",
+			"An AI agent evaluates each PR against workspace-defined practices. Findings include a verdict, severity, evidence, and tailored guidance. Contributors can mark findings as applied, disputed, or not applicable.",
 	},
 	{
 		icon: MessageCircle,
 		badge: "Guide",
-		title: "Multi-Channel Guidance",
-		description: "Feedback via AI mentor, Slack, and in-app notifications",
+		title: "Adaptive Coaching",
+		description: "Guidance adapts to each contributor's track record",
 		content:
-			"When a practice is detected, feedback reaches the contributor via AI mentor conversations, Slack notifications, or achievement unlocks — driven by actual project activity.",
+			"The system tracks each contributor's history per practice. New contributors get concrete examples. Repeat issues get direct coaching. As competence grows, guidance fades toward reflection.",
 	},
 	{
 		icon: TrendingUp,
 		badge: "Grow",
-		title: "Growth Tracking",
-		description: "See development trajectories, not just snapshots",
+		title: "Engagement & Recognition",
+		description: "Make good practices visible across the team",
 		content:
-			"Achievements and a league system track skill development over time. As practices improve, coaching fades — the goal is independence, not dependence on the tool.",
+			"Leaderboards, leagues, and achievements track engagement over time. Weekly Slack digests highlight standout contributors. The AI mentor (Heph) supports reflection and goal-setting.",
 	},
 ];
 
@@ -36,19 +36,20 @@ export function AboutMissionSection() {
 				<Badge className="mb-4" variant="outline">
 					What Hephaestus Does
 				</Badge>
-				<h2 className="text-3xl font-bold mb-6">Purpose</h2>
+				<h2 className="text-3xl font-bold mb-6">Practice-Aware Guidance</h2>
 
 				<div className="space-y-6">
 					<p className="text-lg leading-relaxed">
-						Most developer analytics tools report to managers. Hephaestus sends feedback directly to
-						individual contributors — analyzing how people collaborate to flag what needs attention
-						and coach improvement.
+						You define a catalog of engineering practices per workspace — what good collaboration
+						looks like for your project. Hephaestus evaluates every contribution against those
+						practices and delivers feedback directly to the contributor, not their manager.
 					</p>
 
 					<div className="border-l-4 border-primary pl-6 py-2">
 						<p className="text-lg font-medium">
-							Feedback should reach the person who can act on it, at the moment they can act on it —
-							not aggregated into a quarterly report for their manager.
+							Guidance adapts to each person's track record: new contributors get concrete examples,
+							repeat issues get direct coaching, and improving contributors get prompts for
+							reflection.
 						</p>
 					</div>
 				</div>

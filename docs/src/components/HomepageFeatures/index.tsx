@@ -16,37 +16,37 @@ type FeatureItem = {
 const FeatureList: FeatureItem[] = [
   {
     title: 'Practice Detection',
-    kicker: 'What gets checked, how to configure it, and how to respond to findings',
+    kicker: 'Define practices. Evaluate every contribution against them.',
     description:
-      'LLM-powered checks flag anti-patterns in how contributors collaborate and document their work. Currently analyzes PR descriptions, review comments, and commit patterns. Drafts receive lighter checks than ready-to-merge work.',
+      'Admins curate a practice catalog per workspace. An AI agent evaluates each PR against those practices and produces structured findings with a verdict, severity, evidence, and tailored guidance.',
     bullets: [
-      'Catches anti-patterns in collaboration — across PRs, reviews, and commits',
-      'Adapts to lifecycle — drafts get coaching, finished work gets rigor',
-      'You stay in control — accept, dismiss, or challenge any finding',
+      'Workspace-defined practices — your standards, not generic rules',
+      'Structured findings: verdict, severity, evidence, and guidance',
+      'Contributors mark findings as applied, disputed, or not applicable',
     ],
     cta: {label: 'See the conceptual model', to: '/contributor/conceptual-model'},
   },
   {
-    title: 'Multi-Channel Guidance',
-    kicker: 'How the AI mentor, notifications, and achievements work',
+    title: 'Adaptive Coaching',
+    kicker: 'Guidance adapts to each contributor\'s track record.',
     description:
-      'When a practice is detected, feedback reaches the contributor via AI mentor conversations, Slack notifications, or achievement unlocks — driven by actual project activity.',
+      'The system tracks each contributor\'s history per practice. New contributors get concrete examples. Repeat issues get direct coaching. Improving contributors get reflection prompts. Guidance fades as competence grows.',
     bullets: [
-      'AI mentor (Heph) helps you reflect on your work and plan next steps',
-      'Notifications via Slack, email, or in-app',
-      'Achievements unlock for consistent engagement (e.g., reviewing weekly)',
+      'Contributor history per practice drives guidance method selection',
+      'Findings appear as PR comments and inline code annotations',
+      'AI mentor (Heph) for reflection, goal-setting, and session summaries',
     ],
     cta: {label: 'Work with the mentor', to: '/user/ai-mentor'},
   },
   {
-    title: 'Growth Tracking',
-    kicker: 'Understanding leaderboards, leagues, and weekly digests',
+    title: 'Engagement & Recognition',
+    kicker: 'Make good practices visible across the team.',
     description:
-      'Leaderboards rank contributors by engagement and practice quality. A league system tracks longer-term progression. Weekly Slack digests highlight standout contributors.',
+      'Leaderboards, leagues, and achievements track engagement over time. Weekly Slack digests highlight standout contributors.',
     bullets: [
-      'Achievement tiers reflect increasing engagement and consistency',
-      'A league system ranks contributors by engagement and practice quality, updated weekly',
-      'Weekly digests and leaderboards highlight top contributors to the team',
+      'Leaderboards and leagues track contribution quality over time',
+      'Achievements recognize sustained good practices',
+      'Weekly Slack digests highlight standout contributors',
     ],
     cta: {label: 'See the leaderboard', to: '/user/leaderboard'},
   },

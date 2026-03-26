@@ -34,10 +34,9 @@ export function LandingWhyChooseSection({
 							Practices, Not Just Metrics
 						</h2>
 						<p className="text-lg text-muted-foreground">
-							Most engineering analytics tools aggregate data into dashboards for managers.
-							Hephaestus sends feedback directly to individual contributors — as AI mentor
-							conversations, Slack notifications, or in-app alerts — so the person who can act on it
-							sees it first.
+							Most analytics tools show managers what happened. Hephaestus tells contributors what
+							to do differently — evaluated against practices your team actually defined, with
+							guidance that adapts as people improve.
 						</p>
 
 						<ul className="grid gap-4 mt-4">
@@ -46,10 +45,11 @@ export function LandingWhyChooseSection({
 									<ScanSearch className="h-4 w-4 text-primary" />
 								</div>
 								<div>
-									<p className="font-medium">Analyzes behavior, not just throughput</p>
+									<p className="font-medium">Your practices, not generic rules</p>
 									<p className="text-sm text-muted-foreground">
-										Flags process anti-patterns — shallow reviews, undocumented changes, lopsided
-										collaboration — that cycle-time dashboards miss.
+										Admins define a practice catalog per workspace. The AI evaluates each
+										contribution against those specific standards — not a one-size-fits-all
+										checklist.
 									</p>
 								</div>
 							</li>
@@ -58,10 +58,11 @@ export function LandingWhyChooseSection({
 									<Layers className="h-4 w-4 text-primary" />
 								</div>
 								<div>
-									<p className="font-medium">Four dimensions of health</p>
+									<p className="font-medium">Guidance that adapts</p>
 									<p className="text-sm text-muted-foreground">
-										Organizes findings into technical, process, social, and cognitive dimensions —
-										so you can see where attention is needed.
+										The system tracks each contributor's history per practice. First time? Concrete
+										examples. Repeat issue? Direct coaching. Consistent improvement? Reflection
+										prompts.
 									</p>
 								</div>
 							</li>
@@ -70,10 +71,10 @@ export function LandingWhyChooseSection({
 									<MessageCircle className="h-4 w-4 text-primary" />
 								</div>
 								<div>
-									<p className="font-medium">Feedback for contributors, not managers</p>
+									<p className="font-medium">Feedback where the work happens</p>
 									<p className="text-sm text-muted-foreground">
-										Feedback goes to the person who can act on it — not aggregated into a report for
-										their manager.
+										Findings appear as PR comments and inline code annotations. Contributors can
+										mark them as applied, disputed, or not applicable.
 									</p>
 								</div>
 							</li>

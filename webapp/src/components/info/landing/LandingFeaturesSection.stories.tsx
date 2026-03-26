@@ -23,7 +23,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * Default features section with two main feature cards:
- * Code Review Gamification and AI-Powered Mentorship.
+ * Default features section with three cards:
+ * Practice Detection, Adaptive Coaching, and Engagement & Recognition.
  */
 export const Default: Story = {};
