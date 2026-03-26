@@ -141,10 +141,8 @@ export function PracticeFormDialog({
 				name: form.name,
 				description: form.description,
 				triggerEvents: form.triggerEvents,
-				...(form.category !== undefined && { category: form.category || undefined }),
-				...(form.detectionPrompt !== undefined && {
-					detectionPrompt: form.detectionPrompt || undefined,
-				}),
+				category: form.category || undefined,
+				detectionPrompt: form.detectionPrompt || undefined,
 			};
 			onSubmit(initialData.slug, data);
 		}
@@ -258,7 +256,13 @@ export function PracticeFormDialog({
 							</div>
 
 							{/* Trigger Events */}
-							<fieldset className="grid gap-2">
+							<fieldset
+								className="grid gap-2"
+								aria-invalid={!!(triggerError && form.name.length > 0)}
+								aria-describedby={
+									triggerError && form.name.length > 0 ? "trigger-error" : undefined
+								}
+							>
 								<legend className="text-sm font-medium leading-none mb-1">Trigger Events *</legend>
 								<div className="grid grid-cols-2 gap-3">
 									{TRIGGER_EVENT_OPTIONS.map((option) => (
@@ -279,7 +283,9 @@ export function PracticeFormDialog({
 									))}
 								</div>
 								{triggerError && form.name.length > 0 && (
-									<p className="text-sm text-destructive">{triggerError}</p>
+									<p id="trigger-error" className="text-sm text-destructive">
+										{triggerError}
+									</p>
 								)}
 							</fieldset>
 

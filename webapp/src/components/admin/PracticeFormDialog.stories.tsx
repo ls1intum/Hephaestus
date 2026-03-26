@@ -45,7 +45,6 @@ export const EditMode: Story = {
 	args: {
 		mode: "edit",
 		initialData: mockPractice,
-		onSubmit: fn(),
 	},
 };
 

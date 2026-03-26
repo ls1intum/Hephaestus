@@ -10,8 +10,10 @@ export const TRIGGER_EVENT_OPTIONS = [
 	{ value: "ReviewSubmitted", label: "Review Submitted" },
 ] as const;
 
+type TriggerEventValue = (typeof TRIGGER_EVENT_OPTIONS)[number]["value"];
+
 /** Short labels for inline badge display in the table. */
-export const TRIGGER_EVENT_SHORT_LABELS: Record<string, string> = {
+export const TRIGGER_EVENT_SHORT_LABELS: Record<TriggerEventValue, string> = {
 	PullRequestCreated: "PR Created",
 	PullRequestReady: "PR Ready",
 	PullRequestSynchronized: "PR Synced",

@@ -86,19 +86,28 @@ export const SinglePractice: Story = {
 	},
 };
 
-/** Many practices to test pagination. */
+/** Many practices to test pagination and trigger event badge overflow. */
 export const ManyItems: Story = {
 	args: {
-		practices: Array.from({ length: 50 }, (_, i) => ({
-			id: i + 1,
-			slug: `practice-${i + 1}`,
-			name: `Practice ${i + 1}`,
-			category: i % 3 === 0 ? "code-quality" : i % 3 === 1 ? "collaboration" : undefined,
-			description: `Description for practice ${i + 1}.`,
-			triggerEvents: i % 2 === 0 ? ["PullRequestCreated"] : ["ReviewSubmitted"],
-			active: i % 4 !== 0,
-			createdAt: new Date("2025-06-01"),
-			updatedAt: new Date("2025-06-15"),
-		})),
+		practices: Array.from({ length: 50 }, (_, i) => {
+			const allEvents = [
+				"PullRequestCreated",
+				"PullRequestReady",
+				"PullRequestSynchronized",
+				"ReviewSubmitted",
+			];
+			const eventCount = i % 5; // 0, 1, 2, 3, 4 events
+			return {
+				id: i + 1,
+				slug: `practice-${i + 1}`,
+				name: `Practice ${i + 1}`,
+				category: i % 3 === 0 ? "code-quality" : i % 3 === 1 ? "collaboration" : undefined,
+				description: `Description for practice ${i + 1}`,
+				triggerEvents: allEvents.slice(0, eventCount),
+				active: i % 4 !== 0,
+				createdAt: new Date("2025-06-01"),
+				updatedAt: new Date("2025-06-15"),
+			};
+		}),
 	},
 };
