@@ -148,19 +148,7 @@ public class WorkspaceSettingsService {
     @Transactional
     public Workspace updateFeatures(Long workspaceId, UpdateWorkspaceFeaturesRequestDTO request) {
         Workspace workspace = requireWorkspace(workspaceId);
-
-        if (request.practicesEnabled() != null) {
-            workspace.setPracticesEnabled(request.practicesEnabled());
-        }
-        if (request.achievementsEnabled() != null) {
-            workspace.setAchievementsEnabled(request.achievementsEnabled());
-        }
-        if (request.leaderboardEnabled() != null) {
-            workspace.setLeaderboardEnabled(request.leaderboardEnabled());
-        }
-        if (request.progressionEnabled() != null) {
-            workspace.setProgressionEnabled(request.progressionEnabled());
-        }
+        workspace.getFeatures().applyPatch(request);
 
         log.info(
             "Updated workspace features: workspaceId={}, practices={}, achievements={}, leaderboard={}, progression={}",

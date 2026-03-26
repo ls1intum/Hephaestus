@@ -33,10 +33,10 @@ public record WorkspaceListItemDTO(
             workspace.getAccountLogin(),
             workspace.getProviderType(),
             workspace.getCreatedAt(),
-            workspace.getPracticesEnabled(),
-            workspace.getAchievementsEnabled(),
-            workspace.getLeaderboardEnabled(),
-            workspace.getProgressionEnabled()
+            workspace.getFeatures().getPracticesEnabled(),
+            workspace.getFeatures().getAchievementsEnabled(),
+            workspace.getFeatures().getLeaderboardEnabled(),
+            workspace.getFeatures().getProgressionEnabled()
         );
     }
 }

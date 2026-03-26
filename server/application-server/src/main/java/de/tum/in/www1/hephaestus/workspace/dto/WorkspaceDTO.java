@@ -71,10 +71,10 @@ public record WorkspaceDTO(
             workspace.getSlackToken() != null && !workspace.getSlackToken().isEmpty(),
             workspace.getSlackSigningSecret() != null && !workspace.getSlackSigningSecret().isEmpty(),
             workspace.getGitlabWebhookId() != null,
-            workspace.getPracticesEnabled(),
-            workspace.getAchievementsEnabled(),
-            workspace.getLeaderboardEnabled(),
-            workspace.getProgressionEnabled()
+            workspace.getFeatures().getPracticesEnabled(),
+            workspace.getFeatures().getAchievementsEnabled(),
+            workspace.getFeatures().getLeaderboardEnabled(),
+            workspace.getFeatures().getProgressionEnabled()
         );
     }
 }

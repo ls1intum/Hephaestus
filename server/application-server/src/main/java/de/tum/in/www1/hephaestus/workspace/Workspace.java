@@ -6,6 +6,7 @@ import de.tum.in.www1.hephaestus.gitprovider.organization.Organization;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -20,6 +21,7 @@ import jakarta.persistence.OneToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -311,25 +313,15 @@ public class Workspace {
     // Feature Flags
     // ========================================================================
 
-    /** Whether the best practices detection and tracking feature is enabled for this workspace */
-    @Column(name = "practices_enabled", nullable = false)
-    @NotNull(message = "Practices enabled flag is required")
-    private Boolean practicesEnabled = false;
-
-    /** Whether the achievements system (badges, skill trees) is enabled for this workspace */
-    @Column(name = "achievements_enabled", nullable = false)
-    @NotNull(message = "Achievements enabled flag is required")
-    private Boolean achievementsEnabled = false;
-
-    /** Whether the leaderboard ranking page is enabled for this workspace */
-    @Column(name = "leaderboard_enabled", nullable = false)
-    @NotNull(message = "Leaderboard enabled flag is required")
-    private Boolean leaderboardEnabled = false;
-
-    /** Whether the league/progression system is enabled for this workspace */
-    @Column(name = "progression_enabled", nullable = false)
-    @NotNull(message = "Progression enabled flag is required")
-    private Boolean progressionEnabled = false;
+    /**
+     * Workspace-scoped feature flags controlling which features are enabled.
+     * Defaults all flags to {@code false} for new workspaces.
+     *
+     * @see WorkspaceFeatures
+     */
+    @Embedded
+    @Valid
+    private WorkspaceFeatures features = new WorkspaceFeatures();
 
     /**
      * Returns the high-level provider type (GITHUB or GITLAB) derived from the authentication mode.
