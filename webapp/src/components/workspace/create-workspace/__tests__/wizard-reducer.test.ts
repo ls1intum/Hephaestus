@@ -84,10 +84,22 @@ describe("wizardReducer", () => {
 	});
 
 	describe("SELECT_GROUP", () => {
-		it("selects a group", () => {
+		it("selects a group on step 2", () => {
 			const state = stateAt(2);
 			const result = wizardReducer(state, { type: "SELECT_GROUP", group: sampleGroup });
 			expect(result.selectedGroup).toEqual(sampleGroup);
+		});
+
+		it("rejects selection from step 1 (guard)", () => {
+			const state = stateAt(1);
+			const result = wizardReducer(state, { type: "SELECT_GROUP", group: sampleGroup });
+			expect(result).toBe(state);
+		});
+
+		it("rejects selection from step 3 (guard)", () => {
+			const state = stateAt(3);
+			const result = wizardReducer(state, { type: "SELECT_GROUP", group: sampleGroup });
+			expect(result).toBe(state);
 		});
 	});
 

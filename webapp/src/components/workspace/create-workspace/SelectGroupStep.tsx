@@ -12,15 +12,12 @@ export function SelectGroupStep() {
 	const { state, dispatch } = useWizard();
 	const [search, setSearch] = useState("");
 
-	const filteredGroups = useMemo(
-		() =>
-			state.groups.filter(
-				(g) =>
-					g.name.toLowerCase().includes(search.toLowerCase()) ||
-					g.fullPath.toLowerCase().includes(search.toLowerCase()),
-			),
-		[state.groups, search],
-	);
+	const filteredGroups = useMemo(() => {
+		const q = search.toLowerCase();
+		return state.groups.filter(
+			(g) => g.name.toLowerCase().includes(q) || g.fullPath.toLowerCase().includes(q),
+		);
+	}, [state.groups, search]);
 
 	if (state.groups.length === 0) {
 		return (
