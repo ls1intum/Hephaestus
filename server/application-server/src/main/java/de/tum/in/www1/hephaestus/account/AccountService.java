@@ -132,10 +132,7 @@ public class AccountService {
     }
 
     private static UserSettingsDTO toDTO(UserPreferences preferences) {
-        return new UserSettingsDTO(
-            preferences.isParticipateInResearch(),
-            preferences.isAiReviewEnabled()
-        );
+        return new UserSettingsDTO(preferences.isParticipateInResearch(), preferences.isAiReviewEnabled());
     }
 
     private boolean deletePosthogIdentities(User user, String primaryDistinctId) {
