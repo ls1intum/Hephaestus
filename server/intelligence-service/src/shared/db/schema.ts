@@ -1304,6 +1304,7 @@ export const practiceFinding = pgTable(
 			"chk_practice_finding_guidance_method",
 			sql`(guidance_method IS NULL) OR ((guidance_method)::text = ANY ((ARRAY['MODELING'::character varying, 'COACHING'::character varying, 'SCAFFOLDING'::character varying, 'ARTICULATION'::character varying, 'REFLECTION'::character varying, 'EXPLORATION'::character varying])::text[]))`,
 		),
+		check("chk_practice_finding_target_type", sql`(target_type)::text = 'PULL_REQUEST'::text`),
 	],
 );
 

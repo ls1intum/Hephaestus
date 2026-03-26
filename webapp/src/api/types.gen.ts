@@ -972,9 +972,9 @@ export type PracticeFindingList = {
      */
     targetId: number;
     /**
-     * Target type (e.g. pull_request, review)
+     * Target type (e.g. PULL_REQUEST)
      */
-    targetType: string;
+    targetType: 'PULL_REQUEST';
     /**
      * Finding title
      */
@@ -1038,9 +1038,9 @@ export type PracticeFindingDetail = {
      */
     targetId: number;
     /**
-     * Target type (e.g. pull_request, review)
+     * Target type (e.g. PULL_REQUEST)
      */
-    targetType: string;
+    targetType: 'PULL_REQUEST';
     /**
      * Finding title
      */

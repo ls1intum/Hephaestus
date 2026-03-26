@@ -28,6 +28,7 @@ import de.tum.in.www1.hephaestus.practices.finding.PracticeDetectionCompletedEve
 import de.tum.in.www1.hephaestus.practices.finding.PracticeFindingRepository;
 import de.tum.in.www1.hephaestus.practices.model.Practice;
 import de.tum.in.www1.hephaestus.practices.model.PracticeFinding;
+import de.tum.in.www1.hephaestus.practices.model.PracticeFindingTargetType;
 import de.tum.in.www1.hephaestus.practices.model.Severity;
 import de.tum.in.www1.hephaestus.practices.model.Verdict;
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
@@ -317,7 +318,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
             PracticeDetectionCompletedEvent event = events.get(0);
             assertThat(event.agentJobId()).isEqualTo(agentJob.getId());
             assertThat(event.workspaceId()).isEqualTo(workspace.getId());
-            assertThat(event.targetType()).isEqualTo("pull_request");
+            assertThat(event.targetType()).isEqualTo(PracticeFindingTargetType.PULL_REQUEST);
             assertThat(event.targetId()).isEqualTo(prId);
             assertThat(event.findingsInserted()).isEqualTo(1);
             assertThat(event.findingsDiscarded()).isZero();
