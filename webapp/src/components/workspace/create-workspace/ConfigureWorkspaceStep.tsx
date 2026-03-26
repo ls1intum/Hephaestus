@@ -107,10 +107,13 @@ export function ConfigureWorkspaceStep() {
 
 			{/* Summary */}
 			<div className="rounded-lg border bg-muted/30 p-3 text-sm">
-				<h2 className="font-medium text-xs text-muted-foreground uppercase tracking-wider mb-1.5">
+				<h2
+					id="workspace-summary-heading"
+					className="font-medium text-xs text-muted-foreground uppercase tracking-wider mb-1.5"
+				>
 					Summary
 				</h2>
-				<dl className="space-y-1.5">
+				<dl className="space-y-1.5" aria-labelledby="workspace-summary-heading">
 					<SummaryRow label="Provider" value="GitLab" />
 					<SummaryRow label="Instance" value={state.serverUrl || "https://gitlab.com"} />
 					<SummaryRow label="Group" value={state.selectedGroup?.fullPath ?? "—"} />

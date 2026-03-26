@@ -57,6 +57,7 @@ export function wizardReducer(state: WizardState, action: WizardAction): WizardS
 			if (state.step !== 1) return state;
 			return { ...state, step: 2, groups: action.groups };
 		case "SELECT_GROUP":
+			if (state.step !== 2) return state;
 			return { ...state, selectedGroup: action.group };
 		case "ADVANCE_TO_CONFIGURE": {
 			if (state.step !== 2 || !state.selectedGroup) return state;
