@@ -14,8 +14,6 @@ src/
 │       ├── reviews.tool.ts     # Factory + Langfuse definition
 │       ├── documents.tool.ts   # Factory + Langfuse definition
 │       └── ...
-├── detector/
-│   └── bad-practice.prompt.ts  # ← Detector prompt
 └── prompts/                # This module (loader + types)
     ├── index.ts            # Re-exports prompts from features
     ├── types.ts            # Type definitions

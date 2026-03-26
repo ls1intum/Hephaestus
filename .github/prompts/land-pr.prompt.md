@@ -66,7 +66,7 @@ npm run db:generate-erd-docs
 **Intelligence-service API changed:**
 
 ```bash
-MODEL_NAME=fake:model DETECTION_MODEL_NAME=fake:model npm run generate:api:intelligence-service:specs
+MODEL_NAME=fake:model npm run generate:api:intelligence-service:specs
 npm run generate:api:intelligence-service:client
 ```
 

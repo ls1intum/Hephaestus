@@ -4,7 +4,7 @@ import { SettingsPage } from "./SettingsPage";
 
 /**
  * SettingsPage component for the user settings page
- * Combines notification, AI review, research, and account management sections
+ * Combines AI review, research, and account management sections
  */
 const meta = {
 	component: SettingsPage,
@@ -13,9 +13,6 @@ const meta = {
 	},
 	tags: ["autodocs"],
 	argTypes: {
-		notificationsProps: {
-			description: "Props for the NotificationsSection component",
-		},
 		aiReviewProps: {
 			description: "Props for the AiReviewSection component",
 		},
@@ -48,10 +45,6 @@ type Story = StoryObj<typeof meta>;
  */
 export const Default: Story = {
 	args: {
-		notificationsProps: {
-			receiveNotifications: true,
-			onToggleNotifications: fn(),
-		},
 		aiReviewProps: {
 			aiReviewEnabled: true,
 			onToggleAiReview: fn(),
@@ -74,10 +67,6 @@ export const Default: Story = {
  */
 export const AllTogglesDisabled: Story = {
 	args: {
-		notificationsProps: {
-			receiveNotifications: false,
-			onToggleNotifications: fn(),
-		},
 		aiReviewProps: {
 			aiReviewEnabled: false,
 			onToggleAiReview: fn(),
@@ -100,10 +89,6 @@ export const AllTogglesDisabled: Story = {
  */
 export const Loading: Story = {
 	args: {
-		notificationsProps: {
-			receiveNotifications: false,
-			onToggleNotifications: fn(),
-		},
 		aiReviewProps: {
 			aiReviewEnabled: true,
 			onToggleAiReview: fn(),
@@ -126,10 +111,6 @@ export const Loading: Story = {
  */
 export const AiReviewHidden: Story = {
 	args: {
-		notificationsProps: {
-			receiveNotifications: true,
-			onToggleNotifications: fn(),
-		},
 		aiReviewProps: {
 			aiReviewEnabled: true,
 			onToggleAiReview: fn(),
@@ -152,10 +133,6 @@ export const AiReviewHidden: Story = {
  */
 export const ResearchHidden: Story = {
 	args: {
-		notificationsProps: {
-			receiveNotifications: true,
-			onToggleNotifications: fn(),
-		},
 		aiReviewProps: {
 			aiReviewEnabled: true,
 			onToggleAiReview: fn(),

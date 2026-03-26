@@ -22,11 +22,9 @@ export function mockFeatureFlags(overrides?: Partial<FeatureFlags>): FeatureFlag
 	return {
 		MENTOR_ACCESS: false,
 		NOTIFICATION_ACCESS: false,
-		RUN_AUTOMATIC_DETECTION: false,
 		RUN_PRACTICE_REVIEW: false,
 		ADMIN: false,
 		PRACTICE_REVIEW_FOR_ALL: false,
-		DETECTION_FOR_ALL: false,
 		GITLAB_WORKSPACE_CREATION: false,
 		...overrides,
 	};

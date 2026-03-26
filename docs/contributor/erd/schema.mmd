@@ -66,22 +66,6 @@ erDiagram
         TEXT container_logs
     }
 
-    BadPracticeDetection {
-        BIGINT id PK
-        TIMESTAMPTZ detected_at
-        VARCHAR(255) trace_id
-        BIGINT pullrequest_id FK
-        TEXT summary
-    }
-
-    BadPracticeFeedback {
-        BIGINT id PK
-        VARCHAR(255) type
-        BIGINT pull_request_bad_practice_id FK
-        TIMESTAMPTZ created_at
-        TEXT explanation
-    }
-
     ChatMessage {
         UUID id PK
         TIMESTAMPTZ created_at "NOT NULL"
@@ -508,20 +492,6 @@ erDiagram
         BIGINT provider_id FK,UK "NOT NULL"
     }
 
-    PullRequestBadPractice {
-        BIGINT id PK
-        VARCHAR(255) title
-        BIGINT pullrequest_id FK
-        VARCHAR(32) state
-        TIMESTAMPTZ detected_at
-        TIMESTAMPTZ updated_at
-        VARCHAR(32) user_state
-        VARCHAR(32) detection_pullrequest_lifecycle_state
-        VARCHAR(255) detection_trace_id
-        BIGINT bad_practice_detection_id FK
-        TEXT description
-    }
-
     PullRequestRequestedReviewer {
         BIGINT pull_request_id PK,FK
         BIGINT user_id PK,FK
@@ -691,7 +661,6 @@ erDiagram
     UserPreference {
         BIGINT id PK
         BIGINT user_id FK,UK "NOT NULL"
-        BOOLEAN notifications_enabled "NOT NULL"
         BOOLEAN participate_in_research "NOT NULL"
         BOOLEAN ai_review_enabled "NOT NULL"
     }
@@ -817,8 +786,6 @@ erDiagram
     Repository ||--o{ ActivityEvent : has
     AgentConfig ||--o{ AgentJob : has
     Workspace ||--o{ AgentJob : has
-    Issue ||--o{ BadPracticeDetection : references
-    PullRequestBadPractice ||--o{ BadPracticeFeedback : has
     ChatMessage ||--o{ ChatMessage : references
     ChatThread ||--o{ ChatMessage : has
     User ||--o{ ChatThread : has
@@ -853,8 +820,6 @@ erDiagram
     Issue ||--o{ ProjectItem : has
     User ||--o{ ProjectStatusUpdate : created_by
     Project ||--o{ ProjectStatusUpdate : has
-    BadPracticeDetection ||--o{ PullRequestBadPractice : has
-    Issue ||--o{ PullRequestBadPractice : references
     User ||--o{ PullRequestReview : reviewed
     Issue ||--o{ PullRequestReview : reviewed
     User ||--o{ PullRequestReviewComment : commented_on

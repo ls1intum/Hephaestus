@@ -93,8 +93,6 @@ class FeatureFlagControllerIntegrationTest extends BaseIntegrationTest {
                 .isEqualTo(false)
                 .jsonPath("$.RUN_PRACTICE_REVIEW")
                 .isEqualTo(false)
-                .jsonPath("$.RUN_AUTOMATIC_DETECTION")
-                .isEqualTo(false)
                 .jsonPath("$.NOTIFICATION_ACCESS")
                 .isEqualTo(false);
         }
@@ -117,15 +115,11 @@ class FeatureFlagControllerIntegrationTest extends BaseIntegrationTest {
                 .exists()
                 .jsonPath("$.NOTIFICATION_ACCESS")
                 .exists()
-                .jsonPath("$.RUN_AUTOMATIC_DETECTION")
-                .exists()
                 .jsonPath("$.RUN_PRACTICE_REVIEW")
                 .exists()
                 .jsonPath("$.ADMIN")
                 .exists()
                 .jsonPath("$.PRACTICE_REVIEW_FOR_ALL")
-                .exists()
-                .jsonPath("$.DETECTION_FOR_ALL")
                 .exists()
                 .jsonPath("$.GITLAB_WORKSPACE_CREATION")
                 .exists();

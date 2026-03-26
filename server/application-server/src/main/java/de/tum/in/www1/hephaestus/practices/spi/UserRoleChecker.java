@@ -31,7 +31,7 @@ public interface UserRoleChecker {
      * callers can safely use the result without wrapping in try-catch.
      *
      * @param username the username (login) to check — must not be null
-     * @param roleName the realm role name to check for (e.g., "run_automatic_detection") — must not be null or blank
+     * @param roleName the realm role name to check for (e.g., "run_practice_review") — must not be null or blank
      * @return true if the user has the specified role, false otherwise (including on error)
      */
     boolean hasRole(@NonNull String username, @NonNull String roleName);

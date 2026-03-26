@@ -20,8 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
  * Service for managing practice definitions (CRUD).
  *
  * <p>This service handles the lifecycle of {@link Practice} entities — creating, reading,
- * updating, and toggling active state. It is distinct from {@link PracticesService} (plural),
- * which orchestrates bad practice detection and resolution workflows.
+ * updating, and toggling active state.
  */
 @Service
 @RequiredArgsConstructor

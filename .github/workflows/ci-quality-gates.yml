@@ -217,7 +217,6 @@ jobs:
         env:
           DATABASE_URL: postgresql://fake:fake@localhost:5432/fake
           MODEL_NAME: fake:model
-          DETECTION_MODEL_NAME: fake:model
         run: |
           npm ci --prefer-offline --no-audit
           cd server/application-server

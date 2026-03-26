@@ -63,9 +63,6 @@ public class AccountService {
 
         UserPreferences preferences = getOrCreatePreferences(user);
 
-        preferences.setNotificationsEnabled(
-            Objects.requireNonNull(userSettings.receiveNotifications(), "receiveNotifications must not be null")
-        );
         preferences.setAiReviewEnabled(
             Objects.requireNonNull(userSettings.aiReviewEnabled(), "aiReviewEnabled must not be null")
         );
@@ -135,11 +132,7 @@ public class AccountService {
     }
 
     private static UserSettingsDTO toDTO(UserPreferences preferences) {
-        return new UserSettingsDTO(
-            preferences.isNotificationsEnabled(),
-            preferences.isParticipateInResearch(),
-            preferences.isAiReviewEnabled()
-        );
+        return new UserSettingsDTO(preferences.isParticipateInResearch(), preferences.isAiReviewEnabled());
     }
 
     private boolean deletePosthogIdentities(User user, String primaryDistinctId) {

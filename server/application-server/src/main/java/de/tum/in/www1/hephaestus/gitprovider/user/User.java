@@ -120,7 +120,7 @@ public class User extends BaseGitServiceEntity {
     // Note: Membership is accessed via the consuming module's repository, not via User entity.
     // The relationship is unidirectional to maintain module separation.
 
-    // Note: User preferences (notificationsEnabled, participateInResearch) are stored in
+    // Note: User preferences (participateInResearch, aiReviewEnabled) are stored in
     // UserPreferences entity in the account module to maintain domain isolation.
     // The gitprovider module should only contain data from the Git provider.
 
