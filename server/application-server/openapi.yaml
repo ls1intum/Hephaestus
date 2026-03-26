@@ -3397,6 +3397,8 @@ components:
           description: Git provider account login (GitHub org/user or GitLab group
             path)
           example: my-org
+          maxLength: 255
+          minLength: 0
         accountType:
           type: string
           description: Type of account (USER or ORG)
@@ -3407,6 +3409,8 @@ components:
           type: string
           description: Human-readable name of the workspace
           example: My Workspace
+          maxLength: 120
+          minLength: 0
         gitProviderMode:
           type: string
           description: Git provider authentication mode. Defaults to PAT_ORG (GitHub
@@ -3419,12 +3423,16 @@ components:
         ownerUserId:
           type: integer
           format: int64
-          description: User ID of the workspace owner
+          deprecated: true
+          description: "Deprecated: ignored by the server. The authenticated user\
+            \ always becomes the owner."
         personalAccessToken:
           type: string
           description: Personal Access Token for GitLab API access. Required when
             gitProviderMode is GITLAB_PAT. Stored encrypted at rest.
           example: your-gitlab-token
+          maxLength: 512
+          minLength: 0
         serverUrl:
           type: string
           description: Custom server URL for self-hosted GitLab instances. Must use
@@ -3439,7 +3447,6 @@ components:
       - accountLogin
       - accountType
       - displayName
-      - ownerUserId
       - workspaceSlug
     Document:
       type: object
