@@ -1,4 +1,4 @@
-import { ArrowRight, Code, Hammer, Users } from "lucide-react";
+import { ArrowRight, Layers, MessageCircle, ScanSearch } from "lucide-react";
 import agileHephaestus from "@/assets/agile_hephaestus.png";
 import { GitHubSignInButton } from "@/components/auth/GitHubSignInButton";
 import { Badge } from "@/components/ui/badge";
@@ -28,47 +28,52 @@ export function LandingWhyChooseSection({
 					/>
 					<div className="flex flex-col justify-center space-y-5">
 						<Badge className="w-fit" variant="outline">
-							Our Approach
+							What's Different
 						</Badge>
 						<h2 className="text-3xl font-bold tracking-tighter sm:text-4xl">
-							Why Choose Hephaestus?
+							Practices, Not Just Metrics
 						</h2>
 						<p className="text-lg text-muted-foreground">
-							Named after the Greek god of craftsmen, Hephaestus combines creativity with technical
-							expertise to build better team habits through process-aware, AI-guided mentoring.
+							Most engineering analytics tools aggregate data into dashboards for managers.
+							Hephaestus sends feedback directly to individual contributors — as AI mentor
+							conversations, Slack notifications, or in-app alerts — so the person who can act on it
+							sees it first.
 						</p>
 
 						<ul className="grid gap-4 mt-4">
 							<li className="flex items-start gap-3">
 								<div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 mt-0.5">
-									<Hammer className="h-4 w-4 text-primary" />
+									<ScanSearch className="h-4 w-4 text-primary" />
 								</div>
 								<div>
-									<p className="font-medium">Empower engineers</p>
+									<p className="font-medium">Analyzes behavior, not just throughput</p>
 									<p className="text-sm text-muted-foreground">
-										Tools that accelerate learning through real-world feedback
+										Flags process anti-patterns — shallow reviews, undocumented changes, lopsided
+										collaboration — that cycle-time dashboards miss.
 									</p>
 								</div>
 							</li>
 							<li className="flex items-start gap-3">
 								<div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 mt-0.5">
-									<Users className="h-4 w-4 text-primary" />
+									<Layers className="h-4 w-4 text-primary" />
 								</div>
 								<div>
-									<p className="font-medium">Foster collaboration</p>
+									<p className="font-medium">Four dimensions of health</p>
 									<p className="text-sm text-muted-foreground">
-										Build team habits that strengthen your engineering culture
+										Organizes findings into technical, process, social, and cognitive dimensions —
+										so you can see where attention is needed.
 									</p>
 								</div>
 							</li>
 							<li className="flex items-start gap-3">
 								<div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 mt-0.5">
-									<Code className="h-4 w-4 text-primary" />
+									<MessageCircle className="h-4 w-4 text-primary" />
 								</div>
 								<div>
-									<p className="font-medium">Improve code quality</p>
+									<p className="font-medium">Feedback for contributors, not managers</p>
 									<p className="text-sm text-muted-foreground">
-										Motivate better code reviews through friendly competition
+										Feedback goes to the person who can act on it — not aggregated into a report for
+										their manager.
 									</p>
 								</div>
 							</li>

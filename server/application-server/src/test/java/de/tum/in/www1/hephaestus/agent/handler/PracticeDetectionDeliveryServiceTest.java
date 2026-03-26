@@ -28,7 +28,6 @@ import de.tum.in.www1.hephaestus.practices.finding.PracticeDetectionProperties;
 import de.tum.in.www1.hephaestus.practices.finding.PracticeFindingRepository;
 import de.tum.in.www1.hephaestus.practices.model.CaMethod;
 import de.tum.in.www1.hephaestus.practices.model.Practice;
-import de.tum.in.www1.hephaestus.practices.model.PracticeFindingTargetType;
 import de.tum.in.www1.hephaestus.practices.model.Severity;
 import de.tum.in.www1.hephaestus.practices.model.Verdict;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
@@ -158,10 +157,10 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
 
             verify(practiceFindingRepository).insertIfAbsent(
                 any(UUID.class),
-                eq("pr-description-quality:PULL_REQUEST:456:" + testJob.getId() + ":0"),
+                eq("pr-description-quality:pull_request:456:" + testJob.getId() + ":0"),
                 eq(testJob.getId()),
                 eq(10L),
-                eq("PULL_REQUEST"),
+                eq("pull_request"),
                 eq(456L),
                 eq(789L),
                 eq("Test finding"),
@@ -433,7 +432,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             );
 
             String key = keyCaptor.getValue();
-            assertThat(key).isEqualTo("pr-description-quality:PULL_REQUEST:456:" + testJob.getId() + ":0");
+            assertThat(key).isEqualTo("pr-description-quality:pull_request:456:" + testJob.getId() + ":0");
         }
     }
 
@@ -466,7 +465,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             assertThat(event.findingsDiscarded()).isEqualTo(1); // unknown slug
             assertThat(event.hasNegative()).isTrue(); // error-handling finding is NEGATIVE
             assertThat(event.contributorId()).isEqualTo(789L);
-            assertThat(event.targetType()).isEqualTo(PracticeFindingTargetType.PULL_REQUEST);
+            assertThat(event.targetType()).isEqualTo("pull_request");
             assertThat(event.targetId()).isEqualTo(456L);
         }
     }

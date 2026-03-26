@@ -14,7 +14,6 @@ import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.practices.PracticeRepository;
 import de.tum.in.www1.hephaestus.practices.model.Practice;
 import de.tum.in.www1.hephaestus.practices.model.PracticeFinding;
-import de.tum.in.www1.hephaestus.practices.model.PracticeFindingTargetType;
 import de.tum.in.www1.hephaestus.practices.model.Verdict;
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.in.www1.hephaestus.testconfig.TestUserFactory;
@@ -100,7 +99,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "key-1",
                 agentJob.getId(),
                 practice.getId(),
-                "PULL_REQUEST",
+                "pull_request",
                 42L,
                 contributor.getId(),
                 "Good PR description",
@@ -139,7 +138,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "dup-key",
                 agentJob.getId(),
                 practice.getId(),
-                "PULL_REQUEST",
+                "pull_request",
                 1L,
                 contributor.getId(),
                 "Duplicate test",
@@ -158,7 +157,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "dup-key",
                 agentJob.getId(),
                 practice.getId(),
-                "PULL_REQUEST",
+                "pull_request",
                 2L,
                 contributor.getId(),
                 "Should not insert",
@@ -188,7 +187,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "evidence-key",
                 agentJob.getId(),
                 practice.getId(),
-                "PULL_REQUEST",
+                "pull_request",
                 99L,
                 contributor.getId(),
                 "Missing error handling in Main.java",
@@ -224,7 +223,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "purge-key",
                 agentJob.getId(),
                 practice.getId(),
-                "PULL_REQUEST",
+                "pull_request",
                 1L,
                 contributor.getId(),
                 "Purge test finding",
@@ -275,7 +274,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "ws-a-key",
                 agentJob.getId(),
                 practice.getId(),
-                "PULL_REQUEST",
+                "pull_request",
                 1L,
                 contributor.getId(),
                 "WS-A finding",
@@ -294,7 +293,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "ws-b-key",
                 agentJobB.getId(),
                 practiceB.getId(),
-                "PULL_REQUEST",
+                "pull_request",
                 2L,
                 contributor.getId(),
                 "WS-B finding",
@@ -342,7 +341,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "cascade-key-1",
                 agentJob.getId(),
                 practice.getId(),
-                "PULL_REQUEST",
+                "pull_request",
                 1L,
                 contributor.getId(),
                 "Cascade test 1",
@@ -361,7 +360,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "cascade-key-2",
                 agentJob.getId(),
                 otherPractice.getId(),
-                "PULL_REQUEST",
+                "pull_request",
                 2L,
                 contributor.getId(),
                 "Cascade test 2",
@@ -487,7 +486,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "iso-2",
                 otherJob.getId(),
                 otherPractice.getId(),
-                "PULL_REQUEST",
+                "pull_request",
                 2L,
                 contributor.getId(),
                 "Other WS finding",
@@ -548,7 +547,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "contrib-iso-2",
                 agentJob.getId(),
                 practice.getId(),
-                "PULL_REQUEST",
+                "pull_request",
                 2L,
                 otherContributor.getId(),
                 "Other contributor finding",
@@ -596,7 +595,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 idempotencyKey,
                 agentJob.getId(),
                 targetPractice.getId(),
-                "PULL_REQUEST",
+                "pull_request",
                 1L,
                 contributor.getId(),
                 "Test finding",
@@ -609,38 +608,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 null,
                 detectedAt
             );
-        }
-    }
-
-    @Nested
-    @DisplayName("target_type enum mapping")
-    class TargetTypeTests {
-
-        @Test
-        @DisplayName("persisted 'PULL_REQUEST' maps to PracticeFindingTargetType.PULL_REQUEST on read")
-        void enumRoundTrip() {
-            UUID id = UUID.randomUUID();
-            practiceFindingRepository.insertIfAbsent(
-                id,
-                "tt-roundtrip",
-                agentJob.getId(),
-                practice.getId(),
-                "PULL_REQUEST",
-                1L,
-                contributor.getId(),
-                "Enum mapping test",
-                "POSITIVE",
-                "INFO",
-                0.9f,
-                null,
-                null,
-                null,
-                null,
-                Instant.now()
-            );
-
-            PracticeFinding found = practiceFindingRepository.findById(id).orElseThrow();
-            assertThat(found.getTargetType()).isEqualTo(PracticeFindingTargetType.PULL_REQUEST);
         }
     }
 }

@@ -9,12 +9,12 @@ import styles from './index.module.css';
 const guideLinks = [
   {
     title: 'User Guide',
-    description: 'Navigate weekly rituals, mentoring flows, and leaderboard insights.',
+    description: 'Use the AI mentor, leaderboards, and weekly digests to improve your practices.',
     to: '/user/overview',
   },
   {
     title: 'Contributor Guide',
-    description: 'Set up local services, follow coding standards, and ship with confidence.',
+    description: 'Set up local development, understand the architecture, and follow coding standards.',
     to: '/contributor/overview',
   },
   {
@@ -30,10 +30,10 @@ function HomepageHeader() {
       <div className="container">
         <div className={styles.heroCopy}>
           <Heading as="h1" className={styles.heroTitle}>
-            Process-Aware Mentoring for Agile Software Teams
+            How You Build Matters
           </Heading>
           <p className={styles.heroSubtitle}>
-            Onboard faster and learn better habits with an AI mentor grounded in your repo workflow — from issues to pull requests and team rituals.
+            Documentation for the Hephaestus platform — practice analytics, AI mentoring, and contributor engagement.
           </p>
           <div className={styles.heroActions}>
             <Link className="button button--primary button--lg" to="/user/overview">
@@ -81,7 +81,7 @@ export default function Home(): ReactNode {
   return (
     <Layout
       title={siteConfig.title}
-      description="Process-Aware Mentoring for Agile Software Teams with AI guidance, gamified reviews, and actionable analytics.">
+      description="Hephaestus documentation — an open-source practice analytics platform that coaches individual contributors on how they collaborate. Currently analyzes GitHub activity.">
       <HomepageHeader />
       <main>
         <QuickstartGuides />

@@ -94,9 +94,8 @@ public class PracticeFinding {
     private Practice practice;
 
     @NotNull
-    @Enumerated(EnumType.STRING)
     @Column(name = "target_type", length = 32, nullable = false)
-    private PracticeFindingTargetType targetType;
+    private String targetType;
 
     @NotNull
     @Column(name = "target_id", nullable = false)

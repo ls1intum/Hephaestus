@@ -1,5 +1,4 @@
-import { CheckCheck, Trophy } from "lucide-react";
-import { MentorIcon } from "@/components/mentor/MentorIcon";
+import { CheckCheck, MessageCircle, ScanSearch, TrendingUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -12,35 +11,42 @@ export function LandingFeaturesSection() {
 						Key Features
 					</Badge>
 					<h2 className="text-3xl font-bold tracking-tighter sm:text-4xl mb-4">
-						Tools for Team Growth
+						What Hephaestus Does
 					</h2>
 					<p className="text-muted-foreground text-lg">
-						Features designed to elevate your engineering team's collaboration and learning
+						Detects anti-patterns in how your team works. Delivers feedback via AI mentor, Slack, or
+						in-app. Tracks engagement with leaderboards.
 					</p>
 				</div>
 
-				<div className="grid gap-8 md:grid-cols-2">
+				<div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
 					<Card>
 						<CardHeader>
 							<div className="flex items-center gap-2 mb-2">
-								<Trophy className="h-5 w-5 text-yellow-500" />
+								<ScanSearch className="h-5 w-5 text-blue-500" />
 							</div>
-							<CardTitle>Code Review Gamification</CardTitle>
-							<CardDescription>Transform code reviews into learning opportunities</CardDescription>
+							<CardTitle>Practice Detection</CardTitle>
+							<CardDescription>
+								Identify what's working and what's not — before it becomes habit
+							</CardDescription>
 						</CardHeader>
 						<CardContent>
 							<ul className="space-y-2">
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>Weekly leaderboards with GitHub integration</span>
+									<span>
+										Catches anti-patterns in collaboration — across PRs, reviews, and commits
+									</span>
 								</li>
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>Team competitions across multiple repositories</span>
+									<span>
+										Adapts to context — early work gets coaching, finished work gets rigor
+									</span>
 								</li>
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>Structured league system for ongoing engagement</span>
+									<span>You stay in control — accept, dismiss, or challenge any finding</span>
 								</li>
 							</ul>
 						</CardContent>
@@ -48,27 +54,60 @@ export function LandingFeaturesSection() {
 
 					<Card>
 						<CardHeader>
-							<div className="flex items-center gap-2 mb-2 text-muted-foreground">
-								<MentorIcon className="-m-2" size={32} pad={4} />
+							<div className="flex items-center gap-2 mb-2">
+								<MessageCircle className="h-5 w-5 text-primary" />
 							</div>
-							<CardTitle>Process-Aware AI Mentoring</CardTitle>
+							<CardTitle>Multi-Channel Guidance</CardTitle>
 							<CardDescription>
-								Heph provides guidance grounded in your repository activity
+								Feedback via AI mentor, Slack, and in-app notifications
 							</CardDescription>
 						</CardHeader>
 						<CardContent>
 							<ul className="space-y-2">
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>SRL-guided weekly reflection</span>
+									<span>AI mentor (Heph) helps you reflect on your work and plan next steps</span>
 								</li>
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>Repo activity context for objective feedback</span>
+									<span>Notifications via Slack, email, or in-app</span>
 								</li>
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>Goal setting and progress tracking</span>
+									<span>
+										Achievements unlock for consistent engagement (e.g., reviewing weekly)
+									</span>
+								</li>
+							</ul>
+						</CardContent>
+					</Card>
+
+					<Card>
+						<CardHeader>
+							<div className="flex items-center gap-2 mb-2">
+								<TrendingUp className="h-5 w-5 text-green-500" />
+							</div>
+							<CardTitle>Growth Tracking</CardTitle>
+							<CardDescription>See development trajectories, not just snapshots</CardDescription>
+						</CardHeader>
+						<CardContent>
+							<ul className="space-y-2">
+								<li className="flex gap-2 items-start">
+									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
+									<span>Achievement tiers reflect increasing engagement and consistency</span>
+								</li>
+								<li className="flex gap-2 items-start">
+									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
+									<span>
+										A league system ranks contributors by engagement and practice quality, updated
+										weekly
+									</span>
+								</li>
+								<li className="flex gap-2 items-start">
+									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
+									<span>
+										Weekly digests and leaderboards make great work visible to the whole team
+									</span>
 								</li>
 							</ul>
 						</CardContent>

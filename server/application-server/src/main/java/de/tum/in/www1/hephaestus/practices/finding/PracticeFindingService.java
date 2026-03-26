@@ -5,7 +5,6 @@ import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.practices.finding.dto.ContributorPracticeSummaryProjection;
 import de.tum.in.www1.hephaestus.practices.model.PracticeFinding;
-import de.tum.in.www1.hephaestus.practices.model.PracticeFindingTargetType;
 import de.tum.in.www1.hephaestus.practices.model.Verdict;
 import java.util.List;
 import java.util.Optional;
@@ -97,10 +96,6 @@ public class PracticeFindingService {
      */
     @Transactional(readOnly = true)
     public List<PracticeFinding> getFindingsForPullRequest(Long workspaceId, Long pullRequestId) {
-        return practiceFindingRepository.findByPullRequestAndWorkspace(
-            PracticeFindingTargetType.PULL_REQUEST,
-            pullRequestId,
-            workspaceId
-        );
+        return practiceFindingRepository.findByPullRequestAndWorkspace(pullRequestId, workspaceId);
     }
 }

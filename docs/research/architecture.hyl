@@ -1,0 +1,102 @@
+// Hephaestus Architecture — 7 Components
+// Render at https://hylimo.github.io
+componentDiagram {
+
+    // === Internal Platform ===
+    component("Hephaestus") {
+
+        component("WebApp", keywords = list("React 19")) layout {
+            pos = apos(50, 50)
+        }
+
+        component("ApplicationServer", keywords = list("Spring Boot")) layout {
+            pos = apos(500, 50)
+        }
+
+        component("IntelligenceService", keywords = list("Hono")) layout {
+            pos = apos(50, 250)
+        }
+
+        component("WebhookIngest", keywords = list("Hono")) layout {
+            pos = apos(500, 250)
+        }
+
+    } layout {
+        pos = apos(200, 0)
+    }
+
+    // === External Systems (row 1) ===
+    component("CodePlatforms", keywords = list("GitHub, GitLab")) layout {
+        pos = apos(0, 650)
+    }
+
+    component("PostgreSQL", keywords = list("Database")) layout {
+        pos = apos(350, 650)
+    }
+
+    component("NATS", keywords = list("Events")) layout {
+        pos = apos(650, 650)
+    }
+
+    // === External Systems (row 2) ===
+    component("Keycloak", keywords = list("Auth")) layout {
+        pos = apos(950, 650)
+    }
+
+    component("LLMProvider", keywords = list("AI")) layout {
+        pos = apos(1250, 650)
+    }
+
+    component("Langfuse", keywords = list("Traces")) layout {
+        pos = apos(1550, 650)
+    }
+
+    // === Internal Interfaces ===
+
+    // WebApp → ApplicationServer (REST)
+    appREST = ApplicationServer.provides("REST", 0.5, dist = 50)
+    webREST = WebApp.requires("REST", 0.5)
+    webREST dependsOn appREST
+
+    // WebApp → IntelligenceService (Mentor)
+    intelMentor = IntelligenceService.provides("MentorAPI", 0.75, dist = 50)
+    webMentor = WebApp.requires("MentorAPI", 0.75)
+    webMentor dependsOn intelMentor
+
+    // ApplicationServer → IntelligenceService (AI)
+    appAI = ApplicationServer.requires("AI", 0.75)
+    appAI dependsOn intelMentor
+
+    // WebhookIngest provides Webhooks
+    webhookIn = WebhookIngest.provides("Webhooks", 0.75, dist = 50)
+
+    // === External Dependencies ===
+
+    pgDB = PostgreSQL.provides("DB", 0.5, dist = 40)
+    natsEvents = NATS.provides("Events", 0.5, dist = 40)
+    kcAuth = Keycloak.provides("Auth", 0.5, dist = 40)
+    llmAI = LLMProvider.provides("LLM", 0.5, dist = 40)
+    lfTraces = Langfuse.provides("Traces", 0.5, dist = 40)
+
+    // ApplicationServer → External
+    appDB = ApplicationServer.requires("DB", 0.25)
+    appDB dependsOn pgDB
+    appEvents = ApplicationServer.requires("Events", 0.25)
+    appEvents dependsOn natsEvents
+    appAuthReq = ApplicationServer.requires("Auth", 0.25)
+    appAuthReq dependsOn kcAuth
+
+    // IntelligenceService → External
+    intelLLM = IntelligenceService.requires("LLM", 0.25)
+    intelLLM dependsOn llmAI
+    intelTraces = IntelligenceService.requires("Traces", 0.25)
+    intelTraces dependsOn lfTraces
+
+    // WebhookIngest → NATS
+    webhookPub = WebhookIngest.requires("Publish", 0.25)
+    webhookPub dependsOn natsEvents
+
+    // CodePlatforms → WebhookIngest
+    cpWebhooks = CodePlatforms.requires("push", 0.5)
+    cpWebhooks dependsOn webhookIn
+}

@@ -6,7 +6,7 @@ import type * as Preset from '@docusaurus/preset-classic';
 
 const config: Config = {
   title: 'Hephaestus Documentation',
-  tagline: 'Process-Aware Mentoring for Agile Software Teams',
+  tagline: 'How You Build Matters',
   favicon: 'img/favicon.ico',
 
   // Future flags and performance optimizations
@@ -149,16 +149,16 @@ const config: Config = {
       {
         name: 'description',
         content:
-          'Onboard faster and learn better habits with an AI mentor grounded in your repo workflow — from issues to pull requests and team rituals.',
+          'Hephaestus — open-source practice analytics platform that coaches contributors on how they collaborate, with AI-powered feedback, leaderboards, and an AI mentor.',
       },
-      {name: 'keywords', content: 'Hephaestus, AI mentor, agile coaching, code review gamification, TUM'},
+      {name: 'keywords', content: 'Hephaestus, practice analytics, developer coaching, code review, GitHub, AI mentor, contributor engagement, Cognitive Apprenticeship, software engineering education, open source, TUM'},
       {name: 'twitter:card', content: 'summary_large_image'},
       {name: 'twitter:site', content: '@ls1intum'},
       {name: 'twitter:title', content: 'Hephaestus Documentation'},
       {
         name: 'twitter:description',
         content:
-          'Onboard faster and learn better habits with an AI mentor grounded in your repo workflow — from issues to pull requests and team rituals.',
+          'Hephaestus — open-source practice analytics platform that coaches contributors on how they collaborate, with AI-powered feedback, leaderboards, and an AI mentor.',
       },
     ],
     navbar: {
