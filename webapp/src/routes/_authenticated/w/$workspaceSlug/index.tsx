@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, retainSearchParams, useNavigate } from "@tanstack/react-router";
 import { formatISO } from "date-fns";
 import { useEffect } from "react";
+import { toast } from "sonner";
 import { z } from "zod";
 import {
 	computeUserLeagueStatsOptions,
@@ -12,8 +13,10 @@ import {
 } from "@/api/@tanstack/react-query.gen";
 import { LeaderboardPage } from "@/components/leaderboard/LeaderboardPage";
 import type { LeaderboardSortType } from "@/components/leaderboard/SortFilter";
+import { Spinner } from "@/components/ui/spinner";
 import { NoWorkspace } from "@/components/workspace/NoWorkspace";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
+import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
 import { useAuth } from "@/integrations/auth/AuthContext";
 import {
 	DEFAULT_SCHEDULE,
@@ -49,6 +52,7 @@ function LeaderboardContainer() {
 	// Get the current user from auth context
 	const { username } = useAuth();
 	const { workspaceSlug, providerType, isLoading: isWorkspaceLoading } = useActiveWorkspaceSlug();
+	const { leaderboardEnabled, isLoading: featuresLoading } = useWorkspaceFeatures();
 	const slug = workspaceSlug ?? "";
 	const hasWorkspace = Boolean(workspaceSlug);
 	const showNoWorkspace = !isWorkspaceLoading && !hasWorkspace;
@@ -246,6 +250,26 @@ function LeaderboardContainer() {
 		}),
 		enabled: hasWorkspace && Boolean(username) && Boolean(parsedAfter) && Boolean(parsedBefore),
 	});
+
+	// Feature guard — redirect to profile when leaderboard is disabled
+	useEffect(() => {
+		if (!featuresLoading && !leaderboardEnabled && workspaceSlug && username) {
+			toast.error("Leaderboard is not enabled for this workspace");
+			navigate({
+				to: "/w/$workspaceSlug/user/$username",
+				params: { workspaceSlug, username },
+				replace: true,
+			});
+		}
+	}, [featuresLoading, leaderboardEnabled, workspaceSlug, username, navigate]);
+
+	if (featuresLoading || !leaderboardEnabled) {
+		return (
+			<div className="flex items-center justify-center h-96">
+				<Spinner className="size-8" />
+			</div>
+		);
+	}
 
 	if (showNoWorkspace) {
 		return <NoWorkspace />;

@@ -83,6 +83,10 @@ export type WorkspaceListItem = {
      */
     accountLogin: string;
     /**
+     * Whether the achievements system is enabled
+     */
+    achievementsEnabled: boolean;
+    /**
      * Timestamp when the workspace was created
      */
     createdAt: Date;
@@ -94,6 +98,18 @@ export type WorkspaceListItem = {
      * Unique identifier of the workspace
      */
     id: number;
+    /**
+     * Whether the leaderboard is enabled
+     */
+    leaderboardEnabled: boolean;
+    /**
+     * Whether best practices detection is enabled
+     */
+    practicesEnabled: boolean;
+    /**
+     * Whether the league/progression system is enabled
+     */
+    progressionEnabled: boolean;
     /**
      * High-level git provider type (GITHUB or GITLAB)
      */
@@ -116,6 +132,10 @@ export type Workspace = {
      * Git provider account login associated with this workspace
      */
     accountLogin: string;
+    /**
+     * Whether the achievements system is enabled
+     */
+    achievementsEnabled: boolean;
     /**
      * Timestamp when the workspace was created
      */
@@ -161,6 +181,10 @@ export type Workspace = {
      */
     isPubliclyViewable: boolean;
     /**
+     * Whether the leaderboard is enabled
+     */
+    leaderboardEnabled: boolean;
+    /**
      * Slack channel ID for leaderboard notifications
      */
     leaderboardNotificationChannelId?: string;
@@ -180,6 +204,14 @@ export type Workspace = {
      * Time for leaderboard notifications in HH:mm format
      */
     leaderboardScheduleTime?: string;
+    /**
+     * Whether best practices detection is enabled
+     */
+    practicesEnabled: boolean;
+    /**
+     * Whether the league/progression system is enabled
+     */
+    progressionEnabled: boolean;
     /**
      * High-level git provider type derived from the authentication mode
      */
@@ -535,6 +567,28 @@ export type UpdateWorkspaceNotificationsRequest = {
      * Team name for filtering leaderboard notifications
      */
     team?: string;
+};
+
+/**
+ * Request to update workspace feature flags. Null fields are left unchanged.
+ */
+export type UpdateWorkspaceFeaturesRequest = {
+    /**
+     * Enable the achievements system
+     */
+    achievementsEnabled?: boolean;
+    /**
+     * Enable the leaderboard ranking page
+     */
+    leaderboardEnabled?: boolean;
+    /**
+     * Enable best practices detection and tracking
+     */
+    practicesEnabled?: boolean;
+    /**
+     * Enable the league/progression system
+     */
+    progressionEnabled?: boolean;
 };
 
 /**
@@ -2484,6 +2538,27 @@ export type DetectForUserResponses = {
 };
 
 export type DetectForUserResponse = DetectForUserResponses[keyof DetectForUserResponses];
+
+export type UpdateFeaturesData = {
+    body: UpdateWorkspaceFeaturesRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/features';
+};
+
+export type UpdateFeaturesResponses = {
+    /**
+     * Workspace updated
+     */
+    200: Workspace;
+};
+
+export type UpdateFeaturesResponse = UpdateFeaturesResponses[keyof UpdateFeaturesResponses];
 
 export type GetLeaderboardData = {
     body?: never;

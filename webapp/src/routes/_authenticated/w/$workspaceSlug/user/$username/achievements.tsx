@@ -1,5 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
+import { toast } from "sonner";
 import { AchievementsView } from "@/components/achievements/AchievementsView";
+import { Spinner } from "@/components/ui/spinner";
+import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
 import { useAuth } from "@/integrations/auth/AuthContext";
 
 export const Route = createFileRoute(
@@ -15,6 +19,27 @@ export const Route = createFileRoute(
 function UserAchievementsPage() {
 	const { workspaceSlug, username } = Route.useParams();
 	const { isCurrentUser } = useAuth();
+	const navigate = useNavigate();
+	const { achievementsEnabled, isLoading } = useWorkspaceFeatures();
+
+	useEffect(() => {
+		if (!isLoading && !achievementsEnabled && workspaceSlug && username) {
+			toast.error("Achievements are not enabled for this workspace");
+			navigate({
+				to: "/w/$workspaceSlug/user/$username",
+				params: { workspaceSlug, username },
+				replace: true,
+			});
+		}
+	}, [isLoading, achievementsEnabled, workspaceSlug, username, navigate]);
+
+	if (isLoading || !achievementsEnabled) {
+		return (
+			<div className="flex items-center justify-center h-96">
+				<Spinner className="size-8" />
+			</div>
+		);
+	}
 
 	return (
 		<AchievementsView

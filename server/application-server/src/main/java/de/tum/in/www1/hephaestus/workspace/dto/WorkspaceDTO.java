@@ -41,7 +41,11 @@ public record WorkspaceDTO(
     @NonNull @Schema(description = "Whether Slack signing secret is configured") Boolean hasSlackSigningSecret,
     @NonNull
     @Schema(description = "Whether a GitLab webhook has been auto-registered for this workspace")
-    Boolean gitlabWebhookRegistered
+    Boolean gitlabWebhookRegistered,
+    @NonNull @Schema(description = "Whether best practices detection is enabled") Boolean practicesEnabled,
+    @NonNull @Schema(description = "Whether the achievements system is enabled") Boolean achievementsEnabled,
+    @NonNull @Schema(description = "Whether the leaderboard is enabled") Boolean leaderboardEnabled,
+    @NonNull @Schema(description = "Whether the league/progression system is enabled") Boolean progressionEnabled
 ) {
     public static WorkspaceDTO from(Workspace workspace) {
         return new WorkspaceDTO(
@@ -66,7 +70,11 @@ public record WorkspaceDTO(
             workspace.getPersonalAccessToken() != null && !workspace.getPersonalAccessToken().isEmpty(),
             workspace.getSlackToken() != null && !workspace.getSlackToken().isEmpty(),
             workspace.getSlackSigningSecret() != null && !workspace.getSlackSigningSecret().isEmpty(),
-            workspace.getGitlabWebhookId() != null
+            workspace.getGitlabWebhookId() != null,
+            workspace.getFeatures().getPracticesEnabled(),
+            workspace.getFeatures().getAchievementsEnabled(),
+            workspace.getFeatures().getLeaderboardEnabled(),
+            workspace.getFeatures().getProgressionEnabled()
         );
     }
 }

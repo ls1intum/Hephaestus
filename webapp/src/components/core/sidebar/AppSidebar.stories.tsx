@@ -3,6 +3,20 @@ import type { ChatThreadGroup } from "@/api/types.gen";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
 
+const mockWorkspace = {
+	displayName: "AET",
+	accountLogin: "aet-org",
+	workspaceSlug: "aet",
+	id: 1,
+	status: "ACTIVE",
+	providerType: "GITHUB",
+	createdAt: new Date("2025-01-15T00:00:00Z"),
+	achievementsEnabled: true,
+	leaderboardEnabled: true,
+	practicesEnabled: true,
+	progressionEnabled: false,
+} as const;
+
 /**
  * Main sidebar component for the application, combining all navigation sections and
  * providing access to different areas of the application.
@@ -24,26 +38,8 @@ const meta = {
 		isAdmin: false,
 		hasMentorAccess: false,
 		context: "main",
-		workspaces: [
-			{
-				displayName: "AET",
-				accountLogin: "aet-org",
-				workspaceSlug: "aet",
-				id: 1,
-				status: "ACTIVE",
-				providerType: "GITHUB",
-				createdAt: new Date(),
-			},
-		],
-		activeWorkspace: {
-			displayName: "AET",
-			accountLogin: "aet-org",
-			workspaceSlug: "aet",
-			id: 1,
-			status: "ACTIVE",
-			providerType: "GITHUB",
-			createdAt: new Date(),
-		},
+		workspaces: [mockWorkspace],
+		activeWorkspace: mockWorkspace,
 	},
 	argTypes: {
 		username: {
@@ -80,15 +76,7 @@ export const RegularUser: Story = {
 		isAdmin: false,
 		hasMentorAccess: false,
 		context: "main",
-		activeWorkspace: {
-			displayName: "AET",
-			accountLogin: "aet-org",
-			workspaceSlug: "aet",
-			id: 1,
-			status: "ACTIVE",
-			providerType: "GITHUB",
-			createdAt: new Date(),
-		},
+		activeWorkspace: mockWorkspace,
 	},
 };
 
@@ -101,15 +89,7 @@ export const AdminUser: Story = {
 		isAdmin: true,
 		hasMentorAccess: true,
 		context: "main",
-		activeWorkspace: {
-			displayName: "AET",
-			accountLogin: "aet-org",
-			workspaceSlug: "aet",
-			id: 1,
-			status: "ACTIVE",
-			providerType: "GITHUB",
-			createdAt: new Date(),
-		},
+		activeWorkspace: mockWorkspace,
 	},
 };
 
@@ -129,12 +109,12 @@ export const MentorContext: Story = {
 					{
 						id: "1",
 						title: "React Hooks Best Practices",
-						createdAt: new Date(),
+						createdAt: new Date("2025-01-15T00:00:00Z"),
 					},
 					{
 						id: "2",
 						title: "TypeScript Generic Types",
-						createdAt: new Date(),
+						createdAt: new Date("2025-01-15T00:00:00Z"),
 					},
 				],
 			},
@@ -144,7 +124,7 @@ export const MentorContext: Story = {
 					{
 						id: "3",
 						title: "API Architecture Review",
-						createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+						createdAt: new Date("2025-01-14T00:00:00Z"),
 					},
 				],
 			},
@@ -163,6 +143,28 @@ export const MentorLoading: Story = {
 		hasMentorAccess: true,
 		context: "mentor",
 		mentorThreadsLoading: true,
+	},
+};
+
+/**
+ * Sidebar when all features are disabled — only Profile and Teams are visible.
+ */
+export const AllFeaturesDisabled: Story = {
+	args: {
+		activeWorkspace: {
+			...mockWorkspace,
+			achievementsEnabled: false,
+			leaderboardEnabled: false,
+			practicesEnabled: false,
+		},
+		workspaces: [
+			{
+				...mockWorkspace,
+				achievementsEnabled: false,
+				leaderboardEnabled: false,
+				practicesEnabled: false,
+			},
+		],
 	},
 };
 

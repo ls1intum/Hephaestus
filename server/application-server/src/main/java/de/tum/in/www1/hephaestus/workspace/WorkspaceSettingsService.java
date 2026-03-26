@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.workspace;
 
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.in.www1.hephaestus.workspace.dto.UpdateWorkspaceFeaturesRequestDTO;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
@@ -133,6 +134,30 @@ public class WorkspaceSettingsService {
         Workspace workspace = requireWorkspace(workspaceId);
         workspace.setIsPubliclyViewable(isPubliclyViewable);
         log.info("Updated workspace visibility: workspaceId={}, isPublic={}", workspaceId, isPubliclyViewable);
+        return workspaceRepository.save(workspace);
+    }
+
+    /**
+     * Update workspace feature flags.
+     * Null fields in the request DTO are ignored (PATCH semantics).
+     *
+     * @param workspaceId the workspace ID
+     * @param request the feature flags to update (null fields are left unchanged)
+     * @return the updated workspace
+     */
+    @Transactional
+    public Workspace updateFeatures(Long workspaceId, UpdateWorkspaceFeaturesRequestDTO request) {
+        Workspace workspace = requireWorkspace(workspaceId);
+        workspace.getFeatures().applyPatch(request);
+
+        log.info(
+            "Updated workspace features: workspaceId={}, practices={}, achievements={}, leaderboard={}, progression={}",
+            workspaceId,
+            request.practicesEnabled(),
+            request.achievementsEnabled(),
+            request.leaderboardEnabled(),
+            request.progressionEnabled()
+        );
         return workspaceRepository.save(workspace);
     }
 

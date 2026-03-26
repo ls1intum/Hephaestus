@@ -1,3 +1,4 @@
+import { AdminFeaturesSettings, type FeatureKey } from "./AdminFeaturesSettings";
 import { AdminLeagueSettings } from "./AdminLeagueSettings";
 import { AdminRepositoriesSettings } from "./AdminRepositoriesSettings";
 
@@ -19,6 +20,13 @@ export interface AdminSettingsPageProps {
 	onAddRepository: (nameWithOwner: string) => void;
 	onRemoveRepository: (nameWithOwner: string) => void;
 	onResetLeagues: () => void;
+	// Feature flags
+	practicesEnabled: boolean;
+	achievementsEnabled: boolean;
+	leaderboardEnabled: boolean;
+	progressionEnabled: boolean;
+	isSavingFeatures: boolean;
+	onToggleFeature: (feature: FeatureKey, enabled: boolean) => void;
 }
 
 /**
@@ -36,12 +44,28 @@ export function AdminSettingsPage({
 	onAddRepository,
 	onRemoveRepository,
 	onResetLeagues,
+	practicesEnabled,
+	achievementsEnabled,
+	leaderboardEnabled,
+	progressionEnabled,
+	isSavingFeatures,
+	onToggleFeature,
 }: AdminSettingsPageProps) {
 	return (
 		<div className="container mx-auto py-6 max-w-4xl">
 			<h1 className="text-3xl font-bold mb-8">Workspace Settings</h1>
 
 			<div className="space-y-10">
+				{/* Features Settings */}
+				<AdminFeaturesSettings
+					practicesEnabled={practicesEnabled}
+					achievementsEnabled={achievementsEnabled}
+					leaderboardEnabled={leaderboardEnabled}
+					progressionEnabled={progressionEnabled}
+					isSaving={isSavingFeatures}
+					onToggle={onToggleFeature}
+				/>
+
 				{/* Repositories Settings */}
 				<AdminRepositoriesSettings
 					repositories={repositories}

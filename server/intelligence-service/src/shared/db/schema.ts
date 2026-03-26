@@ -2229,6 +2229,10 @@ export const workspace = pgTable(
 		gitlabGroupId: bigint("gitlab_group_id", { mode: "number" }),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		gitlabWebhookId: bigint("gitlab_webhook_id", { mode: "number" }),
+		practicesEnabled: boolean("practices_enabled").default(false).notNull(),
+		achievementsEnabled: boolean("achievements_enabled").default(false).notNull(),
+		leaderboardEnabled: boolean("leaderboard_enabled").default(false).notNull(),
+		progressionEnabled: boolean("progression_enabled").default(false).notNull(),
 	},
 	(table) => [
 		foreignKey({

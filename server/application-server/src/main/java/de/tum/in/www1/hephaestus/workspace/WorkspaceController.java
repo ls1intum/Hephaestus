@@ -168,6 +168,22 @@ public class WorkspaceController {
         return ResponseEntity.ok(WorkspaceDTO.from(workspace));
     }
 
+    @PatchMapping("/features")
+    @Operation(summary = "Update workspace feature flags")
+    @ApiResponse(
+        responseCode = "200",
+        description = "Workspace updated",
+        content = @Content(schema = @Schema(implementation = WorkspaceDTO.class))
+    )
+    @RequireAtLeastWorkspaceAdmin
+    public ResponseEntity<WorkspaceDTO> updateFeatures(
+        WorkspaceContext workspaceContext,
+        @Valid @RequestBody UpdateWorkspaceFeaturesRequestDTO request
+    ) {
+        Workspace workspace = workspaceService.updateFeatures(workspaceContext, request);
+        return ResponseEntity.ok(WorkspaceDTO.from(workspace));
+    }
+
     @PatchMapping("/slug")
     @Operation(summary = "Rename workspace slug and create redirect")
     @ApiResponse(
