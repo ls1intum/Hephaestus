@@ -1,6 +1,7 @@
 package de.tum.in.www1.hephaestus.workspace;
 
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.in.www1.hephaestus.workspace.dto.UpdateWorkspaceFeaturesRequestDTO;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
@@ -138,45 +139,36 @@ public class WorkspaceSettingsService {
 
     /**
      * Update workspace feature flags.
-     * Null parameters are ignored (PATCH semantics).
+     * Null fields in the request DTO are ignored (PATCH semantics).
      *
      * @param workspaceId the workspace ID
-     * @param practicesEnabled whether practices feature is enabled
-     * @param achievementsEnabled whether achievements feature is enabled
-     * @param leaderboardEnabled whether leaderboard feature is enabled
-     * @param progressionEnabled whether progression feature is enabled
+     * @param request the feature flags to update (null fields are left unchanged)
      * @return the updated workspace
      */
     @Transactional
-    public Workspace updateFeatures(
-        Long workspaceId,
-        Boolean practicesEnabled,
-        Boolean achievementsEnabled,
-        Boolean leaderboardEnabled,
-        Boolean progressionEnabled
-    ) {
+    public Workspace updateFeatures(Long workspaceId, UpdateWorkspaceFeaturesRequestDTO request) {
         Workspace workspace = requireWorkspace(workspaceId);
 
-        if (practicesEnabled != null) {
-            workspace.setPracticesEnabled(practicesEnabled);
+        if (request.practicesEnabled() != null) {
+            workspace.setPracticesEnabled(request.practicesEnabled());
         }
-        if (achievementsEnabled != null) {
-            workspace.setAchievementsEnabled(achievementsEnabled);
+        if (request.achievementsEnabled() != null) {
+            workspace.setAchievementsEnabled(request.achievementsEnabled());
         }
-        if (leaderboardEnabled != null) {
-            workspace.setLeaderboardEnabled(leaderboardEnabled);
+        if (request.leaderboardEnabled() != null) {
+            workspace.setLeaderboardEnabled(request.leaderboardEnabled());
         }
-        if (progressionEnabled != null) {
-            workspace.setProgressionEnabled(progressionEnabled);
+        if (request.progressionEnabled() != null) {
+            workspace.setProgressionEnabled(request.progressionEnabled());
         }
 
         log.info(
             "Updated workspace features: workspaceId={}, practices={}, achievements={}, leaderboard={}, progression={}",
             workspaceId,
-            practicesEnabled,
-            achievementsEnabled,
-            leaderboardEnabled,
-            progressionEnabled
+            request.practicesEnabled(),
+            request.achievementsEnabled(),
+            request.leaderboardEnabled(),
+            request.progressionEnabled()
         );
         return workspaceRepository.save(workspace);
     }

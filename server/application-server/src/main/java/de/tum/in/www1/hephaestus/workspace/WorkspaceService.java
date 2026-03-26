@@ -5,6 +5,7 @@ import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.in.www1.hephaestus.workspace.dto.CreateWorkspaceRequestDTO;
+import de.tum.in.www1.hephaestus.workspace.dto.UpdateWorkspaceFeaturesRequestDTO;
 import de.tum.in.www1.hephaestus.workspace.exception.*;
 import de.tum.in.www1.hephaestus.workspace.settings.WorkspaceTeamSettingsService;
 import java.util.List;
@@ -303,37 +304,13 @@ public class WorkspaceService {
         return updatePublicVisibility(requireSlug(workspaceContext), isPubliclyViewable);
     }
 
-    public Workspace updateFeatures(
-        String slug,
-        Boolean practicesEnabled,
-        Boolean achievementsEnabled,
-        Boolean leaderboardEnabled,
-        Boolean progressionEnabled
-    ) {
+    public Workspace updateFeatures(String slug, UpdateWorkspaceFeaturesRequestDTO request) {
         Workspace workspace = requireWorkspace(slug);
-        return workspaceSettingsService.updateFeatures(
-            workspace.getId(),
-            practicesEnabled,
-            achievementsEnabled,
-            leaderboardEnabled,
-            progressionEnabled
-        );
+        return workspaceSettingsService.updateFeatures(workspace.getId(), request);
     }
 
-    public Workspace updateFeatures(
-        WorkspaceContext workspaceContext,
-        Boolean practicesEnabled,
-        Boolean achievementsEnabled,
-        Boolean leaderboardEnabled,
-        Boolean progressionEnabled
-    ) {
-        return updateFeatures(
-            requireSlug(workspaceContext),
-            practicesEnabled,
-            achievementsEnabled,
-            leaderboardEnabled,
-            progressionEnabled
-        );
+    public Workspace updateFeatures(WorkspaceContext workspaceContext, UpdateWorkspaceFeaturesRequestDTO request) {
+        return updateFeatures(requireSlug(workspaceContext), request);
     }
 
     // ========================================================================

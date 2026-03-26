@@ -180,13 +180,7 @@ public class WorkspaceController {
         WorkspaceContext workspaceContext,
         @Valid @RequestBody UpdateWorkspaceFeaturesRequestDTO request
     ) {
-        Workspace workspace = workspaceService.updateFeatures(
-            workspaceContext,
-            request.practicesEnabled(),
-            request.achievementsEnabled(),
-            request.leaderboardEnabled(),
-            request.progressionEnabled()
-        );
+        Workspace workspace = workspaceService.updateFeatures(workspaceContext, request);
         return ResponseEntity.ok(WorkspaceDTO.from(workspace));
     }
 
