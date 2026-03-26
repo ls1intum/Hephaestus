@@ -26,7 +26,8 @@ import {
 import type { AchievementCategory, UIAchievement, ViewMode } from "@/components/achievements/types";
 import { calculateStats } from "@/components/achievements/utils";
 import { Button } from "@/components/ui/button";
-import { Progress, ProgressIndicator, ProgressTrack } from "@/components/ui/progress";
+import { Progress as ProgressRoot } from "@base-ui/react/progress";
+import { ProgressIndicator, ProgressTrack } from "@/components/ui/progress";
 import {
 	Sheet,
 	SheetContent,
@@ -209,14 +210,14 @@ function SidebarBody({
 									{stats.percentage}%
 								</span>
 							</div>
-							<Progress
+							<ProgressRoot.Root
 								value={stats.percentage}
 								aria-label={`Total achievement progress: ${stats.percentage}%`}
 							>
 								<ProgressTrack className="h-3 [&>div]:bg-foreground">
 									<ProgressIndicator />
 								</ProgressTrack>
-							</Progress>
+							</ProgressRoot.Root>{" "}
 							<div className="flex justify-between mt-2 text-xs text-muted-foreground">
 								<span>
 									{stats.unlocked} / {stats.total} Achievements
@@ -258,11 +259,14 @@ function SidebarBody({
 											</div>
 										</div>
 									</div>
-									<Progress value={percentage} aria-label={`${meta.name} progress: ${percentage}%`}>
+									<ProgressRoot.Root
+										value={percentage}
+										aria-label={`${meta.name} progress: ${percentage}%`}
+									>
 										<ProgressTrack className="h-1.5 [&>div]:bg-foreground/70">
 											<ProgressIndicator />
 										</ProgressTrack>
-									</Progress>
+									</ProgressRoot.Root>
 								</div>
 							);
 						})}
