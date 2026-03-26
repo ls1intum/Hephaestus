@@ -240,56 +240,6 @@ export const agentJob = pgTable(
 	],
 );
 
-export const badPracticeDetection = pgTable(
-	"bad_practice_detection",
-	{
-		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({
-			name: "bad_practice_detection_id_seq",
-			startWith: 1,
-			increment: 1,
-			cache: 1,
-		}),
-		detectedAt: timestamp("detected_at", { precision: 6, withTimezone: true, mode: "string" }),
-		traceId: varchar("trace_id", { length: 255 }),
-		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		pullrequestId: bigint("pullrequest_id", { mode: "number" }),
-		summary: text(),
-	},
-	(table) => [
-		foreignKey({
-			columns: [table.pullrequestId],
-			foreignColumns: [issue.id],
-			name: "FKhk2vrsr2rdq2gb3cjnvieh3nw",
-		}),
-	],
-);
-
-export const badPracticeFeedback = pgTable(
-	"bad_practice_feedback",
-	{
-		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({
-			name: "bad_practice_feedback_id_seq",
-			startWith: 1,
-			increment: 1,
-			cache: 1,
-		}),
-		type: varchar({ length: 255 }),
-		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		pullRequestBadPracticeId: bigint("pull_request_bad_practice_id", { mode: "number" }),
-		createdAt: timestamp("created_at", { precision: 6, withTimezone: true, mode: "string" }),
-		explanation: text(),
-	},
-	(table) => [
-		foreignKey({
-			columns: [table.pullRequestBadPracticeId],
-			foreignColumns: [pullRequestBadPractice.id],
-			name: "FK34k5tg4qb6gy4g7tn9q8uhogl",
-		}),
-	],
-);
-
 export const chatMessage = pgTable(
 	"chat_message",
 	{
@@ -1610,45 +1560,6 @@ export const projectStatusUpdate = pgTable(
 	],
 );
 
-export const pullRequestBadPractice = pgTable(
-	"pull_request_bad_practice",
-	{
-		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		id: bigint({ mode: "number" }).primaryKey().generatedByDefaultAsIdentity({
-			name: "pullrequestbadpractice_id_seq",
-			startWith: 1,
-			increment: 1,
-			cache: 1,
-		}),
-		title: varchar({ length: 255 }),
-		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		pullrequestId: bigint("pullrequest_id", { mode: "number" }),
-		state: varchar({ length: 32 }).default(0),
-		detectedAt: timestamp("detected_at", { precision: 6, withTimezone: true, mode: "string" }),
-		updatedAt: timestamp("updated_at", { precision: 6, withTimezone: true, mode: "string" }),
-		userState: varchar("user_state", { length: 32 }),
-		detectionPullrequestLifecycleState: varchar("detection_pullrequest_lifecycle_state", {
-			length: 32,
-		}),
-		detectionTraceId: varchar("detection_trace_id", { length: 255 }),
-		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-		badPracticeDetectionId: bigint("bad_practice_detection_id", { mode: "number" }),
-		description: text(),
-	},
-	(table) => [
-		foreignKey({
-			columns: [table.pullrequestId],
-			foreignColumns: [issue.id],
-			name: "FK1m1jhw92ublt7ya0d557sg5j",
-		}),
-		foreignKey({
-			columns: [table.badPracticeDetectionId],
-			foreignColumns: [badPracticeDetection.id],
-			name: "FKdn50l1oul09kq3142ku39gnlp",
-		}),
-	],
-);
-
 export const pullRequestRequestedReviewers = pgTable(
 	"pull_request_requested_reviewers",
 	{
@@ -2229,10 +2140,6 @@ export const workspace = pgTable(
 		gitlabGroupId: bigint("gitlab_group_id", { mode: "number" }),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		gitlabWebhookId: bigint("gitlab_webhook_id", { mode: "number" }),
-		practicesEnabled: boolean("practices_enabled").default(false).notNull(),
-		achievementsEnabled: boolean("achievements_enabled").default(false).notNull(),
-		leaderboardEnabled: boolean("leaderboard_enabled").default(false).notNull(),
-		progressionEnabled: boolean("progression_enabled").default(false).notNull(),
 	},
 	(table) => [
 		foreignKey({

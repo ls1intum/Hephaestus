@@ -1,8 +1,4 @@
 import { z } from "@hono/zod-openapi";
-import type { badPracticeDetection, pullRequestBadPractice } from "@/shared/db/schema";
-
-export type PullRequestBadPractice = typeof pullRequestBadPractice.$inferSelect;
-export type BadPracticeDetection = typeof badPracticeDetection.$inferSelect;
 
 export const tags = ["Detector"] as const;
 

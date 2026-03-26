@@ -1,0 +1,24 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog" xmlns:ext="http://www.liquibase.org/xml/ns/dbchangelog-ext" xmlns:pro="http://www.liquibase.org/xml/ns/pro" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd http://www.liquibase.org/xml/ns/pro http://www.liquibase.org/xml/ns/pro/liquibase-pro-latest.xsd http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <changeSet author="root (generated)" id="1774511105860-1">
+        <dropForeignKeyConstraint baseTableName="pull_request_bad_practice" constraintName="FK1m1jhw92ublt7ya0d557sg5j"/>
+    </changeSet>
+    <changeSet author="root (generated)" id="1774511105860-2">
+        <dropForeignKeyConstraint baseTableName="bad_practice_feedback" constraintName="FK34k5tg4qb6gy4g7tn9q8uhogl"/>
+    </changeSet>
+    <changeSet author="root (generated)" id="1774511105860-3">
+        <dropForeignKeyConstraint baseTableName="pull_request_bad_practice" constraintName="FKdn50l1oul09kq3142ku39gnlp"/>
+    </changeSet>
+    <changeSet author="root (generated)" id="1774511105860-4">
+        <dropForeignKeyConstraint baseTableName="bad_practice_detection" constraintName="FKhk2vrsr2rdq2gb3cjnvieh3nw"/>
+    </changeSet>
+    <changeSet author="root (generated)" id="1774511105860-5">
+        <dropTable tableName="bad_practice_detection"/>
+    </changeSet>
+    <changeSet author="root (generated)" id="1774511105860-6">
+        <dropTable tableName="bad_practice_feedback"/>
+    </changeSet>
+    <changeSet author="root (generated)" id="1774511105860-7">
+        <dropTable tableName="pull_request_bad_practice"/>
+    </changeSet>
+</databaseChangeLog>
