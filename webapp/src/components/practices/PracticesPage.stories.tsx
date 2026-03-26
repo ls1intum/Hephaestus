@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { fn } from "storybook/test";
 import type { UserPractices } from "@/api/types.gen";
 import { PracticesPage } from "./PracticesPage";
 
@@ -34,14 +33,6 @@ const meta = {
 				defaultValue: { summary: "false" },
 			},
 		},
-		isDetectingBadPractices: {
-			description: "Whether the system is currently detecting bad practices",
-			control: "boolean",
-			table: {
-				type: { summary: "boolean" },
-				defaultValue: { summary: "false" },
-			},
-		},
 		username: {
 			description: "Username of the dashboard owner",
 			control: "text",
@@ -57,13 +48,6 @@ const meta = {
 				defaultValue: { summary: "true" },
 			},
 		},
-		onDetectBadPractices: {
-			description: "Callback when detect bad practices button is clicked",
-			action: "detect bad practices clicked",
-		},
-	},
-	args: {
-		onDetectBadPractices: fn(),
 	},
 	tags: ["autodocs"],
 } satisfies Meta<typeof PracticesPage>;
@@ -157,7 +141,6 @@ export const Default: Story = {
 	args: {
 		activityData: mockActivityData,
 		isLoading: false,
-		isDetectingBadPractices: false,
 		username: "johndoe",
 		currUserIsDashboardUser: true,
 	},
@@ -169,20 +152,6 @@ export const Default: Story = {
 export const Loading: Story = {
 	args: {
 		isLoading: true,
-		isDetectingBadPractices: false,
-		username: "johndoe",
-		currUserIsDashboardUser: true,
-	},
-};
-
-/**
- * State shown while the system is analyzing pull requests for bad practices.
- */
-export const DetectingBadPractices: Story = {
-	args: {
-		activityData: mockActivityData,
-		isLoading: false,
-		isDetectingBadPractices: true,
 		username: "johndoe",
 		currUserIsDashboardUser: true,
 	},
@@ -197,7 +166,6 @@ export const NoBadPractices: Story = {
 			pullRequests: [],
 		},
 		isLoading: false,
-		isDetectingBadPractices: false,
 		username: "johndoe",
 		currUserIsDashboardUser: false,
 	},
@@ -210,7 +178,6 @@ export const OtherUserView: Story = {
 	args: {
 		activityData: mockActivityData,
 		isLoading: false,
-		isDetectingBadPractices: false,
 		username: "janedoe",
 		currUserIsDashboardUser: false,
 	},

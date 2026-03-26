@@ -2,7 +2,6 @@ package de.tum.in.www1.hephaestus.practices;
 
 import de.tum.in.www1.hephaestus.practices.dto.BadPracticeFeedbackDTO;
 import de.tum.in.www1.hephaestus.practices.feedback.BadPracticeFeedbackService;
-import de.tum.in.www1.hephaestus.practices.model.DetectionResult;
 import de.tum.in.www1.hephaestus.practices.model.PullRequestBadPractice;
 import de.tum.in.www1.hephaestus.practices.model.PullRequestBadPracticeDTO;
 import de.tum.in.www1.hephaestus.practices.model.PullRequestBadPracticeState;
@@ -24,9 +23,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 /**
- * Controller for bad practice detection and resolution.
+ * Controller for bad practice resolution and feedback.
  *
- * <p>This controller handles the legacy bad practice detection, resolution, and feedback workflows.
+ * <p>This controller handles the legacy bad practice resolution and feedback workflows.
  * It is scheduled for removal — new practice management is handled by {@code PracticeCatalogController}.
  *
  * <p>All endpoints require workspace membership via {@link WorkspaceScopedController}.
@@ -39,7 +38,7 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 @Tag(
     name = "Bad Practices (Deprecated)",
-    description = "Legacy bad practice detection — deprecated, scheduled for removal"
+    description = "Legacy bad practice resolution — deprecated, scheduled for removal"
 )
 public class PracticesController {
 
@@ -118,42 +117,8 @@ public class PracticesController {
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    // POST endpoints - Detection, resolution, and feedback
+    // POST endpoints - Resolution and feedback
     // ══════════════════════════════════════════════════════════════════════════
-
-    @PostMapping("/user/{login}/detect")
-    @Operation(
-        summary = "Detect bad practices for a user",
-        description = "Triggers bad practice detection for all pull requests of the specified user",
-        deprecated = true
-    )
-    @ApiResponse(responseCode = "200", description = "Detection completed successfully")
-    @ApiResponse(responseCode = "400", description = "Detection failed due to no updates on pull requests")
-    public ResponseEntity<DetectionResultDTO> detectForUser(
-        WorkspaceContext workspaceContext,
-        @PathVariable String login
-    ) {
-        Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
-        DetectionResult result = practicesService.detectForUser(workspace, login);
-        return ResponseEntity.ok(new DetectionResultDTO(result));
-    }
-
-    @PostMapping("/pullrequest/{pullRequestId}/detect")
-    @Operation(
-        summary = "Detect bad practices for a pull request",
-        description = "Triggers bad practice detection for a specific pull request",
-        deprecated = true
-    )
-    @ApiResponse(responseCode = "200", description = "Detection completed successfully")
-    @ApiResponse(responseCode = "400", description = "Detection failed due to no updates on pull request")
-    public ResponseEntity<DetectionResultDTO> detectForPullRequest(
-        WorkspaceContext workspaceContext,
-        @PathVariable Long pullRequestId
-    ) {
-        Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
-        DetectionResult result = practicesService.detectForPullRequest(workspace, pullRequestId);
-        return ResponseEntity.ok(new DetectionResultDTO(result));
-    }
 
     @PostMapping("/badpractice/{id}/resolve")
     @Operation(
@@ -194,9 +159,6 @@ public class PracticesController {
     // ══════════════════════════════════════════════════════════════════════════
     // DTOs for API responses
     // ══════════════════════════════════════════════════════════════════════════
-
-    /** Response for detection operations */
-    public record DetectionResultDTO(DetectionResult result) {}
 
     /** Response for user bad practices listing */
     public record UserPracticesDTO(String login, List<PullRequestWithBadPracticesDTO> pullRequests) {}

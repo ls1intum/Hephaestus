@@ -1,4 +1,3 @@
-import detector from "@/detector";
 import { registerMentorRoutes } from "@/mentor/register";
 import createApp from "@/shared/http/hono";
 import configureOpenAPI from "@/shared/http/openapi";
@@ -21,7 +20,6 @@ app.get("/health", (c) => c.json({ status: "OK" as const }));
 app.get("/", (c) => c.redirect("/reference"));
 
 // Feature routes
-app.route("/detector", detector);
 registerMentorRoutes(app);
 
 export default app;

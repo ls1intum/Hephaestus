@@ -14,7 +14,7 @@
     },
     {
       "name": "hephaestus.detection",
-      "description": "Bad practice detection and tracing settings"
+      "description": "Detection tracing settings for Langfuse observability"
     },
     {
       "name": "hephaestus.posthog",
@@ -48,16 +48,6 @@
       "description": "Base URL of the intelligence service"
     },
     {
-      "name": "hephaestus.mail.sender",
-      "type": "java.lang.String",
-      "description": "Email sender address"
-    },
-    {
-      "name": "hephaestus.mail.enabled",
-      "type": "java.lang.Boolean",
-      "description": "Whether email sending is enabled"
-    },
-    {
       "name": "hephaestus.leaderboard.schedule.cron",
       "type": "java.lang.String",
       "description": "Cron expression for leaderboard calculation"
@@ -66,11 +56,6 @@
       "name": "hephaestus.activity.self-review-author-logins",
       "type": "java.util.List",
       "description": "List of bot logins whose PRs are excluded from self-review scoring"
-    },
-    {
-      "name": "hephaestus.detection.run-automatic-detection-for-all",
-      "type": "java.lang.Boolean",
-      "description": "Whether to run automatic detection for all PRs"
     },
     {
       "name": "hephaestus.detection.tracing.enabled",

@@ -84,7 +84,6 @@ environment:
   
   # Intelligence service model configuration (fake provider for tooling/generation)
   MODEL_NAME: fake:model
-  DETECTION_MODEL_NAME: fake:model
   
   # Add Java 21 to PATH
   PATH: /usr/lib/jvm/temurin-21-jdk-amd64/bin:$PATH

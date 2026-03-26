@@ -14,20 +14,6 @@ spring:
                     # Public URL for issuer validation (must match token's iss claim)
                     issuer-uri: ${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}
 
-    mail:
-        host: ${POSTFIX_HOST:localhost}
-        port: ${POSTFIX_PORT:25}
-        username: ${POSTFIX_USERNAME:}
-        password: ${POSTFIX_PASSWORD:}
-        properties:
-            mail:
-                transport:
-                    protocol: smtp
-                smtp:
-                    starttls:
-                        enable: true
-                debug: false
-
 hephaestus:
     host-url: ${APPLICATION_HOST_URL}
 
@@ -53,14 +39,7 @@ hephaestus:
     intelligence-service:
         url: ${INTELLIGENCE_SERVICE_URL}
 
-    mail:
-        enabled: ${MAIL_ENABLED:true}
-        sender: ${MAIL_SENDER:hephaestus@aet.cit.tum.de}
-
     detection:
-        legacy:
-            enabled: ${LEGACY_DETECTION_ENABLED:false}
-        run-automatic-detection-for-all: ${RUN_AUTOMATIC_DETECTION_FOR_ALL:false}
         tracing:
             enabled: true
             # The host of the langfuse server

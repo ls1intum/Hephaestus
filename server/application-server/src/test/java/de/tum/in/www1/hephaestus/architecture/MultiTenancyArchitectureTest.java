@@ -642,8 +642,6 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
         static final Set<String> ASYNC_LISTENERS_WITH_PAYLOAD_CONTEXT = Set.of(
             // ActivityEventListener handles CommentCreated, ReviewSubmitted events which carry full entity graphs
             "ActivityEventListener",
-            // BadPracticeEventListener handles PullRequestUpdated events which carry full entity graphs
-            "BadPracticeEventListener",
             // AchievementEventListener handles ActivitySavedEvent which carries workspaceId context
             "AchievementEventListener",
             // AgentJobSubmitter handles AgentJobCreatedEvent which directly carries workspaceId

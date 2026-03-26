@@ -3,9 +3,8 @@ import { fn } from "storybook/test";
 import { PullRequestBadPracticeCard } from "./PullRequestBadPracticeCard";
 
 /**
- * Card component for displaying pull requests with their metadata and analysis options.
- * Allows users to trigger bad practice detection on specific pull requests and take
- * actions on discovered issues.
+ * Card component for displaying pull requests with their metadata and analysis results.
+ * Shows detected issues with actionable controls to resolve them.
  */
 const meta = {
 	component: PullRequestBadPracticeCard,
@@ -97,10 +96,6 @@ const meta = {
 			description: "Whether the card should be expanded by default",
 			control: "boolean",
 		},
-		onDetectBadPractices: {
-			description: "Callback when detect bad practices button is clicked",
-			action: "detect bad practices clicked",
-		},
 		onResolveBadPracticeAsFixed: {
 			description: "Callback when a bad practice is resolved as fixed",
 			action: "resolve as fixed clicked",
@@ -119,7 +114,6 @@ const meta = {
 		},
 	},
 	args: {
-		onDetectBadPractices: fn(),
 		onResolveBadPracticeAsFixed: fn(),
 		onResolveBadPracticeAsWontFix: fn(),
 		onResolveBadPracticeAsWrong: fn(),

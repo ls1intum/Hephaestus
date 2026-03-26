@@ -57,24 +57,6 @@ spring:
                 jwt:
                     issuer-uri: http://localhost:${KEYCLOAK_PORT:8081}/realms/hephaestus
 
-    thymeleaf:
-        prefix: ${MAIL_TEMPLATE_FOLDER:classpath:/mail-templates/}
-        suffix: .html
-
-    mail:
-        host: ${MAIL_HOST:smtp.gmail.com}
-        port: ${MAIL_PORT:587}
-        username: ${POSTFIX_USERNAME:} # gmail email address e.g hephaestus@gmail.com
-        password: ${POSTFIX_PASSWORD:} # app code password from gmail. how to: https://support.google.com/mail/answer/185833?hl=en
-        properties:
-            mail:
-                transport:
-                    protocol: smtp
-                smtp:
-                    starttls:
-                        enable: true
-                debug: ${MAIL_DEBUG:false}
-
     # Disable Mustache template location check as we don't use Mustache templates
     mustache:
         check-template-location: false
@@ -345,15 +327,8 @@ hephaestus:
         leaderboard-xp:
             # Eviction rate in milliseconds (60 seconds - leaderboard data is moderately hot)
             evict-rate: 60000
-    mail:
-        enabled: ${MAIL_ENABLED:false}
-        sender: ${MAIL_SENDER:hephaestus@gmail.com} # use gmail email address for local testing
 
     detection:
-        legacy:
-            # Deprecated — re-enable as escape hatch while agent-based reviews stabilize
-            enabled: false
-        run-automatic-detection-for-all: false
         tracing:
             enabled: false
             # The host of the langfuse server
@@ -371,7 +346,6 @@ hephaestus:
     features:
         flags:
             practice-review-for-all: false
-            detection-for-all: false
             gitlab-workspace-creation: false
 
     # ═══════════════════════════════════════════════════════════════════════════

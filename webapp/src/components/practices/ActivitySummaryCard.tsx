@@ -10,8 +10,6 @@ interface ActivitySummaryCardProps {
 	numberOfPullRequests: number;
 	numberOfGoodPractices: number;
 	numberOfBadPractices: number;
-	isDetectingBadPractices: boolean;
-	onDetectBadPractices: () => void;
 }
 
 export function ActivitySummaryCard({
@@ -60,32 +58,6 @@ export function ActivitySummaryCard({
 					</p>
 				</CardDescription>
 			</CardHeader>
-			{/* {currUserIsDashboardUser && (
-				<CardContent>
-					<TooltipProvider>
-						<Tooltip>
-							<TooltipTrigger asChild>
-								<Button
-									variant="outline"
-									className="w-full gap-2"
-									onClick={onDetectBadPractices}
-									disabled={isDetectingBadPractices}
-								>
-									{isDetectingBadPractices ? (
-										<Spinner className="size-4" />
-									) : (
-										<RefreshCw className="size-4" />
-									)}
-									<span>Refresh Analysis</span>
-								</Button>
-							</TooltipTrigger>
-							<TooltipContent>
-								<p>Updates insights for all open pull requests</p>
-							</TooltipContent>
-						</Tooltip>
-					</TooltipProvider>
-				</CardContent>
-			)} */}
 		</Card>
 	);
 }

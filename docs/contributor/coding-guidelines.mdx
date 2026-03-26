@@ -77,7 +77,7 @@ These guidelines keep every service aligned. Keep changes focused. Mention any d
 ## Intelligence service (`/server/intelligence-service`)
 
 - Uses Hono for HTTP routing and Vercel AI SDK for model orchestration.
-- Settings live in `src/env.ts`; `MODEL_NAME` and `DETECTION_MODEL_NAME` must be provider-qualified (`openai:gpt-5-mini`, `azure:gpt-5-mini`, etc.).
+- Settings live in `src/env.ts`; `MODEL_NAME` must be provider-qualified (`openai:gpt-5-mini`, `azure:gpt-5-mini`, etc.).
 - Drizzle ORM for database access; regenerate the schema with `npm run db:generate-models:intelligence-service` (writes to `src/shared/db/schema.ts`).
 - Export the OpenAPI spec with `npm run openapi:export` after API changes.
 - Format and lint with Biome (`npm run format:intelligence-service`, `npm run check:intelligence-service`).

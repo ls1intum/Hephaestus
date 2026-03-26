@@ -23,7 +23,7 @@ This file governs the entire repository. Each service has its own `AGENTS.md` wi
 - **Java**: JDK 21 (see `pom.xml`). Run builds with `mvn` from `server/application-server/`.
 - **Docker & Docker Compose**: Required for database helper scripts (`scripts/db-utils.sh`) and for spinning up Postgres/Keycloak/NATS locally.
 - **Databases**: Default PostgreSQL DSN is `postgresql://root:root@localhost:5432/hephaestus`. The database helpers spin this up for you via Docker.
-- **Environment variables**: When generating intelligence service OpenAPI specs locally, set `MODEL_NAME=fake:model` and `DETECTION_MODEL_NAME=fake:model` (the service settings expect a provider-qualified model name).
+- **Environment variables**: When generating intelligence service OpenAPI specs locally, set `MODEL_NAME=fake:model` (the service settings expect a provider-qualified model name).
 
 ## 3. Quality gates & routine commands
 
@@ -131,7 +131,7 @@ Regeneration is destructive; stash local edits before running these commands. Ch
 ## 8. Intelligence service expectations (TypeScript)
 
 - Uses Hono as the HTTP framework with Vercel AI SDK for LLM orchestration.
-- Settings live in `src/env.ts`; `MODEL_NAME` and `DETECTION_MODEL_NAME` must be provider-qualified (`openai:gpt-5-mini`, `azure:gpt-5-mini`, etc.).
+- Settings live in `src/env.ts`; `MODEL_NAME` must be provider-qualified (`openai:gpt-5-mini`, `azure:gpt-5-mini`, etc.).
 - Drizzle ORM for database access; schema is auto-generated via `npm run db:introspect` from the application-server's Liquibase-managed PostgreSQL.
 - OpenAPI spec is exported via `npm run openapi:export`.
 - Formatting: run `npm run format:intelligence-service`. Biome handles linting and formatting.
@@ -161,7 +161,7 @@ Before opening a PR, run `npm run format && npm run check`. The PR template (`.g
 ## 12. Known command caveats
 
 - `npm run db:draft-changelog` requires Docker to be installed and available on PATH. In CI we set `CI=true`; locally ensure Docker Desktop/daemon is running before invoking the script.
-- `npm run generate:api:intelligence-service:specs` fails unless `MODEL_NAME` and `DETECTION_MODEL_NAME` are set (use the `fake:model` provider for tooling).
+- `npm run generate:api:intelligence-service:specs` fails unless `MODEL_NAME` is set (use the `fake:model` provider for tooling).
 - `npm run generate:api:application-server:specs` performs a full Maven `verify` against the specs profile. The initial run downloads the entire Spring Boot dependency tree (~hundreds of MB); expect several minutes on a cold cache.
 
 Stay consistent with the existing patterns and prefer improving the structure rather than introducing ad-hoc shortcuts.

@@ -1498,10 +1498,6 @@ export type FeatureFlags = {
      */
     ADMIN?: boolean;
     /**
-     * Automatic detection runs for all users regardless of role
-     */
-    DETECTION_FOR_ALL?: boolean;
-    /**
      * GitLab workspace creation feature is enabled
      */
     GITLAB_WORKSPACE_CREATION?: boolean;
@@ -1517,10 +1513,6 @@ export type FeatureFlags = {
      * Practice review runs for all users regardless of role
      */
     PRACTICE_REVIEW_FOR_ALL?: boolean;
-    /**
-     * User's PRs trigger automatic detection
-     */
-    RUN_AUTOMATIC_DETECTION?: boolean;
     /**
      * User's PRs trigger practice review
      */
@@ -1552,13 +1544,6 @@ export type Document = {
     title: string;
     userId: number;
     versionNumber: number;
-};
-
-/**
- * Response for detection operations
- */
-export type DetectionResult = {
-    result?: 'BAD_PRACTICES_DETECTED' | 'NO_BAD_PRACTICES_DETECTED' | 'ERROR_NO_UPDATE_ON_PULLREQUEST';
 };
 
 /**
@@ -2455,37 +2440,6 @@ export type GetBadPracticesForPullRequestResponses = {
 
 export type GetBadPracticesForPullRequestResponse = GetBadPracticesForPullRequestResponses[keyof GetBadPracticesForPullRequestResponses];
 
-export type DetectForPullRequestData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        pullRequestId: number;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/bad-practices/pullrequest/{pullRequestId}/detect';
-};
-
-export type DetectForPullRequestErrors = {
-    /**
-     * Detection failed due to no updates on pull request
-     */
-    400: DetectionResult;
-};
-
-export type DetectForPullRequestError = DetectForPullRequestErrors[keyof DetectForPullRequestErrors];
-
-export type DetectForPullRequestResponses = {
-    /**
-     * Detection completed successfully
-     */
-    200: DetectionResult;
-};
-
-export type DetectForPullRequestResponse = DetectForPullRequestResponses[keyof DetectForPullRequestResponses];
-
 export type GetBadPracticesForUserData = {
     body?: never;
     path: {
@@ -2508,37 +2462,6 @@ export type GetBadPracticesForUserResponses = {
 
 export type GetBadPracticesForUserResponse = GetBadPracticesForUserResponses[keyof GetBadPracticesForUserResponses];
 
-export type DetectForUserData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        login: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/bad-practices/user/{login}/detect';
-};
-
-export type DetectForUserErrors = {
-    /**
-     * Detection failed due to no updates on pull requests
-     */
-    400: DetectionResult;
-};
-
-export type DetectForUserError = DetectForUserErrors[keyof DetectForUserErrors];
-
-export type DetectForUserResponses = {
-    /**
-     * Detection completed successfully
-     */
-    200: DetectionResult;
-};
-
-export type DetectForUserResponse = DetectForUserResponses[keyof DetectForUserResponses];
-
 export type UpdateFeaturesData = {
     body: UpdateWorkspaceFeaturesRequest;
     path: {
@@ -2559,6 +2482,7 @@ export type UpdateFeaturesResponses = {
 };
 
 export type UpdateFeaturesResponse = UpdateFeaturesResponses[keyof UpdateFeaturesResponses];
+
 
 export type GetLeaderboardData = {
     body?: never;

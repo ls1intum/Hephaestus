@@ -2,10 +2,10 @@
 id: intelligence-service
 sidebar_position: 11
 title: Intelligence Service
-description: AI-powered mentor chat and detection API development guide.
+description: AI-powered mentor chat API development guide.
 ---
 
-The Intelligence Service provides AI-powered features including the mentor chat assistant and bad practice detection. It's built with Node.js, Hono, and AI SDK v6 (Vercel).
+The Intelligence Service provides the AI-powered mentor chat assistant. It's built with Node.js, Hono, and AI SDK v6 (Vercel).
 
 ## Architecture Overview
 
@@ -56,7 +56,6 @@ The service is a pure backend API that:
    
    # Model configuration (provider:model format)
    MODEL_NAME=openai:gpt-4o-mini
-   DETECTION_MODEL_NAME=openai:gpt-4o-mini
    ```
 
 4. Start the development server:
@@ -164,7 +163,7 @@ After schema changes in the application server:
 npm run db:introspect
 ```
 
-This introspects the database and generates TypeScript models in `src/db/schema.ts`.
+This introspects the database and generates TypeScript models in `src/shared/db/schema.ts`.
 
 ## Testing
 

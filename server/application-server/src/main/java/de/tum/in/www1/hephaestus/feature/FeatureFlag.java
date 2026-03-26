@@ -25,13 +25,11 @@ public enum FeatureFlag {
     // ── Authorization flags (Keycloak realm roles) ──────────────────────
     MENTOR_ACCESS(Kind.ROLE, "mentor_access"),
     NOTIFICATION_ACCESS(Kind.ROLE, "notification_access"),
-    RUN_AUTOMATIC_DETECTION(Kind.ROLE, "run_automatic_detection"),
     RUN_PRACTICE_REVIEW(Kind.ROLE, "run_practice_review"),
     ADMIN(Kind.ROLE, "admin"),
 
     // ── Operational/development flags (Spring Boot config) ──────────────
     PRACTICE_REVIEW_FOR_ALL(Kind.CONFIG, "practice-review-for-all"),
-    DETECTION_FOR_ALL(Kind.CONFIG, "detection-for-all"),
     GITLAB_WORKSPACE_CREATION(Kind.CONFIG, "gitlab-workspace-creation");
 
     private final Kind kind;

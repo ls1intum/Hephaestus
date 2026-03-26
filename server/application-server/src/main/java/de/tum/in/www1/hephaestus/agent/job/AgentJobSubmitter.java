@@ -20,9 +20,8 @@ import org.springframework.transaction.event.TransactionalEventListener;
 /**
  * Publishes agent jobs to NATS JetStream after the database transaction commits.
  *
- * <p>Uses {@code @TransactionalEventListener(AFTER_COMMIT)} + {@code @Async} to match the
- * existing codebase convention (see {@code BadPracticeEventListener}). The async execution
- * ensures we don't block the originating thread while waiting for the JetStream ack.
+ * <p>Uses {@code @TransactionalEventListener(AFTER_COMMIT)} + {@code @Async} so the async
+ * execution ensures we don't block the originating thread while waiting for the JetStream ack.
  *
  * <p>If NATS publish fails, the zombie sweeper re-publishes stale QUEUED jobs periodically.
  */

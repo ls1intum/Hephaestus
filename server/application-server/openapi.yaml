@@ -36,8 +36,6 @@ tags:
   name: Agent Jobs
 - description: "User account management (settings, deletion)"
   name: Account
-- description: "Legacy bad practice detection — deprecated, scheduled for removal"
-  name: Bad Practices (Deprecated)
 - description: Manage practice definitions
   name: Practice Catalog
 - description: Workspace-scoped team settings management
@@ -46,6 +44,8 @@ tags:
   name: Teams
 - description: Contributor feedback on AI-generated practice findings
   name: Finding Feedback
+- description: "Legacy bad practice resolution — deprecated, scheduled for removal"
+  name: Bad Practices (Deprecated)
 - description: User profile and activity data
   name: Profile
 - description: Contributor rankings and league statistics
@@ -657,41 +657,6 @@ paths:
       summary: Get bad practices for a pull request
       tags:
       - Bad Practices (Deprecated)
-  /workspaces/{workspaceSlug}/bad-practices/pullrequest/{pullRequestId}/detect:
-    post:
-      deprecated: true
-      description: Triggers bad practice detection for a specific pull request
-      operationId: detectForPullRequest
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: pullRequestId
-        required: true
-        schema:
-          type: integer
-          format: int64
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/DetectionResult"
-          description: Detection completed successfully
-        "400":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/DetectionResult"
-          description: Detection failed due to no updates on pull request
-      summary: Detect bad practices for a pull request
-      tags:
-      - Bad Practices (Deprecated)
   /workspaces/{workspaceSlug}/bad-practices/user/{login}:
     get:
       deprecated: true
@@ -720,41 +685,6 @@ paths:
           description: Bad practices returned
       security: []
       summary: Get bad practices for a user
-      tags:
-      - Bad Practices (Deprecated)
-  /workspaces/{workspaceSlug}/bad-practices/user/{login}/detect:
-    post:
-      deprecated: true
-      description: Triggers bad practice detection for all pull requests of the specified
-        user
-      operationId: detectForUser
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: login
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/DetectionResult"
-          description: Detection completed successfully
-        "400":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/DetectionResult"
-          description: Detection failed due to no updates on pull requests
-      summary: Detect bad practices for a user
       tags:
       - Bad Practices (Deprecated)
   /workspaces/{workspaceSlug}/features:
@@ -3693,16 +3623,6 @@ components:
       - displayName
       - ownerUserId
       - workspaceSlug
-    DetectionResult:
-      type: object
-      description: Response for detection operations
-      properties:
-        result:
-          type: string
-          enum:
-          - BAD_PRACTICES_DETECTED
-          - NO_BAD_PRACTICES_DETECTED
-          - ERROR_NO_UPDATE_ON_PULLREQUEST
     Document:
       type: object
       properties:
@@ -3778,9 +3698,6 @@ components:
         ADMIN:
           type: boolean
           description: User has admin privileges
-        DETECTION_FOR_ALL:
-          type: boolean
-          description: Automatic detection runs for all users regardless of role
         GITLAB_WORKSPACE_CREATION:
           type: boolean
           description: GitLab workspace creation feature is enabled
@@ -3793,9 +3710,6 @@ components:
         PRACTICE_REVIEW_FOR_ALL:
           type: boolean
           description: Practice review runs for all users regardless of role
-        RUN_AUTOMATIC_DETECTION:
-          type: boolean
-          description: User's PRs trigger automatic detection
         RUN_PRACTICE_REVIEW:
           type: boolean
           description: User's PRs trigger practice review

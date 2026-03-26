@@ -191,7 +191,6 @@ services:
       DATABASE_URL: postgresql://hephaestus:${POSTGRES_PASSWORD:-hephaestus-preview}@postgres:5432/hephaestus
       # AI Models
       MODEL_NAME: ${MODEL_NAME:?Required}
-      DETECTION_MODEL_NAME: ${DETECTION_MODEL_NAME:?Required}
       # OpenAI
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       # Azure OpenAI
@@ -250,9 +249,6 @@ services:
       KEYCLOAK_INTERNAL_URL: http://keycloak:8080
       KEYCLOAK_CLIENT_ID: hephaestus-confidential
       KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_HEPHAESTUS_CONFIDENTIAL_CLIENT_SECRET:?Required}
-      # Shared Postfix
-      POSTFIX_HOST: postfix
-      POSTFIX_PORT: 25
       # GitHub integration
       GH_APP_ID: ${GH_APP_ID:?Required}
       GH_APP_PRIVATE_KEY: ${GH_APP_PRIVATE_KEY:?Required}

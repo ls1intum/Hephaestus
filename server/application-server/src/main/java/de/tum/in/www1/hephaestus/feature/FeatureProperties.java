@@ -14,7 +14,6 @@ import org.springframework.validation.annotation.Validated;
  *   features:
  *     flags:
  *       practice-review-for-all: false
- *       detection-for-all: false
  *       gitlab-workspace-creation: false
  * }</pre>
  *

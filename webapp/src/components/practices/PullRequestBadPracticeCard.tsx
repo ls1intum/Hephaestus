@@ -1,5 +1,3 @@
-import { RefreshCw } from "lucide-react";
-import type React from "react";
 import { useState } from "react";
 import type { LabelInfo, PullRequestBadPractice } from "@/api/types.gen";
 import { IssueCard } from "@/components/shared/IssueCard";
@@ -9,8 +7,6 @@ import {
 	AccordionItem,
 	AccordionTrigger,
 } from "@/components/ui/accordion";
-import { Button } from "@/components/ui/button";
-import { Spinner } from "@/components/ui/spinner";
 import type { ProviderType } from "@/lib/provider";
 import { BadPracticeCard } from "./BadPracticeCard";
 import { filterGoodAndBadPractices } from "./utils";
@@ -67,18 +63,10 @@ export interface PullRequestBadPracticeCardProps {
 	badPracticeSummary?: string;
 	/** Whether the card is in a loading state */
 	isLoading?: boolean;
-	/** Whether the card is in a detecting state */
-	isDetectingBadPractices?: boolean;
 	/** Whether the card should be expanded by default */
 	openCard?: boolean;
 	/** Whether the current user has permission to perform dashboard actions */
 	currUserIsDashboardUser?: boolean;
-
-	/**
-	 * Callback to trigger bad practice detection
-	 * @param id The ID of the pull request to analyze
-	 */
-	onDetectBadPractices?: (id: number) => void;
 
 	/**
 	 * Callback to resolve a bad practice as fixed
@@ -108,7 +96,6 @@ export interface PullRequestBadPracticeCardProps {
 
 export function PullRequestBadPracticeCard({
 	providerType = "GITHUB",
-	id,
 	title = "",
 	number = 0,
 	additions = 0,
@@ -124,10 +111,8 @@ export function PullRequestBadPracticeCard({
 	oldBadPractices = [],
 	badPracticeSummary = "",
 	isLoading = false,
-	isDetectingBadPractices = false,
 	openCard = false,
 	currUserIsDashboardUser = false,
-	onDetectBadPractices,
 	onResolveBadPracticeAsFixed,
 	onResolveBadPracticeAsWontFix,
 	onResolveBadPracticeAsWrong,
@@ -171,13 +156,6 @@ export function PullRequestBadPracticeCard({
 		);
 	});
 
-	const handleDetectClick = (e: React.MouseEvent) => {
-		e.stopPropagation();
-		if (onDetectBadPractices) {
-			onDetectBadPractices(id);
-		}
-	};
-
 	// Determine practice types - we need this information for UI display
 	const {
 		// These are used to decide what to show in the UI
@@ -218,25 +196,6 @@ export function PullRequestBadPracticeCard({
 			isMerged={isMerged}
 			pullRequestLabels={pullRequestLabels}
 			noLinkWrapper
-			rightContent={
-				currUserIsDashboardUser && (
-					<Button
-						variant="outline"
-						size="sm"
-						className="gap-1"
-						onClick={handleDetectClick}
-						type="button"
-						disabled={isDetectingBadPractices}
-					>
-						{isDetectingBadPractices ? (
-							<Spinner className="size-3.5" />
-						) : (
-							<RefreshCw className="size-3.5" />
-						)}
-						Analyze Changes
-					</Button>
-				)
-			}
 		>
 			{!isLoading && (
 				<div className="w-full">

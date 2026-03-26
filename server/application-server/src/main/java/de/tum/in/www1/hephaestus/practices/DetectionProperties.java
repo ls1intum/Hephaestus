@@ -8,16 +8,15 @@ import org.springframework.lang.Nullable;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * Type-safe configuration properties for bad practice detection.
+ * Type-safe configuration properties for detection tracing.
  *
  * <p>Binds to the {@code hephaestus.detection} prefix in application configuration.
- * Controls automatic detection behavior and Langfuse tracing integration.
+ * Controls Langfuse tracing integration for bad practice feedback.
  *
  * <h2>Configuration Example</h2>
  * <pre>{@code
  * hephaestus:
  *   detection:
- *     run-automatic-detection-for-all: false
  *     tracing:
  *       enabled: true
  *       host: https://cloud.langfuse.com
@@ -25,12 +24,11 @@ import org.springframework.validation.annotation.Validated;
  *       secret-key: sk-xxx
  * }</pre>
  *
- * @param runAutomaticDetectionForAll whether to run detection for all PRs (true) or only for users with specific roles (false)
- * @param tracing                     Langfuse tracing configuration for LLM observability
+ * @param tracing Langfuse tracing configuration for LLM observability
  */
 @Validated
 @ConfigurationProperties(prefix = "hephaestus.detection")
-public record DetectionProperties(@DefaultValue("false") boolean runAutomaticDetectionForAll, @Valid Tracing tracing) {
+public record DetectionProperties(@Valid Tracing tracing) {
     /**
      * Compact constructor ensuring nested records are never null.
      */

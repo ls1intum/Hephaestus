@@ -3,8 +3,6 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { toast } from "sonner";
 import {
-	detectForPullRequestMutation,
-	detectForUserMutation,
 	getBadPracticesForUserOptions,
 	getBadPracticesForUserQueryKey,
 	getUserProfileOptions,
@@ -18,7 +16,6 @@ import { NoWorkspace } from "@/components/workspace/NoWorkspace";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
 import { useAuth } from "@/integrations/auth/AuthContext";
-import { getProviderTerms } from "@/lib/provider";
 
 export const Route = createFileRoute(
 	"/_authenticated/w/$workspaceSlug/user/$username/best-practices",
@@ -33,7 +30,6 @@ export function BestPracticesContainer() {
 	const navigate = useNavigate();
 	const { workspaceSlug, providerType } = useActiveWorkspaceSlug();
 	const { practicesEnabled, isLoading: featuresLoading } = useWorkspaceFeatures();
-	const terms = getProviderTerms(providerType);
 	const slug = workspaceSlug ?? "";
 	const hasWorkspace = Boolean(workspaceSlug);
 	const showNoWorkspace = !hasWorkspace;
@@ -55,23 +51,6 @@ export function BestPracticesContainer() {
 			path: { workspaceSlug: slug, login: username },
 		}),
 		enabled: hasWorkspace && Boolean(username),
-	});
-
-	// Mutation for detecting bad practices
-	const detect = useMutation({
-		...detectForUserMutation(),
-		onSuccess: () => {
-			queryClient.invalidateQueries({
-				queryKey: getBadPracticesForUserQueryKey({
-					path: { workspaceSlug: slug, login: username },
-				}),
-			});
-		},
-		onError: () => {
-			toast.error(
-				`Your ${terms.pullRequests.toLowerCase()} have not changed since the last detection. Try changing status or description, then run the detection again.`,
-			);
-		},
 	});
 
 	// Mutation for resolving bad practices
@@ -105,23 +84,6 @@ export function BestPracticesContainer() {
 		},
 	});
 
-	// Mutation for detecting bad practices for a specific pull request
-	const detectBadPracticesForPullRequest = useMutation({
-		...detectForPullRequestMutation(),
-		onSuccess: () => {
-			queryClient.invalidateQueries({
-				queryKey: getBadPracticesForUserQueryKey({
-					path: { workspaceSlug: slug, login: username },
-				}),
-			});
-		},
-		onError: () => {
-			toast.error(
-				`This ${terms.pullRequest.toLowerCase()} has not changed since the last detection. Try changing status or description, then run the detection again.`,
-			);
-		},
-	});
-
 	// Feature guard — redirect to profile when practices are disabled
 	useEffect(() => {
 		if (!featuresLoading && !practicesEnabled && workspaceSlug) {
@@ -142,30 +104,13 @@ export function BestPracticesContainer() {
 		);
 	}
 
+
 	if (showNoWorkspace) {
 		return <NoWorkspace />;
 	}
 
 	// Get user's display name from profile data
 	const displayName = profileQuery.data?.userInfo?.name;
-
-	const onDetectBadPractices = () => {
-		if (!hasWorkspace) {
-			return;
-		}
-		detect.mutate({
-			path: { workspaceSlug: slug, login: username },
-		});
-	};
-
-	const onDetectBadPracticesForPullRequest = (pullRequestId: number) => {
-		if (!hasWorkspace) {
-			return;
-		}
-		detectBadPracticesForPullRequest.mutate({
-			path: { workspaceSlug: slug, pullRequestId },
-		});
-	};
 
 	const onResolveBadPracticeAsFixed = (badPracticeId: number) => {
 		if (!hasWorkspace) {
@@ -212,12 +157,9 @@ export function BestPracticesContainer() {
 			providerType={providerType}
 			activityData={activityQuery.data}
 			isLoading={activityQuery.isLoading}
-			isDetectingBadPractices={detect.isPending || detectBadPracticesForPullRequest.isPending}
 			username={username}
 			displayName={displayName}
 			currUserIsDashboardUser={currUserIsDashboardUser}
-			onDetectBadPractices={onDetectBadPractices}
-			onDetectBadPracticesForPullRequest={onDetectBadPracticesForPullRequest}
 			onResolveBadPracticeAsFixed={onResolveBadPracticeAsFixed}
 			onResolveBadPracticeAsWontFix={onResolveBadPracticeAsWontFix}
 			onResolveBadPracticeAsWrong={onResolveBadPracticeAsWrong}

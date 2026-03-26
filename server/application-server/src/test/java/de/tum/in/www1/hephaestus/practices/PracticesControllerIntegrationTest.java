@@ -116,28 +116,6 @@ class PracticesControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
     }
 
     @Nested
-    @DisplayName("POST /bad-practices/pullrequest/{pullRequestId}/detect")
-    class DetectBadPracticesForPullRequest {
-
-        @Test
-        @DisplayName("should return unauthorized when not logged in")
-        void shouldReturnUnauthorizedWhenNotLoggedIn() {
-            Long pullRequestId = 123L;
-
-            webTestClient
-                .post()
-                .uri(
-                    "/workspaces/{workspaceSlug}/bad-practices/pullrequest/{pullRequestId}/detect",
-                    workspace.getWorkspaceSlug(),
-                    pullRequestId
-                )
-                .exchange()
-                .expectStatus()
-                .isUnauthorized();
-        }
-    }
-
-    @Nested
     @DisplayName("Workspace filtering")
     class WorkspaceFiltering {
 

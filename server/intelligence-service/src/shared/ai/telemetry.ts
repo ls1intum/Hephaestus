@@ -102,7 +102,7 @@ export function getTelemetryOptionsWithPrompt(
  * for versioning and A/B testing analytics.
  *
  * @param resolvedPrompt - Prompt loaded via loadPrompt()
- * @param functionId - Trace name in Langfuse (e.g., "mentor:chat", "detector:bad-practices")
+ * @param functionId - Trace name in Langfuse (e.g., "mentor:chat")
  * @param metadata - Additional metadata to attach to the trace
  * @returns Telemetry options object or undefined
  *

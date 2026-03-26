@@ -11,16 +11,14 @@
  * ┌─────────────────────────────────────────────────────────────────────────────┐
  * │                          CODE HEALTH MODULE                                  │
  * │                                                                              │
- * │  Domain Events → BadPracticeEventListener → PullRequestBadPracticeDetector  │
- * │                        ↓                              ↓                      │
- * │              BadPracticeDetectorScheduler    intelligence-service (AI)      │
+ * │  Domain Events → AgentJobEventListener → Agent Pipeline (Docker sandbox)    │
+ * │                                                       ↓                      │
+ * │                    PracticeDetectionDeliveryService → PracticeFinding        │
  * │                                                       ↓                      │
  * │                              ┌────────────────────────────────────┐          │
  * │                              │    BadPracticeDetection (Model)    │          │
  * │                              │    PullRequestBadPractice (Model)  │          │
  * │                              └────────────────────────────────────┘          │
- * │                                           ↓                                  │
- * │                    BadPracticeNotificationSender (SPI) → notification module │
  * │                                           ↓                                  │
  * │                    BadPracticeFeedbackService → Langfuse (LLM observability) │
  * └─────────────────────────────────────────────────────────────────────────────┘
@@ -28,16 +26,12 @@
  *
  * <h2>Key Components</h2>
  * <ul>
- *   <li>{@link de.tum.in.www1.hephaestus.practices.detection.PullRequestBadPracticeDetector} - Core detection logic using AI</li>
- *   <li>{@link de.tum.in.www1.hephaestus.practices.detection.BadPracticeDetectorScheduler} - Scheduled detection for all workspaces</li>
- *   <li>{@link de.tum.in.www1.hephaestus.practices.detection.BadPracticeEventListener} - Listens to PR events for real-time detection</li>
  *   <li>{@link de.tum.in.www1.hephaestus.practices.feedback.BadPracticeFeedbackService} - User feedback collection with Langfuse integration</li>
  *   <li>{@link de.tum.in.www1.hephaestus.practices.model.PullRequestBadPractice} - Detection result entity</li>
  * </ul>
  *
  * <h2>SPI (Service Provider Interfaces)</h2>
  * <ul>
- *   <li>{@link de.tum.in.www1.hephaestus.practices.spi.BadPracticeNotificationSender} - Notification sending abstraction</li>
  *   <li>{@link de.tum.in.www1.hephaestus.practices.spi.UserRoleChecker} - User role verification abstraction</li>
  * </ul>
  *
@@ -45,7 +39,7 @@
  * <ul>
  *   <li><strong>Bounded Context Isolation</strong>: Separate from activity module (event log vs. analysis)</li>
  *   <li><strong>Infrastructure Abstraction</strong>: AI service calls via anti-corruption layer</li>
- *   <li><strong>SPI Pattern</strong>: Decoupled from notification infrastructure</li>
+ *   <li><strong>SPI Pattern</strong>: Decoupled via service provider interfaces (e.g. UserRoleChecker)</li>
  *   <li><strong>Feedback Loop</strong>: User feedback improves AI model via Langfuse</li>
  * </ul>
  *

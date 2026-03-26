@@ -4,12 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 
 import de.tum.in.www1.hephaestus.practices.PracticeRepository;
-import de.tum.in.www1.hephaestus.practices.PracticesPullRequestQueryRepository;
-import de.tum.in.www1.hephaestus.practices.detection.BadPracticeDetectorScheduler;
 import de.tum.in.www1.hephaestus.practices.finding.PracticeFindingRepository;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
-import java.util.Collections;
-import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -17,12 +13,6 @@ import org.mockito.Mock;
 
 @DisplayName("PracticesWorkspacePurgeAdapter")
 class PracticesWorkspacePurgeAdapterTest extends BaseUnitTest {
-
-    @Mock
-    private PracticesPullRequestQueryRepository pullRequestQueryRepository;
-
-    @Mock
-    private BadPracticeDetectorScheduler detectorScheduler;
 
     @Mock
     private PracticeFindingRepository practiceFindingRepository;
@@ -34,46 +24,7 @@ class PracticesWorkspacePurgeAdapterTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        adapter = new PracticesWorkspacePurgeAdapter(
-            pullRequestQueryRepository,
-            detectorScheduler,
-            practiceFindingRepository,
-            practiceRepository
-        );
-    }
-
-    @Test
-    @DisplayName("cancels scheduled tasks when PRs exist")
-    void deleteWorkspaceData_withPullRequests_cancelsScheduledTasks() {
-        // Given
-        Long workspaceId = 123L;
-        List<Long> prIds = List.of(1L, 2L, 3L);
-        when(pullRequestQueryRepository.findPullRequestIdsByWorkspaceId(workspaceId)).thenReturn(prIds);
-        when(detectorScheduler.cancelScheduledTasksForPullRequests(prIds)).thenReturn(2);
-
-        // When
-        adapter.deleteWorkspaceData(workspaceId);
-
-        // Then
-        verify(pullRequestQueryRepository).findPullRequestIdsByWorkspaceId(workspaceId);
-        verify(detectorScheduler).cancelScheduledTasksForPullRequests(prIds);
-    }
-
-    @Test
-    @DisplayName("skips scheduler when no PRs exist")
-    void deleteWorkspaceData_withNoPullRequests_skipsSchedulerCall() {
-        // Given
-        Long workspaceId = 456L;
-        when(pullRequestQueryRepository.findPullRequestIdsByWorkspaceId(workspaceId)).thenReturn(
-            Collections.emptyList()
-        );
-
-        // When
-        adapter.deleteWorkspaceData(workspaceId);
-
-        // Then
-        verify(pullRequestQueryRepository).findPullRequestIdsByWorkspaceId(workspaceId);
-        verifyNoInteractions(detectorScheduler);
+        adapter = new PracticesWorkspacePurgeAdapter(practiceFindingRepository, practiceRepository);
     }
 
     @Test
@@ -81,36 +32,11 @@ class PracticesWorkspacePurgeAdapterTest extends BaseUnitTest {
     void deleteWorkspaceData_deletesFindingsAndPractices() {
         // Given
         Long workspaceId = 789L;
-        when(pullRequestQueryRepository.findPullRequestIdsByWorkspaceId(workspaceId)).thenReturn(
-            Collections.emptyList()
-        );
 
         // When
         adapter.deleteWorkspaceData(workspaceId);
 
         // Then — both deletes called (explicit finding deletion is defense-in-depth; CASCADE also handles it)
-        verify(practiceFindingRepository).deleteAllByPracticeWorkspaceId(workspaceId);
-        verify(practiceRepository).deleteAllByWorkspaceId(workspaceId);
-    }
-
-    @Test
-    @DisplayName("deletes findings and practices when legacy scheduler is disabled (null)")
-    void deleteWorkspaceData_withNullScheduler_stillDeletesFindingsAndPractices() {
-        // Given — legacy detection disabled, scheduler bean absent
-        var adapterWithoutScheduler = new PracticesWorkspacePurgeAdapter(
-            pullRequestQueryRepository,
-            null,
-            practiceFindingRepository,
-            practiceRepository
-        );
-        Long workspaceId = 321L;
-        List<Long> prIds = List.of(1L, 2L);
-        when(pullRequestQueryRepository.findPullRequestIdsByWorkspaceId(workspaceId)).thenReturn(prIds);
-
-        // When — completes without NPE despite non-empty prIds
-        adapterWithoutScheduler.deleteWorkspaceData(workspaceId);
-
-        // Then — findings and practices still cleaned up
         verify(practiceFindingRepository).deleteAllByPracticeWorkspaceId(workspaceId);
         verify(practiceRepository).deleteAllByWorkspaceId(workspaceId);
     }

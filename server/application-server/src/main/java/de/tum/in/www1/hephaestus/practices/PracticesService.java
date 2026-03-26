@@ -7,10 +7,8 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.practices.detection.BadPracticeDetectionRepository;
-import de.tum.in.www1.hephaestus.practices.detection.PullRequestBadPracticeDetector;
 import de.tum.in.www1.hephaestus.practices.detection.PullRequestBadPracticeRepository;
 import de.tum.in.www1.hephaestus.practices.model.BadPracticeDetection;
-import de.tum.in.www1.hephaestus.practices.model.DetectionResult;
 import de.tum.in.www1.hephaestus.practices.model.PullRequestBadPractice;
 import de.tum.in.www1.hephaestus.practices.model.PullRequestBadPracticeDTO;
 import de.tum.in.www1.hephaestus.practices.model.PullRequestBadPracticeState;
@@ -31,7 +29,6 @@ import org.springframework.transaction.annotation.Transactional;
  * including:
  * <ul>
  *   <li>Retrieving bad practices for users and pull requests</li>
- *   <li>Triggering detection for users and individual PRs</li>
  *   <li>Resolving bad practices with user state updates</li>
  *   <li>Authorization checks for practice operations</li>
  * </ul>
@@ -39,20 +36,17 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class PracticesService {
 
-    private final PullRequestBadPracticeDetector detector;
     private final PullRequestBadPracticeRepository badPracticeRepository;
     private final BadPracticeDetectionRepository detectionRepository;
     private final UserRepository userRepository;
     private final PracticesPullRequestQueryRepository practicesPullRequestQueryRepository;
 
     public PracticesService(
-        PullRequestBadPracticeDetector detector,
         PullRequestBadPracticeRepository badPracticeRepository,
         BadPracticeDetectionRepository detectionRepository,
         UserRepository userRepository,
         PracticesPullRequestQueryRepository practicesPullRequestQueryRepository
     ) {
-        this.detector = detector;
         this.badPracticeRepository = badPracticeRepository;
         this.detectionRepository = detectionRepository;
         this.userRepository = userRepository;
@@ -118,40 +112,6 @@ public class PracticesService {
     public PullRequestBadPracticeDTO getBadPractice(Workspace workspace, Long badPracticeId) {
         PullRequestBadPractice badPractice = requireBadPracticeInWorkspace(badPracticeId, workspace);
         return PullRequestBadPracticeDTO.fromPullRequestBadPractice(badPractice);
-    }
-
-    /**
-     * Triggers bad practice detection for all pull requests assigned to a user.
-     *
-     * @param workspace the workspace to scope the detection
-     * @param login the user's login (must match the current user)
-     * @return the aggregate detection result
-     * @throws AccessForbiddenException if the current user does not match the target login
-     */
-    @Transactional
-    public DetectionResult detectForUser(Workspace workspace, String login) {
-        User currentUser = requireCurrentUser();
-        requireSameUser(currentUser, login);
-
-        return detector.detectForUser(workspace.getId(), login);
-    }
-
-    /**
-     * Triggers bad practice detection for a specific pull request.
-     *
-     * @param workspace the workspace to scope the detection
-     * @param pullRequestId the ID of the pull request
-     * @return the detection result
-     * @throws EntityNotFoundException if the pull request is not found or not in workspace
-     * @throws AccessForbiddenException if the current user is not an assignee
-     */
-    @Transactional
-    public DetectionResult detectForPullRequest(Workspace workspace, Long pullRequestId) {
-        User currentUser = requireCurrentUser();
-        PullRequest pullRequest = requirePullRequestInWorkspace(pullRequestId, workspace);
-        requireAssignee(pullRequest, currentUser);
-
-        return detector.detectAndSyncBadPractices(pullRequest);
     }
 
     /**
@@ -257,12 +217,6 @@ public class PracticesService {
         return userRepository
             .getCurrentUser()
             .orElseThrow(() -> new AccessForbiddenException("User not authenticated"));
-    }
-
-    private void requireSameUser(User currentUser, String login) {
-        if (!currentUser.getLogin().equals(login)) {
-            throw new AccessForbiddenException("Cannot access practices for another user");
-        }
     }
 
     private void requireAssignee(PullRequest pullRequest, User user) {

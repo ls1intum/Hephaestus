@@ -11,12 +11,9 @@ interface PracticesPageProps {
 	providerType?: ProviderType;
 	activityData?: UserPractices;
 	isLoading: boolean;
-	isDetectingBadPractices: boolean;
 	username: string; // Login name
 	displayName?: string; // User's display name
 	currUserIsDashboardUser: boolean;
-	onDetectBadPractices: () => void;
-	onDetectBadPracticesForPullRequest?: (pullRequestId: number) => void;
 	onResolveBadPracticeAsFixed?: (badPracticeId: number) => void;
 	onResolveBadPracticeAsWontFix?: (badPracticeId: number) => void;
 	onResolveBadPracticeAsWrong?: (badPracticeId: number) => void;
@@ -27,12 +24,9 @@ export function PracticesPage({
 	providerType = "GITHUB",
 	activityData,
 	isLoading,
-	isDetectingBadPractices,
 	username,
 	displayName,
 	currUserIsDashboardUser,
-	onDetectBadPractices,
-	onDetectBadPracticesForPullRequest,
 	onResolveBadPracticeAsFixed,
 	onResolveBadPracticeAsWontFix,
 	onResolveBadPracticeAsWrong,
@@ -68,8 +62,6 @@ export function PracticesPage({
 								numberOfPullRequests={numberOfPullRequests}
 								numberOfGoodPractices={numberOfGoodPractices}
 								numberOfBadPractices={numberOfBadPractices}
-								isDetectingBadPractices={isDetectingBadPractices}
-								onDetectBadPractices={onDetectBadPractices}
 							/>
 						</div>
 					</div>
@@ -103,14 +95,12 @@ export function PracticesPage({
 										isMerged={pullRequest.isMerged}
 										additions={pullRequest.additions}
 										deletions={pullRequest.deletions}
-										isDetectingBadPractices={isDetectingBadPractices}
 										repositoryName={pullRequest.repository?.name}
 										createdAt={pullRequest.createdAt}
 										pullRequestLabels={pullRequest.labels}
 										badPractices={pullRequest.badPractices}
 										badPracticeSummary={pullRequest.badPracticeSummary}
 										currUserIsDashboardUser={currUserIsDashboardUser}
-										onDetectBadPractices={onDetectBadPracticesForPullRequest}
 										onResolveBadPracticeAsFixed={onResolveBadPracticeAsFixed}
 										onResolveBadPracticeAsWontFix={onResolveBadPracticeAsWontFix}
 										onResolveBadPracticeAsWrong={onResolveBadPracticeAsWrong}
