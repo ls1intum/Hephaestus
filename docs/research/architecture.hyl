@@ -1,4 +1,4 @@
-// Hephaestus Architecture — 7 Components
+// Hephaestus Architecture — 5 Internal + 7 External Components
 // Render at https://hylimo.github.io
 componentDiagram {
 
@@ -19,6 +19,10 @@ componentDiagram {
 
         component("WebhookIngest", keywords = list("Hono")) layout {
             pos = apos(500, 250)
+        }
+
+        component("DockerSandbox", keywords = list("AI Agents")) layout {
+            pos = apos(275, 450)
         }
 
     } layout {
@@ -51,6 +55,10 @@ componentDiagram {
         pos = apos(1550, 650)
     }
 
+    component("Slack", keywords = list("Notifications")) layout {
+        pos = apos(1850, 650)
+    }
+
     // === Internal Interfaces ===
 
     // WebApp → ApplicationServer (REST)
@@ -63,9 +71,10 @@ componentDiagram {
     webMentor = WebApp.requires("MentorAPI", 0.75)
     webMentor dependsOn intelMentor
 
-    // ApplicationServer → IntelligenceService (AI)
-    appAI = ApplicationServer.requires("AI", 0.75)
-    appAI dependsOn intelMentor
+    // ApplicationServer → DockerSandbox (Spawn Agent)
+    sandboxAPI = DockerSandbox.provides("AgentAPI", 0.5, dist = 50)
+    appAgent = ApplicationServer.requires("Agent", 0.75)
+    appAgent dependsOn sandboxAPI
 
     // WebhookIngest provides Webhooks
     webhookIn = WebhookIngest.provides("Webhooks", 0.75, dist = 50)
@@ -86,11 +95,20 @@ componentDiagram {
     appAuthReq = ApplicationServer.requires("Auth", 0.25)
     appAuthReq dependsOn kcAuth
 
+    // DockerSandbox → External
+    sandboxLLM = DockerSandbox.requires("LLM", 0.25)
+    sandboxLLM dependsOn llmAI
+
     // IntelligenceService → External
     intelLLM = IntelligenceService.requires("LLM", 0.25)
     intelLLM dependsOn llmAI
     intelTraces = IntelligenceService.requires("Traces", 0.25)
     intelTraces dependsOn lfTraces
+
+    // ApplicationServer → Slack
+    slackNotify = Slack.provides("Notify", 0.5, dist = 40)
+    appSlack = ApplicationServer.requires("Notify", 0.5)
+    appSlack dependsOn slackNotify
 
     // WebhookIngest → NATS
     webhookPub = WebhookIngest.requires("Publish", 0.25)

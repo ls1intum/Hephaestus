@@ -13,6 +13,7 @@ import de.tum.in.www1.hephaestus.practices.finding.PracticeDetectionCompletedEve
 import de.tum.in.www1.hephaestus.practices.finding.PracticeDetectionProperties;
 import de.tum.in.www1.hephaestus.practices.finding.PracticeFindingRepository;
 import de.tum.in.www1.hephaestus.practices.model.Practice;
+import de.tum.in.www1.hephaestus.practices.model.PracticeFinding;
 import de.tum.in.www1.hephaestus.practices.model.Verdict;
 import java.time.Instant;
 import java.util.HashMap;
@@ -107,7 +108,7 @@ public class PracticeDetectionDeliveryService {
             );
         }
         Long contributorId = pullRequest.getAuthor().getId();
-        String targetType = "pull_request";
+        String targetType = PracticeFinding.TARGET_TYPE_PULL_REQUEST;
         Long targetId = pullRequestId;
 
         // Persist findings

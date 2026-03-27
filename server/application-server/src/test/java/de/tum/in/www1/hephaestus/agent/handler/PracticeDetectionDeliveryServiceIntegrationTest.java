@@ -317,7 +317,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
             PracticeDetectionCompletedEvent event = events.get(0);
             assertThat(event.agentJobId()).isEqualTo(agentJob.getId());
             assertThat(event.workspaceId()).isEqualTo(workspace.getId());
-            assertThat(event.targetType()).isEqualTo("pull_request");
+            assertThat(event.targetType()).isEqualTo("PULL_REQUEST");
             assertThat(event.targetId()).isEqualTo(prId);
             assertThat(event.findingsInserted()).isEqualTo(1);
             assertThat(event.findingsDiscarded()).isZero();

@@ -62,6 +62,9 @@ import org.hibernate.annotations.Type;
 @AllArgsConstructor
 public class PracticeFinding {
 
+    /** Target type for pull request findings. Matches the DB CHECK constraint on {@code target_type}. */
+    public static final String TARGET_TYPE_PULL_REQUEST = "PULL_REQUEST";
+
     @Id
     @Column(columnDefinition = "UUID")
     private UUID id;

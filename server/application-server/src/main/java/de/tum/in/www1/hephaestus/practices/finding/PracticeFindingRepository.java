@@ -177,11 +177,12 @@ public interface PracticeFindingRepository extends JpaRepository<PracticeFinding
     /**
      * All findings for a specific pull request within a workspace.
      */
+    // JPQL literal must match PracticeFinding.TARGET_TYPE_PULL_REQUEST
     @Query(
         """
         SELECT f FROM PracticeFinding f
         JOIN FETCH f.practice p
-        WHERE f.targetType = 'pull_request'
+        WHERE f.targetType = 'PULL_REQUEST'
         AND f.targetId = :pullRequestId
         AND p.workspace.id = :workspaceId
         ORDER BY f.detectedAt DESC

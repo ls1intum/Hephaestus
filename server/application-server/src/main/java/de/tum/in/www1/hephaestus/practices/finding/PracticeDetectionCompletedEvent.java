@@ -10,7 +10,7 @@ import java.util.UUID;
  *
  * @param agentJobId      the agent job that produced these findings
  * @param workspaceId     the workspace context
- * @param targetType      the target entity type (e.g., "pull_request")
+ * @param targetType      the target entity type (e.g., "PULL_REQUEST")
  * @param targetId        the target entity ID
  * @param contributorId   the contributor whose work was evaluated
  * @param findingsInserted number of new findings persisted

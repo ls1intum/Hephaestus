@@ -23,7 +23,7 @@ public record PracticeFindingDetailDTO(
     @NonNull @Schema(description = "Practice slug") String practiceSlug,
     @NonNull @Schema(description = "Practice name") String practiceName,
     @Nullable @Schema(description = "Practice category") String category,
-    @NonNull @Schema(description = "Target type (e.g. pull_request, review)") String targetType,
+    @NonNull @Schema(description = "Target type (e.g. PULL_REQUEST)") String targetType,
     @NonNull @Schema(description = "Target entity ID") Long targetId,
     @NonNull @Schema(description = "Finding title") String title,
     @NonNull @Schema(description = "Verdict: POSITIVE, NEGATIVE, NOT_APPLICABLE, or NEEDS_REVIEW") Verdict verdict,
