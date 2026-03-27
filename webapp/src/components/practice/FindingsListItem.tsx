@@ -142,9 +142,9 @@ function FindingDetail({
 						Evidence
 					</span>
 					<ul className="text-sm space-y-0.5">
-						{evidence.locations.map((loc) => (
+						{evidence.locations.map((loc, index) => (
 							<li
-								key={`${loc.path}:${loc.startLine}`}
+								key={`${loc.path}:${loc.startLine}:${index}`}
 								className="font-mono text-xs text-muted-foreground"
 							>
 								{loc.path}

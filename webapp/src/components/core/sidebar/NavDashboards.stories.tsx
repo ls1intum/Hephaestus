@@ -23,6 +23,7 @@ const meta = {
 		workspaceSlug: "aet",
 		achievementsEnabled: true,
 		leaderboardEnabled: true,
+		practicesEnabled: false,
 	},
 	argTypes: {
 		username: {
@@ -40,6 +41,10 @@ const meta = {
 		leaderboardEnabled: {
 			control: "boolean",
 			description: "Whether leaderboard sidebar item is visible",
+		},
+		practicesEnabled: {
+			control: "boolean",
+			description: "Whether practices sidebar item is visible",
 		},
 	},
 	decorators: [
@@ -70,11 +75,22 @@ export const DifferentUser: Story = {
 };
 
 /**
+ * Practices-first workspace with leaderboard disabled.
+ */
+export const PracticesEnabled: Story = {
+	args: {
+		practicesEnabled: true,
+		leaderboardEnabled: false,
+	},
+};
+
+/**
  * All optional features disabled — only Profile and Teams remain.
  */
 export const AllFeaturesDisabled: Story = {
 	args: {
 		achievementsEnabled: false,
 		leaderboardEnabled: false,
+		practicesEnabled: false,
 	},
 };

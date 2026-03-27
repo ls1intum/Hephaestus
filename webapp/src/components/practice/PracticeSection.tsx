@@ -72,7 +72,7 @@ export function PracticeSection({ workspaceSlug }: PracticeSectionProps) {
 	}
 
 	return (
-		<div className="flex flex-col gap-6" aria-busy={isInitialLoading}>
+		<div id="practices" className="flex flex-col gap-6" aria-busy={isInitialLoading}>
 			<h2 className="text-xl font-semibold">Practices</h2>
 
 			{engagement && totalFindings > 0 && (

@@ -103,7 +103,7 @@ export function FindingsList({
 					value={[selectedVerdict]}
 					onValueChange={(value) => {
 						const newValue = value[value.length - 1];
-						if (isVerdictFilter(newValue)) onVerdictChange(newValue);
+						onVerdictChange(isVerdictFilter(newValue) ? newValue : "ALL");
 					}}
 					aria-label="Filter by verdict"
 					className="bg-secondary/50 rounded-lg p-0.5"

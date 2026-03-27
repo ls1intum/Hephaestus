@@ -47,6 +47,7 @@ export function NavDashboards({
 								<Link
 									to="/w/$workspaceSlug/user/$username"
 									params={{ username: username ?? "", workspaceSlug }}
+									hash="practices"
 								/>
 							}
 						>
