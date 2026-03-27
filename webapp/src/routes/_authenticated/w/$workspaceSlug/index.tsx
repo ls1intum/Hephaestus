@@ -52,7 +52,11 @@ function LeaderboardContainer() {
 	// Get the current user from auth context
 	const { username } = useAuth();
 	const { workspaceSlug, providerType, isLoading: isWorkspaceLoading } = useActiveWorkspaceSlug();
-	const { leaderboardEnabled, isLoading: featuresLoading } = useWorkspaceFeatures();
+	const {
+		leaderboardEnabled,
+		practicesEnabled,
+		isLoading: featuresLoading,
+	} = useWorkspaceFeatures();
 	const slug = workspaceSlug ?? "";
 	const hasWorkspace = Boolean(workspaceSlug);
 	const showNoWorkspace = !isWorkspaceLoading && !hasWorkspace;
@@ -254,14 +258,16 @@ function LeaderboardContainer() {
 	// Feature guard — redirect to profile when leaderboard is disabled
 	useEffect(() => {
 		if (!featuresLoading && !leaderboardEnabled && workspaceSlug && username) {
-			toast.error("Leaderboard is not enabled for this workspace");
+			if (!practicesEnabled) {
+				toast.info("The leaderboard is not available. Redirecting to your profile.");
+			}
 			navigate({
 				to: "/w/$workspaceSlug/user/$username",
 				params: { workspaceSlug, username },
 				replace: true,
 			});
 		}
-	}, [featuresLoading, leaderboardEnabled, workspaceSlug, username, navigate]);
+	}, [featuresLoading, leaderboardEnabled, practicesEnabled, workspaceSlug, username, navigate]);
 
 	if (featuresLoading || !leaderboardEnabled) {
 		return (

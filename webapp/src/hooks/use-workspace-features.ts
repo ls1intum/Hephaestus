@@ -14,7 +14,8 @@ export interface WorkspaceFeatures {
 /**
  * Returns the feature flags for the active workspace.
  * Reads from the listWorkspaces query cache (same query as useActiveWorkspaceSlug).
- * Defaults all flags to true while loading to prevent sidebar flicker.
+ * Flags default to false while loading — consumers must check `isLoading`
+ * before acting on flag values.
  */
 export function useWorkspaceFeatures(): WorkspaceFeatures & { isLoading: boolean } {
 	const { selectedSlug } = useWorkspaceStore();
@@ -37,13 +38,16 @@ export function useWorkspaceFeatures(): WorkspaceFeatures & { isLoading: boolean
 
 /**
  * Extracts feature flags from a WorkspaceListItem.
- * Defaults all to true when workspace is undefined (loading state).
+ * Defaults all to false when workspace is undefined (loading / error / not found).
+ * This is the safe default — all consumers already show a spinner or return null
+ * while `isLoading` is true, so the false default only matters on query failure
+ * where showing nothing is safer than showing gated content.
  */
 export function getWorkspaceFeatures(workspace?: WorkspaceListItem): WorkspaceFeatures {
 	return {
-		practicesEnabled: workspace?.practicesEnabled ?? true,
-		achievementsEnabled: workspace?.achievementsEnabled ?? true,
-		leaderboardEnabled: workspace?.leaderboardEnabled ?? true,
-		progressionEnabled: workspace?.progressionEnabled ?? true,
+		practicesEnabled: workspace?.practicesEnabled ?? false,
+		achievementsEnabled: workspace?.achievementsEnabled ?? false,
+		leaderboardEnabled: workspace?.leaderboardEnabled ?? false,
+		progressionEnabled: workspace?.progressionEnabled ?? false,
 	};
 }

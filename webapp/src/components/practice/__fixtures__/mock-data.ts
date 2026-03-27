@@ -1,0 +1,116 @@
+import type { ContributorPracticeSummary, PracticeFindingList } from "@/api/types.gen";
+
+/** Fixed reference date for deterministic Storybook snapshots. */
+const REFERENCE_DATE = new Date("2025-06-15T12:00:00Z");
+
+export const mockSummaries: ContributorPracticeSummary[] = [
+	{
+		practiceName: "Code Review Thoroughness",
+		practiceSlug: "code-review-thoroughness",
+		category: "Code Quality",
+		positiveCount: 15,
+		negativeCount: 3,
+		totalFindings: 18,
+		lastFindingAt: REFERENCE_DATE,
+	},
+	{
+		practiceName: "Test Coverage",
+		practiceSlug: "test-coverage",
+		category: "Testing",
+		positiveCount: 5,
+		negativeCount: 8,
+		totalFindings: 13,
+		lastFindingAt: new Date("2025-06-14T10:00:00Z"),
+	},
+	{
+		practiceName: "Error Handling",
+		practiceSlug: "error-handling",
+		category: "Reliability",
+		positiveCount: 7,
+		negativeCount: 4,
+		totalFindings: 11,
+		lastFindingAt: new Date("2025-06-13T08:00:00Z"),
+	},
+	{
+		practiceName: "Documentation Standards",
+		practiceSlug: "documentation-standards",
+		category: "Documentation",
+		positiveCount: 10,
+		negativeCount: 2,
+		totalFindings: 12,
+		lastFindingAt: new Date("2025-06-12T15:00:00Z"),
+	},
+];
+
+export const mockFindings: PracticeFindingList[] = [
+	{
+		id: "f1",
+		title: "Reviewer provided thorough inline feedback on error handling paths",
+		verdict: "POSITIVE",
+		severity: "MINOR",
+		confidence: 0.92,
+		detectedAt: new Date("2025-06-15T09:00:00Z"),
+		practiceName: "Code Review Thoroughness",
+		practiceSlug: "code-review-thoroughness",
+		category: "Code Quality",
+		targetId: 42,
+		targetType: "PULL_REQUEST",
+	},
+	{
+		id: "f2",
+		title: "Missing error handling in async database operation",
+		verdict: "NEGATIVE",
+		severity: "MAJOR",
+		confidence: 0.88,
+		detectedAt: new Date("2025-06-15T04:00:00Z"),
+		practiceName: "Error Handling",
+		practiceSlug: "error-handling",
+		category: "Reliability",
+		targetId: 43,
+		targetType: "PULL_REQUEST",
+	},
+	{
+		id: "f3",
+		title: "Comprehensive test suite added for authentication module",
+		verdict: "POSITIVE",
+		severity: "INFO",
+		confidence: 0.95,
+		detectedAt: new Date("2025-06-14T12:00:00Z"),
+		practiceName: "Test Coverage",
+		practiceSlug: "test-coverage",
+		category: "Testing",
+		targetId: 44,
+		targetType: "PULL_REQUEST",
+	},
+	{
+		id: "f4",
+		title: "Review comment addressed edge case in payment processing",
+		verdict: "POSITIVE",
+		severity: "MINOR",
+		confidence: 0.85,
+		detectedAt: new Date("2025-06-13T12:00:00Z"),
+		practiceName: "Code Review Thoroughness",
+		practiceSlug: "code-review-thoroughness",
+		category: "Code Quality",
+		targetId: 45,
+		targetType: "PULL_REQUEST",
+	},
+	{
+		id: "f5",
+		title: "Unhandled promise rejection in event listener cleanup",
+		verdict: "NEGATIVE",
+		severity: "CRITICAL",
+		confidence: 0.91,
+		detectedAt: new Date("2025-06-12T12:00:00Z"),
+		practiceName: "Error Handling",
+		practiceSlug: "error-handling",
+		category: "Reliability",
+		targetId: 46,
+		targetType: "PULL_REQUEST",
+	},
+];
+
+export const mockPracticeOptions = mockSummaries.map((s) => ({
+	value: s.practiceSlug,
+	label: s.practiceName,
+}));
