@@ -15,40 +15,40 @@ type FeatureItem = {
 
 const FeatureList: FeatureItem[] = [
   {
-    title: 'Code Review Gamification',
-    kicker: 'Transform code reviews into learning opportunities',
+    title: 'Practice Detection',
+    kicker: 'Define practices. Evaluate every contribution against them.',
     description:
-      'Friendly competition keeps healthy review habits visible with leaderboards, leagues, and team-wide recognition.',
+      'Admins curate a practice catalog per workspace. An AI agent evaluates each contribution against those practices and produces structured findings with a verdict, severity, evidence, and tailored guidance.',
     bullets: [
-      'Weekly leaderboards with GitHub integration',
-      'Team competitions across multiple repositories',
-      'Structured league system for ongoing engagement',
+      'Workspace-defined practices — your standards, not generic rules',
+      'Structured findings: verdict, severity, evidence, and guidance',
+      'Contributors mark findings as applied, disputed, or not applicable',
     ],
-    cta: {label: 'See the leaderboard tour', to: '/user/leaderboard'},
+    cta: {label: 'See the conceptual model', to: '/contributor/conceptual-model'},
   },
   {
-    title: 'Process-Aware AI Mentoring',
-    kicker: 'Heph provides guidance grounded in your repository activity',
+    title: 'Adaptive Coaching',
+    kicker: 'Guidance adapts to each contributor\'s track record.',
     description:
-      'Mentoring sessions blend self-regulated learning prompts with real repo events so goals, reflections, and next steps stay actionable.',
+      'The system tracks each contributor\'s history per practice and instructs the agent to adapt accordingly. New contributors are guided toward concrete examples. Repeat issues prompt direct coaching. Improving contributors get prompts for reflection.',
     bullets: [
-      'SRL-guided weekly reflection',
-      'Repo activity context for objective feedback',
-      'Goal setting and progress tracking',
+      'Each contributor\'s history with a practice shapes what kind of feedback they get',
+      'Findings appear in context, where the work happens',
+      'AI mentor (Heph) for reflection, goal-setting, and session summaries',
     ],
     cta: {label: 'Work with the mentor', to: '/user/ai-mentor'},
   },
   {
-    title: 'Build Better Team Habits',
-    kicker: 'Creativity meets technical expertise — just like on the landing page',
+    title: 'Engagement & Recognition',
+    kicker: 'Make good practices visible across the team.',
     description:
-      'Our approach combines craft, collaboration, and quality so teams stay aligned while the platform scales with them.',
+      'Leaderboards, leagues, and achievements track engagement over time. Weekly Slack digests highlight standout contributors.',
     bullets: [
-      'Empower engineers with real-world feedback loops',
-      'Foster collaboration that strengthens engineering culture',
-      'Improve code quality through friendly competition',
+      'Leaderboards and leagues track contribution quality over time',
+      'Achievements recognize sustained good practices',
+      'Weekly Slack digests highlight standout contributors',
     ],
-    cta: {label: 'Dive into contributor docs', to: '/contributor/overview'},
+    cta: {label: 'See the leaderboard', to: '/user/leaderboard'},
   },
 ];
 

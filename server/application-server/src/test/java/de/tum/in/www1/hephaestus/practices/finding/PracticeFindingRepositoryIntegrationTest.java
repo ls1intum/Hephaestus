@@ -14,7 +14,6 @@ import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.practices.PracticeRepository;
 import de.tum.in.www1.hephaestus.practices.model.Practice;
 import de.tum.in.www1.hephaestus.practices.model.PracticeFinding;
-import de.tum.in.www1.hephaestus.practices.model.PracticeFindingTargetType;
 import de.tum.in.www1.hephaestus.practices.model.Verdict;
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.in.www1.hephaestus.testconfig.TestUserFactory;
@@ -609,38 +608,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 null,
                 detectedAt
             );
-        }
-    }
-
-    @Nested
-    @DisplayName("target_type enum mapping")
-    class TargetTypeTests {
-
-        @Test
-        @DisplayName("persisted 'PULL_REQUEST' maps to PracticeFindingTargetType.PULL_REQUEST on read")
-        void enumRoundTrip() {
-            UUID id = UUID.randomUUID();
-            practiceFindingRepository.insertIfAbsent(
-                id,
-                "tt-roundtrip",
-                agentJob.getId(),
-                practice.getId(),
-                "PULL_REQUEST",
-                1L,
-                contributor.getId(),
-                "Enum mapping test",
-                "POSITIVE",
-                "INFO",
-                0.9f,
-                null,
-                null,
-                null,
-                null,
-                Instant.now()
-            );
-
-            PracticeFinding found = practiceFindingRepository.findById(id).orElseThrow();
-            assertThat(found.getTargetType()).isEqualTo(PracticeFindingTargetType.PULL_REQUEST);
         }
     }
 }

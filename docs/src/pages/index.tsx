@@ -9,12 +9,12 @@ import styles from './index.module.css';
 const guideLinks = [
   {
     title: 'User Guide',
-    description: 'Navigate weekly rituals, mentoring flows, and leaderboard insights.',
+    description: 'Use the AI mentor, leaderboards, and weekly digests to improve your practices.',
     to: '/user/overview',
   },
   {
     title: 'Contributor Guide',
-    description: 'Set up local services, follow coding standards, and ship with confidence.',
+    description: 'Set up local development, understand the architecture, and follow coding standards.',
     to: '/contributor/overview',
   },
   {
@@ -30,10 +30,10 @@ function HomepageHeader() {
       <div className="container">
         <div className={styles.heroCopy}>
           <Heading as="h1" className={styles.heroTitle}>
-            Process-Aware Mentoring for Agile Software Teams
+            Practice-Aware Guidance for Software Projects
           </Heading>
           <p className={styles.heroSubtitle}>
-            Onboard faster and learn better habits with an AI mentor grounded in your repo workflow — from issues to pull requests and team rituals.
+            Practice-aware guidance for software projects. Define your practices, evaluate contributions, and coach each contributor based on their track record.
           </p>
           <div className={styles.heroActions}>
             <Link className="button button--primary button--lg" to="/user/overview">
@@ -56,8 +56,7 @@ function QuickstartGuides(): ReactNode {
         <div className={styles.quickstartHeader}>
           <Heading as="h2">Pick the guide that matches your role</Heading>
           <p>
-            Whether you&apos;re exploring the mentor experience, extending the platform, or running production operations, the
-            docs below map directly to the workflows in the Hephaestus webapp.
+            Each guide covers the workflows relevant to your role.
           </p>
         </div>
         <div className={styles.quickstartGrid}>
@@ -81,7 +80,7 @@ export default function Home(): ReactNode {
   return (
     <Layout
       title={siteConfig.title}
-      description="Process-Aware Mentoring for Agile Software Teams with AI guidance, gamified reviews, and actionable analytics.">
+      description="Hephaestus documentation — open-source practice-aware guidance for software projects. Define your practices, evaluate contributions, and coach each contributor based on their track record.">
       <HomepageHeader />
       <main>
         <QuickstartGuides />

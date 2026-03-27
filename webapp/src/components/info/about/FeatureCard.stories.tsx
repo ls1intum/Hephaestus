@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { Code, Sparkles, Users, Zap } from "lucide-react";
+import { MessageCircle, ScanSearch, TrendingUp, Zap } from "lucide-react";
 import { FeatureCard } from "./FeatureCard";
 
 /**
@@ -21,65 +21,65 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * Default feature card showcasing code review gamification.
+ * Practice detection feature card.
  */
 export const Default: Story = {
 	args: {
 		feature: {
-			icon: Code,
-			badge: "Core Feature",
-			title: "Code Review Gamification",
-			description: "Turning technical work into team growth",
+			icon: ScanSearch,
+			badge: "Detect",
+			title: "Practice Detection",
+			description: "Evaluate contributions against your project's practice catalog",
 			content:
-				"Transform code reviews into engaging experiences with dynamic leaderboards, team competitions, and a structured league system that recognizes excellence and encourages participation from developers at all skill levels.",
+				"An AI agent evaluates each contribution against workspace-defined practices. Findings include a verdict, severity, evidence, and tailored guidance. Contributors can mark findings as applied, disputed, or not applicable.",
 		},
 	},
 };
 
 /**
- * AI mentorship feature with sparkles icon.
+ * Adaptive coaching feature card.
  */
-export const AIMentorship: Story = {
+export const AdaptiveCoaching: Story = {
 	args: {
 		feature: {
-			icon: Sparkles,
-			badge: "Core Feature",
-			title: "AI-Powered Mentorship",
-			description: "Your team's personalized guide",
+			icon: MessageCircle,
+			badge: "Guide",
+			title: "Adaptive Coaching",
+			description: "Guidance adapts to each contributor's track record",
 			content:
-				"Receive contextual guidance through our AI mentor that provides personalized feedback, identifies growth opportunities, and helps team members develop their skills with practical insights that lead to measurable improvement.",
+				"The system tracks each contributor's history per practice and instructs the agent to adapt accordingly. New contributors are guided toward concrete examples. Repeat issues prompt direct coaching. Improving contributors get prompts for reflection.",
 		},
 	},
 };
 
 /**
- * Team collaboration feature with a different badge style.
+ * Engagement and recognition feature card.
  */
-export const TeamCollaboration: Story = {
+export const EngagementRecognition: Story = {
 	args: {
 		feature: {
-			icon: Users,
-			badge: "New Feature",
-			title: "Team Collaboration Hub",
-			description: "Connect and grow together",
+			icon: TrendingUp,
+			badge: "Grow",
+			title: "Engagement & Recognition",
+			description: "Make good practices visible across the team",
 			content:
-				"Foster meaningful connections within your development team through shared challenges, peer mentoring opportunities, and collaborative learning experiences that strengthen both individual skills and team cohesion.",
+				"Leaderboards, leagues, and achievements track engagement over time. Weekly Slack digests highlight standout contributors. The AI mentor (Heph) supports reflection and goal-setting.",
 		},
 	},
 };
 
 /**
- * Performance analytics with lightning icon.
+ * Agent orchestration feature card.
  */
-export const PerformanceAnalytics: Story = {
+export const AgentOrchestration: Story = {
 	args: {
 		feature: {
 			icon: Zap,
-			badge: "Analytics",
-			title: "Performance Insights",
-			description: "Data-driven development insights",
+			badge: "Infrastructure",
+			title: "Agent Orchestration",
+			description: "Run AI agents in sandboxed containers",
 			content:
-				"Gain deep visibility into your team's development patterns, identify bottlenecks, and discover optimization opportunities through comprehensive analytics and intelligent reporting.",
+				"Run AI agents (Claude Code, OpenCode) in sandboxed Docker containers with configurable LLM providers, resource limits, and concurrency caps.",
 		},
 	},
 };

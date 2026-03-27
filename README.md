@@ -7,47 +7,71 @@
   [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/ls1intum/Hephaestus/blob/main/CONTRIBUTING.md)
 </div>
 
-# Hephaestus — Process-Aware Mentoring for Agile Software Teams
+# Hephaestus — Practice-Aware Guidance for Software Projects
 
-Hephaestus is an open-source platform for process-aware mentoring that scaffolds self-regulated learning and onboarding for agile software teams. The platform focuses on the software process — from issues to pull requests and team rituals — to bridge the theory–practice gap and help novices adopt industry best practices faster with less struggle. Heph is the platform’s conversational AI mentor that delivers repo-grounded guidance.
+Hephaestus is an open-source platform for **practice-aware guidance**. You define the practices that matter for your project, and Hephaestus evaluates every contribution against them. When something needs attention, it tells the contributor directly, with guidance that adapts based on their track record.
 
 <img alt="Agile Hephaestus" height="200px" src="./docs/user/img/overview/agile_hephaestus.png">
 
-Hephaestus /hɪˈfɛstəs/ is the Greek god of blacksmiths, craftsmen, and artisans, symbolizing the fusion of creativity and technical skill.
+> Currently integrates with GitHub and GitLab.
 
-## Main Features
+## How It Works
 
-1. **Code Review Gamification**
+1. **Define practices** — Admins curate a practice catalog per workspace (e.g., contribution description quality, review thoroughness, documentation standards). Each practice has a detection prompt that tells the AI what to look for.
 
-   - **Weekly Leaderboard:** Stay motivated with a dynamic leaderboard that updates in real time via GitHub integration. Earn points for review activity, view detailed stats, and easily copy pull request links.
+2. **Evaluate contributions** — When a contribution is submitted or updated, an AI agent runs in a sandboxed container with full project access. It evaluates the contribution against each relevant practice and produces structured findings with a verdict, severity, and tailored guidance.
 
-   - **Team Competitions:** Foster a collaborative spirit with team leaderboards spanning multiple repositories and options to filter the associated activities via labels.
+3. **Adapt guidance** — The system tracks each contributor's history per practice and instructs the agent to adapt accordingly. New contributors get concrete examples. Repeat issues get direct coaching. Improving contributors get prompts for reflection.
 
-   - **Leagues:** Engage in a structured league system where consistent review efforts build an Elo-like ranking — adding a competitive edge to your code reviews.
+4. **Deliver feedback** — Findings appear where the work happens. Contributors can mark them as applied, disputed, or not applicable.
 
-   - **Automated Recognition:** Celebrate excellence with weekly Slack notifications that honor the top three reviewers and link directly to the previous week's leaderboard.
+### Four Health Dimensions
 
-2. **Heph (Conversational AI Mentor)**
+Practices are organized into four dimensions so no single area dominates:
 
-   - **SRL-guided reflection:** Run structured, AI-assisted sessions that support self-regulated learning (goals → strategies → reflection) tailored to agile project work.
-   - **Automated standups:** Turn weekly insights into a concise standup table to streamline team communication and accountability.
-   - **Repo context awareness:** Ground guidance in actual activity (issues, commits, reviews, PRs) to deliver objective, data-informed feedback and next steps.
+| Dimension | What it covers | Example question |
+|-----------|---------------|-----------------|
+| **Technical** | Contribution and review quality | Are reviews substantive? Are known anti-patterns declining? |
+| **Process** | Workflow effectiveness | Are contributions well-scoped? Is work-in-progress manageable? |
+| **Social** | Collaboration patterns | Is review load shared? Do people work across team boundaries? |
+| **Cognitive** | Understanding and growth | Are contributors building understanding, not just shipping faster? |
+
+## Features
+
+### Practice Detection
+
+The core of the platform. An AI agent evaluates each contribution against your workspace's practice catalog and produces structured findings — with guidance adapted to each contributor's experience level.
+
+Contributors stay in control: mark any finding as applied, disputed, or not applicable.
+
+### AI Mentor (Heph)
+
+A conversational AI mentor grounded in your actual project activity. Heph helps contributors reflect on their work, set goals, and plan next steps. Generates session summaries that can be shared with mentors.
+
+### Engagement & Recognition
+
+Leaderboards, leagues, and achievements make good practices visible across the team. Weekly Slack digests highlight standout contributors.
+
+### Agent Orchestration
+
+Run AI agents (Claude Code, OpenCode) in sandboxed Docker containers with configurable LLM providers, resource limits, and concurrency caps.
 
 ## Roadmap
 
-- **Short Term:** Develop initial workspace support by moving environment variable configuration into a user-friendly workspace settings UI for setting up API credentials, webhooks, etc.
-- **Short Term:** Streamline project setup and improve contributor accessibility by enhancing documentation and onboarding resources.
-- **Medium Term:** Expand multi-workspace capabilities to allow configuration of multiple organizations and selected open-source repositories, enabling seamless integration into diverse GitHub projects.
-- **Medium Term:** Integrate GitLab support to cater to self-hosted Git platforms, particularly for educational contexts.
-- **Medium Term:** Develop an advanced mentor prompt scheduler tailored for project-based courses, enabling daily reflective sessions and guided adaptation to evolving project requirements.
-- **Medium Term:** Enhance the gamification system with additional features and further expand Heph's capabilities.
-- **Long Term:** Proactively integrate with GitHub and GitLab to deliver feedback directly via comments on issues or pull requests.
-- **Long Term:** Launch a peer-to-peer recognition system to reward high-quality reviews and establish a review quality assurance mechanism.
+- **Practice Detection**: Broaden coverage to review depth, workflow patterns, and task management
+- **Good Practice Recognition**: Detect and reinforce beneficial patterns, not just flag problems
+- **Inline Guidance**: Contextual coaching directly on contributions *(shipped for PRs)*
+- **Health Signals**: Track project health across multiple dimensions with confidence scores
+- **Trajectories**: Track how contributors improve over time and reduce guidance as they grow
+- **Cross-Platform**: Full parity across GitHub, GitLab, and other code platforms
+- **Beyond Software**: Explore applicability to design, research, and course projects
 
 ## Documentation
 
 Technical & user docs (GitHub Pages): [https://ls1intum.github.io/Hephaestus/](https://ls1intum.github.io/Hephaestus/)
 UI component docs: [Storybook](https://main--66a8981a27ced8fef3190d41.chromatic.com/)
+
+For the domain model, architecture, and theoretical foundations, see the [Conceptual Model](https://ls1intum.github.io/Hephaestus/contributor/conceptual-model).
 
 ### Setup
 

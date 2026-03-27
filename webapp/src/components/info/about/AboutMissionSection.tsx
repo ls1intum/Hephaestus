@@ -1,23 +1,31 @@
-import { Code, Sparkles } from "lucide-react";
+import { MessageCircle, ScanSearch, TrendingUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { FeatureCard, type FeatureData } from "./FeatureCard";
 
 const FEATURES_DATA: FeatureData[] = [
 	{
-		icon: Code,
-		badge: "Core Feature",
-		title: "Code Review Gamification",
-		description: "Turning technical work into team growth",
+		icon: ScanSearch,
+		badge: "Detect",
+		title: "Practice Detection",
+		description: "Evaluate contributions against your project's practice catalog",
 		content:
-			"Transform code reviews into engaging experiences with dynamic leaderboards, team competitions, and a structured league system that recognizes excellence and encourages participation from developers at all skill levels.",
+			"An AI agent evaluates each contribution against workspace-defined practices. Findings include a verdict, severity, evidence, and tailored guidance. Contributors can mark findings as applied, disputed, or not applicable.",
 	},
 	{
-		icon: Sparkles,
-		badge: "Core Feature",
-		title: "Process-Aware AI Mentoring",
-		description: "Guidance grounded in your repo activity",
+		icon: MessageCircle,
+		badge: "Guide",
+		title: "Adaptive Coaching",
+		description: "Guidance adapts to each contributor's track record",
 		content:
-			"Heph — our AI mentor — delivers personalized, data-informed feedback based on issues, commits, reviews, and pull requests. It supports self-regulated learning with goal setting, reflection, and practical next steps.",
+			"The system tracks each contributor's history per practice and instructs the agent to adapt accordingly. New contributors are guided toward concrete examples. Repeat issues prompt direct coaching. Improving contributors get prompts for reflection.",
+	},
+	{
+		icon: TrendingUp,
+		badge: "Grow",
+		title: "Engagement & Recognition",
+		description: "Make good practices visible across the team",
+		content:
+			"Leaderboards, leagues, and achievements track engagement over time. Weekly Slack digests highlight standout contributors. The AI mentor (Heph) supports reflection and goal-setting.",
 	},
 ];
 
@@ -26,27 +34,18 @@ export function AboutMissionSection() {
 		<section className="space-y-12">
 			<div>
 				<Badge className="mb-4" variant="outline">
-					Our Purpose
+					What Hephaestus Does
 				</Badge>
-				<h2 className="text-3xl font-bold mb-6">The Mission</h2>
+				<h2 className="text-3xl font-bold mb-6">Practice-Aware Guidance</h2>
 
-				<div className="space-y-6">
-					<p className="text-lg leading-relaxed">
-						We help novice developers onboard and grow in agile software teams by combining smart
-						gamification with process-aware AI mentoring. Our guidance is grounded in your actual
-						repository activity and supports self-regulated learning.
-					</p>
-
-					<div className="border-l-4 border-primary pl-6 py-2">
-						<p className="text-lg font-medium">
-							We believe the best software isn't just about code — it's about building teams that
-							practice healthy habits and continuous reflection.
-						</p>
-					</div>
-				</div>
+				<p className="text-lg leading-relaxed">
+					You define a practice catalog per workspace. Hephaestus evaluates every contribution
+					against those practices and delivers guidance directly to the contributor — adapted based
+					on their track record with each practice.
+				</p>
 			</div>
 
-			<div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+			<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
 				{FEATURES_DATA.map((feature) => (
 					<FeatureCard key={feature.title} feature={feature} />
 				))}

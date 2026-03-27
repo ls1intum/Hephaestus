@@ -1,5 +1,4 @@
-import { CheckCheck, Trophy } from "lucide-react";
-import { MentorIcon } from "@/components/mentor/MentorIcon";
+import { CheckCheck, MessageCircle, ScanSearch, TrendingUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -12,35 +11,38 @@ export function LandingFeaturesSection() {
 						Key Features
 					</Badge>
 					<h2 className="text-3xl font-bold tracking-tighter sm:text-4xl mb-4">
-						Tools for Team Growth
+						Practice-Aware Guidance
 					</h2>
 					<p className="text-muted-foreground text-lg">
-						Features designed to elevate your engineering team's collaboration and learning
+						You define what good looks like. Hephaestus evaluates every contribution against your
+						practices and gives each contributor personalized feedback.
 					</p>
 				</div>
 
-				<div className="grid gap-8 md:grid-cols-2">
+				<div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
 					<Card>
 						<CardHeader>
 							<div className="flex items-center gap-2 mb-2">
-								<Trophy className="h-5 w-5 text-yellow-500" />
+								<ScanSearch className="h-5 w-5 text-blue-500" />
 							</div>
-							<CardTitle>Code Review Gamification</CardTitle>
-							<CardDescription>Transform code reviews into learning opportunities</CardDescription>
+							<CardTitle>Practice Detection</CardTitle>
+							<CardDescription>
+								Evaluate contributions against your project's practice catalog
+							</CardDescription>
 						</CardHeader>
 						<CardContent>
 							<ul className="space-y-2">
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>Weekly leaderboards with GitHub integration</span>
+									<span>AI agent evaluates each PR against workspace-defined practices</span>
 								</li>
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>Team competitions across multiple repositories</span>
+									<span>Structured findings with verdict, severity, evidence, and guidance</span>
 								</li>
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>Structured league system for ongoing engagement</span>
+									<span>You stay in control — mark findings as applied, disputed, or N/A</span>
 								</li>
 							</ul>
 						</CardContent>
@@ -48,27 +50,53 @@ export function LandingFeaturesSection() {
 
 					<Card>
 						<CardHeader>
-							<div className="flex items-center gap-2 mb-2 text-muted-foreground">
-								<MentorIcon className="-m-2" size={32} pad={4} />
+							<div className="flex items-center gap-2 mb-2">
+								<MessageCircle className="h-5 w-5 text-primary" />
 							</div>
-							<CardTitle>Process-Aware AI Mentoring</CardTitle>
-							<CardDescription>
-								Heph provides guidance grounded in your repository activity
-							</CardDescription>
+							<CardTitle>Adaptive Coaching</CardTitle>
+							<CardDescription>Guidance adapts to each contributor's track record</CardDescription>
 						</CardHeader>
 						<CardContent>
 							<ul className="space-y-2">
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>SRL-guided weekly reflection</span>
+									<span>
+										New to a practice? Get concrete examples. Repeat issue? Direct coaching.
+									</span>
 								</li>
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>Repo activity context for objective feedback</span>
+									<span>Findings appear as PR comments and inline code annotations</span>
 								</li>
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>Goal setting and progress tracking</span>
+									<span>AI mentor (Heph) for reflection, goal-setting, and session summaries</span>
+								</li>
+							</ul>
+						</CardContent>
+					</Card>
+
+					<Card>
+						<CardHeader>
+							<div className="flex items-center gap-2 mb-2">
+								<TrendingUp className="h-5 w-5 text-green-500" />
+							</div>
+							<CardTitle>Engagement & Recognition</CardTitle>
+							<CardDescription>Make good practices visible across the team</CardDescription>
+						</CardHeader>
+						<CardContent>
+							<ul className="space-y-2">
+								<li className="flex gap-2 items-start">
+									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
+									<span>Leaderboards and leagues track contribution quality over time</span>
+								</li>
+								<li className="flex gap-2 items-start">
+									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
+									<span>Achievements recognize sustained good practices</span>
+								</li>
+								<li className="flex gap-2 items-start">
+									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
+									<span>Weekly Slack digests highlight standout contributors</span>
 								</li>
 							</ul>
 						</CardContent>

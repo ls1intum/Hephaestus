@@ -3,7 +3,6 @@ package de.tum.in.www1.hephaestus.practices.finding;
 import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import de.tum.in.www1.hephaestus.practices.finding.dto.ContributorPracticeSummaryProjection;
 import de.tum.in.www1.hephaestus.practices.model.PracticeFinding;
-import de.tum.in.www1.hephaestus.practices.model.PracticeFindingTargetType;
 import de.tum.in.www1.hephaestus.practices.model.Verdict;
 import java.time.Instant;
 import java.util.List;
@@ -178,18 +177,18 @@ public interface PracticeFindingRepository extends JpaRepository<PracticeFinding
     /**
      * All findings for a specific pull request within a workspace.
      */
+    // JPQL literal must match PracticeFinding.TARGET_TYPE_PULL_REQUEST
     @Query(
         """
         SELECT f FROM PracticeFinding f
         JOIN FETCH f.practice p
-        WHERE f.targetType = :targetType
+        WHERE f.targetType = 'PULL_REQUEST'
         AND f.targetId = :pullRequestId
         AND p.workspace.id = :workspaceId
         ORDER BY f.detectedAt DESC
         """
     )
     List<PracticeFinding> findByPullRequestAndWorkspace(
-        @Param("targetType") PracticeFindingTargetType targetType,
         @Param("pullRequestId") Long pullRequestId,
         @Param("workspaceId") Long workspaceId
     );

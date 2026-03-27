@@ -116,11 +116,11 @@ export function LandingHeroSection({
 				<div className="flex flex-col items-center space-y-8 text-center">
 					<div className="space-y-4 max-w-3xl">
 						<h1 className="text-4xl font-bold tracking-tighter sm:text-5xl md:text-6xl">
-							Process-Aware Mentoring for Agile Software Teams
+							Practice-Aware Guidance for Software Projects
 						</h1>
 						<p className="mx-auto max-w-[700px] text-xl text-muted-foreground">
-							Onboard faster and learn better habits with an AI mentor grounded in your repo
-							workflow — from issues to pull requests and team rituals.
+							Define the practices that matter for your project. Hephaestus evaluates every
+							contribution against them and coaches each contributor based on their track record.
 						</p>
 					</div>
 					<div className="flex flex-col items-center gap-4 sm:flex-row sm:gap-6">
@@ -142,7 +142,7 @@ export function LandingHeroSection({
 					<div className="flex items-center gap-2 text-muted-foreground">
 						<MentorIcon size={36} className="text-primary" />
 						<span className="text-sm">
-							Powered by <span className="text-provider-done-foreground">Heph</span>, your AI mentor
+							Meet <span className="text-provider-done-foreground">Heph</span>, the AI mentor
 						</span>
 					</div>
 				</div>

@@ -62,6 +62,9 @@ import org.hibernate.annotations.Type;
 @AllArgsConstructor
 public class PracticeFinding {
 
+    /** Target type for pull request findings. Matches the DB CHECK constraint on {@code target_type}. */
+    public static final String TARGET_TYPE_PULL_REQUEST = "PULL_REQUEST";
+
     @Id
     @Column(columnDefinition = "UUID")
     private UUID id;
@@ -94,9 +97,8 @@ public class PracticeFinding {
     private Practice practice;
 
     @NotNull
-    @Enumerated(EnumType.STRING)
     @Column(name = "target_type", length = 32, nullable = false)
-    private PracticeFindingTargetType targetType;
+    private String targetType;
 
     @NotNull
     @Column(name = "target_id", nullable = false)

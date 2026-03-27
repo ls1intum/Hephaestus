@@ -1,0 +1,272 @@
+---
+id: conceptual-model
+sidebar_position: 2
+title: Conceptual Model
+description: Domain model, architecture, and theoretical foundations of Hephaestus.
+---
+
+# Conceptual Model
+
+Hephaestus is grounded in **Cognitive Apprenticeship** (Collins, Brown & Newman, 1989) and built around a framework for practice-aware guidance. This page describes the core domain concepts, their relationships, the system architecture, and how both map to established learning theory.
+
+## Domain Model
+
+The domain model captures the core concepts Hephaestus works with. Eight concepts form a pipeline: **Observe → Detect → Guide → Grow**.
+
+```mermaid
+classDiagram
+    direction TB
+
+    class Project {
+        name : String
+        goals : List
+        norms : NormSet
+        timeline : DateRange
+        enroll(participant, role)
+        configure(dimension, thresholds)
+        summarize(period)
+    }
+
+    class Participant {
+        role : Role
+        maturity : MaturityLevel
+        teams : List
+        perform(activity)
+        reflect(period)
+        reviewTrajectory(dimension)
+    }
+
+    class Artifact {
+        kind : ArtifactKind
+        title : String
+        createdBy : Participant
+        state : LifecycleState
+        submit()
+        link(other)
+        assess(dimension)
+    }
+
+    class Activity {
+        subject : Participant
+        verb : ActionVerb
+        object : Artifact
+        occurredAt : DateTime
+        record()
+        enrich(metadata)
+        correlate(other)
+    }
+
+    class Practice {
+        name : String
+        dimension : HealthDimension
+        valence : Valence
+        criteria : DetectionRule
+        detect(activities)
+        define(name, criteria)
+        explain()
+    }
+
+    class Signal {
+        practice : Practice
+        participant : Participant
+        dimension : HealthDimension
+        value : Float
+        confidence : Float
+        emit(practice, evidence)
+        compare(baseline)
+        trigger(strategy)
+    }
+
+    class Guidance {
+        signal : Signal
+        participant : Participant
+        method : CAMethod
+        channel : DeliveryChannel
+        content : String
+        status : GuidanceStatus
+        compose(signal, method)
+        deliver(channel)
+        evaluate(outcome)
+    }
+
+    class Trajectory {
+        participant : Participant
+        dimension : HealthDimension
+        direction : TrendDirection
+        rate : Float
+        phase : GrowthPhase
+        track(signals)
+        project(horizon)
+        milestone(phase)
+    }
+
+    class HealthDimension {
+        <<enumeration>>
+        TECHNICAL
+        PROCESS
+        SOCIAL
+        COGNITIVE
+    }
+
+    class Valence {
+        <<enumeration>>
+        BENEFICIAL
+        DETRIMENTAL
+        NEUTRAL
+    }
+
+    class CAMethod {
+        <<enumeration>>
+        MODELING
+        COACHING
+        SCAFFOLDING
+        ARTICULATION
+        REFLECTION
+        EXPLORATION
+    }
+
+    Project "1" --> "1..*" Participant : enrolls
+    Project "1" --> "*" Artifact : contains
+    Participant "1" --> "*" Activity : performs
+    Activity "*" --> "1" Artifact : on
+    Activity "*" --> "*" Signal : aggregates into
+    Practice "1" --> "*" Signal : detects
+    Signal "1" --> "0..*" Guidance : triggers
+    Guidance "*" ..> "1" Participant : targets
+    Signal "*" --> "*" Trajectory : feeds
+    Practice "*" --> "*" Trajectory : tracked over
+    Trajectory "*" ..> "1" Participant : belongs to
+    Signal --> HealthDimension
+    Practice --> HealthDimension
+    Practice --> Valence
+    Guidance --> CAMethod
+```
+
+### The Eight Concepts
+
+| # | Concept | What it is | Key insight |
+|---|---------|-----------|-------------|
+| 1 | **Project** | Bounded endeavor with goals, timeline, and norms | Sets the norms that give signals meaning |
+| 2 | **Participant** | Person (or agent) developing professional practice | The subject of observation and guidance |
+| 3 | **Artifact** | Tangible work product mediating activity | The tangible outputs of collaboration |
+| 4 | **Activity** | Normalized, immutable record of what happened | Same structure regardless of source platform |
+| 5 | **Practice** | Named behavioral pattern, beneficial or detrimental | The vocabulary for talking about *how* people work |
+| 6 | **Signal** | Quantified measure along a health dimension | Measured across multiple dimensions so gaming one metric doesn't hide problems |
+| 7 | **Guidance** | Coaching response grounded in a CA method | Closes the loop: Signal → Guidance → Participant |
+| 8 | **Trajectory** | Development over time | Direction, rate, and phase — not just snapshots |
+
+### Four Health Dimensions
+
+Signals are measured along four dimensions so that improving one area cannot mask decline in another:
+
+| Dimension | What it measures | Example signals |
+|-----------|-----------------|-----------------|
+| **Technical** | Domain skill quality | Review thoroughness, bad practice detection rate, complexity management |
+| **Process** | Workflow effectiveness | Lead time, WIP count, abandonment rate, issue linkage |
+| **Social** | Collaboration quality | Review reciprocity, response time, cross-team engagement, knowledge sharing |
+| **Cognitive** | Understanding & growth | Declining bad practice rate, reflection depth, cognitive debt indicators |
+
+### Beyond Software Engineering (Future)
+
+These examples illustrate how the concepts *could* map to other domains — none have been validated yet:
+
+| Concept | Software Engineering | Design | Research | Course Project |
+|---------|---------------------|--------|----------|----------------|
+| Project | Repository + Sprint | Design Brief | Study | Capstone |
+| Participant | Developer | Designer | Researcher | Student |
+| Artifact | Pull request, review, issue | Mockup, critique, spec | Paper, experiment | Report, presentation |
+| Activity | "submitted pull request #42" | "uploaded mockup v3" | "submitted revision §4" | "gave peer feedback" |
+| Practice | "Gives substantive reviews" | "Tests with users" | "Pre-registers hypotheses" | "Incorporates feedback" |
+| Signal | Review substantiveness: 0.85 | Iteration velocity: 3/wk | Rigor score: 4.2 | Timeliness: 95% |
+| Guidance | Inline comment: "Consider breaking this into smaller changes" | Critique prompt: "How might color-blind users experience this?" | Revision note: "Methods section lacks power analysis" | Reflection: "What did you learn from the peer feedback?" |
+| Trajectory | Solo contributor → collaborative practitioner | Pixel-pusher → user-centered designer | Protocol-follower → independent investigator | Surface learner → self-regulated |
+
+### Mapping to Codebase
+
+| Domain Concept | Current Implementation | Status |
+|---|---|---|
+| Project | `Workspace` + `Repository` | Implemented |
+| Participant | `User` + `WorkspaceMembership` | Implemented |
+| Artifact | `Issue`, `PullRequest`, `PullRequestReview`, `PullRequestReviewComment` | Implemented |
+| Activity | `ActivityEvent` (immutable ledger, 55+ event types) | Implemented |
+| Practice | `Practice` (workspace-scoped, with detection prompts and category) + `PracticeFinding` with `Verdict` (POSITIVE, NEGATIVE, NOT_APPLICABLE, NEEDS_REVIEW) | Implemented (missing: health dimension enum, valence field) |
+| Signal | Implicit (XP scores, leaderboard metrics, finding aggregation) | Needs explicit modeling |
+| Guidance | AI mentor messages, inline comments on contributions, finding guidance text with `CaMethod` | Implemented (missing: standalone Guidance entity) |
+| Trajectory | Not modeled | Planned |
+
+---
+
+## Architecture
+
+```mermaid
+graph TB
+    subgraph Hephaestus["Hephaestus Platform"]
+        WA["Web Application<br/><small>React 19 · TanStack Router</small>"]
+        AS["Application Server<br/><small>Spring Boot 3.5 · Java 21</small>"]
+        IS["Intelligence Service<br/><small>Hono · TypeScript · Vercel AI SDK</small>"]
+        WI["Webhook Ingest<br/><small>Hono · TypeScript</small>"]
+        DS["Docker Sandbox<br/><small>AI Agent Containers</small>"]
+    end
+
+    subgraph External["External Systems"]
+        CP["Code Platforms<br/><small>GitHub · GitLab</small>"]
+        DI["Data Infrastructure<br/><small>PostgreSQL · NATS</small>"]
+        PS["Platform Services<br/><small>Keycloak · Slack · LLM · Langfuse</small>"]
+    end
+
+    WA -->|REST API| AS
+    WA -->|Mentor Chat| IS
+    AS -->|Spawns Agent| DS
+    DS -->|LLM Inference| PS
+    AS -->|Queries| DI
+    AS -->|Auth| PS
+    AS -->|Notifications| PS
+    AS -->|GraphQL / REST| CP
+    IS -->|LLM Inference| PS
+    IS -->|Traces| PS
+    WI -->|Publish Events| DI
+    CP -->|Webhooks| WI
+```
+
+### Data Flows
+
+1. **Observe**: Code Platforms → Webhook Ingest → NATS → Application Server → PostgreSQL
+2. **Detect (Practices)**: Application Server → Docker Sandbox (Agent) → LLM Provider → PostgreSQL
+3. **Guide (AI Mentor)**: Participant → Web App → Intelligence Service → LLM Provider
+4. **Interact**: Participant → Web App → Application Server (via Keycloak auth)
+5. **Notify**: Application Server → Slack
+
+---
+
+## Cognitive Apprenticeship Mapping
+
+Hephaestus operationalizes the six methods of **Cognitive Apprenticeship** (Collins, Brown & Newman, 1989) plus **Fading** as a meta-principle:
+
+| CA Method | Definition | Hephaestus Mechanism | Status |
+|-----------|-----------|---------------------|--------|
+| **Modeling** | Making expert practice visible | Positive-verdict findings surface good examples, leaderboard highlights what high performers do, achievement progression chains | Current |
+| **Coaching** | Observing and providing feedback | AI mentor (Hattie feedback levels), practice detection findings with severity, inline comments on contributions | Current |
+| **Scaffolding** | Providing support to perform beyond current ability | Draft contributions skip detection (reducing noise), cognitive load cap (max 5 negative findings per practice per job, max 100 per job) | Current |
+| **Articulation** | Getting learners to externalize reasoning | Mentor reflection sessions ("What happened? What did you try?"), practice-defined contribution description quality checks | Current |
+| **Reflection** | Enabling comparison with experts or peers | Activity summaries, week-over-week trends, peer comparison via leaderboard, session history | Current |
+| **Exploration** | Encouraging self-directed problem solving | Pull-based mentor (user initiates), hidden achievements | Current |
+| **Fading** | Withdrawing support as competence grows | Contributor history per practice injected into agent context; agent selects CA method. No system-level fading logic yet. | Partial |
+
+### Secondary Theories
+
+| Theory | Role in Hephaestus |
+|--------|-------------------|
+| **Self-Regulated Learning** (Zimmerman, 2002) | Micro-theory for AI mentor design: forethought → performance → self-reflection cycle |
+| **Model of Feedback** (Hattie & Timperley, 2007) | Feedback level hierarchy: Task > Process > Self-Regulation >> Self. Guides what the mentor and detector say |
+| **Self-Determination Theory** (Deci & Ryan, 2000) | Gamification design: achievements → competence, team competitions → relatedness, pull-based mentor → autonomy |
+
+---
+
+## Canonical Diagrams
+
+The canonical versions of these diagrams are maintained as [HyLiMo](https://hylimo.github.io) files for use in research publications:
+
+- **Domain Model**: [`docs/research/domain-model.hyl`](https://github.com/ls1intum/Hephaestus/blob/main/docs/research/domain-model.hyl)
+- **Architecture**: [`docs/research/architecture.hyl`](https://github.com/ls1intum/Hephaestus/blob/main/docs/research/architecture.hyl)
+
+Render these at [hylimo.github.io](https://hylimo.github.io) by pasting the file contents.
