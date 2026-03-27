@@ -11,8 +11,8 @@ import {
 export function NavDashboards({
 	username,
 	workspaceSlug,
-	achievementsEnabled = true,
-	leaderboardEnabled = true,
+	achievementsEnabled = false,
+	leaderboardEnabled = false,
 	practicesEnabled = false,
 }: {
 	username: string;
