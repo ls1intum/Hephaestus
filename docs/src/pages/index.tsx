@@ -30,10 +30,10 @@ function HomepageHeader() {
       <div className="container">
         <div className={styles.heroCopy}>
           <Heading as="h1" className={styles.heroTitle}>
-            How You Build Matters
+            Practice-Aware Guidance for Software Projects
           </Heading>
           <p className={styles.heroSubtitle}>
-            Practice-aware guidance for software projects. Define what good looks like — Hephaestus does the rest.
+            Practice-aware guidance for software projects. Define your practices, evaluate contributions, and coach each contributor based on their track record.
           </p>
           <div className={styles.heroActions}>
             <Link className="button button--primary button--lg" to="/user/overview">
@@ -56,8 +56,7 @@ function QuickstartGuides(): ReactNode {
         <div className={styles.quickstartHeader}>
           <Heading as="h2">Pick the guide that matches your role</Heading>
           <p>
-            Whether you&apos;re exploring the mentor experience, extending the platform, or running production operations, the
-            docs below map directly to the workflows in the Hephaestus webapp.
+            Each guide covers the workflows relevant to your role.
           </p>
         </div>
         <div className={styles.quickstartGrid}>

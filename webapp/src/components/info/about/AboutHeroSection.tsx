@@ -10,10 +10,8 @@ export function AboutHeroSection() {
 				About <span className="text-provider-done-foreground">Heph</span>aestus
 			</h1>
 			<p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-				Hephaestus is a research project from TUM's Applied Education Technologies group. You define
-				the practices that matter for your project — Hephaestus evaluates every contribution against
-				them and adapts its coaching based on each contributor's track record. Grounded in Cognitive
-				Apprenticeship theory.
+				A research project from TUM's Applied Education Technologies group, building practice-aware
+				guidance for software projects. Grounded in Cognitive Apprenticeship theory.
 			</p>
 		</section>
 	);

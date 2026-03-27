@@ -31,7 +31,7 @@ export const Default: Story = {
 			title: "Practice Detection",
 			description: "Evaluate contributions against your project's practice catalog",
 			content:
-				"An AI agent evaluates each PR against workspace-defined practices. Findings include a verdict, severity, evidence, and tailored guidance. Contributors can mark findings as applied, disputed, or not applicable.",
+				"An AI agent evaluates each contribution against workspace-defined practices. Findings include a verdict, severity, evidence, and tailored guidance. Contributors can mark findings as applied, disputed, or not applicable.",
 		},
 	},
 };
@@ -47,7 +47,7 @@ export const AdaptiveCoaching: Story = {
 			title: "Adaptive Coaching",
 			description: "Guidance adapts to each contributor's track record",
 			content:
-				"The system tracks each contributor's history per practice. New contributors get concrete examples. Repeat issues get direct coaching. As competence grows, guidance fades toward reflection.",
+				"The system tracks each contributor's history per practice and instructs the agent to adapt accordingly. New contributors are guided toward concrete examples. Repeat issues prompt direct coaching. Improving contributors get prompts for reflection.",
 		},
 	},
 };
@@ -69,17 +69,17 @@ export const EngagementRecognition: Story = {
 };
 
 /**
- * Performance analytics with lightning icon.
+ * Agent orchestration feature card.
  */
-export const PerformanceAnalytics: Story = {
+export const AgentOrchestration: Story = {
 	args: {
 		feature: {
 			icon: Zap,
-			badge: "Analytics",
-			title: "Performance Insights",
-			description: "Data-driven development insights",
+			badge: "Infrastructure",
+			title: "Agent Orchestration",
+			description: "Run AI agents in sandboxed containers",
 			content:
-				"Gain deep visibility into your team's development patterns, identify bottlenecks, and discover optimization opportunities through comprehensive analytics and intelligent reporting.",
+				"Run AI agents (Claude Code, OpenCode) in sandboxed Docker containers with configurable LLM providers, resource limits, and concurrency caps.",
 		},
 	},
 };
