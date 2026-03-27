@@ -114,6 +114,7 @@ export function AppSidebar({
 				{isAdmin && (
 					<NavAdmin
 						workspaceSlug={activeWorkspace.workspaceSlug}
+						achievementsEnabled={activeWorkspace.achievementsEnabled}
 						practicesEnabled={activeWorkspace.practicesEnabled}
 					/>
 				)}

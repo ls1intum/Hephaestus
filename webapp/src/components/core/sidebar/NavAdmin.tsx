@@ -10,10 +10,15 @@ import {
 
 export interface NavAdminProps {
 	workspaceSlug: string;
+	achievementsEnabled?: boolean;
 	practicesEnabled?: boolean;
 }
 
-export function NavAdmin({ workspaceSlug, practicesEnabled = true }: NavAdminProps) {
+export function NavAdmin({
+	workspaceSlug,
+	achievementsEnabled = true,
+	practicesEnabled = true,
+}: NavAdminProps) {
 	return (
 		<SidebarGroup>
 			<SidebarGroupLabel>Administration</SidebarGroupLabel>
@@ -45,15 +50,17 @@ export function NavAdmin({ workspaceSlug, practicesEnabled = true }: NavAdminPro
 						<span>Manage teams</span>
 					</SidebarMenuButton>
 				</SidebarMenuItem>
-				<SidebarMenuItem>
-					<SidebarMenuButton
-						tooltip="Manage achievements"
-						render={<Link to="/w/$workspaceSlug/admin/achievements" params={{ workspaceSlug }} />}
-					>
-						<Trophy />
-						<span>Manage achievements</span>
-					</SidebarMenuButton>
-				</SidebarMenuItem>
+				{achievementsEnabled && (
+					<SidebarMenuItem>
+						<SidebarMenuButton
+							tooltip="Manage achievements"
+							render={<Link to="/w/$workspaceSlug/admin/achievements" params={{ workspaceSlug }} />}
+						>
+							<Trophy />
+							<span>Manage achievements</span>
+						</SidebarMenuButton>
+					</SidebarMenuItem>
+				)}
 				{practicesEnabled && (
 					<SidebarMenuItem>
 						<SidebarMenuButton
@@ -65,17 +72,22 @@ export function NavAdmin({ workspaceSlug, practicesEnabled = true }: NavAdminPro
 						</SidebarMenuButton>
 					</SidebarMenuItem>
 				)}
-				<SidebarMenuItem>
-					<SidebarMenuButton
-						tooltip="Achievement Designer"
-						render={
-							<Link to="/w/$workspaceSlug/admin/achievement-designer" params={{ workspaceSlug }} />
-						}
-					>
-						<MapIcon />
-						<span>Achievement Designer</span>
-					</SidebarMenuButton>
-				</SidebarMenuItem>
+				{achievementsEnabled && (
+					<SidebarMenuItem>
+						<SidebarMenuButton
+							tooltip="Achievement Designer"
+							render={
+								<Link
+									to="/w/$workspaceSlug/admin/achievement-designer"
+									params={{ workspaceSlug }}
+								/>
+							}
+						>
+							<MapIcon />
+							<span>Achievement Designer</span>
+						</SidebarMenuButton>
+					</SidebarMenuItem>
+				)}
 			</SidebarMenu>
 		</SidebarGroup>
 	);
