@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
 	createPracticeMutation,
@@ -12,8 +12,10 @@ import {
 } from "@/api/@tanstack/react-query.gen";
 import type { CreatePracticeRequest, UpdatePracticeRequest } from "@/api/types.gen";
 import { AdminPracticesPage } from "@/components/admin/AdminPracticesPage";
+import { Spinner } from "@/components/ui/spinner";
 import { NoWorkspace } from "@/components/workspace/NoWorkspace";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
+import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/_admin/practices")({
 	component: AdminPracticesContainer,
@@ -21,11 +23,13 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/_ad
 
 function AdminPracticesContainer() {
 	const queryClient = useQueryClient();
+	const navigate = useNavigate();
 	const {
 		workspaceSlug,
 		isLoading: isWorkspaceLoading,
 		error: workspaceError,
 	} = useActiveWorkspaceSlug();
+	const { practicesEnabled, isLoading: featuresLoading } = useWorkspaceFeatures();
 
 	const [togglingPractices, setTogglingPractices] = useState<Set<string>>(new Set());
 
@@ -108,8 +112,28 @@ function AdminPracticesContainer() {
 		},
 	});
 
+	// Feature guard — redirect to admin settings when practices are disabled
+	useEffect(() => {
+		if (!featuresLoading && !practicesEnabled && workspaceSlug) {
+			toast.error("Practices are not enabled for this workspace");
+			navigate({
+				to: "/w/$workspaceSlug/admin/settings",
+				params: { workspaceSlug },
+				replace: true,
+			});
+		}
+	}, [featuresLoading, practicesEnabled, workspaceSlug, navigate]);
+
 	if (!workspaceSlug && !isWorkspaceLoading) {
 		return <NoWorkspace />;
+	}
+
+	if (featuresLoading || !practicesEnabled) {
+		return (
+			<div className="flex justify-center items-center h-64">
+				<Spinner className="h-8 w-8" />
+			</div>
+		);
 	}
 
 	const isLoading = isWorkspaceLoading || isPracticesLoading || !workspaceSlug;
