@@ -30,7 +30,7 @@ const SKELETON_FINDING: PracticeFindingList = {
 	practiceName: "",
 	practiceSlug: "",
 	targetId: 0,
-	targetType: "",
+	targetType: "PULL_REQUEST",
 };
 
 export interface FindingsListProps {

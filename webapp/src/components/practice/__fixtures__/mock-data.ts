@@ -54,7 +54,7 @@ export const mockFindings: PracticeFindingList[] = [
 		practiceSlug: "code-review-thoroughness",
 		category: "Code Quality",
 		targetId: 42,
-		targetType: "pull_request",
+		targetType: "PULL_REQUEST",
 	},
 	{
 		id: "f2",
@@ -67,7 +67,7 @@ export const mockFindings: PracticeFindingList[] = [
 		practiceSlug: "error-handling",
 		category: "Reliability",
 		targetId: 43,
-		targetType: "pull_request",
+		targetType: "PULL_REQUEST",
 	},
 	{
 		id: "f3",
@@ -80,7 +80,7 @@ export const mockFindings: PracticeFindingList[] = [
 		practiceSlug: "test-coverage",
 		category: "Testing",
 		targetId: 44,
-		targetType: "pull_request",
+		targetType: "PULL_REQUEST",
 	},
 	{
 		id: "f4",
@@ -93,7 +93,7 @@ export const mockFindings: PracticeFindingList[] = [
 		practiceSlug: "code-review-thoroughness",
 		category: "Code Quality",
 		targetId: 45,
-		targetType: "review",
+		targetType: "PULL_REQUEST",
 	},
 	{
 		id: "f5",
@@ -106,7 +106,7 @@ export const mockFindings: PracticeFindingList[] = [
 		practiceSlug: "error-handling",
 		category: "Reliability",
 		targetId: 46,
-		targetType: "pull_request",
+		targetType: "PULL_REQUEST",
 	},
 ];
 

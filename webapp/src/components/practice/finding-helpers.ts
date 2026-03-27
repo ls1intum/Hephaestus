@@ -47,14 +47,8 @@ export const GUIDANCE_METHOD_LABELS: Record<GuidanceMethod, string> = {
 /** Human-readable label for the target type (e.g., "Pull Request"). */
 export function formatTargetLabel(targetType: string): string {
 	switch (targetType) {
-		case "pull_request":
+		case "PULL_REQUEST":
 			return "Pull Request";
-		case "review":
-			return "Review";
-		case "issue":
-			return "Issue";
-		case "commit":
-			return "Commit";
 		default:
 			return targetType.replace(/_/g, " ");
 	}
