@@ -99,6 +99,7 @@ export function FindingsList({
 					</SelectContent>
 				</Select>
 
+				{/* Deselecting the active toggle produces an empty array → fall back to "ALL" */}
 				<ToggleGroup
 					value={[selectedVerdict]}
 					onValueChange={(value) => {
