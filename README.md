@@ -71,7 +71,11 @@ Run AI agents (Claude Code, OpenCode) in sandboxed Docker containers with config
 Technical & user docs (GitHub Pages): [https://ls1intum.github.io/Hephaestus/](https://ls1intum.github.io/Hephaestus/)
 UI component docs: [Storybook](https://main--66a8981a27ced8fef3190d41.chromatic.com/)
 
-For the domain model, architecture, and theoretical foundations, see the [Conceptual Model](https://ls1intum.github.io/Hephaestus/contributor/conceptual-model).
+### Domain Model
+
+<img alt="Hephaestus Domain Model" src="./docs/diagrams/domain-model.svg" width="800">
+
+For architecture, theoretical foundations, and codebase mapping, see the [Conceptual Model](https://ls1intum.github.io/Hephaestus/contributor/conceptual-model).
 
 ### Setup
 

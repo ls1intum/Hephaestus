@@ -1,6 +1,8 @@
 // Hephaestus Architecture — 5 Internal + 7 External Components
 // Render at https://hylimo.github.io
 componentDiagram {
+    vdist = 200
+    hdist = 350
 
     // === Internal Platform ===
     component("Hephaestus") {
@@ -10,53 +12,52 @@ componentDiagram {
         }
 
         component("ApplicationServer", keywords = list("Spring Boot")) layout {
-            pos = apos(500, 50)
+            pos = rpos(WebApp, hdist + 100, 0)
         }
 
         component("IntelligenceService", keywords = list("Hono")) layout {
-            pos = apos(50, 250)
+            pos = rpos(WebApp, 0, vdist)
         }
 
         component("WebhookIngest", keywords = list("Hono")) layout {
-            pos = apos(500, 250)
+            pos = rpos(ApplicationServer, 0, vdist)
         }
 
         component("DockerSandbox", keywords = list("AI Agents")) layout {
-            pos = apos(275, 450)
+            pos = rpos(IntelligenceService, (hdist + 100) / 2, vdist)
         }
 
     } layout {
         pos = apos(200, 0)
     }
 
-    // === External Systems (row 1) ===
+    // === External Systems ===
     component("CodePlatforms", keywords = list("GitHub, GitLab")) layout {
-        pos = apos(0, 650)
+        pos = rpos(Hephaestus, -200, vdist * 2 + 200)
     }
 
     component("PostgreSQL", keywords = list("Database")) layout {
-        pos = apos(350, 650)
+        pos = rpos(CodePlatforms, hdist, 0)
     }
 
     component("NATS", keywords = list("Events")) layout {
-        pos = apos(650, 650)
+        pos = rpos(PostgreSQL, hdist - 50, 0)
     }
 
-    // === External Systems (row 2) ===
     component("Keycloak", keywords = list("Auth")) layout {
-        pos = apos(950, 650)
+        pos = rpos(NATS, hdist - 50, 0)
     }
 
     component("LLMProvider", keywords = list("AI")) layout {
-        pos = apos(1250, 650)
+        pos = rpos(Keycloak, hdist - 50, 0)
     }
 
     component("Langfuse", keywords = list("Traces")) layout {
-        pos = apos(1550, 650)
+        pos = rpos(LLMProvider, hdist - 50, 0)
     }
 
     component("Slack", keywords = list("Notifications")) layout {
-        pos = apos(1850, 650)
+        pos = rpos(Langfuse, hdist - 50, 0)
     }
 
     // === Internal Interfaces ===

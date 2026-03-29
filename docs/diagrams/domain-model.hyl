@@ -1,0 +1,182 @@
+// Hephaestus Domain Model — 7 Entities
+// Render at https://hylimo.github.io
+// Pipeline: Observe → Detect → Guide → Grow
+classDiagram {
+    vdist = 200
+    hdist = 300
+
+    class("Project") {
+        default {
+            name
+            goals
+            timeline
+        }
+        section(
+            "enroll()"
+        )
+    } layout {
+        width = 200
+        pos = apos(614, -198)
+    }
+
+    class("Contributor") {
+        default {
+            role
+        }
+        section(
+            "contribute()",
+            "react()"
+        )
+    } layout {
+        width = 200
+        pos = rpos(Project, hdist * -1, 0)
+    }
+
+    class("Artifact") {
+        default {
+            kind
+            title
+            state
+        }
+        section(
+            "submit()",
+            "revise()"
+        )
+    } layout {
+        width = 200
+        pos = rpos(Project, 0, vdist)
+    }
+
+    // === Row 3: Event + Practice ===
+    class("Event") {
+        default {
+            action
+            timestamp
+        }
+        section(
+            "record()"
+        )
+    } layout {
+        width = 200
+        pos = rpos(Contributor, 0, vdist)
+    }
+
+    class("Practice") {
+        default {
+            name
+            dimension
+            criteria
+            description
+        }
+        section(
+            "define()",
+            "detect()",
+            "explain()"
+        )
+    } layout {
+        width = 200
+        pos = rpos(Artifact, hdist * 4 / 5 + 0, 0)
+    }
+
+    // === Row 4: Finding ===
+    class("Finding") {
+        default {
+            verdict
+            severity
+            evidence
+            reasoning
+        }
+    } layout {
+        width = 200
+        pos = rpos(Artifact, 0, vdist)
+    }
+
+    // === Row 5: Guidance ===
+    class("Guidance") {
+        default {
+            approach
+            content
+            channel
+            status
+        }
+        section(
+            "compose()",
+            "deliver()"
+        )
+    } layout {
+        width = 200
+        pos = rpos(Event, 0, vdist)
+    }
+
+    // === Relationships ===
+
+    // Project enrolls Contributors
+    Project -- Contributor with {
+        over = start(0.5).axisAligned(0.5, end(0))
+        label("1..*", 0.85, -22)
+        label("*", 0.1, -22)
+    }
+
+    // Project contains Artifacts (composition)
+    Project *-- Artifact with {
+        over = start(0.25).axisAligned(0.5, end(0.75))
+        label("*", 0.45, 12)
+    }
+
+    // Project defines Practices
+    Project -- Practice with {
+        over = start(0).axisAligned(1, end(0.75))
+        label("*", 0.6, 15.8)
+    }
+
+    // Contributor authors Artifact
+    Contributor -- Artifact with {
+        over = start(0.183).line(end(0.675))
+        label("authors", 0.5, 22, 20)
+        label("1..*", 0.01, -12, 360)
+        label("*", 0.95, 22, 360)
+    }
+
+    // Contributor performs Event
+    Contributor -- Event with {
+        over = start(0.25).axisAligned(0.5, end(0.75))
+        label("*", 0.575, 12)
+    }
+
+    // Event targets Artifact
+    Event -- Artifact with {
+        over = start(0).axisAligned(0.5, end(0.5))
+        label("0..1", 0.85, 22, 360)
+        label("*", 0.1, 22, 360)
+    }
+
+    // Practice produces Finding
+    Practice -- Finding with {
+        over = start(0.25).axisAligned(0, end(0.0))
+        label("*", 0.985, -22)
+    }
+
+    // Finding evaluates Artifact
+    Finding -- Artifact with {
+        over = start(0.75).axisAligned(0.3, end(0.25))
+        label("*", 0.45, -11.4)
+    }
+
+    // Finding informs Guidance
+    Finding -- Guidance with {
+        over = start(0.5).line(end(0))
+        label("*", 0.15, -22)
+        label("0..1", 0.8, -22)
+    }
+
+    // Guidance targets Contributor (closes the loop)
+    Guidance ..> Contributor with {
+        over = start(0.51).axisAligned(
+            -1,
+            rpos(Event, hdist * -2.5 / 5, 0),
+            0,
+            end(0.5))
+        label("targets", 0.5, 22, 270)
+        label("*", 0.2, -22)
+    }
+}
