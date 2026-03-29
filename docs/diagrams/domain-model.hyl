@@ -64,7 +64,7 @@ classDiagram {
     class("Practice") {
         default {
             name
-            dimension
+            category
             criteria
             description
         }

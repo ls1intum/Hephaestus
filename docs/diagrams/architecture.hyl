@@ -1,127 +1,93 @@
-// Hephaestus Architecture — 5 Internal + 5 External
+// Hephaestus Architecture
 // Render at https://hylimo.github.io
-//
-// Design decisions:
-//   - Dropped Langfuse (observability) and Slack (notifications) as non-architectural
-//   - Merged CodePlatforms webhooks + API into single "Git" interface
-//   - Merged NATS publish/subscribe into single "Events" interface
-//   - 8 named interfaces total, max 5 per component (ApplicationServer)
-//   - Connected notation for internal interfaces; dependsOn for cross-canvas
 componentDiagram {
-    hdist = 400
-    vdist = 200
+    hdist = 350
+    vdist = 250
 
     // ================================================================
-    // Internal Platform
+    // Managed components
     // ================================================================
-    component("Hephaestus") {
+    component("WebApp", keywords = list("managed")) layout {
+        pos = apos(0, 0)
+    }
 
-        component("WebApp", keywords = list("React 19")) layout {
-            pos = apos(50, 50)
-        }
+    component("ApplicationServer", keywords = list("managed")) layout {
+        pos = rpos(WebApp, hdist + 100, 0)
+    }
 
-        component("ApplicationServer", keywords = list("Spring Boot")) layout {
-            pos = rpos(WebApp, hdist + 50, 0)
-        }
+    component("IntelligenceService", keywords = list("managed")) layout {
+        pos = rpos(WebApp, 0, vdist)
+    }
 
-        component("IntelligenceService", keywords = list("Hono")) layout {
-            pos = rpos(WebApp, 0, vdist)
-        }
+    component("WebhookIngest", keywords = list("managed")) layout {
+        pos = rpos(ApplicationServer, 0, vdist)
+    }
 
-        component("WebhookIngest", keywords = list("Hono")) layout {
-            pos = rpos(ApplicationServer, 0, vdist)
-        }
-
-        component("DockerSandbox", keywords = list("AI Agents")) layout {
-            pos = rpos(IntelligenceService, (hdist + 50) / 2, vdist)
-        }
-
-    } layout {
-        pos = apos(100, 0)
+    component("DockerSandbox", keywords = list("managed")) layout {
+        pos = rpos(IntelligenceService, (hdist + 100) / 2, vdist)
     }
 
     // ================================================================
-    // External Systems — single row
+    // External systems
     // ================================================================
-    component("CodePlatforms", keywords = list("GitHub, GitLab")) layout {
-        pos = apos(0, 800)
+    component("CodePlatforms", keywords = list("external")) layout {
+        pos = rpos(WebApp, -50, vdist * 3)
     }
 
-    component("PostgreSQL", keywords = list("Database")) layout {
-        pos = rpos(CodePlatforms, hdist - 50, 0)
+    component("PostgreSQL", keywords = list("external")) layout {
+        pos = rpos(CodePlatforms, hdist, 0)
     }
 
-    component("NATS", keywords = list("JetStream")) layout {
-        pos = rpos(PostgreSQL, hdist - 100, 0)
+    component("NATS", keywords = list("external")) layout {
+        pos = rpos(PostgreSQL, hdist, 0)
     }
 
-    component("Keycloak", keywords = list("OIDC")) layout {
-        pos = rpos(NATS, hdist - 100, 0)
+    component("Keycloak", keywords = list("external")) layout {
+        pos = rpos(NATS, hdist, 0)
     }
 
-    component("LLMProvider", keywords = list("OpenAI, Azure")) layout {
-        pos = rpos(Keycloak, hdist - 100, 0)
+    component("LLMProvider", keywords = list("external")) layout {
+        pos = rpos(Keycloak, hdist, 0)
     }
 
     // ================================================================
-    // Internal interfaces (connected notation)
+    // Interfaces (all connected notation)
     // ================================================================
 
-    // WebApp --> ApplicationServer (REST API)
+    // WebApp --> ApplicationServer
     ApplicationServer.provides("REST", 0.5, dist = 50)
     WebApp.requires(0.5, REST)
 
-    // WebApp --> IntelligenceService (Mentor chat, SSE streaming)
+    // ApplicationServer --> IntelligenceService
     IntelligenceService.provides("Mentor", 0.75, dist = 50)
-    WebApp.requires(0.75, Mentor)
+    ApplicationServer.requires(0.75, Mentor)
 
-    // ApplicationServer --> DockerSandbox (container orchestration)
+    // ApplicationServer --> DockerSandbox
     DockerSandbox.provides("Sandbox", 0.5, dist = 50)
-    ApplicationServer.requires(0.75, Sandbox)
+    ApplicationServer.requires(0.5, Sandbox)
 
-    // ================================================================
-    // External interfaces (dependsOn — required for cross-canvas)
-    // ================================================================
+    // WebhookIngest + ApplicationServer --> CodePlatforms
+    CodePlatforms.provides("Git", 0.75, dist = 40)
+    WebhookIngest.requires(0.25, Git)
+    ApplicationServer.requires(0.25, Git)
 
-    // -- CodePlatforms: webhooks in + GraphQL/REST out --
-    gitAPI = CodePlatforms.provides("Git", 0.75, dist = 40)
+    // ApplicationServer + IntelligenceService --> PostgreSQL
+    PostgreSQL.provides("DB", 0.75, dist = 40)
+    ApplicationServer.requires(0.25, DB)
+    IntelligenceService.requires(0.25, DB)
 
-    whGit = WebhookIngest.requires("Git", 0.25)
-    whGit dependsOn gitAPI
+    // ApplicationServer + WebhookIngest --> NATS
+    NATS.provides("Events", 0.75, dist = 40)
+    ApplicationServer.requires(0.25, Events)
+    WebhookIngest.requires(0.25, Events)
 
-    appGit = ApplicationServer.requires("Git", 0.25)
-    appGit dependsOn gitAPI
+    // WebApp + ApplicationServer --> Keycloak
+    Keycloak.provides("Auth", 0.75, dist = 40)
+    WebApp.requires(0.75, Auth)
+    ApplicationServer.requires(0.25, Auth)
 
-    // -- PostgreSQL --
-    pgDB = PostgreSQL.provides("DB", 0.75, dist = 40)
-
-    appDB = ApplicationServer.requires("DB", 0.25)
-    appDB dependsOn pgDB
-
-    intelDB = IntelligenceService.requires("DB", 0.25)
-    intelDB dependsOn pgDB
-
-    // -- NATS --
-    natsEvents = NATS.provides("Events", 0.75, dist = 40)
-
-    appEvents = ApplicationServer.requires("Events", 0.25)
-    appEvents dependsOn natsEvents
-
-    whEvents = WebhookIngest.requires("Events", 0.25)
-    whEvents dependsOn natsEvents
-
-    // -- Keycloak --
-    kcAuth = Keycloak.provides("Auth", 0.75, dist = 40)
-
-    appAuth = ApplicationServer.requires("Auth", 0.25)
-    appAuth dependsOn kcAuth
-
-    // -- LLM Provider --
-    llmAPI = LLMProvider.provides("LLM", 0.75, dist = 40)
-
-    intelLLM = IntelligenceService.requires("LLM", 0.25)
-    intelLLM dependsOn llmAPI
-
-    sandboxLLM = DockerSandbox.requires("LLM", 0.25)
-    sandboxLLM dependsOn llmAPI
+    // IntelligenceService + DockerSandbox --> LLMProvider
+    LLMProvider.provides("LLM", 0.75, dist = 40)
+    IntelligenceService.requires(0.25, LLM)
+    DockerSandbox.requires(0.25, LLM)
 }
