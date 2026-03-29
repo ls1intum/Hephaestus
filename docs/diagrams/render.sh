@@ -3,12 +3,11 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-HYLIMO_DIR="$(cd "$SCRIPT_DIR/../../.context/hylimo" && pwd)"
-CLI="$HYLIMO_DIR/packages/cli/lib/index.js"
+REPO_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+CLI="$REPO_DIR/node_modules/.bin/cli"
 
 if [ ! -f "$CLI" ]; then
-  echo "Error: HyLiMo CLI not found at $CLI"
-  echo "Clone hylimo into .context/hylimo first."
+  echo "Error: @hylimo/cli not found. Run 'npm install' first."
   exit 1
 fi
 
@@ -20,7 +19,7 @@ for hyl in "$SCRIPT_DIR"/*.hyl; do
   [ -f "$hyl" ] || continue
   svg="${hyl%.hyl}.svg"
   name="$(basename "$hyl")"
-  if (cd "$HYLIMO_DIR" && node "$CLI" -f "$hyl" -o "$svg" 2>&1); then
+  if "$CLI" -f "$hyl" -o "$svg" 2>&1; then
     cp "$svg" "$STATIC_DIR/"
     echo "$name → $(basename "$svg")"
   else
