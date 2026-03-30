@@ -62,7 +62,7 @@ These examples illustrate how the entities *could* map to other domains — none
 | Event | `ActivityEvent` (immutable ledger, 55+ event types) | Implemented |
 | Practice | `Practice` (workspace-scoped, with detection prompts and category) | Implemented |
 | Finding | `PracticeFinding` with `Verdict` (POSITIVE, NEGATIVE, NOT_APPLICABLE, NEEDS_REVIEW) | Implemented (missing: severity field, reasoning field) |
-| Guidance | AI mentor messages, inline comments, finding guidance text with `CaMethod` | Implemented (missing: standalone Guidance entity, status lifecycle) |
+| Guidance | AI mentor messages, inline comments, finding guidance text with cognitive apprenticeship method | Implemented (missing: standalone Guidance entity, status lifecycle) |
 
 ---
 
@@ -72,11 +72,10 @@ These examples illustrate how the entities *could* map to other domains — none
 
 ### Data Flows
 
-1. **Observe**: Code Platforms → Webhook Ingest → NATS → Application Server → PostgreSQL
-2. **Detect (Practices)**: Application Server → Docker Sandbox (Agent) → LLM Provider → PostgreSQL
-3. **Guide (AI Mentor)**: Contributor → Web App → Intelligence Service → LLM Provider
-4. **Interact**: Contributor → Web App → Application Server (via Keycloak auth)
-5. **Notify**: Application Server → Slack
+1. **Observe**: Artifact Environment → Webhook Ingest → Message Broker → Application Server → PostgreSQL
+2. **Detect (Practices)**: Application Server → Agent Sandbox → LLM Provider → PostgreSQL
+3. **Guide (AI Mentor)**: Contributor → Webapp → Application Server → Intelligence Service → LLM Provider
+4. **Interact**: Contributor → Webapp → Application Server (via User Management)
 
 ---
 
@@ -90,7 +89,7 @@ Hephaestus operationalizes the six methods of **Cognitive Apprenticeship** (Coll
 | **Coaching** | Observing and providing feedback | AI mentor (Hattie feedback levels), practice detection findings with severity, inline comments on contributions | Current |
 | **Scaffolding** | Providing support to perform beyond current ability | Draft contributions skip detection (reducing noise), cognitive load cap (max 5 negative findings per practice per job, max 100 per job) | Current |
 | **Articulation** | Getting learners to externalize reasoning | Mentor reflection sessions, practice-defined contribution description quality checks | Current |
-| **Reflection** | Enabling comparison with experts or peers | Activity summaries, week-over-week trends, peer comparison via leaderboard, session history | Current |
+| **Reflection** | Enabling comparison with experts or peers | Contributor summaries, week-over-week trends, peer comparison via leaderboard, session history | Current |
 | **Exploration** | Encouraging self-directed problem solving | Pull-based mentor (user initiates), hidden achievements | Current |
 | **Fading** | Withdrawing support as competence grows | Contributor history per practice injected into agent context; agent selects CA method. No system-level fading logic yet. | Partial |
 

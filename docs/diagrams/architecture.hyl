@@ -1,93 +1,111 @@
-// Hephaestus Architecture
-// Render at https://hylimo.github.io
 componentDiagram {
-    hdist = 350
-    vdist = 250
+    w = 250
+    hdist = 450
+    vdist = 110
 
-    // ================================================================
-    // Managed components
-    // ================================================================
-    component("WebApp", keywords = list("managed")) layout {
-        pos = apos(0, 0)
+    component("Hephaestus") {
+        component("Webapp") layout {
+            width = w
+        }
+
+        component("Application Server") layout {
+            width = w
+            pos = rpos(Webapp, hdist, 0)
+        }
+
+        component("PostgreSQL") layout {
+            width = w
+            pos = rpos(`Application Server`, 0, vdist * -2)
+        }
+
+        component("User Management") layout {
+            width = w
+            pos = rpos(`Application Server`, hdist * -0.5, vdist * -1)
+        }
+
+        component("Agent Sandbox") layout {
+            width = w
+            pos = rpos(`Application Server`, hdist, 0)
+        }
+
+        component("Intelligence Service") layout {
+            width = w
+            pos = rpos(`Agent Sandbox`, 0, vdist * -1)
+        }
+
+        component("Message Broker") layout {
+            width = w
+            pos = rpos(`Agent Sandbox`, 0, vdist)
+        }
+
+        component("Webhook Ingest") layout {
+            width = w
+            pos = rpos(`Application Server`, 0, vdist)
+        }
+
+        component("Artifact Environment") layout {
+            width = w
+            pos = rpos(`User Management`, 0, vdist * 3.75)
+        }
+
+        component("LLM Provider") layout {
+            width = w
+            pos = rpos(`Intelligence Service`, hdist, vdist / 2)
+        }
+    } layout {
+        height = 521.35
+        pos = apos(0, 1)
+        width = 1248
     }
 
-    component("ApplicationServer", keywords = list("managed")) layout {
-        pos = rpos(WebApp, hdist + 100, 0)
+    `LLM Provider`.provides("LLM", 0.5, dist = 70, namePos = [0, 25])
+    `Intelligence Service`.requires(0, LLM) with {
+        over = start(0).axisAligned(0.75, end(0.5))
+    }
+    `Agent Sandbox`.requires(0, LLM) with {
+        over = start(0).axisAligned(0.75, end(0.5))
     }
 
-    component("IntelligenceService", keywords = list("managed")) layout {
-        pos = rpos(WebApp, 0, vdist)
+    PostgreSQL.provides("Data", 0.205, dist = 50, namePos = [50, -10])
+    `Application Server`.requires(0.795,Data)
+
+    `User Management`.provides("Auth", 0.5, dist = 50, namePos = [0, 25])
+    `User Management`.provides("User Data", dist = 50, namePos = [0, 25])
+    `Webapp`.requires(0.75, Auth) with {
+        over = start(0).axisAligned(0, end(0.5))
+    }
+    `Application Server`.requires(0.75, `User Data`) with {
+        over = start(0).axisAligned(0, end(0.5))
     }
 
-    component("WebhookIngest", keywords = list("managed")) layout {
-        pos = rpos(ApplicationServer, 0, vdist)
+    `Application Server`.provides("App Data", 0.5, dist = 100, namePos = [0, 25])
+    Webapp.requires(0, `App Data`)
+
+    `Intelligence Service`.provides("Intelligence Data", 0.5, dist = 100, namePos = [0, 25])
+    `Application Server`.requires(0.839, `Intelligence Data`) with {
+        over = start(0).axisAligned(0, end(0.5))
+    }
+    `Agent Sandbox`.provides("Sandbox", 0.5, dist = 100, namePos = [0, 25])
+    `Application Server`.requires(0.01, `Sandbox`, dist = 108.2) with {
+        over = start(0).axisAligned(0, end(0.5))
     }
 
-    component("DockerSandbox", keywords = list("managed")) layout {
-        pos = rpos(IntelligenceService, (hdist + 100) / 2, vdist)
+    `Webhook Ingest`.provides("Artifact Events", 0.25, dist = 94.7, namePos = [80, -10])
+
+    `Message Broker`.provides("Message", 0.501, dist = 100, namePos = [50, 13])
+    `Webhook Ingest`.requires(0, Message) with {
+        over = start(0).axisAligned(0, end(0.5))
+    }
+    `Application Server`.requires(0.161, Message) with {
+        over = start(0).axisAligned(-0.431, end(0.5))
     }
 
-    // ================================================================
-    // External systems
-    // ================================================================
-    component("CodePlatforms", keywords = list("external")) layout {
-        pos = rpos(WebApp, -50, vdist * 3)
+    `Artifact Environment`.provides("Artifact Data", 0.75, dist = 46.3, namePos = [-75, -10])
+    `Artifact Environment`.requires(0, `Artifact Events`, dist = 80) with {
+        over = start(0).axisAligned(-1, end(0.5))
     }
 
-    component("PostgreSQL", keywords = list("external")) layout {
-        pos = rpos(CodePlatforms, hdist, 0)
+    `Application Server`.requires(0.33, `Artifact Data`, dist = 250) with {
+        over = start(0).axisAligned(-0.827, end(0.5))
     }
-
-    component("NATS", keywords = list("external")) layout {
-        pos = rpos(PostgreSQL, hdist, 0)
-    }
-
-    component("Keycloak", keywords = list("external")) layout {
-        pos = rpos(NATS, hdist, 0)
-    }
-
-    component("LLMProvider", keywords = list("external")) layout {
-        pos = rpos(Keycloak, hdist, 0)
-    }
-
-    // ================================================================
-    // Interfaces (all connected notation)
-    // ================================================================
-
-    // WebApp --> ApplicationServer
-    ApplicationServer.provides("REST", 0.5, dist = 50)
-    WebApp.requires(0.5, REST)
-
-    // ApplicationServer --> IntelligenceService
-    IntelligenceService.provides("Mentor", 0.75, dist = 50)
-    ApplicationServer.requires(0.75, Mentor)
-
-    // ApplicationServer --> DockerSandbox
-    DockerSandbox.provides("Sandbox", 0.5, dist = 50)
-    ApplicationServer.requires(0.5, Sandbox)
-
-    // WebhookIngest + ApplicationServer --> CodePlatforms
-    CodePlatforms.provides("Git", 0.75, dist = 40)
-    WebhookIngest.requires(0.25, Git)
-    ApplicationServer.requires(0.25, Git)
-
-    // ApplicationServer + IntelligenceService --> PostgreSQL
-    PostgreSQL.provides("DB", 0.75, dist = 40)
-    ApplicationServer.requires(0.25, DB)
-    IntelligenceService.requires(0.25, DB)
-
-    // ApplicationServer + WebhookIngest --> NATS
-    NATS.provides("Events", 0.75, dist = 40)
-    ApplicationServer.requires(0.25, Events)
-    WebhookIngest.requires(0.25, Events)
-
-    // WebApp + ApplicationServer --> Keycloak
-    Keycloak.provides("Auth", 0.75, dist = 40)
-    WebApp.requires(0.75, Auth)
-    ApplicationServer.requires(0.25, Auth)
-
-    // IntelligenceService + DockerSandbox --> LLMProvider
-    LLMProvider.provides("LLM", 0.75, dist = 40)
-    IntelligenceService.requires(0.25, LLM)
-    DockerSandbox.requires(0.25, LLM)
 }

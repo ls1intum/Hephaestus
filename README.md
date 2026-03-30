@@ -61,8 +61,8 @@ Run AI agents (Claude Code, OpenCode) in sandboxed Docker containers with config
 - **Practice Detection**: Broaden coverage to review depth, workflow patterns, and task management
 - **Good Practice Recognition**: Detect and reinforce beneficial patterns, not just flag problems
 - **Inline Guidance**: Contextual coaching directly on contributions *(shipped for PRs)*
-- **Health Signals**: Track project health across multiple dimensions with confidence scores
-- **Trajectories**: Track how contributors improve over time and reduce guidance as they grow
+- **Project Health**: Track practice adherence across multiple dimensions per project
+- **Guidance Fading**: Reduce guidance automatically as contributors improve over time
 - **Cross-Platform**: Full parity across GitHub, GitLab, and other code platforms
 - **Beyond Software**: Explore applicability to design, research, and course projects
 
@@ -75,7 +75,11 @@ UI component docs: [Storybook](https://main--66a8981a27ced8fef3190d41.chromatic.
 
 <img alt="Hephaestus Domain Model" src="./docs/diagrams/domain-model.svg" width="800">
 
-For architecture, theoretical foundations, and codebase mapping, see the [Conceptual Model](https://ls1intum.github.io/Hephaestus/contributor/conceptual-model).
+### Architecture
+
+<img alt="Hephaestus Architecture" src="./docs/diagrams/architecture.svg" width="800">
+
+For theoretical foundations and codebase mapping, see the [Conceptual Model](https://ls1intum.github.io/Hephaestus/contributor/conceptual-model).
 
 ### Setup
 

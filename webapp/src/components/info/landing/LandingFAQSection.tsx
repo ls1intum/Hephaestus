@@ -12,7 +12,7 @@ const faqItems = [
 	{
 		key: "faq-item-1",
 		q: "How does Hephaestus integrate with our existing workflow?",
-		a: "Hephaestus integrates with GitHub, providing insights without disrupting your current processes. Setup is simple with our guided configuration.",
+		a: "Hephaestus integrates with GitHub and GitLab, providing insights without disrupting your current processes. Setup requires a few environment variables and Docker Compose.",
 	},
 	{
 		key: "faq-item-2",
@@ -22,12 +22,12 @@ const faqItems = [
 	{
 		key: "faq-item-3",
 		q: "How does the AI Mentor work?",
-		a: "The AI Mentor analyzes your GitHub activity and reflection inputs to provide personalized guidance, helping team members set goals and track their progress.",
+		a: "The AI Mentor analyzes your project activity and reflection inputs to provide personalized guidance, helping team members set goals and track their progress.",
 	},
 	{
 		key: "faq-item-4",
-		q: "Do we need to change how we use GitHub?",
-		a: "No, Hephaestus works alongside your existing GitHub workflow without requiring any changes to how your team uses pull requests, reviews, or issues.",
+		q: "Do we need to change how we use our code platform?",
+		a: "No, Hephaestus works alongside your existing workflow without requiring any changes to how your team uses pull requests, reviews, or issues.",
 	},
 ];
 

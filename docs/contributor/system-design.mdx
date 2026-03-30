@@ -5,10 +5,10 @@ title: System Design
 description: Explore the architecture, workflows, and user journeys that power Hephaestus.
 ---
 
-Hephaestus follows an architecture-first approach. All diagrams originate from a shared StarUML project that you can [download as `hephaestus-system-model.mdj`](/files/hephaestus-system-model.mdj).
+Hephaestus follows an architecture-first approach. Top-level diagrams (architecture and domain model) are maintained as [HyLiMo](https://hylimo.github.io) files in `docs/diagrams/` — run `npm run docs:render-diagrams` to regenerate SVGs. Detailed workflow diagrams below originate from a shared StarUML project that you can [download as `hephaestus-system-model.mdj`](/files/hephaestus-system-model.mdj).
 
 :::tip Update the source of truth
-Open the `.mdj` file in StarUML, adjust the relevant diagram, then export the SVG back into `docs/contributor/img/system-design`. Keep filenames stable so existing embeds stay intact.
+For workflow diagrams: open the `.mdj` file in StarUML, adjust the relevant diagram, then export the SVG back into `docs/contributor/img/system-design`. For architecture and domain model: edit the `.hyl` files in `docs/diagrams/` and re-render.
 :::
 
 ## Top-level architecture
@@ -22,7 +22,7 @@ The platform is intentionally layered. Internally we distinguish between:
 - **Webhook Ingest** - NATS-based ingestion for GitHub/GitLab events, decoupling external webhooks from downstream processing.
 - **User Management** - Keycloak identity realm configured with GitHub as identity provider.
 
-Externally we integrate with code hosting (GitHub today, GitLab planned), Slack/email notifications, and the analytics stack used for anonymised usage metrics. Data enters through webhooks, gets enriched via API calls, and surfaces in the React client.
+Externally we integrate with code hosting (GitHub and GitLab), Slack notifications, and the analytics stack used for anonymised usage metrics. Data enters through webhooks, gets enriched via API calls, and surfaces in the React client.
 
 ## Gamification model
 

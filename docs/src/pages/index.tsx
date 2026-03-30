@@ -33,7 +33,7 @@ function HomepageHeader() {
             Practice-Aware Guidance for Software Projects
           </Heading>
           <p className={styles.heroSubtitle}>
-            Practice-aware guidance for software projects. Define your practices, evaluate contributions, and coach each contributor based on their track record.
+            Define your practices, evaluate contributions, and coach each contributor based on their track record.
           </p>
           <div className={styles.heroActions}>
             <Link className="button button--primary button--lg" to="/user/overview">
