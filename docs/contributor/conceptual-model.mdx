@@ -2,12 +2,12 @@
 id: conceptual-model
 sidebar_position: 2
 title: Conceptual Model
-description: Domain model, architecture, and theoretical foundations of Hephaestus.
+description: Domain model, architecture, and codebase mapping of Hephaestus.
 ---
 
 # Conceptual Model
 
-Hephaestus is grounded in **Cognitive Apprenticeship** (Collins, Brown & Newman, 1989) and built around a framework for practice-aware guidance. This page describes the core domain concepts, their relationships, the system architecture, and how both map to established learning theory.
+This page describes the core domain concepts, their relationships, the system architecture, and how they map to the codebase.
 
 ## Domain Model
 
@@ -26,17 +26,6 @@ The domain model captures the core concepts Hephaestus works with. Seven entitie
 | 5 | **Practice** | Named behavioral pattern with detection criteria | The vocabulary for talking about *how* people work |
 | 6 | **Finding** | Immutable assessment result from evaluating an artifact against a practice | Verdict, severity, evidence, reasoning — separates assessment from coaching |
 | 7 | **Guidance** | Adaptive coaching response grounded in findings | Closes the loop: Finding → Guidance → Contributor |
-
-### Four Health Dimensions
-
-We propose organizing practices into four dimensions so no single area dominates:
-
-| Dimension | What it measures | Example practices |
-|-----------|-----------------|-------------------|
-| **Technical** | Contribution and review quality | Review thoroughness, anti-pattern detection rate, complexity management |
-| **Process** | Workflow effectiveness | Contribution scoping, work-in-progress limits, issue linkage |
-| **Social** | Collaboration quality | Review reciprocity, response time, cross-team engagement |
-| **Cognitive** | Understanding and growth | Declining anti-pattern rate, reflection depth, self-regulation |
 
 ### Beyond Software Engineering (Future)
 
@@ -62,7 +51,7 @@ These examples illustrate how the entities *could* map to other domains — none
 | Event | `ActivityEvent` (immutable ledger, 55+ event types) | Implemented |
 | Practice | `Practice` (workspace-scoped, with detection prompts and category) | Implemented |
 | Finding | `PracticeFinding` with `Verdict`, `Severity`, evidence, and reasoning fields | Implemented |
-| Guidance | AI mentor messages, inline comments, finding guidance text with cognitive apprenticeship method | Partial (no standalone Guidance entity or status lifecycle yet) |
+| Guidance | AI mentor messages, inline comments, finding guidance text | Partial (no standalone Guidance entity or status lifecycle yet) |
 
 ---
 
@@ -73,33 +62,9 @@ These examples illustrate how the entities *could* map to other domains — none
 ### Data Flows
 
 1. **Observe**: Artifact Environment → Webhook Ingest → Message Broker → Application Server → PostgreSQL
-2. **Detect (Practices)**: Application Server spawns Agent Sandbox → Agent Sandbox calls Application Server LLM proxy → LLM Provider → results persisted to PostgreSQL
+2. **Detect (Practices)**: Application Server → Agent Sandbox → LLM Provider → PostgreSQL
 3. **Guide (AI Mentor)**: Contributor → Webapp → Application Server → Intelligence Service → LLM Provider
 4. **Interact**: Contributor → Webapp → Application Server (via User Management)
-
----
-
-## Cognitive Apprenticeship Mapping
-
-Hephaestus operationalizes the six methods of **Cognitive Apprenticeship** (Collins, Brown & Newman, 1989) plus **Fading** as a meta-principle:
-
-| CA Method | Definition | Hephaestus Mechanism | Status |
-|-----------|-----------|---------------------|--------|
-| **Modeling** | Making expert practice visible | Positive-verdict findings surface good examples, leaderboard highlights what high performers do, achievement progression chains | Current |
-| **Coaching** | Observing and providing feedback | AI mentor (Hattie feedback levels), practice detection findings with severity, inline comments on contributions | Current |
-| **Scaffolding** | Providing support to perform beyond current ability | Draft contributions skip detection (reducing noise), cognitive load cap (max 5 negative findings per practice per job, max 100 per job) | Current |
-| **Articulation** | Getting learners to externalize reasoning | Mentor reflection sessions, practice-defined contribution description quality checks | Current |
-| **Reflection** | Enabling comparison with experts or peers | Contributor summaries, week-over-week trends, peer comparison via leaderboard, session history | Current |
-| **Exploration** | Encouraging self-directed problem solving | Pull-based mentor (user initiates), hidden achievements | Current |
-| **Fading** | Withdrawing support as competence grows | Contributor history per practice injected into agent context; agent selects CA method. No system-level fading logic yet. | Partial |
-
-### Secondary Theories
-
-| Theory | Role in Hephaestus |
-|--------|-------------------|
-| **Self-Regulated Learning** (Zimmerman, 2002) | Micro-theory for AI mentor design: forethought → performance → self-reflection cycle |
-| **Model of Feedback** (Hattie & Timperley, 2007) | Feedback level hierarchy: Task > Process > Self-Regulation >> Self. Guides what the mentor and detector say |
-| **Self-Determination Theory** (Deci & Ryan, 2000) | Engagement design: achievements → competence, team competitions → relatedness, pull-based mentor → autonomy |
 
 ---
 

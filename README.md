@@ -25,17 +25,6 @@ Hephaestus is an open-source platform for **practice-aware guidance**. You defin
 
 4. **Deliver feedback** — Findings appear where the work happens. Contributors can mark them as applied, disputed, or not applicable.
 
-### Four Health Dimensions
-
-We propose organizing practices into four dimensions so no single area dominates:
-
-| Dimension | What it covers | Example question |
-|-----------|---------------|-----------------|
-| **Technical** | Contribution and review quality | Are reviews substantive? Are known anti-patterns declining? |
-| **Process** | Workflow effectiveness | Are contributions well-scoped? Is work-in-progress manageable? |
-| **Social** | Collaboration patterns | Is review load shared? Do people work across team boundaries? |
-| **Cognitive** | Understanding and growth | Are contributors building understanding, not just shipping faster? |
-
 ## Features
 
 ### Practice Detection
@@ -78,7 +67,7 @@ UI component docs: [Storybook](https://main--66a8981a27ced8fef3190d41.chromatic.
 
 <img alt="Hephaestus Architecture" src="./docs/diagrams/architecture.svg" width="800">
 
-For theoretical foundations and codebase mapping, see the [Conceptual Model](https://ls1intum.github.io/Hephaestus/contributor/conceptual-model).
+For domain entities and codebase mapping, see the [Conceptual Model](https://ls1intum.github.io/Hephaestus/contributor/conceptual-model).
 
 ### Setup
 
