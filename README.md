@@ -11,7 +11,7 @@
 
 Hephaestus is an open-source platform for **practice-aware guidance**. You define the practices that matter for your project, and Hephaestus evaluates every contribution against them. When something needs attention, it tells the contributor directly, with guidance that adapts based on their track record.
 
-<img alt="Agile Hephaestus" height="200px" src="./docs/user/img/overview/agile_hephaestus.png">
+<img alt="Hephaestus mascot" height="200px" src="./docs/user/img/overview/agile_hephaestus.png">
 
 > Currently integrates with GitHub and GitLab.
 
@@ -19,7 +19,7 @@ Hephaestus is an open-source platform for **practice-aware guidance**. You defin
 
 1. **Define practices** — Admins curate a practice catalog per workspace (e.g., contribution description quality, review thoroughness, documentation standards). Each practice has a detection prompt that tells the AI what to look for.
 
-2. **Evaluate contributions** — When a contribution is submitted or updated, an AI agent runs in a sandboxed container with full project access. It evaluates the contribution against each relevant practice and produces structured findings with a verdict, severity, and tailored guidance.
+2. **Evaluate contributions** — When a contribution is submitted or updated, an AI agent runs in a sandboxed container with full project access. It evaluates the contribution against each relevant practice and produces structured findings with a verdict, severity, evidence, and tailored guidance.
 
 3. **Adapt guidance** — The system tracks each contributor's history per practice and instructs the agent to adapt accordingly. New contributors get concrete examples. Repeat issues get direct coaching. Improving contributors get prompts for reflection.
 

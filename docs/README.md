@@ -37,10 +37,11 @@ npm install   # in docs directory
 Run from repo root:
 
 ```bash
-npm run docs:dev     # Start development server
-npm run docs:build   # Build for production
-npm run docs:serve   # Preview production build
-npm run docs:lint    # TypeScript + Markdown linting
+npm run docs:dev              # Start development server
+npm run docs:build            # Build for production
+npm run docs:serve            # Preview production build
+npm run docs:lint             # TypeScript + Markdown linting
+npm run docs:render-diagrams  # Regenerate HyLiMo SVGs from docs/diagrams/*.hyl
 ```
 
 ## Quality Gates

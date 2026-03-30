@@ -44,7 +44,7 @@ These examples illustrate how the entities *could* map to other domains — none
 
 | Entity | Software Engineering | Design | Research | Course Project |
 |--------|---------------------|--------|----------|----------------|
-| Project | Repository + Sprint | Design Brief | Study | Capstone |
+| Project | Repository + Milestone | Design Brief | Study | Capstone |
 | Contributor | Developer | Designer | Researcher | Student |
 | Artifact | Pull request, review, issue | Mockup, critique, spec | Paper, experiment | Report, presentation |
 | Event | "submitted pull request #42" | "uploaded mockup v3" | "submitted revision §4" | "gave peer feedback" |
@@ -61,8 +61,8 @@ These examples illustrate how the entities *could* map to other domains — none
 | Artifact | `Issue`, `PullRequest`, `PullRequestReview`, `PullRequestReviewComment` | Implemented |
 | Event | `ActivityEvent` (immutable ledger, 55+ event types) | Implemented |
 | Practice | `Practice` (workspace-scoped, with detection prompts and category) | Implemented |
-| Finding | `PracticeFinding` with `Verdict` (POSITIVE, NEGATIVE, NOT_APPLICABLE, NEEDS_REVIEW) | Implemented (missing: severity field, reasoning field) |
-| Guidance | AI mentor messages, inline comments, finding guidance text with cognitive apprenticeship method | Implemented (missing: standalone Guidance entity, status lifecycle) |
+| Finding | `PracticeFinding` with `Verdict`, `Severity`, evidence, and reasoning fields | Implemented |
+| Guidance | AI mentor messages, inline comments, finding guidance text with cognitive apprenticeship method | Partial (no standalone Guidance entity or status lifecycle yet) |
 
 ---
 

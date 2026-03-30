@@ -13,24 +13,29 @@ For workflow diagrams: open the `.mdj` file in StarUML, adjust the relevant diag
 
 ## Top-level architecture
 
+The canonical architecture diagram lives in [`docs/diagrams/architecture.hyl`](https://github.com/ls1intum/Hephaestus/blob/main/docs/diagrams/architecture.hyl) — see the [Conceptual Model](/contributor/conceptual-model#architecture) for the rendered version and data flow descriptions.
+
+The legacy StarUML diagram below predates the canonical version and covers the same ground at a lower level of abstraction:
+
 ![Hephaestus top level architecture](./img/system-design/top_level_architecture.svg)
 
 The platform is intentionally layered. Internally we distinguish between:
 
-- **Application Server** - Spring Boot, integrates with Git providers, manages the leaderboard, and exposes the primary REST API.
-- **Intelligence Service** - TypeScript + Hono mentor logic that produces conversational guidance and artifacts.
-- **Webhook Ingest** - NATS-based ingestion for GitHub/GitLab events, decoupling external webhooks from downstream processing.
-- **User Management** - Keycloak identity realm configured with GitHub as identity provider.
+- **Application Server** — Spring Boot, integrates with code platforms, manages the leaderboard, and exposes the primary REST API.
+- **Intelligence Service** — TypeScript + Hono guidance logic that powers the AI mentor and produces conversational artifacts.
+- **Webhook Ingest** — Event ingestion for GitHub/GitLab webhooks, decoupled from downstream processing via a message broker.
+- **Agent Sandbox** — Isolated Docker containers running AI agents (Claude Code, OpenCode) for practice detection.
+- **User Management** — Keycloak identity realm configured with GitHub as identity provider.
 
 Externally we integrate with code hosting (GitHub and GitLab), Slack notifications, and the analytics stack used for anonymised usage metrics. Data enters through webhooks, gets enriched via API calls, and surfaces in the React client.
 
-## Gamification model
+## Engagement & recognition model
 
-![Gamification analysis object model](./img/system-design/gamification_analysis_object_model.svg)
+![Engagement analysis object model](./img/system-design/gamification_analysis_object_model.svg)
 
-The analysis object model maps GitHub webhook payloads to Hephaestus entities. Core classes (`Review`, `PullRequest`, `Developer`) mirror GitHub data, while `Leaderboard`, `Reward`, and `GamificationDashboard` extend the model for competitions.
+The analysis object model maps webhook payloads to Hephaestus entities. Core classes (`Review`, `PullRequest`, `Contributor`) mirror code platform data, while `Leaderboard`, `Reward`, and `Dashboard` extend the model for competitions.
 
-The original webhook events contain redundant fields, so we normalise them into dedicated entities. Around that core we layer abstractions for leaderboards, rewards, and dashboards that keep gamification state cohesive and queryable.
+The original webhook events contain redundant fields, so we normalise them into dedicated entities. Around that core we layer abstractions for leaderboards, rewards, and dashboards that keep engagement state cohesive and queryable.
 
 ## AI mentor architecture
 
@@ -38,21 +43,21 @@ The original webhook events contain redundant fields, so we normalise them into 
 
 The mentor relies on LangGraph nodes that update storage, generate responses, and maintain state. Conditional edges decide which node executes next based on the conversation context.
 
-Each call to the mentor executes the graph: storage update nodes persist longitudinal context, response nodes craft user-facing replies, state nodes mutate the TypedDict that represents the conversation, and conditional edges steer the flow. The result is a predictable yet adaptive mentoring experience.
+Each call to the mentor executes the graph: storage update nodes persist longitudinal context, response nodes craft user-facing replies, state nodes mutate the TypedDict that represents the conversation, and conditional edges steer the flow. The result is a predictable yet adaptive guidance experience.
 
 ## User interaction flows
 
-![Gamification use cases](./img/system-design/gamification_use_cases.svg)
+![Engagement use cases](./img/system-design/gamification_use_cases.svg)
 
 ![AI mentor use cases](./img/system-design/mentor_use_cases.svg)
 
-These use case diagrams model the primary developer interactions with the platform, from leaderboard browsing to mentor sessions.
+These use case diagrams model the primary contributor interactions with the platform, from leaderboard browsing to AI mentor sessions.
 
-We model the developer as the primary actor: configuring workspaces, reviewing pull requests, receiving mentor guidance, and engaging with competitions. The diagrams capture how a user moves between dashboards, mentor sessions, and notifications across a typical sprint.
+We model the contributor as the primary actor: configuring workspaces, reviewing pull requests, receiving guidance, and engaging with competitions. The diagrams capture how a user moves between dashboards, AI mentor sessions, and notifications across a typical week.
 
-![Developer journeys across the platform](./img/system-design/all_use_cases.svg)
+![Contributor journeys across the platform](./img/system-design/all_use_cases.svg)
 
-The combined journey map highlights how onboarding, weekly rituals, and review feedback interleave across gamification and mentoring features.
+The combined journey map highlights how onboarding, weekly rituals, and review feedback interleave across engagement and guidance features.
 
 ## Core workflows
 

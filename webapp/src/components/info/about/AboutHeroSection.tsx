@@ -11,7 +11,7 @@ export function AboutHeroSection() {
 			</h1>
 			<p className="text-xl text-muted-foreground max-w-2xl mx-auto">
 				A research project from TUM's Applied Education Technologies group, building practice-aware
-				guidance for software projects. Grounded in Cognitive Apprenticeship theory.
+				guidance for software projects. Grounded in established learning theory.
 			</p>
 		</section>
 	);

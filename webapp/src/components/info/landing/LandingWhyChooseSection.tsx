@@ -21,7 +21,7 @@ export function LandingWhyChooseSection({
 				<div className="grid gap-10 lg:grid-cols-[1fr_500px] lg:gap-12">
 					<img
 						src={agileHephaestus}
-						alt="Agile Hephaestus"
+						alt="Hephaestus mascot"
 						width="500"
 						height="350"
 						className="mx-auto rounded-lg aspect-auto object-cover lg:order-last"
