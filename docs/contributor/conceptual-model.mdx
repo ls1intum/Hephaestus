@@ -29,7 +29,7 @@ The domain model captures the core concepts Hephaestus works with. Seven entitie
 
 ### Four Health Dimensions
 
-Practices are organized into four dimensions so no single area dominates:
+We propose organizing practices into four dimensions so no single area dominates:
 
 | Dimension | What it measures | Example practices |
 |-----------|-----------------|-------------------|
@@ -73,7 +73,7 @@ These examples illustrate how the entities *could* map to other domains — none
 ### Data Flows
 
 1. **Observe**: Artifact Environment → Webhook Ingest → Message Broker → Application Server → PostgreSQL
-2. **Detect (Practices)**: Application Server → Agent Sandbox → LLM Provider → PostgreSQL
+2. **Detect (Practices)**: Application Server spawns Agent Sandbox → Agent Sandbox calls Application Server LLM proxy → LLM Provider → results persisted to PostgreSQL
 3. **Guide (AI Mentor)**: Contributor → Webapp → Application Server → Intelligence Service → LLM Provider
 4. **Interact**: Contributor → Webapp → Application Server (via User Management)
 
@@ -99,7 +99,7 @@ Hephaestus operationalizes the six methods of **Cognitive Apprenticeship** (Coll
 |--------|-------------------|
 | **Self-Regulated Learning** (Zimmerman, 2002) | Micro-theory for AI mentor design: forethought → performance → self-reflection cycle |
 | **Model of Feedback** (Hattie & Timperley, 2007) | Feedback level hierarchy: Task > Process > Self-Regulation >> Self. Guides what the mentor and detector say |
-| **Self-Determination Theory** (Deci & Ryan, 2000) | Gamification design: achievements → competence, team competitions → relatedness, pull-based mentor → autonomy |
+| **Self-Determination Theory** (Deci & Ryan, 2000) | Engagement design: achievements → competence, team competitions → relatedness, pull-based mentor → autonomy |
 
 ---
 

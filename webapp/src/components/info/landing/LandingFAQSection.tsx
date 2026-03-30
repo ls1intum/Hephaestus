@@ -12,7 +12,7 @@ const faqItems = [
 	{
 		key: "faq-item-1",
 		q: "How does Hephaestus integrate with our existing workflow?",
-		a: "Hephaestus integrates with GitHub and GitLab, providing insights without disrupting your current processes. Setup requires a few environment variables and Docker Compose.",
+		a: "Hephaestus syncs data from GitHub and GitLab via webhooks. Setup involves Docker Compose with several services and configuration for your code platform and LLM provider. See the deployment guide for details.",
 	},
 	{
 		key: "faq-item-2",

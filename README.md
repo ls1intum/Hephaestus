@@ -27,7 +27,7 @@ Hephaestus is an open-source platform for **practice-aware guidance**. You defin
 
 ### Four Health Dimensions
 
-Practices are organized into four dimensions so no single area dominates:
+We propose organizing practices into four dimensions so no single area dominates:
 
 | Dimension | What it covers | Example question |
 |-----------|---------------|-----------------|
@@ -42,7 +42,7 @@ Practices are organized into four dimensions so no single area dominates:
 
 The core of the platform. An AI agent evaluates each contribution against your workspace's practice catalog and produces structured findings — with guidance adapted to each contributor's experience level.
 
-Contributors stay in control: mark any finding as applied, disputed, or not applicable.
+Findings appear as PR comments and inline code annotations — contextual coaching where the work happens. Contributors stay in control: mark any finding as applied, disputed, or not applicable.
 
 ### AI Mentor (Heph)
 
@@ -60,9 +60,8 @@ Run AI agents (Claude Code, OpenCode) in sandboxed Docker containers with config
 
 - **Practice Detection**: Broaden coverage to review depth, workflow patterns, and task management
 - **Good Practice Recognition**: Detect and reinforce beneficial patterns, not just flag problems
-- **Inline Guidance**: Contextual coaching directly on contributions *(shipped for PRs)*
 - **Project Health**: Track practice adherence across multiple dimensions per project
-- **Guidance Fading**: Reduce guidance automatically as contributors improve over time
+- **Guidance Fading**: Reduce guidance automatically as contributors improve over time (partially implemented — agent already receives contributor history per practice)
 - **Cross-Platform**: Full parity across GitHub, GitLab, and other code platforms
 - **Beyond Software**: Explore applicability to design, research, and course projects
 

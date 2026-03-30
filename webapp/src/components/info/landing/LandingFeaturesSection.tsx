@@ -88,11 +88,11 @@ export function LandingFeaturesSection() {
 							<ul className="space-y-2">
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>Leaderboards and leagues track contribution quality over time</span>
+									<span>Leaderboards and leagues track contribution activity over time</span>
 								</li>
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />
-									<span>Achievements recognize sustained good practices</span>
+									<span>Achievements recognize consistent contribution activity</span>
 								</li>
 								<li className="flex gap-2 items-start">
 									<CheckCheck className="size-5 mt-1 text-provider-success-foreground" />

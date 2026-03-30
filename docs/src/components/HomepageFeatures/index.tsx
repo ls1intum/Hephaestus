@@ -44,8 +44,8 @@ const FeatureList: FeatureItem[] = [
     description:
       'Leaderboards, leagues, and achievements track engagement over time. Weekly Slack digests highlight standout contributors.',
     bullets: [
-      'Leaderboards and leagues track contribution quality over time',
-      'Achievements recognize sustained good practices',
+      'Leaderboards and leagues track contribution activity over time',
+      'Achievements recognize consistent contribution activity',
       'Weekly Slack digests highlight standout contributors',
     ],
     cta: {label: 'See the leaderboard', to: '/user/leaderboard'},
