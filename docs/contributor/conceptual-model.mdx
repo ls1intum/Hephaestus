@@ -21,7 +21,7 @@ The domain model captures the core concepts Hephaestus works with. Seven entitie
 |---|--------|-----------|-------------|
 | 1 | **Project** | Bounded endeavor with goals, timeline, and enrolled contributors | Sets the practice catalog that gives findings meaning |
 | 2 | **Contributor** | Person (or AI agent) developing professional practice | The subject of observation and guidance |
-| 3 | **Artifact** | Any evaluable output of a contributor's work | Pull requests, issues, reviews, comments, thesis chapters, design mockups |
+| 3 | **Artifact** | Any evaluable output of a contributor's work | Currently: pull requests, issues, reviews, comments. Extensible to other artifact types. |
 | 4 | **Event** | Lightweight trigger recording that something happened | Same structure regardless of source platform |
 | 5 | **Practice** | Named behavioral pattern with detection criteria | The vocabulary for talking about *how* people work |
 | 6 | **Finding** | Immutable assessment result from evaluating an artifact against a practice | Verdict, severity, evidence, reasoning — separates assessment from coaching |
@@ -48,7 +48,7 @@ These examples illustrate how the entities *could* map to other domains — none
 | Project | `Workspace` + `Repository` | Implemented |
 | Contributor | `User` + `WorkspaceMembership` | Implemented |
 | Artifact | `Issue`, `PullRequest`, `PullRequestReview`, `PullRequestReviewComment` | Implemented |
-| Event | `ActivityEvent` (immutable ledger, 55+ event types) | Implemented |
+| Event | `ActivityEvent` (immutable ledger, 55 event types) | Implemented |
 | Practice | `Practice` (workspace-scoped, with detection prompts and category) | Implemented |
 | Finding | `PracticeFinding` with `Verdict`, `Severity`, evidence, and reasoning fields | Implemented |
 | Guidance | AI mentor messages, inline comments, finding guidance text | Partial (no standalone Guidance entity or status lifecycle yet) |

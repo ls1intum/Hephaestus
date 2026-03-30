@@ -13,7 +13,7 @@ Hephaestus is an open-source platform for **practice-aware guidance**. You defin
 
 <img alt="Hephaestus mascot" height="200px" src="./docs/user/img/overview/agile_hephaestus.png">
 
-> Currently integrates with GitHub and GitLab.
+> Integrates with GitHub (primary) and GitLab (webhook ingestion, practice detection). Full platform parity is on the roadmap.
 
 ## How It Works
 

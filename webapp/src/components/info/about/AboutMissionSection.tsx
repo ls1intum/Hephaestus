@@ -25,7 +25,7 @@ const FEATURES_DATA: FeatureData[] = [
 		title: "Engagement & Recognition",
 		description: "Make good practices visible across the team",
 		content:
-			"Leaderboards, leagues, and achievements track engagement over time. Weekly Slack digests highlight standout contributors. The AI mentor (Heph) supports reflection and goal-setting.",
+			"Leaderboards, leagues, and achievements track engagement over time. Weekly Slack digests highlight standout contributors.",
 	},
 ];
 
