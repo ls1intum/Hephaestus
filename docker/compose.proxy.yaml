@@ -1,6 +1,6 @@
 services:
   reverse-proxy:
-    image: traefik:v3.2
+    image: traefik:v3.6@sha256:171c9c3565b29f6c133f1c1b43c5d4e5853415198e9e1078c001f8702ff66aec
     restart: unless-stopped
     networks:
       - shared-network
@@ -43,7 +43,7 @@ services:
       retries: 5
 
   maintenance:
-    image: nginx:alpine
+    image: nginx:alpine@sha256:e7257f1ef28ba17cf7c248cb8ccf6f0c6e0228ab9c315c152f9c203cd34cf6d1
     restart: unless-stopped
     configs:
       - source: maintenance-page

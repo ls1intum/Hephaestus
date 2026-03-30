@@ -1,6 +1,6 @@
-# syntax=docker/dockerfile:1.4
+# syntax=docker/dockerfile:1.22@sha256:4a43a54dd1fedceb30ba47e76cfcf2b47304f4161c0caeac2db1c61804ea3c91
 
-FROM node:22-alpine AS base
+FROM node:22-alpine@sha256:4d64b49e6c891c8fc821007cb1cdc6c0db7773110ac2c34bf2e6960adef62ed3 AS base
 
 FROM base AS builder
 

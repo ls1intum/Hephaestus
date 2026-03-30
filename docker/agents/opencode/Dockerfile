@@ -1,7 +1,7 @@
-# syntax=docker/dockerfile:1.4
+# syntax=docker/dockerfile:1.22@sha256:4a43a54dd1fedceb30ba47e76cfcf2b47304f4161c0caeac2db1c61804ea3c91
 # OpenCode agent container image
 # Used by OpenCodeAgentAdapter — command set by SandboxSpec, no entrypoint.
-ARG NODE_TAG=22-slim
+ARG NODE_TAG=22-slim@sha256:80fdb3f57c815e1b638d221f30a826823467c4a56c8f6a8d7aa091cd9b1675ea
 FROM node:${NODE_TAG}
 
 RUN apt-get update -qq && apt-get install -y --no-install-recommends git findutils tree jq && \
