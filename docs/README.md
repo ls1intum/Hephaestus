@@ -7,7 +7,7 @@
 This site is powered by [Docusaurus 3](https://docusaurus.io/) with Rspack, SWC, and LightningCSS for 2-4x faster builds. The content is split into three guides:
 
 - **User Guide** — End-user workflows (mentor sessions, leaderboard, workspace management)
-- **Contributor Guide** — Engineering guides, ERD + StarUML assets, and local development setup
+- **Contributor Guide** — Engineering guides, HyLiMo diagrams, ERD, and local development setup
 - **Admin Guide** — Production deployment runbooks
 
 ## Quick Start
@@ -37,10 +37,11 @@ npm install   # in docs directory
 Run from repo root:
 
 ```bash
-npm run docs:dev     # Start development server
-npm run docs:build   # Build for production
-npm run docs:serve   # Preview production build
-npm run docs:lint    # TypeScript + Markdown linting
+npm run docs:dev              # Start development server
+npm run docs:build            # Build for production
+npm run docs:serve            # Preview production build
+npm run docs:lint             # TypeScript + Markdown linting
+npm run docs:render-diagrams  # Regenerate HyLiMo SVGs from docs/diagrams/*.hyl
 ```
 
 ## Quality Gates

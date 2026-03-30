@@ -12,22 +12,22 @@ const faqItems = [
 	{
 		key: "faq-item-1",
 		q: "How does Hephaestus integrate with our existing workflow?",
-		a: "Hephaestus integrates with GitHub, providing insights without disrupting your current processes. Setup is simple with our guided configuration.",
+		a: "Hephaestus connects to GitHub and GitLab via webhooks. Your admin installs the GitHub App (or configures the GitLab integration), and contributors just sign in — no workflow changes required.",
 	},
 	{
 		key: "faq-item-2",
 		q: "Is Hephaestus suitable for small teams?",
-		a: "Yes! Hephaestus is built with flexibility in mind and works well for teams of any size, from small student projects to larger development teams.",
+		a: "Yes. Hephaestus works for teams of any size. Define as many or as few practices as you need — a three-person student project and a forty-person engineering team use the same workspace model.",
 	},
 	{
 		key: "faq-item-3",
 		q: "How does the AI Mentor work?",
-		a: "The AI Mentor analyzes your GitHub activity and reflection inputs to provide personalized guidance, helping team members set goals and track their progress.",
+		a: "The AI Mentor (Heph) runs structured coaching sessions grounded in your actual project activity — pull requests, reviews, and practice detection findings. It helps you set goals, reflect on progress, and generates shareable session summaries.",
 	},
 	{
 		key: "faq-item-4",
-		q: "Do we need to change how we use GitHub?",
-		a: "No, Hephaestus works alongside your existing GitHub workflow without requiring any changes to how your team uses pull requests, reviews, or issues.",
+		q: "Do we need to change how we use our code platform?",
+		a: "No changes to your workflow. Hephaestus observes via webhooks and posts findings as PR comments. The only visible difference is that contributors receive inline guidance on their contributions.",
 	},
 ];
 

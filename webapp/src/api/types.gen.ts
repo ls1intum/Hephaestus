@@ -974,7 +974,7 @@ export type PracticeFindingList = {
     /**
      * Target type (e.g. PULL_REQUEST)
      */
-    targetType: 'PULL_REQUEST';
+    targetType: string;
     /**
      * Finding title
      */
@@ -1040,7 +1040,7 @@ export type PracticeFindingDetail = {
     /**
      * Target type (e.g. PULL_REQUEST)
      */
-    targetType: 'PULL_REQUEST';
+    targetType: string;
     /**
      * Finding title
      */

@@ -1,4 +1,4 @@
-import { ArrowRight, Code, Hammer, Users } from "lucide-react";
+import { ArrowRight, Layers, MessageCircle, ScanSearch } from "lucide-react";
 import agileHephaestus from "@/assets/agile_hephaestus.png";
 import { GitHubSignInButton } from "@/components/auth/GitHubSignInButton";
 import { Badge } from "@/components/ui/badge";
@@ -21,54 +21,60 @@ export function LandingWhyChooseSection({
 				<div className="grid gap-10 lg:grid-cols-[1fr_500px] lg:gap-12">
 					<img
 						src={agileHephaestus}
-						alt="Agile Hephaestus"
+						alt="Hephaestus mascot"
 						width="500"
 						height="350"
 						className="mx-auto rounded-lg aspect-auto object-cover lg:order-last"
 					/>
 					<div className="flex flex-col justify-center space-y-5">
 						<Badge className="w-fit" variant="outline">
-							Our Approach
+							What's Different
 						</Badge>
 						<h2 className="text-3xl font-bold tracking-tighter sm:text-4xl">
-							Why Choose Hephaestus?
+							Practices, Not Just Metrics
 						</h2>
 						<p className="text-lg text-muted-foreground">
-							Named after the Greek god of craftsmen, Hephaestus combines creativity with technical
-							expertise to build better team habits through process-aware, AI-guided mentoring.
+							Most analytics tools show managers what happened. Hephaestus tells contributors what
+							to do differently — evaluated against practices your team actually defined, with
+							guidance that adapts as people improve.
 						</p>
 
 						<ul className="grid gap-4 mt-4">
 							<li className="flex items-start gap-3">
 								<div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 mt-0.5">
-									<Hammer className="h-4 w-4 text-primary" />
+									<ScanSearch className="h-4 w-4 text-primary" />
 								</div>
 								<div>
-									<p className="font-medium">Empower engineers</p>
+									<p className="font-medium">Your practices, not generic rules</p>
 									<p className="text-sm text-muted-foreground">
-										Tools that accelerate learning through real-world feedback
+										Admins define a practice catalog per workspace. The AI evaluates each
+										contribution against those specific standards — not a one-size-fits-all
+										checklist.
 									</p>
 								</div>
 							</li>
 							<li className="flex items-start gap-3">
 								<div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 mt-0.5">
-									<Users className="h-4 w-4 text-primary" />
+									<Layers className="h-4 w-4 text-primary" />
 								</div>
 								<div>
-									<p className="font-medium">Foster collaboration</p>
+									<p className="font-medium">Guidance that adapts</p>
 									<p className="text-sm text-muted-foreground">
-										Build team habits that strengthen your engineering culture
+										The system tracks each contributor's history per practice. First time? Concrete
+										examples. Repeat issue? Direct coaching. Consistent improvement? Reflection
+										prompts.
 									</p>
 								</div>
 							</li>
 							<li className="flex items-start gap-3">
 								<div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 mt-0.5">
-									<Code className="h-4 w-4 text-primary" />
+									<MessageCircle className="h-4 w-4 text-primary" />
 								</div>
 								<div>
-									<p className="font-medium">Improve code quality</p>
+									<p className="font-medium">Feedback where the work happens</p>
 									<p className="text-sm text-muted-foreground">
-										Motivate better code reviews through friendly competition
+										Findings appear as PR comments and inline code annotations. Contributors can
+										mark them as applied, disputed, or not applicable.
 									</p>
 								</div>
 							</li>

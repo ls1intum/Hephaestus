@@ -3951,8 +3951,6 @@ components:
         targetType:
           type: string
           description: Target type (e.g. PULL_REQUEST)
-          enum:
-          - PULL_REQUEST
         title:
           type: string
           description: Finding title
@@ -4025,8 +4023,6 @@ components:
         targetType:
           type: string
           description: Target type (e.g. PULL_REQUEST)
-          enum:
-          - PULL_REQUEST
         title:
           type: string
           description: Finding title

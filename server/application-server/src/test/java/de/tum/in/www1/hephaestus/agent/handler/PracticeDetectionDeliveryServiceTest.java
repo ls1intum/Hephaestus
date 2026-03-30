@@ -28,7 +28,6 @@ import de.tum.in.www1.hephaestus.practices.finding.PracticeDetectionProperties;
 import de.tum.in.www1.hephaestus.practices.finding.PracticeFindingRepository;
 import de.tum.in.www1.hephaestus.practices.model.CaMethod;
 import de.tum.in.www1.hephaestus.practices.model.Practice;
-import de.tum.in.www1.hephaestus.practices.model.PracticeFindingTargetType;
 import de.tum.in.www1.hephaestus.practices.model.Severity;
 import de.tum.in.www1.hephaestus.practices.model.Verdict;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
@@ -466,7 +465,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             assertThat(event.findingsDiscarded()).isEqualTo(1); // unknown slug
             assertThat(event.hasNegative()).isTrue(); // error-handling finding is NEGATIVE
             assertThat(event.contributorId()).isEqualTo(789L);
-            assertThat(event.targetType()).isEqualTo(PracticeFindingTargetType.PULL_REQUEST);
+            assertThat(event.targetType()).isEqualTo("PULL_REQUEST");
             assertThat(event.targetId()).isEqualTo(456L);
         }
     }

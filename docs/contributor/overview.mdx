@@ -5,7 +5,9 @@ title: Contributor Guide
 description: Orientation for engineers who build and operate the Hephaestus platform.
 ---
 
-Hephaestus is maintained by the Applied Education Technologies (AET) team at TUM. It delivers **process-aware mentoring for agile software teams**, blending repo-grounded AI guidance with real-time review analytics. This guide captures the operational knowledge you need to contribute confidently—from local development to production releases.
+Hephaestus is maintained by the Applied Education Technologies (AET) team at TUM. It evaluates contributions against team-defined practices and provides AI coaching grounded in actual project activity.
+
+This guide covers everything you need to develop, test, and ship changes to Hephaestus.
 
 ## Repository layout
 
@@ -14,7 +16,7 @@ Hephaestus/
 ├── webapp/                    # React + Vite front-end (public UI)
 ├── server/
 │   ├── application-server/    # Spring Boot server (GitHub + mentor APIs)
-│   ├── intelligence-service/  # TypeScript + Hono mentoring service
+│   ├── intelligence-service/  # TypeScript + Hono intelligence service (AI mentor, guidance)
 │   └── webhook-ingest/        # NATS-based GitHub/GitLab webhook adapter
 ├── docs/                      # Docusaurus site (this documentation)
 └── scripts/                   # Tooling (ERD generation, migrations, utilities)

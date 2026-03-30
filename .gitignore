@@ -193,6 +193,9 @@ tmp
 # Research directory (local only)
 .research/
 
+# Context directory (local tools, cloned repos)
+.context/
+
 # OpenCode builder mission files (per-worktree, ephemeral)
 MISSION.md
 # Builder session tracking (per-worktree)

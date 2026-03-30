@@ -1,0 +1,78 @@
+---
+id: conceptual-model
+sidebar_position: 2
+title: Conceptual Model
+description: Domain model, architecture, and codebase mapping of Hephaestus.
+---
+
+# Conceptual Model
+
+This page describes the core domain concepts, their relationships, the system architecture, and how they map to the codebase.
+
+## Domain Model
+
+The domain model captures the core concepts Hephaestus works with. Seven entities form a pipeline: **Observe → Detect → Guide → Grow**.
+
+<img alt="Hephaestus Domain Model" src="/img/diagrams/domain-model.svg" />
+
+### The Seven Entities
+
+| # | Entity | What it is | Key insight |
+|---|--------|-----------|-------------|
+| 1 | **Project** | Bounded endeavor with goals, timeline, and enrolled contributors | Sets the practice catalog that gives findings meaning |
+| 2 | **Contributor** | Person (or AI agent) developing professional practice | The subject of observation and guidance |
+| 3 | **Artifact** | Any evaluable output of a contributor's work | Currently: pull requests, issues, reviews, comments. Extensible to other artifact types. |
+| 4 | **Event** | Lightweight trigger recording that something happened | Same structure regardless of source platform |
+| 5 | **Practice** | Named behavioral pattern with detection criteria | The vocabulary for talking about *how* people work |
+| 6 | **Finding** | Immutable assessment result from evaluating an artifact against a practice | Verdict, severity, evidence, reasoning — separates assessment from coaching |
+| 7 | **Guidance** | Adaptive coaching response grounded in findings | Closes the loop: Finding → Guidance → Contributor |
+
+### Beyond Software Engineering (Future)
+
+These examples illustrate how the entities *could* map to other domains — none have been validated yet:
+
+| Entity | Software Engineering | Design | Research | Course Project |
+|--------|---------------------|--------|----------|----------------|
+| Project | Repository + Milestone | Design Brief | Study | Capstone |
+| Contributor | Developer | Designer | Researcher | Student |
+| Artifact | Pull request, review, issue | Mockup, critique, spec | Paper, experiment | Report, presentation |
+| Event | "submitted pull request #42" | "uploaded mockup v3" | "submitted revision §4" | "gave peer feedback" |
+| Practice | "Gives substantive reviews" | "Tests with users" | "Pre-registers hypotheses" | "Incorporates feedback" |
+| Finding | Review lacks substance (severity: medium) | Mockup untested (severity: high) | Missing power analysis (severity: high) | Feedback not incorporated (severity: low) |
+| Guidance | "Consider breaking this into smaller changes" | "How might color-blind users experience this?" | "Methods section lacks power analysis" | "What did you learn from the peer feedback?" |
+
+### Mapping to Codebase
+
+| Domain Entity | Current Implementation | Status |
+|---|---|---|
+| Project | `Workspace` + `Repository` | Implemented |
+| Contributor | `User` + `WorkspaceMembership` | Implemented |
+| Artifact | `Issue`, `PullRequest`, `PullRequestReview`, `PullRequestReviewComment` | Implemented |
+| Event | `ActivityEvent` (immutable ledger, 55 event types) | Implemented |
+| Practice | `Practice` (workspace-scoped, with detection prompts and category) | Implemented |
+| Finding | `PracticeFinding` with `Verdict`, `Severity`, evidence, and reasoning fields | Implemented |
+| Guidance | AI mentor messages, inline comments, finding guidance text | Partial (no standalone Guidance entity or status lifecycle yet) |
+
+---
+
+## Architecture
+
+<img alt="Hephaestus Architecture" src="/img/diagrams/architecture.svg" />
+
+### Data Flows
+
+1. **Observe**: Artifact Environment → Webhook Ingest → Message Broker → Application Server → PostgreSQL
+2. **Detect (Practices)**: Application Server → Agent Sandbox → LLM Provider → PostgreSQL
+3. **Guide (AI Mentor)**: Contributor → Webapp → Application Server → Intelligence Service → LLM Provider
+4. **Interact**: Contributor → Webapp → Application Server (via User Management)
+
+---
+
+## Canonical Diagrams
+
+The canonical versions of these diagrams are maintained as [HyLiMo](https://hylimo.github.io) files:
+
+- **Domain Model**: [`docs/diagrams/domain-model.hyl`](https://github.com/ls1intum/Hephaestus/blob/main/docs/diagrams/domain-model.hyl)
+- **Architecture**: [`docs/diagrams/architecture.hyl`](https://github.com/ls1intum/Hephaestus/blob/main/docs/diagrams/architecture.hyl)
+
+Render these at [hylimo.github.io](https://hylimo.github.io) by pasting the file contents, or run `npm run docs:render-diagrams` to regenerate SVGs.
