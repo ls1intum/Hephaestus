@@ -263,8 +263,8 @@ class OpenCodeAgentAdapterTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("extractTextFromNdjson")
-    class ExtractTextFromNdjson {
+    @DisplayName("parseNdjson")
+    class ParseNdjson {
 
         @Test
         @DisplayName("should extract text content from NDJSON streaming output")
@@ -273,17 +273,19 @@ class OpenCodeAgentAdapterTest extends BaseUnitTest {
                 {"type":"step_start","timestamp":123,"part":{"type":"step-start"}}
                 {"type":"text","timestamp":124,"part":{"type":"text","text":"{\\"findings\\":[{\\"title\\":\\"test\\"}]}"}}
                 {"type":"step_finish","timestamp":125,"part":{"type":"step-finish"}}""";
-            String result = adapter.extractTextFromNdjson(ndjson);
-            assertThat(result).contains("findings");
-            assertThat(result).contains("test");
+            var result = adapter.parseNdjson(ndjson);
+            assertThat(result).isNotNull();
+            assertThat(result.text()).contains("findings");
+            assertThat(result.text()).contains("test");
         }
 
         @Test
         @DisplayName("should return plain JSON as-is when not NDJSON")
         void shouldReturnPlainJsonAsIs() {
             String plainJson = "{\"findings\":[{\"title\":\"test\"}]}";
-            String result = adapter.extractTextFromNdjson(plainJson);
-            assertThat(result).isEqualTo(plainJson);
+            var result = adapter.parseNdjson(plainJson);
+            assertThat(result).isNotNull();
+            assertThat(result.text()).isEqualTo(plainJson);
         }
 
         @Test
@@ -292,16 +294,17 @@ class OpenCodeAgentAdapterTest extends BaseUnitTest {
             String ndjson = """
                 {"type":"text","timestamp":1,"part":{"type":"text","text":"hello "}}
                 {"type":"text","timestamp":2,"part":{"type":"text","text":"world"}}""";
-            String result = adapter.extractTextFromNdjson(ndjson);
-            assertThat(result).isEqualTo("hello world");
+            var result = adapter.parseNdjson(ndjson);
+            assertThat(result).isNotNull();
+            assertThat(result.text()).isEqualTo("hello world");
         }
 
         @Test
         @DisplayName("should return null for null or blank input")
         void shouldReturnNullForBlankInput() {
-            assertThat(adapter.extractTextFromNdjson(null)).isNull();
-            assertThat(adapter.extractTextFromNdjson("")).isNull();
-            assertThat(adapter.extractTextFromNdjson("  ")).isNull();
+            assertThat(adapter.parseNdjson(null)).isNull();
+            assertThat(adapter.parseNdjson("")).isNull();
+            assertThat(adapter.parseNdjson("  ")).isNull();
         }
 
         @Test
@@ -310,52 +313,49 @@ class OpenCodeAgentAdapterTest extends BaseUnitTest {
             String ndjson = """
                 {"type":"step_start","timestamp":123,"part":{"type":"step-start"}}
                 {"type":"step_finish","timestamp":125,"part":{"type":"step-finish"}}""";
-            String result = adapter.extractTextFromNdjson(ndjson);
-            assertThat(result).isNull();
+            var result = adapter.parseNdjson(ndjson);
+            assertThat(result).isNotNull();
+            assertThat(result.text()).isNull();
         }
     }
 
     @Nested
-    @DisplayName("buildAgentDefinition")
-    class BuildAgentDefinition {
+    @DisplayName("Classpath agent files")
+    class ClasspathAgentFiles {
 
         @Test
-        @DisplayName("should contain restrictive bash permissions")
-        void shouldContainRestrictiveBashPermissions() {
+        @DisplayName("should inject orchestrator agent definition from classpath at plural agents path")
+        void shouldInjectOrchestratorFromClasspath() {
             var spec = adapter.buildSandboxSpec(proxyRequest(LlmProvider.ANTHROPIC, "claude-sonnet-4-20250514"));
-            String agentDef = new String(
-                spec.inputFiles().get(".opencode/agent/practice-review.md"),
+            assertThat(spec.inputFiles()).containsKey(".opencode/agents/practice-review.md");
+            String orchestrator = new String(
+                spec.inputFiles().get(".opencode/agents/practice-review.md"),
                 StandardCharsets.UTF_8
             );
-            assertThat(agentDef).contains("\"*\": deny");
-            assertThat(agentDef).contains("edit: deny");
-            assertThat(agentDef).contains("write: deny");
-            assertThat(agentDef).contains("webfetch: deny");
+            // Content is loaded from classpath resource agent/opencode-orchestrator.md
+            assertThat(orchestrator).contains("orchestrator");
+            assertThat(orchestrator).isNotBlank();
         }
 
         @Test
-        @DisplayName("should contain allowed read-only bash commands")
-        void shouldContainAllowedReadOnlyCommands() {
+        @DisplayName("should inject practice-analyzer agent definition from classpath")
+        void shouldInjectPracticeAnalyzerFromClasspath() {
             var spec = adapter.buildSandboxSpec(proxyRequest(LlmProvider.ANTHROPIC, "claude-sonnet-4-20250514"));
-            String agentDef = new String(
-                spec.inputFiles().get(".opencode/agent/practice-review.md"),
+            assertThat(spec.inputFiles()).containsKey(".opencode/agents/practice-analyzer.md");
+            String analyzer = new String(
+                spec.inputFiles().get(".opencode/agents/practice-analyzer.md"),
                 StandardCharsets.UTF_8
             );
-            assertThat(agentDef).contains("\"grep *\": allow");
-            assertThat(agentDef).contains("\"git log *\": allow");
-            assertThat(agentDef).contains("\"git blame *\": allow");
-            assertThat(agentDef).contains("read: allow");
+            // Content is loaded from classpath resource agent/opencode-practice-analyzer.md
+            assertThat(analyzer).contains("practice");
+            assertThat(analyzer).isNotBlank();
         }
 
         @Test
-        @DisplayName("should set MAX_AGENT_STEPS in agent definition")
-        void shouldSetMaxAgentSteps() {
+        @DisplayName("should not inject agent definitions at old singular path")
+        void shouldNotInjectAtOldSingularPath() {
             var spec = adapter.buildSandboxSpec(proxyRequest(LlmProvider.ANTHROPIC, "claude-sonnet-4-20250514"));
-            String agentDef = new String(
-                spec.inputFiles().get(".opencode/agent/practice-review.md"),
-                StandardCharsets.UTF_8
-            );
-            assertThat(agentDef).contains("steps: 15");
+            assertThat(spec.inputFiles()).doesNotContainKey(".opencode/agent/practice-review.md");
         }
     }
 

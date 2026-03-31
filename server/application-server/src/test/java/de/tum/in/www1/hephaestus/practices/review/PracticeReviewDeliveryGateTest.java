@@ -26,7 +26,7 @@ class PracticeReviewDeliveryGateTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        PracticeReviewProperties properties = new PracticeReviewProperties(false, true, 5, "");
+        PracticeReviewProperties properties = new PracticeReviewProperties(false, true, false, 5, "");
         gate = new PracticeReviewDeliveryGate(properties);
     }
 
@@ -129,7 +129,7 @@ class PracticeReviewDeliveryGateTest extends BaseUnitTest {
         @Test
         @DisplayName("Should continue when PR is draft but skipDrafts=false")
         void continueWhenSkipDraftsDisabled() {
-            PracticeReviewProperties noSkipProps = new PracticeReviewProperties(false, false, 5, "");
+            PracticeReviewProperties noSkipProps = new PracticeReviewProperties(false, false, false, 5, "");
             PracticeReviewDeliveryGate noSkipGate = new PracticeReviewDeliveryGate(noSkipProps);
 
             PullRequest pr = createOpenPr();

@@ -244,6 +244,21 @@ class DiffNotePoster {
 
                 List<String> errors = response.field("createDiffNote.errors").getValue();
                 if (errors != null && !errors.isEmpty()) {
+                    // Fallback: if line is outside diff hunk, post as regular MR comment
+                    if (isLineCodeError(errors)) {
+                        log.info(
+                            "Diff note line outside diff hunk, falling back to MR comment: jobId={}, file={}, line={}",
+                            job.getId(),
+                            note.filePath(),
+                            note.startLine()
+                        );
+                        if (postFallbackComment(scopeId, mrInfo.globalId, note, sanitizedBody, job)) {
+                            posted++;
+                        } else {
+                            failed++;
+                        }
+                        continue;
+                    }
                     failed++;
                     log.warn(
                         "GitLab createDiffNote failed: jobId={}, file={}, line={}, errors={}",
@@ -314,6 +329,55 @@ class DiffNotePoster {
     private static boolean isRateLimitError(Exception e) {
         String message = e.getMessage();
         return message != null && (message.contains("rate limit") || message.contains("429"));
+    }
+
+    private static boolean isLineCodeError(List<String> errors) {
+        return errors.stream().anyMatch(e ->
+            e.toLowerCase().contains("line code") || e.toLowerCase().contains("line_code")
+        );
+    }
+
+    /**
+     * Fallback: post a diff note as a regular MR comment when the line is outside the diff hunk.
+     * Includes file path and line number in the comment body for context.
+     */
+    private boolean postFallbackComment(
+        Long scopeId,
+        String mrGlobalId,
+        DiffNote note,
+        String sanitizedBody,
+        AgentJob job
+    ) {
+        try {
+            String fallbackBody = String.format(
+                "**`%s:%d`**\n\n%s",
+                note.filePath(),
+                note.startLine(),
+                sanitizedBody
+            );
+            ClientGraphQlResponse response = gitLabProvider
+                .forScope(scopeId)
+                .documentName("CreateMergeRequestNote")
+                .variable("noteableId", mrGlobalId)
+                .variable("body", fallbackBody)
+                .execute()
+                .block(GRAPHQL_TIMEOUT);
+
+            if (response == null) {
+                log.warn("Null response posting fallback MR comment: jobId={}", job.getId());
+                return false;
+            }
+
+            List<String> errors = response.field("createNote.errors").getValue();
+            if (errors != null && !errors.isEmpty()) {
+                log.warn("Fallback MR comment failed: jobId={}, errors={}", job.getId(), errors);
+                return false;
+            }
+            return true;
+        } catch (Exception e) {
+            log.warn("Fallback MR comment failed: jobId={}, file={}", job.getId(), note.filePath(), e);
+            return false;
+        }
     }
 
     record MrInfo(String globalId, @Nullable String baseSha, @Nullable String headSha, @Nullable String startSha) {}

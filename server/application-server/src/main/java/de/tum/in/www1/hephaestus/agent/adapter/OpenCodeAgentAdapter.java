@@ -9,6 +9,8 @@ import de.tum.in.www1.hephaestus.agent.adapter.spi.AgentAdapter;
 import de.tum.in.www1.hephaestus.agent.adapter.spi.AgentAdapterRequest;
 import de.tum.in.www1.hephaestus.agent.adapter.spi.AgentSandboxSpec;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.SandboxResult;
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -36,7 +38,6 @@ public class OpenCodeAgentAdapter implements AgentAdapter {
 
     static final String IMAGE = "ghcr.io/ls1intum/hephaestus/agent-opencode:latest";
     static final String OUTPUT_PATH = "/workspace/.output";
-    private static final int MAX_AGENT_STEPS = 15;
     private static final int MAX_STDOUT_BUFFER_BYTES = 10 * 1024 * 1024;
     private static final int MAX_DEBUG_LOG_DISPLAY_CHARS = 4096;
     /** Buffer time (seconds) reserved for cleanup before container timeout. */
@@ -63,9 +64,16 @@ public class OpenCodeAgentAdapter implements AgentAdapter {
         inputFiles.put("opencode.json", configJson);
         inputFiles.put(".prompt", request.prompt().getBytes(StandardCharsets.UTF_8));
 
-        // Inject a restrictive agent definition that denies file/bash tool use.
-        // OpenCode agents live at .opencode/agent/<name>.md in the workspace.
-        inputFiles.put(".opencode/agent/practice-review.md", buildAgentDefinition());
+        // OpenCode agent definitions loaded from classpath resources.
+        // The orchestrator (practice-review) spawns per-practice subagents via the task tool.
+        inputFiles.put(
+            ".opencode/agents/practice-review.md",
+            loadClasspathResource("opencode-orchestrator.md")
+        );
+        inputFiles.put(
+            ".opencode/agents/practice-analyzer.md",
+            loadClasspathResource("opencode-practice-analyzer.md")
+        );
 
         // Use a Node.js wrapper to invoke opencode with spawnSync.
         // This bypasses shell variable handling entirely — the prompt file is read
@@ -79,7 +87,13 @@ public class OpenCodeAgentAdapter implements AgentAdapter {
         // This lets us use built-in providers (no npm install) even through the proxy.
         String proxyEnvSetup = buildProxyEnvAliases(request);
 
-        String command = "mkdir -p " + OUTPUT_PATH + proxyEnvSetup + " && node /workspace/.run-opencode.mjs";
+        // Redirect TMPDIR to the exec-allowed tmpfs. OpenCode's Node.js file watcher
+        // extracts a native .node addon to $TMPDIR and dlopen()s it — the default /tmp
+        // has noexec, causing "failed to map segment from shared object" errors.
+        env.put("TMPDIR", "/home/agent/.local/tmp");
+
+        String command =
+            "mkdir -p " + OUTPUT_PATH + " /home/agent/.local/tmp" + proxyEnvSetup + " && node /workspace/.run-opencode.mjs";
 
         return new AgentSandboxSpec(
             IMAGE,
@@ -93,68 +107,6 @@ public class OpenCodeAgentAdapter implements AgentAdapter {
         );
     }
 
-    /**
-     * Build an OpenCode agent definition with read-only tool access and safety settings.
-     *
-     * <p>Key settings:
-     * <ul>
-     *   <li>{@code temperature: 0} — deterministic output for reliable structured JSON</li>
-     *   <li>{@code steps: MAX_AGENT_STEPS} — prevents runaway agentic loops within the sandbox timeout</li>
-     *   <li>{@code doom_loop: deny} — prevents hang on infinite-loop detection prompts in non-interactive mode</li>
-     *   <li>{@code external_directory: deny} — prevents hang on access-confirmation prompts</li>
-     *   <li>Bash allowlist — read-only commands only (grep, find, cat, git log, git blame, etc.)</li>
-     * </ul>
-     */
-    private byte[] buildAgentDefinition() {
-        String agentMd = """
-            ---
-            description: Practice-aware code review agent. Analyzes diffs, explores codebases, and produces structured JSON findings.
-            temperature: 0
-            steps: %d
-            permission:
-              bash:
-                "grep *": allow
-                "find *": allow
-                "cat *": allow
-                "head *": allow
-                "tail *": allow
-                "wc *": allow
-                "ls *": allow
-                "tree *": allow
-                "git log *": allow
-                "git show *": allow
-                "git diff *": allow
-                "git blame *": allow
-                "*": deny
-              edit: deny
-              read: allow
-              glob: allow
-              grep: allow
-              list: allow
-              write: deny
-              webfetch: deny
-              websearch: deny
-              task: deny
-              doom_loop: deny
-              external_directory: deny
-            ---
-
-            You are an expert code review agent with full read access to the repository.
-            The repository is cloned at /workspace/repo/. The diff, commits, and practice definitions
-            are provided in the user prompt, but you should also explore the codebase to understand
-            context, check related files, and verify your findings.
-
-            Use tools to produce a thorough, high-quality review:
-            - Read related source files to understand architectural context
-            - Check if a pattern flagged in the diff is consistent with the rest of the codebase
-            - Run grep/find to check for similar issues elsewhere
-            - Verify import paths, dependency versions, or configuration files
-
-            Your final output MUST be a valid JSON object. Output it as your final message — do NOT write it to a file.
-            """.formatted(MAX_AGENT_STEPS);
-        return agentMd.getBytes(StandardCharsets.UTF_8);
-    }
-
     @Override
     public AgentResult parseResult(SandboxResult sandboxResult) {
         boolean success = sandboxResult.exitCode() == 0 && !sandboxResult.timedOut();
@@ -162,11 +114,24 @@ public class OpenCodeAgentAdapter implements AgentAdapter {
         output.put("exitCode", sandboxResult.exitCode());
         output.put("timedOut", sandboxResult.timedOut());
 
+        AgentResult.LlmUsage usage = null;
         byte[] resultFile = sandboxResult.outputFiles().get("result.json");
         if (resultFile != null && resultFile.length > 0) {
             String rawContent = new String(resultFile, StandardCharsets.UTF_8);
-            String extracted = extractTextFromNdjson(rawContent);
-            output.put("rawOutput", extracted != null ? extracted : rawContent);
+            log.debug("NDJSON output: {} bytes", rawContent.length());
+            NdjsonParseResult parsed = parseNdjson(rawContent);
+            if (parsed != null) {
+                output.put("rawOutput", parsed.text() != null ? parsed.text() : rawContent);
+                usage = parsed.usage();
+                if (usage != null) {
+                    log.info(
+                        "OpenCode usage: calls={}, inputTokens={}, outputTokens={}, cost={}",
+                        usage.totalCalls(), usage.inputTokens(), usage.outputTokens(), usage.costUsd()
+                    );
+                }
+            } else {
+                output.put("rawOutput", rawContent);
+            }
         }
 
         // Capture debug.log for introspection
@@ -197,7 +162,7 @@ public class OpenCodeAgentAdapter implements AgentAdapter {
             output.put("workspaceListing", listingContent);
         }
 
-        return new AgentResult(success, output);
+        return new AgentResult(success, output, usage);
     }
 
     /**
@@ -256,17 +221,22 @@ public class OpenCodeAgentAdapter implements AgentAdapter {
     }
 
     /**
-     * Extract the model's text response from OpenCode NDJSON streaming output.
+     * Parsed OpenCode NDJSON output containing both text and usage data.
+     */
+    record NdjsonParseResult(String text, AgentResult.LlmUsage usage) {}
+
+    /**
+     * Parse OpenCode NDJSON streaming output, extracting both text and usage.
      *
-     * <p>OpenCode {@code --format json} writes NDJSON lines: {@code step_start}, {@code text},
-     * {@code step_finish}. The actual model response is in the {@code text} event's
-     * {@code part.text} field. We concatenate all text parts (usually just one) to produce
-     * the final output.
+     * <p>OpenCode {@code --format json} writes NDJSON lines: {@code step-start}, {@code text},
+     * {@code step-finish}. The text response is in the {@code text} event's {@code part.text}
+     * field. Usage/cost data is in the {@code step-finish} event's {@code tokens} and
+     * {@code cost} fields.
      *
      * @param ndjsonContent raw NDJSON content from result.json
-     * @return concatenated text content, or null if parsing fails or no text events found
+     * @return parsed text and usage, or null if parsing fails
      */
-    String extractTextFromNdjson(String ndjsonContent) {
+    NdjsonParseResult parseNdjson(String ndjsonContent) {
         if (ndjsonContent == null || ndjsonContent.isBlank()) {
             return null;
         }
@@ -274,25 +244,100 @@ public class OpenCodeAgentAdapter implements AgentAdapter {
         // Quick check: if it starts with '{' and contains "findings", it's already plain JSON
         String trimmed = ndjsonContent.trim();
         if (trimmed.startsWith("{") && !trimmed.contains("\n{")) {
-            return ndjsonContent;
+            return new NdjsonParseResult(ndjsonContent, null);
         }
 
         try {
             StringBuilder textContent = new StringBuilder();
+            int totalInputTokens = 0;
+            int totalOutputTokens = 0;
+            int totalReasoningTokens = 0;
+            int totalCacheReadTokens = 0;
+            int totalCacheWriteTokens = 0;
+            double totalCost = 0.0;
+            int stepCount = 0;
+            String model = null;
+
+            var seenTypes = new java.util.LinkedHashSet<String>();
             for (String line : ndjsonContent.split("\n")) {
                 if (line.isBlank()) continue;
                 var node = objectMapper.readTree(line);
-                if ("text".equals(node.path("type").asText())) {
+                String type = node.path("type").asText("");
+                seenTypes.add(type);
+
+                if ("text".equals(type)) {
                     String text = node.path("part").path("text").asText(null);
                     if (text != null) {
                         textContent.append(text);
                     }
+                } else if ("step_finish".equals(type) || "step-finish".equals(type)) {
+                    stepCount++;
+                    // Usage may be at top level or nested under "part"
+                    var tokens = node.path("tokens");
+                    if (tokens.isMissingNode()) {
+                        tokens = node.path("part").path("tokens");
+                    }
+                    if (!tokens.isMissingNode()) {
+                        totalInputTokens += tokens.path("input").asInt(0);
+                        totalOutputTokens += tokens.path("output").asInt(0);
+                        totalReasoningTokens += tokens.path("reasoning").asInt(0);
+                        var cache = tokens.path("cache");
+                        totalCacheReadTokens += cache.path("read").asInt(0);
+                        totalCacheWriteTokens += cache.path("write").asInt(0);
+                    }
+                    double stepCost = node.path("cost").asDouble(0.0);
+                    if (stepCost == 0.0) {
+                        stepCost = node.path("part").path("cost").asDouble(0.0);
+                    }
+                    totalCost += stepCost;
+
+                } else if ("step_start".equals(type) || "step-start".equals(type)) {
+                    // Extract model name from the step metadata if available
+                    String stepModel = node.path("model").asText(null);
+                    if (stepModel == null) {
+                        stepModel = node.path("part").path("model").asText(null);
+                    }
+                    if (stepModel != null) {
+                        model = stepModel;
+                    }
                 }
             }
-            return textContent.isEmpty() ? null : textContent.toString();
+            log.debug("NDJSON event types: {}", seenTypes);
+
+            AgentResult.LlmUsage usage = stepCount > 0
+                ? new AgentResult.LlmUsage(
+                    model,
+                    totalInputTokens > 0 ? totalInputTokens : null,
+                    totalOutputTokens > 0 ? totalOutputTokens : null,
+                    totalReasoningTokens > 0 ? totalReasoningTokens : null,
+                    totalCacheReadTokens > 0 ? totalCacheReadTokens : null,
+                    totalCacheWriteTokens > 0 ? totalCacheWriteTokens : null,
+                    totalCost > 0 ? totalCost : null,
+                    stepCount
+                )
+                : null;
+
+            String text = textContent.isEmpty() ? null : textContent.toString();
+            return new NdjsonParseResult(text, usage);
         } catch (Exception e) {
             log.warn("Failed to parse OpenCode NDJSON output: {}", e.getMessage());
             return null;
+        }
+    }
+
+    /** Classpath prefix for agent resource files. */
+    private static final String AGENT_RESOURCE_PREFIX = "agent/";
+
+    /** Load a classpath resource from the {@code agent/} directory. */
+    private static byte[] loadClasspathResource(String relativePath) {
+        String fullPath = AGENT_RESOURCE_PREFIX + relativePath;
+        try (InputStream is = OpenCodeAgentAdapter.class.getClassLoader().getResourceAsStream(fullPath)) {
+            if (is == null) {
+                throw new IllegalStateException("Missing classpath resource: " + fullPath);
+            }
+            return is.readAllBytes();
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to read classpath resource: " + fullPath, e);
         }
     }
 

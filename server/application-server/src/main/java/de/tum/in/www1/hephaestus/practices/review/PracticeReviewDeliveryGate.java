@@ -72,10 +72,14 @@ public class PracticeReviewDeliveryGate {
 
         Long prId = pullRequest.getId();
 
-        // 2. PR state: closed or merged
-        if (pullRequest.getState() == Issue.State.CLOSED || pullRequest.getState() == Issue.State.MERGED) {
-            log.info("Review delivery gate: STORE_ONLY, reason=PR is {}, prId={}", pullRequest.getState(), prId);
-            return new DeliveryDecision.StoreOnly("PR is " + pullRequest.getState());
+        // 2. PR state: closed always blocked; merged blocked unless deliverToMerged is enabled
+        if (pullRequest.getState() == Issue.State.CLOSED) {
+            log.info("Review delivery gate: STORE_ONLY, reason=PR is CLOSED, prId={}", prId);
+            return new DeliveryDecision.StoreOnly("PR is CLOSED");
+        }
+        if (pullRequest.getState() == Issue.State.MERGED && !properties.deliverToMerged()) {
+            log.info("Review delivery gate: STORE_ONLY, reason=PR is MERGED (deliverToMerged=false), prId={}", prId);
+            return new DeliveryDecision.StoreOnly("PR is MERGED");
         }
 
         // 3. Draft gate (defense in depth — detection gate also checks this)

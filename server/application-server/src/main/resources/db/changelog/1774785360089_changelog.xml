@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
+
+    <!-- Add job-level LLM usage columns to agent_job -->
+    <changeSet id="1774785360089-1" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <not><columnExists tableName="agent_job" columnName="llm_model"/></not>
+        </preConditions>
+        <addColumn tableName="agent_job">
+            <column name="llm_model" type="VARCHAR(100)"/>
+            <column name="llm_total_calls" type="INTEGER"/>
+            <column name="llm_total_input_tokens" type="INTEGER"/>
+            <column name="llm_total_output_tokens" type="INTEGER"/>
+            <column name="llm_total_reasoning_tokens" type="INTEGER"/>
+            <column name="llm_cache_read_tokens" type="INTEGER"/>
+            <column name="llm_cache_write_tokens" type="INTEGER"/>
+            <column name="llm_cost_usd" type="DOUBLE PRECISION"/>
+        </addColumn>
+    </changeSet>
+
+    <!-- Drop per-call llm_call table (no longer needed — usage tracked at job level) -->
+    <changeSet id="1774785360089-2" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="llm_call"/>
+        </preConditions>
+        <dropTable tableName="llm_call"/>
+    </changeSet>
+
+    <!-- Drop legacy duration column (job already has started_at / completed_at) -->
+    <changeSet id="1774785360089-3" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="agent_job" columnName="llm_total_duration_ms"/>
+        </preConditions>
+        <dropColumn tableName="agent_job" columnName="llm_total_duration_ms"/>
+    </changeSet>
+
+    <!-- Add model version tracking -->
+    <changeSet id="1774785360089-4" author="hephaestus">
+        <addColumn tableName="agent_config">
+            <column name="model_version" type="VARCHAR(50)"/>
+        </addColumn>
+        <addColumn tableName="agent_job">
+            <column name="llm_model_version" type="VARCHAR(50)"/>
+        </addColumn>
+    </changeSet>
+
+</databaseChangeLog>

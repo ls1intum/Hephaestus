@@ -30,7 +30,6 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullReques
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.practices.PracticeRepository;
 import de.tum.in.www1.hephaestus.practices.finding.ContributorHistoryProvider;
-import de.tum.in.www1.hephaestus.practices.model.CaMethod;
 import de.tum.in.www1.hephaestus.practices.model.Practice;
 import de.tum.in.www1.hephaestus.practices.model.Severity;
 import de.tum.in.www1.hephaestus.practices.model.Verdict;
@@ -142,13 +141,13 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         return job;
     }
 
-    private Practice createPractice(String slug, String name, String description, String detectionPrompt) {
+    private Practice createPractice(String slug, String name, String description, String criteria) {
         Practice p = new Practice();
         p.setId((long) slug.hashCode());
         p.setSlug(slug);
         p.setName(name);
         p.setDescription(description);
-        p.setDetectionPrompt(detectionPrompt);
+        p.setCriteria(criteria);
         p.setActive(true);
         return p;
     }
@@ -415,13 +414,13 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should NOT include practices.json (practices are inline in prompt)")
+        @DisplayName("should NOT include practices.json in .context/ (practices are in .practices/ directory)")
         void shouldNotIncludePracticesJson() throws Exception {
             stubDefaults();
 
             Map<String, byte[]> files = handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata()));
 
-            // Practices are no longer written to workspace files — they are inline in buildPrompt()
+            // Practices are injected as .practices/index.json and .practices/{slug}.md, not in .context/
             assertThat(files).doesNotContainKey(".context/practices.json");
         }
 
@@ -545,41 +544,24 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
     class BuildPrompt {
 
         @Test
-        @DisplayName("should contain section headers, output path, git instructions, and pull request details")
-        void shouldReferenceWorkspacePaths() {
-            when(practiceRepository.findByWorkspaceIdAndActiveTrue(WORKSPACE_ID)).thenReturn(samplePractices());
-
+        @DisplayName("should return slim orchestrator prompt with PR number and repo name")
+        void shouldReturnSlimOrchestratorPrompt() {
             String prompt = handler.buildPrompt(jobWithMetadata(sampleJobMetadata()));
 
-            // Prompt structure: section headers for inline context and instructions
-            assertThat(prompt).contains("## Context");
-            assertThat(prompt).contains("## Repository");
-            assertThat(prompt).contains("## Practices to Evaluate");
-            assertThat(prompt).contains("## Instructions");
-            assertThat(prompt).contains("## Output");
-            // Output path is still referenced (agent writes results there)
-            assertThat(prompt).contains("/workspace/.output/result.json");
-            // Pull request details are present
-            assertThat(prompt).contains("#42");
+            assertThat(prompt).contains("Review merge request #42");
             assertThat(prompt).contains("owner/repo");
-            // Git instructions reference real branch names
-            assertThat(prompt).contains("origin/feature/auth-fix");
-            assertThat(prompt).contains("origin/main");
-            assertThat(prompt).contains("git diff origin/main..origin/feature/auth-fix");
+            assertThat(prompt).contains("orchestrator-protocol.md");
         }
 
         @Test
         @DisplayName("should handle percent characters in metadata without format string errors")
         void shouldHandlePercentInMetadata() {
-            when(practiceRepository.findByWorkspaceIdAndActiveTrue(WORKSPACE_ID)).thenReturn(samplePractices());
             ObjectNode metadata = sampleJobMetadata();
             metadata.put("repository_full_name", "owner/repo%with%percent");
-            metadata.put("pr_url", "https://github.com/owner/repo%20special/pull/42");
 
             String prompt = handler.buildPrompt(jobWithMetadata(metadata));
 
             assertThat(prompt).contains("owner/repo%with%percent");
-            assertThat(prompt).contains("repo%20special");
         }
 
         @Test
@@ -607,196 +589,53 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should throw JobPreparationException when workspace is null")
-        void shouldThrowWhenWorkspaceIsNull() {
-            var job = new AgentJob();
-            job.setMetadata(sampleJobMetadata());
-            // workspace deliberately not set
+        @DisplayName("should not query practices from database")
+        void shouldNotQueryPractices() {
+            handler.buildPrompt(jobWithMetadata(sampleJobMetadata()));
 
-            assertThatThrownBy(() -> handler.buildPrompt(job))
-                .isInstanceOf(JobPreparationException.class)
-                .hasMessageContaining("no workspace");
+            verifyNoInteractions(practiceRepository);
+        }
+    }
+
+    @Nested
+    @DisplayName("annotateDiffWithLineNumbers")
+    class AnnotateDiffWithLineNumbers {
+
+        @Test
+        @DisplayName("annotateDiffWithLineNumbers should annotate + and context lines with source line numbers")
+        void annotatesDiff() {
+            String diff = "diff --git a/Foo.swift b/Foo.swift\n" +
+                "--- a/Foo.swift\n" +
+                "+++ b/Foo.swift\n" +
+                "@@ -1,3 +1,4 @@\n" +
+                " import SwiftUI\n" +
+                "+import Foundation\n" +
+                " \n" +
+                " struct Foo {\n";
+            String annotated = PullRequestReviewHandler.annotateDiffWithLineNumbers(diff);
+            assertThat(annotated).contains("[L1]  import SwiftUI");
+            assertThat(annotated).contains("[L2] +import Foundation");
+            assertThat(annotated).contains("[L3]  ");
+            assertThat(annotated).contains("[L4]  struct Foo {");
         }
 
         @Test
-        @DisplayName("should include all practice definitions as markdown headings")
-        void shouldIncludeAllPracticeDefinitions() {
-            when(practiceRepository.findByWorkspaceIdAndActiveTrue(WORKSPACE_ID)).thenReturn(samplePractices());
-
-            String prompt = handler.buildPrompt(jobWithMetadata(sampleJobMetadata()));
-
-            // Both practices appear as structured markdown headings
-            assertThat(prompt).contains("### pr-description-quality: PR Description Quality");
-            assertThat(prompt).contains("### error-handling: Error Handling");
-            // Category is null for sample practices — must NOT appear
-            assertThat(prompt).doesNotContain("Category:");
-        }
-
-        @Test
-        @DisplayName("should use detectionPrompt when available, description as fallback")
-        void shouldPreferDetectionPromptOverDescription() {
-            when(practiceRepository.findByWorkspaceIdAndActiveTrue(WORKSPACE_ID)).thenReturn(samplePractices());
-
-            String prompt = handler.buildPrompt(jobWithMetadata(sampleJobMetadata()));
-
-            // Practice with detectionPrompt — uses it, NOT the description
-            assertThat(prompt).contains(
-                "Check if the PR has a meaningful title and description that explains the why."
-            );
-            assertThat(prompt).doesNotContain("PRs should have clear titles and descriptions explaining the change.");
-            // Practice without detectionPrompt — falls back to description
-            assertThat(prompt).contains(
-                "Code should handle errors explicitly rather than silently swallowing exceptions."
-            );
-        }
-
-        @Test
-        @DisplayName("should specify output contract matching PracticeDetectionResultParser")
-        void shouldSpecifyOutputContractMatchingParser() {
-            when(practiceRepository.findByWorkspaceIdAndActiveTrue(WORKSPACE_ID)).thenReturn(samplePractices());
-
-            String prompt = handler.buildPrompt(jobWithMetadata(sampleJobMetadata()));
-
-            // Output section exists and specifies the result file
-            assertThat(prompt).contains("## Output");
-            assertThat(prompt).contains("/workspace/.output/result.json");
-            assertThat(prompt).contains("\"findings\"");
-
-            // Required fields appear in the JSON schema section
-            String outputSection = prompt.substring(prompt.indexOf("## Output"));
-            assertThat(outputSection).contains("\"practiceSlug\"");
-            assertThat(outputSection).contains("\"title\"");
-            assertThat(outputSection).contains("\"verdict\"");
-            assertThat(outputSection).contains("\"severity\"");
-            assertThat(outputSection).contains("\"confidence\"");
-
-            // Optional fields marked as such
-            assertThat(outputSection).contains("\"reasoning\"");
-            assertThat(outputSection).contains("\"guidance\"");
-            assertThat(outputSection).contains("\"guidanceMethod\"");
-            assertThat(outputSection).contains("(optional");
-
-            // All Verdict enum values from Verdict.java
-            for (Verdict v : Verdict.values()) {
-                assertThat(prompt).contains(v.name());
-            }
-            // All Severity enum values from Severity.java
-            for (Severity s : Severity.values()) {
-                assertThat(prompt).contains(s.name());
-            }
-            // All CaMethod enum values from CaMethod.java
-            for (CaMethod m : CaMethod.values()) {
-                assertThat(prompt).contains(m.name());
-            }
-
-            // JSON output instruction
-            assertThat(prompt).contains("write a JSON object to `/workspace/.output/result.json`");
-        }
-
-        @Test
-        @DisplayName("should throw when no active practices exist")
-        void shouldThrowWhenNoPractices() {
-            when(practiceRepository.findByWorkspaceIdAndActiveTrue(WORKSPACE_ID)).thenReturn(List.of());
-
-            assertThatThrownBy(() -> handler.buildPrompt(jobWithMetadata(sampleJobMetadata())))
-                .isInstanceOf(JobPreparationException.class)
-                .hasMessageContaining("No active practices");
-        }
-
-        @Test
-        @DisplayName("should handle practice with null description and null detectionPrompt")
-        void shouldHandleNullInstructions() {
-            Practice noInstructions = createPractice("code-style", "Code Style", null, null);
-            when(practiceRepository.findByWorkspaceIdAndActiveTrue(WORKSPACE_ID)).thenReturn(List.of(noInstructions));
-
-            String prompt = handler.buildPrompt(jobWithMetadata(sampleJobMetadata()));
-
-            // Practice heading is present even without instructions
-            assertThat(prompt).contains("### code-style: Code Style");
-            // Should not contain "null" as literal text
-            assertThat(prompt).doesNotContain("null\n");
-        }
-
-        @Test
-        @DisplayName("should include category in prompt when practice has one")
-        void shouldIncludeCategoryInPrompt() {
-            Practice withCategory = createPractice("test-coverage", "Test Coverage", "Tests required.", null);
-            withCategory.setCategory("testing");
-            when(practiceRepository.findByWorkspaceIdAndActiveTrue(WORKSPACE_ID)).thenReturn(List.of(withCategory));
-
-            String prompt = handler.buildPrompt(jobWithMetadata(sampleJobMetadata()));
-
-            assertThat(prompt).contains("### test-coverage: Test Coverage");
-            assertThat(prompt).contains("Category: testing");
-        }
-
-        @Test
-        @DisplayName("should work correctly with a single practice")
-        void shouldWorkWithSinglePractice() {
-            Practice single = createPractice(
-                "naming-conventions",
-                "Naming Conventions",
-                "Variables and methods should follow language conventions.",
-                null
-            );
-            when(practiceRepository.findByWorkspaceIdAndActiveTrue(WORKSPACE_ID)).thenReturn(List.of(single));
-
-            String prompt = handler.buildPrompt(jobWithMetadata(sampleJobMetadata()));
-
-            assertThat(prompt).contains("### naming-conventions: Naming Conventions");
-            assertThat(prompt).contains("Variables and methods should follow language conventions.");
-            // Only one practice heading
-            assertThat(prompt.split("### ").length - 1).isEqualTo(1);
-        }
-
-        @Test
-        @DisplayName("should include verdict meanings for agent guidance")
-        void shouldIncludeVerdictMeanings() {
-            when(practiceRepository.findByWorkspaceIdAndActiveTrue(WORKSPACE_ID)).thenReturn(samplePractices());
-
-            String prompt = handler.buildPrompt(jobWithMetadata(sampleJobMetadata()));
-
-            assertThat(prompt).contains("POSITIVE`: the contributor followed");
-            assertThat(prompt).contains("NEGATIVE`: the contributor violated");
-            assertThat(prompt).contains("NOT_APPLICABLE`: practice does not apply");
-            assertThat(prompt).contains("NEEDS_REVIEW`: borderline");
-        }
-
-        @Test
-        @DisplayName("should include practice count in output contract")
-        void shouldIncludePracticeCountInOutputContract() {
-            when(practiceRepository.findByWorkspaceIdAndActiveTrue(WORKSPACE_ID)).thenReturn(samplePractices());
-
-            String prompt = handler.buildPrompt(jobWithMetadata(sampleJobMetadata()));
-
-            // samplePractices() returns 2 practices — count must appear in field rules
-            assertThat(prompt).contains("2 total");
-        }
-
-        @Test
-        @DisplayName("should include severity+verdict example for disambiguation")
-        void shouldIncludeSeverityVerdictExample() {
-            when(practiceRepository.findByWorkspaceIdAndActiveTrue(WORKSPACE_ID)).thenReturn(samplePractices());
-
-            String prompt = handler.buildPrompt(jobWithMetadata(sampleJobMetadata()));
-
-            // Severity semantics are disambiguated with a concrete example
-            assertThat(prompt).contains("verdict=POSITIVE severity=MAJOR");
-            assertThat(prompt).contains("verdict=NEGATIVE severity=MINOR");
-        }
-
-        @Test
-        @DisplayName("should include contributor history reference with CA method guidance")
-        void shouldIncludeContributorHistoryReference() {
-            when(practiceRepository.findByWorkspaceIdAndActiveTrue(WORKSPACE_ID)).thenReturn(samplePractices());
-
-            String prompt = handler.buildPrompt(jobWithMetadata(sampleJobMetadata()));
-
-            assertThat(prompt).contains("contributor_history.json");
-            assertThat(prompt).contains("guidanceMethod");
-            assertThat(prompt).contains("COACHING");
-            assertThat(prompt).contains("SCAFFOLDING");
-            assertThat(prompt).contains("new contributor");
+        @DisplayName("annotateDiffWithLineNumbers should not annotate deleted lines")
+        void annotatesDiffWithDeletions() {
+            String diff = "diff --git a/Bar.swift b/Bar.swift\n" +
+                "--- a/Bar.swift\n" +
+                "+++ b/Bar.swift\n" +
+                "@@ -5,4 +5,3 @@\n" +
+                " context\n" +
+                "-deleted line\n" +
+                "+added line\n" +
+                " more context\n";
+            String annotated = PullRequestReviewHandler.annotateDiffWithLineNumbers(diff);
+            assertThat(annotated).contains("[L5]  context");
+            assertThat(annotated).contains("[L6] +added line");
+            assertThat(annotated).contains("[L7]  more context");
+            // The deleted line should NOT have [L prefix
+            assertThat(annotated).containsPattern("(?m)^-deleted line$");
         }
     }
 

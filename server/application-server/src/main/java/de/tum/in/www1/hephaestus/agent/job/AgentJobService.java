@@ -92,57 +92,85 @@ public class AgentJobService {
     // ── Submit ──
 
     /**
-     * Submit an agent job for the given workspace.
+     * Submit agent jobs for the given workspace — one per enabled config.
      *
-     * <p>Always queues the job — concurrency limits are enforced at execution time by the
-     * executor, not at submit time. Idempotency is enforced by a partial unique index on
+     * <p>Creates a job for EACH enabled agent config, with config-scoped idempotency keys.
+     * This provides redundancy: if one agent times out, others may still complete.
+     * Delivery dedup (via {@code findPreviousDeliveryCommentId}) ensures only one summary
+     * comment is posted; subsequent completions edit the existing comment.
+     *
+     * <p>Concurrency limits are enforced at execution time by the executor, not at submit time.
+     * Idempotency is enforced by a partial unique index on
      * {@code (workspace_id, idempotency_key)} for active jobs.
      *
      * @param workspaceId workspace ID
      * @param jobType     the job type
      * @param request     handler-specific submission request
-     * @return the created (or existing deduplicated) job, or empty if no enabled config found
+     * @return the first created (or existing deduplicated) job, or empty if no enabled config found
      */
     @Transactional
     public Optional<AgentJob> submit(Long workspaceId, AgentJobType jobType, JobSubmissionRequest request) {
-        // 1. Find first enabled config for workspace (no lock — executor handles concurrency)
-        List<AgentConfig> configs = agentConfigRepository.findByWorkspaceId(workspaceId);
-        AgentConfig config = configs.stream().filter(AgentConfig::isEnabled).findFirst().orElse(null);
-        if (config == null) {
+        // 1. Find ALL enabled configs for workspace
+        List<AgentConfig> enabledConfigs = agentConfigRepository
+            .findByWorkspaceId(workspaceId)
+            .stream()
+            .filter(AgentConfig::isEnabled)
+            .toList();
+        if (enabledConfigs.isEmpty()) {
             log.debug("No enabled agent config for workspace: workspaceId={}", workspaceId);
             return Optional.empty();
         }
 
-        // 2. Handler creates submission (metadata + idempotency key)
+        // 2. Handler creates submission (metadata + base idempotency key)
         JobTypeHandler handler = handlerRegistry.getHandler(jobType);
         JobSubmission submission = handler.createSubmission(request);
 
-        // 3. Idempotency check — application-level (partial unique index is safety net)
+        Workspace workspace = workspaceRepository
+            .findById(workspaceId)
+            .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId.toString()));
+
+        // 3. Submit a job for EACH enabled config
+        AgentJob firstJob = null;
+        for (AgentConfig config : enabledConfigs) {
+            AgentJob job = submitForConfig(workspace, config, jobType, submission);
+            if (job != null && firstJob == null) {
+                firstJob = job;
+            }
+        }
+
+        return Optional.ofNullable(firstJob);
+    }
+
+    private AgentJob submitForConfig(
+        Workspace workspace,
+        AgentConfig config,
+        AgentJobType jobType,
+        JobSubmission submission
+    ) {
+        // Config-scoped idempotency key prevents duplicate jobs per config
+        String configScopedKey = submission.idempotencyKey() + ":config:" + config.getId();
+
+        // Idempotency check — application-level (partial unique index is safety net)
         Optional<AgentJob> existing = agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(
-            workspaceId,
-            submission.idempotencyKey(),
+            workspace.getId(),
+            configScopedKey,
             ACTIVE_STATUSES
         );
         if (existing.isPresent()) {
             log.info(
                 "Deduplicated job submission: existingJobId={}, idempotencyKey={}",
                 existing.get().getId(),
-                submission.idempotencyKey()
+                configScopedKey
             );
-            return existing;
+            return existing.get();
         }
-
-        // 4. Build and persist job
-        Workspace workspace = workspaceRepository
-            .findById(workspaceId)
-            .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId.toString()));
 
         AgentJob job = new AgentJob();
         job.setWorkspace(workspace);
         job.setConfig(config);
         job.setJobType(jobType);
         job.setMetadata(submission.metadata());
-        job.setIdempotencyKey(submission.idempotencyKey());
+        job.setIdempotencyKey(configScopedKey);
         job.setConfigSnapshot(ConfigSnapshot.from(config).toJson(objectMapper));
 
         // Copy LLM API key — needed for all credential modes:
@@ -156,10 +184,8 @@ public class AgentJobService {
             agentJobRepository.saveAndFlush(job);
         } catch (DataIntegrityViolationException e) {
             // Partial unique index race: another concurrent submit won.
-            // Cannot re-query in this transaction — PostgreSQL aborts the tx on constraint violation.
-            // Throw 409; the caller can retry.
-            log.info("Idempotency constraint caught concurrent duplicate: key={}", submission.idempotencyKey());
-            throw new AgentJobStateConflictException("A job with this idempotency key is already active");
+            log.info("Idempotency constraint caught concurrent duplicate: key={}", configScopedKey);
+            return null;
         }
 
         log.info(
@@ -167,13 +193,13 @@ public class AgentJobService {
             job.getId(),
             jobType,
             config.getId(),
-            workspaceId
+            workspace.getId()
         );
 
-        // 5. Publish event — picked up by AgentJobSubmitter after transaction commits
-        eventPublisher.publishEvent(new AgentJobCreatedEvent(job.getId(), workspaceId));
+        // Publish event — picked up by AgentJobSubmitter after transaction commits
+        eventPublisher.publishEvent(new AgentJobCreatedEvent(job.getId(), workspace.getId()));
 
-        return Optional.of(job);
+        return job;
     }
 
     // ── Retry delivery ──

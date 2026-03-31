@@ -158,7 +158,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
 
             verify(practiceFindingRepository).insertIfAbsent(
                 any(UUID.class),
-                eq("pr-description-quality:PULL_REQUEST:456:" + testJob.getId() + ":0"),
+                eq("pr-description-quality:PULL_REQUEST:456:" + testJob.getId()),
                 eq(testJob.getId()),
                 eq(10L),
                 eq("PULL_REQUEST"),
@@ -354,18 +354,6 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             assertThat(result.discardedOverCap()).isZero();
         }
 
-        @Test
-        @DisplayName("does not cap NOT_APPLICABLE findings")
-        void notApplicableNotCapped() {
-            var findings = new java.util.ArrayList<ValidatedFinding>();
-            for (int i = 0; i < 10; i++) {
-                findings.add(validFinding("pr-description-quality", Verdict.NOT_APPLICABLE));
-            }
-
-            var result = service.deliver(testJob, findings);
-
-            assertThat(result.inserted()).isEqualTo(10);
-        }
     }
 
     @Nested
@@ -433,7 +421,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             );
 
             String key = keyCaptor.getValue();
-            assertThat(key).isEqualTo("pr-description-quality:PULL_REQUEST:456:" + testJob.getId() + ":0");
+            assertThat(key).isEqualTo("pr-description-quality:PULL_REQUEST:456:" + testJob.getId());
         }
     }
 

@@ -19,8 +19,7 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Queries {@link PracticeFindingRepository} for verdict counts per practice and
  * produces a compact JSON array suitable for injection into the agent sandbox as
- * {@code .context/contributor_history.json}. NOT_APPLICABLE verdicts are excluded
- * (they carry no calibration signal for guidance method selection).
+ * {@code .context/contributor_history.json}.
  *
  * <p>Output is capped at {@value #MAX_PRACTICES} practices, sorted by NEGATIVE count
  * descending so the most problematic practices are always included when truncation occurs.
@@ -60,9 +59,6 @@ public class ContributorHistoryProvider {
         // Group by practice slug, accumulate verdict counts and track latest detection
         Map<String, PracticeAggregate> byPractice = new LinkedHashMap<>();
         for (ContributorPracticeSummary row : summaries) {
-            if (row.getVerdict() == Verdict.NOT_APPLICABLE) {
-                continue; // No calibration signal
-            }
             byPractice.computeIfAbsent(row.getPracticeSlug(), slug -> new PracticeAggregate()).add(row);
         }
 
@@ -89,7 +85,6 @@ public class ContributorHistoryProvider {
             node.put("practice", entry.getKey());
             node.put("positive", agg.positive);
             node.put("negative", agg.negative);
-            node.put("needsReview", agg.needsReview);
             node.put("lastSeen", agg.lastDetectedAt.toString());
             array.add(node);
         }
@@ -118,17 +113,12 @@ public class ContributorHistoryProvider {
 
         long positive;
         long negative;
-        long needsReview;
         Instant lastDetectedAt;
 
         void add(ContributorPracticeSummary row) {
             switch (row.getVerdict()) {
                 case POSITIVE -> positive += row.getCount();
                 case NEGATIVE -> negative += row.getCount();
-                case NEEDS_REVIEW -> needsReview += row.getCount();
-                default -> {
-                    /* NOT_APPLICABLE already filtered */
-                }
             }
             if (lastDetectedAt == null || row.getLastDetectedAt().isAfter(lastDetectedAt)) {
                 lastDetectedAt = row.getLastDetectedAt();

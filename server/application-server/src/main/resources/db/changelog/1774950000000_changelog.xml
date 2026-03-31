@@ -1,0 +1,43 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        Replace delivery dedup index to use stable external identifiers
+        (repository_full_name + pr_number) instead of internal pull_request_id.
+
+        This prevents duplicate comments when a PR record is deleted and
+        re-created in the database (which changes the internal ID but not
+        the external MR identifier).
+    -->
+    <changeSet author="practice-delivery" id="1774950000000-1">
+        <sql>
+            DROP INDEX IF EXISTS idx_agent_job_delivery_dedup;
+
+            CREATE INDEX idx_agent_job_delivery_dedup
+            ON agent_job (
+                workspace_id,
+                (metadata->>'repository_full_name'),
+                CAST(metadata->>'pr_number' AS integer),
+                completed_at DESC
+            )
+            WHERE delivery_status = 'DELIVERED'
+              AND job_type = 'PULL_REQUEST_REVIEW'
+              AND delivery_comment_id IS NOT NULL;
+        </sql>
+        <rollback>
+            <sql>
+                DROP INDEX IF EXISTS idx_agent_job_delivery_dedup;
+
+                CREATE INDEX idx_agent_job_delivery_dedup
+                ON agent_job (workspace_id, (metadata->>'pull_request_id'), completed_at DESC)
+                WHERE delivery_status = 'DELIVERED'
+                  AND job_type = 'PULL_REQUEST_REVIEW'
+                  AND delivery_comment_id IS NOT NULL;
+            </sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

@@ -7,6 +7,8 @@ import de.tum.in.www1.hephaestus.agent.adapter.spi.AgentAdapter;
 import de.tum.in.www1.hephaestus.agent.adapter.spi.AgentAdapterRequest;
 import de.tum.in.www1.hephaestus.agent.adapter.spi.AgentSandboxSpec;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.SandboxResult;
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -39,7 +41,8 @@ public class ClaudeCodeAgentAdapter implements AgentAdapter {
     static final String OUTPUT_PATH = "/workspace/.output";
     private static final int MAX_BRACE_ATTEMPTS = 5;
     private static final String MAX_BUDGET_USD = "5.00";
-    private static final String EFFORT_LEVEL = "max";
+    private static final String EFFORT_LEVEL = "medium";
+    private static final int MAX_TURNS = 25;
 
     private final ObjectMapper objectMapper;
 
@@ -65,12 +68,17 @@ public class ClaudeCodeAgentAdapter implements AgentAdapter {
         inputFiles.put(".prompt", request.prompt().getBytes(StandardCharsets.UTF_8));
         inputFiles.put(".json-schema", buildJsonSchema());
 
-        // Full agentic mode with optimal flags:
-        // --json-schema: constrained decoding for reliable structured output (post-agentic-loop)
-        // --effort max: maximum extended thinking for thorough code review
+        // Claude Code-specific orchestrator file (auto-discovered by Claude Code CLI)
+        inputFiles.put("CLAUDE.md", loadClasspathResource("CLAUDE.md"));
+
+        // Agentic mode with controlled turns:
+        // --json-schema: constrained decoding for structured output (post-agentic-loop)
+        // --effort: controls extended thinking depth
+        // --max-turns: caps agentic loop (3 turns ≈ read context → analyze → output)
         // --no-session-persistence: skip disk I/O in ephemeral containers
         // --max-budget-usd: cost ceiling to prevent runaway spending
-        // --verbose: debug info on stderr (does not affect stdout)
+        // --verbose: debug info on stderr
+        // After agent finishes, copy .analysis/ to output for observability.
         String command =
             authSetup +
             "mkdir -p " +
@@ -81,6 +89,8 @@ public class ClaudeCodeAgentAdapter implements AgentAdapter {
             " --json-schema \"$SCHEMA\"" +
             " --effort " +
             EFFORT_LEVEL +
+            " --max-turns " +
+            MAX_TURNS +
             " --dangerously-skip-permissions" +
             " --no-session-persistence" +
             " --max-budget-usd " +
@@ -88,7 +98,10 @@ public class ClaudeCodeAgentAdapter implements AgentAdapter {
             " --verbose" +
             " > " +
             OUTPUT_PATH +
-            "/result.json";
+            "/result.json" +
+            "; cp -r /workspace/.analysis " +
+            OUTPUT_PATH +
+            "/analysis 2>/dev/null; true";
 
         return new AgentSandboxSpec(
             IMAGE,
@@ -114,12 +127,16 @@ public class ClaudeCodeAgentAdapter implements AgentAdapter {
         String schema = """
             {"type":"object","properties":{"findings":{"type":"array","items":{"type":"object",\
             "properties":{"practiceSlug":{"type":"string"},"title":{"type":"string"},\
-            "verdict":{"type":"string","enum":["POSITIVE","NEGATIVE","NOT_APPLICABLE","NEEDS_REVIEW"]},\
+            "verdict":{"type":"string","enum":["POSITIVE","NEGATIVE"]},\
             "severity":{"type":"string","enum":["CRITICAL","MAJOR","MINOR","INFO"]},\
             "confidence":{"type":"number","minimum":0,"maximum":1},\
-            "evidence":{"type":"object"},"reasoning":{"type":"string"},\
-            "guidance":{"type":"string"},"guidanceMethod":{"type":"string",\
-            "enum":["MODELING","COACHING","SCAFFOLDING","ARTICULATION","REFLECTION","EXPLORATION"]}},\
+            "evidence":{"type":"object","properties":{\
+            "locations":{"type":"array","items":{"type":"object","properties":{\
+            "path":{"type":"string"},"startLine":{"type":"integer","minimum":1},\
+            "endLine":{"type":"integer","minimum":1}}}},\
+            "snippets":{"type":"array","items":{"type":"string"}}}},\
+            "reasoning":{"type":"string","maxLength":500},\
+            "guidance":{"type":"string","maxLength":800}},\
             "required":["practiceSlug","title","verdict","severity","confidence"]}},\
             "delivery":{"type":"object","properties":{"mrNote":{"type":"string"},\
             "diffNotes":{"type":"array","items":{"type":"object","properties":{\
@@ -136,6 +153,9 @@ public class ClaudeCodeAgentAdapter implements AgentAdapter {
      * {type:"result",...}]}. With {@code --json-schema}, the result event may contain a
      * {@code structured_output} field with validated JSON. Falls back to extracting from
      * the {@code result} text field.
+     *
+     * <p>Also extracts LLM usage statistics ({@code total_cost_usd}, {@code total_input_tokens},
+     * {@code total_output_tokens}, {@code model}) from the {@code type: "result"} event.
      */
     @Override
     public AgentResult parseResult(SandboxResult sandboxResult) {
@@ -158,7 +178,18 @@ public class ClaudeCodeAgentAdapter implements AgentAdapter {
             output.put("rawOutput", cliOutput);
         }
 
-        return new AgentResult(success, output);
+        AgentResult.LlmUsage usage = extractUsage(cliOutput);
+        if (usage != null) {
+            log.info(
+                "Claude Code usage: model={}, input={}, output={}, cost={}",
+                usage.model(),
+                usage.inputTokens(),
+                usage.outputTokens(),
+                usage.costUsd()
+            );
+        }
+
+        return new AgentResult(success, output, usage);
     }
 
     /**
@@ -203,6 +234,93 @@ public class ClaudeCodeAgentAdapter implements AgentAdapter {
             log.warn("Failed to parse Claude Code CLI output: {}", e.getMessage());
             return null;
         }
+    }
+
+    /**
+     * Extract LLM usage statistics from the Claude Code CLI output.
+     *
+     * <p>The {@code type: "result"} event contains top-level fields:
+     * {@code total_cost_usd}, {@code total_input_tokens}, {@code total_output_tokens},
+     * and {@code model}. These are extracted into an {@link AgentResult.LlmUsage} record.
+     *
+     * <p>Returns {@code null} when the output is a plain JSON object (e.g. direct
+     * {@code --json-schema} structured output without an event wrapper) or when no
+     * result event is found.
+     *
+     * @param cliOutput raw CLI stdout content
+     * @return usage statistics, or null if unavailable
+     */
+    AgentResult.LlmUsage extractUsage(String cliOutput) {
+        try {
+            JsonNode root = objectMapper.readTree(cliOutput);
+            JsonNode resultEvent = null;
+
+            // Single result object format
+            if (root.isObject() && "result".equals(root.path("type").asText())) {
+                resultEvent = root;
+            }
+
+            // JSON array of events format — find the result event
+            if (root.isArray()) {
+                for (JsonNode event : root) {
+                    if ("result".equals(event.path("type").asText())) {
+                        resultEvent = event;
+                        // Don't break — use the last result event if multiple exist
+                    }
+                }
+            }
+
+            if (resultEvent == null) {
+                return null;
+            }
+
+            String model = resultEvent.path("model").asText(null);
+            Integer inputTokens = intOrNull(resultEvent, "total_input_tokens");
+            Integer outputTokens = intOrNull(resultEvent, "total_output_tokens");
+            Double costUsd = doubleOrNull(resultEvent, "total_cost_usd");
+
+            // Count assistant events as LLM calls (each represents one model invocation)
+            int totalCalls = 0;
+            if (root.isArray()) {
+                for (JsonNode event : root) {
+                    if ("assistant".equals(event.path("type").asText())) {
+                        totalCalls++;
+                    }
+                }
+            } else {
+                // Single result object — at least one call was made
+                totalCalls = 1;
+            }
+
+            // Only return usage if at least some data is present
+            if (model == null && inputTokens == null && outputTokens == null && costUsd == null) {
+                return null;
+            }
+
+            return new AgentResult.LlmUsage(
+                model,
+                inputTokens,
+                outputTokens,
+                null, // reasoningTokens — not reported by Claude Code CLI
+                null, // cacheReadTokens — not reported by Claude Code CLI
+                null, // cacheWriteTokens — not reported by Claude Code CLI
+                costUsd,
+                Math.max(totalCalls, 1)
+            );
+        } catch (Exception e) {
+            log.warn("Failed to extract LLM usage from Claude Code output: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    private static Integer intOrNull(JsonNode node, String field) {
+        JsonNode value = node.path(field);
+        return value.isNumber() ? value.asInt() : null;
+    }
+
+    private static Double doubleOrNull(JsonNode node, String field) {
+        JsonNode value = node.path(field);
+        return value.isNumber() ? value.asDouble() : null;
     }
 
     /**
@@ -274,6 +392,22 @@ public class ClaudeCodeAgentAdapter implements AgentAdapter {
             return node != null && node.isObject() && node.has("findings");
         } catch (Exception e) {
             return false;
+        }
+    }
+
+    /** Classpath prefix for agent resource files. */
+    private static final String AGENT_RESOURCE_PREFIX = "agent/";
+
+    /** Load a classpath resource from the {@code agent/} directory. */
+    private static byte[] loadClasspathResource(String relativePath) {
+        String fullPath = AGENT_RESOURCE_PREFIX + relativePath;
+        try (InputStream is = ClaudeCodeAgentAdapter.class.getClassLoader().getResourceAsStream(fullPath)) {
+            if (is == null) {
+                throw new IllegalStateException("Missing classpath resource: " + fullPath);
+            }
+            return is.readAllBytes();
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to read classpath resource: " + fullPath, e);
         }
     }
 

@@ -68,6 +68,7 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
             LlmProvider.ANTHROPIC,
             CredentialMode.PROXY,
             null,
+            null,
             timeoutSeconds,
             false
         );

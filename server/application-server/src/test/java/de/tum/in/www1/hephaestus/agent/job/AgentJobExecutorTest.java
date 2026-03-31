@@ -132,6 +132,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
             LlmProvider.ANTHROPIC,
             CredentialMode.PROXY,
             null,
+            null,
             600,
             false
         );

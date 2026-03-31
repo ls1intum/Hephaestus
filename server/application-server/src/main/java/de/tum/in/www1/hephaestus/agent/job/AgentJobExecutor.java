@@ -351,13 +351,16 @@ public class AgentJobExecutor {
 
         // Wrap in a read-only transaction so prepareInputFiles/buildPrompt can
         // resolve lazy JPA proxies (e.g. PullRequest.author) on this sandbox thread.
+        // Re-fetch the job WITH workspace eagerly loaded to avoid LazyInitializationException
+        // (the original job object is detached from the claim transaction).
         TransactionTemplate readOnlyTx = new TransactionTemplate(transactionTemplate.getTransactionManager());
         readOnlyTx.setReadOnly(true);
         record PrepareResult(Map<String, byte[]> files, String prompt, Map<String, String> volumeMounts) {}
         PrepareResult prepared = readOnlyTx.execute(status -> {
-            Map<String, byte[]> files = handler.prepareInputFiles(job);
-            String p = handler.buildPrompt(job);
-            Map<String, String> volumes = handler.volumeMounts(job);
+            AgentJob managedJob = jobRepository.findByIdWithWorkspace(jobId).orElse(job);
+            Map<String, byte[]> files = handler.prepareInputFiles(managedJob);
+            String p = handler.buildPrompt(managedJob);
+            Map<String, String> volumes = handler.volumeMounts(managedJob);
             return new PrepareResult(files, p, volumes);
         });
 
@@ -629,6 +632,33 @@ public class AgentJobExecutor {
                     // Mark delivery as PENDING so crash recovery can distinguish
                     // "delivery not attempted yet" from "no delivery needed"
                     freshJob.setDeliveryStatus(DeliveryStatus.PENDING);
+                }
+                // Primary: agent-reported usage (from OpenCode step-finish / Claude Code result)
+                var agentUsage = agentResult.usage();
+                if (agentUsage != null && agentUsage.totalCalls() > 0) {
+                    freshJob.setLlmTotalCalls(agentUsage.totalCalls());
+                    freshJob.setLlmTotalInputTokens(agentUsage.inputTokens());
+                    freshJob.setLlmTotalOutputTokens(agentUsage.outputTokens());
+                    freshJob.setLlmTotalReasoningTokens(agentUsage.reasoningTokens());
+                    freshJob.setLlmCacheReadTokens(agentUsage.cacheReadTokens());
+                    freshJob.setLlmCacheWriteTokens(agentUsage.cacheWriteTokens());
+                    freshJob.setLlmCostUsd(agentUsage.costUsd());
+                    // Model + version from config snapshot (Azure doesn't expose version in API)
+                    var snapshot = freshJob.getConfigSnapshot();
+                    String model = agentUsage.model();
+                    if ((model == null || model.isBlank()) && snapshot != null) {
+                        model = snapshot.path("modelName").asText(null);
+                    }
+                    freshJob.setLlmModel(model);
+                    if (snapshot != null) {
+                        freshJob.setLlmModelVersion(snapshot.path("modelVersion").asText(null));
+                    }
+                    log.info(
+                        "LLM usage (agent-reported): model={}, calls={}, in={}, out={}, reasoning={}, cost={}, jobId={}",
+                        model, agentUsage.totalCalls(),
+                        agentUsage.inputTokens(), agentUsage.outputTokens(),
+                        agentUsage.reasoningTokens(), agentUsage.costUsd(), jobId
+                    );
                 }
                 jobRepository.saveAndFlush(freshJob);
             }

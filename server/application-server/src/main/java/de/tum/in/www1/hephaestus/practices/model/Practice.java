@@ -79,8 +79,8 @@ public class Practice {
     @Column(name = "trigger_events", columnDefinition = "jsonb", nullable = false)
     private JsonNode triggerEvents;
 
-    @Column(name = "detection_prompt", columnDefinition = "TEXT")
-    private String detectionPrompt;
+    @Column(name = "criteria", columnDefinition = "TEXT")
+    private String criteria;
 
     @Column(name = "is_active", nullable = false)
     private boolean active = true;

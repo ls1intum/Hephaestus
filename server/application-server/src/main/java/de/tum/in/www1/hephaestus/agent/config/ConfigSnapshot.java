@@ -22,16 +22,6 @@ import org.springframework.lang.Nullable;
  *   <li>{@code maxConcurrentJobs} — concurrency gate read live from AgentConfig so admin
  *       changes take effect immediately</li>
  * </ul>
- *
- * @param schemaVersion snapshot format version (always {@link #SCHEMA_VERSION})
- * @param configId      source config ID (for audit after config deletion)
- * @param configName    source config name (for display after config deletion)
- * @param agentType     agent runtime (CLAUDE_CODE, OPENCODE)
- * @param llmProvider   LLM API provider
- * @param credentialMode authentication mode (PROXY, API_KEY, OAUTH)
- * @param modelName     model name override (null = agent default)
- * @param timeoutSeconds container timeout
- * @param allowInternet  whether the container may reach the public internet
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record ConfigSnapshot(
@@ -42,11 +32,12 @@ public record ConfigSnapshot(
     LlmProvider llmProvider,
     CredentialMode credentialMode,
     @Nullable String modelName,
+    @Nullable String modelVersion,
     int timeoutSeconds,
     boolean allowInternet
 ) {
     /** Current schema version. Bump when adding/removing fields. */
-    public static final int SCHEMA_VERSION = 1;
+    public static final int SCHEMA_VERSION = 2;
 
     public ConfigSnapshot {
         Objects.requireNonNull(agentType, "agentType must not be null");
@@ -70,6 +61,7 @@ public record ConfigSnapshot(
             config.getLlmProvider(),
             config.getCredentialMode(),
             config.getModelName(),
+            config.getModelVersion(),
             config.getTimeoutSeconds(),
             config.isAllowInternet()
         );

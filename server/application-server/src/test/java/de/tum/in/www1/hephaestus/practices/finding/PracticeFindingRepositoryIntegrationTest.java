@@ -571,24 +571,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
             assertThat(result.get(0).getCount()).isEqualTo(1);
         }
 
-        @Test
-        @DisplayName("includes NOT_APPLICABLE verdict rows in query results")
-        void includesNotApplicableVerdict() {
-            insertFinding("na-1", practice, "NOT_APPLICABLE", Instant.parse("2026-03-20T10:00:00Z"));
-            insertFinding("na-2", practice, "NEGATIVE", Instant.parse("2026-03-19T10:00:00Z"));
-
-            List<ContributorPracticeSummary> result = practiceFindingRepository.findContributorPracticeSummary(
-                contributor.getId(),
-                workspace.getId()
-            );
-
-            // Query returns all verdicts — filtering is the caller's responsibility
-            assertThat(result).hasSize(2);
-            assertThat(result)
-                .extracting(ContributorPracticeSummary::getVerdict)
-                .containsExactlyInAnyOrder(Verdict.NOT_APPLICABLE, Verdict.NEGATIVE);
-        }
-
         /** Helper to insert a finding with minimal boilerplate. */
         private void insertFinding(String idempotencyKey, Practice targetPractice, String verdict, Instant detectedAt) {
             practiceFindingRepository.insertIfAbsent(

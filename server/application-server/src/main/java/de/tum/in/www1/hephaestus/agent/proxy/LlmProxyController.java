@@ -81,7 +81,6 @@ class LlmProxyController {
     private final Map<LlmProvider, ProviderProxyConfig> providerConfigs;
     private final ObjectMapper objectMapper;
     private final MeterRegistry meterRegistry;
-
     LlmProxyController(
         WebClient llmProxyWebClient,
         LlmProxyProperties properties,

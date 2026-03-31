@@ -73,10 +73,10 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         // Mockito returns null for Optional-returning methods by default,
         // which causes NPE on .orElse(). Provide a safe default.
         lenient()
-            .when(agentJobRepository.findPreviousDeliveryCommentId(any(), any(), any()))
+            .when(agentJobRepository.findPreviousDeliveryCommentId(any(), any(), any(Integer.class), any()))
             .thenReturn(Optional.empty());
 
-        reviewProperties = new PracticeReviewProperties(false, true, MAX_INLINE_NOTES, APP_BASE_URL);
+        reviewProperties = new PracticeReviewProperties(false, true, false, MAX_INLINE_NOTES, APP_BASE_URL);
         deliveryGate = new PracticeReviewDeliveryGate(reviewProperties);
         service = new FeedbackDeliveryService(
             deliveryGate,
@@ -129,7 +129,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             AgentJob job = createJob();
             stubOpenPr();
             when(
-                agentJobRepository.findPreviousDeliveryCommentId(eq(WORKSPACE_ID), eq(PULL_REQUEST_ID), any())
+                agentJobRepository.findPreviousDeliveryCommentId(eq(WORKSPACE_ID), eq("owner/repo"), eq(42), any())
             ).thenReturn(Optional.empty());
             when(commentPoster.postFormattedBody(eq(job), any(String.class), isNull())).thenReturn("IC_comment123");
 
@@ -227,7 +227,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             AgentJob job = createJob();
             stubOpenPr();
             when(
-                agentJobRepository.findPreviousDeliveryCommentId(eq(WORKSPACE_ID), eq(PULL_REQUEST_ID), any())
+                agentJobRepository.findPreviousDeliveryCommentId(eq(WORKSPACE_ID), eq("owner/repo"), eq(42), any())
             ).thenReturn(Optional.of("IC_previous123"));
             when(commentPoster.postFormattedBody(eq(job), any(String.class), eq("IC_previous123"))).thenReturn(
                 "IC_previous123"
@@ -245,7 +245,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             AgentJob job = createJob();
             stubOpenPr();
             when(
-                agentJobRepository.findPreviousDeliveryCommentId(eq(WORKSPACE_ID), eq(PULL_REQUEST_ID), any())
+                agentJobRepository.findPreviousDeliveryCommentId(eq(WORKSPACE_ID), eq("owner/repo"), eq(42), any())
             ).thenReturn(Optional.of("IC_previous123"));
             when(commentPoster.postFormattedBody(any(), any(), any())).thenReturn("IC_previous123");
 
@@ -262,7 +262,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             AgentJob job = createJob();
             stubOpenPr();
             when(
-                agentJobRepository.findPreviousDeliveryCommentId(eq(WORKSPACE_ID), eq(PULL_REQUEST_ID), any())
+                agentJobRepository.findPreviousDeliveryCommentId(eq(WORKSPACE_ID), eq("owner/repo"), eq(42), any())
             ).thenReturn(Optional.empty());
             when(commentPoster.postFormattedBody(any(), any(), any())).thenReturn("IC_new123");
             when(diffNotePoster.postDiffNotes(eq(job), any())).thenReturn(new DiffNotePoster.DiffNoteResult(1, 0));
@@ -306,7 +306,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             AgentJob job = createJob();
             stubOpenPr();
             when(
-                agentJobRepository.findPreviousDeliveryCommentId(eq(WORKSPACE_ID), eq(PULL_REQUEST_ID), any())
+                agentJobRepository.findPreviousDeliveryCommentId(eq(WORKSPACE_ID), eq("owner/repo"), eq(42), any())
             ).thenReturn(Optional.empty());
             when(commentPoster.postFormattedBody(any(), any(), any())).thenReturn(null);
 
@@ -324,7 +324,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             pr.setAuthor(null);
             when(pullRequestRepository.findByIdWithAuthor(PULL_REQUEST_ID)).thenReturn(Optional.of(pr));
             when(
-                agentJobRepository.findPreviousDeliveryCommentId(eq(WORKSPACE_ID), eq(PULL_REQUEST_ID), any())
+                agentJobRepository.findPreviousDeliveryCommentId(eq(WORKSPACE_ID), eq("owner/repo"), eq(42), any())
             ).thenReturn(Optional.empty());
             when(commentPoster.postFormattedBody(any(), any(), any())).thenReturn("IC_comment456");
 
@@ -340,7 +340,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         void entityStateUnchangedAfterFailure() {
             AgentJob job = createJob();
             stubOpenPr();
-            when(agentJobRepository.findPreviousDeliveryCommentId(any(), any(), any())).thenReturn(Optional.empty());
+            when(agentJobRepository.findPreviousDeliveryCommentId(any(), any(), any(Integer.class), any())).thenReturn(Optional.empty());
             when(commentPoster.postFormattedBody(any(), any(), any())).thenThrow(
                 new RuntimeException("GraphQL timeout")
             );
@@ -359,7 +359,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             AgentJob job = createJob();
             stubOpenPr();
             when(
-                agentJobRepository.findPreviousDeliveryCommentId(eq(WORKSPACE_ID), eq(PULL_REQUEST_ID), any())
+                agentJobRepository.findPreviousDeliveryCommentId(eq(WORKSPACE_ID), eq("owner/repo"), eq(42), any())
             ).thenReturn(Optional.empty());
             when(diffNotePoster.postDiffNotes(eq(job), any())).thenReturn(new DiffNotePoster.DiffNoteResult(2, 0));
 
@@ -379,7 +379,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         void doesNotThrowOnFailure() {
             AgentJob job = createJob();
             stubOpenPr();
-            when(agentJobRepository.findPreviousDeliveryCommentId(any(), any(), any())).thenReturn(Optional.empty());
+            when(agentJobRepository.findPreviousDeliveryCommentId(any(), any(), any(Integer.class), any())).thenReturn(Optional.empty());
             when(commentPoster.postFormattedBody(any(), any(), any())).thenThrow(
                 new RuntimeException("GraphQL timeout")
             );
@@ -432,7 +432,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             AgentJob job = createJob();
             stubOpenPr();
             when(
-                agentJobRepository.findPreviousDeliveryCommentId(eq(WORKSPACE_ID), eq(PULL_REQUEST_ID), any())
+                agentJobRepository.findPreviousDeliveryCommentId(eq(WORKSPACE_ID), eq("owner/repo"), eq(42), any())
             ).thenReturn(Optional.of("IC_previous123"));
             when(commentPoster.postFormattedBody(eq(job), any(String.class), eq("IC_previous123"))).thenReturn(
                 "IC_previous123"
@@ -452,7 +452,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             AgentJob job = createJob();
             stubOpenPr();
             when(
-                agentJobRepository.findPreviousDeliveryCommentId(eq(WORKSPACE_ID), eq(PULL_REQUEST_ID), any())
+                agentJobRepository.findPreviousDeliveryCommentId(eq(WORKSPACE_ID), eq("owner/repo"), eq(42), any())
             ).thenReturn(Optional.of("IC_previous123"));
             when(commentPoster.postFormattedBody(eq(job), any(String.class), eq("IC_previous123"))).thenReturn(
                 "IC_previous123"
@@ -473,7 +473,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             AgentJob job = createJob();
             stubOpenPr();
             when(
-                agentJobRepository.findPreviousDeliveryCommentId(eq(WORKSPACE_ID), eq(PULL_REQUEST_ID), any())
+                agentJobRepository.findPreviousDeliveryCommentId(eq(WORKSPACE_ID), eq("owner/repo"), eq(42), any())
             ).thenReturn(Optional.of("IC_previous123"));
             when(commentPoster.postFormattedBody(any(), any(), any())).thenReturn(null);
 
@@ -489,7 +489,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             AgentJob job = createJob();
             stubOpenPr();
             when(
-                agentJobRepository.findPreviousDeliveryCommentId(eq(WORKSPACE_ID), eq(PULL_REQUEST_ID), any())
+                agentJobRepository.findPreviousDeliveryCommentId(eq(WORKSPACE_ID), eq("owner/repo"), eq(42), any())
             ).thenReturn(Optional.of("IC_previous123"));
             when(commentPoster.postFormattedBody(any(), any(), any())).thenThrow(new RuntimeException("GraphQL error"));
 
@@ -511,7 +511,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             AgentJob job = createJob();
             stubOpenPr();
             when(
-                agentJobRepository.findPreviousDeliveryCommentId(eq(WORKSPACE_ID), eq(PULL_REQUEST_ID), any())
+                agentJobRepository.findPreviousDeliveryCommentId(eq(WORKSPACE_ID), eq("owner/repo"), eq(42), any())
             ).thenReturn(Optional.empty());
             when(commentPoster.postFormattedBody(any(), any(), any())).thenReturn("IC_new123");
             when(diffNotePoster.postDiffNotes(any(), any())).thenReturn(
@@ -535,7 +535,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             AgentJob job = createJob();
             stubOpenPr();
             when(
-                agentJobRepository.findPreviousDeliveryCommentId(eq(WORKSPACE_ID), eq(PULL_REQUEST_ID), any())
+                agentJobRepository.findPreviousDeliveryCommentId(eq(WORKSPACE_ID), eq("owner/repo"), eq(42), any())
             ).thenReturn(Optional.empty());
             when(commentPoster.postFormattedBody(any(), any(), any())).thenReturn("IC_new123");
             when(diffNotePoster.postDiffNotes(any(), any())).thenReturn(new DiffNotePoster.DiffNoteResult(3, 0));

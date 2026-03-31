@@ -44,7 +44,16 @@ public record GitLabMergeRequestEventDTO(
         @JsonProperty("updated_at") @NonNull String updatedAt,
         @JsonProperty("closed_at") @Nullable String closedAt,
         @JsonProperty("merged_at") @Nullable String mergedAt,
-        @NonNull String url
+        @NonNull String url,
+        @JsonProperty("last_commit") @Nullable LastCommit lastCommit,
+        @JsonProperty("merge_commit_sha") @Nullable String mergeCommitSha
+    ) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record LastCommit(
+        @NonNull String id,
+        @Nullable String message,
+        @Nullable String title
     ) {}
 
     public boolean isConfidential() {

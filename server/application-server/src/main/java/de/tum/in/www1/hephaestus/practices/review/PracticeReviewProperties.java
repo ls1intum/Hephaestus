@@ -35,6 +35,7 @@ import org.springframework.validation.annotation.Validated;
 public record PracticeReviewProperties(
     @DefaultValue("false") boolean runForAllUsers,
     @DefaultValue("true") boolean skipDrafts,
+    @DefaultValue("false") boolean deliverToMerged,
     @Min(value = 0, message = "maxInlineNotes must be >= 0")
     @Max(value = 50, message = "maxInlineNotes must be <= 50")
     @DefaultValue("5")

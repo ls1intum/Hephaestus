@@ -58,7 +58,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         practice.setCategory(category);
         practice.setDescription("Description for " + slug);
         practice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
-        practice.setDetectionPrompt("Detect prompt for " + slug);
+        practice.setCriteria("Detect prompt for " + slug);
         practice.setActive(active);
         return practiceRepository.save(practice);
     }
@@ -273,7 +273,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(result.category()).isEqualTo("cat");
             assertThat(result.active()).isTrue();
             assertThat(result.triggerEvents()).containsExactly("PullRequestCreated");
-            assertThat(result.detectionPrompt()).isEqualTo("Detect prompt for target-practice");
+            assertThat(result.criteria()).isEqualTo("Detect prompt for target-practice");
             assertThat(result.createdAt()).isNotNull();
             assertThat(result.updatedAt()).isNotNull();
         }
@@ -365,7 +365,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(result.name()).isEqualTo("Practice new-practice");
             assertThat(result.category()).isEqualTo("test-category");
             assertThat(result.triggerEvents()).containsExactly("PullRequestCreated", "ReviewSubmitted");
-            assertThat(result.detectionPrompt()).isEqualTo("Detect if the PR follows best practices");
+            assertThat(result.criteria()).isEqualTo("Detect if the PR follows best practices");
             assertThat(result.active()).isTrue();
             assertThat(result.id()).isNotNull();
             assertThat(result.createdAt()).isNotNull();
@@ -413,7 +413,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(result).isNotNull();
             assertThat(result.slug()).isEqualTo("minimal-practice");
             assertThat(result.category()).isNull();
-            assertThat(result.detectionPrompt()).isNull();
+            assertThat(result.criteria()).isNull();
             assertThat(result.active()).isTrue();
         }
 
@@ -850,7 +850,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(result.category()).isEqualTo("original-cat");
             assertThat(result.description()).isEqualTo("Description for update-me");
             assertThat(result.triggerEvents()).containsExactly("PullRequestCreated");
-            assertThat(result.detectionPrompt()).isEqualTo("Detect prompt for update-me");
+            assertThat(result.criteria()).isEqualTo("Detect prompt for update-me");
             assertThat(result.active()).isTrue();
         }
 
@@ -887,7 +887,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(result.category()).isEqualTo("new-cat");
             assertThat(result.description()).isEqualTo("New description");
             assertThat(result.triggerEvents()).containsExactly("ReviewSubmitted");
-            assertThat(result.detectionPrompt()).isEqualTo("New prompt");
+            assertThat(result.criteria()).isEqualTo("New prompt");
 
             // Verify database state matches response
             Optional<Practice> persisted = practiceRepository.findByWorkspaceIdAndSlug(

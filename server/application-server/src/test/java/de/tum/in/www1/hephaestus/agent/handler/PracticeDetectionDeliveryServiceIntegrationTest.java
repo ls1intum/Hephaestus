@@ -349,11 +349,11 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
     class NonNegativeVerdicts {
 
         @Test
-        @DisplayName("NOT_APPLICABLE and NEEDS_REVIEW verdicts persisted without triggering hasNegative")
-        void nonNegativeVerdictsDoNotTriggerHasNegative() {
+        @DisplayName("POSITIVE verdicts persisted without triggering hasNegative")
+        void positiveVerdictsDoNotTriggerHasNegative() {
             var findings = List.of(
-                finding("pr-description-quality", Verdict.NOT_APPLICABLE),
-                finding("error-handling", Verdict.NEEDS_REVIEW)
+                finding("pr-description-quality", Verdict.POSITIVE),
+                finding("error-handling", Verdict.POSITIVE)
             );
 
             var result = deliveryService.deliver(agentJob, findings);
@@ -365,7 +365,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
             assertThat(persisted).hasSize(2);
             assertThat(persisted)
                 .extracting(PracticeFinding::getVerdict)
-                .containsExactlyInAnyOrder(Verdict.NOT_APPLICABLE, Verdict.NEEDS_REVIEW);
+                .containsExactlyInAnyOrder(Verdict.POSITIVE, Verdict.POSITIVE);
         }
     }
 

@@ -59,6 +59,11 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
     )
     Optional<AgentJob> findByIdQueuedForUpdateSkipLocked(@Param("id") UUID id);
 
+    /** Reload a job with its workspace eagerly fetched (avoids LazyInitializationException on sandbox threads). */
+    @WorkspaceAgnostic("ID-based reload; job ID from workspace-scoped claim context")
+    @Query("SELECT j FROM AgentJob j LEFT JOIN FETCH j.workspace WHERE j.id = :id")
+    Optional<AgentJob> findByIdWithWorkspace(@Param("id") UUID id);
+
     /**
      * Conditional terminal status transition. Returns number of rows affected (0 or 1).
      * Used to prevent cancel/executor races from corrupting state.
@@ -117,12 +122,11 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
     );
 
     /**
-     * Find the delivery comment ID from the most recent delivered job for the same PR.
+     * Find the delivery comment ID from the most recent delivered job for the same MR/PR.
      * Used for re-analysis dedup: update the existing comment instead of creating a duplicate.
      *
-     * <p>Note: {@code CAST(:pullRequestId AS text)} is required because the expression index
-     * {@code idx_agent_job_delivery_dedup} is defined on {@code (metadata->>'pull_request_id')}
-     * which returns text. Without the explicit cast, PostgreSQL may not match the index.
+     * <p>Uses stable external identifiers (repository name + PR number) instead of internal
+     * pull_request_id, so dedup survives PR record deletion and re-creation in the database.
      */
     @WorkspaceAgnostic("Cross-job lookup for re-analysis dedup; workspace-scoped by parameter")
     @Query(
@@ -132,7 +136,8 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
         AND job_type = 'PULL_REQUEST_REVIEW'
         AND delivery_comment_id IS NOT NULL
         AND delivery_status = 'DELIVERED'
-        AND metadata->>'pull_request_id' = CAST(:pullRequestId AS text)
+        AND metadata->>'repository_full_name' = :repoFullName
+        AND CAST(metadata->>'pr_number' AS integer) = :prNumber
         AND id != :currentJobId
         ORDER BY completed_at DESC NULLS LAST
         LIMIT 1
@@ -141,7 +146,8 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
     )
     Optional<String> findPreviousDeliveryCommentId(
         @Param("workspaceId") Long workspaceId,
-        @Param("pullRequestId") Long pullRequestId,
+        @Param("repoFullName") String repoFullName,
+        @Param("prNumber") int prNumber,
         @Param("currentJobId") UUID currentJobId
     );
 }

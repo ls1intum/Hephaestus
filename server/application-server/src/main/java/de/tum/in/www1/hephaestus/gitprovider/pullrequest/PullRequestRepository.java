@@ -220,7 +220,7 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
             body = EXCLUDED.body,
             state = EXCLUDED.state,
             state_reason = EXCLUDED.state_reason,
-            html_url = EXCLUDED.html_url,
+            html_url = COALESCE(EXCLUDED.html_url, issue.html_url),
             is_locked = COALESCE(EXCLUDED.is_locked, issue.is_locked),
             closed_at = EXCLUDED.closed_at,
             comments_count = COALESCE(EXCLUDED.comments_count, issue.comments_count),
@@ -238,10 +238,10 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
             review_decision = COALESCE(EXCLUDED.review_decision, issue.review_decision),
             merge_state_status = COALESCE(EXCLUDED.merge_state_status, issue.merge_state_status),
             mergeable = COALESCE(EXCLUDED.mergeable, issue.mergeable),
-            head_ref_name = EXCLUDED.head_ref_name,
-            base_ref_name = EXCLUDED.base_ref_name,
-            head_ref_oid = EXCLUDED.head_ref_oid,
-            base_ref_oid = EXCLUDED.base_ref_oid,
+            head_ref_name = COALESCE(EXCLUDED.head_ref_name, issue.head_ref_name),
+            base_ref_name = COALESCE(EXCLUDED.base_ref_name, issue.base_ref_name),
+            head_ref_oid = COALESCE(EXCLUDED.head_ref_oid, issue.head_ref_oid),
+            base_ref_oid = COALESCE(EXCLUDED.base_ref_oid, issue.base_ref_oid),
             merged_by_id = COALESCE(EXCLUDED.merged_by_id, issue.merged_by_id)
         """,
         nativeQuery = true
