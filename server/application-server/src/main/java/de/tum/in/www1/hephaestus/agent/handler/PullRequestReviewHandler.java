@@ -437,8 +437,18 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             throw new JobDeliveryException("Delivery failed unexpectedly: jobId=" + job.getId(), e);
         }
 
-        // 3. Post feedback to PR/MR (soft failure — logged, not thrown)
-        feedbackService.deliverFeedback(job, parsed.delivery(), result.hasNegative());
+        // 3. Compose delivery content if agent didn't produce one (two-step architecture:
+        //    agent outputs findings only, server renders the MR comment from structured data)
+        PracticeDetectionResultParser.DeliveryContent delivery = parsed.delivery();
+        if (delivery == null) {
+            delivery = DeliveryComposer.compose(scopedFindings);
+            if (delivery != null) {
+                log.info("Server-side delivery composed from {} findings: jobId={}", scopedFindings.size(), job.getId());
+            }
+        }
+
+        // 4. Post feedback to PR/MR (soft failure — logged, not thrown)
+        feedbackService.deliverFeedback(job, delivery, result.hasNegative());
     }
 
     // -------------------------------------------------------------------------

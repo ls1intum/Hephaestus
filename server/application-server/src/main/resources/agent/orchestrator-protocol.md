@@ -55,13 +55,7 @@ The diff is pre-annotated with `[L<n>]` prefixes = **source-file line number**:
         {"filePath": "path.swift", "startLine": 42, "endLine": 42, "body": "max 300 chars. The fix, not the diagnosis."}
       ]
     }
-  ],
-  "delivery": {
-    "mrNote": "string — markdown summary, 100-300 words",
-    "diffNotes": [
-      {"filePath": "string", "startLine": 1, "endLine": 1, "body": "string"}
-    ]
-  }
+  ]
 }
 ```
 
@@ -95,15 +89,14 @@ The diff is pre-annotated with `[L<n>]` prefixes = **source-file line number**:
 6. **Check false-positive exclusions** in practice criteria before flagging NEGATIVE.
 7. **No finding for irrelevant practices** — if a practice doesn't apply, produce no finding.
 8. **One finding per practiceSlug** — deduplicate by slug.
-9. **If ALL findings are POSITIVE**: set `delivery.mrNote` to `""` and `delivery.diffNotes` to `[]`. Silence = approval.
+9. **If ALL findings are POSITIVE**: output only POSITIVE findings. The server interprets all-positive as approval (no comment posted).
 10. **One finding per practice, but note ALL violations** — if a practice has multiple violations (e.g., both `fatalError` AND `URL(string:)!` for fatal-error-crash), include ALL of them in the same finding's evidence/guidance. Don't silently drop the second violation. The title should reference the most impactful one, but guidance must cover all instances.
 11. **Fix must be non-empty** — guidance code blocks must show the actual corrected code. Never show an empty function body or a no-op as a "fix".
 12. **Secrets: show deletion, not commenting-out** — for hardcoded secrets, the fix is DELETE the line + rotate the credential. Never show a commented-out version of the secret.
 13. **Don't imply completeness** — say "Here are N issues to address" not "I found N issues" (the review may not be exhaustive).
 14. **Crash-class defects include force unwraps** — `!` on Optional values (e.g., `URL(string:)!`, `array.first!`) are crash risks equal to `fatalError`. Always check for `!` postfix operators in the diff. Even `URL(string: "https://...")!` with a hardcoded valid URL is a crash pattern because the code teaches force-unwrapping as a habit.
 15. **Positive findings must be verifiable** — don't claim "no X found" unless you've actually scanned for X. If commented-out code or debug prints exist, don't claim "no development debris".
-16. **Code blocks in mrNote must not contain unflagged issues** — if you paste code that shows a naming problem (e.g., `@State var x`), either flag it or choose a different excerpt.
-17. **Suggested fixes must actually solve the problem** — if a button's action is `print("TODO")`, the fix must implement the real functionality (e.g., delete the item), not replace it with another no-op like `dismiss()`. If the correct fix requires context you can't see, say "implement the actual [action] here" rather than suggesting a wrong implementation.
+16. **Suggested fixes must actually solve the problem** — if a button's action is `print("TODO")`, the fix must implement the real functionality (e.g., delete the item), not replace it with another no-op like `dismiss()`. If the correct fix requires context you can't see, say "implement the actual [action] here" rather than suggesting a wrong implementation.
 18. **Unguarded array access is a crash risk** — `array[0]`, `result.choices[0]`, `items[index]` without bounds checking crash at runtime if the collection is empty. Flag these under fatal-error-crash with the same severity as force unwraps.
 19. **Confidence floor** — do not report findings with confidence below 0.70. If confidence is below 0.70 but above 0.60, cap severity at INFO. Reserve 0.95+ for mechanical/unambiguous patterns only.
 20. **Verify context before flagging** — before marking NEGATIVE, check: (a) the pattern is not inside #Preview, #if DEBUG, or test files, (b) the pattern is not inside a container that resolves the issue (e.g., Image inside a labeled Button for accessibility), (c) the fix you suggest does not introduce a new issue.
@@ -114,40 +107,6 @@ The diff is pre-annotated with `[L<n>]` prefixes = **source-file line number**:
 25. **Function/variable names must be verbatim** — every function name, variable name, or type name in a finding's title, reasoning, or guidance MUST appear exactly as-is in the diff. Never paraphrase, rename, or approximate identifiers. If you write `fetchMotivation` but the diff says `loadMotivation`, the finding is wrong.
 26. **Verify `async`/`throws`/access modifiers before claiming** — before making claims about a function's sync/async behavior, visibility, or error propagation, quote its full signature from the diff including all keywords (`async`, `throws`, `private`, etc.).
 
-## delivery.mrNote Format
+## Delivery
 
-Target: **100-500 words**. Scale with finding count — more findings means more content is appropriate.
-
-```
-[1 sentence: what the MR does + 1 positive observation]. [1 sentence: what needs fixing before merge, with count].
-
-**🔴 [CRITICAL Title]** · `File.swift:42`
-[1 sentence: what + real-world consequence]. [code block: the fix, 2-5 lines]
-
-**🟠 [MAJOR Title]** · `File.swift:87`
-[1-2 sentences + code block if severity warrants it]
-
-**🟡 [MINOR Title]** · `File.swift:12`
-[1 sentence]
-
----
-<sub>Hephaestus · automated review</sub>
-```
-
-STRICT emoji-to-severity mapping:
-- 🔴 = CRITICAL only
-- 🟠 = MAJOR only
-- 🟡 = MINOR only
-- Never use 🔴 for MAJOR findings. This distinction is essential for triage.
-
-Rules:
-- DON'T restate the MR title in the opening sentence. Describe what the code does in your own words.
-- Open with a genuine positive + issue count ("Here are N issues to address before merge").
-- No separate "What's Working Well" section — weave positives into the opening sentence.
-- Severity-ordered. Omit empty severity tiers.
-- CRITICAL and MAJOR: quote the defective line FIRST, then show the corrected version.
-- MINOR: description only, no code block needed.
-- No "Recommended Priority" section — the ordering IS the priority.
-- No disclaimer banner at top — the footer handles attribution.
-- No INFO-level findings in the mrNote.
-- No horizontal rules between findings (only before footer).
+The server composes the MR/PR comment from your structured findings. You do NOT produce a `delivery` block — only `findings`. The server renders mrNote, diffNotes, and inline comments from your evidence, reasoning, and guidance fields.
