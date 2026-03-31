@@ -174,10 +174,10 @@ class DeliveryComposerTest {
         System.out.println(mrNote);
         System.out.println("=== END MR NOTE ===");
 
-        // Opening: names positive practices
+        // Opening: names positive practices (using positive labels, not raw slugs)
         assertThat(mrNote).contains("error state handling");
         assertThat(mrNote).contains("view decomposition");
-        assertThat(mrNote).contains("meaningful naming");
+        assertThat(mrNote).contains("naming clarity");
 
         // Issue count with merge-blocking language (has CRITICAL + MAJOR)
         assertThat(mrNote).contains("4 issues to address before merge");

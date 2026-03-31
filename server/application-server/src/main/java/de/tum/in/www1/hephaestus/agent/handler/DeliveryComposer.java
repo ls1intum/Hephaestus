@@ -33,6 +33,9 @@ class DeliveryComposer {
     /** Max findings shown in the MR summary note. More than 5 causes cognitive overload. */
     static final int MAX_MR_NOTE_FINDINGS = 5;
 
+    /** Min confidence to name a positive practice in the opening line. */
+    static final float POSITIVE_CONFIDENCE_FLOOR = 0.90f;
+
     /**
      * Compose delivery content from validated findings.
      *
@@ -55,8 +58,9 @@ class DeliveryComposer {
             return null;
         }
 
+        // Only name high-confidence positives in the opening (low-confidence = not sure enough)
         List<ValidatedFinding> positives = findings.stream()
-            .filter(f -> f.verdict() == Verdict.POSITIVE)
+            .filter(f -> f.verdict() == Verdict.POSITIVE && f.confidence() >= POSITIVE_CONFIDENCE_FLOOR)
             .toList();
 
         // MR note: top N findings
@@ -111,6 +115,9 @@ class DeliveryComposer {
                 .append(" more issue").append(overflow > 1 ? "s" : "")
                 .append(" noted as inline comments on the diff.*\n\n");
         }
+
+        // Provenance footer
+        sb.append("---\n<sub>Hephaestus \u2014 automated practice review</sub>\n");
 
         return sb.toString();
     }
@@ -262,9 +269,29 @@ class DeliveryComposer {
         return (snippet != null && !snippet.isBlank()) ? snippet.strip() : null;
     }
 
-    /** Turn "view-decomposition" into "view decomposition". */
+    /**
+     * Maps practice slugs to natural positive labels for the opening line.
+     * "Good crash avoidance" reads much better than "Good fatal error crash".
+     */
+    private static final Map<String, String> SLUG_TO_POSITIVE_LABEL = Map.ofEntries(
+        Map.entry("hardcoded-secrets", "credential hygiene"),
+        Map.entry("fatal-error-crash", "crash avoidance"),
+        Map.entry("silent-failure-patterns", "error propagation"),
+        Map.entry("error-state-handling", "error state handling"),
+        Map.entry("view-decomposition", "view decomposition"),
+        Map.entry("view-logic-separation", "separation of concerns"),
+        Map.entry("state-ownership-misuse", "state ownership"),
+        Map.entry("meaningful-naming", "naming clarity"),
+        Map.entry("code-hygiene", "code hygiene"),
+        Map.entry("preview-quality", "preview coverage"),
+        Map.entry("accessibility-support", "accessibility support"),
+        Map.entry("mr-description-quality", "MR documentation"),
+        Map.entry("commit-discipline", "commit discipline")
+    );
+
+    /** Map a practice slug to a human-friendly positive label. */
     private static String humanizePracticeSlug(String slug) {
-        return slug.replace('-', ' ');
+        return SLUG_TO_POSITIVE_LABEL.getOrDefault(slug, slug.replace('-', ' '));
     }
 
     /** Join ["a", "b", "c"] as "a, b, and c". */

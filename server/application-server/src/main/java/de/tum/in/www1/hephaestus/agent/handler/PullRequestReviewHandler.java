@@ -438,11 +438,18 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         }
 
         // 3. Compose delivery content if agent didn't produce one (two-step architecture:
-        //    agent outputs findings only, server renders the MR comment from structured data)
+        //    agent outputs findings only, server renders the MR comment from structured data).
+        //    The parser may return a delivery with only diffNotes (from suggestedDiffNotes fallback)
+        //    but no mrNote — in that case, compose the mrNote server-side and merge diffNotes.
         PracticeDetectionResultParser.DeliveryContent delivery = parsed.delivery();
-        if (delivery == null) {
-            delivery = DeliveryComposer.compose(scopedFindings);
-            if (delivery != null) {
+        if (delivery == null || delivery.mrNote() == null) {
+            var composed = DeliveryComposer.compose(scopedFindings);
+            if (composed != null) {
+                // Merge: use composed mrNote, prefer existing diffNotes if present
+                var diffNotes = (delivery != null && !delivery.diffNotes().isEmpty())
+                    ? delivery.diffNotes()
+                    : composed.diffNotes();
+                delivery = new PracticeDetectionResultParser.DeliveryContent(composed.mrNote(), diffNotes);
                 log.info("Server-side delivery composed from {} findings: jobId={}", scopedFindings.size(), job.getId());
             }
         }
