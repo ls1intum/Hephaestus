@@ -94,7 +94,7 @@ public class SecurityConfig {
             // Without this, OPTIONS requests are rejected with 403 before CORS headers can be added.
             requests.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll();
             // Actuator endpoints for Docker/K8s health checks and basic info
-            requests.requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll();
+            requests.requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info", "/actuator/dev/**").permitAll();
             // OpenAPI documentation endpoints (public for spec generation and dev access)
             requests
                 .requestMatchers("/v3/api-docs/**", "/v3/api-docs.yaml", "/swagger-ui/**", "/swagger-ui.html")
