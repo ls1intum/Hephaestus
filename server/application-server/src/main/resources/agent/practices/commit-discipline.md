@@ -1,33 +1,31 @@
 # Commit Discipline
 **Category:** Process
 
-## What This Practice Means
-MR titles should communicate what changed. MRs should not bundle unrelated concerns without explanation. This is an MR-level evaluation, not inline on code.
+**Scope:** MR scope, coherence, and title meaningfulness. MRs should not bundle unrelated concerns, and titles should communicate the change.
 
-## Positive Signals (-> verdict POSITIVE)
-- MR title with 3+ words describing WHAT changed (e.g., "Implement the EventListView")
-- Title references an issue number (e.g., "#19: Feedback on user selection")
-- Clear title on a large MR makes scope understandable
+## Positive Signals
+- MR touches a single feature area or concern
+- Title clearly states WHAT was changed (e.g., "Add login screen", "Fix crash on empty cart")
+- Large MR with clear title/description explaining the unified scope
+- Refactoring/rename MRs touching many files but one concern
 
-## Negative Signals (-> verdict NEGATIVE)
-- **Empty or meaningless title**: empty, single punctuation, gibberish (".", "asdf"), single generic word alone ("fix", "update", "changes", "stuff", "wip", "test")
-- **Truly generic multi-word title**: vague adjective + vague noun with zero specificity ("further improvements", "small fixes", "some changes")
-- **Kitchen-sink MR**: 20+ files across 4+ unrelated concerns AND a vague title (a 20-file MR with a clear title is fine; refactoring/renames are fine)
+## Negative Signals
+- **Kitchen-sink MR**: 20+ files across 4+ unrelated concerns AND no title/description that justifies the breadth
+- **Meaningless title**: empty, single punctuation, gibberish (".", "asdf", "wip"), or titles that describe process rather than content (e.g., "forget issue and branch", "see message history", "push changes")
+- **Branch-slug title**: title is just the branch name with slashes/hyphens (e.g., "#24-2-8: feature-branch-name") without describing the change
+- **Generic-only title**: title uses only generic verbs without a subject ("fix", "update", "changes", "stuff")
 
-### Critical False-Positive Exclusions
-Do NOT flag:
+## Exclusions — Do NOT Flag
 - MRs touching only 1-3 files (scope is self-evident)
 - README-only MRs
-- Auto-generated kebab-case branch name titles from GitLab
-- MRs where the description body clearly explains the changes
-- Any title with an issue reference
-- Short but specific titles: "Add logging", "Settings View", "Code Refactor"
-- Any title >= 3 words that identifies WHAT was changed
+- MRs where the description body explains the bundled scope
+- Titles with an issue reference AND a clear subject (e.g., "Resolve #12: Add weather fetching")
+- Auto-generated "Resolve ..." titles from GitLab that include the issue title
 
-### Boundary with mr-description-quality
-Both practices may evaluate the same MR title. If overlapping, let mr-description-quality handle title quality — this practice should focus on scope/structure concerns (kitchen-sink).
+## Boundary with mr-description-quality
+If the MR title is vague but the MR scope is tight (few files, single concern), flag under mr-description-quality, not here. This practice fires on **structural** scope problems OR titles so meaningless they indicate zero thought about what was changed.
 
-## Severity Guide
-- CRITICAL: Never used for this practice
-- MAJOR: Never used for this practice
-- MINOR: All negative findings — meaningless titles, generic titles, kitchen-sink scope
+## Severity
+- **CRITICAL**: Never
+- **MAJOR**: Never
+- **MINOR**: All findings — meaningless titles, kitchen-sink scope

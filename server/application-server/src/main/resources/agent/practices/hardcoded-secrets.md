@@ -1,30 +1,30 @@
 # Hardcoded Secrets
 **Category:** Security
 
-## What This Practice Means
-API keys, tokens, passwords, and private keys must never appear as string literals in source code. Secrets in git history persist even after removal.
+**Scope:** API keys, tokens, passwords, and private keys as string literals in source code. Secrets in git history persist even after deletion.
 
-## Positive Signals (-> verdict POSITIVE)
+## Positive Signals
 - Secrets loaded from `.xcconfig`, `.plist`, Keychain, or environment variables
-- `ProcessInfo.processInfo.environment["KEY"]` pattern
+- `ProcessInfo.processInfo.environment["KEY"]`
 - `Bundle.main.infoDictionary` for build-time injected values
 
-## Negative Signals (-> verdict NEGATIVE)
-- Prefixed tokens in string literals: `sk-`, `ghp_`, `glpat-`, `AIzaSy`, `Bearer eyJ...`
-- Base64-encoded credentials in source
+## Negative Signals
+- Prefixed tokens: `sk-`, `ghp_`, `glpat-`, `AIzaSy`, `Bearer eyJ`, `xox[bpsa]-`
+- Base64-encoded credentials (40+ character base64 strings assigned to key/token/secret variables)
 - URLs with embedded tokens: `"https://api.example.com?key=ABC123"`
 - Secrets stored in `enum`/`struct` constants as string literals
 - Passwords or private keys as string literals
+- Firebase/cloud config strings containing project-specific API keys
 
-### Critical False-Positive Exclusions
-Do NOT flag:
-- Placeholder strings: `"YOUR_API_KEY_HERE"`, `"<token>"`, `"INSERT_KEY"`
+## Exclusions — Do NOT Flag
+- Placeholder strings: `"YOUR_API_KEY_HERE"`, `"<token>"`, `"INSERT_KEY"`, `"TODO"`
 - Empty strings `""`
-- `Info.plist` key references populated at build time
-- OAuth client IDs that are intentionally public
-- Test/mock values clearly marked as such (e.g., in test files, named `mock`/`fake`/`test`)
+- `Info.plist` key names (not values) used for build-time lookup
+- OAuth client IDs that are intentionally public (e.g., Google OAuth web client IDs)
+- Test/mock values clearly named `mock`/`fake`/`test`/`sample`
+- Localhost URLs without credentials
+- Bundle identifiers (`com.example.myapp`)
+- Public API base URLs without embedded tokens
 
-## Severity Guide
-- CRITICAL: Always. Every hardcoded secret is CRITICAL severity, confidence >= 0.95
-- MAJOR: Not used
-- MINOR: Not used
+## Severity
+- **CRITICAL**: Always. Every hardcoded secret is CRITICAL, confidence >= 0.95

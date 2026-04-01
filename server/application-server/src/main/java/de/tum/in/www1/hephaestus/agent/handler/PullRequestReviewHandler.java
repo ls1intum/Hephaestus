@@ -630,7 +630,10 @@ public class PullRequestReviewHandler implements JobTypeHandler {
                     diff.length(), annotatedDiff.length(),
                     diffStat != null ? diffStat.length() : 0, headSha);
             } else {
-                log.warn("Empty diff for headSha={}, targetBranch={}", headSha, targetBranch);
+                throw new JobPreparationException(
+                    "Empty diff: no changed files between target and head. headSha=" + headSha +
+                    ", targetBranch=" + targetBranch + ", sourceBranch=" + sourceBranch
+                );
             }
         } catch (Exception e) {
             log.warn("Failed to pre-compute diff, agent will compute its own: headSha={}, error={}", headSha, e.getMessage());
