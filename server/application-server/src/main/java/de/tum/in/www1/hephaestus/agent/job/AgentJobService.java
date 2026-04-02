@@ -7,11 +7,15 @@ import de.tum.in.www1.hephaestus.agent.config.AgentConfig;
 import de.tum.in.www1.hephaestus.agent.config.AgentConfigRepository;
 import de.tum.in.www1.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.in.www1.hephaestus.agent.handler.JobTypeHandlerRegistry;
+import de.tum.in.www1.hephaestus.agent.handler.PullRequestReviewSubmissionRequest;
 import de.tum.in.www1.hephaestus.agent.handler.spi.JobSubmission;
 import de.tum.in.www1.hephaestus.agent.handler.spi.JobSubmissionRequest;
 import de.tum.in.www1.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.SandboxManager;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.EventPayload;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
@@ -40,6 +44,7 @@ public class AgentJobService {
     private final AgentJobRepository agentJobRepository;
     private final AgentConfigRepository agentConfigRepository;
     private final WorkspaceRepository workspaceRepository;
+    private final PullRequestRepository pullRequestRepository;
     private final JobTypeHandlerRegistry handlerRegistry;
     private final ObjectMapper objectMapper;
     private final ApplicationEventPublisher eventPublisher;
@@ -50,6 +55,7 @@ public class AgentJobService {
         AgentJobRepository agentJobRepository,
         AgentConfigRepository agentConfigRepository,
         WorkspaceRepository workspaceRepository,
+        PullRequestRepository pullRequestRepository,
         JobTypeHandlerRegistry handlerRegistry,
         ObjectMapper objectMapper,
         ApplicationEventPublisher eventPublisher,
@@ -59,6 +65,7 @@ public class AgentJobService {
         this.agentJobRepository = agentJobRepository;
         this.agentConfigRepository = agentConfigRepository;
         this.workspaceRepository = workspaceRepository;
+        this.pullRequestRepository = pullRequestRepository;
         this.handlerRegistry = handlerRegistry;
         this.objectMapper = objectMapper;
         this.eventPublisher = eventPublisher;
@@ -90,6 +97,38 @@ public class AgentJobService {
     }
 
     // ── Submit ──
+
+    /**
+     * Lookup a PR by ID, build a review submission request, and submit a job.
+     * Used by the dev trigger endpoint to bypass NATS.
+     *
+     * @param workspaceId workspace ID
+     * @param prId        the pull request's DB id
+     * @return description of result (job ID or error message)
+     */
+    @Transactional(readOnly = true)
+    public String submitReviewForPullRequest(Long workspaceId, Long prId) {
+        PullRequest pr = pullRequestRepository.findByIdWithAllForGate(prId).orElse(null);
+        if (pr == null) {
+            return "PR not found: " + prId;
+        }
+        if (pr.getHeadRefOid() == null || pr.getHeadRefName() == null || pr.getBaseRefName() == null) {
+            return "PR missing branch info: prId=" + prId;
+        }
+
+        EventPayload.PullRequestData prData = EventPayload.PullRequestData.from(pr);
+        PullRequestReviewSubmissionRequest request = new PullRequestReviewSubmissionRequest(
+            prData,
+            pr.getHeadRefName(),
+            pr.getHeadRefOid(),
+            pr.getBaseRefName()
+        );
+
+        log.info("Dev trigger: submitting review for PR {} ({})", prId, pr.getHtmlUrl());
+
+        Optional<AgentJob> job = submit(workspaceId, AgentJobType.PULL_REQUEST_REVIEW, request);
+        return job.map(j -> "Job submitted: " + j.getId()).orElse("No job created (no enabled agent config?)");
+    }
 
     /**
      * Submit agent jobs for the given workspace — one per enabled config.

@@ -4,6 +4,7 @@ import static de.tum.in.www1.hephaestus.gitprovider.common.events.DomainEvent.Tr
 
 import de.tum.in.www1.hephaestus.agent.AgentJobType;
 import de.tum.in.www1.hephaestus.agent.handler.PullRequestReviewSubmissionRequest;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.BotCommandReceivedEvent;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.EventPayload;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
@@ -16,11 +17,13 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
  * Processes bot commands from MR comments (e.g., {@code /hephaestus review}).
  *
- * <p>Triggered by {@link de.tum.in.www1.hephaestus.gitprovider.issuecomment.gitlab.GitLabNoteMessageHandler}
+ * <p>Listens for {@link BotCommandReceivedEvent} published by
+ * {@link de.tum.in.www1.hephaestus.gitprovider.issuecomment.gitlab.GitLabNoteMessageHandler}
  * when a non-system MR comment matches a known command pattern. Runs asynchronously
  * to avoid blocking webhook processing.
  *
@@ -53,29 +56,18 @@ public class BotCommandProcessor {
     }
 
     /**
-     * Check if a comment body contains a bot command.
+     * Handle a bot command received event. Runs in a new transaction asynchronously.
      *
-     * @param noteBody the raw comment body
-     * @return true if the body starts with the command prefix (case-insensitive)
-     */
-    public static boolean isBotCommand(String noteBody) {
-        if (noteBody == null || noteBody.isBlank()) {
-            return false;
-        }
-        return noteBody.strip().toLowerCase().startsWith(COMMAND_PREFIX);
-    }
-
-    /**
-     * Process a bot command from an MR comment. Runs in a new transaction asynchronously.
-     *
-     * @param repositoryId the repository's DB id
-     * @param mrNumber     the merge request iid (project-scoped number)
-     * @param noteBody     the raw comment body (e.g., "/hephaestus review")
-     * @param noteAuthor   the login of the note author (for logging)
+     * @param event the bot command event
      */
     @Async
+    @TransactionalEventListener
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void processCommand(long repositoryId, int mrNumber, String noteBody, String noteAuthor) {
+    public void onBotCommandReceived(BotCommandReceivedEvent event) {
+        processCommand(event.repositoryId(), event.mrNumber(), event.noteBody(), event.noteAuthor());
+    }
+
+    private void processCommand(long repositoryId, int mrNumber, String noteBody, String noteAuthor) {
         String command = noteBody.strip().toLowerCase();
 
         if (command.startsWith(COMMAND_PREFIX + "review")) {

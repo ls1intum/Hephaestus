@@ -2,9 +2,9 @@ package de.tum.in.www1.hephaestus.gitprovider.issuecomment.gitlab;
 
 import static de.tum.in.www1.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.in.www1.hephaestus.agent.job.BotCommandProcessor;
 import de.tum.in.www1.hephaestus.gitprovider.common.NatsMessageDeserializer;
 import de.tum.in.www1.hephaestus.gitprovider.common.ProcessingContext;
+import de.tum.in.www1.hephaestus.gitprovider.common.events.BotCommandReceivedEvent;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabEventAction;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabEventType;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabMessageHandler;
@@ -14,7 +14,7 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.gitlab.Git
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.lang.Nullable;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -24,11 +24,12 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class GitLabNoteMessageHandler extends GitLabMessageHandler<GitLabNoteEventDTO> {
 
     private static final Logger log = LoggerFactory.getLogger(GitLabNoteMessageHandler.class);
+    private static final String BOT_COMMAND_PREFIX = "/hephaestus ";
 
     private final GitLabIssueCommentProcessor issueCommentProcessor;
     private final GitLabDiffNoteWebhookProcessor diffNoteProcessor;
     private final GitLabWebhookContextResolver contextResolver;
-    private final @Nullable BotCommandProcessor botCommandProcessor;
+    private final ApplicationEventPublisher eventPublisher;
 
     GitLabNoteMessageHandler(
         GitLabIssueCommentProcessor issueCommentProcessor,
@@ -36,13 +37,13 @@ public class GitLabNoteMessageHandler extends GitLabMessageHandler<GitLabNoteEve
         GitLabWebhookContextResolver contextResolver,
         NatsMessageDeserializer deserializer,
         TransactionTemplate transactionTemplate,
-        @Nullable BotCommandProcessor botCommandProcessor
+        ApplicationEventPublisher eventPublisher
     ) {
         super(GitLabNoteEventDTO.class, deserializer, transactionTemplate);
         this.issueCommentProcessor = issueCommentProcessor;
         this.diffNoteProcessor = diffNoteProcessor;
         this.contextResolver = contextResolver;
-        this.botCommandProcessor = botCommandProcessor;
+        this.eventPublisher = eventPublisher;
     }
 
     @Override
@@ -112,11 +113,11 @@ public class GitLabNoteMessageHandler extends GitLabMessageHandler<GitLabNoteEve
         }
 
         // Bot command detection: check for commands like "/hephaestus review" on MR notes.
-        // Runs async and does not block normal comment processing below.
+        // Publishes an event so the agent module can process it asynchronously.
         if (
             "MergeRequest".equals(noteableType) &&
             action == GitLabEventAction.CREATE &&
-            BotCommandProcessor.isBotCommand(event.objectAttributes().note())
+            isBotCommand(event.objectAttributes().note())
         ) {
             handleBotCommand(event, context, safeProjectPath);
         }
@@ -144,16 +145,11 @@ public class GitLabNoteMessageHandler extends GitLabMessageHandler<GitLabNoteEve
         }
     }
 
-    private void handleBotCommand(GitLabNoteEventDTO event, ProcessingContext context, String safeProjectPath) {
-        if (botCommandProcessor == null) {
-            log.debug(
-                "Bot command ignored (agent NATS not enabled): projectPath={}, noteId={}",
-                safeProjectPath,
-                event.objectAttributes().id()
-            );
-            return;
-        }
+    private static boolean isBotCommand(String noteBody) {
+        return noteBody != null && !noteBody.isBlank() && noteBody.strip().toLowerCase().startsWith(BOT_COMMAND_PREFIX);
+    }
 
+    private void handleBotCommand(GitLabNoteEventDTO event, ProcessingContext context, String safeProjectPath) {
         var mr = event.mergeRequest();
         if (mr == null || mr.iid() == null) {
             log.warn(
@@ -182,12 +178,13 @@ public class GitLabNoteMessageHandler extends GitLabMessageHandler<GitLabNoteEve
             event.objectAttributes().id()
         );
 
-        // Fire-and-forget: processCommand runs @Async in a new transaction
-        botCommandProcessor.processCommand(
-            context.repository().getId(),
-            mr.iid(),
-            event.objectAttributes().note(),
-            event.user().username()
+        eventPublisher.publishEvent(
+            new BotCommandReceivedEvent(
+                context.repository().getId(),
+                mr.iid(),
+                event.objectAttributes().note(),
+                event.user().username()
+            )
         );
     }
 }

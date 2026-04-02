@@ -1,15 +1,9 @@
 package de.tum.in.www1.hephaestus.agent.job;
 
-import de.tum.in.www1.hephaestus.agent.AgentJobType;
-import de.tum.in.www1.hephaestus.agent.handler.PullRequestReviewSubmissionRequest;
-import de.tum.in.www1.hephaestus.gitprovider.common.events.EventPayload;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
-import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
-import java.util.Optional;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.lang.Nullable;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -22,16 +16,14 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @ConditionalOnProperty(name = "hephaestus.dev.trigger-enabled", havingValue = "true")
+@PreAuthorize("permitAll()")
+@WorkspaceAgnostic("Dev-only endpoint; workspace ID passed as request parameter")
 public class DevTriggerController {
 
-    private static final Logger log = LoggerFactory.getLogger(DevTriggerController.class);
-
     private final AgentJobService agentJobService;
-    private final PullRequestRepository pullRequestRepository;
 
-    public DevTriggerController(AgentJobService agentJobService, PullRequestRepository pullRequestRepository) {
+    public DevTriggerController(AgentJobService agentJobService) {
         this.agentJobService = agentJobService;
-        this.pullRequestRepository = pullRequestRepository;
     }
 
     @PostMapping("/api/dev/trigger-review")
@@ -39,39 +31,6 @@ public class DevTriggerController {
         if (prId == null || workspaceId == null) {
             return "Error: prId and workspaceId are required";
         }
-
-        PullRequest pr = pullRequestRepository.findByIdWithAllForGate(prId).orElse(null);
-        if (pr == null) {
-            return "PR not found: " + prId;
-        }
-
-        if (pr.getHeadRefOid() == null || pr.getHeadRefName() == null || pr.getBaseRefName() == null) {
-            return (
-                "PR missing branch info: headRefOid=" +
-                pr.getHeadRefOid() +
-                ", headRefName=" +
-                pr.getHeadRefName() +
-                ", baseRefName=" +
-                pr.getBaseRefName()
-            );
-        }
-
-        EventPayload.PullRequestData prData = EventPayload.PullRequestData.from(pr);
-        PullRequestReviewSubmissionRequest request = new PullRequestReviewSubmissionRequest(
-            prData,
-            pr.getHeadRefName(),
-            pr.getHeadRefOid(),
-            pr.getBaseRefName()
-        );
-
-        log.info("Dev trigger: submitting review for PR {} ({})", prId, pr.getHtmlUrl());
-
-        Optional<AgentJob> job = agentJobService.submit(workspaceId, AgentJobType.PULL_REQUEST_REVIEW, request);
-
-        if (job.isPresent()) {
-            return "Job submitted: " + job.get().getId();
-        } else {
-            return "No job created (no enabled agent config?)";
-        }
+        return agentJobService.submitReviewForPullRequest(workspaceId, prId);
     }
 }

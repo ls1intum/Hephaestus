@@ -32,12 +32,14 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 public class SecurityConfig {
 
     private final CorsProperties corsProperties;
+    private final boolean devTriggerEnabled;
 
-    @Value("${hephaestus.dev.trigger-enabled:false}")
-    private boolean devTriggerEnabled;
-
-    public SecurityConfig(CorsProperties corsProperties) {
+    public SecurityConfig(
+        CorsProperties corsProperties,
+        @Value("${hephaestus.dev.trigger-enabled:false}") boolean devTriggerEnabled
+    ) {
         this.corsProperties = corsProperties;
+        this.devTriggerEnabled = devTriggerEnabled;
     }
 
     interface AuthoritiesConverter extends Converter<Map<String, Object>, Collection<GrantedAuthority>> {}

@@ -27,6 +27,7 @@ import de.tum.in.www1.hephaestus.agent.handler.spi.JobSubmissionRequest;
 import de.tum.in.www1.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.SandboxManager;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
@@ -61,6 +62,9 @@ class AgentJobServiceTest extends BaseUnitTest {
     private WorkspaceRepository workspaceRepository;
 
     @Mock
+    private PullRequestRepository pullRequestRepository;
+
+    @Mock
     private JobTypeHandlerRegistry handlerRegistry;
 
     @Mock
@@ -85,6 +89,7 @@ class AgentJobServiceTest extends BaseUnitTest {
             agentJobRepository,
             agentConfigRepository,
             workspaceRepository,
+            pullRequestRepository,
             handlerRegistry,
             objectMapper,
             eventPublisher,

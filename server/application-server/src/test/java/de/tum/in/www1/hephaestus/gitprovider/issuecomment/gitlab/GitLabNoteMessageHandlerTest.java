@@ -31,6 +31,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -52,6 +53,9 @@ class GitLabNoteMessageHandlerTest extends BaseUnitTest {
 
     @Mock
     private NatsMessageDeserializer deserializer;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     private TransactionTemplate transactionTemplate;
     private GitLabNoteMessageHandler handler;
@@ -75,7 +79,7 @@ class GitLabNoteMessageHandlerTest extends BaseUnitTest {
             contextResolver,
             deserializer,
             transactionTemplate,
-            null
+            eventPublisher
         );
 
         lenient()
