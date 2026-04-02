@@ -41,7 +41,7 @@ public class DevTriggerController {
             return "Error: prId and workspaceId are required";
         }
 
-        PullRequest pr = pullRequestRepository.findById(prId).orElse(null);
+        PullRequest pr = pullRequestRepository.findByIdWithAllForGate(prId).orElse(null);
         if (pr == null) {
             return "PR not found: " + prId;
         }

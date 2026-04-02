@@ -74,7 +74,8 @@ class GitLabNoteMessageHandlerTest extends BaseUnitTest {
             diffNoteProcessor,
             contextResolver,
             deserializer,
-            transactionTemplate
+            transactionTemplate,
+            null
         );
 
         lenient()
