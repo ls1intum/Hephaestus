@@ -628,7 +628,9 @@ public class PullRequestReviewHandler implements JobTypeHandler {
                 if (mergeCommit != null) {
                     for (String line : mergeCommit.split("\n")) {
                         String[] parts = line.trim().split("\\s+");
-                        if (parts.length >= 3 && headSha.length() >= 8 && parts[2].startsWith(headSha.substring(0, 8))) {
+                        if (
+                            parts.length >= 3 && headSha.length() >= 8 && parts[2].startsWith(headSha.substring(0, 8))
+                        ) {
                             base = parts[1]; // First parent = target before merge
                             break;
                         }

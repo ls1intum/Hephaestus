@@ -103,10 +103,7 @@ class PullRequestReviewHandlerStaticMethodsTest extends BaseUnitTest {
     @DisplayName("filterByDiffScope")
     class FilterByDiffScope {
 
-        private PracticeDetectionResultParser.ValidatedFinding makeFinding(
-            String slug,
-            List<String> filePaths
-        ) {
+        private PracticeDetectionResultParser.ValidatedFinding makeFinding(String slug, List<String> filePaths) {
             ObjectNode evidence = objectMapper.createObjectNode();
             ArrayNode locations = objectMapper.createArrayNode();
             for (String path : filePaths) {
@@ -117,13 +114,27 @@ class PullRequestReviewHandlerStaticMethodsTest extends BaseUnitTest {
             }
             evidence.set("locations", locations);
             return new PracticeDetectionResultParser.ValidatedFinding(
-                slug, "Test Title", Verdict.NEGATIVE, Severity.MINOR, 0.9f, evidence, "reasoning", "guidance", null
+                slug,
+                "Test Title",
+                Verdict.NEGATIVE,
+                Severity.MINOR,
+                0.9f,
+                evidence,
+                "reasoning",
+                "guidance"
             );
         }
 
         private PracticeDetectionResultParser.ValidatedFinding makeFindingNoEvidence(String slug) {
             return new PracticeDetectionResultParser.ValidatedFinding(
-                slug, "Test Title", Verdict.POSITIVE, Severity.INFO, 0.9f, null, "reasoning", "guidance", null
+                slug,
+                "Test Title",
+                Verdict.POSITIVE,
+                Severity.INFO,
+                0.9f,
+                null,
+                "reasoning",
+                "guidance"
             );
         }
 
@@ -140,7 +151,8 @@ class PullRequestReviewHandlerStaticMethodsTest extends BaseUnitTest {
         void keepsMatchingFindings() {
             var finding = makeFinding("test", List.of("src/Main.swift"));
             var result = PullRequestReviewHandler.filterByDiffScope(
-                List.of(finding), Set.of("src/Main.swift", "src/Helper.swift")
+                List.of(finding),
+                Set.of("src/Main.swift", "src/Helper.swift")
             );
             assertThat(result).hasSize(1);
         }
@@ -149,9 +161,7 @@ class PullRequestReviewHandlerStaticMethodsTest extends BaseUnitTest {
         @DisplayName("removes findings with no matching file paths")
         void removesNonMatchingFindings() {
             var finding = makeFinding("test", List.of("src/Other.swift"));
-            var result = PullRequestReviewHandler.filterByDiffScope(
-                List.of(finding), Set.of("src/Main.swift")
-            );
+            var result = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("src/Main.swift"));
             assertThat(result).isEmpty();
         }
 
@@ -159,9 +169,7 @@ class PullRequestReviewHandlerStaticMethodsTest extends BaseUnitTest {
         @DisplayName("keeps findings with no evidence (cannot filter)")
         void keepsNoEvidenceFindings() {
             var finding = makeFindingNoEvidence("mr-description");
-            var result = PullRequestReviewHandler.filterByDiffScope(
-                List.of(finding), Set.of("src/Main.swift")
-            );
+            var result = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("src/Main.swift"));
             assertThat(result).hasSize(1);
         }
 
@@ -169,9 +177,7 @@ class PullRequestReviewHandlerStaticMethodsTest extends BaseUnitTest {
         @DisplayName("keeps finding if ANY location is in scope")
         void keepsIfAnyLocationInScope() {
             var finding = makeFinding("test", List.of("out-of-scope.swift", "src/Main.swift"));
-            var result = PullRequestReviewHandler.filterByDiffScope(
-                List.of(finding), Set.of("src/Main.swift")
-            );
+            var result = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("src/Main.swift"));
             assertThat(result).hasSize(1);
         }
     }
