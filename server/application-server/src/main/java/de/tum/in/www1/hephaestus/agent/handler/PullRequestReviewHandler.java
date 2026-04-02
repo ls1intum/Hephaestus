@@ -19,7 +19,6 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullReques
 import de.tum.in.www1.hephaestus.practices.PracticeRepository;
 import de.tum.in.www1.hephaestus.practices.finding.ContributorHistoryProvider;
 import de.tum.in.www1.hephaestus.practices.model.Practice;
-import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -27,15 +26,18 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.lang.Nullable;
 
 /**
  * Handler for {@link AgentJobType#PULL_REQUEST_REVIEW} jobs.
@@ -89,11 +91,6 @@ public class PullRequestReviewHandler implements JobTypeHandler {
 
     /** High-entropy strings in quotes (≥20 chars, alphanumeric/base64) — likely real keys. */
     private static final Pattern HIGH_ENTROPY_STRING = Pattern.compile("\"[A-Za-z0-9+/=_\\-]{20,}\"");
-
-    /** Config files that commonly contain secrets. */
-    private static final Pattern CONFIG_FILE_PATTERN = Pattern.compile(
-        "(?i)(\\.xcconfig|\\.plist|\\.env|secrets|credentials)"
-    );
 
     private final ObjectMapper objectMapper;
     private final GitRepositoryManager gitRepositoryManager;
@@ -387,8 +384,6 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         return s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "");
     }
 
-    // Legacy monolithic prompt methods removed — replaced by orchestrator architecture.
-
     @Override
     public void deliver(AgentJob job) {
         // 1. Parse findings + delivery content
@@ -674,6 +669,8 @@ public class PullRequestReviewHandler implements JobTypeHandler {
                         sourceBranch
                 );
             }
+        } catch (JobPreparationException e) {
+            throw e;
         } catch (Exception e) {
             log.warn(
                 "Failed to pre-compute diff, agent will compute its own: headSha={}, error={}",
@@ -780,7 +777,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
 
     /** Quick-scan a file diff for notable tokens on + lines. Structural, not judgmental. */
     private static String quickScanTokens(String fileDiff) {
-        Set<String> found = new java.util.LinkedHashSet<>();
+        Set<String> found = new LinkedHashSet<>();
         for (String line : fileDiff.split("\n", -1)) {
             if (!line.startsWith("[L") || !line.contains("] +")) continue;
             String content = line.substring(line.indexOf("] +") + 3);
@@ -801,15 +798,10 @@ public class PullRequestReviewHandler implements JobTypeHandler {
     }
 
     /**
-     * Compute the set of changed file paths by re-running {@code git diff --stat} at delivery time.
-     * Uses the same commit SHAs from metadata that were used during preparation.
-     * Returns empty set on failure (graceful degradation — no filtering applied).
-     */
-    /**
      * Compute valid diff note line numbers per file by parsing the full diff.
      * Used by DiffHunkValidator to snap agent-provided line numbers to valid positions.
      */
-    private Map<String, java.util.TreeSet<Integer>> computeDiffValidLines(AgentJob job) {
+    private Map<String, TreeSet<Integer>> computeDiffValidLines(AgentJob job) {
         JsonNode metadata = job.getMetadata();
         if (metadata == null) return Map.of();
 
@@ -873,10 +865,6 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         return parseDiffStatPaths(diffStat);
     }
 
-    /**
-     * Parse diff stat output to extract changed file paths.
-     * Format: " path/to/file.ext | 42 +++--" — extract the path before the pipe.
-     */
     /**
      * Parse diff stat paths, handling renames like {@code dir/{old => new}/file.ext}.
      *

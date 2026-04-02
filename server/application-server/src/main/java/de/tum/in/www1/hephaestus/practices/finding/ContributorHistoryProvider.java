@@ -119,6 +119,9 @@ public class ContributorHistoryProvider {
             switch (row.getVerdict()) {
                 case POSITIVE -> positive += row.getCount();
                 case NEGATIVE -> negative += row.getCount();
+                case NOT_APPLICABLE -> {
+                    /* not counted in history */
+                }
             }
             if (lastDetectedAt == null || row.getLastDetectedAt().isAfter(lastDetectedAt)) {
                 lastDetectedAt = row.getLastDetectedAt();

@@ -86,64 +86,11 @@ public class AgentJobEventListener {
         handlePullRequestEvent(event.pullRequest(), event.context(), TriggerEventNames.PULL_REQUEST_SYNCHRONIZED);
     }
 
-    // TODO(testing): Temporary handler for PullRequestUpdated to allow re-testing with existing MRs.
-    // Skips the merged/closed state check so we can trigger reviews on already-merged MRs.
-    // Remove after live testing is complete.
-    @Async
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onPullRequestUpdated(DomainEvent.PullRequestUpdated event) {
-        handlePullRequestEventForTesting(event.pullRequest(), event.context(), TriggerEventNames.PULL_REQUEST_CREATED);
-    }
-
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onReviewSubmitted(DomainEvent.ReviewSubmitted event) {
         handleReviewEvent(event.review(), event.context());
-    }
-
-    // ── Testing-only PR event handling (skips state check) ────────────────
-
-    private void handlePullRequestEventForTesting(
-        EventPayload.PullRequestData prData,
-        EventContext context,
-        String triggerEventName
-    ) {
-        if (context.isSync()) {
-            return;
-        }
-
-        try {
-            PullRequest pr = pullRequestRepository.findByIdWithAllForGate(prData.id()).orElse(null);
-            if (pr == null) {
-                log.warn("Cannot submit agent job: PR not found, prId={}", prData.id());
-                return;
-            }
-
-            if (!hasBranchInfo(pr, prData.id())) {
-                return;
-            }
-
-            switch (practiceReviewDetectionGate.evaluate(pr, triggerEventName)) {
-                case GateDecision.Skip skip -> log.debug(
-                    "Agent job skipped by practice gate: prNumber={}, repoName={}, event={}, reason={}",
-                    prData.number(),
-                    prData.repository().nameWithOwner(),
-                    triggerEventName,
-                    skip.reason()
-                );
-                case GateDecision.Detect detect -> submitJob(prData, pr, detect, triggerEventName);
-            }
-        } catch (Exception e) {
-            log.error(
-                "Failed to process PR event (testing): prNumber={}, repoName={}, event={}",
-                prData.number(),
-                prData.repository().nameWithOwner(),
-                triggerEventName,
-                e
-            );
-        }
     }
 
     // ── PR event handling ───────────────────────────────────────────────────
