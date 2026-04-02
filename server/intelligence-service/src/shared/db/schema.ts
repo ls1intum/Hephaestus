@@ -203,17 +203,6 @@ export const agentJob = pgTable(
 		llmModelVersion: varchar("llm_model_version", { length: 50 }),
 	},
 	(table) => [
-		index("idx_agent_job_delivery_dedup")
-			.using(
-				"btree",
-				sql`workspace_id`,
-				sql`((metadata ->> 'repository_full_name'::text))`,
-				sql`(((metadata ->> 'pr_number'::text))::integer)`,
-				sql`completed_at`,
-			)
-			.where(
-				sql`(((delivery_status)::text = 'DELIVERED'::text) AND ((job_type)::text = 'PULL_REQUEST_REVIEW'::text) AND (delivery_comment_id IS NOT NULL))`,
-			),
 		index("idx_agent_job_status_started")
 			.using("btree", table.status.asc().nullsLast(), table.startedAt.asc().nullsLast())
 			.where(sql`((status)::text = 'RUNNING'::text)`),
