@@ -26,7 +26,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -83,17 +82,6 @@ public class PullRequestReviewHandler implements JobTypeHandler {
 
     // Security scan patterns for pre-computed secret detection.
     // These run server-side in Java so they work regardless of container resource limits.
-
-    /** Keywords commonly associated with secrets/credentials in source code. */
-    private static final Pattern SECURITY_KEYWORDS = Pattern.compile(
-        "(?i)(api[_-]?key|apikey|token|secret|password|credential|bearer|authorization|private[_-]?key|access[_-]?key)"
-    );
-
-    /** High-entropy strings in quotes (≥20 chars, alphanumeric/base64) — likely real keys. */
-    private static final Pattern HIGH_ENTROPY_STRING = Pattern.compile("\"[A-Za-z0-9+/=_\\-]{20,}\"");
-
-    /** Force-unwrap pattern: {@code !} after identifier or bracket, not followed by {@code =}. */
-    private static final Pattern FORCE_UNWRAP = Pattern.compile("[\\w\\])]!(?!=)");
 
     private final ObjectMapper objectMapper;
     private final GitRepositoryManager gitRepositoryManager;
@@ -696,12 +684,9 @@ public class PullRequestReviewHandler implements JobTypeHandler {
      * Build a structured per-file diff summary optimized for single-pass AI consumption.
      *
      * <p>This is pure structural transformation — splitting on {@code diff --git} boundaries
-     * and formatting into indexed sections. No quality judgments. The AI reads this once
-     * and evaluates all practices in a single pass, eliminating the need for grep commands
-     * or subagent spawning.
-     *
-     * <p>For each file, a quick-scan column lists tokens found on {@code +} lines
-     * (e.g., {@code try?, @State, fatalError}) so the AI can prioritize without scanning.
+     * and formatting into indexed sections. No quality judgments, no language-specific
+     * pattern matching. The AI reads this once and evaluates all practices in a single
+     * pass, using the practice criteria (loaded from the DB) to decide what matters.
      */
     void computeAndStoreDiffSummary(Map<String, byte[]> files) {
         byte[] diffBytes = files.get(".context/diff.patch");
@@ -745,23 +730,18 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         summary.append("# Diff Summary\n\n");
         summary.append("**").append(filePaths.size()).append(" files changed**\n\n");
 
-        // File index with quick-scan tokens
-        summary.append("| # | File | +Lines | Quick scan |\n");
-        summary.append("|---|------|--------|------------|\n");
+        // File index
+        summary.append("| # | File | +Lines |\n");
+        summary.append("|---|------|--------|\n");
         for (int i = 0; i < filePaths.size(); i++) {
-            String content = fileDiffs.get(i);
-            int added = countAddedLines(content);
-            String tokens = quickScanTokens(content);
+            int added = countAddedLines(fileDiffs.get(i));
             summary
                 .append("| ")
                 .append(i + 1)
                 .append(" | `")
                 .append(filePaths.get(i))
-                .append("`")
-                .append(" | +")
+                .append("` | +")
                 .append(added)
-                .append(" | ")
-                .append(tokens)
                 .append(" |\n");
         }
 
@@ -785,28 +765,6 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             }
         }
         return count;
-    }
-
-    /** Quick-scan a file diff for notable tokens on + lines. Structural, not judgmental. */
-    private static String quickScanTokens(String fileDiff) {
-        Set<String> found = new LinkedHashSet<>();
-        for (String line : fileDiff.split("\n", -1)) {
-            if (!line.startsWith("[L") || !line.contains("] +")) continue;
-            String content = line.substring(line.indexOf("] +") + 3);
-            if (content.contains("try?")) found.add("try?");
-            if (content.contains("fatalError")) found.add("fatalError");
-            if (FORCE_UNWRAP.matcher(content).find()) found.add("force-unwrap");
-            if (content.contains("@State")) found.add("@State");
-            if (content.contains("@StateObject")) found.add("@StateObject");
-            if (content.contains("@Binding")) found.add("@Binding");
-            if (content.contains("@Observable")) found.add("@Observable");
-            if (content.contains("#Preview")) found.add("#Preview");
-            if (SECURITY_KEYWORDS.matcher(content).find()) found.add("⚠secret-keyword");
-            if (HIGH_ENTROPY_STRING.matcher(content).find()) found.add("⚠high-entropy");
-            if (content.contains("print(")) found.add("print()");
-            if (content.contains("Task {") || content.contains("Task{")) found.add("Task{}");
-        }
-        return found.isEmpty() ? "—" : String.join(", ", found);
     }
 
     /**
