@@ -357,7 +357,7 @@ public class OpenCodeAgentAdapter implements AgentAdapter {
             );
 
             console.error(`[run-opencode] ${valid ? 'SUCCESS' : 'FAILED: no valid findings'}`);
-            process.exit(result.status || 0);
+            process.exit(valid ? 0 : (result.status || 1));
             """.formatted(MAX_STDOUT_BUFFER_BYTES, initialTimeoutMs, retryTimeoutMs, posRetryTimeoutMs);
         return script.getBytes(StandardCharsets.UTF_8);
     }
@@ -403,20 +403,21 @@ public class OpenCodeAgentAdapter implements AgentAdapter {
             return new NdjsonParseResult(ndjsonContent, null);
         }
 
-        try {
-            StringBuilder textContent = new StringBuilder();
-            int totalInputTokens = 0;
-            int totalOutputTokens = 0;
-            int totalReasoningTokens = 0;
-            int totalCacheReadTokens = 0;
-            int totalCacheWriteTokens = 0;
-            double totalCost = 0.0;
-            int stepCount = 0;
-            String model = null;
+        StringBuilder textContent = new StringBuilder();
+        int totalInputTokens = 0;
+        int totalOutputTokens = 0;
+        int totalReasoningTokens = 0;
+        int totalCacheReadTokens = 0;
+        int totalCacheWriteTokens = 0;
+        double totalCost = 0.0;
+        int stepCount = 0;
+        String model = null;
+        int badLines = 0;
 
-            var seenTypes = new java.util.LinkedHashSet<String>();
-            for (String line : ndjsonContent.split("\n")) {
-                if (line.isBlank()) continue;
+        var seenTypes = new java.util.LinkedHashSet<String>();
+        for (String line : ndjsonContent.split("\n")) {
+            if (line.isBlank()) continue;
+            try {
                 var node = objectMapper.readTree(line);
                 String type = node.path("type").asText("");
                 seenTypes.add(type);
@@ -456,29 +457,34 @@ public class OpenCodeAgentAdapter implements AgentAdapter {
                         model = stepModel;
                     }
                 }
+            } catch (Exception e) {
+                badLines++;
+                if (badLines <= 3) {
+                    log.warn("Skipping malformed NDJSON line: {}", e.getMessage());
+                }
             }
-            log.debug("NDJSON event types: {}", seenTypes);
-
-            AgentResult.LlmUsage usage =
-                stepCount > 0
-                    ? new AgentResult.LlmUsage(
-                          model,
-                          totalInputTokens > 0 ? totalInputTokens : null,
-                          totalOutputTokens > 0 ? totalOutputTokens : null,
-                          totalReasoningTokens > 0 ? totalReasoningTokens : null,
-                          totalCacheReadTokens > 0 ? totalCacheReadTokens : null,
-                          totalCacheWriteTokens > 0 ? totalCacheWriteTokens : null,
-                          totalCost > 0 ? totalCost : null,
-                          stepCount
-                      )
-                    : null;
-
-            String text = textContent.isEmpty() ? null : textContent.toString();
-            return new NdjsonParseResult(text, usage);
-        } catch (Exception e) {
-            log.warn("Failed to parse OpenCode NDJSON output: {}", e.getMessage());
-            return null;
         }
+        if (badLines > 3) {
+            log.warn("Skipped {} total malformed NDJSON lines", badLines);
+        }
+        log.debug("NDJSON event types: {}", seenTypes);
+
+        AgentResult.LlmUsage usage =
+            stepCount > 0
+                ? new AgentResult.LlmUsage(
+                      model,
+                      totalInputTokens > 0 ? totalInputTokens : null,
+                      totalOutputTokens > 0 ? totalOutputTokens : null,
+                      totalReasoningTokens > 0 ? totalReasoningTokens : null,
+                      totalCacheReadTokens > 0 ? totalCacheReadTokens : null,
+                      totalCacheWriteTokens > 0 ? totalCacheWriteTokens : null,
+                      totalCost > 0 ? totalCost : null,
+                      stepCount
+                  )
+                : null;
+
+        String text = textContent.isEmpty() ? null : textContent.toString();
+        return new NdjsonParseResult(text, usage);
     }
 
     /** Classpath prefix for agent resource files. */

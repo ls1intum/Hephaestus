@@ -382,9 +382,16 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         }
     }
 
-    /** Minimal JSON string escaping for index.json generation. */
-    private static String escapeJson(String s) {
-        return s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "");
+    /** JSON string escaping via Jackson (handles all control characters correctly). */
+    private String escapeJson(String s) {
+        try {
+            // writeValueAsString wraps in quotes — strip them
+            String quoted = objectMapper.writeValueAsString(s);
+            return quoted.substring(1, quoted.length() - 1);
+        } catch (JsonProcessingException e) {
+            // Fallback: basic escaping (should never happen for a plain string)
+            return s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "");
+        }
     }
 
     @Override

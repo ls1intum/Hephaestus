@@ -22,7 +22,7 @@
       }
     }
   },
-  "workspaceContext": "This workspace reviews code from undergraduate students in a 9-day intensive iOS/SwiftUI intro course at TUM (Technical University of Munich). Students are beginners building solo MVP apps targeting iOS 17+ with the Observation framework and SwiftData. Calibrate severity thresholds accordingly: be educational and encouraging, not punitive. Use Cognitive Apprenticeship guidance methods adapted to each contributor's demonstrated skill level (see contributor_history.json).\n\nMR template placeholder strings used in this course (for mr-description-quality detection):\n- \"Briefly describe what was implemented\"\n- \"Link the related issue (e.g., #12\"\n- \"List steps to verify the changes (if applicable)\"\n- \"State which acceptance criteria are fulfilled\"",
+  "workspaceContext": "This workspace reviews code from undergraduate students in a 9-day intensive iOS/SwiftUI intro course at TUM (Technical University of Munich). Students are beginners building solo MVP apps targeting iOS 17+ with the Observation framework and SwiftData. Calibrate severity thresholds accordingly: be educational and encouraging, not punitive. Be educational and constructive, calibrated to each contributor's demonstrated skill level (see contributor_history.json).\n\nMR template placeholder strings used in this course (for mr-description-quality detection):\n- \"Briefly describe what was implemented\"\n- \"Link the related issue (e.g., #12\"\n- \"List steps to verify the changes (if applicable)\"\n- \"State which acceptance criteria are fulfilled\"",
   "practices": [
     {
       "slug": "accessibility-support",

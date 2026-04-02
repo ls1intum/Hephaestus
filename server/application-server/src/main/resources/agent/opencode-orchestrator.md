@@ -102,9 +102,9 @@ RULES (from orchestrator-protocol.md):
 - Only flag code on + lines in the diff
 - Evidence must cite exact code with [L<n>] line numbers
 - One finding per practice — include ALL violations in that finding
-- For each practice: evaluate as NEGATIVE (violation found) or POSITIVE (good practice)
+- For each practice: evaluate as NEGATIVE (violation found), POSITIVE (good practice), or NOT_APPLICABLE (practice not relevant to this diff)
 - Do NOT skip practices. You MUST produce exactly 4 findings.
-- View-decomposition: count body lines using [L<start>] to [L<end>] annotations. >120 lines = flag.
+- View-decomposition: count body lines using [L<start>] to [L<end>] annotations. >100 lines with 3+ concerns = MAJOR, 60-100 = MINOR.
 - State-ownership: check if @State is used where @Binding or @Observable should be.
 - Be a STRICT reviewer. Students make mistakes — find them.
 

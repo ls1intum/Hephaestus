@@ -239,7 +239,7 @@ public class ClaudeCodeAgentAdapter implements AgentAdapter {
             }
 
             console.error(`[run-claude] ${valid ? 'SUCCESS' : 'FAILED: no valid findings after retries'}`);
-            process.exit(result.status || 0);
+            process.exit(valid ? 0 : (result.status || 1));
             """.formatted(
                 MAX_STDOUT_BUFFER_BYTES,
                 EFFORT_LEVEL,

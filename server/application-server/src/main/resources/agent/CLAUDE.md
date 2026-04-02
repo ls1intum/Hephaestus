@@ -12,7 +12,8 @@ Read `/workspace/orchestrator-protocol.md` for the output schema, field definiti
 Read ALL of these files in a SINGLE parallel batch (one message, multiple Read calls):
 - `/workspace/orchestrator-protocol.md` — output schema and rules
 - `/workspace/.context/diff_stat.txt` — scope
-- `/workspace/.context/diff.patch` — code changes with `[L<n>]` line annotations
+- `/workspace/.context/diff_summary.md` — per-file diff chunks with index table (primary input)
+- `/workspace/.context/diff.patch` — full diff with `[L<n>]` line annotations (for line lookups)
 - `/workspace/.context/metadata.json` — PR title, body, author, branches
 - `/workspace/.practices/all-criteria.md` — ALL practice criteria bundled
 - `/workspace/.practices/index.json` — practice registry

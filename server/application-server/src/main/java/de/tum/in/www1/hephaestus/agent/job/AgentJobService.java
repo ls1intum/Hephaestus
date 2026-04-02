@@ -98,9 +98,11 @@ public class AgentJobService {
      * This provides redundancy: if one agent times out, others may still complete.
      * Each delivery independently posts a new summary comment + diff notes.
      *
-     * <p>Not {@code @Transactional}: each config gets its own transaction via
+     * <p><strong>Not {@code @Transactional}</strong>: each config gets its own transaction via
      * {@link #submitForConfig}, so a constraint-violation race on one config
      * does not abort the PostgreSQL transaction for subsequent configs.
+     * Callers MUST NOT wrap calls to this method in an outer {@code @Transactional},
+     * as that would cause the template to join the outer transaction, defeating isolation.
      *
      * @param workspaceId workspace ID
      * @param jobType     the job type
