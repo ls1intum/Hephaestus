@@ -42,10 +42,10 @@ import org.springframework.lang.Nullable;
 /**
  * Handler for {@link AgentJobType#PULL_REQUEST_REVIEW} jobs.
  *
- * <p>Uses an orchestrator + subagent architecture: a main Claude Code agent reads CLAUDE.md,
- * decides which practices are relevant, then spawns parallel subagents (one per practice)
- * that each write findings to {@code .analysis/practices/{slug}.json}. The orchestrator
- * collects, cross-references, and returns final structured JSON.
+ * <p>Uses a single-pass architecture: one AI agent (Claude Code or OpenCode) reads all
+ * context files, evaluates every relevant practice against the diff, and returns structured
+ * JSON findings. The server then renders delivery (MR summary + diff notes) via
+ * {@link DeliveryComposer} and posts via {@link FeedbackDeliveryService}.
  *
  * <p>Container workspace layout:
  * <pre>
@@ -56,13 +56,13 @@ import org.springframework.lang.Nullable;
  * │   ├── comments.json                  # Review comments
  * │   ├── diff.patch                     # Pre-computed diff with [L&lt;n&gt;] annotations
  * │   ├── diff_stat.txt                  # Changed files summary
+ * │   ├── diff_summary.md                # Per-file diff chunks with index table
  * │   └── contributor_history.json       # Aggregated practice history (optional)
  * ├── .practices/
  * │   ├── index.json                     # Practice registry [{slug, name, category}]
+ * │   ├── all-criteria.md                # All practice criteria bundled
  * │   └── {slug}.md                      # Evaluation criteria per practice
- * ├── .analysis/practices/               # Subagents write findings here
- * ├── CLAUDE.md                          # Orchestrator meta-instructions
- * ├── .claude/agents/practice-analyzer.md # Subagent definition
+ * ├── CLAUDE.md / orchestrator-protocol.md # Agent instructions + shared protocol
  * ├── .prompt                            # Slim task prompt
  * ├── .json-schema                       # Output schema for constrained decoding
  * └── .output/                           # Agent writes final results here
@@ -951,23 +951,34 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         return filtered;
     }
 
-    /** Run a git command in the repository directory. Returns stdout or null on failure. */
+    /**
+     * Run a git command in the repository directory. Returns stdout or null on failure.
+     *
+     * <p>Redirects stdout to a temp file to avoid pipe-buffer deadlocks: if git output
+     * exceeds the OS pipe buffer (~64KB), reading all bytes from the pipe would block
+     * before {@code waitFor} is reached, effectively bypassing the timeout.
+     */
     private String runGit(Path repoPath, String... args) {
+        java.io.File tmpFile = null;
         Process process = null;
         try {
+            tmpFile = java.io.File.createTempFile("hephaestus-git-", ".out");
             String[] cmd = new String[args.length + 1];
             cmd[0] = "git";
             System.arraycopy(args, 0, cmd, 1, args.length);
             ProcessBuilder pb = new ProcessBuilder(cmd);
             pb.directory(repoPath.toFile());
             pb.redirectError(ProcessBuilder.Redirect.DISCARD);
+            pb.redirectOutput(tmpFile);
             process = pb.start();
-            String stdout = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
             boolean finished = process.waitFor(30, TimeUnit.SECONDS);
             if (!finished) {
                 return null;
             }
-            return process.exitValue() == 0 ? stdout : null;
+            if (process.exitValue() != 0) {
+                return null;
+            }
+            return java.nio.file.Files.readString(tmpFile.toPath(), StandardCharsets.UTF_8);
         } catch (IOException e) {
             return null;
         } catch (InterruptedException e) {
@@ -976,6 +987,9 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         } finally {
             if (process != null) {
                 process.destroyForcibly();
+            }
+            if (tmpFile != null) {
+                tmpFile.delete();
             }
         }
     }
