@@ -117,6 +117,19 @@ class AgentJobServiceTest extends BaseUnitTest {
     @DisplayName("submit()")
     class Submit {
 
+        @BeforeEach
+        @SuppressWarnings("unchecked")
+        void setUpSubmit() {
+            // Make transactionTemplate.execute() actually invoke the callback
+            // (submitForConfig uses transactionTemplate.execute() for per-config isolation)
+            lenient()
+                .when(transactionTemplate.execute(any()))
+                .thenAnswer(inv -> {
+                    TransactionCallback<?> callback = inv.getArgument(0);
+                    return callback.doInTransaction(mock(TransactionStatus.class));
+                });
+        }
+
         @Test
         @DisplayName("should return empty when no enabled config exists")
         void shouldReturnEmptyWhenNoEnabledConfig() {

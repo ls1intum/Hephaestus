@@ -74,11 +74,12 @@ class DiffHunkValidator {
                 newLineNum++;
             } else if (effectiveLine.startsWith("-")) {
                 // Deleted line — doesn't increment new-file counter, not valid for notes
-            } else {
+            } else if (effectiveLine.startsWith(" ")) {
                 // Context line — valid for diff notes (within hunk)
                 result.get(currentFile).add(newLineNum);
                 newLineNum++;
             }
+            // else: skip empty/unknown lines (e.g. trailing newline, "No newline at end of file")
         }
 
         return result;
