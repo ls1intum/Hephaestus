@@ -3,26 +3,25 @@ package de.tum.in.www1.hephaestus.agent.job;
 import de.tum.in.www1.hephaestus.agent.AgentJobType;
 import de.tum.in.www1.hephaestus.agent.handler.PullRequestReviewSubmissionRequest;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.EventPayload;
-import de.tum.in.www1.hephaestus.gitprovider.common.events.RepositoryRef;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.actuate.endpoint.annotation.Endpoint;
+import org.springframework.boot.actuate.endpoint.annotation.WriteOperation;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.http.ResponseEntity;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.lang.Nullable;
+import org.springframework.stereotype.Component;
 
 /**
- * Dev-only controller for manually triggering PR reviews without NATS.
+ * Dev-only actuator endpoint for manually triggering PR reviews without NATS.
  * Enabled by setting hephaestus.dev.trigger-enabled=true.
+ *
+ * Usage: POST /actuator/dev-trigger-review (with prId and workspaceId params)
  */
-@RestController
-@RequestMapping("/actuator/dev")
+@Component
+@Endpoint(id = "dev-trigger-review")
 @ConditionalOnProperty(name = "hephaestus.dev.trigger-enabled", havingValue = "true")
 public class DevTriggerController {
 
@@ -36,22 +35,25 @@ public class DevTriggerController {
         this.pullRequestRepository = pullRequestRepository;
     }
 
-    @PostMapping("/trigger-review")
-    @Transactional
-    public ResponseEntity<String> triggerReview(@RequestParam Long prId, @RequestParam Long workspaceId) {
+    @WriteOperation
+    public String triggerReview(@Nullable Long prId, @Nullable Long workspaceId) {
+        if (prId == null || workspaceId == null) {
+            return "Error: prId and workspaceId are required";
+        }
+
         PullRequest pr = pullRequestRepository.findById(prId).orElse(null);
         if (pr == null) {
-            return ResponseEntity.badRequest().body("PR not found: " + prId);
+            return "PR not found: " + prId;
         }
 
         if (pr.getHeadRefOid() == null || pr.getHeadRefName() == null || pr.getBaseRefName() == null) {
-            return ResponseEntity.badRequest().body(
+            return (
                 "PR missing branch info: headRefOid=" +
-                    pr.getHeadRefOid() +
-                    ", headRefName=" +
-                    pr.getHeadRefName() +
-                    ", baseRefName=" +
-                    pr.getBaseRefName()
+                pr.getHeadRefOid() +
+                ", headRefName=" +
+                pr.getHeadRefName() +
+                ", baseRefName=" +
+                pr.getBaseRefName()
             );
         }
 
@@ -68,9 +70,9 @@ public class DevTriggerController {
         Optional<AgentJob> job = agentJobService.submit(workspaceId, AgentJobType.PULL_REQUEST_REVIEW, request);
 
         if (job.isPresent()) {
-            return ResponseEntity.ok("Job submitted: " + job.get().getId());
+            return "Job submitted: " + job.get().getId();
         } else {
-            return ResponseEntity.ok("No job created (no enabled agent config?)");
+            return "No job created (no enabled agent config?)";
         }
     }
 }

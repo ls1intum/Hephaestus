@@ -95,7 +95,12 @@ public class SecurityConfig {
             requests.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll();
             // Actuator endpoints for Docker/K8s health checks and basic info
             requests
-                .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info", "/actuator/dev/**")
+                .requestMatchers(
+                    "/actuator/health",
+                    "/actuator/health/**",
+                    "/actuator/info",
+                    "/actuator/dev-trigger-review"
+                )
                 .permitAll();
             // OpenAPI documentation endpoints (public for spec generation and dev access)
             requests

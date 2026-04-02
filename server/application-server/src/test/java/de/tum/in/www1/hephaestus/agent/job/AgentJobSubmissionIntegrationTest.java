@@ -194,7 +194,9 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
             AgentJob job = result.get();
             assertThat(job.getStatus()).isEqualTo(AgentJobStatus.QUEUED);
             assertThat(job.getJobType()).isEqualTo(AgentJobType.PULL_REQUEST_REVIEW);
-            assertThat(job.getIdempotencyKey()).isEqualTo("pr_review:org/submit-repo:10:abc123");
+            assertThat(job.getIdempotencyKey()).isEqualTo(
+                "pr_review:org/submit-repo:10:abc123:config:" + agentConfig.getId()
+            );
             assertThat(job.getConfigSnapshot()).isNotNull();
             assertThat(job.getMetadata().get("pull_request_id").asLong()).isEqualTo(prId);
             assertThat(job.getMetadata().get("pr_number").asInt()).isEqualTo(10);
@@ -285,7 +287,9 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
             existing.setWorkspace(workspace);
             existing.setConfig(agentConfig);
             existing.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
-            existing.setIdempotencyKey("pr_review:" + repo.getNameWithOwner() + ":10:race123");
+            existing.setIdempotencyKey(
+                "pr_review:" + repo.getNameWithOwner() + ":10:race123:config:" + agentConfig.getId()
+            );
             existing.setMetadata(OBJECT_MAPPER.createObjectNode());
             existing.setConfigSnapshot(OBJECT_MAPPER.createObjectNode());
             agentJobRepository.saveAndFlush(existing);
