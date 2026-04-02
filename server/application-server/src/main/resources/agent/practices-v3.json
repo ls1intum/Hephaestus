@@ -3,7 +3,7 @@
     "version": "3.0",
     "date": "2026-04-02",
     "description": "Practice catalogue for AI-based code review. v3 renames detectionPrompt→criteria, removes guidanceMethod (CaMethod), and updates verdict enum to POSITIVE|NEGATIVE|NOT_APPLICABLE.",
-    "total_practices": 12,
+    "total_practices": 13,
     "entity_schema": {
       "Practice": {
         "slug": "kebab-case, 3-64 chars, unique per workspace",
@@ -166,6 +166,19 @@
         "PullRequestReady"
       ],
       "criteria": "# View-Logic Separation\n**Category:** SwiftUI Architecture\n\n**Scope:** SwiftUI View structs must not contain business logic. Networking, encoding/decoding, complex algorithms, and multi-step persistence belong in @Observable view models or service types.\n\n## Positive Signals\n- View delegates work via `.task { await viewModel.load() }` to an @Observable class\n- Networking, JSON decoding, and domain logic live in separate types\n- View contains only: @Query, simple CRUD (context.delete, single insert), computed filters, conditional rendering, navigation, sheet/alert presentation\n\n## Negative Signals\n\n**Networking in View (MAJOR):**\n`URLSession`, `URLRequest`, `HTTPURLResponse`, `URLComponents` used inside a View struct or its private methods.\n\n**JSON coding in View (MAJOR):**\n`JSONDecoder().decode(...)` or `JSONEncoder().encode(...)` called inside a View.\n\n**Domain algorithm in View (MAJOR):**\nPrivate function >15 lines of non-UI logic with domain-specific branching (scoring, recommendations, multi-step pipelines).\n\n**Heavy persistence orchestration (MINOR):**\n`FetchDescriptor` + conditional insert/update + state reconciliation spanning >15 lines in a View.\n\n**3+ private functions** that each manipulate domain data (not UI state).\n\n**Complex for/while loops** implementing domain algorithms inside a View.\n\n## Exclusions — Do NOT Flag\n- `.onDelete { indexSet in for i in indexSet { context.delete(items[i]) } }` — idiomatic SwiftData\n- Simple `addItem()` that creates one model, inserts, optionally saves\n- `var filteredItems: [Item] { items.filter { $0.isActive } }` — simple computed filter\n- `await viewModel.fetchData()` in `.task` — this IS the correct pattern\n- @Query + conditional rendering\n- Single `modelContext` delete/insert in a button action\n- Non-View files (models, services, view models, app entry points, preview-only files)\n\n## Verification — Confirm Logic Is in the View Struct\n1. The code is inside a `struct` conforming to `View` (check for `: View` on a `+` line)\n2. The code is on `+` lines — pre-existing code is not flaggable\n3. For \">15 lines\" claims — cite start and end `[L<n>]` lines and state the actual count\n4. Confirm the code is not in a separate file — check file path in the diff hunk header\n\n## Severity\n- **CRITICAL**: Never\n- **MAJOR**: Networking in View, JSON coding in View, >15-line domain algorithm in View\n- **MINOR**: Heavy persistence orchestration (>15 lines with business-rule branching)",
+      "isActive": true
+    },
+    {
+      "slug": "hardcoded-secrets",
+      "name": "Hardcoded Secrets",
+      "category": "Security",
+      "description": "Detects secrets, API keys, tokens, passwords, and other credentials committed directly in source code. Hardcoded secrets in version control are the most common cause of credential leaks and are nearly impossible to fully revoke once pushed.",
+      "triggerEvents": [
+        "PullRequestCreated",
+        "PullRequestReady",
+        "PullRequestSynchronized"
+      ],
+      "criteria": "# Hardcoded Secrets\n**Category:** Security\n\n**Scope:** Detect secrets, API keys, tokens, passwords, and credentials committed in source code. This practice is ALWAYS evaluated regardless of file type or category.\n\n## Positive Signals\n- Secrets loaded from environment variables, Keychain, or config files excluded from version control\n- `.gitignore` entries for `.env`, `credentials.json`, etc.\n- Placeholder values in committed code with instructions to set real values elsewhere\n\n## Negative Signals\n- **API keys/tokens**: Strings matching known key formats (OpenAI `sk-...`, GitHub `ghp_...`, AWS `AKIA...`, etc.)\n- **High-entropy strings**: Quoted strings ≥20 chars of alphanumeric/base64 characters assigned to variables named `key`, `token`, `secret`, `password`, `apiKey`, `auth`, `credential`\n- **Hardcoded passwords**: `password = \"...\"`, `pwd = \"...\"` with non-placeholder values\n- **Private keys**: `-----BEGIN (RSA |EC |)PRIVATE KEY-----`\n- **Connection strings**: Database URLs with embedded credentials (`postgres://user:pass@host`)\n\n## Exclusions — Do NOT Flag\n- Placeholder/example values: `\"YOUR_API_KEY_HERE\"`, `\"xxx\"`, `\"changeme\"`, empty strings\n- Test fixtures with obviously fake data\n- Public keys (only private keys are secrets)\n- Bundle identifiers, app IDs, public OAuth client IDs (these are not secrets)\n- URLs without embedded credentials\n- UUIDs used as identifiers (not secrets)\n- Hash values (SHA, MD5) that are checksums, not credentials\n\n## Severity\n- **CRITICAL**: Real API keys, tokens, or private keys committed in source (requires immediate rotation)\n- **MAJOR**: Hardcoded passwords or connection strings with credentials\n- **MINOR**: Variable names suggesting secrets with suspiciously high-entropy values (uncertain)",
       "isActive": true
     }
   ]

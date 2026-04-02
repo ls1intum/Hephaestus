@@ -139,14 +139,13 @@ class DiffHunkValidator {
             );
             corrections++;
 
-            // Create corrected note with new position
+            // Create corrected note with new position, preserving the original span width
             Integer correctedEnd = note.endLine();
             if (correctedEnd != null) {
-                // Shift endLine by the same delta
-                int delta = nearest - note.startLine();
-                correctedEnd = Math.max(nearest, correctedEnd + delta);
-                // Ensure endLine is also valid
-                Integer nearestEnd = fileLines.ceiling(correctedEnd);
+                int originalSpan = Math.max(0, note.endLine() - note.startLine());
+                int desiredEnd = nearest + originalSpan;
+                // Find nearest valid line that doesn't expand beyond the original span
+                Integer nearestEnd = fileLines.floor(desiredEnd);
                 if (nearestEnd != null && nearestEnd >= nearest) {
                     correctedEnd = nearestEnd;
                 } else {

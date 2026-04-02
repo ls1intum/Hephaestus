@@ -348,8 +348,6 @@ hephaestus:
         run-for-all-users: false
         # true = skip practice review for draft PRs
         skip-drafts: true
-        # Maximum number of inline diff comments per review (0-50)
-        max-inline-notes: 5
 
     posthog:
         enabled: ${POSTHOG_ENABLED:false}

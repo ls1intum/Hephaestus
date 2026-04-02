@@ -40,6 +40,12 @@
 
     <!-- Add model version tracking -->
     <changeSet id="1774785360089-4" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <and>
+                <not><columnExists tableName="agent_config" columnName="model_version"/></not>
+                <not><columnExists tableName="agent_job" columnName="llm_model_version"/></not>
+            </and>
+        </preConditions>
         <addColumn tableName="agent_config">
             <column name="model_version" type="VARCHAR(50)"/>
         </addColumn>

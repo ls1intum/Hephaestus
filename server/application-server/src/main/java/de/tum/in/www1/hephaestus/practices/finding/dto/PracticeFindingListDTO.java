@@ -23,7 +23,7 @@ public record PracticeFindingListDTO(
     @NonNull @Schema(description = "Target type (e.g. PULL_REQUEST)") PracticeFindingTargetType targetType,
     @NonNull @Schema(description = "Target entity ID") Long targetId,
     @NonNull @Schema(description = "Finding title") String title,
-    @NonNull @Schema(description = "Verdict: POSITIVE or NEGATIVE") Verdict verdict,
+    @NonNull @Schema(description = "Verdict: POSITIVE, NEGATIVE, or NOT_APPLICABLE") Verdict verdict,
     @NonNull @Schema(description = "Severity level") Severity severity,
     @NonNull @Schema(description = "AI confidence score (0.0–1.0)") Float confidence,
     @NonNull @Schema(description = "When the finding was detected") Instant detectedAt

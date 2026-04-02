@@ -92,6 +92,9 @@ public class PullRequestReviewHandler implements JobTypeHandler {
     /** High-entropy strings in quotes (≥20 chars, alphanumeric/base64) — likely real keys. */
     private static final Pattern HIGH_ENTROPY_STRING = Pattern.compile("\"[A-Za-z0-9+/=_\\-]{20,}\"");
 
+    /** Force-unwrap pattern: {@code !} after identifier or bracket, not followed by {@code =}. */
+    private static final Pattern FORCE_UNWRAP = Pattern.compile("[\\w\\])]!(?!=)");
+
     private final ObjectMapper objectMapper;
     private final GitRepositoryManager gitRepositoryManager;
     private final PullRequestRepository pullRequestRepository;
@@ -625,7 +628,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
                 if (mergeCommit != null) {
                     for (String line : mergeCommit.split("\n")) {
                         String[] parts = line.trim().split("\\s+");
-                        if (parts.length >= 3 && parts[2].startsWith(headSha.substring(0, 8))) {
+                        if (parts.length >= 3 && headSha.length() >= 8 && parts[2].startsWith(headSha.substring(0, 8))) {
                             base = parts[1]; // First parent = target before merge
                             break;
                         }
@@ -783,7 +786,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             String content = line.substring(line.indexOf("] +") + 3);
             if (content.contains("try?")) found.add("try?");
             if (content.contains("fatalError")) found.add("fatalError");
-            if (content.contains("!") && !content.contains("!=")) found.add("force-unwrap");
+            if (FORCE_UNWRAP.matcher(content).find()) found.add("force-unwrap");
             if (content.contains("@State")) found.add("@State");
             if (content.contains("@StateObject")) found.add("@StateObject");
             if (content.contains("@Binding")) found.add("@Binding");
@@ -941,23 +944,30 @@ public class PullRequestReviewHandler implements JobTypeHandler {
 
     /** Run a git command in the repository directory. Returns stdout or null on failure. */
     private String runGit(Path repoPath, String... args) {
+        Process process = null;
         try {
             String[] cmd = new String[args.length + 1];
             cmd[0] = "git";
             System.arraycopy(args, 0, cmd, 1, args.length);
             ProcessBuilder pb = new ProcessBuilder(cmd);
             pb.directory(repoPath.toFile());
-            pb.redirectErrorStream(false);
-            Process process = pb.start();
+            pb.redirectError(ProcessBuilder.Redirect.DISCARD);
+            process = pb.start();
             String stdout = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
             boolean finished = process.waitFor(30, TimeUnit.SECONDS);
             if (!finished) {
-                process.destroyForcibly();
                 return null;
             }
             return process.exitValue() == 0 ? stdout : null;
-        } catch (IOException | InterruptedException e) {
+        } catch (IOException e) {
             return null;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return null;
+        } finally {
+            if (process != null) {
+                process.destroyForcibly();
+            }
         }
     }
 
