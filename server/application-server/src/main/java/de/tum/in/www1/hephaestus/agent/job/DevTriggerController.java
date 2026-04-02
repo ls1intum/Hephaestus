@@ -8,20 +8,19 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.actuate.endpoint.annotation.Endpoint;
-import org.springframework.boot.actuate.endpoint.annotation.WriteOperation;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.lang.Nullable;
-import org.springframework.stereotype.Component;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Dev-only actuator endpoint for manually triggering PR reviews without NATS.
+ * Dev-only REST endpoint for manually triggering PR reviews without NATS.
  * Enabled by setting hephaestus.dev.trigger-enabled=true.
  *
- * Usage: POST /actuator/dev-trigger-review (with prId and workspaceId params)
+ * Usage: POST /api/dev/trigger-review?prId=...&workspaceId=...
  */
-@Component
-@Endpoint(id = "dev-trigger-review")
+@RestController
 @ConditionalOnProperty(name = "hephaestus.dev.trigger-enabled", havingValue = "true")
 public class DevTriggerController {
 
@@ -35,8 +34,8 @@ public class DevTriggerController {
         this.pullRequestRepository = pullRequestRepository;
     }
 
-    @WriteOperation
-    public String triggerReview(@Nullable Long prId, @Nullable Long workspaceId) {
+    @PostMapping("/api/dev/trigger-review")
+    public String triggerReview(@RequestParam @Nullable Long prId, @RequestParam @Nullable Long workspaceId) {
         if (prId == null || workspaceId == null) {
             return "Error: prId and workspaceId are required";
         }
