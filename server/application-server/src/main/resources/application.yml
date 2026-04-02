@@ -393,6 +393,11 @@ hephaestus:
             cpus: ${SANDBOX_CPUS:2.0}
             pids-limit: ${SANDBOX_PIDS_LIMIT:256}
 
+    # Dev-only actuator for manually triggering PR reviews (never enable in production).
+    # Layered safety: (1) this flag, (2) not in endpoint exposure list, (3) Spring Security auth.
+    dev:
+        trigger-enabled: false
+
     # ═══════════════════════════════════════════════════════════════════════════
     # AGENT JOB NATS CONFIGURATION
     # ═══════════════════════════════════════════════════════════════════════════
