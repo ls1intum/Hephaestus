@@ -10,7 +10,6 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -26,7 +25,6 @@ import de.tum.in.www1.hephaestus.practices.PracticeRepository;
 import de.tum.in.www1.hephaestus.practices.finding.PracticeDetectionCompletedEvent;
 import de.tum.in.www1.hephaestus.practices.finding.PracticeDetectionProperties;
 import de.tum.in.www1.hephaestus.practices.finding.PracticeFindingRepository;
-import de.tum.in.www1.hephaestus.practices.model.CaMethod;
 import de.tum.in.www1.hephaestus.practices.model.Practice;
 import de.tum.in.www1.hephaestus.practices.model.PracticeFindingTargetType;
 import de.tum.in.www1.hephaestus.practices.model.Severity;
@@ -129,7 +127,6 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                     any(),
                     any(),
                     any(),
-                    any(),
                     any()
                 )
             )
@@ -137,7 +134,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
     }
 
     private ValidatedFinding validFinding(String slug, Verdict verdict) {
-        return new ValidatedFinding(slug, "Test finding", verdict, Severity.INFO, 0.9f, null, null, null, null);
+        return new ValidatedFinding(slug, "Test finding", verdict, Severity.INFO, 0.9f, null, null, null);
     }
 
     @Nested
@@ -168,7 +165,6 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                 eq("POSITIVE"),
                 eq("INFO"),
                 eq(0.9f),
-                isNull(),
                 isNull(),
                 isNull(),
                 isNull(),
@@ -210,7 +206,6 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                 anyString(),
                 anyString(),
                 anyFloat(),
-                any(),
                 any(),
                 any(),
                 any(),
@@ -353,7 +348,37 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             assertThat(result.inserted()).isEqualTo(10);
             assertThat(result.discardedOverCap()).isZero();
         }
+    }
 
+    @Nested
+    @DisplayName("NOT_APPLICABLE verdict")
+    class NotApplicableVerdict {
+
+        @Test
+        @DisplayName("persists NOT_APPLICABLE finding without counting as negative")
+        void notApplicablePersisted() {
+            var findings = List.of(validFinding("pr-description-quality", Verdict.NOT_APPLICABLE));
+
+            var result = service.deliver(testJob, findings);
+
+            assertThat(result.inserted()).isEqualTo(1);
+            assertThat(result.hasNegative()).isFalse();
+        }
+
+        @Test
+        @DisplayName("NOT_APPLICABLE is not subject to negative cap")
+        void notApplicableNotCapped() {
+            var findings = new java.util.ArrayList<ValidatedFinding>();
+            // 10 NOT_APPLICABLE — none should be capped (cap only applies to NEGATIVE)
+            for (int i = 0; i < 10; i++) {
+                findings.add(validFinding("pr-description-quality", Verdict.NOT_APPLICABLE));
+            }
+
+            var result = service.deliver(testJob, findings);
+
+            assertThat(result.inserted()).isEqualTo(10);
+            assertThat(result.discardedOverCap()).isZero();
+        }
     }
 
     @Nested
@@ -376,7 +401,6 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                     anyString(),
                     anyString(),
                     anyFloat(),
-                    any(),
                     any(),
                     any(),
                     any(),
@@ -413,7 +437,6 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                 anyString(),
                 anyString(),
                 anyFloat(),
-                any(),
                 any(),
                 any(),
                 any(),

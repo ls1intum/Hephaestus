@@ -65,7 +65,7 @@ Your prompt from the orchestrator includes a **DIFF SCOPE** section listing the 
 {
   "practiceSlug": "the-slug",
   "title": "Max 120 chars — describe the defect or good practice",
-  "verdict": "POSITIVE or NEGATIVE",
+  "verdict": "POSITIVE or NEGATIVE or NOT_APPLICABLE",
   "severity": "CRITICAL or MAJOR or MINOR or INFO",
   "confidence": 0.85,
   "evidence": {
@@ -124,11 +124,12 @@ Your prompt from the orchestrator includes a **DIFF SCOPE** section listing the 
 - **Follow the criteria file for severity** — it's authoritative, don't guess
 - **Evidence must be exact** — snippets from diff, [L<n>] line numbers
 - **Code in guidance must compile** — only reference symbols from the diff or stdlib
+- **Guidance code must be defect-free** — NEVER use `try!`, `!` (force unwrap), `fatalError()`, or `try?` in guidance. Show proper error handling with `do/catch` and `@State` error variables.
 - **Reasoning ≤500 chars** — what, why, consequence. No padding.
 - **Check ALL patterns** listed in criteria (A, B, C, D, E). Don't stop early.
 - **suggestedDiffNotes**: body = the fix action, NOT a restatement of the problem
 - Only evaluate CHANGED code (lines with `+` prefix)
-- If no evidence either way → lean POSITIVE with lower confidence
+- If no evidence either way → use NOT_APPLICABLE when the practice's subject matter is entirely absent from the diff; lean POSITIVE with lower confidence only when the practice is relevant but no violations are found
 - **One finding per practice, all violations included** — if a practice has multiple violations (e.g., `fatalError` AND `URL(string:)!`), include ALL in the same finding's evidence
 - **Fix must be non-empty** — guidance code blocks must show actual corrected code, never empty function bodies
 - **Secrets: show deletion** — for hardcoded secrets, the fix is DELETE the line + rotate. Never show commented-out secrets

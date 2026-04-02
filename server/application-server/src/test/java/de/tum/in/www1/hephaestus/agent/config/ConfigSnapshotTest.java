@@ -197,7 +197,18 @@ class ConfigSnapshotTest extends BaseUnitTest {
         @DisplayName("should reject null agentType")
         void shouldRejectNullAgentType() {
             assertThatThrownBy(() ->
-                new ConfigSnapshot(1, 1L, "name", null, LlmProvider.ANTHROPIC, CredentialMode.PROXY, null, null, 600, false)
+                new ConfigSnapshot(
+                    1,
+                    1L,
+                    "name",
+                    null,
+                    LlmProvider.ANTHROPIC,
+                    CredentialMode.PROXY,
+                    null,
+                    null,
+                    600,
+                    false
+                )
             ).isInstanceOf(NullPointerException.class);
         }
 
@@ -205,7 +216,18 @@ class ConfigSnapshotTest extends BaseUnitTest {
         @DisplayName("should reject null llmProvider")
         void shouldRejectNullLlmProvider() {
             assertThatThrownBy(() ->
-                new ConfigSnapshot(1, 1L, "name", AgentType.CLAUDE_CODE, null, CredentialMode.PROXY, null, null, 600, false)
+                new ConfigSnapshot(
+                    1,
+                    1L,
+                    "name",
+                    AgentType.CLAUDE_CODE,
+                    null,
+                    CredentialMode.PROXY,
+                    null,
+                    null,
+                    600,
+                    false
+                )
             ).isInstanceOf(NullPointerException.class);
         }
 
@@ -213,7 +235,18 @@ class ConfigSnapshotTest extends BaseUnitTest {
         @DisplayName("should reject null credentialMode")
         void shouldRejectNullCredentialMode() {
             assertThatThrownBy(() ->
-                new ConfigSnapshot(1, 1L, "name", AgentType.CLAUDE_CODE, LlmProvider.ANTHROPIC, null, null, null, 600, false)
+                new ConfigSnapshot(
+                    1,
+                    1L,
+                    "name",
+                    AgentType.CLAUDE_CODE,
+                    LlmProvider.ANTHROPIC,
+                    null,
+                    null,
+                    null,
+                    600,
+                    false
+                )
             ).isInstanceOf(NullPointerException.class);
         }
 

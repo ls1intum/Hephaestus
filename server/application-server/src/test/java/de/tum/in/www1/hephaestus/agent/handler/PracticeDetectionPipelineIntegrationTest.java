@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -278,7 +277,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         @DisplayName("full pipeline: parse → persist findings → publish event → post feedback")
         void fullPipelineFromParseToDelivery() {
             setJobOutput(validAgentOutput(true));
-            when(commentPoster.postFormattedBody(any(), any(), isNull())).thenReturn("comment-123");
+            when(commentPoster.postFormattedBody(any(), any())).thenReturn("comment-123");
             when(diffNotePoster.postDiffNotes(any(), any())).thenReturn(new DiffNotePoster.DiffNoteResult(1, 0));
 
             handler.deliver(agentJob);
@@ -299,7 +298,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
             assertThat(events.get(0).hasNegative()).isTrue();
 
             // Verify comment poster called with mrNote
-            verify(commentPoster).postFormattedBody(eq(agentJob), any(String.class), isNull());
+            verify(commentPoster).postFormattedBody(eq(agentJob), any(String.class));
 
             // Verify diff notes posted (has negative findings + first analysis)
             verify(diffNotePoster).postDiffNotes(eq(agentJob), any());
@@ -341,7 +340,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
             assertThat(practiceFindingRepository.findAll()).hasSize(2);
 
             // No comment or diff notes posted (no negatives, no delivery content)
-            verify(commentPoster, never()).postFormattedBody(any(), any(), any());
+            verify(commentPoster, never()).postFormattedBody(any(), any());
             verify(diffNotePoster, never()).postDiffNotes(any(), any());
         }
     }
@@ -360,7 +359,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
                 .hasMessageContaining("No valid findings");
 
             assertThat(practiceFindingRepository.findAll()).isEmpty();
-            verify(commentPoster, never()).postFormattedBody(any(), any(), any());
+            verify(commentPoster, never()).postFormattedBody(any(), any());
         }
 
         @Test
@@ -394,7 +393,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
                   "delivery": { "mrNote": "Fix error handling." }
                 }""";
             setJobOutput(output);
-            when(commentPoster.postFormattedBody(any(), any(), isNull())).thenReturn("comment-456");
+            when(commentPoster.postFormattedBody(any(), any())).thenReturn("comment-456");
 
             handler.deliver(agentJob);
 
@@ -458,7 +457,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
             assertThat(practiceFindingRepository.findAll()).hasSize(2);
 
             // Comment NOT posted (FeedbackDeliveryService skips closed PRs)
-            verify(commentPoster, never()).postFormattedBody(any(), any(), any());
+            verify(commentPoster, never()).postFormattedBody(any(), any());
             verify(diffNotePoster, never()).postDiffNotes(any(), any());
 
             // Delivery status not set (feedback was skipped)
@@ -475,7 +474,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         @DisplayName("re-delivering same job creates no duplicate findings")
         void redeliveryNoDuplicates() {
             setJobOutput(validAgentOutput(true));
-            when(commentPoster.postFormattedBody(any(), any(), any())).thenReturn("comment-789");
+            when(commentPoster.postFormattedBody(any(), any())).thenReturn("comment-789");
             when(diffNotePoster.postDiffNotes(any(), any())).thenReturn(new DiffNotePoster.DiffNoteResult(1, 0));
 
             // First delivery

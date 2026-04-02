@@ -3,7 +3,6 @@ package de.tum.in.www1.hephaestus.agent.handler;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import de.tum.in.www1.hephaestus.practices.model.CaMethod;
 import de.tum.in.www1.hephaestus.practices.model.Severity;
 import de.tum.in.www1.hephaestus.practices.model.Verdict;
 import java.nio.charset.StandardCharsets;
@@ -36,8 +35,7 @@ import org.springframework.lang.Nullable;
  *       "confidence": 0.95,
  *       "evidence": { ... },
  *       "reasoning": "...",
- *       "guidance": "...",
- *       "guidanceMethod": "COACHING"
+ *       "guidance": "..."
  *     }
  *   ],
  *   "delivery": {
@@ -126,11 +124,7 @@ public class PracticeDetectionResultParser {
         // Step 4: Max findings guard — truncate rather than reject to preserve valid findings
         int findingsLimit = findingsNode.size();
         if (findingsLimit > maxFindingsPerJob) {
-            log.warn(
-                "Truncating findings from {} to {} (maxFindingsPerJob)",
-                findingsNode.size(),
-                maxFindingsPerJob
-            );
+            log.warn("Truncating findings from {} to {} (maxFindingsPerJob)", findingsNode.size(), maxFindingsPerJob);
             findingsLimit = maxFindingsPerJob;
         }
 
@@ -168,11 +162,18 @@ public class PracticeDetectionResultParser {
             if (!fallbackNotes.isEmpty()) {
                 String mrNote = delivery != null ? delivery.mrNote() : null;
                 delivery = new DeliveryContent(mrNote, fallbackNotes);
-                log.info("Collected {} diff notes from per-finding suggestedDiffNotes (fallback)", fallbackNotes.size());
+                log.info(
+                    "Collected {} diff notes from per-finding suggestedDiffNotes (fallback)",
+                    fallbackNotes.size()
+                );
             }
         }
 
-        return new ParseResult(Collections.unmodifiableList(deduped), Collections.unmodifiableList(discarded), delivery);
+        return new ParseResult(
+            Collections.unmodifiableList(deduped),
+            Collections.unmodifiableList(discarded),
+            delivery
+        );
     }
 
     // =========================================================================
@@ -432,11 +433,7 @@ public class PracticeDetectionResultParser {
         // Required: body
         JsonNode bodyNode = entry.get("body");
         if (bodyNode == null || bodyNode.isNull() || !bodyNode.isTextual() || bodyNode.asText().isBlank()) {
-            log.debug(
-                "Skipping suggestedDiffNote at finding {}, index {}: missing body",
-                findingIndex,
-                noteIndex
-            );
+            log.debug("Skipping suggestedDiffNote at finding {}, index {}: missing body", findingIndex, noteIndex);
             return null;
         }
         String body = bodyNode.asText();
@@ -524,28 +521,7 @@ public class PracticeDetectionResultParser {
             guidance = guidance.substring(0, MAX_GUIDANCE_LENGTH);
         }
 
-        // Optional: guidanceMethod
-        CaMethod guidanceMethod = null;
-        JsonNode gmNode = entry.get("guidanceMethod");
-        if (gmNode != null && !gmNode.isNull() && gmNode.isTextual() && !gmNode.asText().isBlank()) {
-            try {
-                guidanceMethod = CaMethod.valueOf(gmNode.asText().toUpperCase(Locale.ROOT));
-            } catch (IllegalArgumentException e) {
-                // Invalid guidance method — leave null, don't discard the entire finding
-            }
-        }
-
-        return new ValidatedFinding(
-            practiceSlug,
-            title,
-            verdict,
-            severity,
-            confidence,
-            evidence,
-            reasoning,
-            guidance,
-            guidanceMethod
-        );
+        return new ValidatedFinding(practiceSlug, title, verdict, severity, confidence, evidence, reasoning, guidance);
     }
 
     private static String textField(JsonNode entry, String field) {
@@ -631,9 +607,9 @@ public class PracticeDetectionResultParser {
     }
 
     private static boolean isValidJsonEscapeChar(char c) {
-        return c == '"' || c == '\\' || c == '/' ||
-               c == 'b' || c == 'f' || c == 'n' ||
-               c == 'r' || c == 't' || c == 'u';
+        return (
+            c == '"' || c == '\\' || c == '/' || c == 'b' || c == 'f' || c == 'n' || c == 'r' || c == 't' || c == 'u'
+        );
     }
 
     /**
@@ -645,6 +621,11 @@ public class PracticeDetectionResultParser {
      */
     @Nullable
     private JsonNode extractJsonFromText(String text) {
+        // Guard: skip absurdly large inputs (agent rawOutput shouldn't exceed 1MB)
+        if (text.length() > 1_000_000) {
+            log.warn("extractJsonFromText: input too large ({} chars), skipping", text.length());
+            return null;
+        }
         int startIdx = 0;
         for (int attempt = 0; attempt < 5; attempt++) {
             int braceIdx = text.indexOf('{', startIdx);
@@ -701,8 +682,7 @@ public class PracticeDetectionResultParser {
         float confidence,
         JsonNode evidence,
         String reasoning,
-        String guidance,
-        CaMethod guidanceMethod
+        String guidance
     ) {}
 
     public record DiscardedEntry(int index, String reason) {}

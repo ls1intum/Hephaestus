@@ -178,18 +178,31 @@ class ClaudeCodeAgentAdapterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should build shell command with claude CLI flags")
+        @DisplayName("should build shell command using Node.js runner script")
         void shouldBuildCorrectCliFlags() {
             var spec = adapter.buildSandboxSpec(proxyRequest(null));
             String cmd = spec.command().get(2);
-            assertThat(cmd).contains("claude -p \"$PROMPT\"");
-            assertThat(cmd).contains("--output-format json");
-            assertThat(cmd).contains("--dangerously-skip-permissions");
-            assertThat(cmd).contains("--max-turns 25");
-            assertThat(cmd).contains("--effort medium");
-            assertThat(cmd).contains("--max-budget-usd 5.00");
-            assertThat(cmd).contains("--no-session-persistence");
-            assertThat(cmd).contains("--verbose");
+            // Command now delegates to runner script instead of inline claude CLI
+            assertThat(cmd).contains("node /workspace/.run-claude.mjs");
+            assertThat(cmd).doesNotContain("--no-session-persistence");
+        }
+
+        @Test
+        @DisplayName("should inject runner script with claude CLI flags")
+        void shouldInjectRunnerScriptWithFlags() {
+            var spec = adapter.buildSandboxSpec(proxyRequest(null));
+            assertThat(spec.inputFiles()).containsKey(".run-claude.mjs");
+            String script = new String(spec.inputFiles().get(".run-claude.mjs"), StandardCharsets.UTF_8);
+            assertThat(script).contains("--output-format");
+            assertThat(script).contains("--json-schema");
+            assertThat(script).contains("--dangerously-skip-permissions");
+            assertThat(script).contains("--max-turns");
+            assertThat(script).contains("--effort");
+            assertThat(script).contains("--max-budget-usd");
+            assertThat(script).contains("--verbose");
+            // Self-correction: retries via --continue
+            assertThat(script).contains("--continue");
+            assertThat(script).contains("hasFindings");
         }
 
         @Test
@@ -541,8 +554,7 @@ class ClaudeCodeAgentAdapterTest extends BaseUnitTest {
         @Test
         @DisplayName("should handle partial usage data (only cost)")
         void shouldHandlePartialUsageData() {
-            String cliOutput =
-                "[{\"type\":\"result\",\"result\":\"done\",\"total_cost_usd\":0.03}]";
+            String cliOutput = "[{\"type\":\"result\",\"result\":\"done\",\"total_cost_usd\":0.03}]";
             AgentResult.LlmUsage usage = adapter.extractUsage(cliOutput);
             assertThat(usage).isNotNull();
             assertThat(usage.costUsd()).isEqualTo(0.03);
@@ -555,8 +567,7 @@ class ClaudeCodeAgentAdapterTest extends BaseUnitTest {
         @Test
         @DisplayName("should handle partial usage data (only model)")
         void shouldHandlePartialUsageDataModelOnly() {
-            String cliOutput =
-                "[{\"type\":\"result\",\"result\":\"done\",\"model\":\"claude-opus-4-6\"}]";
+            String cliOutput = "[{\"type\":\"result\",\"result\":\"done\",\"model\":\"claude-opus-4-6\"}]";
             AgentResult.LlmUsage usage = adapter.extractUsage(cliOutput);
             assertThat(usage).isNotNull();
             assertThat(usage.model()).isEqualTo("claude-opus-4-6");

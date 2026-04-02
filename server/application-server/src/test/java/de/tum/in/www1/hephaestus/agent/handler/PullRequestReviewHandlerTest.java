@@ -604,7 +604,8 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         @Test
         @DisplayName("annotateDiffWithLineNumbers should annotate + and context lines with source line numbers")
         void annotatesDiff() {
-            String diff = "diff --git a/Foo.swift b/Foo.swift\n" +
+            String diff =
+                "diff --git a/Foo.swift b/Foo.swift\n" +
                 "--- a/Foo.swift\n" +
                 "+++ b/Foo.swift\n" +
                 "@@ -1,3 +1,4 @@\n" +
@@ -622,7 +623,8 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         @Test
         @DisplayName("annotateDiffWithLineNumbers should not annotate deleted lines")
         void annotatesDiffWithDeletions() {
-            String diff = "diff --git a/Bar.swift b/Bar.swift\n" +
+            String diff =
+                "diff --git a/Bar.swift b/Bar.swift\n" +
                 "--- a/Bar.swift\n" +
                 "+++ b/Bar.swift\n" +
                 "@@ -5,4 +5,3 @@\n" +

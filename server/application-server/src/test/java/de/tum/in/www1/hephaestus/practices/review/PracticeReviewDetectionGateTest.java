@@ -61,7 +61,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        PracticeReviewProperties properties = new PracticeReviewProperties(false, true, false, 5, "");
+        PracticeReviewProperties properties = new PracticeReviewProperties(false, true, false, "");
         gate = new PracticeReviewDetectionGate(
             properties,
             userRoleChecker,
@@ -158,7 +158,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         @Test
         @DisplayName("Label skip takes precedence over runForAllUsers=true")
         void labelSkipOverridesRunForAll() {
-            PracticeReviewProperties runForAllProps = new PracticeReviewProperties(true, true, false, 5, "");
+            PracticeReviewProperties runForAllProps = new PracticeReviewProperties(true, true, false, "");
             PracticeReviewDetectionGate runForAllGate = new PracticeReviewDetectionGate(
                 runForAllProps,
                 userRoleChecker,
@@ -236,7 +236,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         @Test
         @DisplayName("Should continue when PR is draft but skipDrafts=false")
         void continueWhenSkipDraftsDisabled() {
-            PracticeReviewProperties noSkipProps = new PracticeReviewProperties(false, false, false, 5, "");
+            PracticeReviewProperties noSkipProps = new PracticeReviewProperties(false, false, false, "");
             PracticeReviewDetectionGate noSkipGate = new PracticeReviewDetectionGate(
                 noSkipProps,
                 userRoleChecker,
@@ -388,7 +388,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         @Test
         @DisplayName("Should DETECT without role check when runForAllUsers=true")
         void detectWhenRunForAllUsers() {
-            PracticeReviewProperties runForAllProps = new PracticeReviewProperties(true, true, false, 5, "");
+            PracticeReviewProperties runForAllProps = new PracticeReviewProperties(true, true, false, "");
             PracticeReviewDetectionGate runForAllGate = new PracticeReviewDetectionGate(
                 runForAllProps,
                 userRoleChecker,

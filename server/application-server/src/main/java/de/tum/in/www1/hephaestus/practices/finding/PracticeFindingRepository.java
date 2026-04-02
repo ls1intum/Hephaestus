@@ -51,14 +51,14 @@ public interface PracticeFindingRepository extends JpaRepository<PracticeFinding
             id, idempotency_key, agent_job_id, practice_id,
             target_type, target_id, contributor_id,
             title, verdict, severity, confidence,
-            evidence, reasoning, guidance, guidance_method,
+            evidence, reasoning, guidance,
             detected_at
         )
         VALUES (
             :id, :idempotencyKey, :agentJobId, :practiceId,
             :targetType, :targetId, :contributorId,
             :title, :verdict, :severity, :confidence,
-            CAST(:evidence AS jsonb), :reasoning, :guidance, :guidanceMethod,
+            CAST(:evidence AS jsonb), :reasoning, :guidance,
             :detectedAt
         )
         ON CONFLICT (idempotency_key) DO NOTHING
@@ -80,7 +80,6 @@ public interface PracticeFindingRepository extends JpaRepository<PracticeFinding
         @Param("evidence") String evidence,
         @Param("reasoning") String reasoning,
         @Param("guidance") String guidance,
-        @Param("guidanceMethod") String guidanceMethod,
         @Param("detectedAt") Instant detectedAt
     );
 

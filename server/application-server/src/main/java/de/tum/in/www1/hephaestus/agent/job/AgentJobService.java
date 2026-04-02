@@ -96,8 +96,7 @@ public class AgentJobService {
      *
      * <p>Creates a job for EACH enabled agent config, with config-scoped idempotency keys.
      * This provides redundancy: if one agent times out, others may still complete.
-     * Delivery dedup (via {@code findPreviousDeliveryCommentId}) ensures only one summary
-     * comment is posted; subsequent completions edit the existing comment.
+     * Each delivery independently posts a new summary comment + diff notes.
      *
      * <p>Concurrency limits are enforced at execution time by the executor, not at submit time.
      * Idempotency is enforced by a partial unique index on

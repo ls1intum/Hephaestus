@@ -31,8 +31,9 @@ This understanding drives all subsequent analysis. **Only `+` lines are in scope
 
 ### Phase 2: Relevance Filter
 
-Using index.json and the diff, decide which practices are **relevant** or **skip**.
-`hardcoded-secrets` ALWAYS runs.
+Using index.json and the diff, decide which practices are **relevant** or **not applicable**.
+For practices whose subject matter is entirely absent from the diff (e.g., no network calls for error-state-handling), emit a NOT_APPLICABLE verdict instead of skipping silently or forcing a vacuous POSITIVE.
+`hardcoded-secrets` ALWAYS runs (never NOT_APPLICABLE).
 
 ### Phase 3: Practice Analysis
 
@@ -72,6 +73,7 @@ Crash-class defects include force unwraps (`!` on Optional values like `URL(stri
 - MUST include a code block for NEGATIVE findings
 - Code must only reference symbols that EXIST in the diff or standard library
 - Never invent variables, types, or properties the student didn't write
+- **Guidance code must be defect-free** — NEVER use `try!`, `!` (force unwrap), `fatalError()`, or `try?` in guidance code. These patterns trigger NEGATIVE findings under other practices. When the fix needs error handling, show `do { try ... } catch { errorMessage = error.localizedDescription }` with a `@State` error variable.
 - If contributor_history has ≥2 prior findings for the same practice, reference the pattern: "This is the Nth time — consider X"
 - For hardcoded-secrets: always mention git history permanence + credential rotation
 - **Fixes must actually solve the problem** — don't replace a no-op (`print("TODO")`) with another no-op (`dismiss()`). Implement the real functionality or say "implement the actual [action] here"
@@ -87,45 +89,8 @@ For each NEGATIVE finding, include at least one `suggestedDiffNote`:
 
 - Report ALL valid NEGATIVE findings — do not cap or suppress. Priority order: security > crashes > correctness > design > style.
 - Exactly one finding per practiceSlug.
-- Aggregate suggestedDiffNotes into delivery.diffNotes (NEGATIVE only, CRITICAL first).
-
 ### Phase 5: Final Output
 
-Your final response must be the JSON object matching the schema in orchestrator-protocol.md.
+Your final response must be a JSON object with ONLY a `findings` array — matching the schema in orchestrator-protocol.md.
+Do NOT include a `delivery` block. The server composes the MR comment from your structured findings.
 The `--json-schema` flag applies constrained decoding.
-
-#### delivery.mrNote — 100-500 words
-
-```
-[1 sentence: what the MR does + 1 genuine positive]. [1 sentence: issue count + what needs fixing].
-
-**🔴 [Title]** · `File.swift:42`
-[What + consequence]. You wrote:
-‍```swift
-// the defective line(s) from the diff
-‍```
-Fix:
-‍```swift
-// the corrected version using only existing symbols
-‍```
-
-**🟠 [Title]** · `File.swift:87`
-[What + consequence + code fix]
-
-**🟡 [Title]** · `File.swift:12`
-[1 sentence description]
-
----
-<sub>Hephaestus · automated review</sub>
-```
-
-Rules:
-- DON'T restate the MR title in the opening sentence. Describe what the code does in your own words.
-- Open with genuine positive + issue count ("Here are N issues to address before merge")
-- No separate "What's Working Well" section — weave positives into the opening
-- Severity-ordered, omit empty tiers
-- STRICT emoji mapping: 🔴 = CRITICAL only, 🟠 = MAJOR only, 🟡 = MINOR only. Never use 🔴 for MAJOR.
-- CRITICAL/MAJOR: quote defective code, then show fix
-- No disclaimer banner, no "Recommended Priority" section
-- No INFO findings in mrNote
-- If ALL findings are POSITIVE: `delivery: {"mrNote": "", "diffNotes": []}`

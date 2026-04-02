@@ -201,7 +201,7 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
     }
 
     private ValidatedFinding finding(String slug, Verdict verdict) {
-        return new ValidatedFinding(slug, "Test: " + slug, verdict, Severity.INFO, 0.9f, null, null, null, null);
+        return new ValidatedFinding(slug, "Test: " + slug, verdict, Severity.INFO, 0.9f, null, null, null);
     }
 
     @Nested
@@ -283,7 +283,6 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
                         Verdict.NEGATIVE,
                         Severity.MINOR,
                         0.8f,
-                        null,
                         null,
                         null,
                         null

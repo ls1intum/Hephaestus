@@ -11,7 +11,6 @@ import de.tum.in.www1.hephaestus.agent.handler.PracticeDetectionResultParser.Dif
 import de.tum.in.www1.hephaestus.agent.handler.PracticeDetectionResultParser.DiscardedEntry;
 import de.tum.in.www1.hephaestus.agent.handler.PracticeDetectionResultParser.ParseResult;
 import de.tum.in.www1.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
-import de.tum.in.www1.hephaestus.practices.model.CaMethod;
 import de.tum.in.www1.hephaestus.practices.model.Severity;
 import de.tum.in.www1.hephaestus.practices.model.Verdict;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
@@ -204,6 +203,18 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         }
 
         @Test
+        @DisplayName("accepts NOT_APPLICABLE verdict")
+        void notApplicableVerdict() {
+            ObjectNode finding = validFindingNode();
+            finding.put("verdict", "NOT_APPLICABLE");
+
+            ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
+
+            assertThat(result.validFindings()).hasSize(1);
+            assertThat(result.validFindings().get(0).verdict()).isEqualTo(Verdict.NOT_APPLICABLE);
+        }
+
+        @Test
         @DisplayName("normalizes lowercase verdict to uppercase")
         void lowercaseVerdict() {
             ObjectNode finding = validFindingNode();
@@ -318,7 +329,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             ObjectNode finding = validFindingNode();
             finding.put("reasoning", "Some reasoning");
             finding.put("guidance", "Some guidance");
-            finding.put("guidanceMethod", "COACHING");
             ObjectNode evidence = objectMapper.createObjectNode();
             evidence.put("key", "value");
             finding.set("evidence", evidence);
@@ -328,7 +338,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             ValidatedFinding f = result.validFindings().get(0);
             assertThat(f.reasoning()).isEqualTo("Some reasoning");
             assertThat(f.guidance()).isEqualTo("Some guidance");
-            assertThat(f.guidanceMethod()).isEqualTo(CaMethod.COACHING);
             assertThat(f.evidence()).isNotNull();
             assertThat(f.evidence().get("key").asText()).isEqualTo("value");
         }
@@ -341,7 +350,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             ValidatedFinding f = result.validFindings().get(0);
             assertThat(f.reasoning()).isNull();
             assertThat(f.guidance()).isNull();
-            assertThat(f.guidanceMethod()).isNull();
             assertThat(f.evidence()).isNull();
         }
 
@@ -407,19 +415,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
 
             assertThat(result.validFindings()).hasSize(1);
             assertThat(result.validFindings().get(0).guidance()).hasSize(5_000);
-        }
-
-        @Test
-        @DisplayName("invalid guidanceMethod is silently ignored (not discarded)")
-        void invalidGuidanceMethod() {
-            ObjectNode finding = validFindingNode();
-            finding.put("guidanceMethod", "INVALID_METHOD");
-
-            ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
-
-            assertThat(result.validFindings()).hasSize(1);
-            assertThat(result.validFindings().get(0).guidanceMethod()).isNull();
-            assertThat(result.discarded()).isEmpty();
         }
     }
 
@@ -612,7 +607,8 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         @DisplayName("collects suggestedDiffNotes from NEGATIVE findings when delivery.diffNotes is empty")
         void collectsFromNegativeFindingsWhenDeliveryEmpty() {
             ObjectNode finding = negativeFindingWithSuggestedNotes(
-                "error-handling", "MAJOR",
+                "error-handling",
+                "MAJOR",
                 suggestedNote("src/Main.java", 42, "Add error handling here.")
             );
             // Delivery present but with empty diffNotes
@@ -638,7 +634,8 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         @DisplayName("collects suggestedDiffNotes when delivery is absent")
         void collectsWhenDeliveryAbsent() {
             ObjectNode finding = negativeFindingWithSuggestedNotes(
-                "error-handling", "MAJOR",
+                "error-handling",
+                "MAJOR",
                 suggestedNote("src/Foo.java", 10, "Fix this.")
             );
             String raw = """
@@ -677,7 +674,8 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         @DisplayName("does not use fallback when delivery.diffNotes already has entries")
         void noFallbackWhenDeliveryHasDiffNotes() {
             ObjectNode finding = negativeFindingWithSuggestedNotes(
-                "error-handling", "MAJOR",
+                "error-handling",
+                "MAJOR",
                 suggestedNote("src/Fallback.java", 5, "Fallback note")
             );
             String raw = """
@@ -703,7 +701,8 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         void prioritizesBySeverity() {
             // Create 12 notes total across MINOR and CRITICAL findings to test cap + priority
             ObjectNode minorFinding = negativeFindingWithSuggestedNotes(
-                "code-style", "MINOR",
+                "code-style",
+                "MINOR",
                 suggestedNote("src/Minor1.java", 1, "minor-1"),
                 suggestedNote("src/Minor2.java", 2, "minor-2"),
                 suggestedNote("src/Minor3.java", 3, "minor-3"),
@@ -712,7 +711,8 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
                 suggestedNote("src/Minor6.java", 6, "minor-6")
             );
             ObjectNode criticalFinding = negativeFindingWithSuggestedNotes(
-                "hardcoded-secrets", "CRITICAL",
+                "hardcoded-secrets",
+                "CRITICAL",
                 suggestedNote("src/Critical1.java", 10, "critical-1"),
                 suggestedNote("src/Critical2.java", 20, "critical-2"),
                 suggestedNote("src/Critical3.java", 30, "critical-3"),
@@ -799,7 +799,8 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         @DisplayName("preserves mrNote from delivery when fallback fills diffNotes")
         void preservesMrNoteFromDelivery() {
             ObjectNode finding = negativeFindingWithSuggestedNotes(
-                "error-handling", "MAJOR",
+                "error-handling",
+                "MAJOR",
                 suggestedNote("src/Fix.java", 1, "Fix this")
             );
             String raw = """
@@ -862,14 +863,21 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
 
             assertThat(result.validFindings()).hasSize(2);
             // error-handling: should keep higher confidence (0.95)
-            ValidatedFinding errorHandling = result.validFindings().stream()
+            ValidatedFinding errorHandling = result
+                .validFindings()
+                .stream()
                 .filter(f -> f.practiceSlug().equals("error-handling"))
-                .findFirst().orElseThrow();
+                .findFirst()
+                .orElseThrow();
             assertThat(errorHandling.confidence()).isEqualTo(0.95f);
             assertThat(errorHandling.title()).isEqualTo("Higher confidence");
             // code-hygiene: should remain
-            assertThat(result.validFindings().stream()
-                .anyMatch(f -> f.practiceSlug().equals("code-hygiene"))).isTrue();
+            assertThat(
+                result
+                    .validFindings()
+                    .stream()
+                    .anyMatch(f -> f.practiceSlug().equals("code-hygiene"))
+            ).isTrue();
         }
 
         @Test
@@ -996,7 +1004,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             ValidatedFinding first = result.validFindings().get(0);
             assertThat(first.practiceSlug()).isEqualTo("pr-description-quality");
             assertThat(first.verdict()).isEqualTo(Verdict.POSITIVE);
-            assertThat(first.guidanceMethod()).isNull();
+            // guidanceMethod removed — no assertion needed
 
             // Verify negative finding
             ValidatedFinding negative = result.validFindings().get(1);

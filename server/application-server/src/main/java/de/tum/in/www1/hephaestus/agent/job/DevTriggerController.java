@@ -38,18 +38,21 @@ public class DevTriggerController {
 
     @PostMapping("/trigger-review")
     @Transactional
-    public ResponseEntity<String> triggerReview(
-        @RequestParam Long prId,
-        @RequestParam Long workspaceId
-    ) {
+    public ResponseEntity<String> triggerReview(@RequestParam Long prId, @RequestParam Long workspaceId) {
         PullRequest pr = pullRequestRepository.findById(prId).orElse(null);
         if (pr == null) {
             return ResponseEntity.badRequest().body("PR not found: " + prId);
         }
 
         if (pr.getHeadRefOid() == null || pr.getHeadRefName() == null || pr.getBaseRefName() == null) {
-            return ResponseEntity.badRequest().body("PR missing branch info: headRefOid=" + pr.getHeadRefOid()
-                + ", headRefName=" + pr.getHeadRefName() + ", baseRefName=" + pr.getBaseRefName());
+            return ResponseEntity.badRequest().body(
+                "PR missing branch info: headRefOid=" +
+                    pr.getHeadRefOid() +
+                    ", headRefName=" +
+                    pr.getHeadRefName() +
+                    ", baseRefName=" +
+                    pr.getBaseRefName()
+            );
         }
 
         EventPayload.PullRequestData prData = EventPayload.PullRequestData.from(pr);

@@ -88,9 +88,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
     );
 
     /** High-entropy strings in quotes (≥20 chars, alphanumeric/base64) — likely real keys. */
-    private static final Pattern HIGH_ENTROPY_STRING = Pattern.compile(
-        "\"[A-Za-z0-9+/=_\\-]{20,}\""
-    );
+    private static final Pattern HIGH_ENTROPY_STRING = Pattern.compile("\"[A-Za-z0-9+/=_\\-]{20,}\"");
 
     /** Config files that commonly contain secrets. */
     private static final Pattern CONFIG_FILE_PATTERN = Pattern.compile(
@@ -245,7 +243,11 @@ public class PullRequestReviewHandler implements JobTypeHandler {
 
         // Slim task prompt — orchestrator instructions are in agent-specific files
         // (CLAUDE.md for Claude Code, agent def for OpenCode), which reference orchestrator-protocol.md.
-        String prompt = "Review merge request #" + pullRequestNumber + " in " + repoName +
+        String prompt =
+            "Review merge request #" +
+            pullRequestNumber +
+            " in " +
+            repoName +
             ". Follow the orchestrator protocol in /workspace/orchestrator-protocol.md.";
         log.info("Built orchestrator prompt: {} chars, jobId={}", prompt.length(), job.getId());
         return prompt;
@@ -289,9 +291,13 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         for (int i = 0; i < practices.size(); i++) {
             Practice p = practices.get(i);
             if (i > 0) indexJson.append(",\n");
-            indexJson.append("  {\"slug\": \"").append(escapeJson(p.getSlug()))
-                .append("\", \"name\": \"").append(escapeJson(p.getName()))
-                .append("\", \"category\": \"").append(escapeJson(p.getCategory() != null ? p.getCategory() : ""))
+            indexJson
+                .append("  {\"slug\": \"")
+                .append(escapeJson(p.getSlug()))
+                .append("\", \"name\": \"")
+                .append(escapeJson(p.getName()))
+                .append("\", \"category\": \"")
+                .append(escapeJson(p.getCategory() != null ? p.getCategory() : ""))
                 .append("\"}");
         }
         indexJson.append("\n]");
@@ -313,7 +319,9 @@ public class PullRequestReviewHandler implements JobTypeHandler {
 
         log.info(
             "Injected orchestrator files: {} practices, workspaceId={}, jobId={}",
-            practices.size(), workspaceId, job.getId()
+            practices.size(),
+            workspaceId,
+            job.getId()
         );
     }
 
@@ -414,9 +422,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             );
         }
         if (scopedFindings.isEmpty()) {
-            throw new JobDeliveryException(
-                "All findings filtered by diff scope: jobId=" + job.getId()
-            );
+            throw new JobDeliveryException("All findings filtered by diff scope: jobId=" + job.getId());
         }
 
         // 2. Persist findings (hard failure — must succeed)
@@ -450,7 +456,25 @@ public class PullRequestReviewHandler implements JobTypeHandler {
                     ? delivery.diffNotes()
                     : composed.diffNotes();
                 delivery = new PracticeDetectionResultParser.DeliveryContent(composed.mrNote(), diffNotes);
-                log.info("Server-side delivery composed from {} findings: jobId={}", scopedFindings.size(), job.getId());
+                log.info(
+                    "Server-side delivery composed from {} findings: jobId={}",
+                    scopedFindings.size(),
+                    job.getId()
+                );
+            }
+        }
+
+        // 3b. Validate and correct diff note positions against actual diff hunks.
+        //     This prevents "line outside diff hunk" errors at the GitLab API level.
+        if (delivery != null && !delivery.diffNotes().isEmpty()) {
+            var validLines = computeDiffValidLines(job);
+            if (!validLines.isEmpty()) {
+                var correctedNotes = DiffHunkValidator.validateAndCorrect(
+                    delivery.diffNotes(),
+                    validLines,
+                    job.getId().toString()
+                );
+                delivery = new PracticeDetectionResultParser.DeliveryContent(delivery.mrNote(), correctedNotes);
             }
         }
 
@@ -593,8 +617,15 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             } else {
                 // Strategy 2: Find merge commit and diff its parents
                 // Look for merge commit that has headSha as second parent
-                String mergeCommit = runGit(repoPath, "log", "--all", "--merges", "--format=%H %P",
-                    "--ancestry-path", headSha + "..origin/" + targetBranch);
+                String mergeCommit = runGit(
+                    repoPath,
+                    "log",
+                    "--all",
+                    "--merges",
+                    "--format=%H %P",
+                    "--ancestry-path",
+                    headSha + "..origin/" + targetBranch
+                );
                 String base = null;
                 if (mergeCommit != null) {
                     for (String line : mergeCommit.split("\n")) {
@@ -626,17 +657,29 @@ public class PullRequestReviewHandler implements JobTypeHandler {
                 if (diffStat != null) {
                     files.put(".context/diff_stat.txt", diffStat.getBytes(StandardCharsets.UTF_8));
                 }
-                log.info("Pre-computed diff: {} bytes (annotated: {} bytes), diffStat={} bytes, headSha={}",
-                    diff.length(), annotatedDiff.length(),
-                    diffStat != null ? diffStat.length() : 0, headSha);
+                log.info(
+                    "Pre-computed diff: {} bytes (annotated: {} bytes), diffStat={} bytes, headSha={}",
+                    diff.length(),
+                    annotatedDiff.length(),
+                    diffStat != null ? diffStat.length() : 0,
+                    headSha
+                );
             } else {
                 throw new JobPreparationException(
-                    "Empty diff: no changed files between target and head. headSha=" + headSha +
-                    ", targetBranch=" + targetBranch + ", sourceBranch=" + sourceBranch
+                    "Empty diff: no changed files between target and head. headSha=" +
+                        headSha +
+                        ", targetBranch=" +
+                        targetBranch +
+                        ", sourceBranch=" +
+                        sourceBranch
                 );
             }
         } catch (Exception e) {
-            log.warn("Failed to pre-compute diff, agent will compute its own: headSha={}, error={}", headSha, e.getMessage());
+            log.warn(
+                "Failed to pre-compute diff, agent will compute its own: headSha={}, error={}",
+                headSha,
+                e.getMessage()
+            );
         }
     }
 
@@ -700,17 +743,22 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             String content = fileDiffs.get(i);
             int added = countAddedLines(content);
             String tokens = quickScanTokens(content);
-            summary.append("| ").append(i + 1)
-                .append(" | `").append(filePaths.get(i)).append("`")
-                .append(" | +").append(added)
-                .append(" | ").append(tokens)
+            summary
+                .append("| ")
+                .append(i + 1)
+                .append(" | `")
+                .append(filePaths.get(i))
+                .append("`")
+                .append(" | +")
+                .append(added)
+                .append(" | ")
+                .append(tokens)
                 .append(" |\n");
         }
 
         // Per-file diffs (already annotated with [L<n>])
         for (int i = 0; i < filePaths.size(); i++) {
-            summary.append("\n---\n\n### ").append(i + 1).append(". ")
-                .append(filePaths.get(i)).append("\n\n");
+            summary.append("\n---\n\n### ").append(i + 1).append(". ").append(filePaths.get(i)).append("\n\n");
             summary.append("```diff\n").append(fileDiffs.get(i)).append("```\n");
         }
 
@@ -757,6 +805,42 @@ public class PullRequestReviewHandler implements JobTypeHandler {
      * Uses the same commit SHAs from metadata that were used during preparation.
      * Returns empty set on failure (graceful degradation — no filtering applied).
      */
+    /**
+     * Compute valid diff note line numbers per file by parsing the full diff.
+     * Used by DiffHunkValidator to snap agent-provided line numbers to valid positions.
+     */
+    private Map<String, java.util.TreeSet<Integer>> computeDiffValidLines(AgentJob job) {
+        JsonNode metadata = job.getMetadata();
+        if (metadata == null) return Map.of();
+
+        long repositoryId;
+        String headSha, targetBranch, sourceBranch;
+        try {
+            repositoryId = requireLong(metadata, "repository_id");
+            headSha = requireText(metadata, "commit_sha");
+            targetBranch = requireText(metadata, "target_branch");
+            sourceBranch = requireText(metadata, "source_branch");
+        } catch (Exception e) {
+            log.debug("Cannot compute diff valid lines, missing metadata: {}", e.getMessage());
+            return Map.of();
+        }
+
+        if (!gitRepositoryManager.isRepositoryCloned(repositoryId)) return Map.of();
+        Path repoPath = gitRepositoryManager.getRepositoryPath(repositoryId);
+
+        // Get full diff using same strategy as computeAndStoreDiff
+        String diff = runGit(repoPath, "diff", "origin/" + targetBranch + "..origin/" + sourceBranch);
+        if (diff == null || diff.isBlank()) {
+            String base = runGit(repoPath, "merge-base", "origin/" + targetBranch, headSha);
+            if (base != null) {
+                diff = runGit(repoPath, "diff", base.trim() + ".." + headSha);
+            }
+        }
+        if (diff == null || diff.isBlank()) return Map.of();
+
+        return DiffHunkValidator.parseValidLines(diff);
+    }
+
     private Set<String> computeDiffStatFiles(AgentJob job) {
         JsonNode metadata = job.getMetadata();
         if (metadata == null) return Set.of();
@@ -861,9 +945,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             if (hasInScopeLocation) {
                 filtered.add(finding);
             } else {
-                log.info("Filtered out-of-scope finding: slug={}, paths={}",
-                    finding.practiceSlug(),
-                    locations);
+                log.info("Filtered out-of-scope finding: slug={}, paths={}", finding.practiceSlug(), locations);
             }
         }
         return filtered;

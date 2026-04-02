@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.practices.finding.dto;
 
-import de.tum.in.www1.hephaestus.practices.model.CaMethod;
 import de.tum.in.www1.hephaestus.practices.model.PracticeFinding;
 import de.tum.in.www1.hephaestus.practices.model.PracticeFindingTargetType;
 import de.tum.in.www1.hephaestus.practices.model.Severity;
@@ -33,7 +32,6 @@ public record PracticeFindingDetailDTO(
     @Nullable @Schema(description = "Structured evidence (locations, snippets, references)") Object evidence,
     @Nullable @Schema(description = "AI reasoning behind the verdict") String reasoning,
     @Nullable @Schema(description = "Actionable guidance for the contributor") String guidance,
-    @Nullable @Schema(description = "Cognitive apprenticeship guidance method") CaMethod guidanceMethod,
     @NonNull @Schema(description = "When the finding was detected") Instant detectedAt
 ) {
     /**
@@ -55,7 +53,6 @@ public record PracticeFindingDetailDTO(
             f.getEvidence(),
             f.getReasoning(),
             f.getGuidance(),
-            f.getGuidanceMethod(),
             f.getDetectedAt()
         );
     }

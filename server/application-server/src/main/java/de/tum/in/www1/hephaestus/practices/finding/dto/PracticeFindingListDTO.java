@@ -1,6 +1,5 @@
 package de.tum.in.www1.hephaestus.practices.finding.dto;
 
-import de.tum.in.www1.hephaestus.practices.model.CaMethod;
 import de.tum.in.www1.hephaestus.practices.model.PracticeFinding;
 import de.tum.in.www1.hephaestus.practices.model.PracticeFindingTargetType;
 import de.tum.in.www1.hephaestus.practices.model.Severity;
@@ -27,7 +26,6 @@ public record PracticeFindingListDTO(
     @NonNull @Schema(description = "Verdict: POSITIVE or NEGATIVE") Verdict verdict,
     @NonNull @Schema(description = "Severity level") Severity severity,
     @NonNull @Schema(description = "AI confidence score (0.0–1.0)") Float confidence,
-    @Nullable @Schema(description = "Cognitive apprenticeship guidance method") CaMethod guidanceMethod,
     @NonNull @Schema(description = "When the finding was detected") Instant detectedAt
 ) {
     /**
@@ -46,7 +44,6 @@ public record PracticeFindingListDTO(
             f.getVerdict(),
             f.getSeverity(),
             f.getConfidence(),
-            f.getGuidanceMethod(),
             f.getDetectedAt()
         );
     }

@@ -120,34 +120,4 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
         @Param("newStatus") DeliveryStatus newStatus,
         @Param("fromStatuses") Collection<DeliveryStatus> fromStatuses
     );
-
-    /**
-     * Find the delivery comment ID from the most recent delivered job for the same MR/PR.
-     * Used for re-analysis dedup: update the existing comment instead of creating a duplicate.
-     *
-     * <p>Uses stable external identifiers (repository name + PR number) instead of internal
-     * pull_request_id, so dedup survives PR record deletion and re-creation in the database.
-     */
-    @WorkspaceAgnostic("Cross-job lookup for re-analysis dedup; workspace-scoped by parameter")
-    @Query(
-        value = """
-        SELECT delivery_comment_id FROM agent_job
-        WHERE workspace_id = :workspaceId
-        AND job_type = 'PULL_REQUEST_REVIEW'
-        AND delivery_comment_id IS NOT NULL
-        AND delivery_status = 'DELIVERED'
-        AND metadata->>'repository_full_name' = :repoFullName
-        AND CAST(metadata->>'pr_number' AS integer) = :prNumber
-        AND id != :currentJobId
-        ORDER BY completed_at DESC NULLS LAST
-        LIMIT 1
-        """,
-        nativeQuery = true
-    )
-    Optional<String> findPreviousDeliveryCommentId(
-        @Param("workspaceId") Long workspaceId,
-        @Param("repoFullName") String repoFullName,
-        @Param("prNumber") int prNumber,
-        @Param("currentJobId") UUID currentJobId
-    );
 }

@@ -50,11 +50,7 @@ public record GitLabMergeRequestEventDTO(
     ) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record LastCommit(
-        @NonNull String id,
-        @Nullable String message,
-        @Nullable String title
-    ) {}
+    public record LastCommit(@NonNull String id, @Nullable String message, @Nullable String title) {}
 
     public boolean isConfidential() {
         return "confidential_merge_request".equals(eventType);

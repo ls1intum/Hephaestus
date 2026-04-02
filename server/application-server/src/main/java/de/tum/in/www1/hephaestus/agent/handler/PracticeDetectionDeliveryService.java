@@ -181,7 +181,6 @@ public class PracticeDetectionDeliveryService {
                 evidenceJson,
                 finding.reasoning(),
                 finding.guidance(),
-                finding.guidanceMethod() != null ? finding.guidanceMethod().name() : null,
                 detectedAt
             );
 

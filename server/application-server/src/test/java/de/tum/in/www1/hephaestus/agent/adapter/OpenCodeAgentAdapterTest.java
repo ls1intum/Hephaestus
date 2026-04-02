@@ -373,12 +373,23 @@ class OpenCodeAgentAdapterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should calculate timeout with buffer subtracted")
+        @DisplayName("should calculate timeout with buffer and retry reservations subtracted")
         void shouldCalculateTimeoutWithBuffer() {
-            // timeout=600s, buffer=60s → agent timeout = 540000ms
+            // timeout=600s, buffer=60s → agentTimeout=540000ms, retryFormat=90000ms, retryPosition=90000ms → initial=360000ms
             var spec = adapter.buildSandboxSpec(proxyRequest(LlmProvider.ANTHROPIC, "claude-sonnet-4-20250514"));
             String script = new String(spec.inputFiles().get(".run-opencode.mjs"), StandardCharsets.UTF_8);
-            assertThat(script).contains("timeout: 540000");
+            // Timeouts passed as function arguments: runOpenCode([...], label, timeoutMs)
+            assertThat(script).contains("'initial', 360000");
+            assertThat(script).contains("'retry-format', 90000");
+            assertThat(script).contains("'retry-position', 90000");
+        }
+
+        @Test
+        @DisplayName("should use --continue flag for retry")
+        void shouldUseContinueFlagForRetry() {
+            var spec = adapter.buildSandboxSpec(proxyRequest(LlmProvider.ANTHROPIC, "claude-sonnet-4-20250514"));
+            String script = new String(spec.inputFiles().get(".run-opencode.mjs"), StandardCharsets.UTF_8);
+            assertThat(script).contains("'--continue'");
         }
 
         @Test

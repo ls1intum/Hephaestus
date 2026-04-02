@@ -22,7 +22,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Adapter for the OpenCode CLI agent (provider-agnostic).
  *
- * <p>CLI: {@code opencode run "prompt" --format json}
+ * <p>CLI: {@code opencode run "prompt" --format json} (retry: {@code opencode run --continue "correction"})
  *
  * <p>OpenCode requires a JSON config file. In proxy mode, the config uses the built-in
  * provider (e.g. {@code openai/model}) and the shell command aliases the generic proxy
@@ -66,14 +66,8 @@ public class OpenCodeAgentAdapter implements AgentAdapter {
 
         // OpenCode agent definitions loaded from classpath resources.
         // The orchestrator (practice-review) spawns per-practice subagents via the task tool.
-        inputFiles.put(
-            ".opencode/agents/practice-review.md",
-            loadClasspathResource("opencode-orchestrator.md")
-        );
-        inputFiles.put(
-            ".opencode/agents/practice-analyzer.md",
-            loadClasspathResource("opencode-practice-analyzer.md")
-        );
+        inputFiles.put(".opencode/agents/practice-review.md", loadClasspathResource("opencode-orchestrator.md"));
+        inputFiles.put(".opencode/agents/practice-analyzer.md", loadClasspathResource("opencode-practice-analyzer.md"));
 
         // Use a Node.js wrapper to invoke opencode with spawnSync.
         // This bypasses shell variable handling entirely — the prompt file is read
@@ -93,7 +87,11 @@ public class OpenCodeAgentAdapter implements AgentAdapter {
         env.put("TMPDIR", "/home/agent/.local/tmp");
 
         String command =
-            "mkdir -p " + OUTPUT_PATH + " /home/agent/.local/tmp" + proxyEnvSetup + " && node /workspace/.run-opencode.mjs";
+            "mkdir -p " +
+            OUTPUT_PATH +
+            " /home/agent/.local/tmp" +
+            proxyEnvSetup +
+            " && node /workspace/.run-opencode.mjs";
 
         return new AgentSandboxSpec(
             IMAGE,
@@ -126,7 +124,10 @@ public class OpenCodeAgentAdapter implements AgentAdapter {
                 if (usage != null) {
                     log.info(
                         "OpenCode usage: calls={}, inputTokens={}, outputTokens={}, cost={}",
-                        usage.totalCalls(), usage.inputTokens(), usage.outputTokens(), usage.costUsd()
+                        usage.totalCalls(),
+                        usage.inputTokens(),
+                        usage.outputTokens(),
+                        usage.costUsd()
                     );
                 }
             } else {
@@ -171,38 +172,193 @@ public class OpenCodeAgentAdapter implements AgentAdapter {
      * and writes stdout/stderr to output files.
      */
     private byte[] buildRunnerScript(long agentTimeoutMs) {
+        // Reserve 90s for format retry + 90s for position retry
+        long retryTimeoutMs = 90_000;
+        long posRetryTimeoutMs = 90_000;
+        long initialTimeoutMs = Math.max(60_000, agentTimeoutMs - retryTimeoutMs - posRetryTimeoutMs);
         String script = """
             import { spawnSync } from 'child_process';
-            import { readFileSync, writeFileSync, mkdirSync } from 'fs';
+            import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
 
             const OUTPUT = '/workspace/.output';
             mkdirSync(OUTPUT, { recursive: true });
 
             const prompt = readFileSync('/workspace/.prompt', 'utf-8').trim();
-            console.error(`Prompt loaded: ${prompt.length} chars`);
+            console.error(`[run-opencode] Prompt loaded: ${prompt.length} chars`);
 
-            const result = spawnSync('opencode', [
-                'run',
-                '--format', 'json',
-                '--agent', 'practice-review',
-                '--print-logs',
-                '--log-level', 'WARN',
-                '--', prompt
-            ], {
+            function runOpenCode(args, label, timeoutMs) {
+              console.error(`[run-opencode] ${label}`);
+              const start = Date.now();
+              const r = spawnSync('opencode', args, {
                 encoding: 'utf-8',
                 maxBuffer: %d,
-                timeout: %d,
+                timeout: timeoutMs || 0,
                 stdio: ['pipe', 'pipe', 'pipe']
-            });
+              });
+              const sec = ((Date.now() - start) / 1000).toFixed(1);
+              console.error(`[run-opencode] ${label}: ${sec}s, exit=${r.status}, stdout=${(r.stdout||'').length}b`);
+              if (r.error) console.error(`[run-opencode] error: ${r.error.message}`);
+              return r;
+            }
 
-            writeFileSync(`${OUTPUT}/result.json`, result.stdout || '');
+            function extractText(ndjson) {
+              if (!ndjson?.trim()) return '';
+              const trimmed = ndjson.trim();
+              if (trimmed.startsWith('{') && !trimmed.includes('\\n{')) return trimmed;
+              let text = '';
+              for (const line of ndjson.split('\\n')) {
+                if (!line.trim()) continue;
+                try {
+                  const ev = JSON.parse(line);
+                  if (ev.type === 'text') text += ev.part?.text || '';
+                } catch {}
+              }
+              return text;
+            }
+
+            function hasFindings(output) {
+              if (!output?.trim()) return false;
+              const text = extractText(output);
+              return text.includes('"findings"') && text.includes('"practiceSlug"');
+            }
+
+            // Parse diff.patch to find valid + line numbers per file
+            function parseDiffValidLines() {
+              const diffPath = '/workspace/.context/diff.patch';
+              if (!existsSync(diffPath)) return new Map();
+              const diff = readFileSync(diffPath, 'utf-8');
+              const result = new Map(); // file -> Set<lineNum>
+              let currentFile = null;
+              let newLineNum = 0;
+              const hunkRe = /@@ -\\d+(?:,\\d+)? \\+(\\d+)(?:,(\\d+))? @@/;
+              for (const line of diff.split('\\n')) {
+                let eff = line;
+                if (eff.startsWith('[L') && eff.includes('] ')) {
+                  eff = eff.substring(eff.indexOf('] ') + 2);
+                }
+                if (eff.startsWith('diff --git')) {
+                  const bIdx = eff.lastIndexOf(' b/');
+                  if (bIdx > 0) {
+                    currentFile = eff.substring(bIdx + 3);
+                    if (!result.has(currentFile)) result.set(currentFile, new Set());
+                  }
+                  newLineNum = 0;
+                  continue;
+                }
+                const hm = hunkRe.exec(eff);
+                if (hm) { newLineNum = parseInt(hm[1]); continue; }
+                if (newLineNum === 0 || !currentFile) continue;
+                if (eff.startsWith('+')) {
+                  result.get(currentFile).add(newLineNum);
+                  newLineNum++;
+                } else if (eff.startsWith('-')) {
+                  // deleted line — no increment
+                } else {
+                  result.get(currentFile).add(newLineNum);
+                  newLineNum++;
+                }
+              }
+              return result;
+            }
+
+            // Check suggestedDiffNotes positions against valid diff lines
+            function validateDiffNotePositions(output) {
+              const text = extractText(output);
+              let json;
+              try {
+                const start = text.indexOf('{');
+                const end = text.lastIndexOf('}');
+                if (start < 0 || end < 0) return [];
+                json = JSON.parse(text.substring(start, end + 1));
+              } catch { return []; }
+              if (!json.findings) return [];
+              const validLines = parseDiffValidLines();
+              if (validLines.size === 0) return [];
+              const errors = [];
+              for (const f of json.findings) {
+                if (!f.suggestedDiffNotes) continue;
+                for (const dn of f.suggestedDiffNotes) {
+                  const fileLines = validLines.get(dn.filePath);
+                  if (!fileLines) {
+                    errors.push(`${dn.filePath}:${dn.startLine} — file not in diff`);
+                  } else if (!fileLines.has(dn.startLine)) {
+                    const valid = [...fileLines].sort((a,b) => a-b);
+                    const nearest = valid.reduce((best, v) =>
+                      Math.abs(v - dn.startLine) < Math.abs(best - dn.startLine) ? v : best, valid[0]);
+                    errors.push(`${dn.filePath}:${dn.startLine} — not in diff hunk (nearest valid: ${nearest})`);
+                  }
+                }
+              }
+              return errors;
+            }
+
+            // Initial run
+            let result = runOpenCode([
+              'run', '--format', 'json',
+              '--agent', 'practice-review',
+              '--print-logs', '--log-level', 'WARN',
+              '--', prompt
+            ], 'initial', %d);
+
+            const initialOutput = result.stdout || '';
+            writeFileSync(`${OUTPUT}/result.json`, initialOutput);
+            writeFileSync(`${OUTPUT}/initial.json`, initialOutput);
+            let valid = hasFindings(initialOutput);
+            let bestOutput = initialOutput;
+
+            // Self-correction phase 1: format retry (if no valid findings)
+            if (!valid && initialOutput.trim()) {
+              console.error('[run-opencode] retry 1: output invalid, retrying with --continue');
+              const correctionMsg = 'Your previous output was not valid JSON with the required schema. Output ONLY the raw JSON object with NO markdown fences: {"findings": [{practiceSlug, title, verdict (POSITIVE/NEGATIVE/NOT_APPLICABLE), severity, confidence, reasoning, guidance, suggestedDiffNotes}, ...]}. Re-examine your analysis and emit ALL findings.';
+
+              result = runOpenCode([
+                'run', '--continue', '--format', 'json',
+                '--print-logs', '--log-level', 'WARN',
+                '--', correctionMsg
+              ], 'retry-format', %d);
+
+              const retryOutput = result.stdout || '';
+              writeFileSync(`${OUTPUT}/retry-format.json`, retryOutput);
+              if (hasFindings(retryOutput)) {
+                bestOutput = retryOutput;
+                valid = true;
+              } else if (retryOutput.trim()) {
+                bestOutput = retryOutput.length > initialOutput.length ? retryOutput : initialOutput;
+              }
+              writeFileSync(`${OUTPUT}/result.json`, bestOutput);
+            }
+
+            // Self-correction phase 2: diff note position validation
+            // If findings are valid, check if suggestedDiffNotes positions are in valid diff lines
+            if (valid) {
+              const posErrors = validateDiffNotePositions(bestOutput);
+              if (posErrors.length > 0) {
+                console.error(`[run-opencode] ${posErrors.length} diff note position errors, retrying`);
+                const posMsg = `Some of your suggestedDiffNotes have line numbers that are NOT in the diff. These will fail when posted as inline comments. Fix the startLine values to point to actual + lines in the diff:\\n${posErrors.join('\\n')}\\n\\nRe-emit the COMPLETE findings JSON with corrected line numbers. Use [L<n>] annotations from the diff to find valid line numbers.`;
+
+                result = runOpenCode([
+                  'run', '--continue', '--format', 'json',
+                  '--print-logs', '--log-level', 'WARN',
+                  '--', posMsg
+                ], 'retry-position', %d);
+
+                const posRetryOutput = result.stdout || '';
+                writeFileSync(`${OUTPUT}/retry-position.json`, posRetryOutput);
+                if (hasFindings(posRetryOutput)) {
+                  bestOutput = posRetryOutput;
+                  console.error('[run-opencode] position retry produced valid output');
+                }
+                writeFileSync(`${OUTPUT}/result.json`, bestOutput);
+              }
+            }
+
             writeFileSync(`${OUTPUT}/debug.log`,
-                `STATUS=${result.status}\\nSIGNAL=${result.signal}\\nERROR=${result.error || ''}\\n---STDERR---\\n${result.stderr || ''}`
+              `STATUS=${result.status}\\nSIGNAL=${result.signal}\\nERROR=${result.error || ''}\\nVALID=${valid}\\n---STDERR---\\n${result.stderr || ''}`
             );
 
-            console.error(`OpenCode exit: status=${result.status}, signal=${result.signal}, stdout=${(result.stdout || '').length} bytes`);
+            console.error(`[run-opencode] ${valid ? 'SUCCESS' : 'FAILED: no valid findings'}`);
             process.exit(result.status || 0);
-            """.formatted(MAX_STDOUT_BUFFER_BYTES, agentTimeoutMs);
+            """.formatted(MAX_STDOUT_BUFFER_BYTES, initialTimeoutMs, retryTimeoutMs, posRetryTimeoutMs);
         return script.getBytes(StandardCharsets.UTF_8);
     }
 
@@ -290,7 +446,6 @@ public class OpenCodeAgentAdapter implements AgentAdapter {
                         stepCost = node.path("part").path("cost").asDouble(0.0);
                     }
                     totalCost += stepCost;
-
                 } else if ("step_start".equals(type) || "step-start".equals(type)) {
                     // Extract model name from the step metadata if available
                     String stepModel = node.path("model").asText(null);
@@ -304,18 +459,19 @@ public class OpenCodeAgentAdapter implements AgentAdapter {
             }
             log.debug("NDJSON event types: {}", seenTypes);
 
-            AgentResult.LlmUsage usage = stepCount > 0
-                ? new AgentResult.LlmUsage(
-                    model,
-                    totalInputTokens > 0 ? totalInputTokens : null,
-                    totalOutputTokens > 0 ? totalOutputTokens : null,
-                    totalReasoningTokens > 0 ? totalReasoningTokens : null,
-                    totalCacheReadTokens > 0 ? totalCacheReadTokens : null,
-                    totalCacheWriteTokens > 0 ? totalCacheWriteTokens : null,
-                    totalCost > 0 ? totalCost : null,
-                    stepCount
-                )
-                : null;
+            AgentResult.LlmUsage usage =
+                stepCount > 0
+                    ? new AgentResult.LlmUsage(
+                          model,
+                          totalInputTokens > 0 ? totalInputTokens : null,
+                          totalOutputTokens > 0 ? totalOutputTokens : null,
+                          totalReasoningTokens > 0 ? totalReasoningTokens : null,
+                          totalCacheReadTokens > 0 ? totalCacheReadTokens : null,
+                          totalCacheWriteTokens > 0 ? totalCacheWriteTokens : null,
+                          totalCost > 0 ? totalCost : null,
+                          stepCount
+                      )
+                    : null;
 
             String text = textContent.isEmpty() ? null : textContent.toString();
             return new NdjsonParseResult(text, usage);

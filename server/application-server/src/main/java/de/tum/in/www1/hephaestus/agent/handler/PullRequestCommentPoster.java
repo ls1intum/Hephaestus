@@ -179,23 +179,21 @@ class PullRequestCommentPoster {
             return null;
         }
         String formatted = formatComment(sanitized, summary != null ? sanitize(summary) : null, job);
-        return postFormattedBody(job, formatted, job.getDeliveryCommentId());
+        return postFormattedBody(job, formatted);
     }
 
     // ── Core posting (shared by all comment types) ──
 
     /**
      * Posts a fully formatted body to the PR/MR associated with the given job.
-     * If an existing comment ID is provided, updates that comment instead of creating a new one.
      *
-     * @param job               the completed agent job (must have metadata)
-     * @param formattedBody     the fully formatted comment body (already sanitized)
-     * @param existingCommentId an existing comment/note ID to update, or null to create a new one
+     * @param job           the completed agent job (must have metadata)
+     * @param formattedBody the fully formatted comment body (already sanitized)
      * @return the provider-specific comment ID
      * @throws JobDeliveryException if posting fails
      */
     @Nullable
-    String postFormattedBody(AgentJob job, String formattedBody, @Nullable String existingCommentId) {
+    String postFormattedBody(AgentJob job, String formattedBody) {
         Long workspaceId = job.getWorkspace().getId();
         Workspace workspace = workspaceRepository
             .findById(workspaceId)
@@ -203,9 +201,9 @@ class PullRequestCommentPoster {
 
         String commentId;
         if (workspace.getProviderType() == GitProviderType.GITHUB) {
-            commentId = postGitHubComment(workspaceId, job, formattedBody, existingCommentId);
+            commentId = postGitHubComment(workspaceId, job, formattedBody);
         } else {
-            commentId = postGitLabNote(workspaceId, job, formattedBody, existingCommentId);
+            commentId = postGitLabNote(workspaceId, job, formattedBody);
         }
 
         log.info(
@@ -219,17 +217,9 @@ class PullRequestCommentPoster {
 
     // ── GitHub ──
 
-    private String postGitHubComment(Long scopeId, AgentJob job, String body, @Nullable String existingCommentId) {
+    private String postGitHubComment(Long scopeId, AgentJob job, String body) {
         if (gitHubProvider.isRateLimitCritical(scopeId)) {
             throw new JobDeliveryException("GitHub rate limit critical — skipping comment post for scope " + scopeId);
-        }
-
-        if (existingCommentId != null && !existingCommentId.isBlank()) {
-            String updatedId = updateGitHubComment(scopeId, existingCommentId, body);
-            if (updatedId != null) {
-                return updatedId;
-            }
-            log.warn("Previous comment was deleted, falling back to create: commentId={}, jobId={}", existingCommentId, job.getId());
         }
 
         JsonNode metadata = job.getMetadata();
@@ -301,62 +291,14 @@ class PullRequestCommentPoster {
         return commentNodeId;
     }
 
-    /**
-     * Updates an existing GitHub comment. Returns the comment ID on success, or {@code null}
-     * if the comment no longer exists (deleted externally). Callers should fall back to
-     * creating a new comment when this returns null.
-     */
-    @Nullable
-    private String updateGitHubComment(Long scopeId, String commentId, String body) {
-        ClientGraphQlResponse response = gitHubProvider
-            .forScope(scopeId)
-            .documentName("UpdatePullRequestComment")
-            .variable("commentId", commentId)
-            .variable("body", body)
-            .execute()
-            .block(GRAPHQL_TIMEOUT);
-
-        if (response == null) {
-            throw new JobDeliveryException("Null response from UpdatePullRequestComment mutation");
-        }
-        gitHubProvider.trackRateLimit(scopeId, response);
-
-        if (response.getErrors() != null && !response.getErrors().isEmpty()) {
-            // Check if the error indicates a missing comment — fall back to create
-            String errorText = response.getErrors().toString().toLowerCase(Locale.ROOT);
-            if (errorText.contains("not found") || errorText.contains("could not resolve")) {
-                log.warn("GitHub comment was deleted, falling back to create: commentId={}, errors={}", commentId, response.getErrors());
-                return null;
-            }
-            throw new JobDeliveryException("GitHub UpdatePullRequestComment failed: " + response.getErrors());
-        }
-
-        // Verify the comment was actually updated
-        String returnedId = response.field("updateIssueComment.issueComment.id").getValue();
-        if (returnedId == null) {
-            log.warn("GitHub updateIssueComment returned null comment — comment was likely deleted: commentId={}", commentId);
-            return null;
-        }
-
-        return returnedId;
-    }
-
     // ── GitLab ──
 
-    private String postGitLabNote(Long scopeId, AgentJob job, String body, @Nullable String existingNoteId) {
+    private String postGitLabNote(Long scopeId, AgentJob job, String body) {
         if (gitLabProvider == null) {
             throw new JobDeliveryException("GitLab provider not configured — cannot post note for scope " + scopeId);
         }
         if (gitLabProvider.isRateLimitCritical(scopeId)) {
             throw new JobDeliveryException("GitLab rate limit critical — skipping note post for scope " + scopeId);
-        }
-
-        if (existingNoteId != null && !existingNoteId.isBlank()) {
-            String updatedId = updateGitLabNote(scopeId, existingNoteId, body);
-            if (updatedId != null) {
-                return updatedId;
-            }
-            log.warn("Previous note was deleted, falling back to create: noteId={}, jobId={}", existingNoteId, job.getId());
         }
 
         JsonNode metadata = job.getMetadata();
@@ -417,47 +359,6 @@ class PullRequestCommentPoster {
             throw new JobDeliveryException("No note ID in CreateMergeRequestNote response");
         }
         return noteId;
-    }
-
-    /**
-     * Updates an existing GitLab note. Returns the note ID on success, or {@code null}
-     * if the note no longer exists (deleted externally). Callers should fall back to
-     * creating a new note when this returns null.
-     */
-    @Nullable
-    private String updateGitLabNote(Long scopeId, String noteId, String body) {
-        ClientGraphQlResponse response = gitLabProvider
-            .forScope(scopeId)
-            .documentName("UpdateMergeRequestNote")
-            .variable("noteId", noteId)
-            .variable("body", body)
-            .execute()
-            .block(GRAPHQL_TIMEOUT);
-
-        if (response == null) {
-            throw new JobDeliveryException("Null response from UpdateMergeRequestNote mutation");
-        }
-
-        List<String> mutationErrors = response.field("updateNote.errors").getValue();
-        if (mutationErrors != null && !mutationErrors.isEmpty()) {
-            // Check if the error indicates a missing note — fall back to create instead of failing
-            String errorText = String.join("; ", mutationErrors);
-            if (errorText.toLowerCase(Locale.ROOT).contains("not found")
-                || errorText.toLowerCase(Locale.ROOT).contains("does not exist")) {
-                log.warn("GitLab updateNote returned not-found error: noteId={}, errors={}", noteId, errorText);
-                return null;
-            }
-            throw new JobDeliveryException("GitLab updateNote failed: " + mutationErrors);
-        }
-
-        // Verify the note was actually updated (deleted notes may return empty errors but null note)
-        String returnedId = response.field("updateNote.note.id").getValue();
-        if (returnedId == null) {
-            log.warn("GitLab updateNote returned null note — note was likely deleted: noteId={}", noteId);
-            return null;
-        }
-
-        return returnedId;
     }
 
     // ── Sanitization ──

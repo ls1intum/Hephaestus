@@ -24,6 +24,9 @@
 - Simple views where one preview genuinely covers all rendering paths
 - Landscape/device-variant previews: never required
 
+## Guidance Rule
+When suggesting additional `#Preview` blocks, each MUST seed DIFFERENT state. If the view's state is injectable (via init parameters, `@Previewable @State`, or model property assignment), show the injection code. If the state is private and cannot be injected from outside the view, do NOT show identical constructor calls with different labels — instead, suggest the student add a preview-only initializer or use an internal enum to switch preview state. Show the initializer signature, not fake identical previews.
+
 ## Severity
 - **CRITICAL**: Never
 - **MAJOR**: Never

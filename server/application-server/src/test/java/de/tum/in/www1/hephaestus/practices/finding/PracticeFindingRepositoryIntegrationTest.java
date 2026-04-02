@@ -110,7 +110,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 null,
                 "Good quality",
                 "Keep it up",
-                "COACHING",
                 Instant.now()
             );
 
@@ -124,7 +123,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
             assertThat(found.getConfidence()).isEqualTo(0.95f);
             assertThat(found.getReasoning()).isEqualTo("Good quality");
             assertThat(found.getGuidance()).isEqualTo("Keep it up");
-            assertThat(found.getGuidanceMethod().name()).isEqualTo("COACHING");
+            // guidanceMethod removed
         }
 
         @Test
@@ -149,7 +148,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                null,
                 now
             );
 
@@ -165,7 +163,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "NEGATIVE",
                 "MAJOR",
                 0.5f,
-                null,
                 null,
                 null,
                 null,
@@ -197,7 +194,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 0.7f,
                 evidence,
                 "Missing error handling",
-                null,
                 null,
                 Instant.now()
             );
@@ -231,7 +227,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "POSITIVE",
                 "INFO",
                 0.9f,
-                null,
                 null,
                 null,
                 null,
@@ -285,7 +280,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                null,
                 Instant.now()
             );
             // Finding in workspace B
@@ -301,7 +295,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "NEGATIVE",
                 "MINOR",
                 0.5f,
-                null,
                 null,
                 null,
                 null,
@@ -352,7 +345,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                null,
                 Instant.now()
             );
             // Finding on the other practice (should survive)
@@ -368,7 +360,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "POSITIVE",
                 "INFO",
                 0.9f,
-                null,
                 null,
                 null,
                 null,
@@ -497,7 +488,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                null,
                 Instant.parse("2026-03-20T10:00:00Z")
             );
 
@@ -558,7 +548,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                null,
                 Instant.parse("2026-03-20T10:00:00Z")
             );
 
@@ -588,7 +577,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                null,
                 detectedAt
             );
         }
@@ -614,7 +602,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "POSITIVE",
                 "INFO",
                 0.9f,
-                null,
                 null,
                 null,
                 null,

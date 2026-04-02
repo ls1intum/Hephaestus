@@ -655,9 +655,13 @@ public class AgentJobExecutor {
                     }
                     log.info(
                         "LLM usage (agent-reported): model={}, calls={}, in={}, out={}, reasoning={}, cost={}, jobId={}",
-                        model, agentUsage.totalCalls(),
-                        agentUsage.inputTokens(), agentUsage.outputTokens(),
-                        agentUsage.reasoningTokens(), agentUsage.costUsd(), jobId
+                        model,
+                        agentUsage.totalCalls(),
+                        agentUsage.inputTokens(),
+                        agentUsage.outputTokens(),
+                        agentUsage.reasoningTokens(),
+                        agentUsage.costUsd(),
+                        jobId
                     );
                 }
                 jobRepository.saveAndFlush(freshJob);

@@ -332,9 +332,9 @@ class DiffNotePoster {
     }
 
     private static boolean isLineCodeError(List<String> errors) {
-        return errors.stream().anyMatch(e ->
-            e.toLowerCase().contains("line code") || e.toLowerCase().contains("line_code")
-        );
+        return errors
+            .stream()
+            .anyMatch(e -> e.toLowerCase().contains("line code") || e.toLowerCase().contains("line_code"));
     }
 
     /**
@@ -349,12 +349,7 @@ class DiffNotePoster {
         AgentJob job
     ) {
         try {
-            String fallbackBody = String.format(
-                "**`%s:%d`**\n\n%s",
-                note.filePath(),
-                note.startLine(),
-                sanitizedBody
-            );
+            String fallbackBody = String.format("**`%s:%d`**\n\n%s", note.filePath(), note.startLine(), sanitizedBody);
             ClientGraphQlResponse response = gitLabProvider
                 .forScope(scopeId)
                 .documentName("CreateMergeRequestNote")

@@ -26,8 +26,8 @@ Your finding must be a JSON object with these fields:
 ```json
 {
   "practiceSlug": "the-practice-slug",
-  "title": "Concise finding title, max 255 chars",
-  "verdict": "POSITIVE or NEGATIVE",
+  "title": "Concise finding title, max 120 chars",
+  "verdict": "POSITIVE or NEGATIVE or NOT_APPLICABLE",
   "severity": "CRITICAL or MAJOR or MINOR or INFO",
   "confidence": 0.85,
   "evidence": {
@@ -36,11 +36,10 @@ Your finding must be a JSON object with these fields:
     ],
     "snippets": ["exact code from the diff, never paraphrased"]
   },
-  "reasoning": "Why you reached this verdict. Max 2000 chars.",
-  "guidance": "Actionable advice for the contributor. Max 1000 chars.",
-  "guidanceMethod": "MODELING or COACHING or SCAFFOLDING or ARTICULATION or REFLECTION or EXPLORATION",
+  "reasoning": "≤500 chars. What the pattern is → why it's bad here → what breaks.",
+  "guidance": "≤800 chars. The fix with a code block. Only reference symbols from the diff.",
   "suggestedDiffNotes": [
-    {"filePath": "relative/path.swift", "startLine": 42, "endLine": 50, "body": "Inline comment, max 500 chars"}
+    {"filePath": "relative/path.swift", "startLine": 42, "endLine": 42, "body": "≤300 chars. The fix, not the diagnosis."}
   ]
 }
 ```
@@ -60,7 +59,7 @@ The diff is pre-annotated with `[L<n>]` prefixes showing **source-file line numb
 - ONLY evaluate CHANGED code (lines with `+` prefix in diff hunks)
 - Pre-existing code (context lines without +/-) is for understanding only — never flag it
 - Evidence must cite exact code from the diff — never fabricate or paraphrase
-- If you cannot find concrete evidence either way, lean POSITIVE with lower confidence
+- If the practice's subject matter is entirely absent from the diff, use NOT_APPLICABLE (e.g., no network calls → error-state-handling is not applicable). Lean POSITIVE with lower confidence only when the practice is relevant but no violations are found
 - Check all false-positive exclusions in the practice criteria before flagging NEGATIVE
 - `suggestedDiffNotes` field names MUST be: `filePath`, `startLine`, `endLine`, `body`
 - `suggestedDiffNotes` only for NEGATIVE verdicts (the orchestrator aggregates these into `delivery.diffNotes`)

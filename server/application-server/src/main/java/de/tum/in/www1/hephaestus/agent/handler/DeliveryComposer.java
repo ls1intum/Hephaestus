@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.lang.Nullable;
 
@@ -17,30 +18,42 @@ import org.springframework.lang.Nullable;
  * Composes delivery content (mrNote + diffNotes) from structured findings.
  *
  * <p>Server-side "step 2" of the two-step architecture: agent produces findings,
- * server renders them into a human-readable MR/PR comment.
+ * server renders them into a human-readable MR/PR comment for students.
  *
- * <p>Design principles (from PE analysis):
+ * <p>Design principles:
  * <ul>
- *   <li>Show defective code before the fix ("You wrote: ... → Fix: ...")</li>
- *   <li>Cap MR note at 5 findings (rest go to inline diff notes only)</li>
- *   <li>Name specific positive practices in the opening, not just a count</li>
- *   <li>CRITICAL/MAJOR = merge-blocking language; MINOR/INFO = improvement suggestions</li>
- *   <li>No collapsible sections — every shown finding is worth reading</li>
+ *   <li>Inline-first: every finding with a file location becomes a diff note</li>
+ *   <li>MR summary only has non-inlinable findings (e.g. MR description quality, commit discipline)
+ *       plus a compact overview of what was posted inline</li>
+ *   <li>Natural, conversational tone — reads like a human code reviewer</li>
+ *   <li>No bracket severity labels — emoji conveys urgency</li>
  * </ul>
  */
 class DeliveryComposer {
 
-    /** Max findings shown in the MR summary note. More than 5 causes cognitive overload. */
-    static final int MAX_MR_NOTE_FINDINGS = 5;
-
     /** Min confidence to name a positive practice in the opening line. */
     static final float POSITIVE_CONFIDENCE_FLOOR = 0.90f;
+
+    /** Max positives to name in the opening (more than 2 creates a run-on). */
+    static final int MAX_NAMED_POSITIVES = 2;
+
+    /** Practices that are inherently non-inlinable (no file-level location). */
+    static final Set<String> NON_INLINABLE_PRACTICES = Set.of("mr-description-quality", "commit-discipline");
+
+    /** Paths that are internal workspace artifacts, not student code. */
+    private static final List<String> INTERNAL_PATH_PREFIXES = List.of(
+        ".context/",
+        ".practices/",
+        ".analysis/",
+        ".opencode/",
+        ".claude/"
+    );
 
     /**
      * Compose delivery content from validated findings.
      *
-     * @param findings validated findings (may include POSITIVE and NEGATIVE)
-     * @return delivery content with mrNote and diffNotes, or null if all findings are POSITIVE
+     * @param findings validated findings (may include POSITIVE, NEGATIVE, and NOT_APPLICABLE)
+     * @return delivery content with mrNote and diffNotes, or null if no NEGATIVE findings
      */
     @Nullable
     static DeliveryContent compose(List<ValidatedFinding> findings) {
@@ -48,76 +61,97 @@ class DeliveryComposer {
             return null;
         }
 
-        List<ValidatedFinding> negatives = findings.stream()
+        List<ValidatedFinding> negatives = findings
+            .stream()
             .filter(f -> f.verdict() == Verdict.NEGATIVE)
             .sorted(Comparator.comparingInt(f -> f.severity().ordinal()))
             .toList();
 
-        // All positive → silence = approval, no comment posted
+        // All positive/not-applicable → silence = approval, no comment posted
         if (negatives.isEmpty()) {
             return null;
         }
 
-        // Only name high-confidence positives in the opening (low-confidence = not sure enough)
-        List<ValidatedFinding> positives = findings.stream()
+        // Only name high-confidence positives in the opening
+        List<ValidatedFinding> positives = findings
+            .stream()
             .filter(f -> f.verdict() == Verdict.POSITIVE && f.confidence() >= POSITIVE_CONFIDENCE_FLOOR)
             .toList();
 
-        // MR note: top N findings
-        List<ValidatedFinding> noteFindings = negatives.size() > MAX_MR_NOTE_FINDINGS
-            ? negatives.subList(0, MAX_MR_NOTE_FINDINGS)
-            : negatives;
+        // Partition negatives: inlinable (has valid file location) vs non-inlinable
+        List<ValidatedFinding> inlinable = new ArrayList<>();
+        List<ValidatedFinding> nonInlinable = new ArrayList<>();
+        for (ValidatedFinding f : negatives) {
+            if (isNonInlinable(f)) {
+                nonInlinable.add(f);
+            } else {
+                inlinable.add(f);
+            }
+        }
 
-        String mrNote = composeMrNote(positives, negatives, noteFindings);
+        // MR summary note: opening + non-inlinable findings expanded + brief inline overview
+        String mrNote = composeMrNote(positives, negatives, nonInlinable, inlinable);
 
-        // Diff notes: ALL negatives get inline comments (not capped to 5)
-        List<DiffNote> diffNotes = collectDiffNotes(negatives);
+        // Diff notes: ALL inlinable negatives get inline comments
+        List<DiffNote> diffNotes = collectDiffNotes(inlinable);
 
         return new DeliveryContent(mrNote, diffNotes);
     }
 
     /**
+     * Check whether a finding is non-inlinable (belongs in MR summary, not a diff note).
+     * Non-inlinable if: practice is inherently non-inlinable, OR finding has no valid file location.
+     */
+    private static boolean isNonInlinable(ValidatedFinding f) {
+        if (NON_INLINABLE_PRACTICES.contains(f.practiceSlug())) {
+            return true;
+        }
+        // Check if there's a valid file location in evidence
+        String location = extractPrimaryLocation(f);
+        return location == null || isInternalPath(location);
+    }
+
+    /**
      * Compose the MR note. Structure:
-     * <pre>
-     * [Named positive observation]. N issues to address [before merge / for improvement].
-     *
-     * **🔴 [CRITICAL] Title** · `File:line`
-     * You wrote:
-     * ```{lang}
-     * defective code
-     * ```
-     * reasoning...
-     * guidance (fix)...
-     *
-     * **🟠 [MAJOR] Title** · `File:line`
-     * ...
-     * </pre>
+     * 1. Opening praise line + issue counts
+     * 2. Non-inlinable findings (full detail, with separators)
+     * 3. Brief overview of inline findings (just title + severity, no full content)
      */
     static String composeMrNote(
         List<ValidatedFinding> positives,
         List<ValidatedFinding> allNegatives,
-        List<ValidatedFinding> shownNegatives
+        List<ValidatedFinding> nonInlinable,
+        List<ValidatedFinding> inlinable
     ) {
         var sb = new StringBuilder(4096);
 
-        // Opening: name specific positive practices
+        // Opening: praise + issue summary
         composeOpening(sb, positives, allNegatives);
 
-        // Shown findings (severity-ordered, capped)
-        for (ValidatedFinding f : shownNegatives) {
-            composeFinding(sb, f);
+        // Non-inlinable findings (full detail) — these only exist in the summary
+        for (int i = 0; i < nonInlinable.size(); i++) {
+            composeFinding(sb, nonInlinable.get(i));
+            if (i < nonInlinable.size() - 1 || !inlinable.isEmpty()) {
+                sb.append("---\n\n");
+            }
         }
 
-        // If we capped, mention the overflow
-        if (allNegatives.size() > shownNegatives.size()) {
-            int overflow = allNegatives.size() - shownNegatives.size();
-            sb.append("*Plus ").append(overflow)
-                .append(" more issue").append(overflow > 1 ? "s" : "")
-                .append(" noted as inline comments on the diff.*\n\n");
+        // Inline findings — compact list (title + location only, detail is on the diff)
+        if (!inlinable.isEmpty()) {
+            if (!nonInlinable.isEmpty()) {
+                sb.append("**Inline comments on the diff:**\n\n");
+            }
+            for (ValidatedFinding f : inlinable) {
+                String emoji = severityEmoji(f.severity());
+                sb.append(emoji).append(" **").append(f.title()).append("**");
+                String location = extractPrimaryLocation(f);
+                if (location != null && !isInternalPath(location)) {
+                    sb.append(" · `").append(location).append("`");
+                }
+                sb.append("\n");
+            }
+            sb.append("\n");
         }
-
-        // Provenance footer
-        sb.append("---\n<sub>Hephaestus \u2014 automated practice review</sub>\n");
 
         return sb.toString();
     }
@@ -127,60 +161,74 @@ class DeliveryComposer {
         List<ValidatedFinding> positives,
         List<ValidatedFinding> negatives
     ) {
-        // Name up to 3 specific positive practices
+        // Name up to MAX_NAMED_POSITIVES specific positive practices
         if (!positives.isEmpty()) {
-            List<String> namedPositives = positives.stream()
-                .limit(3)
+            List<String> namedPositives = positives
+                .stream()
+                .limit(MAX_NAMED_POSITIVES)
                 .map(f -> humanizePracticeSlug(f.practiceSlug()))
                 .toList();
-            sb.append("Good ").append(joinNatural(namedPositives)).append(". ");
+            sb.append("Nice work on the ").append(joinNatural(namedPositives)).append(". ");
         }
 
-        // Issue count with appropriate urgency
-        boolean hasCriticalOrMajor = negatives.stream()
-            .anyMatch(f -> f.severity() == Severity.CRITICAL || f.severity() == Severity.MAJOR);
+        // Split blocking vs improvement counts
+        long blockingCount = negatives
+            .stream()
+            .filter(f -> f.severity() == Severity.CRITICAL || f.severity() == Severity.MAJOR)
+            .count();
+        long improvementCount = negatives.size() - blockingCount;
 
-        sb.append("Here ").append(negatives.size() == 1 ? "is " : "are ")
-            .append(negatives.size())
-            .append(" issue").append(negatives.size() > 1 ? "s" : "")
-            .append(hasCriticalOrMajor ? " to address before merge" : " to improve")
-            .append(".\n\n");
+        if (blockingCount > 0 && improvementCount > 0) {
+            sb
+                .append(blockingCount)
+                .append(blockingCount == 1 ? " issue" : " issues")
+                .append(" to fix before merging, plus ")
+                .append(improvementCount)
+                .append(improvementCount == 1 ? " suggestion" : " suggestions")
+                .append(" for improvement:\n\n");
+        } else if (blockingCount > 0) {
+            sb
+                .append(blockingCount)
+                .append(blockingCount == 1 ? " issue" : " issues")
+                .append(" to fix before merging:\n\n");
+        } else {
+            sb
+                .append(improvementCount)
+                .append(improvementCount == 1 ? " suggestion" : " suggestions")
+                .append(" for improvement:\n\n");
+        }
     }
 
     private static void composeFinding(StringBuilder sb, ValidatedFinding f) {
         String emoji = severityEmoji(f.severity());
-        String severityLabel = f.severity().name();
 
-        // Title with location
-        sb.append("**").append(emoji).append(" [").append(severityLabel).append("] ")
-            .append(f.title()).append("**");
+        // Title with location (no [SEVERITY] bracket — emoji is enough)
+        sb.append("**").append(emoji).append(" ").append(f.title()).append("**");
         String location = extractPrimaryLocation(f);
-        if (location != null) {
+        if (location != null && !isInternalPath(location)) {
             sb.append(" · `").append(location).append("`");
         }
         sb.append("\n\n");
 
         String lang = detectLanguage(f);
 
-        // For CRITICAL/MAJOR: show defective code, then reasoning, then fix
+        // For CRITICAL/MAJOR: "You wrote:" → reasoning → "Instead:" with fix
         if (f.severity() == Severity.CRITICAL || f.severity() == Severity.MAJOR) {
-            // Defective code snippet from evidence
             String snippet = extractPrimarySnippet(f);
             if (snippet != null) {
+                sb.append("You wrote:\n");
                 sb.append("```").append(lang).append("\n").append(snippet).append("\n```\n\n");
             }
 
-            // Reasoning (what's wrong and why it matters)
             if (f.reasoning() != null && !f.reasoning().isBlank()) {
                 sb.append(f.reasoning()).append("\n\n");
             }
 
-            // Guidance (the fix)
             if (f.guidance() != null && !f.guidance().isBlank()) {
                 sb.append(f.guidance()).append("\n\n");
             }
         } else {
-            // MINOR/INFO: reasoning + guidance (both matter for learning)
+            // MINOR/INFO: combine reasoning + guidance naturally
             if (f.reasoning() != null && !f.reasoning().isBlank()) {
                 sb.append(f.reasoning()).append("\n\n");
             }
@@ -188,6 +236,13 @@ class DeliveryComposer {
                 sb.append(f.guidance()).append("\n\n");
             }
         }
+    }
+
+    /** Check if a path is an internal workspace artifact (not student code). */
+    private static boolean isInternalPath(String location) {
+        // Strip line number suffix for comparison
+        String path = location.contains(":") ? location.substring(0, location.lastIndexOf(':')) : location;
+        return INTERNAL_PATH_PREFIXES.stream().anyMatch(path::startsWith);
     }
 
     // ── Helpers ──
@@ -224,7 +279,6 @@ class DeliveryComposer {
     private static String detectLanguage(ValidatedFinding f) {
         String location = extractPrimaryLocation(f);
         if (location == null) return "";
-        // Strip line number suffix (e.g., "Foo.swift:42" → "Foo.swift")
         String path = location.contains(":") ? location.substring(0, location.lastIndexOf(':')) : location;
         int dot = path.lastIndexOf('.');
         if (dot < 0 || dot == path.length() - 1) return "";
@@ -235,9 +289,9 @@ class DeliveryComposer {
     private static String severityEmoji(Severity severity) {
         return switch (severity) {
             case CRITICAL -> "\uD83D\uDD34"; // 🔴
-            case MAJOR -> "\uD83D\uDFE0";    // 🟠
-            case MINOR -> "\uD83D\uDFE1";    // 🟡
-            case INFO -> "\u2139\uFE0F";      // ℹ️
+            case MAJOR -> "\uD83D\uDFE0"; // 🟠
+            case MINOR -> "\uD83D\uDFE1"; // 🟡
+            case INFO -> "\u2139\uFE0F"; // ℹ️
         };
     }
 
@@ -271,7 +325,6 @@ class DeliveryComposer {
 
     /**
      * Maps practice slugs to natural positive labels for the opening line.
-     * "Good crash avoidance" reads much better than "Good fatal error crash".
      */
     private static final Map<String, String> SLUG_TO_POSITIVE_LABEL = Map.ofEntries(
         Map.entry("hardcoded-secrets", "credential hygiene"),
@@ -298,15 +351,17 @@ class DeliveryComposer {
     private static String joinNatural(List<String> items) {
         if (items.size() == 1) return items.get(0);
         if (items.size() == 2) return items.get(0) + " and " + items.get(1);
-        return items.subList(0, items.size() - 1).stream()
-            .collect(Collectors.joining(", "))
-            + ", and " + items.get(items.size() - 1);
+        return (
+            items.subList(0, items.size() - 1).stream().collect(Collectors.joining(", ")) +
+            ", and " +
+            items.get(items.size() - 1)
+        );
     }
 
     /**
      * Collect inline diff notes from NEGATIVE findings.
      * Each finding gets one diff note at its primary location.
-     * Body = guidance (the fix), not reasoning (the diagnosis).
+     * Body includes severity emoji + title header + guidance (the fix).
      */
     private static List<DiffNote> collectDiffNotes(List<ValidatedFinding> negatives) {
         List<DiffNote> notes = new ArrayList<>();
@@ -334,7 +389,7 @@ class DeliveryComposer {
                 endLine = endLineNode.asInt();
             }
 
-            // Diff note body: title + guidance (compact)
+            // Diff note body: emoji title + reasoning + guidance
             String body = composeDiffNoteBody(f);
             if (body != null && !body.isBlank()) {
                 notes.add(new DiffNote(pathNode.asText(), startLine, endLine, body));
@@ -344,21 +399,26 @@ class DeliveryComposer {
         return notes;
     }
 
+    /**
+     * Compose a diff note body — the full finding content placed inline on the diff.
+     * Since the MR summary only has a compact list, the diff note carries the full detail.
+     */
     @Nullable
     private static String composeDiffNoteBody(ValidatedFinding f) {
         var sb = new StringBuilder();
         sb.append("**").append(severityEmoji(f.severity())).append(" ").append(f.title()).append("**\n\n");
 
+        if (f.reasoning() != null && !f.reasoning().isBlank()) {
+            sb.append(f.reasoning()).append("\n\n");
+        }
         if (f.guidance() != null && !f.guidance().isBlank()) {
-            sb.append(f.guidance());
-        } else if (f.reasoning() != null && !f.reasoning().isBlank()) {
-            sb.append(f.reasoning());
+            sb.append(f.guidance()).append("\n\n");
         }
 
-        String body = sb.toString();
+        String body = sb.toString().strip();
         if (body.length() > PracticeDetectionResultParser.MAX_DIFF_NOTE_BODY_LENGTH) {
             body = body.substring(0, PracticeDetectionResultParser.MAX_DIFF_NOTE_BODY_LENGTH - 3) + "...";
         }
-        return body;
+        return body.isBlank() ? null : body;
     }
 }

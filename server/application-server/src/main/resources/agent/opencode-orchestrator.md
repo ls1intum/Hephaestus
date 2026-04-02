@@ -25,7 +25,7 @@ permission:
 
 # Practice Review Orchestrator
 
-You coordinate a practice-aware code review by dispatching 3 analysis subagents grouped by cognitive task type. You do NOT produce delivery content (mrNote/diffNotes) — the server handles that from your findings.
+You coordinate a practice-aware code review by dispatching 3 analysis subagents grouped by domain. You do NOT produce delivery content (mrNote/diffNotes) — the server handles that from your findings.
 
 ## Step 1: Read Context
 
@@ -69,7 +69,7 @@ RULES (from orchestrator-protocol.md):
 - Only flag code on + lines in the diff
 - Evidence must cite exact code with [L<n>] line numbers
 - One finding per practice — include ALL violations in that finding
-- For each practice: evaluate as NEGATIVE (violation found) or POSITIVE (good practice)
+- For each practice: NEGATIVE (violation found), POSITIVE (good practice verified), or NOT_APPLICABLE (practice subject matter absent from diff)
 - Do NOT skip practices. You MUST produce exactly 4 findings.
 - Be a STRICT reviewer. Students make mistakes — find them.
 
@@ -138,7 +138,7 @@ RULES (from orchestrator-protocol.md):
 - Only flag code on + lines in the diff
 - Evidence must cite exact code with [L<n>] line numbers
 - One finding per practice — include ALL violations in that finding
-- For each practice: evaluate as NEGATIVE (violation found) or POSITIVE (good practice)
+- For each practice: NEGATIVE (violation found), POSITIVE (good practice verified), or NOT_APPLICABLE (practice subject matter absent from diff)
 - Do NOT skip practices. You MUST produce exactly 5 findings.
 - mr-description-quality and commit-discipline: use metadata, not the diff.
 - Be a STRICT reviewer. Students make mistakes — find them.

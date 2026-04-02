@@ -39,7 +39,6 @@ import org.hibernate.annotations.Type;
  * {@code @PrePersist}, and {@code insertIfAbsent} for race-condition-safe insertion.
  *
  * @see Practice for the practice definition being evaluated
- * @see CaMethod for the cognitive apprenticeship guidance method
  * @see Severity for the impact level (orthogonal to verdict)
  */
 @Entity
@@ -158,10 +157,6 @@ public class PracticeFinding {
 
     @Column(name = "guidance", columnDefinition = "TEXT")
     private String guidance;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "guidance_method", length = 16)
-    private CaMethod guidanceMethod;
 
     @NotNull
     @Column(name = "detected_at", nullable = false)
