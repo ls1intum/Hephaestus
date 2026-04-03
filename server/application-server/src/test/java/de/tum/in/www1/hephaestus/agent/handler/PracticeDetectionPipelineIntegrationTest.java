@@ -311,8 +311,8 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
-        @DisplayName("all-positive findings: no comment or diff notes posted")
-        void allPositiveFindingsNoComment() {
+        @DisplayName("all-positive findings: approval comment posted, no diff notes")
+        void allPositiveFindingsPostsApproval() {
             String output = """
                 {
                   "findings": [
@@ -339,8 +339,8 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
             // Findings still persisted
             assertThat(practiceFindingRepository.findAll()).hasSize(2);
 
-            // No comment or diff notes posted (no negatives, no delivery content)
-            verify(commentPoster, never()).postFormattedBody(any(), any());
+            // Approval comment posted (no negatives → approval summary), no diff notes
+            verify(commentPoster).postFormattedBody(any(), any());
             verify(diffNotePoster, never()).postDiffNotes(any(), any());
         }
     }
