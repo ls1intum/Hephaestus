@@ -5,15 +5,17 @@ title: Automated Code Review
 description: How Hephaestus reviews your merge requests and provides practice-based feedback.
 ---
 
-Hephaestus automatically reviews your merge requests and gives you feedback on software engineering practices. When you open a merge request or push new commits, the system analyzes your changes and posts comments highlighting what you did well and where you can improve.
+Hephaestus automatically reviews your merge requests and gives you feedback on software engineering practices. When you open a non-draft merge request, the system analyzes your changes and posts comments highlighting what you did well and where you can improve.
 
 ## How it works
 
-1. **You push code** -- Open a merge request or push commits to an existing MR
+1. **You open an MR** -- Create a merge request (non-draft)
 2. **Hephaestus analyzes** -- An AI agent reads your diff and evaluates it against the practices configured for your workspace
 3. **You get feedback** -- Hephaestus posts a summary comment on your MR. If issues are found, you also get inline notes on specific lines
 
-The review typically completes within 2--5 minutes, though queue time may add to this under load.
+To re-run the review after pushing new commits, use the [`/hephaestus review`](#retriggering-a-review) command.
+
+The review typically completes within 2--5 minutes, though large MRs may take longer.
 
 ## Understanding the feedback
 
@@ -25,7 +27,7 @@ A summary comment appears at the top of your MR's discussion. When everything lo
 - Named positive practices you demonstrated well (up to 2)
 - Detailed explanations for any issues that could not be pinpointed to a specific line (e.g., MR description quality, commit messages)
 
-A compact list of line-specific issues is also included, with links to the inline notes.
+A compact list of line-specific issues is also included, showing the file location where each inline note was posted.
 
 ### Inline diff notes
 
@@ -76,7 +78,7 @@ The specific practices evaluated depend on your workspace configuration. Common 
 
 ## Opting out
 
-You can suppress review **comments** in your user settings. Navigate to **Settings** in the Hephaestus web app and disable the code review preference. Each review comment also has a link to this setting in its footer.
+You can suppress review **comments** in your user settings. Navigate to **Settings** in the Hephaestus web app and disable the **Practice review comments** toggle under **AI Review**. Each review comment also has a link to this setting in its footer.
 
 :::info
 The preference suppresses comment delivery only. The review still runs and findings are stored in the database for instructor visibility.
@@ -84,4 +86,4 @@ The preference suppresses comment delivery only. The review still runs and findi
 
 ### Draft MRs
 
-By default, draft (WIP) merge requests are not reviewed. The review will trigger automatically when you mark the MR as ready.
+By default, draft (WIP) merge requests are not reviewed. After marking a draft MR as ready, use `/hephaestus review` to trigger a review.

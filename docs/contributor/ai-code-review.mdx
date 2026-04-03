@@ -5,7 +5,7 @@ title: AI Code Review Pipeline
 description: Architecture and internals of the practice-based automated code review system.
 ---
 
-Hephaestus runs an AI-powered code review pipeline that evaluates merge requests against configurable software engineering practices. When a student opens or updates an MR, the system detects relevant practices, runs an LLM agent inside a sandboxed container, parses the structured output, and posts findings as MR comments and inline diff notes.
+Hephaestus runs an AI-powered code review pipeline that evaluates merge requests against configurable software engineering practices. When a student opens a non-draft MR (or uses `/hephaestus review`), the system detects relevant practices, runs an LLM agent inside a sandboxed container, parses the structured output, and posts findings as MR comments and inline diff notes.
 
 ## Pipeline overview
 
