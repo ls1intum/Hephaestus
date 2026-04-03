@@ -320,9 +320,7 @@ class DiffNotePoster {
                 return;
             }
 
-            List<Map<String, Object>> notes = response
-                .field("project.mergeRequest.notes.nodes")
-                .getValue();
+            List<Map<String, Object>> notes = response.field("project.mergeRequest.notes.nodes").getValue();
 
             if (notes == null || notes.isEmpty()) {
                 return;
@@ -364,8 +362,13 @@ class DiffNotePoster {
             }
 
             if (deleted > 0) {
-                log.info("Deleted {} old hephaestus diff notes before re-posting: jobId={}, mr={}!{}",
-                    deleted, repoFullName, mrIid, job.getId());
+                log.info(
+                    "Deleted {} old hephaestus diff notes before re-posting: jobId={}, mr={}!{}",
+                    deleted,
+                    repoFullName,
+                    mrIid,
+                    job.getId()
+                );
             }
         } catch (Exception e) {
             log.debug("Failed to query existing MR notes for dedup: jobId={}", job.getId(), e);
@@ -428,8 +431,13 @@ class DiffNotePoster {
         AgentJob job
     ) {
         try {
-            String fallbackBody = String.format("**`%s:%d`**\n\n%s\n%s",
-                note.filePath(), note.startLine(), sanitizedBody, HEPHAESTUS_MARKER);
+            String fallbackBody = String.format(
+                "**`%s:%d`**\n\n%s\n%s",
+                note.filePath(),
+                note.startLine(),
+                sanitizedBody,
+                HEPHAESTUS_MARKER
+            );
             ClientGraphQlResponse response = gitLabProvider
                 .forScope(scopeId)
                 .documentName("CreateMergeRequestNote")

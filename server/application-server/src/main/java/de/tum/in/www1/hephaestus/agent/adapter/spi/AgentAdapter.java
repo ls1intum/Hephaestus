@@ -85,16 +85,18 @@ public interface AgentAdapter {
         // 1. Copy scripts + shared libs to writable /tmp/precompute/
         // 2. Run from there, output to agent-writable .precompute-out/
         // 3. The agent reads .precompute-out/summary.md
-        return "(mkdir -p /workspace/.precompute-out/practices"
-            + " && cp /workspace/.precompute/practices/*.ts /workspace/.precompute-out/practices/"
-            + " && ln -sf /opt/precompute/lib /workspace/.precompute-out/lib"
-            + " && bun run /opt/precompute/runner.ts"
-            + " --repo /workspace/repo"
-            + " --diff /workspace/.context/diff.patch"
-            + " --metadata /workspace/.context/metadata.json"
-            + " --output /workspace/.precompute-out"
-            + " > /tmp/precompute-runner.log 2>&1"
-            + " || echo '[precompute] failed, continuing without hints') && ";
+        return (
+            "(mkdir -p /workspace/.precompute-out/practices" +
+            " && cp /workspace/.precompute/practices/*.ts /workspace/.precompute-out/practices/" +
+            " && ln -sf /opt/precompute/lib /workspace/.precompute-out/lib" +
+            " && bun run /opt/precompute/runner.ts" +
+            " --repo /workspace/repo" +
+            " --diff /workspace/.context/diff.patch" +
+            " --metadata /workspace/.context/metadata.json" +
+            " --output /workspace/.precompute-out" +
+            " > /tmp/precompute-runner.log 2>&1" +
+            " || echo '[precompute] failed, continuing without hints') && "
+        );
     }
 
     static NetworkPolicy buildNetworkPolicy(AgentAdapterRequest request) {

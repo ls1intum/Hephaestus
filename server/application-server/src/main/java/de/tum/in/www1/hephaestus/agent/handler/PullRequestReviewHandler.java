@@ -310,10 +310,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         for (Practice p : practices) {
             String script = p.getPrecomputeScript();
             if (script != null && !script.isBlank()) {
-                files.put(
-                    ".precompute/practices/" + p.getSlug() + ".ts",
-                    script.getBytes(StandardCharsets.UTF_8)
-                );
+                files.put(".precompute/practices/" + p.getSlug() + ".ts", script.getBytes(StandardCharsets.UTF_8));
                 precomputeCount++;
             }
         }
@@ -910,14 +907,18 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         // Strategy 2: Find merge commit that has headSha as second parent
         if (headSha != null && !headSha.isBlank()) {
             String mergeLog = runGit(
-                repoPath, "log", "--all", "--merges", "--format=%H %P",
-                "--ancestry-path", headSha + "..origin/" + targetBranch
+                repoPath,
+                "log",
+                "--all",
+                "--merges",
+                "--format=%H %P",
+                "--ancestry-path",
+                headSha + "..origin/" + targetBranch
             );
             if (mergeLog != null) {
                 for (String line : mergeLog.split("\n")) {
                     String[] parts = line.trim().split("\\s+");
-                    if (parts.length >= 3 && headSha.length() >= 8
-                            && parts[2].startsWith(headSha.substring(0, 8))) {
+                    if (parts.length >= 3 && headSha.length() >= 8 && parts[2].startsWith(headSha.substring(0, 8))) {
                         String base = parts[1]; // First parent = target before merge
                         return new String[] { base, headSha };
                     }
@@ -966,8 +967,13 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             }
             if (process.exitValue() != 0) {
                 String stderr = java.nio.file.Files.readString(errFile.toPath(), StandardCharsets.UTF_8);
-                log.debug("git {} exited {} in {}: {}", args[0], process.exitValue(), repoPath,
-                        stderr.length() > 500 ? stderr.substring(0, 500) : stderr);
+                log.debug(
+                    "git {} exited {} in {}: {}",
+                    args[0],
+                    process.exitValue(),
+                    repoPath,
+                    stderr.length() > 500 ? stderr.substring(0, 500) : stderr
+                );
                 return null;
             }
             return java.nio.file.Files.readString(tmpFile.toPath(), StandardCharsets.UTF_8);
@@ -1009,9 +1015,8 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         String headSha = jobMetadata.has("commit_sha") ? jobMetadata.get("commit_sha").asText() : null;
 
         String[] range = resolveDiffRange(repoPath, targetBranch, sourceBranch, headSha);
-        String logOutput = range != null
-            ? runGit(repoPath, "log", "--format=%h\t%s", range[0] + ".." + range[1])
-            : null;
+        String logOutput =
+            range != null ? runGit(repoPath, "log", "--format=%h\t%s", range[0] + ".." + range[1]) : null;
 
         if (logOutput == null || logOutput.isBlank()) {
             log.debug("No commit log available for MR, skipping commit injection");
