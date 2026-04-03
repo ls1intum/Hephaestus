@@ -35,15 +35,12 @@ import org.springframework.lang.Nullable;
  *       "confidence": 0.95,
  *       "evidence": { ... },
  *       "reasoning": "...",
- *       "guidance": "..."
+ *       "guidance": "...",
+ *       "suggestedDiffNotes": [
+ *         { "filePath": "src/Foo.swift", "startLine": 10, "body": "Suggestion..." }
+ *       ]
  *     }
- *   ],
- *   "delivery": {
- *     "mrNote": "Markdown summary for PR author...",
- *     "diffNotes": [
- *       { "filePath": "src/Foo.java", "startLine": 10, "body": "Suggestion..." }
- *     ]
- *   }
+ *   ]
  * }
  * }</pre>
  */
@@ -246,65 +243,10 @@ public class PracticeDetectionResultParser {
         }
 
         for (int i = 0; i < limit; i++) {
-            JsonNode entry = diffNotesNode.get(i);
-            if (!entry.isObject()) {
-                log.debug("Skipping non-object diffNote at index {}", i);
-                continue;
+            DiffNote note = parseSingleDiffNote(diffNotesNode.get(i), -1, i);
+            if (note != null) {
+                notes.add(note);
             }
-
-            // Required: filePath
-            JsonNode filePathNode = entry.get("filePath");
-            if (
-                filePathNode == null ||
-                filePathNode.isNull() ||
-                !filePathNode.isTextual() ||
-                filePathNode.asText().isBlank()
-            ) {
-                log.debug("Skipping diffNote at index {}: missing filePath", i);
-                continue;
-            }
-            String filePath = filePathNode.asText();
-
-            // Required: startLine (positive integer)
-            JsonNode startLineNode = entry.get("startLine");
-            if (startLineNode == null || startLineNode.isNull() || !startLineNode.isNumber()) {
-                log.debug("Skipping diffNote at index {}: missing or non-numeric startLine", i);
-                continue;
-            }
-            int startLine = startLineNode.asInt();
-            if (startLine <= 0) {
-                log.debug("Skipping diffNote at index {}: startLine must be positive, got {}", i, startLine);
-                continue;
-            }
-
-            // Optional: endLine (positive integer, must be >= startLine)
-            Integer endLine = null;
-            JsonNode endLineNode = entry.get("endLine");
-            if (endLineNode != null && !endLineNode.isNull() && endLineNode.isNumber()) {
-                int endLineValue = endLineNode.asInt();
-                if (endLineValue >= startLine) {
-                    endLine = endLineValue;
-                }
-            }
-
-            // Required: body
-            JsonNode bodyNode = entry.get("body");
-            if (bodyNode == null || bodyNode.isNull() || !bodyNode.isTextual() || bodyNode.asText().isBlank()) {
-                log.debug("Skipping diffNote at index {}: missing body", i);
-                continue;
-            }
-            String body = bodyNode.asText();
-            if (body.length() > MAX_DIFF_NOTE_BODY_LENGTH) {
-                log.debug(
-                    "Truncating diffNote body from {} to {} chars at index {}",
-                    body.length(),
-                    MAX_DIFF_NOTE_BODY_LENGTH,
-                    i
-                );
-                body = body.substring(0, MAX_DIFF_NOTE_BODY_LENGTH);
-            }
-
-            notes.add(new DiffNote(filePath, startLine, endLine, body));
         }
 
         return Collections.unmodifiableList(notes);

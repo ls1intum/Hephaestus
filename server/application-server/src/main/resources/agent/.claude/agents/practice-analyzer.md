@@ -62,5 +62,5 @@ The diff is pre-annotated with `[L<n>]` prefixes showing **source-file line numb
 - If the practice's subject matter is entirely absent from the diff, use NOT_APPLICABLE (e.g., no network calls → error-state-handling is not applicable). Lean POSITIVE with lower confidence only when the practice is relevant but no violations are found
 - Check all false-positive exclusions in the practice criteria before flagging NEGATIVE
 - `suggestedDiffNotes` field names MUST be: `filePath`, `startLine`, `endLine`, `body`
-- `suggestedDiffNotes` only for NEGATIVE verdicts (the orchestrator aggregates these into `delivery.diffNotes`)
+- `suggestedDiffNotes` only for NEGATIVE verdicts (the server uses these for inline comments)
 - Confidence scale: 0.0 to 1.0 — never output 0-100

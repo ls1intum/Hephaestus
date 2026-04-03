@@ -70,7 +70,7 @@ public class BotCommandProcessor {
     private void processCommand(long repositoryId, int mrNumber, String noteBody, String noteAuthor) {
         String command = noteBody.strip().toLowerCase();
 
-        if (command.startsWith(COMMAND_PREFIX + "review")) {
+        if (command.equals("/hephaestus review") || command.startsWith("/hephaestus review ")) {
             handleReviewCommand(repositoryId, mrNumber, noteAuthor);
         } else {
             log.debug(

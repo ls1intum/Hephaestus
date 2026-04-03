@@ -80,9 +80,6 @@ public class PullRequestReviewHandler implements JobTypeHandler {
     /** Regex matching unified diff hunk headers: {@code @@ -a,b +c,d @@}. Group 1 captures {@code c}. */
     private static final Pattern HUNK_HEADER = Pattern.compile("^@@ -\\d+(?:,\\d+)? \\+(\\d+)(?:,\\d+)? @@");
 
-    // Security scan patterns for pre-computed secret detection.
-    // These run server-side in Java so they work regardless of container resource limits.
-
     private final ObjectMapper objectMapper;
     private final GitRepositoryManager gitRepositoryManager;
     private final PullRequestRepository pullRequestRepository;

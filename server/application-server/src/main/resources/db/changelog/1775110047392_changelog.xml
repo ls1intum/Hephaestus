@@ -7,6 +7,9 @@
 
     <!-- Step 1: Rename practice.detection_prompt → practice.criteria -->
     <changeSet id="1775110047392-1" author="hephaestus">
+        <preConditions onFail="MARK_RAN">
+            <columnExists tableName="practice" columnName="detection_prompt"/>
+        </preConditions>
         <comment>Rename detection_prompt to criteria to match domain model</comment>
         <renameColumn tableName="practice"
                       oldColumnName="detection_prompt"

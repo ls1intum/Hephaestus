@@ -1,0 +1,76 @@
+---
+id: ai-code-review
+sidebar_position: 4
+title: Automated Code Review
+description: How Hephaestus reviews your merge requests and provides practice-based feedback.
+---
+
+Hephaestus automatically reviews your merge requests and gives you feedback on software engineering practices. When you open or update an MR in a connected repository, the system analyzes your changes and posts comments highlighting what you did well and where you can improve.
+
+## How it works
+
+1. **You push code** -- Open or update a merge request in your GitLab repository
+2. **Hephaestus analyzes** -- An AI agent reads your diff and evaluates it against the practices configured for your workspace
+3. **You get feedback** -- Hephaestus posts a summary comment on your MR and inline notes on specific lines
+
+The review typically takes 2--5 minutes after you push.
+
+## Understanding the feedback
+
+### MR summary comment
+
+The summary comment appears at the top of your MR's discussion. It contains:
+
+- A count of blocking issues and improvements found
+- Named positive practices you demonstrated well
+- Detailed explanations for any issues that could not be pinpointed to a specific line
+
+### Inline diff notes
+
+For issues tied to specific code locations, Hephaestus posts inline notes directly on the relevant lines. Each note includes:
+
+- What the issue is
+- Why it matters
+- How to fix it (often with a code suggestion)
+
+### Severities
+
+| Severity | Meaning |
+|----------|---------|
+| **CRITICAL** | Security vulnerability, data loss risk, or production crash |
+| **MAJOR** | Functional bug or missing safety mechanism |
+| **MINOR** | Style, naming, or minor readability concern |
+| **INFO** | Observation with no direct quality impact |
+
+## Retriggering a review
+
+If you want Hephaestus to re-analyze your MR (for example, after pushing new commits), type this comment on your MR:
+
+```
+/hephaestus review
+```
+
+Hephaestus will run a fresh analysis and post updated feedback.
+
+:::note
+The command is case-insensitive. `/Hephaestus Review` works too.
+:::
+
+## What gets reviewed
+
+Hephaestus only evaluates **changed code** -- the lines you added or modified in the MR. Pre-existing code is used as context for understanding your changes but is never flagged.
+
+The specific practices evaluated depend on your workspace configuration. Common practices include:
+
+- **Security** -- Hardcoded secrets, unhandled errors
+- **Reliability** -- Crash risks, silent failures
+- **Design** -- Component structure, state management
+- **Process** -- MR description quality, commit messages, naming
+
+## Opting out
+
+If you prefer not to receive automated reviews, you can opt out in your user settings. Navigate to **Settings** in the Hephaestus web app and disable the code review preference.
+
+:::info
+Opting out only affects your MRs. It does not change workspace-level settings or affect other team members.
+:::
