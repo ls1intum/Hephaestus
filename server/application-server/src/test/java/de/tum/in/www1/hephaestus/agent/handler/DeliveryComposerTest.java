@@ -220,12 +220,12 @@ class DeliveryComposerTest extends BaseUnitTest {
     }
 
     // =========================================================================
-    // Test 2: All positive findings return null
+    // Test 2: All positive findings produce an approval comment
     // =========================================================================
 
     @Test
-    @DisplayName("compose with all positive findings returns null")
-    void compose_withAllPositive_returnsNull() {
+    @DisplayName("compose with all positive findings produces approval note")
+    void compose_withAllPositive_producesApprovalNote() {
         List<ValidatedFinding> findings = List.of(
             positiveFinding("error-state-handling"),
             positiveFinding("view-decomposition"),
@@ -234,7 +234,11 @@ class DeliveryComposerTest extends BaseUnitTest {
 
         DeliveryContent result = DeliveryComposer.compose(findings);
 
-        assertThat(result).isNull();
+        assertThat(result).isNotNull();
+        assertThat(result.mrNote()).contains("No issues found");
+        assertThat(result.mrNote()).contains("error state handling");
+        assertThat(result.mrNote()).contains("view decomposition");
+        assertThat(result.diffNotes()).isEmpty();
     }
 
     // =========================================================================

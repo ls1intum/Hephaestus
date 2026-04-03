@@ -82,6 +82,14 @@ public class Practice {
     @Column(name = "criteria", columnDefinition = "TEXT")
     private String criteria;
 
+    /**
+     * Optional Bun/TypeScript static analysis script that runs before the AI agent.
+     * Produces structured hints (not verdicts) that the agent uses as starting points.
+     * When null, no precomputation runs for this practice.
+     */
+    @Column(name = "precompute_script", columnDefinition = "TEXT")
+    private String precomputeScript;
+
     @Column(name = "is_active", nullable = false)
     private boolean active = true;
 

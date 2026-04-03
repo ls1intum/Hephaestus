@@ -50,16 +50,16 @@ sequenceDiagram
 
 ## Agent architecture
 
-The system supports two LLM backends. The Claude Code agent may spawn subagents strategically for complex diffs; OpenCode uses a multi-agent orchestrator:
+The system supports two LLM backends. Claude Code uses a single-pass architecture (one agent evaluates all practices); OpenCode uses a multi-agent orchestrator that dispatches specialist subagents:
 
-- **Claude Code** (`ClaudeCodeAgentAdapter`) -- Uses `--json-schema` for constrained decoding. Runner script (`.run-claude.mjs`) validates output and retries via `--continue` if malformed.
+- **Claude Code** (`ClaudeCodeAgentAdapter`) -- Uses `--json-schema` for constrained decoding. Runner script (`.run-claude.mjs`) performs 2-phase self-correction: initial run + up to 2 format retries via `--continue` (same session, full context preserved).
 - **OpenCode** (`OpenCodeAgentAdapter`) -- Uses a self-enforced JSON schema. Runner script (`.run-opencode.mjs`) performs 3-phase self-correction: initial run, format retry, position retry (validates `suggestedDiffNotes` against diff hunks).
 
 Both adapters produce the same output schema. The server is backend-agnostic after the agent returns. The active backend is selected per workspace via the `agent_config` table.
 
 ### Workspace layout
 
-Every agent container gets this file structure:
+Every agent container gets this file structure (agent-specific files noted):
 
 ```
 /workspace/
@@ -75,13 +75,16 @@ Every agent container gets this file structure:
     index.json                       # [{slug, name, category}]
     {slug}.md                        # Per-practice criteria (generated from DB)
     all-criteria.md                  # All criteria bundled (reduces tool calls)
+  .precompute/practices/{slug}.ts    # Precompute scripts (from DB, if present)
+  .precompute-out/                   # Precompute output (summary.md + per-practice JSON)
   orchestrator-protocol.md           # Shared rules and output schema
   .prompt                            # Task prompt for the agent
   .json-schema                       # Output schema (Claude Code only)
-  .run-claude.mjs / .run-opencode.mjs  # Runner script with self-correction
-  CLAUDE.md                          # Claude Code orchestrator instructions
-  .opencode/agents/*.md              # OpenCode agent definitions
-  opencode.json                      # OpenCode configuration (OpenCode only)
+  .run-claude.mjs                    # Runner script (Claude Code only)
+  .run-opencode.mjs                  # Runner script (OpenCode only)
+  CLAUDE.md                          # Orchestrator instructions (Claude Code only)
+  .opencode/agents/*.md              # Agent definitions (OpenCode only)
+  opencode.json                      # Configuration (OpenCode only)
   .analysis/practices/.gitkeep       # Directory for intermediate findings
   .output/                           # Agent writes final results here
 ```
@@ -134,7 +137,7 @@ The current deployment uses 13 practices (12 software engineering + `hardcoded-s
 
 ## Delivery pipeline
 
-After the agent returns findings, the server runs a 7-step delivery pipeline in `PullRequestReviewHandler.deliver()`:
+After the agent returns findings, the server runs a 6-step delivery pipeline in `PullRequestReviewHandler.deliver()`:
 
 1. **Parse** -- `PracticeDetectionResultParser` validates all fields, normalizes slugs (`toLowerCase` + replace `_` with `-`), deduplicates by practice (highest confidence wins), and collects `suggestedDiffNotes` from NEGATIVE findings. Malformed entries are captured in a `discarded` list (never throws).
 
@@ -149,9 +152,7 @@ After the agent returns findings, the server runs a 7-step delivery pipeline in 
 
 5. **Validate positions** -- `DiffHunkValidator` parses the unified diff to extract valid new-side line numbers per file. Invalid positions are snapped to the nearest valid line (`TreeSet.floor`/`ceiling`).
 
-6. **Suppress check** -- `FeedbackDeliveryService` checks suppression conditions: PR closed, PR merged (unless `deliverToMerged`), PR is draft (if `skipDrafts`), or author opted out of AI reviews. Suppressed reviews are logged but not posted.
-
-7. **Post** -- `FeedbackDeliveryService` posts the MR summary comment (with an HTML marker `<!-- hephaestus:practice-review:{jobId} -->` for edit-detection) and inline diff notes to the git provider's API.
+6. **Post** -- `FeedbackDeliveryService` checks suppression conditions (PR closed, merged, draft, or author opted out) and, if not suppressed, posts the MR summary comment (with an HTML marker `<!-- hephaestus:practice-review:{jobId} -->` for identification) and inline diff notes to the git provider's API. On re-runs, `DiffNotePoster` first deletes old diff notes bearing the `<!-- hephaestus-diff-note -->` marker to prevent accumulation.
 
 ## Bot command
 
@@ -168,10 +169,10 @@ Key tables for code review:
 
 | Table              | Key Columns                                                                                                               | Purpose                                                                                      |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `agent_config`     | `model`, `model_version`, `enabled`, `credentials` (encrypted)                                                            | LLM backend configuration per workspace                                                      |
+| `agent_config`     | `name`, `agent_type`, `model_name`, `model_version`, `enabled`, `llm_api_key` (encrypted), `llm_provider`, `credential_mode`, `timeout_seconds`, `max_concurrent_jobs`, `allow_internet` | LLM backend configuration per workspace                                                      |
 | `agent_job`        | `status`, `idempotency_key`, `job_token` (encrypted), `config_snapshot` (JSONB), `delivery_status`, `llm_*` usage columns | Job lifecycle: QUEUED → RUNNING → COMPLETED/FAILED. Tracks container ID, exit code, LLM cost |
-| `practice`         | `slug`, `name`, `category`, `criteria` (TEXT), `trigger_events` (JSONB), `workspace_id`                                   | Practice definitions. Unique constraint on `(workspace_id, slug)`                            |
-| `practice_finding` | `verdict`, `severity`, `confidence`, `evidence` (JSONB), `guidance`, `agent_job_id`, `pull_request_id`                    | Individual findings per PR per practice                                                      |
+| `practice`         | `slug`, `name`, `description` (TEXT, NOT NULL), `category`, `criteria` (TEXT), `trigger_events` (JSONB), `precompute_script` (TEXT), `is_active`, `workspace_id` | Practice definitions. Unique constraint on `(workspace_id, slug)`                            |
+| `practice_finding` | `idempotency_key`, `title`, `verdict`, `severity`, `confidence`, `evidence` (JSONB), `reasoning`, `guidance`, `agent_job_id`, `practice_id`, `target_type`, `target_id`, `contributor_id`, `detected_at` | Individual findings per target (PR) per practice                                             |
 
 ## Configuration
 

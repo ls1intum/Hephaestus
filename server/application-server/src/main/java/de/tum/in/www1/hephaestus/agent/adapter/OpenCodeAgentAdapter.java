@@ -91,7 +91,9 @@ public class OpenCodeAgentAdapter implements AgentAdapter {
             OUTPUT_PATH +
             " /home/agent/.local/tmp" +
             proxyEnvSetup +
-            " && node /workspace/.run-opencode.mjs";
+            " && " +
+            AgentAdapter.buildPrecomputeStep() +
+            "node /workspace/.run-opencode.mjs";
 
         return new AgentSandboxSpec(
             IMAGE,

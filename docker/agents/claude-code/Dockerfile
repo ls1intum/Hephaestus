@@ -4,7 +4,7 @@
 ARG NODE_TAG=22-slim
 FROM node:${NODE_TAG}
 
-RUN apt-get update -qq && apt-get install -y --no-install-recommends git findutils tree jq && \
+RUN apt-get update -qq && apt-get install -y --no-install-recommends git findutils tree jq curl && \
     rm -rf /var/lib/apt/lists/*
 
 ARG CLAUDE_CODE_VERSION=2.1.76
@@ -13,6 +13,14 @@ RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION} && \
     mkdir -p /home/agent/.claude /workspace && \
     echo '{"hasCompletedOnboarding":true}' > /home/agent/.claude.json && \
     chown -R 1000:1000 /home/agent /workspace
+
+# Bun runtime for precomputation scripts (static analysis before agent runs)
+ARG BUN_VERSION=1.3.11
+RUN curl -fsSL https://bun.sh/install | BUN_INSTALL=/usr/local bash -s "bun-v${BUN_VERSION}"
+
+# Precompute runner + shared libraries (practice scripts injected at runtime from DB)
+COPY --chown=1000:1000 precompute/runner.ts /opt/precompute/runner.ts
+COPY --chown=1000:1000 precompute/lib/ /opt/precompute/lib/
 
 # Git security: neutralize hooks and external commands from mounted repos.
 # System-level config cannot be overridden by repo-local .git/config.

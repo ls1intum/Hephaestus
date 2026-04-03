@@ -831,7 +831,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             handler.deliver(job);
 
             var deliveryCaptor = ArgumentCaptor.forClass(PracticeDetectionResultParser.DeliveryContent.class);
-            verify(feedbackService).deliverFeedback(eq(job), deliveryCaptor.capture(), eq(true));
+            verify(feedbackService).deliverFeedback(eq(job), deliveryCaptor.capture());
             var delivery = deliveryCaptor.getValue();
             assertThat(delivery).isNotNull();
             assertThat(delivery.mrNote()).isEqualTo("Please improve PR description.");
@@ -857,7 +857,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
 
             handler.deliver(job);
 
-            verify(feedbackService).deliverFeedback(eq(job), eq(null), eq(false));
+            verify(feedbackService).deliverFeedback(eq(job), any());
         }
 
         @Test

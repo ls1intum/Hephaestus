@@ -37,6 +37,9 @@ Read these files:
 4. `/workspace/.practices/all-criteria.md` — all practice criteria
 5. `/workspace/.practices/index.json` — practice slugs
 6. `/workspace/.context/contributor_history.json` (if exists)
+7. `/workspace/.precompute-out/summary.md` (if exists) — precomputed static analysis hints
+
+If `.precompute-out/summary.md` exists, include its hints in each subagent prompt. These are confirmed pattern matches from static analysis — locations are real, but whether they are actual violations requires the subagent's judgment based on surrounding context.
 
 ## Step 2: Dispatch 3 Analysis Subagents
 
@@ -71,7 +74,8 @@ RULES (from orchestrator-protocol.md):
 - One finding per practice — include ALL violations in that finding
 - For each practice: NEGATIVE (violation found), POSITIVE (good practice verified), or NOT_APPLICABLE (practice subject matter absent from diff)
 - Do NOT skip practices. You MUST produce exactly 4 findings.
-- Be a STRICT reviewer. Students make mistakes — find them.
+- Be thorough but precise. A false positive (flagging correct code) erodes trust more than a missed issue. Only flag patterns you can demonstrate with evidence from `+` lines.
+- Red-team POSITIVE verdicts: before concluding POSITIVE, consider why the practice COULD be NEGATIVE and confirm that reason does not apply.
 
 OUTPUT: A JSON array of exactly 4 finding objects per the schema in orchestrator-protocol.md. No delivery block. No markdown wrapping.
 [{\"practiceSlug\": \"hardcoded-secrets\", ...}, ...]")
@@ -106,7 +110,8 @@ RULES (from orchestrator-protocol.md):
 - Do NOT skip practices. You MUST produce exactly 4 findings.
 - View-decomposition: count body lines using [L<start>] to [L<end>] annotations. >100 lines with 3+ concerns = MAJOR, 60-100 = MINOR.
 - State-ownership: check if @State is used where @Binding or @Observable should be.
-- Be a STRICT reviewer. Students make mistakes — find them.
+- Be thorough but precise. A false positive (flagging correct code) erodes trust more than a missed issue. Only flag patterns you can demonstrate with evidence from `+` lines.
+- Red-team POSITIVE verdicts: before concluding POSITIVE, consider why the practice COULD be NEGATIVE and confirm that reason does not apply.
 
 OUTPUT: A JSON array of exactly 4 finding objects. No delivery block. No markdown wrapping.
 [{\"practiceSlug\": \"view-decomposition\", ...}, ...]")
@@ -141,7 +146,8 @@ RULES (from orchestrator-protocol.md):
 - For each practice: NEGATIVE (violation found), POSITIVE (good practice verified), or NOT_APPLICABLE (practice subject matter absent from diff)
 - Do NOT skip practices. You MUST produce exactly 5 findings.
 - mr-description-quality and commit-discipline: use metadata, not the diff.
-- Be a STRICT reviewer. Students make mistakes — find them.
+- Be thorough but precise. A false positive (flagging correct code) erodes trust more than a missed issue. Only flag patterns you can demonstrate with evidence from `+` lines.
+- Red-team POSITIVE verdicts: before concluding POSITIVE, consider why the practice COULD be NEGATIVE and confirm that reason does not apply.
 
 OUTPUT: A JSON array of exactly 5 finding objects. No delivery block. No markdown wrapping.
 [{\"practiceSlug\": \"meaningful-naming\", ...}, ...]")

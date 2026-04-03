@@ -82,7 +82,9 @@ public class ClaudeCodeAgentAdapter implements AgentAdapter {
             authSetup +
             "mkdir -p " +
             OUTPUT_PATH +
-            " && node /workspace/.run-claude.mjs" +
+            " && " +
+            AgentAdapter.buildPrecomputeStep() +
+            "node /workspace/.run-claude.mjs" +
             "; cp -r /workspace/.analysis " +
             OUTPUT_PATH +
             "/analysis 2>/dev/null; true";
@@ -119,11 +121,11 @@ public class ClaudeCodeAgentAdapter implements AgentAdapter {
             "path":{"type":"string"},"startLine":{"type":"integer","minimum":1},\
             "endLine":{"type":"integer","minimum":1}}}},\
             "snippets":{"type":"array","items":{"type":"string"}}}},\
-            "reasoning":{"type":"string","maxLength":500},\
-            "guidance":{"type":"string","maxLength":800},\
+            "reasoning":{"type":"string"},\
+            "guidance":{"type":"string"},\
             "suggestedDiffNotes":{"type":"array","items":{"type":"object","properties":{\
             "filePath":{"type":"string"},"startLine":{"type":"integer","minimum":1},\
-            "endLine":{"type":"integer","minimum":1},"body":{"type":"string","maxLength":300}},\
+            "endLine":{"type":"integer","minimum":1},"body":{"type":"string"}},\
             "required":["filePath","startLine","body"]}}},\
             "required":["practiceSlug","title","verdict","severity","confidence"]}}},"required":["findings"]}""";
         return schema.getBytes(StandardCharsets.UTF_8);

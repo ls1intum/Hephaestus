@@ -1,0 +1,11 @@
+# Deletes a note (comment) on a merge request.
+# Used to remove old hephaestus diff notes before posting updated ones.
+
+mutation DestroyNote($noteId: NoteID!) {
+    destroyNote(input: { id: $noteId }) {
+        note {
+            id
+        }
+        errors
+    }
+}

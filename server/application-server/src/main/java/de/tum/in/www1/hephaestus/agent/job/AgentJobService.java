@@ -106,7 +106,6 @@ public class AgentJobService {
      * @param prId        the pull request's DB id
      * @return description of result (job ID or error message)
      */
-    @Transactional(readOnly = true)
     public String submitReviewForPullRequest(Long workspaceId, Long prId) {
         PullRequest pr = pullRequestRepository.findByIdWithAllForGate(prId).orElse(null);
         if (pr == null) {

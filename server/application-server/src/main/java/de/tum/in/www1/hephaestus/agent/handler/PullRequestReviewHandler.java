@@ -3,6 +3,7 @@ package de.tum.in.www1.hephaestus.agent.handler;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.tum.in.www1.hephaestus.agent.AgentJobType;
 import de.tum.in.www1.hephaestus.agent.handler.spi.JobDeliveryException;
@@ -302,9 +303,25 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         // 4. Ensure .analysis/practices/ exists (empty marker file)
         files.put(".analysis/practices/.gitkeep", new byte[0]);
 
+        // 5. Precomputation scripts from DB — each practice can optionally define
+        //    a Bun/TypeScript script for fast static analysis before the AI agent runs.
+        //    Scripts produce hints/directions, never verdicts.
+        int precomputeCount = 0;
+        for (Practice p : practices) {
+            String script = p.getPrecomputeScript();
+            if (script != null && !script.isBlank()) {
+                files.put(
+                    ".precompute/practices/" + p.getSlug() + ".ts",
+                    script.getBytes(StandardCharsets.UTF_8)
+                );
+                precomputeCount++;
+            }
+        }
+
         log.info(
-            "Injected orchestrator files: {} practices, workspaceId={}, jobId={}",
+            "Injected orchestrator files: {} practices ({} with precompute scripts), workspaceId={}, jobId={}",
             practices.size(),
+            precomputeCount,
             workspaceId,
             job.getId()
         );
@@ -521,6 +538,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         JsonNode metadata
     ) {
         ObjectNode pullRequestMetadata = buildPullRequestMetadata(pullRequest, metadata);
+        addCommitLog(pullRequestMetadata, metadata);
         try {
             files.put(
                 ".context/metadata.json",
@@ -599,48 +617,14 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         }
         Path repoPath = gitRepositoryManager.getRepositoryPath(repositoryId);
         try {
-            // Strategy 1: Try branch-based diff (works if source branch still exists)
-            String diffStat = runGit(repoPath, "diff", "--stat", "origin/" + targetBranch + "..origin/" + sourceBranch);
-            String diff;
-            if (diffStat != null && !diffStat.isBlank()) {
-                diff = runGit(repoPath, "diff", "origin/" + targetBranch + "..origin/" + sourceBranch);
-            } else {
-                // Strategy 2: Find merge commit and diff its parents
-                // Look for merge commit that has headSha as second parent
-                String mergeCommit = runGit(
-                    repoPath,
-                    "log",
-                    "--all",
-                    "--merges",
-                    "--format=%H %P",
-                    "--ancestry-path",
-                    headSha + "..origin/" + targetBranch
-                );
-                String base = null;
-                if (mergeCommit != null) {
-                    for (String line : mergeCommit.split("\n")) {
-                        String[] parts = line.trim().split("\\s+");
-                        if (
-                            parts.length >= 3 && headSha.length() >= 8 && parts[2].startsWith(headSha.substring(0, 8))
-                        ) {
-                            base = parts[1]; // First parent = target before merge
-                            break;
-                        }
-                    }
-                }
-                if (base == null) {
-                    // Strategy 3: Use merge-base with HEAD (last resort)
-                    base = runGit(repoPath, "merge-base", "origin/" + targetBranch, headSha);
-                    if (base != null) base = base.trim();
-                }
-                if (base != null && !base.equals(headSha)) {
-                    diffStat = runGit(repoPath, "diff", "--stat", base + ".." + headSha);
-                    diff = runGit(repoPath, "diff", base + ".." + headSha);
-                } else {
-                    log.warn("Could not compute diff base for headSha={}, targetBranch={}", headSha, targetBranch);
-                    return;
-                }
+            String[] range = resolveDiffRange(repoPath, targetBranch, sourceBranch, headSha);
+            if (range == null) {
+                log.warn("Could not compute diff base for headSha={}, targetBranch={}", headSha, targetBranch);
+                return;
             }
+            String rangeSpec = range[0] + ".." + range[1];
+            String diffStat = runGit(repoPath, "diff", "--stat", rangeSpec);
+            String diff = runGit(repoPath, "diff", rangeSpec);
             if (diff != null && !diff.isBlank()) {
                 // Annotate diff with [L<n>] source-file line numbers so subagents
                 // can reference correct line numbers without computing offsets.
@@ -787,14 +771,10 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         if (!gitRepositoryManager.isRepositoryCloned(repositoryId)) return Map.of();
         Path repoPath = gitRepositoryManager.getRepositoryPath(repositoryId);
 
-        // Get full diff using same strategy as computeAndStoreDiff
-        String diff = runGit(repoPath, "diff", "origin/" + targetBranch + "..origin/" + sourceBranch);
-        if (diff == null || diff.isBlank()) {
-            String base = runGit(repoPath, "merge-base", "origin/" + targetBranch, headSha);
-            if (base != null) {
-                diff = runGit(repoPath, "diff", base.trim() + ".." + headSha);
-            }
-        }
+        String[] range = resolveDiffRange(repoPath, targetBranch, sourceBranch, headSha);
+        if (range == null) return Map.of();
+
+        String diff = runGit(repoPath, "diff", range[0] + ".." + range[1]);
         if (diff == null || diff.isBlank()) return Map.of();
 
         return DiffHunkValidator.parseValidLines(diff);
@@ -819,14 +799,10 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         if (!gitRepositoryManager.isRepositoryCloned(repositoryId)) return Set.of();
         Path repoPath = gitRepositoryManager.getRepositoryPath(repositoryId);
 
-        // Use same strategy as computeAndStoreDiff: branch-based first, fallback to merge-base
-        String diffStat = runGit(repoPath, "diff", "--stat", "origin/" + targetBranch + "..origin/" + sourceBranch);
-        if (diffStat == null || diffStat.isBlank()) {
-            String base = runGit(repoPath, "merge-base", "origin/" + targetBranch, headSha);
-            if (base != null) {
-                diffStat = runGit(repoPath, "diff", "--stat", base.trim() + ".." + headSha);
-            }
-        }
+        String[] range = resolveDiffRange(repoPath, targetBranch, sourceBranch, headSha);
+        if (range == null) return Set.of();
+
+        String diffStat = runGit(repoPath, "diff", "--stat", range[0] + ".." + range[1]);
         if (diffStat == null || diffStat.isBlank()) return Set.of();
 
         return parseDiffStatPaths(diffStat);
@@ -907,6 +883,61 @@ public class PullRequestReviewHandler implements JobTypeHandler {
     }
 
     /**
+     * Resolves the diff base for a merge request using a 3-strategy approach:
+     * <ol>
+     *   <li><b>Branch-based</b> ({@code origin/target..origin/source}) — works if source branch
+     *       still exists. Verified by running {@code git diff --stat} to ensure non-empty output.</li>
+     *   <li><b>Merge-commit-parent</b> — finds a merge commit whose second parent matches
+     *       {@code headSha}, then uses its first parent (the target before merge) as the base.</li>
+     *   <li><b>Merge-base</b> — last resort using {@code git merge-base}. Only accepted if the
+     *       result differs from {@code headSha} (otherwise the range would be empty).</li>
+     * </ol>
+     *
+     * @return a two-element array {@code [base, head]} forming the git range {@code base..head},
+     *         or {@code null} if no strategy succeeds. For strategy 1, both elements are branch refs
+     *         (e.g. {@code origin/main}); for strategies 2 and 3, both are commit SHAs.
+     */
+    @Nullable
+    private String[] resolveDiffRange(Path repoPath, String targetBranch, String sourceBranch, String headSha) {
+        // Strategy 1: Branch-based diff (works if source branch still exists)
+        String branchBase = "origin/" + targetBranch;
+        String branchHead = "origin/" + sourceBranch;
+        String statCheck = runGit(repoPath, "diff", "--stat", branchBase + ".." + branchHead);
+        if (statCheck != null && !statCheck.isBlank()) {
+            return new String[] { branchBase, branchHead };
+        }
+
+        // Strategy 2: Find merge commit that has headSha as second parent
+        if (headSha != null && !headSha.isBlank()) {
+            String mergeLog = runGit(
+                repoPath, "log", "--all", "--merges", "--format=%H %P",
+                "--ancestry-path", headSha + "..origin/" + targetBranch
+            );
+            if (mergeLog != null) {
+                for (String line : mergeLog.split("\n")) {
+                    String[] parts = line.trim().split("\\s+");
+                    if (parts.length >= 3 && headSha.length() >= 8
+                            && parts[2].startsWith(headSha.substring(0, 8))) {
+                        String base = parts[1]; // First parent = target before merge
+                        return new String[] { base, headSha };
+                    }
+                }
+            }
+
+            // Strategy 3: Use merge-base (last resort)
+            String base = runGit(repoPath, "merge-base", "origin/" + targetBranch, headSha);
+            if (base != null) {
+                base = base.trim();
+                if (!base.isEmpty() && !base.equals(headSha)) {
+                    return new String[] { base, headSha };
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Run a git command in the repository directory. Returns stdout or null on failure.
      *
      * <p>Redirects stdout to a temp file to avoid pipe-buffer deadlocks: if git output
@@ -915,22 +946,28 @@ public class PullRequestReviewHandler implements JobTypeHandler {
      */
     private String runGit(Path repoPath, String... args) {
         java.io.File tmpFile = null;
+        java.io.File errFile = null;
         Process process = null;
         try {
             tmpFile = java.io.File.createTempFile("hephaestus-git-", ".out");
+            errFile = java.io.File.createTempFile("hephaestus-git-", ".err");
             String[] cmd = new String[args.length + 1];
             cmd[0] = "git";
             System.arraycopy(args, 0, cmd, 1, args.length);
             ProcessBuilder pb = new ProcessBuilder(cmd);
             pb.directory(repoPath.toFile());
-            pb.redirectError(ProcessBuilder.Redirect.DISCARD);
+            pb.redirectError(errFile);
             pb.redirectOutput(tmpFile);
             process = pb.start();
             boolean finished = process.waitFor(30, TimeUnit.SECONDS);
             if (!finished) {
+                log.warn("git {} timed out after 30s in {}", args[0], repoPath);
                 return null;
             }
             if (process.exitValue() != 0) {
+                String stderr = java.nio.file.Files.readString(errFile.toPath(), StandardCharsets.UTF_8);
+                log.debug("git {} exited {} in {}: {}", args[0], process.exitValue(), repoPath,
+                        stderr.length() > 500 ? stderr.substring(0, 500) : stderr);
                 return null;
             }
             return java.nio.file.Files.readString(tmpFile.toPath(), StandardCharsets.UTF_8);
@@ -946,12 +983,60 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             if (tmpFile != null) {
                 tmpFile.delete();
             }
+            if (errFile != null) {
+                errFile.delete();
+            }
         }
     }
 
     // -------------------------------------------------------------------------
     // Internal helpers
     // -------------------------------------------------------------------------
+
+    /**
+     * Add the MR's commit log to the metadata so the agent can evaluate individual
+     * commit messages for commit-discipline. Uses the same branch/SHA resolution
+     * strategy as {@link #computeAndStoreDiff}.
+     */
+    private void addCommitLog(ObjectNode metadata, JsonNode jobMetadata) {
+        String sourceBranch = jobMetadata.has("source_branch") ? jobMetadata.get("source_branch").asText() : null;
+        String targetBranch = jobMetadata.has("target_branch") ? jobMetadata.get("target_branch").asText() : null;
+        long repositoryId = requireLong(jobMetadata, "repository_id");
+
+        if (sourceBranch == null || targetBranch == null) return;
+
+        Path repoPath = gitRepositoryManager.getRepositoryPath(repositoryId);
+        String headSha = jobMetadata.has("commit_sha") ? jobMetadata.get("commit_sha").asText() : null;
+
+        String[] range = resolveDiffRange(repoPath, targetBranch, sourceBranch, headSha);
+        String logOutput = range != null
+            ? runGit(repoPath, "log", "--format=%h\t%s", range[0] + ".." + range[1])
+            : null;
+
+        if (logOutput == null || logOutput.isBlank()) {
+            log.debug("No commit log available for MR, skipping commit injection");
+            return;
+        }
+
+        ArrayNode commits = objectMapper.createArrayNode();
+        int count = 0;
+        for (String line : logOutput.split("\n")) {
+            if (line.isBlank()) continue;
+            if (count >= 50) break; // Cap at 50 commits
+            String[] parts = line.split("\t", 2);
+            if (parts.length < 2) continue;
+            ObjectNode commit = objectMapper.createObjectNode();
+            commit.put("sha", parts[0]);
+            commit.put("message", parts[1]);
+            commits.add(commit);
+            count++;
+        }
+
+        if (!commits.isEmpty()) {
+            metadata.set("commits", commits);
+            log.debug("Injected {} commit messages into metadata", commits.size());
+        }
+    }
 
     private ObjectNode buildPullRequestMetadata(PullRequest pullRequest, JsonNode jobMetadata) {
         ObjectNode result = objectMapper.createObjectNode();

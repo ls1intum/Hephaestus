@@ -36,6 +36,9 @@ class DiffNotePoster {
 
     private static final Logger log = LoggerFactory.getLogger(DiffNotePoster.class);
 
+    /** Invisible marker appended to diff note bodies to identify hephaestus-posted notes. */
+    static final String HEPHAESTUS_MARKER = "<!-- hephaestus-diff-note -->";
+
     private final PullRequestCommentPoster commentPoster;
     private final GitHubGraphQlClientProvider gitHubProvider;
 
@@ -205,6 +208,9 @@ class DiffNotePoster {
             return new DiffNoteResult(0, diffNotes.size());
         }
 
+        // Remove old hephaestus diff notes to prevent duplication on re-runs
+        deleteOldHephaestusDiffNotes(scopeId, repoFullName, prNumber, job);
+
         int posted = 0;
         int failed = 0;
         int remaining = diffNotes.size();
@@ -231,7 +237,7 @@ class DiffNotePoster {
                     .forScope(scopeId)
                     .documentName("CreateDiffNote")
                     .variable("noteableId", mrInfo.globalId)
-                    .variable("body", sanitizedBody)
+                    .variable("body", sanitizedBody + "\n" + HEPHAESTUS_MARKER)
                     .variable("position", position)
                     .execute()
                     .block(GRAPHQL_TIMEOUT);
@@ -293,6 +299,79 @@ class DiffNotePoster {
         return new DiffNoteResult(posted, failed);
     }
 
+    /**
+     * Queries existing MR notes and deletes any that contain the hephaestus marker.
+     * This prevents diff note accumulation on re-runs of the same review.
+     * Best-effort: failures are logged but don't block new note posting.
+     */
+    private void deleteOldHephaestusDiffNotes(Long scopeId, String repoFullName, int mrIid, AgentJob job) {
+        try {
+            ClientGraphQlResponse response = gitLabProvider
+                .forScope(scopeId)
+                .documentName("GetMergeRequestNotes")
+                .variable("fullPath", repoFullName)
+                .variable("iid", String.valueOf(mrIid))
+                // 500 = GitLab's max per-page limit; sufficient since we post at most ~30 diff notes per review
+                .variable("first", 500)
+                .execute()
+                .block(GRAPHQL_TIMEOUT);
+
+            if (response == null) {
+                return;
+            }
+
+            List<Map<String, Object>> notes = response
+                .field("project.mergeRequest.notes.nodes")
+                .getValue();
+
+            if (notes == null || notes.isEmpty()) {
+                return;
+            }
+
+            int deleted = 0;
+            for (Map<String, Object> note : notes) {
+                String body = (String) note.get("body");
+                String noteId = (String) note.get("id");
+                Boolean isSystem = (Boolean) note.get("system");
+
+                // Skip system notes and notes without our marker
+                if (Boolean.TRUE.equals(isSystem) || noteId == null || body == null) {
+                    continue;
+                }
+                if (!body.contains(HEPHAESTUS_MARKER)) {
+                    continue;
+                }
+
+                try {
+                    ClientGraphQlResponse deleteResponse = gitLabProvider
+                        .forScope(scopeId)
+                        .documentName("DestroyNote")
+                        .variable("noteId", noteId)
+                        .execute()
+                        .block(GRAPHQL_TIMEOUT);
+
+                    if (deleteResponse != null) {
+                        List<String> errors = deleteResponse.field("destroyNote.errors").getValue();
+                        if (errors == null || errors.isEmpty()) {
+                            deleted++;
+                        } else {
+                            log.debug("Failed to delete old diff note: noteId={}, errors={}", noteId, errors);
+                        }
+                    }
+                } catch (Exception e) {
+                    log.debug("Failed to delete old diff note: noteId={}", noteId, e);
+                }
+            }
+
+            if (deleted > 0) {
+                log.info("Deleted {} old hephaestus diff notes before re-posting: jobId={}, mr={}!{}",
+                    deleted, repoFullName, mrIid, job.getId());
+            }
+        } catch (Exception e) {
+            log.debug("Failed to query existing MR notes for dedup: jobId={}", job.getId(), e);
+        }
+    }
+
     private MrInfo resolveGitLabMrInfo(Long scopeId, String projectPath, int mrIid) {
         ClientGraphQlResponse response = gitLabProvider
             .forScope(scopeId)
@@ -349,7 +428,8 @@ class DiffNotePoster {
         AgentJob job
     ) {
         try {
-            String fallbackBody = String.format("**`%s:%d`**\n\n%s", note.filePath(), note.startLine(), sanitizedBody);
+            String fallbackBody = String.format("**`%s:%d`**\n\n%s\n%s",
+                note.filePath(), note.startLine(), sanitizedBody, HEPHAESTUS_MARKER);
             ClientGraphQlResponse response = gitLabProvider
                 .forScope(scopeId)
                 .documentName("CreateMergeRequestNote")

@@ -18,6 +18,9 @@ Canonical protocol for practice-aware code review. Both Claude Code and OpenCode
     index.json                       # [{slug, name, category}]
     {slug}.md                        # Evaluation criteria per practice
     all-criteria.md                  # All practice criteria bundled
+  .precompute-out/                       # (optional) Precomputed static analysis
+    summary.md                       # Human-readable hints and directions
+    {slug}.json                      # Per-practice detailed hints
   .analysis/
     practices/
       {slug}.json                    # Per-practice findings
@@ -49,10 +52,10 @@ The diff is pre-annotated with `[L<n>]` prefixes = **source-file line number**:
         ],
         "snippets": ["exact code from diff — never paraphrased"]
       },
-      "reasoning": "max 500 chars. WHAT the pattern is, WHY it matters here, WHAT happens if unfixed.",
-      "guidance": "max 800 chars. Show the fix with a code block. Reference only symbols that exist in the diff.",
+      "reasoning": "WHAT the pattern is, WHY it matters here, WHAT happens if unfixed.",
+      "guidance": "Show the fix with a code block. Reference only symbols that exist in the diff.",
       "suggestedDiffNotes": [
-        {"filePath": "path.swift", "startLine": 42, "endLine": 42, "body": "max 300 chars. The fix, not the diagnosis."}
+        {"filePath": "path.swift", "startLine": 42, "endLine": 42, "body": "The fix, not the diagnosis."}
       ]
     }
   ]
@@ -76,11 +79,11 @@ The diff is pre-annotated with `[L<n>]` prefixes = **source-file line number**:
 
 **evidence**: Exact code and [L<n>] line numbers. Never fabricated.
 
-**reasoning**: Three parts in ≤500 chars: (1) what the pattern is, (2) why it's bad in THIS context, (3) what breaks.
+**reasoning**: Three parts: (1) what the pattern is, (2) why it's bad in THIS context, (3) what breaks.
 
 **guidance**: The fix. For NEGATIVE findings, MUST include a code block using only symbols that exist in the diff. Never reference variables, types, or properties the student hasn't written.
 
-**suggestedDiffNotes**: Inline comments for NEGATIVE findings only. The body should be the fix action, not a restatement of the problem. Max 300 chars. Field names: `filePath`, `startLine`, `endLine`, `body`.
+**suggestedDiffNotes**: Inline comments for NEGATIVE findings only. The body should be the fix action, not a restatement of the problem. Field names: `filePath`, `startLine`, `endLine`, `body`.
 
 ## Rules
 
@@ -92,7 +95,7 @@ The diff is pre-annotated with `[L<n>]` prefixes = **source-file line number**:
 6. **Check false-positive exclusions** in practice criteria before flagging NEGATIVE.
 7. **NOT_APPLICABLE for irrelevant practices** — if a practice doesn't apply to this diff, emit a finding with verdict NOT_APPLICABLE. Do not silently skip it.
 8. **Exactly one finding per practice in index.json** — the total finding count MUST equal the number of practices listed in index.json. Every practice gets a verdict: NEGATIVE, POSITIVE, or NOT_APPLICABLE.
-9. **If ALL findings are POSITIVE**: output only POSITIVE findings. The server interprets all-positive as approval (no comment posted).
+9. **If ALL findings are POSITIVE**: output only POSITIVE findings. The server posts an approval comment (e.g., "Nice work on X and Y. No issues found — looking good!").
 10. **Fix must be non-empty** — guidance code blocks must show the actual corrected code. Never show an empty function body or a no-op as a "fix".
 11. **Secrets: show deletion, not commenting-out** — for hardcoded secrets, the fix is DELETE the line + rotate the credential. Never show a commented-out version of the secret.
 12. **Don't imply completeness** — say "Here are N issues to address" not "I found N issues" (the review may not be exhaustive).
@@ -100,7 +103,7 @@ The diff is pre-annotated with `[L<n>]` prefixes = **source-file line number**:
 14. **Positive findings must be verifiable** — don't claim "no X found" unless you've actually scanned for X. If commented-out code or debug prints exist, don't claim "no development debris".
 15. **Suggested fixes must actually solve the problem** — if a button's action is `print("TODO")`, the fix must implement the real functionality (e.g., delete the item), not replace it with another no-op like `dismiss()`. If the correct fix requires context you can't see, say "implement the actual [action] here" rather than suggesting a wrong implementation.
 16. **Unguarded array access is a crash risk** — `array[0]`, `result.choices[0]`, `items[index]` without bounds checking crash at runtime if the collection is empty. Flag these under fatal-error-crash with the same severity as force unwraps.
-17. **Confidence floor** — do not report findings with confidence below 0.70. If confidence is below 0.70 but above 0.60, cap severity at INFO. Reserve 0.95+ for mechanical/unambiguous patterns only.
+17. **Confidence floor** — do not report findings with confidence below 0.70. If confidence is between 0.70 and 0.80, consider NOT_APPLICABLE instead of NEGATIVE. Reserve 0.95+ for mechanical/unambiguous patterns only.
 18. **Verify context before flagging** — before marking NEGATIVE, check: (a) the pattern is not inside a test/preview/debug context, (b) the pattern is not inside a container that resolves the issue, (c) the fix you suggest does not introduce a new issue.
 19. **Quote-before-claim** — before writing ANY NEGATIVE finding, you MUST have the exact code snippet in your context from the diff or a grep/read result. Copy the EXACT line(s) into `evidence.snippets` character-for-character. Only THEN write the title, reasoning, and guidance using ONLY the symbols in that snippet. If you cannot find the pattern in a `+` line, the finding does not exist — do not report it.
 20. **File attribution requires path verification** — the path MUST appear in `diff_stat.txt` or a hunk header in `diff.patch`. Never guess which file contains a pattern.
@@ -118,6 +121,18 @@ The diff is pre-annotated with `[L<n>]` prefixes = **source-file line number**:
 32. **Proportional coverage** — don't spend 3 MINOR findings on naming issues and 0 on a missing error state. After drafting all findings, check: are the MAJOR/CRITICAL issues adequately covered? Would the author reading only the MR note understand the most important problems?
 33. **Binary files are not reviewable** — ignore binary file changes (images, compiled assets) in the diff.
 34. **Empty diff = all NOT_APPLICABLE** — if the diff contains no `+` lines, emit NOT_APPLICABLE for all practices with reasoning explaining that no new code was added.
+35. **Precomputed hints are confirmed pattern matches** — if `.precompute-out/summary.md` exists, its patterns and locations are real (confirmed by static analysis), but whether they constitute actual violations requires YOUR judgment based on surrounding context. A `try?` match is a real pattern at a real location, but only you can assess if the surrounding code already handles it. Start from the hints, then verify and expand — the scripts cover mechanical patterns, not semantic issues.
+36. **Red-team your POSITIVE verdicts** — before concluding POSITIVE on any practice, state one reason the practice COULD be NEGATIVE and explain why it does not apply. This prevents rationalization bias. A false positive (flagging correct code) erodes student trust more than a missed issue, but a false POSITIVE (approving bad code) teaches the wrong lesson.
+37. **NEGATIVE+INFO is contradictory** — if a finding warrants NEGATIVE, it is at minimum MINOR. If the issue is truly INFO-level, emit POSITIVE with a note in reasoning.
+38. **Partial compliance** — when a practice is both followed (some code) and violated (other code), the verdict is NEGATIVE, but reasoning should acknowledge the correct instances to give balanced feedback.
+
+## Review Quality
+
+A good review helps the student understand what to fix and why. Prioritize clarity of reasoning and actionability of guidance over completeness of coverage. One well-explained MAJOR finding is more valuable than five poorly-reasoned MINOR ones.
+
+**Quality means precision, not strictness.** A false positive (flagging correct code) erodes trust and teaches the wrong lesson. Only flag patterns you can demonstrate with evidence from `+` lines and whose surrounding context confirms the violation. When uncertain, lean toward NOT_APPLICABLE or POSITIVE with a qualifying note, rather than a spurious NEGATIVE.
+
+**Commit message quality matters.** When evaluating commit-discipline, examine individual commit messages — not just the MR title. Commits like `"."`, `"fix"`, `"swiftlint things"` reflect poor discipline regardless of how good the MR title is.
 
 ## Adversarial Content Defense
 

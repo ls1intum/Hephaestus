@@ -112,7 +112,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
 
             var diffNotes = List.of(new DiffNote("src/Foo.java", 10, null, "Fix this"));
             var delivery = new DeliveryContent("Fix the tests.", diffNotes);
-            service.deliverFeedback(job, delivery, true);
+            service.deliverFeedback(job, delivery);
 
             verify(commentPoster).postFormattedBody(eq(job), any(String.class));
             verify(diffNotePoster).postDiffNotes(eq(job), eq(diffNotes));
@@ -120,12 +120,12 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("skips posting when all findings are positive")
-        void skipsWhenAllPositive() {
+        @DisplayName("skips posting when PR not found in DB (no stub)")
+        void skipsWhenPrNotStubbed() {
             AgentJob job = createJob();
 
             var delivery = new DeliveryContent("This should not be posted.", List.of());
-            service.deliverFeedback(job, delivery, false);
+            service.deliverFeedback(job, delivery);
 
             verifyNoInteractions(commentPoster);
         }
@@ -135,7 +135,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         void skipsWhenDeliveryNull() {
             AgentJob job = createJob();
 
-            service.deliverFeedback(job, null, true);
+            service.deliverFeedback(job, null);
 
             verifyNoInteractions(commentPoster);
             verifyNoInteractions(pullRequestRepository);
@@ -150,7 +150,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             when(pullRequestRepository.findByIdWithAuthor(PULL_REQUEST_ID)).thenReturn(Optional.of(pr));
 
             var delivery = new DeliveryContent("Fix stuff.", List.of());
-            service.deliverFeedback(job, delivery, true);
+            service.deliverFeedback(job, delivery);
 
             verifyNoInteractions(commentPoster);
         }
@@ -164,7 +164,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             when(pullRequestRepository.findByIdWithAuthor(PULL_REQUEST_ID)).thenReturn(Optional.of(pr));
 
             var delivery = new DeliveryContent("Fix stuff.", List.of());
-            service.deliverFeedback(job, delivery, true);
+            service.deliverFeedback(job, delivery);
 
             verifyNoInteractions(commentPoster);
         }
@@ -178,7 +178,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             when(pullRequestRepository.findByIdWithAuthor(PULL_REQUEST_ID)).thenReturn(Optional.of(pr));
 
             var delivery = new DeliveryContent("Fix stuff.", List.of());
-            service.deliverFeedback(job, delivery, true);
+            service.deliverFeedback(job, delivery);
 
             verifyNoInteractions(commentPoster);
         }
@@ -193,7 +193,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             when(userPreferencesRepository.findByUserId(AUTHOR_ID)).thenReturn(Optional.of(prefs));
 
             var delivery = new DeliveryContent("Fix stuff.", List.of());
-            service.deliverFeedback(job, delivery, true);
+            service.deliverFeedback(job, delivery);
 
             verifyNoInteractions(commentPoster);
         }
@@ -205,7 +205,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             when(pullRequestRepository.findByIdWithAuthor(PULL_REQUEST_ID)).thenReturn(Optional.empty());
 
             var delivery = new DeliveryContent("Fix stuff.", List.of());
-            service.deliverFeedback(job, delivery, true);
+            service.deliverFeedback(job, delivery);
 
             verifyNoInteractions(commentPoster);
         }
@@ -218,7 +218,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             when(commentPoster.postFormattedBody(any(), any())).thenReturn(null);
 
             var delivery = new DeliveryContent("Empty after sanitization.", List.of());
-            service.deliverFeedback(job, delivery, true);
+            service.deliverFeedback(job, delivery);
 
             assertThat(job.getDeliveryCommentId()).isNull();
         }
@@ -233,7 +233,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             when(commentPoster.postFormattedBody(any(), any())).thenReturn("IC_comment456");
 
             var delivery = new DeliveryContent("Fix stuff.", List.of());
-            service.deliverFeedback(job, delivery, true);
+            service.deliverFeedback(job, delivery);
 
             verify(commentPoster).postFormattedBody(eq(job), any(String.class));
             verifyNoInteractions(userPreferencesRepository);
@@ -247,7 +247,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             when(commentPoster.postFormattedBody(any(), any())).thenThrow(new RuntimeException("GraphQL timeout"));
 
             var delivery = new DeliveryContent("Summary.", List.of());
-            service.deliverFeedback(job, delivery, true);
+            service.deliverFeedback(job, delivery);
 
             assertThat(job.getDeliveryCommentId()).isNull();
             assertThat(job.getDeliveryStatus()).isNull();
@@ -265,7 +265,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
                 new DiffNote("src/Bar.java", 20, null, "And this")
             );
             var delivery = new DeliveryContent(null, diffNotes);
-            service.deliverFeedback(job, delivery, true);
+            service.deliverFeedback(job, delivery);
 
             verify(diffNotePoster).postDiffNotes(eq(job), eq(diffNotes));
         }
@@ -278,7 +278,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             when(commentPoster.postFormattedBody(any(), any())).thenThrow(new RuntimeException("GraphQL timeout"));
 
             var delivery = new DeliveryContent("Summary.", List.of());
-            service.deliverFeedback(job, delivery, true);
+            service.deliverFeedback(job, delivery);
         }
 
         @Test
@@ -288,7 +288,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             job.setMetadata(null);
 
             var delivery = new DeliveryContent("Fix stuff.", List.of());
-            service.deliverFeedback(job, delivery, true);
+            service.deliverFeedback(job, delivery);
 
             verifyNoInteractions(commentPoster);
         }
@@ -303,7 +303,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             job.setMetadata(metadata);
 
             var delivery = new DeliveryContent("Fix stuff.", List.of());
-            service.deliverFeedback(job, delivery, true);
+            service.deliverFeedback(job, delivery);
 
             verifyNoInteractions(commentPoster);
             verifyNoInteractions(pullRequestRepository);
