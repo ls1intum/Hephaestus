@@ -63,7 +63,7 @@ public class PracticeService {
         practice.setCategory(request.category());
         practice.setDescription(request.description());
         practice.setTriggerEvents(TriggerEventsConverter.toJsonNode(request.triggerEvents()));
-        practice.setDetectionPrompt(request.detectionPrompt());
+        practice.setCriteria(request.criteria());
 
         try {
             practice = practiceRepository.save(practice);
@@ -102,8 +102,8 @@ public class PracticeService {
             practice.setTriggerEvents(TriggerEventsConverter.toJsonNode(request.triggerEvents()));
             changed = true;
         }
-        if (request.detectionPrompt() != null) {
-            practice.setDetectionPrompt(request.detectionPrompt());
+        if (request.criteria() != null) {
+            practice.setCriteria(request.criteria());
             changed = true;
         }
 

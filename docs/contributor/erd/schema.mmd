@@ -38,6 +38,7 @@ erDiagram
         TIMESTAMPTZ created_at "NOT NULL"
         TIMESTAMPTZ updated_at
         VARCHAR(16) credential_mode "NOT NULL"
+        VARCHAR(50) model_version
     }
 
     AgentJob {
@@ -64,6 +65,15 @@ erDiagram
         VARCHAR(20) delivery_status
         VARCHAR(255) delivery_comment_id
         TEXT container_logs
+        VARCHAR(100) llm_model
+        INTEGER llm_total_calls
+        INTEGER llm_total_input_tokens
+        INTEGER llm_total_output_tokens
+        INTEGER llm_total_reasoning_tokens
+        INTEGER llm_cache_read_tokens
+        INTEGER llm_cache_write_tokens
+        DOUBLE llm_cost_usd
+        VARCHAR(50) llm_model_version
     }
 
     ChatMessage {
@@ -384,10 +394,11 @@ erDiagram
         VARCHAR(64) category
         TEXT description "NOT NULL"
         JSONB trigger_events "NOT NULL"
-        TEXT detection_prompt
+        TEXT criteria
         BOOLEAN is_active "NOT NULL"
         TIMESTAMPTZ created_at "NOT NULL"
         TIMESTAMPTZ updated_at
+        TEXT precompute_script
     }
 
     PracticeFinding {
@@ -405,7 +416,6 @@ erDiagram
         JSONB evidence
         TEXT reasoning
         TEXT guidance
-        VARCHAR(16) guidance_method
         TIMESTAMPTZ detected_at "NOT NULL"
     }
 

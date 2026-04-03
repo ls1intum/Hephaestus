@@ -179,23 +179,21 @@ class PullRequestCommentPoster {
             return null;
         }
         String formatted = formatComment(sanitized, summary != null ? sanitize(summary) : null, job);
-        return postFormattedBody(job, formatted, job.getDeliveryCommentId());
+        return postFormattedBody(job, formatted);
     }
 
     // ── Core posting (shared by all comment types) ──
 
     /**
      * Posts a fully formatted body to the PR/MR associated with the given job.
-     * If an existing comment ID is provided, updates that comment instead of creating a new one.
      *
-     * @param job               the completed agent job (must have metadata)
-     * @param formattedBody     the fully formatted comment body (already sanitized)
-     * @param existingCommentId an existing comment/note ID to update, or null to create a new one
+     * @param job           the completed agent job (must have metadata)
+     * @param formattedBody the fully formatted comment body (already sanitized)
      * @return the provider-specific comment ID
      * @throws JobDeliveryException if posting fails
      */
     @Nullable
-    String postFormattedBody(AgentJob job, String formattedBody, @Nullable String existingCommentId) {
+    String postFormattedBody(AgentJob job, String formattedBody) {
         Long workspaceId = job.getWorkspace().getId();
         Workspace workspace = workspaceRepository
             .findById(workspaceId)
@@ -203,9 +201,9 @@ class PullRequestCommentPoster {
 
         String commentId;
         if (workspace.getProviderType() == GitProviderType.GITHUB) {
-            commentId = postGitHubComment(workspaceId, job, formattedBody, existingCommentId);
+            commentId = postGitHubComment(workspaceId, job, formattedBody);
         } else {
-            commentId = postGitLabNote(workspaceId, job, formattedBody, existingCommentId);
+            commentId = postGitLabNote(workspaceId, job, formattedBody);
         }
 
         log.info(
@@ -219,13 +217,9 @@ class PullRequestCommentPoster {
 
     // ── GitHub ──
 
-    private String postGitHubComment(Long scopeId, AgentJob job, String body, @Nullable String existingCommentId) {
+    private String postGitHubComment(Long scopeId, AgentJob job, String body) {
         if (gitHubProvider.isRateLimitCritical(scopeId)) {
             throw new JobDeliveryException("GitHub rate limit critical — skipping comment post for scope " + scopeId);
-        }
-
-        if (existingCommentId != null && !existingCommentId.isBlank()) {
-            return updateGitHubComment(scopeId, existingCommentId, body);
         }
 
         JsonNode metadata = job.getMetadata();
@@ -297,38 +291,14 @@ class PullRequestCommentPoster {
         return commentNodeId;
     }
 
-    private String updateGitHubComment(Long scopeId, String commentId, String body) {
-        ClientGraphQlResponse response = gitHubProvider
-            .forScope(scopeId)
-            .documentName("UpdatePullRequestComment")
-            .variable("commentId", commentId)
-            .variable("body", body)
-            .execute()
-            .block(GRAPHQL_TIMEOUT);
-
-        if (response == null) {
-            throw new JobDeliveryException("Null response from UpdatePullRequestComment mutation");
-        }
-        gitHubProvider.trackRateLimit(scopeId, response);
-
-        if (response.getErrors() != null && !response.getErrors().isEmpty()) {
-            throw new JobDeliveryException("GitHub UpdatePullRequestComment failed: " + response.getErrors());
-        }
-        return commentId;
-    }
-
     // ── GitLab ──
 
-    private String postGitLabNote(Long scopeId, AgentJob job, String body, @Nullable String existingNoteId) {
+    private String postGitLabNote(Long scopeId, AgentJob job, String body) {
         if (gitLabProvider == null) {
             throw new JobDeliveryException("GitLab provider not configured — cannot post note for scope " + scopeId);
         }
         if (gitLabProvider.isRateLimitCritical(scopeId)) {
             throw new JobDeliveryException("GitLab rate limit critical — skipping note post for scope " + scopeId);
-        }
-
-        if (existingNoteId != null && !existingNoteId.isBlank()) {
-            return updateGitLabNote(scopeId, existingNoteId, body);
         }
 
         JsonNode metadata = job.getMetadata();
@@ -387,26 +357,6 @@ class PullRequestCommentPoster {
         String noteId = response.field("createNote.note.id").getValue();
         if (noteId == null) {
             throw new JobDeliveryException("No note ID in CreateMergeRequestNote response");
-        }
-        return noteId;
-    }
-
-    private String updateGitLabNote(Long scopeId, String noteId, String body) {
-        ClientGraphQlResponse response = gitLabProvider
-            .forScope(scopeId)
-            .documentName("UpdateMergeRequestNote")
-            .variable("noteId", noteId)
-            .variable("body", body)
-            .execute()
-            .block(GRAPHQL_TIMEOUT);
-
-        if (response == null) {
-            throw new JobDeliveryException("Null response from UpdateMergeRequestNote mutation");
-        }
-
-        List<String> mutationErrors = response.field("updateNote.errors").getValue();
-        if (mutationErrors != null && !mutationErrors.isEmpty()) {
-            throw new JobDeliveryException("GitLab updateNote failed: " + mutationErrors);
         }
         return noteId;
     }
@@ -512,9 +462,6 @@ class PullRequestCommentPoster {
 
         // HTML comment marker for identifying bot comments
         sb.append("<!-- hephaestus-agent-feedback:").append(job.getId()).append(" -->\n");
-
-        // Bot disclaimer
-        sb.append("> **Note:** This is an automated review generated by an AI agent. It may contain inaccuracies.\n\n");
 
         // Collapsible review body (cap summary to prevent total comment exceeding provider limits)
         String summaryText;

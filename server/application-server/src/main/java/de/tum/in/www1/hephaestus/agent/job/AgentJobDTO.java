@@ -25,7 +25,16 @@ public record AgentJobDTO(
     @NonNull @Schema(description = "Number of retry attempts") Integer retryCount,
     @NonNull @Schema(description = "Timestamp when the job was created") Instant createdAt,
     @Schema(description = "Timestamp when the job started running") Instant startedAt,
-    @Schema(description = "Timestamp when the job completed") Instant completedAt
+    @Schema(description = "Timestamp when the job completed") Instant completedAt,
+    @Schema(description = "LLM model used (e.g. gpt-5.4-mini, claude-sonnet-4-5)") String llmModel,
+    @Schema(description = "Model version/snapshot date (e.g. 2026-03-17)") String llmModelVersion,
+    @Schema(description = "Total LLM API calls (steps) during execution") Integer llmTotalCalls,
+    @Schema(description = "Total input tokens consumed") Integer llmTotalInputTokens,
+    @Schema(description = "Total output tokens generated") Integer llmTotalOutputTokens,
+    @Schema(description = "Total reasoning/thinking tokens") Integer llmTotalReasoningTokens,
+    @Schema(description = "Tokens read from prompt cache") Integer llmCacheReadTokens,
+    @Schema(description = "Tokens written to prompt cache") Integer llmCacheWriteTokens,
+    @Schema(description = "Estimated cost in USD (agent-reported)") Double llmCostUsd
 ) {
     public static AgentJobDTO from(AgentJob job) {
         return new AgentJobDTO(
@@ -43,7 +52,16 @@ public record AgentJobDTO(
             job.getRetryCount(),
             job.getCreatedAt(),
             job.getStartedAt(),
-            job.getCompletedAt()
+            job.getCompletedAt(),
+            job.getLlmModel(),
+            job.getLlmModelVersion(),
+            job.getLlmTotalCalls(),
+            job.getLlmTotalInputTokens(),
+            job.getLlmTotalOutputTokens(),
+            job.getLlmTotalReasoningTokens(),
+            job.getLlmCacheReadTokens(),
+            job.getLlmCacheWriteTokens(),
+            job.getLlmCostUsd()
         );
     }
 }

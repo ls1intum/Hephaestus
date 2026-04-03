@@ -460,13 +460,13 @@ export type UpdatePracticeRequest = {
      */
     category?: string;
     /**
+     * Practice evaluation criteria
+     */
+    criteria?: string;
+    /**
      * Practice description
      */
     description?: string;
-    /**
-     * AI detection prompt template
-     */
-    detectionPrompt?: string;
     /**
      * Human-readable name
      */
@@ -948,10 +948,6 @@ export type PracticeFindingList = {
      */
     detectedAt: Date;
     /**
-     * Cognitive apprenticeship guidance method
-     */
-    guidanceMethod?: 'MODELING' | 'COACHING' | 'SCAFFOLDING' | 'ARTICULATION' | 'REFLECTION' | 'EXPLORATION';
-    /**
      * Finding ID
      */
     id: string;
@@ -980,9 +976,9 @@ export type PracticeFindingList = {
      */
     title: string;
     /**
-     * Verdict: POSITIVE, NEGATIVE, NOT_APPLICABLE, or NEEDS_REVIEW
+     * Verdict: POSITIVE, NEGATIVE, or NOT_APPLICABLE
      */
-    verdict: 'POSITIVE' | 'NEGATIVE' | 'NOT_APPLICABLE' | 'NEEDS_REVIEW';
+    verdict: 'POSITIVE' | 'NEGATIVE' | 'NOT_APPLICABLE';
 };
 
 /**
@@ -1009,10 +1005,6 @@ export type PracticeFindingDetail = {
      * Actionable guidance for the contributor
      */
     guidance?: string;
-    /**
-     * Cognitive apprenticeship guidance method
-     */
-    guidanceMethod?: 'MODELING' | 'COACHING' | 'SCAFFOLDING' | 'ARTICULATION' | 'REFLECTION' | 'EXPLORATION';
     /**
      * Finding ID
      */
@@ -1046,9 +1038,9 @@ export type PracticeFindingDetail = {
      */
     title: string;
     /**
-     * Verdict: POSITIVE, NEGATIVE, NOT_APPLICABLE, or NEEDS_REVIEW
+     * Verdict: POSITIVE, NEGATIVE, or NOT_APPLICABLE
      */
-    verdict: 'POSITIVE' | 'NEGATIVE' | 'NOT_APPLICABLE' | 'NEEDS_REVIEW';
+    verdict: 'POSITIVE' | 'NEGATIVE' | 'NOT_APPLICABLE';
 };
 
 /**
@@ -1068,13 +1060,13 @@ export type Practice = {
      */
     createdAt: Date;
     /**
+     * Practice evaluation criteria
+     */
+    criteria?: string;
+    /**
      * Practice description
      */
     description: string;
-    /**
-     * AI detection prompt template
-     */
-    detectionPrompt?: string;
     /**
      * Practice ID
      */
@@ -1178,6 +1170,42 @@ export type AgentJob = {
      * Job type
      */
     jobType: 'PULL_REQUEST_REVIEW';
+    /**
+     * Tokens read from prompt cache
+     */
+    llmCacheReadTokens?: number;
+    /**
+     * Tokens written to prompt cache
+     */
+    llmCacheWriteTokens?: number;
+    /**
+     * Estimated cost in USD (agent-reported)
+     */
+    llmCostUsd?: number;
+    /**
+     * LLM model used (e.g. gpt-5.4-mini, claude-sonnet-4-5)
+     */
+    llmModel?: string;
+    /**
+     * Model version/snapshot date (e.g. 2026-03-17)
+     */
+    llmModelVersion?: string;
+    /**
+     * Total LLM API calls (steps) during execution
+     */
+    llmTotalCalls?: number;
+    /**
+     * Total input tokens consumed
+     */
+    llmTotalInputTokens?: number;
+    /**
+     * Total output tokens generated
+     */
+    llmTotalOutputTokens?: number;
+    /**
+     * Total reasoning/thinking tokens
+     */
+    llmTotalReasoningTokens?: number;
     /**
      * Job metadata (routing/display info)
      */
@@ -1489,13 +1517,13 @@ export type CreatePracticeRequest = {
      */
     category?: string;
     /**
+     * Practice evaluation criteria
+     */
+    criteria?: string;
+    /**
      * Practice description
      */
     description: string;
-    /**
-     * AI detection prompt template
-     */
-    detectionPrompt?: string;
     /**
      * Human-readable name
      */
@@ -2999,7 +3027,7 @@ export type ListFindingsData = {
         /**
          * Filter by verdict
          */
-        verdict?: 'POSITIVE' | 'NEGATIVE' | 'NOT_APPLICABLE' | 'NEEDS_REVIEW';
+        verdict?: 'POSITIVE' | 'NEGATIVE' | 'NOT_APPLICABLE';
         page?: number;
         size?: number;
     };

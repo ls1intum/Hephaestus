@@ -81,6 +81,10 @@ public class AgentConfig {
     @Column(name = "model_name", length = 128)
     private String modelName;
 
+    /** Model version/snapshot date (e.g. "2026-03-17"). Azure OpenAI does not expose this in API responses. */
+    @Column(name = "model_version", length = 50)
+    private String modelVersion;
+
     @Convert(converter = EncryptedStringConverter.class)
     @Column(name = "llm_api_key", columnDefinition = "TEXT")
     @ToString.Exclude

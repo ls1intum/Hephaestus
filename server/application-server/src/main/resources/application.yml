@@ -348,8 +348,6 @@ hephaestus:
         run-for-all-users: false
         # true = skip practice review for draft PRs
         skip-drafts: true
-        # Maximum number of inline diff comments per review (0-50)
-        max-inline-notes: 5
 
     posthog:
         enabled: ${POSTHOG_ENABLED:false}
@@ -394,6 +392,11 @@ hephaestus:
             memory-bytes: ${SANDBOX_MEMORY_BYTES:4294967296}  # 4 GB (includes tmpfs)
             cpus: ${SANDBOX_CPUS:2.0}
             pids-limit: ${SANDBOX_PIDS_LIMIT:256}
+
+    # Dev-only actuator for manually triggering PR reviews (never enable in production).
+    # Layered safety: (1) this flag, (2) not in endpoint exposure list, (3) Spring Security auth.
+    dev:
+        trigger-enabled: false
 
     # ═══════════════════════════════════════════════════════════════════════════
     # AGENT JOB NATS CONFIGURATION

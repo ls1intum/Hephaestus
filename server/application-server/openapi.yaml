@@ -1650,7 +1650,6 @@ paths:
           - POSITIVE
           - NEGATIVE
           - NOT_APPLICABLE
-          - NEEDS_REVIEW
       - in: query
         name: page
         required: false
@@ -3065,6 +3064,40 @@ components:
           description: Job type
           enum:
           - PULL_REQUEST_REVIEW
+        llmCacheReadTokens:
+          type: integer
+          format: int32
+          description: Tokens read from prompt cache
+        llmCacheWriteTokens:
+          type: integer
+          format: int32
+          description: Tokens written to prompt cache
+        llmCostUsd:
+          type: number
+          format: double
+          description: Estimated cost in USD (agent-reported)
+        llmModel:
+          type: string
+          description: "LLM model used (e.g. gpt-5.4-mini, claude-sonnet-4-5)"
+        llmModelVersion:
+          type: string
+          description: Model version/snapshot date (e.g. 2026-03-17)
+        llmTotalCalls:
+          type: integer
+          format: int32
+          description: Total LLM API calls (steps) during execution
+        llmTotalInputTokens:
+          type: integer
+          format: int32
+          description: Total input tokens consumed
+        llmTotalOutputTokens:
+          type: integer
+          format: int32
+          description: Total output tokens generated
+        llmTotalReasoningTokens:
+          type: integer
+          format: int32
+          description: Total reasoning/thinking tokens
         metadata:
           description: Job metadata (routing/display info)
         output:
@@ -3349,16 +3382,16 @@ components:
           example: code-quality
           maxLength: 64
           minLength: 0
+        criteria:
+          type: string
+          description: Practice evaluation criteria
+          maxLength: 50000
+          minLength: 0
         description:
           type: string
           description: Practice description
           example: Ensures pull request descriptions are detailed and informative
           maxLength: 10000
-          minLength: 0
-        detectionPrompt:
-          type: string
-          description: AI detection prompt template
-          maxLength: 50000
           minLength: 0
         name:
           type: string
@@ -3859,12 +3892,12 @@ components:
           type: string
           format: date-time
           description: Timestamp when the practice was created
+        criteria:
+          type: string
+          description: Practice evaluation criteria
         description:
           type: string
           description: Practice description
-        detectionPrompt:
-          type: string
-          description: AI detection prompt template
         id:
           type: integer
           format: int64
@@ -3913,16 +3946,6 @@ components:
         guidance:
           type: string
           description: Actionable guidance for the contributor
-        guidanceMethod:
-          type: string
-          description: Cognitive apprenticeship guidance method
-          enum:
-          - MODELING
-          - COACHING
-          - SCAFFOLDING
-          - ARTICULATION
-          - REFLECTION
-          - EXPLORATION
         id:
           type: string
           format: uuid
@@ -3958,12 +3981,11 @@ components:
           description: Finding title
         verdict:
           type: string
-          description: "Verdict: POSITIVE, NEGATIVE, NOT_APPLICABLE, or NEEDS_REVIEW"
+          description: "Verdict: POSITIVE, NEGATIVE, or NOT_APPLICABLE"
           enum:
           - POSITIVE
           - NEGATIVE
           - NOT_APPLICABLE
-          - NEEDS_REVIEW
       required:
       - confidence
       - detectedAt
@@ -3990,16 +4012,6 @@ components:
           type: string
           format: date-time
           description: When the finding was detected
-        guidanceMethod:
-          type: string
-          description: Cognitive apprenticeship guidance method
-          enum:
-          - MODELING
-          - COACHING
-          - SCAFFOLDING
-          - ARTICULATION
-          - REFLECTION
-          - EXPLORATION
         id:
           type: string
           format: uuid
@@ -4032,12 +4044,11 @@ components:
           description: Finding title
         verdict:
           type: string
-          description: "Verdict: POSITIVE, NEGATIVE, NOT_APPLICABLE, or NEEDS_REVIEW"
+          description: "Verdict: POSITIVE, NEGATIVE, or NOT_APPLICABLE"
           enum:
           - POSITIVE
           - NEGATIVE
           - NOT_APPLICABLE
-          - NEEDS_REVIEW
       required:
       - confidence
       - detectedAt
@@ -4645,17 +4656,17 @@ components:
           example: code-quality
           maxLength: 64
           minLength: 0
+        criteria:
+          type: string
+          description: Practice evaluation criteria
+          maxLength: 50000
+          minLength: 0
         description:
           type: string
           description: Practice description
           maxLength: 10000
           minLength: 0
           pattern: .*\S.*
-        detectionPrompt:
-          type: string
-          description: AI detection prompt template
-          maxLength: 50000
-          minLength: 0
         name:
           type: string
           description: Human-readable name

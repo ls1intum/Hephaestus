@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.converter.Converter;
@@ -31,9 +32,14 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 public class SecurityConfig {
 
     private final CorsProperties corsProperties;
+    private final boolean devTriggerEnabled;
 
-    public SecurityConfig(CorsProperties corsProperties) {
+    public SecurityConfig(
+        CorsProperties corsProperties,
+        @Value("${hephaestus.dev.trigger-enabled:false}") boolean devTriggerEnabled
+    ) {
         this.corsProperties = corsProperties;
+        this.devTriggerEnabled = devTriggerEnabled;
     }
 
     interface AuthoritiesConverter extends Converter<Map<String, Object>, Collection<GrantedAuthority>> {}
@@ -95,6 +101,10 @@ public class SecurityConfig {
             requests.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll();
             // Actuator endpoints for Docker/K8s health checks and basic info
             requests.requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll();
+            // Dev-only: permit the dev trigger endpoint when explicitly enabled (defaults to false)
+            if (devTriggerEnabled) {
+                requests.requestMatchers("/api/dev/**").permitAll();
+            }
             // OpenAPI documentation endpoints (public for spec generation and dev access)
             requests
                 .requestMatchers("/v3/api-docs/**", "/v3/api-docs.yaml", "/swagger-ui/**", "/swagger-ui.html")

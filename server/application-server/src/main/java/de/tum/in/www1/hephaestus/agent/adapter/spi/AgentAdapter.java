@@ -69,6 +69,36 @@ public interface AgentAdapter {
      * @param request the agent execution parameters
      * @return the network policy for the container
      */
+    /**
+     * Build the shell command fragment that runs precomputation scripts before the agent.
+     *
+     * <p>Scripts are injected from DB into {@code .precompute/practices/} by the handler.
+     * The runner auto-discovers them, executes via Bun, and produces
+     * {@code .precompute/summary.md} + per-practice JSON. Failure is non-fatal —
+     * the agent works without hints if precompute fails.
+     *
+     * @return shell command fragment ending with {@code " && "}, ready to prepend to agent command
+     */
+    static String buildPrecomputeStep() {
+        // Handler injects practice scripts (root-owned) into .precompute/practices/.
+        // Agent (uid 1000) can't write to root-owned dirs, so:
+        // 1. Copy scripts + shared libs to writable /tmp/precompute/
+        // 2. Run from there, output to agent-writable .precompute-out/
+        // 3. The agent reads .precompute-out/summary.md
+        return (
+            "(mkdir -p /workspace/.precompute-out/practices" +
+            " && cp /workspace/.precompute/practices/*.ts /workspace/.precompute-out/practices/" +
+            " && ln -sf /opt/precompute/lib /workspace/.precompute-out/lib" +
+            " && bun run /opt/precompute/runner.ts" +
+            " --repo /workspace/repo" +
+            " --diff /workspace/.context/diff.patch" +
+            " --metadata /workspace/.context/metadata.json" +
+            " --output /workspace/.precompute-out" +
+            " > /tmp/precompute-runner.log 2>&1" +
+            " || echo '[precompute] failed, continuing without hints') && "
+        );
+    }
+
     static NetworkPolicy buildNetworkPolicy(AgentAdapterRequest request) {
         if (request.credentialMode() == CredentialMode.PROXY) {
             String providerPath = request.llmProvider().name().toLowerCase(java.util.Locale.ROOT);

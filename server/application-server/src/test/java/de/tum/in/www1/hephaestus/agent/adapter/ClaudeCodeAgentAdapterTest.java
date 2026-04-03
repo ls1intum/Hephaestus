@@ -178,15 +178,39 @@ class ClaudeCodeAgentAdapterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should build shell command with claude CLI flags")
+        @DisplayName("should build shell command using Node.js runner script")
         void shouldBuildCorrectCliFlags() {
             var spec = adapter.buildSandboxSpec(proxyRequest(null));
             String cmd = spec.command().get(2);
-            assertThat(cmd).contains("claude -p \"$PROMPT\"");
-            assertThat(cmd).contains("--output-format json");
-            assertThat(cmd).contains("--dangerously-skip-permissions");
-            // --max-turns is NOT a valid Claude Code CLI flag (verified against v2.1.76)
-            assertThat(cmd).doesNotContain("--max-turns");
+            // Command now delegates to runner script instead of inline claude CLI
+            assertThat(cmd).contains("node /workspace/.run-claude.mjs");
+            assertThat(cmd).doesNotContain("--no-session-persistence");
+        }
+
+        @Test
+        @DisplayName("should inject runner script with claude CLI flags")
+        void shouldInjectRunnerScriptWithFlags() {
+            var spec = adapter.buildSandboxSpec(proxyRequest(null));
+            assertThat(spec.inputFiles()).containsKey(".run-claude.mjs");
+            String script = new String(spec.inputFiles().get(".run-claude.mjs"), StandardCharsets.UTF_8);
+            assertThat(script).contains("--output-format");
+            assertThat(script).contains("--json-schema");
+            assertThat(script).contains("--dangerously-skip-permissions");
+            assertThat(script).contains("--max-turns");
+            assertThat(script).contains("--effort");
+            assertThat(script).contains("--max-budget-usd");
+            assertThat(script).contains("--verbose");
+            // Self-correction: retries via --continue
+            assertThat(script).contains("--continue");
+            assertThat(script).contains("hasFindings");
+        }
+
+        @Test
+        @DisplayName("should copy .analysis directory to output after agent finishes")
+        void shouldCopyAnalysisToOutput() {
+            var spec = adapter.buildSandboxSpec(proxyRequest(null));
+            String cmd = spec.command().get(2);
+            assertThat(cmd).contains("cp -r /workspace/.analysis");
         }
 
         @Test
@@ -217,6 +241,28 @@ class ClaudeCodeAgentAdapterTest extends BaseUnitTest {
         void shouldUseNullSecurityProfile() {
             var spec = adapter.buildSandboxSpec(proxyRequest(null));
             assertThat(spec.securityProfile()).isNull();
+        }
+
+        @Test
+        @DisplayName("should inject CLAUDE.md from classpath")
+        void shouldInjectClaudeMdFromClasspath() {
+            var spec = adapter.buildSandboxSpec(proxyRequest(null));
+            assertThat(spec.inputFiles()).containsKey("CLAUDE.md");
+            String claudeMd = new String(spec.inputFiles().get("CLAUDE.md"), StandardCharsets.UTF_8);
+            assertThat(claudeMd).isNotBlank();
+            assertThat(claudeMd).contains("orchestrator");
+        }
+
+        @Test
+        @DisplayName("should inject JSON schema for constrained decoding")
+        void shouldInjectJsonSchema() {
+            var spec = adapter.buildSandboxSpec(proxyRequest(null));
+            assertThat(spec.inputFiles()).containsKey(".json-schema");
+            String schema = new String(spec.inputFiles().get(".json-schema"), StandardCharsets.UTF_8);
+            assertThat(schema).contains("findings");
+            assertThat(schema).contains("evidence");
+            assertThat(schema).contains("locations");
+            assertThat(schema).contains("snippets");
         }
     }
 
@@ -288,6 +334,47 @@ class ClaudeCodeAgentAdapterTest extends BaseUnitTest {
             assertThat(result.success()).isTrue();
             assertThat(result.output().get("rawOutput").toString()).contains("findings");
             assertThat(result.output().get("rawOutput").toString()).contains("practiceSlug");
+            // Direct findings object has no event wrapper, so no usage data
+            assertThat(result.usage()).isNull();
+        }
+
+        @Test
+        @DisplayName("should extract LLM usage from result event in array format")
+        void shouldExtractLlmUsageFromArrayFormat() {
+            String cliOutput = """
+                [{"type":"system","message":"starting"},\
+                {"type":"assistant","message":{"usage":{"input_tokens":1234,"output_tokens":567}}},\
+                {"type":"assistant","message":{"usage":{"input_tokens":800,"output_tokens":300}}},\
+                {"type":"result","result":"{\\"findings\\":[]}",\
+                "total_cost_usd":0.15,"total_input_tokens":5000,"total_output_tokens":2000,\
+                "model":"claude-sonnet-4-6","session_id":"abc123"}]""";
+            var sandboxResult = new SandboxResult(
+                0,
+                Map.of("result.json", cliOutput.getBytes()),
+                "done",
+                false,
+                Duration.ofSeconds(10)
+            );
+            AgentResult result = adapter.parseResult(sandboxResult);
+            assertThat(result.success()).isTrue();
+            assertThat(result.usage()).isNotNull();
+            assertThat(result.usage().model()).isEqualTo("claude-sonnet-4-6");
+            assertThat(result.usage().inputTokens()).isEqualTo(5000);
+            assertThat(result.usage().outputTokens()).isEqualTo(2000);
+            assertThat(result.usage().costUsd()).isEqualTo(0.15);
+            assertThat(result.usage().totalCalls()).isEqualTo(2);
+            // Not reported by Claude Code CLI
+            assertThat(result.usage().reasoningTokens()).isNull();
+            assertThat(result.usage().cacheReadTokens()).isNull();
+            assertThat(result.usage().cacheWriteTokens()).isNull();
+        }
+
+        @Test
+        @DisplayName("should return null usage when result.json is missing")
+        void shouldReturnNullUsageWhenResultFileMissing() {
+            var sandboxResult = new SandboxResult(0, Map.of(), "done", false, Duration.ofSeconds(10));
+            AgentResult result = adapter.parseResult(sandboxResult);
+            assertThat(result.usage()).isNull();
         }
     }
 
@@ -381,6 +468,112 @@ class ClaudeCodeAgentAdapterTest extends BaseUnitTest {
         void shouldReturnNullForResultWithoutFindings() {
             String cliOutput = "[{\"type\":\"result\",\"result\":\"{\\\"summary\\\":\\\"all good\\\"}\"}]";
             assertThat(adapter.extractModelResponse(cliOutput)).isNull();
+        }
+    }
+
+    @Nested
+    @DisplayName("extractUsage")
+    class ExtractUsage {
+
+        @Test
+        @DisplayName("should extract usage from result event in JSON array")
+        void shouldExtractUsageFromResultEventInArray() {
+            String cliOutput = """
+                [{"type":"system","message":"starting"},\
+                {"type":"assistant","message":{"usage":{"input_tokens":1234,"output_tokens":567}}},\
+                {"type":"result","result":"done",\
+                "total_cost_usd":0.42,"total_input_tokens":8000,"total_output_tokens":3000,\
+                "model":"claude-sonnet-4-6","session_id":"sess-1"}]""";
+            AgentResult.LlmUsage usage = adapter.extractUsage(cliOutput);
+            assertThat(usage).isNotNull();
+            assertThat(usage.model()).isEqualTo("claude-sonnet-4-6");
+            assertThat(usage.inputTokens()).isEqualTo(8000);
+            assertThat(usage.outputTokens()).isEqualTo(3000);
+            assertThat(usage.costUsd()).isEqualTo(0.42);
+            assertThat(usage.totalCalls()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("should count assistant events as LLM calls")
+        void shouldCountAssistantEventsAsCalls() {
+            String cliOutput = """
+                [{"type":"system","message":"starting"},\
+                {"type":"assistant","message":{"usage":{"input_tokens":100,"output_tokens":50}}},\
+                {"type":"assistant","message":{"usage":{"input_tokens":200,"output_tokens":100}}},\
+                {"type":"assistant","message":{"usage":{"input_tokens":300,"output_tokens":150}}},\
+                {"type":"result","result":"done",\
+                "total_cost_usd":0.10,"total_input_tokens":600,"total_output_tokens":300,\
+                "model":"claude-sonnet-4-6"}]""";
+            AgentResult.LlmUsage usage = adapter.extractUsage(cliOutput);
+            assertThat(usage).isNotNull();
+            assertThat(usage.totalCalls()).isEqualTo(3);
+        }
+
+        @Test
+        @DisplayName("should extract usage from single result object format")
+        void shouldExtractUsageFromSingleResultObject() {
+            String cliOutput =
+                "{\"type\":\"result\",\"result\":\"done\",\"total_cost_usd\":0.05,\"total_input_tokens\":1000,\"total_output_tokens\":500,\"model\":\"claude-sonnet-4-6\"}";
+            AgentResult.LlmUsage usage = adapter.extractUsage(cliOutput);
+            assertThat(usage).isNotNull();
+            assertThat(usage.model()).isEqualTo("claude-sonnet-4-6");
+            assertThat(usage.inputTokens()).isEqualTo(1000);
+            assertThat(usage.outputTokens()).isEqualTo(500);
+            assertThat(usage.costUsd()).isEqualTo(0.05);
+            assertThat(usage.totalCalls()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("should return null for direct findings JSON (no event wrapper)")
+        void shouldReturnNullForDirectFindingsJson() {
+            String cliOutput =
+                "{\"findings\":[{\"practiceSlug\":\"test\",\"title\":\"ok\",\"verdict\":\"POSITIVE\",\"severity\":\"INFO\",\"confidence\":0.9}]}";
+            AgentResult.LlmUsage usage = adapter.extractUsage(cliOutput);
+            assertThat(usage).isNull();
+        }
+
+        @Test
+        @DisplayName("should return null for empty array")
+        void shouldReturnNullForEmptyArray() {
+            assertThat(adapter.extractUsage("[]")).isNull();
+        }
+
+        @Test
+        @DisplayName("should return null for malformed JSON")
+        void shouldReturnNullForMalformedJson() {
+            assertThat(adapter.extractUsage("not json")).isNull();
+        }
+
+        @Test
+        @DisplayName("should return null when result event has no usage fields")
+        void shouldReturnNullWhenNoUsageFields() {
+            String cliOutput = "[{\"type\":\"result\",\"result\":\"done\"}]";
+            assertThat(adapter.extractUsage(cliOutput)).isNull();
+        }
+
+        @Test
+        @DisplayName("should handle partial usage data (only cost)")
+        void shouldHandlePartialUsageData() {
+            String cliOutput = "[{\"type\":\"result\",\"result\":\"done\",\"total_cost_usd\":0.03}]";
+            AgentResult.LlmUsage usage = adapter.extractUsage(cliOutput);
+            assertThat(usage).isNotNull();
+            assertThat(usage.costUsd()).isEqualTo(0.03);
+            assertThat(usage.model()).isNull();
+            assertThat(usage.inputTokens()).isNull();
+            assertThat(usage.outputTokens()).isNull();
+            assertThat(usage.totalCalls()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("should handle partial usage data (only model)")
+        void shouldHandlePartialUsageDataModelOnly() {
+            String cliOutput = "[{\"type\":\"result\",\"result\":\"done\",\"model\":\"claude-opus-4-6\"}]";
+            AgentResult.LlmUsage usage = adapter.extractUsage(cliOutput);
+            assertThat(usage).isNotNull();
+            assertThat(usage.model()).isEqualTo("claude-opus-4-6");
+            assertThat(usage.inputTokens()).isNull();
+            assertThat(usage.outputTokens()).isNull();
+            assertThat(usage.costUsd()).isNull();
         }
     }
 

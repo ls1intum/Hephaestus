@@ -9,6 +9,8 @@ import de.tum.in.www1.hephaestus.agent.adapter.spi.AgentAdapter;
 import de.tum.in.www1.hephaestus.agent.adapter.spi.AgentAdapterRequest;
 import de.tum.in.www1.hephaestus.agent.adapter.spi.AgentSandboxSpec;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.SandboxResult;
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -20,7 +22,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Adapter for the OpenCode CLI agent (provider-agnostic).
  *
- * <p>CLI: {@code opencode run "prompt" --format json}
+ * <p>CLI: {@code opencode run "prompt" --format json} (retry: {@code opencode run --continue "correction"})
  *
  * <p>OpenCode requires a JSON config file. In proxy mode, the config uses the built-in
  * provider (e.g. {@code openai/model}) and the shell command aliases the generic proxy
@@ -36,7 +38,6 @@ public class OpenCodeAgentAdapter implements AgentAdapter {
 
     static final String IMAGE = "ghcr.io/ls1intum/hephaestus/agent-opencode:latest";
     static final String OUTPUT_PATH = "/workspace/.output";
-    private static final int MAX_AGENT_STEPS = 15;
     private static final int MAX_STDOUT_BUFFER_BYTES = 10 * 1024 * 1024;
     private static final int MAX_DEBUG_LOG_DISPLAY_CHARS = 4096;
     /** Buffer time (seconds) reserved for cleanup before container timeout. */
@@ -63,9 +64,10 @@ public class OpenCodeAgentAdapter implements AgentAdapter {
         inputFiles.put("opencode.json", configJson);
         inputFiles.put(".prompt", request.prompt().getBytes(StandardCharsets.UTF_8));
 
-        // Inject a restrictive agent definition that denies file/bash tool use.
-        // OpenCode agents live at .opencode/agent/<name>.md in the workspace.
-        inputFiles.put(".opencode/agent/practice-review.md", buildAgentDefinition());
+        // OpenCode agent definitions loaded from classpath resources.
+        // The orchestrator (practice-review) spawns per-practice subagents via the task tool.
+        inputFiles.put(".opencode/agents/practice-review.md", loadClasspathResource("opencode-orchestrator.md"));
+        inputFiles.put(".opencode/agents/practice-analyzer.md", loadClasspathResource("opencode-practice-analyzer.md"));
 
         // Use a Node.js wrapper to invoke opencode with spawnSync.
         // This bypasses shell variable handling entirely — the prompt file is read
@@ -79,7 +81,19 @@ public class OpenCodeAgentAdapter implements AgentAdapter {
         // This lets us use built-in providers (no npm install) even through the proxy.
         String proxyEnvSetup = buildProxyEnvAliases(request);
 
-        String command = "mkdir -p " + OUTPUT_PATH + proxyEnvSetup + " && node /workspace/.run-opencode.mjs";
+        // Redirect TMPDIR to the exec-allowed tmpfs. OpenCode's Node.js file watcher
+        // extracts a native .node addon to $TMPDIR and dlopen()s it — the default /tmp
+        // has noexec, causing "failed to map segment from shared object" errors.
+        env.put("TMPDIR", "/home/agent/.local/tmp");
+
+        String command =
+            "mkdir -p " +
+            OUTPUT_PATH +
+            " /home/agent/.local/tmp" +
+            proxyEnvSetup +
+            " && " +
+            AgentAdapter.buildPrecomputeStep() +
+            "node /workspace/.run-opencode.mjs";
 
         return new AgentSandboxSpec(
             IMAGE,
@@ -93,68 +107,6 @@ public class OpenCodeAgentAdapter implements AgentAdapter {
         );
     }
 
-    /**
-     * Build an OpenCode agent definition with read-only tool access and safety settings.
-     *
-     * <p>Key settings:
-     * <ul>
-     *   <li>{@code temperature: 0} — deterministic output for reliable structured JSON</li>
-     *   <li>{@code steps: MAX_AGENT_STEPS} — prevents runaway agentic loops within the sandbox timeout</li>
-     *   <li>{@code doom_loop: deny} — prevents hang on infinite-loop detection prompts in non-interactive mode</li>
-     *   <li>{@code external_directory: deny} — prevents hang on access-confirmation prompts</li>
-     *   <li>Bash allowlist — read-only commands only (grep, find, cat, git log, git blame, etc.)</li>
-     * </ul>
-     */
-    private byte[] buildAgentDefinition() {
-        String agentMd = """
-            ---
-            description: Practice-aware code review agent. Analyzes diffs, explores codebases, and produces structured JSON findings.
-            temperature: 0
-            steps: %d
-            permission:
-              bash:
-                "grep *": allow
-                "find *": allow
-                "cat *": allow
-                "head *": allow
-                "tail *": allow
-                "wc *": allow
-                "ls *": allow
-                "tree *": allow
-                "git log *": allow
-                "git show *": allow
-                "git diff *": allow
-                "git blame *": allow
-                "*": deny
-              edit: deny
-              read: allow
-              glob: allow
-              grep: allow
-              list: allow
-              write: deny
-              webfetch: deny
-              websearch: deny
-              task: deny
-              doom_loop: deny
-              external_directory: deny
-            ---
-
-            You are an expert code review agent with full read access to the repository.
-            The repository is cloned at /workspace/repo/. The diff, commits, and practice definitions
-            are provided in the user prompt, but you should also explore the codebase to understand
-            context, check related files, and verify your findings.
-
-            Use tools to produce a thorough, high-quality review:
-            - Read related source files to understand architectural context
-            - Check if a pattern flagged in the diff is consistent with the rest of the codebase
-            - Run grep/find to check for similar issues elsewhere
-            - Verify import paths, dependency versions, or configuration files
-
-            Your final output MUST be a valid JSON object. Output it as your final message — do NOT write it to a file.
-            """.formatted(MAX_AGENT_STEPS);
-        return agentMd.getBytes(StandardCharsets.UTF_8);
-    }
-
     @Override
     public AgentResult parseResult(SandboxResult sandboxResult) {
         boolean success = sandboxResult.exitCode() == 0 && !sandboxResult.timedOut();
@@ -162,11 +114,27 @@ public class OpenCodeAgentAdapter implements AgentAdapter {
         output.put("exitCode", sandboxResult.exitCode());
         output.put("timedOut", sandboxResult.timedOut());
 
+        AgentResult.LlmUsage usage = null;
         byte[] resultFile = sandboxResult.outputFiles().get("result.json");
         if (resultFile != null && resultFile.length > 0) {
             String rawContent = new String(resultFile, StandardCharsets.UTF_8);
-            String extracted = extractTextFromNdjson(rawContent);
-            output.put("rawOutput", extracted != null ? extracted : rawContent);
+            log.debug("NDJSON output: {} bytes", rawContent.length());
+            NdjsonParseResult parsed = parseNdjson(rawContent);
+            if (parsed != null) {
+                output.put("rawOutput", parsed.text() != null ? parsed.text() : rawContent);
+                usage = parsed.usage();
+                if (usage != null) {
+                    log.info(
+                        "OpenCode usage: calls={}, inputTokens={}, outputTokens={}, cost={}",
+                        usage.totalCalls(),
+                        usage.inputTokens(),
+                        usage.outputTokens(),
+                        usage.costUsd()
+                    );
+                }
+            } else {
+                output.put("rawOutput", rawContent);
+            }
         }
 
         // Capture debug.log for introspection
@@ -197,7 +165,7 @@ public class OpenCodeAgentAdapter implements AgentAdapter {
             output.put("workspaceListing", listingContent);
         }
 
-        return new AgentResult(success, output);
+        return new AgentResult(success, output, usage);
     }
 
     /**
@@ -206,38 +174,193 @@ public class OpenCodeAgentAdapter implements AgentAdapter {
      * and writes stdout/stderr to output files.
      */
     private byte[] buildRunnerScript(long agentTimeoutMs) {
+        // Reserve 90s for format retry + 90s for position retry
+        long retryTimeoutMs = 90_000;
+        long posRetryTimeoutMs = 90_000;
+        long initialTimeoutMs = Math.max(60_000, agentTimeoutMs - retryTimeoutMs - posRetryTimeoutMs);
         String script = """
             import { spawnSync } from 'child_process';
-            import { readFileSync, writeFileSync, mkdirSync } from 'fs';
+            import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
 
             const OUTPUT = '/workspace/.output';
             mkdirSync(OUTPUT, { recursive: true });
 
             const prompt = readFileSync('/workspace/.prompt', 'utf-8').trim();
-            console.error(`Prompt loaded: ${prompt.length} chars`);
+            console.error(`[run-opencode] Prompt loaded: ${prompt.length} chars`);
 
-            const result = spawnSync('opencode', [
-                'run',
-                '--format', 'json',
-                '--agent', 'practice-review',
-                '--print-logs',
-                '--log-level', 'WARN',
-                '--', prompt
-            ], {
+            function runOpenCode(args, label, timeoutMs) {
+              console.error(`[run-opencode] ${label}`);
+              const start = Date.now();
+              const r = spawnSync('opencode', args, {
                 encoding: 'utf-8',
                 maxBuffer: %d,
-                timeout: %d,
+                timeout: timeoutMs || 0,
                 stdio: ['pipe', 'pipe', 'pipe']
-            });
+              });
+              const sec = ((Date.now() - start) / 1000).toFixed(1);
+              console.error(`[run-opencode] ${label}: ${sec}s, exit=${r.status}, stdout=${(r.stdout||'').length}b`);
+              if (r.error) console.error(`[run-opencode] error: ${r.error.message}`);
+              return r;
+            }
 
-            writeFileSync(`${OUTPUT}/result.json`, result.stdout || '');
+            function extractText(ndjson) {
+              if (!ndjson?.trim()) return '';
+              const trimmed = ndjson.trim();
+              if (trimmed.startsWith('{') && !trimmed.includes('\\n{')) return trimmed;
+              let text = '';
+              for (const line of ndjson.split('\\n')) {
+                if (!line.trim()) continue;
+                try {
+                  const ev = JSON.parse(line);
+                  if (ev.type === 'text') text += ev.part?.text || '';
+                } catch {}
+              }
+              return text;
+            }
+
+            function hasFindings(output) {
+              if (!output?.trim()) return false;
+              const text = extractText(output);
+              return text.includes('"findings"') && text.includes('"practiceSlug"');
+            }
+
+            // Parse diff.patch to find valid + line numbers per file
+            function parseDiffValidLines() {
+              const diffPath = '/workspace/.context/diff.patch';
+              if (!existsSync(diffPath)) return new Map();
+              const diff = readFileSync(diffPath, 'utf-8');
+              const result = new Map(); // file -> Set<lineNum>
+              let currentFile = null;
+              let newLineNum = 0;
+              const hunkRe = /@@ -\\d+(?:,\\d+)? \\+(\\d+)(?:,(\\d+))? @@/;
+              for (const line of diff.split('\\n')) {
+                let eff = line;
+                if (eff.startsWith('[L') && eff.includes('] ')) {
+                  eff = eff.substring(eff.indexOf('] ') + 2);
+                }
+                if (eff.startsWith('diff --git')) {
+                  const bIdx = eff.lastIndexOf(' b/');
+                  if (bIdx > 0) {
+                    currentFile = eff.substring(bIdx + 3);
+                    if (!result.has(currentFile)) result.set(currentFile, new Set());
+                  }
+                  newLineNum = 0;
+                  continue;
+                }
+                const hm = hunkRe.exec(eff);
+                if (hm) { newLineNum = parseInt(hm[1]); continue; }
+                if (newLineNum === 0 || !currentFile) continue;
+                if (eff.startsWith('+')) {
+                  result.get(currentFile).add(newLineNum);
+                  newLineNum++;
+                } else if (eff.startsWith('-')) {
+                  // deleted line — no increment
+                } else {
+                  result.get(currentFile).add(newLineNum);
+                  newLineNum++;
+                }
+              }
+              return result;
+            }
+
+            // Check suggestedDiffNotes positions against valid diff lines
+            function validateDiffNotePositions(output) {
+              const text = extractText(output);
+              let json;
+              try {
+                const start = text.indexOf('{');
+                const end = text.lastIndexOf('}');
+                if (start < 0 || end < 0) return [];
+                json = JSON.parse(text.substring(start, end + 1));
+              } catch { return []; }
+              if (!json.findings) return [];
+              const validLines = parseDiffValidLines();
+              if (validLines.size === 0) return [];
+              const errors = [];
+              for (const f of json.findings) {
+                if (!f.suggestedDiffNotes) continue;
+                for (const dn of f.suggestedDiffNotes) {
+                  const fileLines = validLines.get(dn.filePath);
+                  if (!fileLines) {
+                    errors.push(`${dn.filePath}:${dn.startLine} — file not in diff`);
+                  } else if (!fileLines.has(dn.startLine)) {
+                    const valid = [...fileLines].sort((a,b) => a-b);
+                    const nearest = valid.reduce((best, v) =>
+                      Math.abs(v - dn.startLine) < Math.abs(best - dn.startLine) ? v : best, valid[0]);
+                    errors.push(`${dn.filePath}:${dn.startLine} — not in diff hunk (nearest valid: ${nearest})`);
+                  }
+                }
+              }
+              return errors;
+            }
+
+            // Initial run
+            let result = runOpenCode([
+              'run', '--format', 'json',
+              '--agent', 'practice-review',
+              '--print-logs', '--log-level', 'WARN',
+              '--', prompt
+            ], 'initial', %d);
+
+            const initialOutput = result.stdout || '';
+            writeFileSync(`${OUTPUT}/result.json`, initialOutput);
+            writeFileSync(`${OUTPUT}/initial.json`, initialOutput);
+            let valid = hasFindings(initialOutput);
+            let bestOutput = initialOutput;
+
+            // Self-correction phase 1: format retry (if no valid findings)
+            if (!valid && initialOutput.trim()) {
+              console.error('[run-opencode] retry 1: output invalid, retrying with --continue');
+              const correctionMsg = 'Your previous output was not valid JSON with the required schema. Output ONLY the raw JSON object with NO markdown fences: {"findings": [{practiceSlug, title, verdict (POSITIVE/NEGATIVE/NOT_APPLICABLE), severity, confidence, reasoning, guidance, suggestedDiffNotes}, ...]}. Re-examine your analysis and emit ALL findings.';
+
+              result = runOpenCode([
+                'run', '--continue', '--format', 'json',
+                '--print-logs', '--log-level', 'WARN',
+                '--', correctionMsg
+              ], 'retry-format', %d);
+
+              const retryOutput = result.stdout || '';
+              writeFileSync(`${OUTPUT}/retry-format.json`, retryOutput);
+              if (hasFindings(retryOutput)) {
+                bestOutput = retryOutput;
+                valid = true;
+              } else if (retryOutput.trim()) {
+                bestOutput = retryOutput.length > initialOutput.length ? retryOutput : initialOutput;
+              }
+              writeFileSync(`${OUTPUT}/result.json`, bestOutput);
+            }
+
+            // Self-correction phase 2: diff note position validation
+            // If findings are valid, check if suggestedDiffNotes positions are in valid diff lines
+            if (valid) {
+              const posErrors = validateDiffNotePositions(bestOutput);
+              if (posErrors.length > 0) {
+                console.error(`[run-opencode] ${posErrors.length} diff note position errors, retrying`);
+                const posMsg = `Some of your suggestedDiffNotes have line numbers that are NOT in the diff. These will fail when posted as inline comments. Fix the startLine values to point to actual + lines in the diff:\\n${posErrors.join('\\n')}\\n\\nRe-emit the COMPLETE findings JSON with corrected line numbers. Use [L<n>] annotations from the diff to find valid line numbers.`;
+
+                result = runOpenCode([
+                  'run', '--continue', '--format', 'json',
+                  '--print-logs', '--log-level', 'WARN',
+                  '--', posMsg
+                ], 'retry-position', %d);
+
+                const posRetryOutput = result.stdout || '';
+                writeFileSync(`${OUTPUT}/retry-position.json`, posRetryOutput);
+                if (hasFindings(posRetryOutput)) {
+                  bestOutput = posRetryOutput;
+                  console.error('[run-opencode] position retry produced valid output');
+                }
+                writeFileSync(`${OUTPUT}/result.json`, bestOutput);
+              }
+            }
+
             writeFileSync(`${OUTPUT}/debug.log`,
-                `STATUS=${result.status}\\nSIGNAL=${result.signal}\\nERROR=${result.error || ''}\\n---STDERR---\\n${result.stderr || ''}`
+              `STATUS=${result.status}\\nSIGNAL=${result.signal}\\nERROR=${result.error || ''}\\nVALID=${valid}\\n---STDERR---\\n${result.stderr || ''}`
             );
 
-            console.error(`OpenCode exit: status=${result.status}, signal=${result.signal}, stdout=${(result.stdout || '').length} bytes`);
-            process.exit(result.status || 0);
-            """.formatted(MAX_STDOUT_BUFFER_BYTES, agentTimeoutMs);
+            console.error(`[run-opencode] ${valid ? 'SUCCESS' : 'FAILED: no valid findings'}`);
+            process.exit(valid ? 0 : (result.status || 1));
+            """.formatted(MAX_STDOUT_BUFFER_BYTES, initialTimeoutMs, retryTimeoutMs, posRetryTimeoutMs);
         return script.getBytes(StandardCharsets.UTF_8);
     }
 
@@ -256,17 +379,22 @@ public class OpenCodeAgentAdapter implements AgentAdapter {
     }
 
     /**
-     * Extract the model's text response from OpenCode NDJSON streaming output.
+     * Parsed OpenCode NDJSON output containing both text and usage data.
+     */
+    record NdjsonParseResult(String text, AgentResult.LlmUsage usage) {}
+
+    /**
+     * Parse OpenCode NDJSON streaming output, extracting both text and usage.
      *
-     * <p>OpenCode {@code --format json} writes NDJSON lines: {@code step_start}, {@code text},
-     * {@code step_finish}. The actual model response is in the {@code text} event's
-     * {@code part.text} field. We concatenate all text parts (usually just one) to produce
-     * the final output.
+     * <p>OpenCode {@code --format json} writes NDJSON lines: {@code step-start}, {@code text},
+     * {@code step-finish}. The text response is in the {@code text} event's {@code part.text}
+     * field. Usage/cost data is in the {@code step-finish} event's {@code tokens} and
+     * {@code cost} fields.
      *
      * @param ndjsonContent raw NDJSON content from result.json
-     * @return concatenated text content, or null if parsing fails or no text events found
+     * @return parsed text and usage, or null if parsing fails
      */
-    String extractTextFromNdjson(String ndjsonContent) {
+    NdjsonParseResult parseNdjson(String ndjsonContent) {
         if (ndjsonContent == null || ndjsonContent.isBlank()) {
             return null;
         }
@@ -274,25 +402,106 @@ public class OpenCodeAgentAdapter implements AgentAdapter {
         // Quick check: if it starts with '{' and contains "findings", it's already plain JSON
         String trimmed = ndjsonContent.trim();
         if (trimmed.startsWith("{") && !trimmed.contains("\n{")) {
-            return ndjsonContent;
+            return new NdjsonParseResult(ndjsonContent, null);
         }
 
-        try {
-            StringBuilder textContent = new StringBuilder();
-            for (String line : ndjsonContent.split("\n")) {
-                if (line.isBlank()) continue;
+        StringBuilder textContent = new StringBuilder();
+        int totalInputTokens = 0;
+        int totalOutputTokens = 0;
+        int totalReasoningTokens = 0;
+        int totalCacheReadTokens = 0;
+        int totalCacheWriteTokens = 0;
+        double totalCost = 0.0;
+        int stepCount = 0;
+        String model = null;
+        int badLines = 0;
+
+        var seenTypes = new java.util.LinkedHashSet<String>();
+        for (String line : ndjsonContent.split("\n")) {
+            if (line.isBlank()) continue;
+            try {
                 var node = objectMapper.readTree(line);
-                if ("text".equals(node.path("type").asText())) {
+                String type = node.path("type").asText("");
+                seenTypes.add(type);
+
+                if ("text".equals(type)) {
                     String text = node.path("part").path("text").asText(null);
                     if (text != null) {
                         textContent.append(text);
                     }
+                } else if ("step_finish".equals(type) || "step-finish".equals(type)) {
+                    stepCount++;
+                    // Usage may be at top level or nested under "part"
+                    var tokens = node.path("tokens");
+                    if (tokens.isMissingNode()) {
+                        tokens = node.path("part").path("tokens");
+                    }
+                    if (!tokens.isMissingNode()) {
+                        totalInputTokens += tokens.path("input").asInt(0);
+                        totalOutputTokens += tokens.path("output").asInt(0);
+                        totalReasoningTokens += tokens.path("reasoning").asInt(0);
+                        var cache = tokens.path("cache");
+                        totalCacheReadTokens += cache.path("read").asInt(0);
+                        totalCacheWriteTokens += cache.path("write").asInt(0);
+                    }
+                    double stepCost = node.path("cost").asDouble(0.0);
+                    if (stepCost == 0.0) {
+                        stepCost = node.path("part").path("cost").asDouble(0.0);
+                    }
+                    totalCost += stepCost;
+                } else if ("step_start".equals(type) || "step-start".equals(type)) {
+                    // Extract model name from the step metadata if available
+                    String stepModel = node.path("model").asText(null);
+                    if (stepModel == null) {
+                        stepModel = node.path("part").path("model").asText(null);
+                    }
+                    if (stepModel != null) {
+                        model = stepModel;
+                    }
+                }
+            } catch (Exception e) {
+                badLines++;
+                if (badLines <= 3) {
+                    log.warn("Skipping malformed NDJSON line: {}", e.getMessage());
                 }
             }
-            return textContent.isEmpty() ? null : textContent.toString();
-        } catch (Exception e) {
-            log.warn("Failed to parse OpenCode NDJSON output: {}", e.getMessage());
-            return null;
+        }
+        if (badLines > 3) {
+            log.warn("Skipped {} total malformed NDJSON lines", badLines);
+        }
+        log.debug("NDJSON event types: {}", seenTypes);
+
+        AgentResult.LlmUsage usage =
+            stepCount > 0
+                ? new AgentResult.LlmUsage(
+                      model,
+                      totalInputTokens > 0 ? totalInputTokens : null,
+                      totalOutputTokens > 0 ? totalOutputTokens : null,
+                      totalReasoningTokens > 0 ? totalReasoningTokens : null,
+                      totalCacheReadTokens > 0 ? totalCacheReadTokens : null,
+                      totalCacheWriteTokens > 0 ? totalCacheWriteTokens : null,
+                      totalCost > 0 ? totalCost : null,
+                      stepCount
+                  )
+                : null;
+
+        String text = textContent.isEmpty() ? null : textContent.toString();
+        return new NdjsonParseResult(text, usage);
+    }
+
+    /** Classpath prefix for agent resource files. */
+    private static final String AGENT_RESOURCE_PREFIX = "agent/";
+
+    /** Load a classpath resource from the {@code agent/} directory. */
+    private static byte[] loadClasspathResource(String relativePath) {
+        String fullPath = AGENT_RESOURCE_PREFIX + relativePath;
+        try (InputStream is = OpenCodeAgentAdapter.class.getClassLoader().getResourceAsStream(fullPath)) {
+            if (is == null) {
+                throw new IllegalStateException("Missing classpath resource: " + fullPath);
+            }
+            return is.readAllBytes();
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to read classpath resource: " + fullPath, e);
         }
     }
 

@@ -27,13 +27,12 @@ import de.tum.in.www1.hephaestus.agent.handler.spi.JobSubmissionRequest;
 import de.tum.in.www1.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.SandboxManager;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
-import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -63,6 +62,9 @@ class AgentJobServiceTest extends BaseUnitTest {
     private WorkspaceRepository workspaceRepository;
 
     @Mock
+    private PullRequestRepository pullRequestRepository;
+
+    @Mock
     private JobTypeHandlerRegistry handlerRegistry;
 
     @Mock
@@ -87,6 +89,7 @@ class AgentJobServiceTest extends BaseUnitTest {
             agentJobRepository,
             agentConfigRepository,
             workspaceRepository,
+            pullRequestRepository,
             handlerRegistry,
             objectMapper,
             eventPublisher,
@@ -118,6 +121,19 @@ class AgentJobServiceTest extends BaseUnitTest {
     @Nested
     @DisplayName("submit()")
     class Submit {
+
+        @BeforeEach
+        @SuppressWarnings("unchecked")
+        void setUpSubmit() {
+            // Make transactionTemplate.execute() actually invoke the callback
+            // (submitForConfig uses transactionTemplate.execute() for per-config isolation)
+            lenient()
+                .when(transactionTemplate.execute(any()))
+                .thenAnswer(inv -> {
+                    TransactionCallback<?> callback = inv.getArgument(0);
+                    return callback.doInTransaction(mock(TransactionStatus.class));
+                });
+        }
 
         @Test
         @DisplayName("should return empty when no enabled config exists")
@@ -154,6 +170,7 @@ class AgentJobServiceTest extends BaseUnitTest {
         @DisplayName("should return existing job on idempotency match")
         void shouldReturnExistingJobOnIdempotencyMatch() {
             when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(List.of(enabledConfig));
+            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
 
             JobTypeHandler handler = mock(JobTypeHandler.class);
             when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
@@ -164,7 +181,7 @@ class AgentJobServiceTest extends BaseUnitTest {
             when(
                 agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(
                     eq(1L),
-                    eq("pr_review:owner/repo:42:abc123"),
+                    eq("pr_review:owner/repo:42:abc123:config:10"),
                     any()
                 )
             ).thenReturn(Optional.of(existingJob));
@@ -212,7 +229,7 @@ class AgentJobServiceTest extends BaseUnitTest {
             assertThat(job.getWorkspace()).isEqualTo(workspace);
             assertThat(job.getConfig()).isEqualTo(enabledConfig);
             assertThat(job.getJobType()).isEqualTo(AgentJobType.PULL_REQUEST_REVIEW);
-            assertThat(job.getIdempotencyKey()).isEqualTo("pr_review:owner/repo:42:abc123");
+            assertThat(job.getIdempotencyKey()).isEqualTo("pr_review:owner/repo:42:abc123:config:10");
             assertThat(job.getConfigSnapshot()).isNotNull();
 
             // Verify event published
@@ -287,8 +304,8 @@ class AgentJobServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should throw 409 on DataIntegrityViolationException race condition")
-        void shouldThrow409OnDataIntegrityViolation() {
+        @DisplayName("should return empty on DataIntegrityViolationException race condition")
+        void shouldReturnEmptyOnDataIntegrityViolation() {
             when(agentConfigRepository.findByWorkspaceId(1L)).thenReturn(List.of(enabledConfig));
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
 
@@ -299,7 +316,7 @@ class AgentJobServiceTest extends BaseUnitTest {
             when(
                 agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(
                     eq(1L),
-                    eq("pr_review:owner/repo:42:abc123"),
+                    eq("pr_review:owner/repo:42:abc123:config:10"),
                     any()
                 )
             ).thenReturn(Optional.empty());
@@ -309,12 +326,15 @@ class AgentJobServiceTest extends BaseUnitTest {
                 new DataIntegrityViolationException("uk_agent_job_idempotency")
             );
 
-            assertThatThrownBy(() ->
-                service.submit(1L, AgentJobType.PULL_REQUEST_REVIEW, mock(JobSubmissionRequest.class))
-            )
-                .isInstanceOf(AgentJobStateConflictException.class)
-                .hasMessageContaining("idempotency key");
+            // Production code now catches DataIntegrityViolationException and returns null
+            // from submitForConfig, which results in Optional.empty() from submit()
+            Optional<AgentJob> result = service.submit(
+                1L,
+                AgentJobType.PULL_REQUEST_REVIEW,
+                mock(JobSubmissionRequest.class)
+            );
 
+            assertThat(result).isEmpty();
             verify(eventPublisher, never()).publishEvent(any());
         }
 

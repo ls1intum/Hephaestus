@@ -55,7 +55,7 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
         @DisplayName("saves and retrieves a practice with all fields")
         void savesAndRetrieves() {
             Practice practice = createPractice("test-slug", "Test Practice", "test-category");
-            practice.setDetectionPrompt("Check for quality");
+            practice.setCriteria("Check for quality");
             practice.setActive(false);
 
             Practice saved = practiceRepository.save(practice);
@@ -70,7 +70,7 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
             assertThat(found.getCategory()).isEqualTo("test-category");
             assertThat(found.getDescription()).isEqualTo("Test description for test-slug");
             assertThat(found.getTriggerEvents().toString()).contains("PullRequestCreated");
-            assertThat(found.getDetectionPrompt()).isEqualTo("Check for quality");
+            assertThat(found.getCriteria()).isEqualTo("Check for quality");
             assertThat(found.isActive()).isFalse();
         }
     }

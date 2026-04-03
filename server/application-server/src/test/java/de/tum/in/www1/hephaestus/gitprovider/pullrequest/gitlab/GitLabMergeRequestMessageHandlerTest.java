@@ -264,7 +264,9 @@ class GitLabMergeRequestMessageHandlerTest extends BaseUnitTest {
                 "2024-01-15T10:00:00Z",
                 null,
                 null,
-                "https://gitlab.com/gitlab-org/gitlab/-/merge_requests/5"
+                "https://gitlab.com/gitlab-org/gitlab/-/merge_requests/5",
+                null,
+                null
             );
             GitLabMergeRequestEventDTO event = new GitLabMergeRequestEventDTO(
                 "merge_request",
@@ -336,7 +338,9 @@ class GitLabMergeRequestMessageHandlerTest extends BaseUnitTest {
                 "2024-01-15T10:00:00Z",
                 null,
                 null,
-                "https://example.com"
+                "https://example.com",
+                null,
+                null
             );
             GitLabMergeRequestEventDTO event = new GitLabMergeRequestEventDTO(
                 "merge_request",
@@ -417,7 +421,9 @@ class GitLabMergeRequestMessageHandlerTest extends BaseUnitTest {
             "2024-01-15T10:00:00Z",
             null,
             null,
-            "https://gitlab.com/gitlab-org/gitlab/-/merge_requests/5"
+            "https://gitlab.com/gitlab-org/gitlab/-/merge_requests/5",
+            null,
+            null
         );
         return new GitLabMergeRequestEventDTO(
             "merge_request",

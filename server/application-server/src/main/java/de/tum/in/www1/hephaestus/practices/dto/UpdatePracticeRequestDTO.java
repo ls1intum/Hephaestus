@@ -31,7 +31,7 @@ public record UpdatePracticeRequestDTO(
     @Schema(description = "Domain events that trigger detection")
     List<String> triggerEvents,
 
-    @Size(max = 50000, message = "Detection prompt must be at most 50000 characters")
-    @Schema(description = "AI detection prompt template")
-    String detectionPrompt
+    @Size(max = 50000, message = "Criteria must be at most 50000 characters")
+    @Schema(description = "Practice evaluation criteria")
+    String criteria
 ) {}

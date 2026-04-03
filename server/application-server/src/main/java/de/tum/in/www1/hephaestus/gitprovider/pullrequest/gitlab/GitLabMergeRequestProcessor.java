@@ -199,6 +199,8 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         User author = resolveWebhookAuthor(event, context.providerId());
         User mergedBy = resolveWebhookMergeUser(event, context.providerId());
 
+        String headRefOid = attrs.lastCommit() != null ? attrs.lastCommit().id() : null;
+
         PullRequest pr = upsertMergeRequest(
             attrs.id(),
             attrs.iid(),
@@ -207,6 +209,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             attrs.state(),
             attrs.sourceBranch(),
             attrs.targetBranch(),
+            headRefOid,
             attrs.draft(),
             attrs.url(),
             attrs.createdAt(),
@@ -552,6 +555,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         String state,
         @Nullable String sourceBranch,
         @Nullable String targetBranch,
+        @Nullable String headRefOid,
         boolean draft,
         @Nullable String htmlUrl,
         @Nullable String createdAt,
@@ -607,8 +611,8 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             null, // reviewDecision, mergeStateStatus, mergeable — not in webhook
             sourceBranch,
             targetBranch,
-            null,
-            null, // headRefOid, baseRefOid — not in webhook
+            headRefOid,
+            null, // baseRefOid — not in webhook, null preserves existing
             mergedBy != null ? mergedBy.getId() : null
         );
 

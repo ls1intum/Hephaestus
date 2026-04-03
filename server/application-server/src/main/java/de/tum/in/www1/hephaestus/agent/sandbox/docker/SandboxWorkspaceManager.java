@@ -194,6 +194,8 @@ public class SandboxWorkspaceManager {
                     if (Files.isDirectory(path)) {
                         TarArchiveEntry dirEntry = new TarArchiveEntry(entryName + "/");
                         dirEntry.setModTime(Files.getLastModifiedTime(path).toMillis());
+                        dirEntry.setUserId(1000);
+                        dirEntry.setGroupId(1000);
                         tar.putArchiveEntry(dirEntry);
                         tar.closeArchiveEntry();
                     } else if (Files.isRegularFile(path)) {
@@ -208,6 +210,8 @@ public class SandboxWorkspaceManager {
                         TarArchiveEntry fileEntry = new TarArchiveEntry(entryName);
                         fileEntry.setSize(fileSize);
                         fileEntry.setModTime(Files.getLastModifiedTime(path).toMillis());
+                        fileEntry.setUserId(1000);
+                        fileEntry.setGroupId(1000);
                         tar.putArchiveEntry(fileEntry);
 
                         // Stream file through fixed buffer — not Files.readAllBytes()
@@ -325,6 +329,9 @@ public class SandboxWorkspaceManager {
                 TarArchiveEntry tarEntry = new TarArchiveEntry(safePath);
                 tarEntry.setSize(entry.getValue().length);
                 tarEntry.setModTime(System.currentTimeMillis());
+                // Set agent user ownership so container (uid 1000) can read/write injected files
+                tarEntry.setUserId(1000);
+                tarEntry.setGroupId(1000);
                 tar.putArchiveEntry(tarEntry);
                 tar.write(entry.getValue());
                 tar.closeArchiveEntry();

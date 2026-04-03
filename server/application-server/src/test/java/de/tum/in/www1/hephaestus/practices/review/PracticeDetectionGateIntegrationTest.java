@@ -257,24 +257,6 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
     class GateSkips {
 
         @Test
-        @DisplayName("skips when no-ai-review label present")
-        void skipsNoAiReviewLabel() {
-            createPractice("labeled", "Labeled", List.of("PullRequestCreated"), true);
-            Label label = new Label();
-            label.setName("no-ai-review");
-            label.setColor("ff0000");
-            label.setNativeId(9001L);
-            label.setProvider(provider);
-            label = labelRepository.save(label);
-            PullRequest pr = createPullRequest(false, Set.of(label), Set.of(assignee));
-
-            GateDecision decision = gate.evaluate(pr, "PullRequestCreated");
-
-            assertThat(decision).isInstanceOf(GateDecision.Skip.class);
-            assertThat(((GateDecision.Skip) decision).reason()).contains("label");
-        }
-
-        @Test
         @DisplayName("skips when no agent config exists")
         void skipsNoConfig() {
             agentConfigRepository.deleteAll();

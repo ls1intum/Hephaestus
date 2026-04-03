@@ -110,7 +110,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 null,
                 "Good quality",
                 "Keep it up",
-                "COACHING",
                 Instant.now()
             );
 
@@ -124,7 +123,7 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
             assertThat(found.getConfidence()).isEqualTo(0.95f);
             assertThat(found.getReasoning()).isEqualTo("Good quality");
             assertThat(found.getGuidance()).isEqualTo("Keep it up");
-            assertThat(found.getGuidanceMethod().name()).isEqualTo("COACHING");
+            // guidanceMethod removed
         }
 
         @Test
@@ -149,7 +148,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                null,
                 now
             );
 
@@ -165,7 +163,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "NEGATIVE",
                 "MAJOR",
                 0.5f,
-                null,
                 null,
                 null,
                 null,
@@ -197,7 +194,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 0.7f,
                 evidence,
                 "Missing error handling",
-                null,
                 null,
                 Instant.now()
             );
@@ -231,7 +227,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "POSITIVE",
                 "INFO",
                 0.9f,
-                null,
                 null,
                 null,
                 null,
@@ -285,7 +280,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                null,
                 Instant.now()
             );
             // Finding in workspace B
@@ -301,7 +295,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "NEGATIVE",
                 "MINOR",
                 0.5f,
-                null,
                 null,
                 null,
                 null,
@@ -352,7 +345,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                null,
                 Instant.now()
             );
             // Finding on the other practice (should survive)
@@ -368,7 +360,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "POSITIVE",
                 "INFO",
                 0.9f,
-                null,
                 null,
                 null,
                 null,
@@ -497,7 +488,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                null,
                 Instant.parse("2026-03-20T10:00:00Z")
             );
 
@@ -558,7 +548,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 null,
                 null,
                 null,
-                null,
                 Instant.parse("2026-03-20T10:00:00Z")
             );
 
@@ -569,24 +558,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
 
             assertThat(result).hasSize(1);
             assertThat(result.get(0).getCount()).isEqualTo(1);
-        }
-
-        @Test
-        @DisplayName("includes NOT_APPLICABLE verdict rows in query results")
-        void includesNotApplicableVerdict() {
-            insertFinding("na-1", practice, "NOT_APPLICABLE", Instant.parse("2026-03-20T10:00:00Z"));
-            insertFinding("na-2", practice, "NEGATIVE", Instant.parse("2026-03-19T10:00:00Z"));
-
-            List<ContributorPracticeSummary> result = practiceFindingRepository.findContributorPracticeSummary(
-                contributor.getId(),
-                workspace.getId()
-            );
-
-            // Query returns all verdicts — filtering is the caller's responsibility
-            assertThat(result).hasSize(2);
-            assertThat(result)
-                .extracting(ContributorPracticeSummary::getVerdict)
-                .containsExactlyInAnyOrder(Verdict.NOT_APPLICABLE, Verdict.NEGATIVE);
         }
 
         /** Helper to insert a finding with minimal boilerplate. */
@@ -603,7 +574,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 verdict,
                 "INFO",
                 0.9f,
-                null,
                 null,
                 null,
                 null,
@@ -632,7 +602,6 @@ class PracticeFindingRepositoryIntegrationTest extends BaseIntegrationTest {
                 "POSITIVE",
                 "INFO",
                 0.9f,
-                null,
                 null,
                 null,
                 null,
