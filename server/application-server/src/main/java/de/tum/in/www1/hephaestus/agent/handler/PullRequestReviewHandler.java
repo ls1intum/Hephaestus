@@ -469,7 +469,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         }
 
         // 4. Post feedback to PR/MR (soft failure — logged, not thrown)
-        feedbackService.deliverFeedback(job, delivery, result.hasNegative());
+        feedbackService.deliverFeedback(job, delivery);
     }
 
     // -------------------------------------------------------------------------

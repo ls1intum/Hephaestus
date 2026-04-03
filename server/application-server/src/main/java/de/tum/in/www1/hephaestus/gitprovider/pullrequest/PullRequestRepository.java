@@ -121,7 +121,7 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
      * Finds a pull request by ID with all associations needed by the practice review detection gate.
      * <p>
      * Eagerly fetches labels, assignees, repository, author, and mergedBy in a single query.
-     * The gate requires labels (step 1: no-ai-review label check), assignees (step 7: assignee gate),
+     * The gate requires labels, assignees (step 6: assignee gate),
      * and repository (step 3: workspace resolution). Author and mergedBy are needed by
      * {@link de.tum.in.www1.hephaestus.gitprovider.common.events.EventPayload.PullRequestData#from(PullRequest)}
      * for the ReviewSubmitted path.

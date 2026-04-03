@@ -49,21 +49,17 @@ class FeedbackDeliveryService {
     /**
      * Delivers feedback to the PR/MR. Best-effort: failures are logged but never thrown.
      */
-    void deliverFeedback(AgentJob job, @Nullable DeliveryContent delivery, boolean hasNegative) {
+    void deliverFeedback(AgentJob job, @Nullable DeliveryContent delivery) {
         try {
-            doDeliver(job, delivery, hasNegative);
+            doDeliver(job, delivery);
         } catch (Exception e) {
             log.warn("Feedback delivery failed (non-fatal): jobId={}", job.getId(), e);
         }
     }
 
-    private void doDeliver(AgentJob job, @Nullable DeliveryContent delivery, boolean hasNegative) {
+    private void doDeliver(AgentJob job, @Nullable DeliveryContent delivery) {
         if (delivery == null) {
             log.debug("No delivery content, skipping: jobId={}", job.getId());
-            return;
-        }
-        if (!hasNegative) {
-            log.debug("All findings positive, skipping delivery: jobId={}", job.getId());
             return;
         }
 

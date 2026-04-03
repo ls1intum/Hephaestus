@@ -11,11 +11,7 @@ Hephaestus automatically reviews your merge requests and gives you feedback on s
 
 1. **You push code** -- Open a merge request or push commits to an existing MR
 2. **Hephaestus analyzes** -- An AI agent reads your diff and evaluates it against the practices configured for your workspace
-3. **You get feedback** -- If issues are found, Hephaestus posts a summary comment on your MR and inline notes on specific lines
-
-:::tip No news is good news
-If all your practices are positive, **no comment is posted**. Silence means your code passed review.
-:::
+3. **You get feedback** -- Hephaestus posts a summary comment on your MR. If issues are found, you also get inline notes on specific lines
 
 The review typically completes within 2--5 minutes, though queue time may add to this under load.
 
@@ -23,7 +19,7 @@ The review typically completes within 2--5 minutes, though queue time may add to
 
 ### MR summary comment
 
-When issues are found, a summary comment appears at the top of your MR's discussion. It contains:
+A summary comment appears at the top of your MR's discussion. When everything looks good, it posts a short approval. When issues are found, it contains:
 
 - A count of blocking issues and improvements found
 - Named positive practices you demonstrated well (up to 2)
@@ -78,18 +74,12 @@ The specific practices evaluated depend on your workspace configuration. Common 
 - **Code quality** -- Meaningful naming, code hygiene
 - **Process** -- MR description quality, commit discipline
 
-## Skipping a review
-
-### Per-MR: `no-ai-review` label
-
-Add the `no-ai-review` label to your MR to skip the automated review entirely. The review will not run and no findings will be stored.
-
-### Account-level: settings preference
+## Opting out
 
 You can suppress review **comments** in your user settings. Navigate to **Settings** in the Hephaestus web app and disable the code review preference. Each review comment also has a link to this setting in its footer.
 
 :::info
-The account-level preference suppresses comment delivery only. The review still runs and findings are stored in the database for instructor visibility. Use the `no-ai-review` label if you want to prevent the review from running entirely.
+The preference suppresses comment delivery only. The review still runs and findings are stored in the database for instructor visibility.
 :::
 
 ### Draft MRs

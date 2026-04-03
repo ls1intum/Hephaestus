@@ -34,7 +34,6 @@ import org.springframework.stereotype.Service;
  *
  * <h2>Gate checks (in order)</h2>
  * <ol>
- *   <li>{@code no-ai-review} label → SKIP</li>
  *   <li>Draft PR + {@code skipDrafts} config → SKIP</li>
  *   <li>Workspace resolution → SKIP if not found</li>
  *   <li>No enabled agent config for workspace → SKIP</li>
@@ -50,7 +49,6 @@ public class PracticeReviewDetectionGate {
 
     private static final Logger log = LoggerFactory.getLogger(PracticeReviewDetectionGate.class);
     private static final String PRACTICE_REVIEW_ROLE = FeatureFlag.RUN_PRACTICE_REVIEW.key();
-    private static final String NO_AI_REVIEW_LABEL = "no-ai-review";
     private static final Duration SKIP_WARNING_INTERVAL = Duration.ofSeconds(30);
 
     private final PracticeReviewProperties properties;
@@ -89,19 +87,13 @@ public class PracticeReviewDetectionGate {
      * @return a {@link GateDecision} indicating whether to detect or skip (with reason)
      */
     public GateDecision evaluate(@NonNull PullRequest pullRequest, @NonNull String triggerEventName) {
-        // 1. Label gate: no-ai-review label takes absolute precedence
-        if (hasNoAiReviewLabel(pullRequest)) {
-            log.debug("Practice review gate: SKIP, reason=label:no-ai-review, prId={}", pullRequest.getId());
-            return new GateDecision.Skip("label:no-ai-review");
-        }
-
-        // 2. Draft gate
+        // 1. Draft gate
         if (properties.skipDrafts() && pullRequest.isDraft()) {
             log.debug("Practice review gate: SKIP, reason=draftPR, prId={}", pullRequest.getId());
             return new GateDecision.Skip("draft PR");
         }
 
-        // 3. Workspace resolution
+        // 2. Workspace resolution
         String nameWithOwner =
             pullRequest.getRepository() != null ? pullRequest.getRepository().getNameWithOwner() : null;
         Workspace workspace = workspaceResolver.resolveForRepository(nameWithOwner).orElse(null);
@@ -114,7 +106,7 @@ public class PracticeReviewDetectionGate {
             return new GateDecision.Skip("no workspace");
         }
 
-        // 4. Agent config gate: at least one enabled agent config must exist
+        // 3. Agent config gate: at least one enabled agent config must exist
         if (!agentConfigChecker.hasEnabledConfig(workspace.getId())) {
             log.debug(
                 "Practice review gate: SKIP, reason=noEnabledAgentConfig, prId={}, workspaceId={}",
@@ -124,7 +116,7 @@ public class PracticeReviewDetectionGate {
             return new GateDecision.Skip("no enabled agent config");
         }
 
-        // 5. Practice matching: at least one active practice must match the trigger event
+        // 4. Practice matching: at least one active practice must match the trigger event
         List<Practice> matchedPractices = findMatchingPractices(workspace.getId(), triggerEventName);
         if (matchedPractices.isEmpty()) {
             log.debug(
@@ -136,7 +128,7 @@ public class PracticeReviewDetectionGate {
             return new GateDecision.Skip("no matching practices");
         }
 
-        // 6. Run-for-all bypass: skip role check entirely
+        // 5. Run-for-all bypass: skip role check entirely
         if (properties.runForAllUsers()) {
             log.info(
                 "Practice review gate: DETECT, reason=runForAllUsers, prId={}, matchedPractices={}",
@@ -146,14 +138,14 @@ public class PracticeReviewDetectionGate {
             return new GateDecision.Detect(workspace, matchedPractices);
         }
 
-        // 7. Assignee gate: at least one assignee required for role checking
+        // 6. Assignee gate: at least one assignee required for role checking
         var assignees = pullRequest.getAssignees();
         if (assignees == null || assignees.isEmpty()) {
             log.debug("Practice review gate: SKIP, reason=noAssignee, prId={}", pullRequest.getId());
             return new GateDecision.Skip("no assignee");
         }
 
-        // 8. Keycloak health gate
+        // 7. Keycloak health gate
         if (!userRoleChecker.isHealthy()) {
             logSkippedDueToKeycloak(pullRequest);
             return new GateDecision.Skip("keycloak circuit breaker open");
@@ -165,7 +157,7 @@ public class PracticeReviewDetectionGate {
             log.info("Keycloak circuit breaker recovered, resuming practice review gate checks");
         }
 
-        // 9. Role check: DETECT if ANY assignee has the role
+        // 8. Role check: DETECT if ANY assignee has the role
         return checkAssigneeRoles(pullRequest, assignees, workspace, matchedPractices);
     }
 
@@ -211,16 +203,6 @@ public class PracticeReviewDetectionGate {
             PRACTICE_REVIEW_ROLE
         );
         return new GateDecision.Skip("no assignee with role: " + PRACTICE_REVIEW_ROLE);
-    }
-
-    private boolean hasNoAiReviewLabel(PullRequest pullRequest) {
-        if (pullRequest.getLabels() == null) {
-            return false;
-        }
-        return pullRequest
-            .getLabels()
-            .stream()
-            .anyMatch(label -> NO_AI_REVIEW_LABEL.equalsIgnoreCase(label.getName()));
     }
 
     private List<Practice> findMatchingPractices(Long workspaceId, String triggerEventName) {

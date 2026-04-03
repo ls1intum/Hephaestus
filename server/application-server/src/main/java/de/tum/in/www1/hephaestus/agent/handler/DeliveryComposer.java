@@ -53,7 +53,7 @@ class DeliveryComposer {
      * Compose delivery content from validated findings.
      *
      * @param findings validated findings (may include POSITIVE, NEGATIVE, and NOT_APPLICABLE)
-     * @return delivery content with mrNote and diffNotes, or null if no NEGATIVE findings
+     * @return delivery content with mrNote and diffNotes, or null if findings list is empty
      */
     @Nullable
     static DeliveryContent compose(List<ValidatedFinding> findings) {
@@ -67,16 +67,16 @@ class DeliveryComposer {
             .sorted(Comparator.comparingInt(f -> f.severity().ordinal()))
             .toList();
 
-        // All positive/not-applicable → silence = approval, no comment posted
-        if (negatives.isEmpty()) {
-            return null;
-        }
-
         // Only name high-confidence positives in the opening
         List<ValidatedFinding> positives = findings
             .stream()
             .filter(f -> f.verdict() == Verdict.POSITIVE && f.confidence() >= POSITIVE_CONFIDENCE_FLOOR)
             .toList();
+
+        // All positive/not-applicable → post an approval comment
+        if (negatives.isEmpty()) {
+            return new DeliveryContent(composeAllPositiveNote(positives), List.of());
+        }
 
         // Partition negatives: inlinable (has valid file location) vs non-inlinable
         List<ValidatedFinding> inlinable = new ArrayList<>();
@@ -96,6 +96,24 @@ class DeliveryComposer {
         List<DiffNote> diffNotes = collectDiffNotes(inlinable);
 
         return new DeliveryContent(mrNote, diffNotes);
+    }
+
+    /**
+     * Compose a short approval note when all findings are positive.
+     */
+    private static String composeAllPositiveNote(List<ValidatedFinding> positives) {
+        var sb = new StringBuilder(256);
+        sb.append("\u2705 "); // ✅
+        if (!positives.isEmpty()) {
+            List<String> namedPositives = positives
+                .stream()
+                .limit(MAX_NAMED_POSITIVES)
+                .map(f -> humanizePracticeSlug(f.practiceSlug()))
+                .toList();
+            sb.append("Nice work on the ").append(joinNatural(namedPositives)).append(". ");
+        }
+        sb.append("No issues found — looking good!\n");
+        return sb.toString();
     }
 
     /**

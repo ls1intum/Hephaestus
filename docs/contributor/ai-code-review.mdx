@@ -21,7 +21,7 @@ sequenceDiagram
     GL->>WH: MR webhook event
     WH->>NATS: Publish event
     NATS->>AS: Consume event
-    AS->>AS: Detection gate (9 checks)
+    AS->>AS: Detection gate (8 checks)
     AS->>NATS: Submit agent_job to job stream
     Note over AS,NATS: Job persisted as QUEUED
     NATS->>AS: Pull consumer claims job
@@ -39,7 +39,7 @@ sequenceDiagram
 
 | Component         | Class                           | Responsibility                                                                                                                                                             |
 | ----------------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Detection gate    | `PracticeReviewDetectionGate`   | 9-check gate: label opt-out, draft skip, workspace resolution, agent config, practice matching, `runForAllUsers` bypass, assignee presence, Keycloak health, assignee role |
+| Detection gate    | `PracticeReviewDetectionGate`   | 8-check gate: draft skip, workspace resolution, agent config, practice matching, `runForAllUsers` bypass, assignee presence, Keycloak health, assignee role                |
 | Review handler    | `PullRequestReviewHandler`      | Context assembly (diff, metadata, practices), diff summary computation, post-execution delivery orchestration                                                              |
 | Result parser     | `PracticeDetectionResultParser` | Parses agent JSON, validates and normalizes slugs, deduplicates by practice (highest confidence wins). Never throws -- failures go to `discarded` list                     |
 | Delivery composer | `DeliveryComposer`              | Inline-first rendering: inlinable findings (with file locations) become compact MR summary entries + full diff notes; non-inlinable findings get full detail in MR summary |
@@ -50,7 +50,7 @@ sequenceDiagram
 
 ## Agent architecture
 
-The system supports two LLM backends, both running single-pass (one agent evaluates all practices):
+The system supports two LLM backends. The Claude Code agent may spawn subagents strategically for complex diffs; OpenCode uses a multi-agent orchestrator:
 
 - **Claude Code** (`ClaudeCodeAgentAdapter`) -- Uses `--json-schema` for constrained decoding. Runner script (`.run-claude.mjs`) validates output and retries via `--continue` if malformed.
 - **OpenCode** (`OpenCodeAgentAdapter`) -- Uses a self-enforced JSON schema. Runner script (`.run-opencode.mjs`) performs 3-phase self-correction: initial run, format retry, position retry (validates `suggestedDiffNotes` against diff hunks).
@@ -145,7 +145,7 @@ After the agent returns findings, the server runs a 7-step delivery pipeline in 
 4. **Compose** -- `DeliveryComposer` partitions findings into:
    - **Inlinable** (have file locations, not in internal paths like `.context/`, practice not in `NON_INLINABLE_PRACTICES`) -- compact list in MR summary, full detail in diff notes
    - **Non-inlinable** (`mr-description-quality`, `commit-discipline`, or no file location) -- full detail in MR summary
-   - Returns `null` if all findings are positive (silence = approval)
+   - When all findings are positive, composes a short approval comment naming top positive practices
 
 5. **Validate positions** -- `DiffHunkValidator` parses the unified diff to extract valid new-side line numbers per file. Invalid positions are snapped to the nearest valid line (`TreeSet.floor`/`ceiling`).
 
