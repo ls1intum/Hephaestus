@@ -1217,6 +1217,7 @@ export const practice = pgTable(
 			mode: "string",
 		}).notNull(),
 		updatedAt: timestamp("updated_at", { precision: 6, withTimezone: true, mode: "string" }),
+		precomputeScript: text("precompute_script"),
 	},
 	(table) => [
 		index("idx_practice_workspace_active").using(

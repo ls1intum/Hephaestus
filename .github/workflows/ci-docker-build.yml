@@ -128,7 +128,7 @@ jobs:
     with:
       image-name: "ls1intum/hephaestus/agent-claude-code"
       docker-file: "./docker/agents/claude-code/Dockerfile"
-      docker-context: "./docker/agents/claude-code"
+      docker-context: "./docker/agents"
       registry: "ghcr.io"
       tags: |
         ${{ github.ref_name }}
@@ -149,7 +149,7 @@ jobs:
     with:
       image-name: "ls1intum/hephaestus/agent-opencode"
       docker-file: "./docker/agents/opencode/Dockerfile"
-      docker-context: "./docker/agents/opencode"
+      docker-context: "./docker/agents"
       registry: "ghcr.io"
       tags: |
         ${{ github.ref_name }}
