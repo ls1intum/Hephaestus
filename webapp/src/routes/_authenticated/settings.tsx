@@ -3,8 +3,11 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
 	deleteUserMutation,
+	getLinkedAccountsOptions,
+	getLinkedAccountsQueryKey,
 	getUserSettingsOptions,
 	getUserSettingsQueryKey,
+	unlinkAccountMutation,
 	updateUserSettingsMutation,
 } from "@/api/@tanstack/react-query.gen";
 import type { Options } from "@/api/sdk.gen";
@@ -13,6 +16,7 @@ import type {
 	UpdateUserSettingsResponse,
 	UserSettings,
 } from "@/api/types.gen";
+import type { LinkedAccountsSectionProps } from "@/components/settings/LinkedAccountsSection";
 import { SettingsPage } from "@/components/settings/SettingsPage";
 import { useAuth } from "@/integrations/auth/AuthContext";
 import { isPosthogEnabled } from "@/integrations/posthog/config";
@@ -24,7 +28,7 @@ export const Route = createFileRoute("/_authenticated/settings")({
 function RouteComponent() {
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
-	const { logout, hasRole } = useAuth();
+	const { logout, linkAccount, hasRole } = useAuth();
 	const userSettingsQueryKey = getUserSettingsQueryKey();
 
 	// Feature flag: AI review section visible only for users with the practice review role
@@ -34,6 +38,26 @@ function RouteComponent() {
 	const { data: settings, isLoading } = useQuery({
 		...getUserSettingsOptions({}),
 		retry: 1,
+	});
+
+	// Query for linked accounts
+	const linkedAccountsQuery = useQuery({
+		...getLinkedAccountsOptions({}),
+	});
+
+	// Mutation for unlinking an account
+	const unlinkMutation = useMutation({
+		...unlinkAccountMutation(),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: getLinkedAccountsQueryKey() });
+			toast.success("Account disconnected");
+		},
+		onError: (error) => {
+			console.error("Failed to unlink account:", {
+				message: error instanceof Error ? error.message : "Unknown error",
+			});
+			toast.error("Failed to disconnect account. You must have at least one connected provider.");
+		},
 	});
 
 	// Mutation for updating user settings
@@ -103,6 +127,15 @@ function RouteComponent() {
 		deleteAccountMutation.mutate({});
 	};
 
+	const linkedAccountsProps: LinkedAccountsSectionProps = {
+		accounts: linkedAccountsQuery.data ?? [],
+		onLink: linkAccount,
+		onUnlink: (providerAlias) => unlinkMutation.mutate({ path: { providerAlias } }),
+		isUnlinking: unlinkMutation.isPending,
+		isLoading: linkedAccountsQuery.isLoading,
+		isError: linkedAccountsQuery.isError,
+	};
+
 	return (
 		<SettingsPage
 			isLoading={isLoading}
@@ -118,6 +151,7 @@ function RouteComponent() {
 				onToggleResearch: handleResearchToggle,
 				isLoading: updateSettingsMutation.isPending,
 			}}
+			linkedAccountsProps={linkedAccountsProps}
 			accountProps={{
 				onDeleteAccount: handleDeleteAccount,
 				isDeleting: deleteAccountMutation.isPending,

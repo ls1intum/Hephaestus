@@ -1,5 +1,7 @@
 package de.tum.in.www1.hephaestus.workspace;
 
+import de.tum.in.www1.hephaestus.feature.FeatureFlag;
+import de.tum.in.www1.hephaestus.feature.FeatureFlagService;
 import de.tum.in.www1.hephaestus.workspace.dto.CreateWorkspaceRequestDTO;
 import de.tum.in.www1.hephaestus.workspace.dto.GitLabGroupDTO;
 import de.tum.in.www1.hephaestus.workspace.dto.GitLabPreflightRequestDTO;
@@ -40,6 +42,7 @@ public class WorkspaceRegistryController {
     private final WorkspaceService workspaceService;
     private final WorkspaceQueryService workspaceQueryService;
     private final GitLabPreflightService gitLabPreflightService;
+    private final FeatureFlagService featureFlagService;
 
     @PostMapping
     @Operation(summary = "Create a new workspace")
@@ -51,6 +54,14 @@ public class WorkspaceRegistryController {
     public ResponseEntity<WorkspaceDTO> createWorkspace(
         @Valid @RequestBody CreateWorkspaceRequestDTO createWorkspaceRequest
     ) {
+        if (
+            createWorkspaceRequest.gitProviderMode() == Workspace.GitProviderMode.GITLAB_PAT &&
+            !featureFlagService.isEnabled(FeatureFlag.GITLAB_WORKSPACE_CREATION)
+        ) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                "GitLab workspace creation is not enabled"
+            );
+        }
         Workspace workspace = workspaceService.createWorkspace(createWorkspaceRequest);
 
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()
@@ -84,6 +95,9 @@ public class WorkspaceRegistryController {
         description = "Validation result",
         content = @Content(schema = @Schema(implementation = GitLabPreflightResponseDTO.class))
     )
+    @PreAuthorize(
+        "@featureFlagService.isEnabled(T(de.tum.in.www1.hephaestus.feature.FeatureFlag).GITLAB_WORKSPACE_CREATION)"
+    )
     public ResponseEntity<GitLabPreflightResponseDTO> gitLabPreflight(
         @Valid @RequestBody GitLabPreflightRequestDTO request
     ) {
@@ -101,6 +115,9 @@ public class WorkspaceRegistryController {
         responseCode = "200",
         description = "Accessible groups",
         content = @Content(array = @ArraySchema(schema = @Schema(implementation = GitLabGroupDTO.class)))
+    )
+    @PreAuthorize(
+        "@featureFlagService.isEnabled(T(de.tum.in.www1.hephaestus.feature.FeatureFlag).GITLAB_WORKSPACE_CREATION)"
     )
     public ResponseEntity<List<GitLabGroupDTO>> listGitLabGroups(
         @Valid @RequestBody GitLabPreflightRequestDTO request

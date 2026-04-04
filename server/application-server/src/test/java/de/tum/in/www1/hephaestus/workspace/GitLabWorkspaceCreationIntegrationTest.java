@@ -23,6 +23,9 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 
 @AutoConfigureWebTestClient
 @DisplayName("GitLab workspace creation integration")
+@org.springframework.test.context.TestPropertySource(
+    properties = "hephaestus.features.flags.gitlab-workspace-creation=true"
+)
 class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired
