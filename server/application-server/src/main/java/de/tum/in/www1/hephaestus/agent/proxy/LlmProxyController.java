@@ -94,7 +94,9 @@ class LlmProxyController {
             LlmProvider.ANTHROPIC,
             ProviderProxyConfig.forProvider(LlmProvider.ANTHROPIC, properties),
             LlmProvider.OPENAI,
-            ProviderProxyConfig.forProvider(LlmProvider.OPENAI, properties)
+            ProviderProxyConfig.forProvider(LlmProvider.OPENAI, properties),
+            LlmProvider.AZURE_OPENAI,
+            ProviderProxyConfig.forProvider(LlmProvider.AZURE_OPENAI, properties)
         );
         this.meterRegistry = meterRegistry;
     }
@@ -103,7 +105,7 @@ class LlmProxyController {
      * Catch-all proxy endpoint. The {@code provider} path variable determines which
      * upstream to forward to. Regex constraint ensures only known providers match.
      */
-    @RequestMapping("/{provider:anthropic|openai}/**")
+    @RequestMapping("/{provider:anthropic|openai|azure_openai}/**")
     public ResponseEntity<?> proxy(
         @PathVariable String provider,
         HttpServletRequest request,
@@ -223,7 +225,7 @@ class LlmProxyController {
         HttpHeaders outHeaders = buildUpstreamHeaders(incomingHeaders, config, apiKey);
 
         // Sanitize body for Azure OpenAI compatibility (strip unsupported params)
-        byte[] sanitizedBody = sanitizeBodyForAzure(config, body);
+        byte[] sanitizedBody = sanitizeBodyForAzure(llmProvider, config, body);
 
         log.debug("Proxying {} {} for job {}", request.getMethod(), upstreamUrl, job.getId());
 
@@ -309,13 +311,13 @@ class LlmProxyController {
 
     /**
      * Strip parameters that Azure OpenAI rejects but standard OpenAI accepts.
-     * No-op when upstream is not Azure or body is not JSON.
+     * No-op when provider is not Azure OpenAI or body is not JSON.
      */
-    byte[] sanitizeBodyForAzure(ProviderProxyConfig config, byte[] body) {
+    byte[] sanitizeBodyForAzure(LlmProvider provider, ProviderProxyConfig config, byte[] body) {
         if (body == null || body.length == 0) {
             return body;
         }
-        if (!config.upstreamBaseUrl().contains("openai.azure.com")) {
+        if (provider != LlmProvider.AZURE_OPENAI && !config.upstreamBaseUrl().contains("openai.azure.com")) {
             return body;
         }
 

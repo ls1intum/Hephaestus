@@ -5,6 +5,8 @@ import de.tum.in.www1.hephaestus.agent.CredentialMode;
 import de.tum.in.www1.hephaestus.agent.adapter.AgentResult;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.NetworkPolicy;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.SandboxResult;
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
@@ -105,5 +107,29 @@ public interface AgentAdapter {
             return new NetworkPolicy(request.allowInternet(), null, request.jobToken(), providerPath);
         }
         return new NetworkPolicy(true, null, null, null);
+    }
+
+    /** Classpath prefix for agent resource files. */
+    String AGENT_RESOURCE_PREFIX = "agent/";
+
+    /**
+     * Load a classpath resource from the {@code agent/} directory.
+     *
+     * <p>Shared utility for all adapters — eliminates duplicate private methods.
+     *
+     * @param relativePath path relative to {@code agent/} (e.g. {@code "CLAUDE.md"})
+     * @return file content as bytes
+     * @throws IllegalStateException if the resource is missing or unreadable
+     */
+    static byte[] loadClasspathResource(String relativePath) {
+        String fullPath = AGENT_RESOURCE_PREFIX + relativePath;
+        try (InputStream is = AgentAdapter.class.getClassLoader().getResourceAsStream(fullPath)) {
+            if (is == null) {
+                throw new IllegalStateException("Missing classpath resource: " + fullPath);
+            }
+            return is.readAllBytes();
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to read classpath resource: " + fullPath, e);
+        }
     }
 }

@@ -166,10 +166,9 @@ public class AgentConfigService {
                     throw new AgentConfigProviderMismatchException(agentType, LlmProvider.ANTHROPIC, provider);
                 }
             }
-            case OPENCODE -> {
+            case OPENCODE, PI -> {
                 /* any provider is valid */
             }
-            default -> throw new IllegalArgumentException("Unknown agent type: " + agentType);
         }
     }
 }
