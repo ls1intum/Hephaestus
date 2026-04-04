@@ -2959,6 +2959,7 @@ components:
           enum:
           - CLAUDE_CODE
           - OPENCODE
+          - PI
         allowInternet:
           type: boolean
           description: Whether agent containers have internet access
@@ -2989,6 +2990,7 @@ components:
           enum:
           - ANTHROPIC
           - OPENAI
+          - AZURE_OPENAI
         maxConcurrentJobs:
           type: integer
           format: int32
@@ -3282,6 +3284,7 @@ components:
           enum:
           - CLAUDE_CODE
           - OPENCODE
+          - PI
         allowInternet:
           type: boolean
           description: Whether agent containers have internet access
@@ -3306,6 +3309,7 @@ components:
           enum:
           - ANTHROPIC
           - OPENAI
+          - AZURE_OPENAI
         maxConcurrentJobs:
           type: integer
           format: int32
@@ -4593,6 +4597,7 @@ components:
           enum:
           - CLAUDE_CODE
           - OPENCODE
+          - PI
         allowInternet:
           type: boolean
           description: Whether agent containers have internet access
@@ -4616,6 +4621,7 @@ components:
           enum:
           - ANTHROPIC
           - OPENAI
+          - AZURE_OPENAI
         maxConcurrentJobs:
           type: integer
           format: int32

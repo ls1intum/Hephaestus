@@ -494,7 +494,7 @@ export type UpdateAgentConfigRequest = {
     /**
      * Type of coding agent
      */
-    agentType?: 'CLAUDE_CODE' | 'OPENCODE';
+    agentType?: 'CLAUDE_CODE' | 'OPENCODE' | 'PI';
     /**
      * Whether agent containers have internet access
      */
@@ -514,7 +514,7 @@ export type UpdateAgentConfigRequest = {
     /**
      * LLM provider
      */
-    llmProvider?: 'ANTHROPIC' | 'OPENAI';
+    llmProvider?: 'ANTHROPIC' | 'OPENAI' | 'AZURE_OPENAI';
     /**
      * Maximum concurrent jobs
      */
@@ -1565,7 +1565,7 @@ export type CreateAgentConfigRequest = {
     /**
      * Type of coding agent
      */
-    agentType: 'CLAUDE_CODE' | 'OPENCODE';
+    agentType: 'CLAUDE_CODE' | 'OPENCODE' | 'PI';
     /**
      * Whether agent containers have internet access
      */
@@ -1585,7 +1585,7 @@ export type CreateAgentConfigRequest = {
     /**
      * LLM provider
      */
-    llmProvider: 'ANTHROPIC' | 'OPENAI';
+    llmProvider: 'ANTHROPIC' | 'OPENAI' | 'AZURE_OPENAI';
     /**
      * Maximum concurrent jobs
      */
@@ -1715,7 +1715,7 @@ export type AgentConfig = {
     /**
      * Type of coding agent
      */
-    agentType: 'CLAUDE_CODE' | 'OPENCODE';
+    agentType: 'CLAUDE_CODE' | 'OPENCODE' | 'PI';
     /**
      * Whether agent containers have internet access
      */
@@ -1743,7 +1743,7 @@ export type AgentConfig = {
     /**
      * LLM provider
      */
-    llmProvider: 'ANTHROPIC' | 'OPENAI';
+    llmProvider: 'ANTHROPIC' | 'OPENAI' | 'AZURE_OPENAI';
     /**
      * Maximum concurrent jobs
      */
