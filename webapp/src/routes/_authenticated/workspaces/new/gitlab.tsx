@@ -152,6 +152,7 @@ function GitLabWizardPage() {
 	};
 
 	const meta = STEP_META[state.step - 1];
+	const wizardContextValue = useMemo(() => ({ state, dispatch }), [state]);
 	const isTransitioning = listGroups.isPending;
 	const isCreating = createWorkspace.isPending;
 	if (flagLoading) {
@@ -209,7 +210,7 @@ function GitLabWizardPage() {
 			<WizardStepIndicator currentStep={state.step} />
 
 			<div className="mt-6" role="region" aria-labelledby="wizard-heading">
-				<WizardContext.Provider value={{ state, dispatch }}>
+				<WizardContext.Provider value={wizardContextValue}>
 					{state.step === 1 && <ConnectGitLabStep />}
 					{state.step === 2 && <SelectGroupStep />}
 					{state.step === 3 && <ConfigureWorkspaceStep />}

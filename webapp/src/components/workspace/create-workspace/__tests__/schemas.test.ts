@@ -92,9 +92,9 @@ describe("workspaceDetailsSchema", () => {
 		expect(result.success).toBe(false);
 	});
 
-	it("rejects display name over 100 chars", () => {
+	it("rejects display name over 120 chars", () => {
 		const result = workspaceDetailsSchema.safeParse({
-			displayName: "a".repeat(101),
+			displayName: "a".repeat(121),
 			workspaceSlug: "valid-slug",
 		});
 		expect(result.success).toBe(false);

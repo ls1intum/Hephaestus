@@ -139,18 +139,10 @@ function RouteComponent() {
 		deleteAccountMutation.mutate({});
 	};
 
-	const handleLinkAccount = (providerAlias: string) => {
-		linkAccount(providerAlias);
-	};
-
-	const handleUnlinkAccount = (providerAlias: string) => {
-		unlinkMutation.mutate(providerAlias);
-	};
-
 	const linkedAccountsProps: LinkedAccountsSectionProps = {
 		accounts: (linkedAccountsQuery.data ?? []) as LinkedAccountsSectionProps["accounts"],
-		onLink: handleLinkAccount,
-		onUnlink: handleUnlinkAccount,
+		onLink: linkAccount,
+		onUnlink: (providerAlias) => unlinkMutation.mutate(providerAlias),
 		isUnlinking: unlinkMutation.isPending,
 		isLoading: linkedAccountsQuery.isLoading,
 		isError: linkedAccountsQuery.isError,

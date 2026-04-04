@@ -58,7 +58,9 @@ public class WorkspaceRegistryController {
             createWorkspaceRequest.gitProviderMode() == Workspace.GitProviderMode.GITLAB_PAT &&
             !featureFlagService.isEnabled(FeatureFlag.GITLAB_WORKSPACE_CREATION)
         ) {
-            return ResponseEntity.status(403).build();
+            throw new org.springframework.security.access.AccessDeniedException(
+                "GitLab workspace creation is not enabled"
+            );
         }
         Workspace workspace = workspaceService.createWorkspace(createWorkspaceRequest);
 

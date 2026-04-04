@@ -23,7 +23,7 @@ export const workspaceDetailsSchema = z.object({
 	displayName: z
 		.string()
 		.transform((v) => v.trim())
-		.pipe(z.string().min(1, "Display name is required").max(100, "Display name is too long")),
+		.pipe(z.string().min(1, "Display name is required").max(120, "Display name is too long")),
 	workspaceSlug: z
 		.string()
 		.trim()
