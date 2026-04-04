@@ -7,6 +7,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.in.www1.hephaestus.config.KeycloakProperties;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.integrations.posthog.PosthogClient;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
@@ -15,6 +16,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.keycloak.admin.client.Keycloak;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 
@@ -36,11 +38,23 @@ class AccountServiceTest extends BaseUnitTest {
     @Mock
     private PosthogClient posthogClient;
 
+    @Mock
+    private Keycloak keycloak;
+
     private AccountService accountService;
 
     @BeforeEach
     void setUp() {
-        accountService = new AccountService(userPreferencesRepository, posthogClient);
+        KeycloakProperties keycloakProperties = new KeycloakProperties(
+            "http://localhost:8081",
+            "hephaestus",
+            "hephaestus-confidential",
+            null,
+            null,
+            null,
+            null
+        );
+        accountService = new AccountService(userPreferencesRepository, posthogClient, keycloak, keycloakProperties);
     }
 
     private User createUser() {
