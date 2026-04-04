@@ -47,7 +47,6 @@ const defaultLinkedAccountsProps = {
 			providerAlias: "gitlab-lrz",
 			providerName: "GitLab LRZ",
 			connected: false,
-			linkedUsername: null,
 		},
 	],
 	onLink: fn(),

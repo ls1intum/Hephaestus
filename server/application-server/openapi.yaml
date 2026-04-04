@@ -92,6 +92,41 @@ paths:
       summary: Get feature flags for the current user
       tags:
       - Account
+  /user/linked-accounts:
+    get:
+      description: Returns all configured identity providers with their connection
+        status for the current user
+      operationId: getLinkedAccounts
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LinkedAccount"
+          description: OK
+      summary: List linked identity providers
+      tags:
+      - Account
+  /user/linked-accounts/{providerAlias}:
+    delete:
+      description: Remove the federated identity link for the given provider. Cannot
+        unlink the last remaining provider.
+      operationId: unlinkAccount
+      parameters:
+      - in: path
+        name: providerAlias
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9-]{1,64}$"
+      responses:
+        "200":
+          description: OK
+      summary: Unlink an identity provider
+      tags:
+      - Account
   /user/settings:
     get:
       description: "Get the current user's notification, research participation, and\
@@ -3807,6 +3842,26 @@ components:
       required:
       - current
       - target
+    LinkedAccount:
+      type: object
+      description: An identity provider account that can be linked to the user
+      properties:
+        connected:
+          type: boolean
+          description: Whether the user has linked this provider
+        linkedUsername:
+          type: string
+          description: "Username on the external provider, if connected"
+        providerAlias:
+          type: string
+          description: "Identity provider alias (e.g. 'github', 'gitlab-lrz')"
+        providerName:
+          type: string
+          description: Display name of the identity provider
+      required:
+      - connected
+      - providerAlias
+      - providerName
     PageAgentJob:
       type: object
       properties:

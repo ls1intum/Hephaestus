@@ -3,21 +3,20 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
 	deleteUserMutation,
+	getLinkedAccountsOptions,
+	getLinkedAccountsQueryKey,
 	getUserSettingsOptions,
 	getUserSettingsQueryKey,
+	unlinkAccountMutation,
 	updateUserSettingsMutation,
 } from "@/api/@tanstack/react-query.gen";
-import { client } from "@/api/client.gen";
 import type { Options } from "@/api/sdk.gen";
 import type {
 	UpdateUserSettingsData,
 	UpdateUserSettingsResponse,
 	UserSettings,
 } from "@/api/types.gen";
-import type {
-	LinkedAccount,
-	LinkedAccountsSectionProps,
-} from "@/components/settings/LinkedAccountsSection";
+import type { LinkedAccountsSectionProps } from "@/components/settings/LinkedAccountsSection";
 import { SettingsPage } from "@/components/settings/SettingsPage";
 import { useAuth } from "@/integrations/auth/AuthContext";
 import { isPosthogEnabled } from "@/integrations/posthog/config";
@@ -42,26 +41,15 @@ function RouteComponent() {
 	});
 
 	// Query for linked accounts
-	const linkedAccountsQuery = useQuery<LinkedAccount[]>({
-		queryKey: ["user", "linked-accounts"],
-		queryFn: async () => {
-			const response = await client.get({
-				url: "/user/linked-accounts" as never,
-			});
-			return (response.data ?? []) as LinkedAccount[];
-		},
+	const linkedAccountsQuery = useQuery({
+		...getLinkedAccountsOptions({}),
 	});
 
 	// Mutation for unlinking an account
 	const unlinkMutation = useMutation({
-		mutationFn: async (providerAlias: string) => {
-			await client.delete({
-				url: "/user/linked-accounts/{providerAlias}" as never,
-				path: { providerAlias } as never,
-			});
-		},
+		...unlinkAccountMutation(),
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ["user", "linked-accounts"] });
+			queryClient.invalidateQueries({ queryKey: getLinkedAccountsQueryKey() });
 			toast.success("Account disconnected");
 		},
 		onError: (error) => {
@@ -140,9 +128,9 @@ function RouteComponent() {
 	};
 
 	const linkedAccountsProps: LinkedAccountsSectionProps = {
-		accounts: (linkedAccountsQuery.data ?? []) as LinkedAccountsSectionProps["accounts"],
+		accounts: linkedAccountsQuery.data ?? [],
 		onLink: linkAccount,
-		onUnlink: (providerAlias) => unlinkMutation.mutate(providerAlias),
+		onUnlink: (providerAlias) => unlinkMutation.mutate({ path: { providerAlias } }),
 		isUnlinking: unlinkMutation.isPending,
 		isLoading: linkedAccountsQuery.isLoading,
 		isError: linkedAccountsQuery.isError,

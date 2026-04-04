@@ -1,4 +1,5 @@
 import { GithubIcon, GitlabIcon, LinkIcon, type LucideIcon, UnlinkIcon } from "lucide-react";
+import type { LinkedAccount } from "@/api/types.gen";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -13,14 +14,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-
-// TODO(#723): Replace with generated type after OpenAPI client regeneration
-export interface LinkedAccount {
-	providerAlias: string;
-	providerName: string;
-	connected: boolean;
-	linkedUsername: string | null;
-}
 
 const PROVIDER_META: Record<string, { icon: LucideIcon; label: string }> = {
 	github: { icon: GithubIcon, label: "GitHub" },
