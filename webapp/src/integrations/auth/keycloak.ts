@@ -31,6 +31,8 @@ export interface UserProfile {
 	sub: string;
 	token: string;
 	githubId?: string; // Optional GitHub ID from token
+	gitlabId?: string; // Optional GitLab ID from token
+	identityProvider?: string; // IdP alias used for this session (e.g. "github", "gitlab-lrz")
 }
 
 class KeycloakService {
@@ -172,10 +174,18 @@ class KeycloakService {
 	}
 
 	/**
+	 * Get the identity provider alias used for the current session (e.g. "github", "gitlab-lrz").
+	 */
+	public getIdentityProvider(): string | undefined {
+		return this.keycloak?.tokenParsed?.identity_provider;
+	}
+
+	/**
 	 * Get the user's git provider ID if available (e.g. GitHub user ID).
+	 * Returns whichever provider ID is available (GitHub or GitLab).
 	 */
 	public getGitProviderId(): string | undefined {
-		return this.keycloak?.tokenParsed?.github_id;
+		return this.keycloak?.tokenParsed?.github_id ?? this.keycloak?.tokenParsed?.gitlab_id;
 	}
 
 	/**
@@ -194,37 +204,38 @@ class KeycloakService {
 
 	/**
 	 * Get the user's profile picture URL from their identity provider.
-	 * Currently supports GitHub; GitLab IDP support will need an equivalent lookup.
+	 * Supports GitHub (via avatar API) and falls back to empty for other providers.
 	 */
 	public getUserProfilePictureUrl(): string {
-		const providerId = this.getGitProviderId();
-		if (providerId) {
-			return `https://avatars.githubusercontent.com/u/${providerId}`;
+		const githubId = this.keycloak?.tokenParsed?.github_id;
+		if (githubId) {
+			return `https://avatars.githubusercontent.com/u/${githubId}`;
 		}
 		return "";
 	}
 
 	/**
 	 * Get the user's profile URL on their identity provider.
-	 * Currently supports GitHub; GitLab IDP support will need an equivalent lookup.
+	 * Supports GitHub and GitLab based on the identity provider used for login.
 	 */
 	public getUserProfileUrl(): string {
 		const username = this.getUsername();
-		if (username) {
-			return `https://github.com/${username}`;
+		if (!username) return "";
+		const idp = this.getIdentityProvider();
+		if (idp?.startsWith("gitlab")) {
+			// Derive GitLab instance URL from the IdP alias convention (gitlab-lrz → gitlab.lrz.de)
+			return `https://gitlab.lrz.de/${username}`;
 		}
-		return "";
+		return `https://github.com/${username}`;
 	}
 
 	/**
-	 * Redirect to the login page
+	 * Redirect to the Keycloak login page.
+	 * Users can choose between configured identity providers (GitHub, GitLab, etc.).
+	 * Pass an idpHint to skip the provider selection and go directly to a specific provider.
 	 */
-	public login(): Promise<void> {
-		return (
-			this.keycloak?.login({
-				idpHint: "github",
-			}) || Promise.resolve()
-		);
+	public login(idpHint?: string): Promise<void> {
+		return this.keycloak?.login(idpHint ? { idpHint } : undefined) || Promise.resolve();
 	}
 
 	/**
