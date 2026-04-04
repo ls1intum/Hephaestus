@@ -242,6 +242,10 @@ class KeycloakService {
 	 * Initiate account linking for the given identity provider.
 	 * Uses Keycloak's Application Initiated Action (kc_action=idp_link) to redirect
 	 * the user to the external provider's OAuth flow, then back to the given URL.
+	 *
+	 * Note: In Keycloak &lt;26.3, the redirect does not include kc_action_status,
+	 * so the frontend cannot detect success/cancel. The linked accounts query
+	 * refetches on return to show the updated state.
 	 */
 	public linkAccount(providerAlias: string, redirectUri?: string): Promise<void> {
 		return (
