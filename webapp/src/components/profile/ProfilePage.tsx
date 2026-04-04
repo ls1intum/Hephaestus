@@ -1,5 +1,6 @@
 import { XCircleIcon } from "lucide-react";
 import type { Profile } from "@/api/types.gen";
+import { PracticeSection } from "@/components/practice/PracticeSection";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import type { ProviderType } from "@/lib/provider";
 import type { LeaderboardSchedule } from "@/lib/timeframe";
@@ -71,6 +72,7 @@ export function ProfilePage({
 				onTimeframeChange={onTimeframeChange}
 				schedule={schedule}
 			/>
+			<PracticeSection workspaceSlug={workspaceSlug} />
 		</div>
 	);
 }
