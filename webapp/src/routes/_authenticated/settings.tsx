@@ -7,12 +7,17 @@ import {
 	getUserSettingsQueryKey,
 	updateUserSettingsMutation,
 } from "@/api/@tanstack/react-query.gen";
+import { client } from "@/api/client.gen";
 import type { Options } from "@/api/sdk.gen";
 import type {
 	UpdateUserSettingsData,
 	UpdateUserSettingsResponse,
 	UserSettings,
 } from "@/api/types.gen";
+import type {
+	LinkedAccount,
+	LinkedAccountsSectionProps,
+} from "@/components/settings/LinkedAccountsSection";
 import { SettingsPage } from "@/components/settings/SettingsPage";
 import { useAuth } from "@/integrations/auth/AuthContext";
 import { isPosthogEnabled } from "@/integrations/posthog/config";
@@ -24,7 +29,7 @@ export const Route = createFileRoute("/_authenticated/settings")({
 function RouteComponent() {
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
-	const { logout, hasRole } = useAuth();
+	const { logout, linkAccount, hasRole } = useAuth();
 	const userSettingsQueryKey = getUserSettingsQueryKey();
 
 	// Feature flag: AI review section visible only for users with the practice review role
@@ -34,6 +39,37 @@ function RouteComponent() {
 	const { data: settings, isLoading } = useQuery({
 		...getUserSettingsOptions({}),
 		retry: 1,
+	});
+
+	// Query for linked accounts
+	const linkedAccountsQuery = useQuery<LinkedAccount[]>({
+		queryKey: ["user", "linked-accounts"],
+		queryFn: async () => {
+			const response = await client.get({
+				url: "/user/linked-accounts" as never,
+			});
+			return (response.data ?? []) as LinkedAccount[];
+		},
+	});
+
+	// Mutation for unlinking an account
+	const unlinkMutation = useMutation({
+		mutationFn: async (providerAlias: string) => {
+			await client.delete({
+				url: "/user/linked-accounts/{providerAlias}" as never,
+				path: { providerAlias } as never,
+			});
+		},
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ["user", "linked-accounts"] });
+			toast.success("Account disconnected");
+		},
+		onError: (error) => {
+			console.error("Failed to unlink account:", {
+				message: error instanceof Error ? error.message : "Unknown error",
+			});
+			toast.error("Failed to disconnect account. You must have at least one connected provider.");
+		},
 	});
 
 	// Mutation for updating user settings
@@ -103,6 +139,22 @@ function RouteComponent() {
 		deleteAccountMutation.mutate({});
 	};
 
+	const handleLinkAccount = (providerAlias: string) => {
+		linkAccount(providerAlias);
+	};
+
+	const handleUnlinkAccount = (providerAlias: string) => {
+		unlinkMutation.mutate(providerAlias);
+	};
+
+	const linkedAccountsProps: LinkedAccountsSectionProps = {
+		accounts: (linkedAccountsQuery.data ?? []) as LinkedAccountsSectionProps["accounts"],
+		onLink: handleLinkAccount,
+		onUnlink: handleUnlinkAccount,
+		isUnlinking: unlinkMutation.isPending,
+		isLoading: linkedAccountsQuery.isLoading,
+	};
+
 	return (
 		<SettingsPage
 			isLoading={isLoading}
@@ -118,6 +170,7 @@ function RouteComponent() {
 				onToggleResearch: handleResearchToggle,
 				isLoading: updateSettingsMutation.isPending,
 			}}
+			linkedAccountsProps={linkedAccountsProps}
 			accountProps={{
 				onDeleteAccount: handleDeleteAccount,
 				isDeleting: deleteAccountMutation.isPending,

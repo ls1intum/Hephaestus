@@ -15,6 +15,7 @@ export interface AuthContextType {
 	userRoles: string[];
 	userProfile: UserProfile | undefined;
 	login: () => Promise<void>;
+	linkAccount: (providerAlias: string) => Promise<void>;
 	logout: () => Promise<void>;
 	hasRole: (role: string) => boolean;
 	isCurrentUser: (login?: string) => boolean;
@@ -161,6 +162,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
 		await keycloakService.login();
 	};
 
+	const linkAccount = async (providerAlias: string) => {
+		await keycloakService.linkAccount(providerAlias);
+	};
+
 	const logout = async () => {
 		// Reset global initialization state
 		globalState.initialized = false;
@@ -200,6 +205,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 		userRoles,
 		userProfile,
 		login,
+		linkAccount,
 		logout,
 		hasRole,
 		isCurrentUser,
