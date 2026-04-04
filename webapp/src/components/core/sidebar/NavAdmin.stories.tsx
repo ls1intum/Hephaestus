@@ -20,11 +20,21 @@ const meta = {
 	tags: ["autodocs"],
 	args: {
 		workspaceSlug: "aet",
+		achievementsEnabled: true,
+		practicesEnabled: true,
 	},
 	argTypes: {
 		workspaceSlug: {
 			control: "text",
 			description: "Active workspace slug",
+		},
+		achievementsEnabled: {
+			control: "boolean",
+			description: "Whether achievement management is available",
+		},
+		practicesEnabled: {
+			control: "boolean",
+			description: "Whether practice management is available",
 		},
 	},
 	decorators: [
@@ -40,6 +50,28 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * Default view of the administration navigation sidebar.
+ * Default view of the administration navigation sidebar with all features enabled.
  */
 export const Default: Story = {};
+
+/** Admin navigation with achievements feature disabled. */
+export const AchievementsDisabled: Story = {
+	args: {
+		achievementsEnabled: false,
+	},
+};
+
+/** Admin navigation with practices feature disabled. */
+export const PracticesDisabled: Story = {
+	args: {
+		practicesEnabled: false,
+	},
+};
+
+/** Admin navigation with all optional features disabled. */
+export const AllFeaturesDisabled: Story = {
+	args: {
+		achievementsEnabled: false,
+		practicesEnabled: false,
+	},
+};

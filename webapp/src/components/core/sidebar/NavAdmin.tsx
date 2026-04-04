@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { BookUser, Map as MapIcon, Settings2, Trophy, Users } from "lucide-react";
+import { BookUser, ClipboardCheck, Map as MapIcon, Settings2, Trophy, Users } from "lucide-react";
 import {
 	SidebarGroup,
 	SidebarGroupLabel,
@@ -8,7 +8,17 @@ import {
 	SidebarMenuItem,
 } from "@/components/ui/sidebar";
 
-export function NavAdmin({ workspaceSlug }: { workspaceSlug: string }) {
+export interface NavAdminProps {
+	workspaceSlug: string;
+	achievementsEnabled?: boolean;
+	practicesEnabled?: boolean;
+}
+
+export function NavAdmin({
+	workspaceSlug,
+	achievementsEnabled = true,
+	practicesEnabled = true,
+}: NavAdminProps) {
 	return (
 		<SidebarGroup>
 			<SidebarGroupLabel>Administration</SidebarGroupLabel>
@@ -40,26 +50,44 @@ export function NavAdmin({ workspaceSlug }: { workspaceSlug: string }) {
 						<span>Manage teams</span>
 					</SidebarMenuButton>
 				</SidebarMenuItem>
-				<SidebarMenuItem>
-					<SidebarMenuButton
-						tooltip="Manage achievements"
-						render={<Link to="/w/$workspaceSlug/admin/achievements" params={{ workspaceSlug }} />}
-					>
-						<Trophy />
-						<span>Manage achievements</span>
-					</SidebarMenuButton>
-				</SidebarMenuItem>
-				<SidebarMenuItem>
-					<SidebarMenuButton
-						tooltip="Achievement Designer"
-						render={
-							<Link to="/w/$workspaceSlug/admin/achievement-designer" params={{ workspaceSlug }} />
-						}
-					>
-						<MapIcon />
-						<span>Achievement Designer</span>
-					</SidebarMenuButton>
-				</SidebarMenuItem>
+				{achievementsEnabled && (
+					<SidebarMenuItem>
+						<SidebarMenuButton
+							tooltip="Manage achievements"
+							render={<Link to="/w/$workspaceSlug/admin/achievements" params={{ workspaceSlug }} />}
+						>
+							<Trophy />
+							<span>Manage achievements</span>
+						</SidebarMenuButton>
+					</SidebarMenuItem>
+				)}
+				{practicesEnabled && (
+					<SidebarMenuItem>
+						<SidebarMenuButton
+							tooltip="Manage practices"
+							render={<Link to="/w/$workspaceSlug/admin/practices" params={{ workspaceSlug }} />}
+						>
+							<ClipboardCheck />
+							<span>Manage practices</span>
+						</SidebarMenuButton>
+					</SidebarMenuItem>
+				)}
+				{achievementsEnabled && (
+					<SidebarMenuItem>
+						<SidebarMenuButton
+							tooltip="Achievement Designer"
+							render={
+								<Link
+									to="/w/$workspaceSlug/admin/achievement-designer"
+									params={{ workspaceSlug }}
+								/>
+							}
+						>
+							<MapIcon />
+							<span>Achievement Designer</span>
+						</SidebarMenuButton>
+					</SidebarMenuItem>
+				)}
 			</SidebarMenu>
 		</SidebarGroup>
 	);
