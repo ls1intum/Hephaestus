@@ -163,7 +163,7 @@ public class AccountController {
         description = "Remove the federated identity link for the given provider. Cannot unlink the last remaining provider."
     )
     public ResponseEntity<Void> unlinkAccount(
-        @PathVariable String providerAlias,
+        @PathVariable @jakarta.validation.constraints.Pattern(regexp = "^[a-z0-9-]{1,64}$") String providerAlias,
         @AuthenticationPrincipal JwtAuthenticationToken auth
     ) {
         JwtAuthenticationToken token = resolveAuthentication(auth);

@@ -216,17 +216,17 @@ class KeycloakService {
 
 	/**
 	 * Get the user's profile URL on their identity provider.
-	 * Supports GitHub and GitLab based on the identity provider used for login.
+	 * Returns a GitHub profile URL for GitHub users, empty string for other providers
+	 * (GitLab profile URLs require the instance base URL which is not in the token).
 	 */
 	public getUserProfileUrl(): string {
 		const username = this.getUsername();
 		if (!username) return "";
 		const idp = this.getIdentityProvider();
-		if (idp?.startsWith("gitlab")) {
-			// Derive GitLab instance URL from the IdP alias convention (gitlab-lrz → gitlab.lrz.de)
-			return `https://gitlab.lrz.de/${username}`;
+		if (!idp || idp === "github") {
+			return `https://github.com/${username}`;
 		}
-		return `https://github.com/${username}`;
+		return "";
 	}
 
 	/**

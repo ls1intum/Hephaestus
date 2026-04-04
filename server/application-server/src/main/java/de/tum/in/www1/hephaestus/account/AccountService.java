@@ -7,6 +7,7 @@ import de.tum.in.www1.hephaestus.integrations.posthog.PosthogClient;
 import de.tum.in.www1.hephaestus.integrations.posthog.PosthogClientException;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -166,27 +167,26 @@ public class AccountService {
                 .get(keycloakUserId)
                 .getFederatedIdentity();
 
-            Set<String> linkedAliases = linked
+            Map<String, String> linkedUsernames = linked
                 .stream()
-                .map(FederatedIdentityRepresentation::getIdentityProvider)
-                .collect(Collectors.toSet());
+                .collect(
+                    Collectors.toMap(
+                        FederatedIdentityRepresentation::getIdentityProvider,
+                        FederatedIdentityRepresentation::getUserName,
+                        (a, b) -> a
+                    )
+                );
 
             return realmIdps
                 .stream()
                 .filter(idp -> !Boolean.TRUE.equals(idp.isLinkOnly()) && Boolean.TRUE.equals(idp.isEnabled()))
                 .map(idp -> {
                     String alias = idp.getAlias();
-                    boolean isConnected = linkedAliases.contains(alias);
-                    String username = linked
-                        .stream()
-                        .filter(fi -> fi.getIdentityProvider().equals(alias))
-                        .map(FederatedIdentityRepresentation::getUserName)
-                        .findFirst()
-                        .orElse(null);
+                    String username = linkedUsernames.get(alias);
                     return new LinkedAccountDTO(
                         alias,
                         idp.getDisplayName() != null ? idp.getDisplayName() : alias,
-                        isConnected,
+                        username != null,
                         username
                     );
                 })
