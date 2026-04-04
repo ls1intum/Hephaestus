@@ -206,11 +206,8 @@ public class AccountService {
      */
     public void unlinkAccount(String keycloakUserId, String providerAlias) {
         try {
-            List<FederatedIdentityRepresentation> linked = keycloak
-                .realm(keycloakProperties.realm())
-                .users()
-                .get(keycloakUserId)
-                .getFederatedIdentity();
+            var userResource = keycloak.realm(keycloakProperties.realm()).users().get(keycloakUserId);
+            List<FederatedIdentityRepresentation> linked = userResource.getFederatedIdentity();
 
             if (linked.size() <= 1) {
                 log.warn("User {} attempted to unlink last identity provider {}", keycloakUserId, providerAlias);
@@ -222,15 +219,10 @@ public class AccountService {
                 throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Identity provider not linked");
             }
 
-            keycloak
-                .realm(keycloakProperties.realm())
-                .users()
-                .get(keycloakUserId)
-                .removeFederatedIdentity(providerAlias);
-
+            userResource.removeFederatedIdentity(providerAlias);
             log.info("User {} unlinked identity provider {}", keycloakUserId, providerAlias);
         } catch (ResponseStatusException e) {
-            throw e; // Re-throw our own exceptions
+            throw e;
         } catch (Exception e) {
             log.error("Failed to unlink provider {} for user {}", providerAlias, keycloakUserId, e);
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Failed to communicate with identity provider");

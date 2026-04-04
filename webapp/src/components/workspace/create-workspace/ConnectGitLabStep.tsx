@@ -117,6 +117,7 @@ export function ConnectGitLabStep() {
 						className="absolute right-1.5 top-1/2 -translate-y-1/2"
 						onClick={() => setShowToken(!showToken)}
 						aria-label={showToken ? "Hide token" : "Show token"}
+						aria-pressed={showToken}
 					>
 						{showToken ? <EyeOffIcon className="size-3.5" /> : <EyeIcon className="size-3.5" />}
 					</Button>
