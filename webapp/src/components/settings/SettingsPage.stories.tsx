@@ -40,6 +40,20 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+const defaultLinkedAccountsProps = {
+	accounts: [
+		{ providerAlias: "github", providerName: "GitHub", connected: true, linkedUsername: "octocat" },
+		{
+			providerAlias: "gitlab-lrz",
+			providerName: "GitLab LRZ",
+			connected: false,
+			linkedUsername: null,
+		},
+	],
+	onLink: fn(),
+	onUnlink: fn(),
+};
+
 /**
  * Default view with all settings enabled
  */
@@ -55,6 +69,7 @@ export const Default: Story = {
 			participateInResearch: true,
 			onToggleResearch: fn(),
 		},
+		linkedAccountsProps: defaultLinkedAccountsProps,
 		accountProps: {
 			onDeleteAccount: fn(),
 		},
@@ -77,6 +92,7 @@ export const AllTogglesDisabled: Story = {
 			participateInResearch: false,
 			onToggleResearch: fn(),
 		},
+		linkedAccountsProps: defaultLinkedAccountsProps,
 		accountProps: {
 			onDeleteAccount: fn(),
 		},
@@ -99,6 +115,7 @@ export const Loading: Story = {
 			participateInResearch: true,
 			onToggleResearch: fn(),
 		},
+		linkedAccountsProps: defaultLinkedAccountsProps,
 		accountProps: {
 			onDeleteAccount: fn(),
 		},
@@ -121,6 +138,7 @@ export const AiReviewHidden: Story = {
 			participateInResearch: true,
 			onToggleResearch: fn(),
 		},
+		linkedAccountsProps: defaultLinkedAccountsProps,
 		accountProps: {
 			onDeleteAccount: fn(),
 		},
@@ -143,6 +161,7 @@ export const ResearchHidden: Story = {
 			participateInResearch: true,
 			onToggleResearch: fn(),
 		},
+		linkedAccountsProps: defaultLinkedAccountsProps,
 		accountProps: {
 			onDeleteAccount: fn(),
 		},

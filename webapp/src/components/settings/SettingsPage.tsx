@@ -1,6 +1,7 @@
 import { Separator } from "@/components/ui/separator";
 import { AccountSection, type AccountSectionProps } from "./AccountSection";
 import { AiReviewSection, type AiReviewSectionProps } from "./AiReviewSection";
+import { LinkedAccountsSection, type LinkedAccountsSectionProps } from "./LinkedAccountsSection";
 import {
 	ResearchParticipationSection,
 	type ResearchParticipationSectionProps,
@@ -24,6 +25,10 @@ export interface SettingsPageProps {
 	 */
 	showResearchSection: boolean;
 	/**
+	 * Props for the LinkedAccountsSection component
+	 */
+	linkedAccountsProps: LinkedAccountsSectionProps;
+	/**
 	 * Props for the AccountSection component
 	 */
 	accountProps: AccountSectionProps;
@@ -42,11 +47,13 @@ export function SettingsPage({
 	showAiReviewSection,
 	researchProps,
 	showResearchSection,
+	linkedAccountsProps,
 	accountProps,
 	isLoading = false,
 }: SettingsPageProps) {
 	const { isLoading: aiReviewLoading = false, ...aiReviewRest } = aiReviewProps;
 	const { isLoading: researchLoading = false, ...researchRest } = researchProps;
+	const { isLoading: linkedLoading = false, ...linkedRest } = linkedAccountsProps;
 	const { isLoading: accountLoading = false, ...accountRest } = accountProps;
 
 	const aiReviewPending = isLoading || aiReviewLoading;
@@ -75,6 +82,10 @@ export function SettingsPage({
 					<ResearchParticipationSection {...researchRest} isLoading={researchPending} />
 				</>
 			)}
+
+			<Separator />
+
+			<LinkedAccountsSection {...linkedRest} isLoading={isLoading || linkedLoading} />
 
 			<Separator />
 

@@ -6,7 +6,12 @@ import de.tum.in.www1.hephaestus.integrations.posthog.PosthogClientException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.keycloak.admin.client.Keycloak;
+import org.keycloak.representations.idm.FederatedIdentityRepresentation;
+import org.keycloak.representations.idm.IdentityProviderRepresentation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -20,6 +25,7 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -137,6 +143,102 @@ public class AccountController {
             keycloakUserId
         );
         return ResponseEntity.ok(updatedUserSettings);
+    }
+
+    @GetMapping("/linked-accounts")
+    @Operation(
+        summary = "List linked identity providers",
+        description = "Returns all configured identity providers with their connection status for the current user"
+    )
+    public ResponseEntity<List<LinkedAccountDTO>> getLinkedAccounts(
+        @AuthenticationPrincipal JwtAuthenticationToken auth
+    ) {
+        JwtAuthenticationToken token = resolveAuthentication(auth);
+        if (token == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        String keycloakUserId = token.getToken().getClaimAsString(StandardClaimNames.SUB);
+
+        // Get all identity providers configured in the realm
+        List<IdentityProviderRepresentation> realmIdps = keycloak
+            .realm(keycloakProperties.realm())
+            .identityProviders()
+            .findAll();
+
+        // Get the user's currently linked federated identities
+        List<FederatedIdentityRepresentation> linked = keycloak
+            .realm(keycloakProperties.realm())
+            .users()
+            .get(keycloakUserId)
+            .getFederatedIdentity();
+
+        Set<String> linkedAliases = linked
+            .stream()
+            .map(FederatedIdentityRepresentation::getIdentityProvider)
+            .collect(Collectors.toSet());
+
+        List<LinkedAccountDTO> accounts = realmIdps
+            .stream()
+            .filter(idp -> !Boolean.TRUE.equals(idp.isLinkOnly()) && Boolean.TRUE.equals(idp.isEnabled()))
+            .map(idp -> {
+                String alias = idp.getAlias();
+                boolean isConnected = linkedAliases.contains(alias);
+                String username = linked
+                    .stream()
+                    .filter(fi -> fi.getIdentityProvider().equals(alias))
+                    .map(FederatedIdentityRepresentation::getUserName)
+                    .findFirst()
+                    .orElse(null);
+                return new LinkedAccountDTO(
+                    alias,
+                    idp.getDisplayName() != null ? idp.getDisplayName() : alias,
+                    isConnected,
+                    username
+                );
+            })
+            .toList();
+
+        return ResponseEntity.ok(accounts);
+    }
+
+    @DeleteMapping("/linked-accounts/{providerAlias}")
+    @Operation(
+        summary = "Unlink an identity provider",
+        description = "Remove the federated identity link for the given provider. Cannot unlink the last remaining provider."
+    )
+    public ResponseEntity<Void> unlinkAccount(
+        @PathVariable String providerAlias,
+        @AuthenticationPrincipal JwtAuthenticationToken auth
+    ) {
+        JwtAuthenticationToken token = resolveAuthentication(auth);
+        if (token == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        String keycloakUserId = token.getToken().getClaimAsString(StandardClaimNames.SUB);
+
+        List<FederatedIdentityRepresentation> linked = keycloak
+            .realm(keycloakProperties.realm())
+            .users()
+            .get(keycloakUserId)
+            .getFederatedIdentity();
+
+        if (linked.size() <= 1) {
+            log.warn("User {} attempted to unlink last identity provider {}", keycloakUserId, providerAlias);
+            return ResponseEntity.status(HttpStatus.CONFLICT).build();
+        }
+
+        boolean hasProvider = linked.stream().anyMatch(fi -> fi.getIdentityProvider().equals(providerAlias));
+
+        if (!hasProvider) {
+            return ResponseEntity.notFound().build();
+        }
+
+        keycloak.realm(keycloakProperties.realm()).users().get(keycloakUserId).removeFederatedIdentity(providerAlias);
+
+        log.info("User {} unlinked identity provider {}", keycloakUserId, providerAlias);
+        return ResponseEntity.noContent().build();
     }
 
     private JwtAuthenticationToken resolveAuthentication(JwtAuthenticationToken injectedToken) {

@@ -239,6 +239,20 @@ class KeycloakService {
 	}
 
 	/**
+	 * Initiate account linking for the given identity provider.
+	 * Uses Keycloak's Application Initiated Action (kc_action=idp_link) to redirect
+	 * the user to the external provider's OAuth flow, then back to the given URL.
+	 */
+	public linkAccount(providerAlias: string, redirectUri?: string): Promise<void> {
+		return (
+			this.keycloak?.login({
+				action: `idp_link:${providerAlias}`,
+				redirectUri: redirectUri ?? window.location.href,
+			}) || Promise.resolve()
+		);
+	}
+
+	/**
 	 * Logout the current user
 	 */
 	public logout(): Promise<void> {
