@@ -94,6 +94,21 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public PullRequest process(GitHubPullRequestDTO dto, ProcessingContext context) {
+        return processInternal(dto, context, true);
+    }
+
+    /**
+     * Internal method that handles pull request processing.
+     *
+     * @param emitLifecycleOnCreate whether to emit lifecycle events (PullRequestClosed/Merged)
+     *                              for PRs that arrive already in a terminal state. Set to false
+     *                              when called from processClosed() which emits its own events.
+     */
+    private PullRequest processInternal(
+        GitHubPullRequestDTO dto,
+        ProcessingContext context,
+        boolean emitLifecycleOnCreate
+    ) {
         Repository repository = context.repository();
         if (repository == null || repository.getId() == null) {
             log.warn("Skipped pull request processing: reason=missingRepository, prNumber={}", dto.number());
@@ -228,7 +243,7 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         }
 
         // Upsert merge commit if present (from GraphQL data — zero extra rate limit cost)
-        upsertMergeCommit(dto, repository);
+        upsertMergeCommit(dto, repository, context);
 
         // Publish events
         // Promotions (ISSUE→PR) are treated as new for event purposes: existingOpt is empty
@@ -238,6 +253,22 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
                 new DomainEvent.PullRequestCreated(EventPayload.PullRequestData.from(pr), EventContext.from(context))
             );
             log.debug("Created pull request: prId={}, prNumber={}", pr.getId(), dto.number());
+
+            // Emit lifecycle events for PRs that arrived already in a terminal state during sync.
+            // Skipped when called from processClosed() which emits its own events.
+            if (emitLifecycleOnCreate && (pr.getState() == Issue.State.CLOSED || pr.getState() == Issue.State.MERGED)) {
+                EventPayload.PullRequestData prData = EventPayload.PullRequestData.from(pr);
+                EventContext eventContext = EventContext.from(context);
+                eventPublisher.publishEvent(new DomainEvent.PullRequestClosed(prData, pr.isMerged(), eventContext));
+                if (pr.isMerged()) {
+                    eventPublisher.publishEvent(new DomainEvent.PullRequestMerged(prData, eventContext));
+                }
+                log.debug(
+                    "Emitted lifecycle events for already-terminal PR: prId={}, merged={}",
+                    pr.getId(),
+                    pr.isMerged()
+                );
+            }
         } else {
             Set<String> changedFields = computeChangedFields(existingOpt.get(), pr);
             if (!changedFields.isEmpty() || relationshipsChanged) {
@@ -325,7 +356,7 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public PullRequest processClosed(GitHubPullRequestDTO dto, ProcessingContext context) {
-        PullRequest pr = process(dto, context);
+        PullRequest pr = processInternal(dto, context, false);
         boolean wasMerged = dto.isMerged();
         EventPayload.PullRequestData prData = EventPayload.PullRequestData.from(pr);
         EventContext eventContext = EventContext.from(context);
@@ -460,11 +491,13 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
      * R5: After upserting the commit, links it to the PR in the commit_pull_request join table
      * so that the association is established immediately (not deferred to enrichment).
      */
-    private void upsertMergeCommit(GitHubPullRequestDTO dto, Repository repository) {
+    private void upsertMergeCommit(GitHubPullRequestDTO dto, Repository repository, ProcessingContext context) {
         var info = dto.mergeCommitInfo();
         if (info == null || info.sha() == null) {
             return;
         }
+
+        boolean isNew = !commitRepository.existsByShaAndRepositoryId(info.sha(), repository.getId());
 
         Long providerId = repository.getProvider().getId();
         Long authorId = commitAuthorResolver.resolveByLogin(info.authorLogin(), providerId);
@@ -503,6 +536,18 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
             );
         }
 
-        log.debug("Upserted merge commit: sha={}, repository={}", info.sha(), repository.getNameWithOwner());
+        // Publish CommitCreated event for newly created merge commits
+        if (isNew && commitOpt.isPresent()) {
+            eventPublisher.publishEvent(
+                new DomainEvent.CommitCreated(EventPayload.CommitData.from(commitOpt.get()), EventContext.from(context))
+            );
+        }
+
+        log.debug(
+            "Upserted merge commit: sha={}, repository={}, isNew={}",
+            info.sha(),
+            repository.getNameWithOwner(),
+            isNew
+        );
     }
 }
