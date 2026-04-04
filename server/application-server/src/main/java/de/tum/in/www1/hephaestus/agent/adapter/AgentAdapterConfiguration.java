@@ -27,6 +27,11 @@ public class AgentAdapterConfiguration {
     }
 
     @Bean
+    public AgentAdapter piAgentAdapter(ObjectMapper objectMapper) {
+        return new PiAgentAdapter(objectMapper);
+    }
+
+    @Bean
     public AgentAdapterRegistry agentAdapterRegistry(List<AgentAdapter> adapters) {
         return new AgentAdapterRegistry(adapters);
     }

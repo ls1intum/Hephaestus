@@ -35,7 +35,10 @@ class LlmProxyControllerTest extends BaseUnitTest {
         "https://api.anthropic.com",
         "https://api.openai.com",
         "Authorization",
-        true
+        true,
+        "",
+        "api-key",
+        false
     );
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -652,6 +655,9 @@ class LlmProxyControllerTest extends BaseUnitTest {
             "https://api.anthropic.com",
             "https://my-resource.openai.azure.com/openai/deployments/gpt-4",
             "api-key",
+            false,
+            "",
+            "api-key",
             false
         );
 
@@ -664,7 +670,7 @@ class LlmProxyControllerTest extends BaseUnitTest {
             byte[] body = "{\"model\":\"gpt-4\",\"reasoningSummary\":\"auto\",\"messages\":[]}".getBytes(
                 StandardCharsets.UTF_8
             );
-            byte[] sanitized = azureController.sanitizeBodyForAzure(config, body);
+            byte[] sanitized = azureController.sanitizeBodyForAzure(LlmProvider.AZURE_OPENAI, config, body);
 
             var tree = OBJECT_MAPPER.readTree(sanitized);
             assertThat(tree.has("reasoningSummary")).isFalse();
@@ -680,7 +686,7 @@ class LlmProxyControllerTest extends BaseUnitTest {
             byte[] body = "{\"model\":\"gpt-4\",\"reasoningSummary\":\"auto\",\"messages\":[]}".getBytes(
                 StandardCharsets.UTF_8
             );
-            byte[] result = controller.sanitizeBodyForAzure(config, body);
+            byte[] result = controller.sanitizeBodyForAzure(LlmProvider.OPENAI, config, body);
 
             // Should return same reference (no modification)
             assertThat(result).isSameAs(body);
@@ -690,7 +696,7 @@ class LlmProxyControllerTest extends BaseUnitTest {
         @DisplayName("should pass through null body unchanged")
         void shouldPassThroughNullBody() {
             var config = ProviderProxyConfig.forProvider(LlmProvider.OPENAI, AZURE_PROPS);
-            assertThat(controller.sanitizeBodyForAzure(config, null)).isNull();
+            assertThat(controller.sanitizeBodyForAzure(LlmProvider.OPENAI, config, null)).isNull();
         }
 
         @Test
@@ -698,7 +704,7 @@ class LlmProxyControllerTest extends BaseUnitTest {
         void shouldPassThroughEmptyBody() {
             var config = ProviderProxyConfig.forProvider(LlmProvider.OPENAI, AZURE_PROPS);
             byte[] empty = new byte[0];
-            assertThat(controller.sanitizeBodyForAzure(config, empty)).isSameAs(empty);
+            assertThat(controller.sanitizeBodyForAzure(LlmProvider.OPENAI, config, empty)).isSameAs(empty);
         }
 
         @Test
@@ -708,7 +714,7 @@ class LlmProxyControllerTest extends BaseUnitTest {
             var config = ProviderProxyConfig.forProvider(LlmProvider.OPENAI, AZURE_PROPS);
 
             byte[] body = "not-json".getBytes(StandardCharsets.UTF_8);
-            byte[] result = azureController.sanitizeBodyForAzure(config, body);
+            byte[] result = azureController.sanitizeBodyForAzure(LlmProvider.AZURE_OPENAI, config, body);
 
             assertThat(result).isSameAs(body);
         }
@@ -720,7 +726,7 @@ class LlmProxyControllerTest extends BaseUnitTest {
             var config = ProviderProxyConfig.forProvider(LlmProvider.OPENAI, AZURE_PROPS);
 
             byte[] body = "{\"model\":\"gpt-4\",\"max_tokens\":1024,\"messages\":[]}".getBytes(StandardCharsets.UTF_8);
-            byte[] sanitized = azureController.sanitizeBodyForAzure(config, body);
+            byte[] sanitized = azureController.sanitizeBodyForAzure(LlmProvider.AZURE_OPENAI, config, body);
 
             var tree = OBJECT_MAPPER.readTree(sanitized);
             assertThat(tree.has("max_tokens")).isFalse();
@@ -734,7 +740,7 @@ class LlmProxyControllerTest extends BaseUnitTest {
             var config = ProviderProxyConfig.forProvider(LlmProvider.OPENAI, DEFAULT_PROPS);
 
             byte[] body = "{\"model\":\"gpt-4\",\"max_tokens\":1024,\"messages\":[]}".getBytes(StandardCharsets.UTF_8);
-            byte[] result = controller.sanitizeBodyForAzure(config, body);
+            byte[] result = controller.sanitizeBodyForAzure(LlmProvider.OPENAI, config, body);
 
             assertThat(result).isSameAs(body);
         }
@@ -746,7 +752,7 @@ class LlmProxyControllerTest extends BaseUnitTest {
             var config = ProviderProxyConfig.forProvider(LlmProvider.OPENAI, AZURE_PROPS);
 
             byte[] body = "{\"model\":\"gpt-4\",\"messages\":[]}".getBytes(StandardCharsets.UTF_8);
-            byte[] result = azureController.sanitizeBodyForAzure(config, body);
+            byte[] result = azureController.sanitizeBodyForAzure(LlmProvider.AZURE_OPENAI, config, body);
 
             // Should return same reference (no modification needed)
             assertThat(result).isSameAs(body);

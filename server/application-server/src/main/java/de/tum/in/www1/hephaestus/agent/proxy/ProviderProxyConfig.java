@@ -20,6 +20,11 @@ record ProviderProxyConfig(String authHeaderName, boolean useBearerPrefix, Strin
                 properties.openaiUseBearerPrefix(),
                 properties.openaiUpstreamUrl()
             );
+            case AZURE_OPENAI -> new ProviderProxyConfig(
+                properties.azureOpenaiAuthHeader(),
+                properties.azureOpenaiUseBearerPrefix(),
+                properties.azureOpenaiUpstreamUrl()
+            );
         };
     }
 

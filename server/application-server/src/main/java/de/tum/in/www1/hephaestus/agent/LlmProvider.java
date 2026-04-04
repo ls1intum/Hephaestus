@@ -6,4 +6,5 @@ package de.tum.in.www1.hephaestus.agent;
 public enum LlmProvider {
     ANTHROPIC,
     OPENAI,
+    AZURE_OPENAI,
 }

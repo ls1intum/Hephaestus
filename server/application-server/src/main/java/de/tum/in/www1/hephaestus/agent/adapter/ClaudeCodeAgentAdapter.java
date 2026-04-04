@@ -7,8 +7,6 @@ import de.tum.in.www1.hephaestus.agent.adapter.spi.AgentAdapter;
 import de.tum.in.www1.hephaestus.agent.adapter.spi.AgentAdapterRequest;
 import de.tum.in.www1.hephaestus.agent.adapter.spi.AgentSandboxSpec;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.SandboxResult;
-import java.io.IOException;
-import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -72,7 +70,7 @@ public class ClaudeCodeAgentAdapter implements AgentAdapter {
         inputFiles.put(".json-schema", buildJsonSchema());
 
         // Claude Code-specific orchestrator file (auto-discovered by Claude Code CLI)
-        inputFiles.put("CLAUDE.md", loadClasspathResource("CLAUDE.md"));
+        inputFiles.put("CLAUDE.md", AgentAdapter.loadClasspathResource("CLAUDE.md"));
 
         // Node.js runner script handles: run claude → validate output → retry via --continue
         long agentTimeoutMs = Math.max(60_000L, (long) (request.timeoutSeconds() - TIMEOUT_BUFFER_SECONDS) * 1000);
@@ -499,22 +497,6 @@ public class ClaudeCodeAgentAdapter implements AgentAdapter {
             return node != null && node.isObject() && node.has("findings");
         } catch (Exception e) {
             return false;
-        }
-    }
-
-    /** Classpath prefix for agent resource files. */
-    private static final String AGENT_RESOURCE_PREFIX = "agent/";
-
-    /** Load a classpath resource from the {@code agent/} directory. */
-    private static byte[] loadClasspathResource(String relativePath) {
-        String fullPath = AGENT_RESOURCE_PREFIX + relativePath;
-        try (InputStream is = ClaudeCodeAgentAdapter.class.getClassLoader().getResourceAsStream(fullPath)) {
-            if (is == null) {
-                throw new IllegalStateException("Missing classpath resource: " + fullPath);
-            }
-            return is.readAllBytes();
-        } catch (IOException e) {
-            throw new IllegalStateException("Failed to read classpath resource: " + fullPath, e);
         }
     }
 

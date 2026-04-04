@@ -1,4 +1,5 @@
 .DS_Store
+.context
 
 # IDE files
 .project

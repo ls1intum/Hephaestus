@@ -9,8 +9,6 @@ import de.tum.in.www1.hephaestus.agent.adapter.spi.AgentAdapter;
 import de.tum.in.www1.hephaestus.agent.adapter.spi.AgentAdapterRequest;
 import de.tum.in.www1.hephaestus.agent.adapter.spi.AgentSandboxSpec;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.SandboxResult;
-import java.io.IOException;
-import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -66,8 +64,14 @@ public class OpenCodeAgentAdapter implements AgentAdapter {
 
         // OpenCode agent definitions loaded from classpath resources.
         // The orchestrator (practice-review) spawns per-practice subagents via the task tool.
-        inputFiles.put(".opencode/agents/practice-review.md", loadClasspathResource("opencode-orchestrator.md"));
-        inputFiles.put(".opencode/agents/practice-analyzer.md", loadClasspathResource("opencode-practice-analyzer.md"));
+        inputFiles.put(
+            ".opencode/agents/practice-review.md",
+            AgentAdapter.loadClasspathResource("opencode-orchestrator.md")
+        );
+        inputFiles.put(
+            ".opencode/agents/practice-analyzer.md",
+            AgentAdapter.loadClasspathResource("opencode-practice-analyzer.md")
+        );
 
         // Use a Node.js wrapper to invoke opencode with spawnSync.
         // This bypasses shell variable handling entirely — the prompt file is read
@@ -375,6 +379,7 @@ public class OpenCodeAgentAdapter implements AgentAdapter {
         return switch (request.llmProvider()) {
             case OPENAI -> " && export OPENAI_BASE_URL=$LLM_PROXY_URL && export OPENAI_API_KEY=$LLM_PROXY_TOKEN";
             case ANTHROPIC -> " && export ANTHROPIC_BASE_URL=$LLM_PROXY_URL && export ANTHROPIC_API_KEY=$LLM_PROXY_TOKEN";
+            case AZURE_OPENAI -> " && export OPENAI_BASE_URL=$LLM_PROXY_URL && export OPENAI_API_KEY=$LLM_PROXY_TOKEN";
         };
     }
 
@@ -489,22 +494,6 @@ public class OpenCodeAgentAdapter implements AgentAdapter {
         return new NdjsonParseResult(text, usage);
     }
 
-    /** Classpath prefix for agent resource files. */
-    private static final String AGENT_RESOURCE_PREFIX = "agent/";
-
-    /** Load a classpath resource from the {@code agent/} directory. */
-    private static byte[] loadClasspathResource(String relativePath) {
-        String fullPath = AGENT_RESOURCE_PREFIX + relativePath;
-        try (InputStream is = OpenCodeAgentAdapter.class.getClassLoader().getResourceAsStream(fullPath)) {
-            if (is == null) {
-                throw new IllegalStateException("Missing classpath resource: " + fullPath);
-            }
-            return is.readAllBytes();
-        } catch (IOException e) {
-            throw new IllegalStateException("Failed to read classpath resource: " + fullPath, e);
-        }
-    }
-
     void configureAuth(AgentAdapterRequest request, Map<String, String> env) {
         switch (request.credentialMode()) {
             case PROXY -> {
@@ -518,6 +507,7 @@ public class OpenCodeAgentAdapter implements AgentAdapter {
                 switch (request.llmProvider()) {
                     case ANTHROPIC -> env.put("ANTHROPIC_API_KEY", request.credential());
                     case OPENAI -> env.put("OPENAI_API_KEY", request.credential());
+                    case AZURE_OPENAI -> env.put("OPENAI_API_KEY", request.credential());
                 }
             }
         }
@@ -543,7 +533,7 @@ public class OpenCodeAgentAdapter implements AgentAdapter {
         // In proxy mode, OPENAI_BASE_URL/ANTHROPIC_BASE_URL env vars redirect to the proxy.
         String providerPrefix = switch (request.llmProvider()) {
             case ANTHROPIC -> "anthropic";
-            case OPENAI -> "openai";
+            case OPENAI, AZURE_OPENAI -> "openai";
         };
         config.put("model", providerPrefix + "/" + model);
 
