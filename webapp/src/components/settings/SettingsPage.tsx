@@ -59,6 +59,8 @@ export function SettingsPage({
 	const aiReviewPending = isLoading || aiReviewLoading;
 	const researchPending = isLoading || researchLoading;
 	const accountPending = isLoading || accountLoading;
+	const showLinkedAccounts =
+		linkedRest.isError || linkedLoading || isLoading || linkedRest.accounts.length > 1;
 
 	return (
 		<div className="w-full max-w-3xl mx-auto space-y-8">
@@ -83,9 +85,12 @@ export function SettingsPage({
 				</>
 			)}
 
-			<Separator />
-
-			<LinkedAccountsSection {...linkedRest} isLoading={isLoading || linkedLoading} />
+			{showLinkedAccounts && (
+				<>
+					<Separator />
+					<LinkedAccountsSection {...linkedRest} isLoading={isLoading || linkedLoading} />
+				</>
+			)}
 
 			<Separator />
 

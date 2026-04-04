@@ -1,13 +1,4 @@
 import { GithubIcon, GitlabIcon, LinkIcon, type LucideIcon, UnlinkIcon } from "lucide-react";
-
-// Temporary type until OpenAPI client is regenerated
-export interface LinkedAccount {
-	providerAlias: string;
-	providerName: string;
-	connected: boolean;
-	linkedUsername: string | null;
-}
-
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -22,6 +13,14 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+
+// TODO: Replace with generated type after OpenAPI client regeneration
+export interface LinkedAccount {
+	providerAlias: string;
+	providerName: string;
+	connected: boolean;
+	linkedUsername: string | null;
+}
 
 const PROVIDER_META: Record<string, { icon: LucideIcon; label: string }> = {
 	github: { icon: GithubIcon, label: "GitHub" },
@@ -38,6 +37,7 @@ export interface LinkedAccountsSectionProps {
 	onUnlink: (providerAlias: string) => void;
 	isUnlinking?: boolean;
 	isLoading?: boolean;
+	isError?: boolean;
 }
 
 export function LinkedAccountsSection({
@@ -46,8 +46,14 @@ export function LinkedAccountsSection({
 	onUnlink,
 	isUnlinking = false,
 	isLoading = false,
+	isError = false,
 }: LinkedAccountsSectionProps) {
 	const connectedCount = accounts.filter((a) => a.connected).length;
+
+	// Don't render if there's nothing to show (single provider or error with no data)
+	if (!isLoading && !isError && accounts.length <= 1) {
+		return null;
+	}
 
 	if (isLoading) {
 		return (
@@ -67,10 +73,6 @@ export function LinkedAccountsSection({
 		);
 	}
 
-	if (accounts.length <= 1) {
-		return null;
-	}
-
 	return (
 		<section className="space-y-4" aria-labelledby="linked-accounts-heading">
 			<div className="space-y-1">
@@ -81,6 +83,12 @@ export function LinkedAccountsSection({
 					Link your identity providers to sign in with either
 				</p>
 			</div>
+
+			{isError && (
+				<p className="text-sm text-destructive">
+					Failed to load connected accounts. Please try refreshing the page.
+				</p>
+			)}
 
 			<div className="space-y-3">
 				{accounts.map((account) => {

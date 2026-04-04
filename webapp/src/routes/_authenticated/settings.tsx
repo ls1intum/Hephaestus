@@ -153,6 +153,7 @@ function RouteComponent() {
 		onUnlink: handleUnlinkAccount,
 		isUnlinking: unlinkMutation.isPending,
 		isLoading: linkedAccountsQuery.isLoading,
+		isError: linkedAccountsQuery.isError,
 	};
 
 	return (
