@@ -2004,7 +2004,7 @@
             "description": "Flow for the existing/non-existing user alternatives",
             "providerId": "basic-flow",
             "topLevel": false,
-            "builtIn": true,
+            "builtIn": false,
             "authenticationExecutions": [
                 {
                     "authenticatorConfig": "create unique user config",
@@ -2016,11 +2016,11 @@
                     "userSetupAllowed": false
                 },
                 {
-                    "authenticatorFlow": true,
+                    "authenticator": "idp-auto-link",
+                    "authenticatorFlow": false,
                     "requirement": "ALTERNATIVE",
                     "priority": 20,
-                    "autheticatorFlow": true,
-                    "flowAlias": "Handle Existing Account",
+                    "autheticatorFlow": false,
                     "userSetupAllowed": false
                 }
             ]
