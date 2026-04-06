@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, retainSearchParams, useNavigate } from "@tanstack/react-router";
 import { formatISO } from "date-fns";
 import { useEffect } from "react";
-import { toast } from "sonner";
 import { z } from "zod";
 import {
 	computeUserLeagueStatsOptions,
@@ -251,10 +250,9 @@ function LeaderboardContainer() {
 		enabled: hasWorkspace && Boolean(username) && Boolean(parsedAfter) && Boolean(parsedBefore),
 	});
 
-	// Feature guard — redirect to profile when leaderboard is disabled
+	// Feature guard — silently redirect to profile when leaderboard is disabled
 	useEffect(() => {
 		if (!featuresLoading && !leaderboardEnabled && workspaceSlug && username) {
-			toast.error("Leaderboard is not enabled for this workspace");
 			navigate({
 				to: "/w/$workspaceSlug/user/$username",
 				params: { workspaceSlug, username },
