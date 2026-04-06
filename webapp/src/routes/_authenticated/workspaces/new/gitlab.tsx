@@ -5,6 +5,7 @@ import { useEffect, useMemo, useReducer, useRef } from "react";
 import { toast } from "sonner";
 import {
 	createWorkspaceMutation,
+	getIdentityProvidersOptions,
 	getProvidersOptions,
 	listGitLabGroupsMutation,
 	listWorkspacesQueryKey,
@@ -22,6 +23,7 @@ import {
 	WizardContext,
 	wizardReducer,
 } from "@/components/workspace/create-workspace/wizard-context";
+import { useAuth } from "@/integrations/auth/AuthContext";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
 export const Route = createFileRoute("/_authenticated/workspaces/new/gitlab")({
@@ -38,6 +40,9 @@ const STEP_META = [
 ] as const;
 
 function GitLabWizardPage() {
+	const { userProfile, linkAccount } = useAuth();
+	const hasGitLabIdentity = Boolean(userProfile?.gitlabId);
+
 	const {
 		data: providers,
 		isLoading: providersLoading,
@@ -46,6 +51,13 @@ function GitLabWizardPage() {
 		...getProvidersOptions(),
 		staleTime: 5 * 60 * 1000,
 	});
+
+	// Find the GitLab IdP alias for account linking
+	const { data: identityProviders } = useQuery({
+		...getIdentityProvidersOptions(),
+		staleTime: 5 * 60 * 1000,
+	});
+	const gitlabIdpAlias = identityProviders?.find((p) => p.alias.startsWith("gitlab"))?.alias;
 
 	const gitlabEnabled = !!providers?.gitlab;
 	const defaultServerUrl = providers?.gitlab?.defaultServerUrl;
@@ -185,6 +197,48 @@ function GitLabWizardPage() {
 	}
 	if (!gitlabEnabled) {
 		return <Navigate to="/workspaces/new" />;
+	}
+
+	if (!hasGitLabIdentity) {
+		return (
+			<div className="mx-auto max-w-2xl py-8">
+				<Link
+					to="/workspaces/new"
+					className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-6"
+				>
+					<ArrowLeftIcon className="size-3.5" />
+					Back
+				</Link>
+
+				<div className="space-y-4">
+					<div className="space-y-1.5">
+						<h1 className="text-2xl font-semibold tracking-tight">Link Your GitLab Account</h1>
+						<p className="text-muted-foreground">
+							To create a GitLab workspace, you need to link your GitLab account first.
+						</p>
+					</div>
+
+					<Alert>
+						<AlertTitle>GitLab account not linked</AlertTitle>
+						<AlertDescription>
+							Your Hephaestus account is not connected to a GitLab identity. Link your GitLab
+							account in Settings to continue.
+						</AlertDescription>
+					</Alert>
+
+					<div className="flex gap-3">
+						<Link to="/settings">
+							<Button>Go to Settings</Button>
+						</Link>
+						{gitlabIdpAlias && (
+							<Button variant="outline" onClick={() => linkAccount(gitlabIdpAlias)}>
+								Link GitLab Now
+							</Button>
+						)}
+					</div>
+				</div>
+			</div>
+		);
 	}
 
 	return (

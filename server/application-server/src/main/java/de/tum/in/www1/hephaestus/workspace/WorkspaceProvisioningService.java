@@ -269,6 +269,17 @@ public class WorkspaceProvisioningService {
      *
      * @param gitLabServerUrl the GitLab server URL for GitLab users (resolved to default if blank)
      */
+    /**
+     * Ensures the currently authenticated Keycloak user has a corresponding git provider
+     * {@link User} entity so they can be assigned as workspace owner.
+     *
+     * <p>For GitLab workspaces, the user must have a linked GitLab identity ({@code gitlab_id}
+     * in their JWT). If they logged in via GitHub without linking GitLab, this method throws
+     * so the frontend can prompt them to link their account first.
+     *
+     * @param gitLabServerUrl the GitLab server URL (resolved to default if blank)
+     * @throws IllegalStateException if the user has no GitLab identity linked
+     */
     @Transactional
     public void ensureAuthenticatedUserExists(String gitLabServerUrl) {
         String login = SecurityUtils.getCurrentUserLoginOrThrow();
@@ -282,51 +293,29 @@ public class WorkspaceProvisioningService {
         Authentication auth =
             org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !(auth.getPrincipal() instanceof org.springframework.security.oauth2.jwt.Jwt jwt)) {
-            log.warn("Cannot ensure user exists: reason=noJwt, login={}", LoggingUtils.sanitizeForLog(login));
-            return;
+            throw new IllegalStateException("No JWT found for authenticated user");
         }
 
         Long gitlabId = jwt.getClaim("gitlab_id");
-        Long githubId = jwt.getClaim("github_id");
-
         if (gitlabId != null) {
             String resolvedUrl = resolveGitLabServerUrl(gitLabServerUrl);
             upsertGitLabUser(gitlabId, login, login, "", resolvedUrl + "/" + login, resolvedUrl, User.Type.USER);
-        } else if (githubId != null) {
-            upsertGitHubUser(githubId, login);
-        } else {
-            log.warn(
-                "Cannot ensure user exists: reason=noProviderIdInJwt, login={}",
-                LoggingUtils.sanitizeForLog(login)
+            return;
+        }
+
+        // No GitLab identity — check if they at least have a GitHub identity
+        Long githubId = jwt.getClaim("github_id");
+        if (githubId != null) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.CONFLICT,
+                "You need to link your GitLab account before creating a GitLab workspace. " +
+                    "Go to Settings → Linked Accounts to connect your GitLab identity."
             );
         }
-    }
 
-    private void upsertGitHubUser(Long githubId, String login) {
-        String serverUrl = GITHUB_API_BASE_URL.replace("/api/v3", "");
-        GitProvider provider = gitProviderRepository
-            .findByTypeAndServerUrl(GitProviderType.GITHUB, serverUrl)
-            .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, serverUrl)));
-        Long providerId = provider.getId();
-
-        userRepository.acquireLoginLock(login, providerId);
-        userRepository.freeLoginConflicts(login, githubId, providerId);
-        userRepository.upsertUser(
-            githubId,
-            providerId,
-            login,
-            login,
-            "https://avatars.githubusercontent.com/u/" + githubId,
-            "https://github.com/" + login,
-            User.Type.USER.name(),
-            null,
-            null,
-            null
-        );
-        log.info(
-            "Upserted user from JWT for workspace ownership: login={}, provider=GITHUB, nativeId={}",
-            LoggingUtils.sanitizeForLog(login),
-            githubId
+        throw new org.springframework.web.server.ResponseStatusException(
+            org.springframework.http.HttpStatus.CONFLICT,
+            "No GitLab identity found. Please link your GitLab account in Settings → Linked Accounts."
         );
     }
 

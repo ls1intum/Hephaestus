@@ -76,9 +76,11 @@ public class WorkspaceRegistryController {
             );
         }
 
-        // Ensure the authenticated user has a git provider User entity before creating
-        // the workspace. First-time users (fresh DB, first login) may not have one yet.
-        workspaceProvisioningService.ensureAuthenticatedUserExists(createWorkspaceRequest.serverUrl());
+        // For GitLab PAT workspaces, ensure the user has a linked GitLab identity.
+        // This creates the User entity from JWT claims or returns 409 if no GitLab account is linked.
+        if (createWorkspaceRequest.gitProviderMode() == Workspace.GitProviderMode.GITLAB_PAT) {
+            workspaceProvisioningService.ensureAuthenticatedUserExists(createWorkspaceRequest.serverUrl());
+        }
 
         Workspace workspace = workspaceService.createWorkspaceWithInitialization(createWorkspaceRequest);
 
