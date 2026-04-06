@@ -14,7 +14,7 @@ export interface AuthContextType {
 	username: string | undefined;
 	userRoles: string[];
 	userProfile: UserProfile | undefined;
-	login: () => Promise<void>;
+	login: (idpHint?: string) => Promise<void>;
 	linkAccount: (providerAlias: string) => Promise<void>;
 	logout: () => Promise<void>;
 	hasRole: (role: string) => boolean;
@@ -158,8 +158,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
 		globalState.initPromise = initKeycloak();
 	}, []);
 
-	const login = async () => {
-		await keycloakService.login();
+	const login = async (idpHint?: string) => {
+		await keycloakService.login(idpHint);
 	};
 
 	const linkAccount = async (providerAlias: string) => {

@@ -14,7 +14,7 @@ export const GitHubSignInButton = forwardRef<HTMLButtonElement, GitHubSignInButt
 			<Button
 				ref={ref}
 				size={size}
-				className="bg-github-black text-github-white dark:bg-github-white dark:text-github-black"
+				className="bg-github-black text-github-white dark:bg-github-white dark:text-github-black transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-github-black/20 dark:hover:shadow-github-white/20 active:scale-[0.98]"
 				{...props}
 			>
 				<GitHubMarkIcon className="!text-github-white dark:!text-github-black" />

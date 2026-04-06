@@ -1,10 +1,11 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, Navigate, useNavigate } from "@tanstack/react-router";
 import { ArrowLeftIcon, OctagonXIcon } from "lucide-react";
 import { useEffect, useMemo, useReducer, useRef } from "react";
 import { toast } from "sonner";
 import {
 	createWorkspaceMutation,
+	getWorkspaceProvidersOptions,
 	listGitLabGroupsMutation,
 	listWorkspacesQueryKey,
 } from "@/api/@tanstack/react-query.gen";
@@ -17,11 +18,10 @@ import { SelectGroupStep } from "@/components/workspace/create-workspace/SelectG
 import { workspaceDetailsSchema } from "@/components/workspace/create-workspace/schemas";
 import { WizardStepIndicator } from "@/components/workspace/create-workspace/WizardStepIndicator";
 import {
-	initialWizardState,
+	createInitialWizardState,
 	WizardContext,
 	wizardReducer,
 } from "@/components/workspace/create-workspace/wizard-context";
-import { useFeatureFlag } from "@/integrations/feature-flags";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
 export const Route = createFileRoute("/_authenticated/workspaces/new/gitlab")({
@@ -31,7 +31,7 @@ export const Route = createFileRoute("/_authenticated/workspaces/new/gitlab")({
 const STEP_META = [
 	{
 		title: "Connect to GitLab",
-		description: "Enter your GitLab instance URL and personal access token.",
+		description: "Enter your GitLab instance URL and access token.",
 	},
 	{ title: "Select a Group", description: "Choose the GitLab group to monitor." },
 	{ title: "Configure Workspace", description: "Set a name and URL slug for your workspace." },
@@ -39,12 +39,22 @@ const STEP_META = [
 
 function GitLabWizardPage() {
 	const {
-		enabled: gitlabEnabled,
-		isLoading: flagLoading,
-		isError: flagError,
-	} = useFeatureFlag("GITLAB_WORKSPACE_CREATION");
+		data: providers,
+		isLoading: providersLoading,
+		isError: providersError,
+	} = useQuery({
+		...getWorkspaceProvidersOptions(),
+		staleTime: 5 * 60 * 1000,
+	});
 
-	const [state, dispatch] = useReducer(wizardReducer, initialWizardState);
+	const gitlabEnabled = !!providers?.gitlab;
+	const defaultServerUrl = providers?.gitlab?.defaultServerUrl;
+
+	const [state, dispatch] = useReducer(
+		wizardReducer,
+		defaultServerUrl,
+		(url) => createInitialWizardState(url),
+	);
 	const queryClient = useQueryClient();
 	const navigate = useNavigate();
 	const { setSelectedSlug } = useWorkspaceStore();
@@ -155,16 +165,16 @@ function GitLabWizardPage() {
 	const wizardContextValue = useMemo(() => ({ state, dispatch }), [state]);
 	const isTransitioning = listGroups.isPending;
 	const isCreating = createWorkspace.isPending;
-	if (flagLoading) {
+	if (providersLoading) {
 		return (
 			<div className="flex justify-center py-16">
 				<Spinner />
 			</div>
 		);
 	}
-	if (flagError) {
+	if (providersError) {
 		return (
-			<div className="mx-auto max-w-lg px-4 py-8">
+			<div className="mx-auto max-w-2xl py-8">
 				<Alert variant="destructive">
 					<OctagonXIcon aria-hidden="true" />
 					<AlertTitle>Unable to load</AlertTitle>
@@ -180,7 +190,7 @@ function GitLabWizardPage() {
 	}
 
 	return (
-		<div className="mx-auto max-w-lg px-4 py-8">
+		<div className="mx-auto max-w-2xl py-8">
 			{/* Visually hidden live region for screen reader step announcements */}
 			<div aria-live="polite" aria-atomic="true" className="sr-only">
 				{stepAnnouncement}

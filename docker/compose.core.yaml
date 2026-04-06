@@ -68,7 +68,7 @@ services:
         max-file: "3"
 
   keycloak:
-    image: quay.io/keycloak/keycloak:26.0
+    image: quay.io/keycloak/keycloak:26.5
     restart: unless-stopped
     depends_on:
       keycloak-postgres:
@@ -99,6 +99,7 @@ services:
       - KEYCLOAK_GITHUB_CLIENT_ID=${KEYCLOAK_GITHUB_CLIENT_ID}
       - KEYCLOAK_GITHUB_CLIENT_SECRET=${KEYCLOAK_GITHUB_CLIENT_SECRET}
       - KEYCLOAK_GITHUB_ADMIN_USERNAME=${KEYCLOAK_GITHUB_ADMIN_USERNAME}
+      - KEYCLOAK_GITLAB_ENABLED=${KEYCLOAK_GITLAB_ENABLED:-false}
       - KEYCLOAK_GITLAB_CLIENT_ID=${KEYCLOAK_GITLAB_CLIENT_ID}
       - KEYCLOAK_GITLAB_CLIENT_SECRET=${KEYCLOAK_GITLAB_CLIENT_SECRET}
       - KEYCLOAK_GITLAB_BASE_URL=${KEYCLOAK_GITLAB_BASE_URL:-https://gitlab.lrz.de}
@@ -381,7 +382,7 @@ configs:
             "displayName": "GitHub",
             "providerId": "github",
             "enabled": true,
-            "updateProfileFirstLoginMode": "on",
+            "updateProfileFirstLoginMode": "off",
             "trustEmail": true,
             "storeToken": false,
             "addReadTokenRoleOnCreate": false,
@@ -399,8 +400,8 @@ configs:
             "alias": "gitlab-lrz",
             "displayName": "GitLab LRZ",
             "providerId": "oidc",
-            "enabled": true,
-            "updateProfileFirstLoginMode": "on",
+            "enabled": ${KEYCLOAK_GITLAB_ENABLED:-false},
+            "updateProfileFirstLoginMode": "off",
             "trustEmail": true,
             "storeToken": false,
             "addReadTokenRoleOnCreate": false,
@@ -409,7 +410,7 @@ configs:
             "hideOnLogin": false,
             "firstBrokerLoginFlowAlias": "first broker login",
             "config": {
-              "syncMode": "FORCE",
+              "syncMode": "IMPORT",
               "clientSecret": "${KEYCLOAK_GITLAB_CLIENT_SECRET}",
               "clientId": "${KEYCLOAK_GITLAB_CLIENT_ID}",
               "issuer": "${KEYCLOAK_GITLAB_BASE_URL}",
@@ -417,7 +418,7 @@ configs:
               "tokenUrl": "${KEYCLOAK_GITLAB_BASE_URL}/oauth/token",
               "userInfoUrl": "${KEYCLOAK_GITLAB_BASE_URL}/oauth/userinfo",
               "jwksUrl": "${KEYCLOAK_GITLAB_BASE_URL}/oauth/discovery/keys",
-              "logoutUrl": "${KEYCLOAK_GITLAB_BASE_URL}/users/sign_out",
+              "logoutUrl": "",
               "defaultScope": "openid profile email",
               "validateSignature": "true",
               "useJwksUrl": "true",
@@ -550,10 +551,27 @@ configs:
                   "realm-management": [
                       "view-users",
                       "query-users",
-                      "manage-users"
+                      "manage-users",
+                      "view-identity-providers"
                   ]
               },
               "notBefore": 0,
               "groups": []
+          }],
+        "authenticatorConfig": [
+          {
+            "alias": "review profile config",
+            "config": {
+              "update.profile.on.first.login": "off"
+            }
+          }
+        ],
+        "components": {
+          "org.keycloak.userprofile.UserProfileProvider": [{
+            "providerId": "declarative-user-profile",
+            "config": {
+              "kc.user.profile.config": ["{\"attributes\":[{\"name\":\"username\",\"displayName\":\"${username}\",\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"validations\":{\"length\":{\"min\":3,\"max\":255},\"username-prohibited-characters\":{},\"up-username-not-idn-homograph\":{}}},{\"name\":\"email\",\"displayName\":\"${email}\",\"required\":{\"roles\":[\"user\"]},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"validations\":{\"email\":{},\"length\":{\"max\":255}}},{\"name\":\"firstName\",\"displayName\":\"${firstName}\",\"required\":{\"roles\":[\"user\"]},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"validations\":{\"length\":{\"max\":255}}},{\"name\":\"lastName\",\"displayName\":\"${lastName}\",\"required\":{\"roles\":[\"user\"]},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"validations\":{\"length\":{\"max\":255}}}],\"groups\":[{\"name\":\"user-metadata\",\"displayHeader\":\"User metadata\",\"displayDescription\":\"Attributes, which refer to user metadata\"}]}"]
+            }
           }]
+        }
       }

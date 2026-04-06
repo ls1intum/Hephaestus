@@ -1,11 +1,11 @@
 import { ArrowRight, Code, Hammer, Users } from "lucide-react";
 import agileHephaestus from "@/assets/agile_hephaestus.png";
-import { GitHubSignInButton } from "@/components/auth/GitHubSignInButton";
+import { SignInButtons } from "@/components/auth/SignInButtons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
 interface LandingWhyChooseSectionProps {
-	onSignIn: () => void;
+	onSignIn: (idpHint: string) => void;
 	onGoToDashboard?: () => void;
 	isSignedIn: boolean;
 }
@@ -80,8 +80,8 @@ export function LandingWhyChooseSection({
 									Go to Dashboard <ArrowRight className="h-4 w-4" />
 								</Button>
 							) : (
-								<GitHubSignInButton
-									onClick={onSignIn}
+								<SignInButtons
+									onSignIn={onSignIn}
 									className="w-full justify-center sm:w-auto"
 								/>
 							)}

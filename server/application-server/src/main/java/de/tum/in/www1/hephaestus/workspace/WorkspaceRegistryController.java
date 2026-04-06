@@ -2,12 +2,15 @@ package de.tum.in.www1.hephaestus.workspace;
 
 import de.tum.in.www1.hephaestus.feature.FeatureFlag;
 import de.tum.in.www1.hephaestus.feature.FeatureFlagService;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
+import de.tum.in.www1.hephaestus.gitprovider.github.GitHubProperties;
 import de.tum.in.www1.hephaestus.workspace.dto.CreateWorkspaceRequestDTO;
 import de.tum.in.www1.hephaestus.workspace.dto.GitLabGroupDTO;
 import de.tum.in.www1.hephaestus.workspace.dto.GitLabPreflightRequestDTO;
 import de.tum.in.www1.hephaestus.workspace.dto.GitLabPreflightResponseDTO;
 import de.tum.in.www1.hephaestus.workspace.dto.WorkspaceDTO;
 import de.tum.in.www1.hephaestus.workspace.dto.WorkspaceListItemDTO;
+import de.tum.in.www1.hephaestus.workspace.dto.WorkspaceProvidersDTO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -41,8 +44,29 @@ public class WorkspaceRegistryController {
 
     private final WorkspaceService workspaceService;
     private final WorkspaceQueryService workspaceQueryService;
+    private final WorkspaceProvisioningService workspaceProvisioningService;
     private final GitLabPreflightService gitLabPreflightService;
     private final FeatureFlagService featureFlagService;
+    private final GitHubProperties gitHubProperties;
+    private final GitLabProperties gitLabProperties;
+
+    @GetMapping("/providers")
+    @Operation(
+        summary = "List available workspace creation providers",
+        description = "Returns available workspace providers with their configuration. Public endpoint — no authentication required."
+    )
+    @io.swagger.v3.oas.annotations.security.SecurityRequirements
+    public ResponseEntity<WorkspaceProvidersDTO> getProviders() {
+        var github = gitHubProperties.app().id() > 0 && gitHubProperties.app().installationUrl() != null
+            ? new WorkspaceProvidersDTO.GitHubProviderDTO(gitHubProperties.app().installationUrl())
+            : null;
+
+        var gitlab = featureFlagService.isEnabled(FeatureFlag.GITLAB_WORKSPACE_CREATION)
+            ? new WorkspaceProvidersDTO.GitLabProviderDTO(gitLabProperties.defaultServerUrl())
+            : null;
+
+        return ResponseEntity.ok(new WorkspaceProvidersDTO(github, gitlab));
+    }
 
     @PostMapping
     @Operation(summary = "Create a new workspace")
@@ -62,6 +86,17 @@ public class WorkspaceRegistryController {
                 "GitLab workspace creation is not enabled"
             );
         }
+
+        // For GitLab PAT workspaces, ensure the authenticated Keycloak user has a
+        // git provider User entity. First-time GitLab users won't have one yet
+        // (it's normally created during group sync). Without this, the workspace
+        // would have no owner — a security and UX problem.
+        if (createWorkspaceRequest.gitProviderMode() == Workspace.GitProviderMode.GITLAB_PAT) {
+            workspaceProvisioningService.ensureAuthenticatedGitLabUser(
+                createWorkspaceRequest.serverUrl()
+            );
+        }
+
         Workspace workspace = workspaceService.createWorkspace(createWorkspaceRequest);
 
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()

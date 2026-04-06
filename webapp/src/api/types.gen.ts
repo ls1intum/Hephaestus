@@ -125,6 +125,40 @@ export type WorkspaceListItem = {
 };
 
 /**
+ * GitLab provider configuration
+ */
+export type GitLabProvider = {
+    /**
+     * Default GitLab server URL for this deployment
+     */
+    defaultServerUrl: string;
+};
+
+/**
+ * GitHub provider configuration
+ */
+export type GitHubProvider = {
+    /**
+     * GitHub App installation URL
+     */
+    appInstallationUrl: string;
+};
+
+/**
+ * Available workspace creation providers and their configuration
+ */
+export type WorkspaceProviders = {
+    /**
+     * GitHub workspace provider config, null if not available
+     */
+    github?: GitHubProvider;
+    /**
+     * GitLab workspace provider config, null if not available
+     */
+    gitlab?: GitLabProvider;
+};
+
+/**
  * Complete workspace information including configuration and settings
  */
 export type Workspace = {
@@ -1251,6 +1285,24 @@ export type LinkedAccount = {
 };
 
 /**
+ * An enabled identity provider available for login
+ */
+export type IdentityProvider = {
+    /**
+     * Identity provider alias used as idpHint (e.g. 'github', 'gitlab-lrz')
+     */
+    alias: string;
+    /**
+     * Display name of the identity provider
+     */
+    displayName: string;
+    /**
+     * Provider type (e.g. 'github', 'oidc')
+     */
+    type: string;
+};
+
+/**
  * Linear progress with current and target counts
  */
 export type LinearAchievementProgress = Omit<AchievementProgress, 'type'> & {
@@ -1830,6 +1882,22 @@ export type Achievement = {
     unlockedAt: Date;
 };
 
+export type GetIdentityProvidersData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/auth/identity-providers';
+};
+
+export type GetIdentityProvidersResponses = {
+    /**
+     * OK
+     */
+    200: Array<IdentityProvider>;
+};
+
+export type GetIdentityProvidersResponse = GetIdentityProvidersResponses[keyof GetIdentityProvidersResponses];
+
 export type ListGlobalContributorsData = {
     body?: never;
     path?: never;
@@ -1939,6 +2007,22 @@ export type UpdateUserSettingsResponses = {
 };
 
 export type UpdateUserSettingsResponse = UpdateUserSettingsResponses[keyof UpdateUserSettingsResponses];
+
+export type GetWorkspaceProvidersData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/workspaces/providers';
+};
+
+export type GetWorkspaceProvidersResponses = {
+    /**
+     * OK
+     */
+    200: WorkspaceProviders;
+};
+
+export type GetWorkspaceProvidersResponse = GetWorkspaceProvidersResponses[keyof GetWorkspaceProvidersResponses];
 
 export type ListWorkspacesData = {
     body?: never;

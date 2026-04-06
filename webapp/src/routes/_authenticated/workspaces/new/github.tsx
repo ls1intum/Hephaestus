@@ -1,18 +1,25 @@
+import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeftIcon, ExternalLinkIcon, GithubIcon } from "lucide-react";
+import { getWorkspaceProvidersOptions } from "@/api/@tanstack/react-query.gen";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import environment from "@/environment";
+import { Spinner } from "@/components/ui/spinner";
 
 export const Route = createFileRoute("/_authenticated/workspaces/new/github")({
 	component: GitHubSetupPage,
 });
 
 function GitHubSetupPage() {
-	const appUrl = environment.github.appUrl;
+	const { data: providers, isLoading } = useQuery({
+		...getWorkspaceProvidersOptions(),
+		staleTime: 5 * 60 * 1000,
+	});
+
+	const appUrl = providers?.github?.appInstallationUrl;
 
 	return (
-		<div className="mx-auto max-w-lg py-8">
+		<div className="mx-auto max-w-2xl py-8">
 			<Link
 				to="/workspaces/new"
 				className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-6"
@@ -44,7 +51,11 @@ function GitHubSetupPage() {
 					</ol>
 				</div>
 
-				{appUrl ? (
+				{isLoading ? (
+					<div className="flex justify-center py-4">
+						<Spinner />
+					</div>
+				) : appUrl ? (
 					<Button
 						render={<a href={appUrl} target="_blank" rel="noopener noreferrer" />}
 						className="w-full"
@@ -58,8 +69,7 @@ function GitHubSetupPage() {
 						<AlertTitle>GitHub App not configured</AlertTitle>
 						<AlertDescription>
 							The GitHub App installation URL has not been configured for this deployment. Contact
-							your administrator to set the <code className="text-xs">GITHUB_APP_URL</code>{" "}
-							environment variable.
+							your administrator.
 						</AlertDescription>
 					</Alert>
 				)}

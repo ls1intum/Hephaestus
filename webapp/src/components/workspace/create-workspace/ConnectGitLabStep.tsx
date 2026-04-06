@@ -59,41 +59,30 @@ export function ConnectGitLabStep() {
 		});
 	};
 
-	// Only use validated server URL for the settings link
-	const settingsBaseUrl = state.preflightResult?.valid
-		? state.serverUrl || "https://gitlab.com"
-		: "https://gitlab.com";
+	const settingsBaseUrl = state.serverUrl || "https://gitlab.com";
 
 	return (
 		<div className="flex flex-col gap-4">
 			<Field data-invalid={fieldErrors.serverUrl ? "true" : undefined}>
-				<FieldLabel htmlFor="gitlab-server-url">GitLab Instance URL</FieldLabel>
+				<FieldLabel htmlFor="gitlab-server-url">GitLab Instance</FieldLabel>
 				<Input
 					id="gitlab-server-url"
-					placeholder="https://gitlab.com"
-					value={state.serverUrl}
-					onChange={(e) => dispatch({ type: "SET_SERVER_URL", value: e.target.value })}
-					autoComplete="url"
-					aria-invalid={!!fieldErrors.serverUrl}
-					aria-describedby={
-						fieldErrors.serverUrl ? "gitlab-server-url-error" : "gitlab-server-url-description"
-					}
+					value={state.serverUrl || "https://gitlab.com"}
+					disabled
+					aria-describedby="gitlab-server-url-description"
 				/>
 				<FieldDescription id="gitlab-server-url-description">
-					Leave empty for gitlab.com. Enter a custom URL for self-hosted instances.
+					Configured by your administrator.
 				</FieldDescription>
-				{fieldErrors.serverUrl && (
-					<FieldError id="gitlab-server-url-error">{fieldErrors.serverUrl}</FieldError>
-				)}
 			</Field>
 
 			<Field data-invalid={fieldErrors.personalAccessToken ? "true" : undefined}>
-				<FieldLabel htmlFor="gitlab-pat">Personal Access Token</FieldLabel>
+				<FieldLabel htmlFor="gitlab-pat">Access Token</FieldLabel>
 				<div className="relative">
 					<Input
 						id="gitlab-pat"
 						type={showToken ? "text" : "password"}
-						placeholder="glpat-..."
+						placeholder="glpat-... or glgat-..."
 						value={state.personalAccessToken}
 						onChange={(e) => dispatch({ type: "SET_PAT", value: e.target.value })}
 						autoComplete="off"
@@ -123,13 +112,21 @@ export function ConnectGitLabStep() {
 					</Button>
 				</div>
 				<FieldDescription id="gitlab-pat-description">
-					Create a token with <code className="text-xs">api</code> scope at your{" "}
+					Use a{" "}
+					<a
+						href={`${settingsBaseUrl}/help/user/group/settings/group_access_tokens`}
+						target="_blank"
+						rel="noopener noreferrer"
+					>
+						Group Access Token
+					</a>{" "}
+					with <code className="text-xs">api</code> scope (recommended), or a{" "}
 					<a
 						href={`${settingsBaseUrl}/-/user_settings/personal_access_tokens`}
 						target="_blank"
 						rel="noopener noreferrer"
 					>
-						GitLab settings
+						Personal Access Token
 					</a>
 					.
 				</FieldDescription>

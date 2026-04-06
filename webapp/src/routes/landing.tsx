@@ -25,7 +25,7 @@ export function LandingContainer() {
 	return (
 		<div className="-m-4">
 			<LandingPage
-				onSignIn={() => login()}
+				onSignIn={(idpHint) => login(idpHint)}
 				onGoToDashboard={handleGoToDashboard}
 				isSignedIn={isAuthenticated}
 			/>

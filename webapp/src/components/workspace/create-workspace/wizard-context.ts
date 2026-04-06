@@ -31,17 +31,21 @@ export type WizardAction =
 	| { type: "GO_BACK" }
 	| { type: "RESET" };
 
-export const initialWizardState: WizardState = {
-	step: 1,
-	serverUrl: "",
-	personalAccessToken: "",
-	preflightResult: null,
-	groups: [],
-	selectedGroup: null,
-	displayName: "",
-	workspaceSlug: "",
-	slugManuallyEdited: false,
-};
+export function createInitialWizardState(defaultServerUrl?: string): WizardState {
+	return {
+		step: 1,
+		serverUrl: defaultServerUrl ?? "",
+		personalAccessToken: "",
+		preflightResult: null,
+		groups: [],
+		selectedGroup: null,
+		displayName: "",
+		workspaceSlug: "",
+		slugManuallyEdited: false,
+	};
+}
+
+export const initialWizardState: WizardState = createInitialWizardState();
 
 export function wizardReducer(state: WizardState, action: WizardAction): WizardState {
 	switch (action.type) {

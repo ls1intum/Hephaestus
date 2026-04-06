@@ -148,6 +148,30 @@ public class AccountService {
     }
 
     /**
+     * Returns all enabled, non-link-only identity providers configured in the Keycloak realm.
+     * This is a public endpoint — no user context required.
+     */
+    public List<IdentityProviderDTO> getAvailableIdentityProviders() {
+        try {
+            return keycloak
+                .realm(keycloakProperties.realm())
+                .identityProviders()
+                .findAll()
+                .stream()
+                .filter(idp -> !Boolean.TRUE.equals(idp.isLinkOnly()) && Boolean.TRUE.equals(idp.isEnabled()))
+                .map(idp -> new IdentityProviderDTO(
+                    idp.getAlias(),
+                    idp.getDisplayName() != null ? idp.getDisplayName() : idp.getAlias(),
+                    idp.getProviderId()
+                ))
+                .toList();
+        } catch (Exception e) {
+            log.error("Failed to fetch identity providers", e);
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Failed to communicate with identity provider");
+        }
+    }
+
+    /**
      * Returns all identity providers configured in the Keycloak realm along with
      * the current user's connection status for each.
      *

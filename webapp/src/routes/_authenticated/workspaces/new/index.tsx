@@ -1,11 +1,11 @@
+import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import type { LucideIcon } from "lucide-react";
 import { ArrowLeftIcon, GithubIcon, GitlabIcon, OctagonXIcon } from "lucide-react";
+import { getWorkspaceProvidersOptions } from "@/api/@tanstack/react-query.gen";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
-import environment from "@/environment";
-import { useFeatureFlag } from "@/integrations/feature-flags";
 
 export const Route = createFileRoute("/_authenticated/workspaces/new/")({
 	component: ProviderSelectionPage,
@@ -21,13 +21,16 @@ interface Provider {
 
 function ProviderSelectionPage() {
 	const {
-		enabled: gitlabEnabled,
-		isLoading: flagLoading,
-		isError: flagError,
-	} = useFeatureFlag("GITLAB_WORKSPACE_CREATION");
+		data: workspaceProviders,
+		isLoading,
+		isError,
+	} = useQuery({
+		...getWorkspaceProvidersOptions(),
+		staleTime: 5 * 60 * 1000,
+	});
 
 	const providers: Provider[] = [];
-	if (environment.github.appUrl) {
+	if (workspaceProviders?.github) {
 		providers.push({
 			id: "github",
 			name: "GitHub",
@@ -37,11 +40,11 @@ function ProviderSelectionPage() {
 			to: "/workspaces/new/github",
 		});
 	}
-	if (gitlabEnabled) {
+	if (workspaceProviders?.gitlab) {
 		providers.push({
 			id: "gitlab",
 			name: "GitLab",
-			description: "Connect with a Personal Access Token and select a group to monitor.",
+			description: "Connect with an access token and select a group to monitor.",
 			icon: GitlabIcon,
 			to: "/workspaces/new/gitlab",
 		});
@@ -61,20 +64,20 @@ function ProviderSelectionPage() {
 				<h1 className="text-2xl font-semibold tracking-tight">Create Workspace</h1>
 				<p className="text-muted-foreground">Choose your Git provider to get started.</p>
 			</div>
-			{flagError && (
+			{isError && (
 				<Alert variant="destructive" className="mb-4">
 					<OctagonXIcon aria-hidden="true" />
-					<AlertTitle>Partial load failure</AlertTitle>
+					<AlertTitle>Load failure</AlertTitle>
 					<AlertDescription>
-						Some provider options could not be loaded. Try refreshing the page.
+						Could not load provider options. Try refreshing the page.
 					</AlertDescription>
 				</Alert>
 			)}
-			{flagLoading ? (
+			{isLoading ? (
 				<div className="flex justify-center py-12">
 					<Spinner />
 				</div>
-			) : providers.length === 0 && !flagError ? (
+			) : providers.length === 0 && !isError ? (
 				<p className="text-center text-muted-foreground py-12">
 					No providers are currently available. Contact your administrator.
 				</p>
