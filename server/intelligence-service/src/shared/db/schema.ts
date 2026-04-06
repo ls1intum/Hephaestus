@@ -510,6 +510,7 @@ export const discussion = pgTable(
 			name: "fk_discussion_provider",
 		}),
 		unique("uq_discussion_repo_number").on(table.number, table.repositoryId),
+		unique("uknlcwyn2relkgw95s8okgpkqrt").on(table.number, table.repositoryId),
 		unique("uk_discussion_answer_comment_id").on(table.answerCommentId),
 		unique("uq_discussion_provider_native_id").on(table.nativeId, table.providerId),
 	],
@@ -540,6 +541,7 @@ export const discussionCategory = pgTable(
 			name: "fk_discussion_category_repository",
 		}).onDelete("cascade"),
 		unique("uq_discussion_category_repo_slug").on(table.slug, table.repositoryId),
+		unique("uk6cjmvjyh5jc9bfnn8i9wggbo5").on(table.slug, table.repositoryId),
 	],
 );
 
@@ -2140,6 +2142,7 @@ export const workspace = pgTable(
 		achievementsEnabled: boolean("achievements_enabled").default(false).notNull(),
 		leaderboardEnabled: boolean("leaderboard_enabled").default(false).notNull(),
 		progressionEnabled: boolean("progression_enabled").default(false).notNull(),
+		leaguesEnabled: boolean("leagues_enabled").default(false).notNull(),
 	},
 	(table) => [
 		foreignKey({
@@ -2166,6 +2169,7 @@ export const workspaceMembership = pgTable(
 		userId: bigint("user_id", { mode: "number" }).notNull(),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		workspaceId: bigint("workspace_id", { mode: "number" }).notNull(),
+		hidden: boolean().default(false).notNull(),
 	},
 	(table) => [
 		index("idx_workspace_membership_user_id").using("btree", table.userId.asc().nullsLast()),
