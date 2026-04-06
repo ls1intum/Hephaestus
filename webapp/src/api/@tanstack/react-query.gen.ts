@@ -1442,6 +1442,23 @@ export const updatePublicVisibilityMutation = (options?: Partial<Options<UpdateP
     return mutationOptions;
 };
 
+/**
+ * Remove a repository from a workspace monitor list
+ */
+export const removeRepositoryToMonitorMutation = (options?: Partial<Options<RemoveRepositoryToMonitorData>>): UseMutationOptions<unknown, DefaultError, Options<RemoveRepositoryToMonitorData>> => {
+    const mutationOptions: UseMutationOptions<unknown, DefaultError, Options<RemoveRepositoryToMonitorData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await removeRepositoryToMonitor({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
 export const getRepositoriesToMonitorQueryKey = (options: Options<GetRepositoriesToMonitorData>) => createQueryKey('getRepositoriesToMonitor', options);
 
 /**
@@ -1459,23 +1476,6 @@ export const getRepositoriesToMonitorOptions = (options: Options<GetRepositories
     },
     queryKey: getRepositoriesToMonitorQueryKey(options)
 });
-
-/**
- * Remove a repository from a workspace monitor list
- */
-export const removeRepositoryToMonitorMutation = (options?: Partial<Options<RemoveRepositoryToMonitorData>>): UseMutationOptions<unknown, DefaultError, Options<RemoveRepositoryToMonitorData>> => {
-    const mutationOptions: UseMutationOptions<unknown, DefaultError, Options<RemoveRepositoryToMonitorData>> = {
-        mutationFn: async (fnOptions) => {
-            const { data } = await removeRepositoryToMonitor({
-                ...options,
-                ...fnOptions,
-                throwOnError: true
-            });
-            return data;
-        }
-    };
-    return mutationOptions;
-};
 
 /**
  * Add a repository to a workspace monitor list

@@ -126,7 +126,8 @@ function AdminSettings() {
 			return;
 		}
 		addRepository.mutate({
-			path: { workspaceSlug, nameWithOwner },
+			path: { workspaceSlug },
+			query: { nameWithOwner },
 		});
 	};
 
@@ -136,7 +137,8 @@ function AdminSettings() {
 			return;
 		}
 		removeRepository.mutate({
-			path: { workspaceSlug, nameWithOwner },
+			path: { workspaceSlug },
+			query: { nameWithOwner },
 		});
 	};
 

@@ -27,6 +27,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 @WorkspaceScopedController
@@ -217,29 +218,26 @@ public class WorkspaceController {
         return ResponseEntity.ok(repositories);
     }
 
-    @PostMapping("/repositories/{*nameWithOwner}")
+    @PostMapping("/repositories")
     @Operation(summary = "Add a repository to a workspace monitor list")
     @RequireAtLeastWorkspaceAdmin
     public ResponseEntity<Void> addRepositoryToMonitor(
         WorkspaceContext workspaceContext,
-        @PathVariable String nameWithOwner
+        @RequestParam String nameWithOwner
     ) {
-        // Strip leading slash from Spring's {*path} capture
-        String cleaned = nameWithOwner.startsWith("/") ? nameWithOwner.substring(1) : nameWithOwner;
-        workspaceRepositoryMonitorService.addRepositoryToMonitor(workspaceContext, cleaned);
+        workspaceRepositoryMonitorService.addRepositoryToMonitor(workspaceContext, nameWithOwner);
         URI location = ServletUriComponentsBuilder.fromCurrentRequest().build().toUri();
         return ResponseEntity.created(location).build();
     }
 
-    @DeleteMapping("/repositories/{*nameWithOwner}")
+    @DeleteMapping("/repositories")
     @Operation(summary = "Remove a repository from a workspace monitor list")
     @RequireAtLeastWorkspaceAdmin
     public ResponseEntity<Void> removeRepositoryToMonitor(
         WorkspaceContext workspaceContext,
-        @PathVariable String nameWithOwner
+        @RequestParam String nameWithOwner
     ) {
-        String cleaned = nameWithOwner.startsWith("/") ? nameWithOwner.substring(1) : nameWithOwner;
-        workspaceRepositoryMonitorService.removeRepositoryFromMonitor(workspaceContext, cleaned);
+        workspaceRepositoryMonitorService.removeRepositoryFromMonitor(workspaceContext, nameWithOwner);
         return ResponseEntity.noContent().build();
     }
 

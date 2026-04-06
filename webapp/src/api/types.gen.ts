@@ -3574,6 +3574,27 @@ export type UpdatePublicVisibilityResponses = {
 
 export type UpdatePublicVisibilityResponse = UpdatePublicVisibilityResponses[keyof UpdatePublicVisibilityResponses];
 
+export type RemoveRepositoryToMonitorData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query: {
+        nameWithOwner: string;
+    };
+    url: '/workspaces/{workspaceSlug}/repositories';
+};
+
+export type RemoveRepositoryToMonitorResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
 export type GetRepositoriesToMonitorData = {
     body?: never;
     path: {
@@ -3595,26 +3616,6 @@ export type GetRepositoriesToMonitorResponses = {
 
 export type GetRepositoriesToMonitorResponse = GetRepositoriesToMonitorResponses[keyof GetRepositoriesToMonitorResponses];
 
-export type RemoveRepositoryToMonitorData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        nameWithOwner: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/repositories/{nameWithOwner}';
-};
-
-export type RemoveRepositoryToMonitorResponses = {
-    /**
-     * OK
-     */
-    200: unknown;
-};
-
 export type AddRepositoryToMonitorData = {
     body?: never;
     path: {
@@ -3622,10 +3623,11 @@ export type AddRepositoryToMonitorData = {
          * Workspace slug
          */
         workspaceSlug: string;
+    };
+    query: {
         nameWithOwner: string;
     };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/repositories/{nameWithOwner}';
+    url: '/workspaces/{workspaceSlug}/repositories';
 };
 
 export type AddRepositoryToMonitorResponses = {

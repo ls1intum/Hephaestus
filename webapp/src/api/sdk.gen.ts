@@ -646,25 +646,25 @@ export const updatePublicVisibility = <ThrowOnError extends boolean = false>(opt
 });
 
 /**
- * List repositories monitored by a workspace
- */
-export const getRepositoriesToMonitor = <ThrowOnError extends boolean = false>(options: Options<GetRepositoriesToMonitorData, ThrowOnError>) => (options.client ?? client).get<GetRepositoriesToMonitorResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/repositories', ...options });
-
-/**
  * Remove a repository from a workspace monitor list
  */
 export const removeRepositoryToMonitor = <ThrowOnError extends boolean = false>(options: Options<RemoveRepositoryToMonitorData, ThrowOnError>) => (options.client ?? client).delete<RemoveRepositoryToMonitorResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/workspaces/{workspaceSlug}/repositories/{nameWithOwner}',
+    url: '/workspaces/{workspaceSlug}/repositories',
     ...options
 });
+
+/**
+ * List repositories monitored by a workspace
+ */
+export const getRepositoriesToMonitor = <ThrowOnError extends boolean = false>(options: Options<GetRepositoriesToMonitorData, ThrowOnError>) => (options.client ?? client).get<GetRepositoriesToMonitorResponses, unknown, ThrowOnError>({ url: '/workspaces/{workspaceSlug}/repositories', ...options });
 
 /**
  * Add a repository to a workspace monitor list
  */
 export const addRepositoryToMonitor = <ThrowOnError extends boolean = false>(options: Options<AddRepositoryToMonitorData, ThrowOnError>) => (options.client ?? client).post<AddRepositoryToMonitorResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/workspaces/{workspaceSlug}/repositories/{nameWithOwner}',
+    url: '/workspaces/{workspaceSlug}/repositories',
     ...options
 });
 
