@@ -120,15 +120,8 @@ export function ConnectGitLabStep() {
 					>
 						Group Access Token
 					</a>{" "}
-					with <code className="text-xs">api</code> scope (recommended), or a{" "}
-					<a
-						href={`${settingsBaseUrl}/-/user_settings/personal_access_tokens`}
-						target="_blank"
-						rel="noopener noreferrer"
-					>
-						Personal Access Token
-					</a>
-					.
+					with <strong>Owner</strong> role and <code className="text-xs">api</code> scope. Owner
+					role is required for webhook registration. Enable token rotation for long-lived setups.
 				</FieldDescription>
 				{fieldErrors.personalAccessToken && (
 					<FieldError id="gitlab-pat-error">{fieldErrors.personalAccessToken}</FieldError>
