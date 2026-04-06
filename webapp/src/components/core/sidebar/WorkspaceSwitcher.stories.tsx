@@ -8,6 +8,7 @@ const featureFlags = {
 	achievementsEnabled: true,
 	leaderboardEnabled: true,
 	progressionEnabled: false,
+	leaguesEnabled: false,
 } as const;
 
 /**

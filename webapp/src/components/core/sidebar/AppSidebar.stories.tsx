@@ -15,6 +15,7 @@ const mockWorkspace = {
 	achievementsEnabled: true,
 	leaderboardEnabled: true,
 	progressionEnabled: false,
+	leaguesEnabled: false,
 } as const;
 
 /**

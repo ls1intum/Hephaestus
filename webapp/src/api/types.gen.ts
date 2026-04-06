@@ -141,6 +141,10 @@ export type WorkspaceListItem = {
      */
     leaderboardEnabled: boolean;
     /**
+     * Whether league tiers and rankings are enabled
+     */
+    leaguesEnabled: boolean;
+    /**
      * Whether the practice review feature is enabled
      */
     practicesEnabled: boolean;
@@ -242,6 +246,10 @@ export type Workspace = {
      * Time for leaderboard notifications in HH:mm format
      */
     leaderboardScheduleTime?: string;
+    /**
+     * Whether league tiers and rankings are enabled
+     */
+    leaguesEnabled: boolean;
     /**
      * Whether the practice review feature is enabled
      */
@@ -460,6 +468,10 @@ export type UpdateWorkspaceFeaturesRequest = {
      * Enable the leaderboard ranking page
      */
     leaderboardEnabled?: boolean;
+    /**
+     * Enable league tiers and rankings
+     */
+    leaguesEnabled?: boolean;
     /**
      * Enable the practice review feature
      */

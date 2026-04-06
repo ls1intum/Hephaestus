@@ -52,7 +52,7 @@ function LeaderboardContainer() {
 	// Get the current user from auth context
 	const { username } = useAuth();
 	const { workspaceSlug, providerType, isLoading: isWorkspaceLoading } = useActiveWorkspaceSlug();
-	const { leaderboardEnabled, isLoading: featuresLoading } = useWorkspaceFeatures();
+	const { leaderboardEnabled, leaguesEnabled, isLoading: featuresLoading } = useWorkspaceFeatures();
 	const slug = workspaceSlug ?? "";
 	const hasWorkspace = Boolean(workspaceSlug);
 	const showNoWorkspace = !isWorkspaceLoading && !hasWorkspace;
@@ -368,6 +368,7 @@ function LeaderboardContainer() {
 			selectedMode={mode}
 			onModeChange={handleModeChange}
 			onTeamClick={handleTeamClick}
+			leaguesEnabled={leaguesEnabled}
 		/>
 	);
 }

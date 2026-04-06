@@ -8,7 +8,13 @@ import {
 	SidebarMenuItem,
 } from "@/components/ui/sidebar";
 
-export function NavAdmin({ workspaceSlug }: { workspaceSlug: string }) {
+export function NavAdmin({
+	workspaceSlug,
+	achievementsEnabled,
+}: {
+	workspaceSlug: string;
+	achievementsEnabled: boolean;
+}) {
 	return (
 		<SidebarGroup>
 			<SidebarGroupLabel>Administration</SidebarGroupLabel>
@@ -40,26 +46,33 @@ export function NavAdmin({ workspaceSlug }: { workspaceSlug: string }) {
 						<span>Manage teams</span>
 					</SidebarMenuButton>
 				</SidebarMenuItem>
-				<SidebarMenuItem>
-					<SidebarMenuButton
-						tooltip="Manage achievements"
-						render={<Link to="/w/$workspaceSlug/admin/achievements" params={{ workspaceSlug }} />}
-					>
-						<Trophy />
-						<span>Manage achievements</span>
-					</SidebarMenuButton>
-				</SidebarMenuItem>
-				<SidebarMenuItem>
-					<SidebarMenuButton
-						tooltip="Achievement Designer"
-						render={
-							<Link to="/w/$workspaceSlug/admin/achievement-designer" params={{ workspaceSlug }} />
-						}
-					>
-						<MapIcon />
-						<span>Achievement Designer</span>
-					</SidebarMenuButton>
-				</SidebarMenuItem>
+				{achievementsEnabled && (
+					<SidebarMenuItem>
+						<SidebarMenuButton
+							tooltip="Manage achievements"
+							render={<Link to="/w/$workspaceSlug/admin/achievements" params={{ workspaceSlug }} />}
+						>
+							<Trophy />
+							<span>Manage achievements</span>
+						</SidebarMenuButton>
+					</SidebarMenuItem>
+				)}
+				{achievementsEnabled && (
+					<SidebarMenuItem>
+						<SidebarMenuButton
+							tooltip="Achievement designer"
+							render={
+								<Link
+									to="/w/$workspaceSlug/admin/achievement-designer"
+									params={{ workspaceSlug }}
+								/>
+							}
+						>
+							<MapIcon />
+							<span>Achievement designer</span>
+						</SidebarMenuButton>
+					</SidebarMenuItem>
+				)}
 			</SidebarMenu>
 		</SidebarGroup>
 	);

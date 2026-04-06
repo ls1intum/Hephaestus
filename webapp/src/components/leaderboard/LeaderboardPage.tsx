@@ -35,6 +35,7 @@ interface LeaderboardPageProps {
 	selectedMode: LeaderboardVariant;
 	onModeChange?: (mode: LeaderboardVariant) => void;
 	onTeamClick?: (teamId: number) => void;
+	leaguesEnabled?: boolean;
 }
 
 export function LeaderboardPage({
@@ -60,6 +61,7 @@ export function LeaderboardPage({
 	selectedMode,
 	onModeChange,
 	onTeamClick,
+	leaguesEnabled = true,
 }: LeaderboardPageProps) {
 	// Add formatted property to the leaderboardSchedule object if it exists
 	const formattedSchedule = leaderboardSchedule
@@ -88,6 +90,7 @@ export function LeaderboardPage({
 								initialAfterDate={initialAfterDate}
 								initialBeforeDate={initialBeforeDate}
 								leaderboardSchedule={formattedSchedule}
+								leaguesEnabled={leaguesEnabled}
 							/>
 						</div>
 					</div>
@@ -99,6 +102,7 @@ export function LeaderboardPage({
 								leaguePoints={leaguePoints}
 								leaderboardEnd={leaderboardEnd}
 								leaguePointsChange={leaguePointsChange}
+								leaguesEnabled={leaguesEnabled}
 							/>
 						)}
 
@@ -112,6 +116,7 @@ export function LeaderboardPage({
 								onTeamClick={onTeamClick}
 								teamLabelsById={teamLabelsById}
 								providerType={providerType}
+								leaguesEnabled={leaguesEnabled}
 							/>
 						</div>
 					</div>

@@ -4885,6 +4885,9 @@ components:
         leaderboardEnabled:
           type: boolean
           description: Enable the leaderboard ranking page
+        leaguesEnabled:
+          type: boolean
+          description: Enable league tiers and rankings
         practicesEnabled:
           type: boolean
           description: Enable the practice review feature
@@ -5122,6 +5125,9 @@ components:
           type: string
           description: Time for leaderboard notifications in HH:mm format
           example: 09:00
+        leaguesEnabled:
+          type: boolean
+          description: Whether league tiers and rankings are enabled
         practicesEnabled:
           type: boolean
           description: Whether the practice review feature is enabled
@@ -5163,6 +5169,7 @@ components:
       - id
       - isPubliclyViewable
       - leaderboardEnabled
+      - leaguesEnabled
       - practicesEnabled
       - progressionEnabled
       - providerType
@@ -5193,6 +5200,9 @@ components:
         leaderboardEnabled:
           type: boolean
           description: Whether the leaderboard is enabled
+        leaguesEnabled:
+          type: boolean
+          description: Whether league tiers and rankings are enabled
         practicesEnabled:
           type: boolean
           description: Whether the practice review feature is enabled
@@ -5220,6 +5230,7 @@ components:
       - displayName
       - id
       - leaderboardEnabled
+      - leaguesEnabled
       - practicesEnabled
       - progressionEnabled
       - providerType

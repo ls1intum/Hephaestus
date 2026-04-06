@@ -31,6 +31,7 @@ export interface LeaderboardTableProps {
 	onTeamClick?: (teamId: number) => void;
 	teamLabelsById?: Record<number, string>;
 	providerType?: ProviderType;
+	leaguesEnabled?: boolean;
 }
 export function LeaderboardTable({
 	leaderboard = [],
@@ -41,6 +42,7 @@ export function LeaderboardTable({
 	onTeamClick,
 	teamLabelsById,
 	providerType = "GITHUB",
+	leaguesEnabled = true,
 }: LeaderboardTableProps) {
 	if (isLoading) {
 		return <LeaderboardTableSkeleton />;
@@ -63,7 +65,7 @@ export function LeaderboardTable({
 			<TableHeader>
 				<TableRow>
 					<TableHead className="text-center w-10">Rank</TableHead>
-					{!isTeam && <TableHead className="text-center w-20">League</TableHead>}
+					{!isTeam && leaguesEnabled && <TableHead className="text-center w-20">League</TableHead>}
 					<TableHead className="w-56">{isTeam ? "Team" : "Contributor"}</TableHead>
 					<TableHead className="text-center">
 						<div className="flex justify-center items-center gap-1 text-provider-done-foreground">
@@ -137,11 +139,13 @@ export function LeaderboardTable({
 							}}
 						>
 							<TableCell className="text-center">{entry.rank}</TableCell>
-							<TableCell className="px-0">
-								<div className="flex flex-col justify-center items-center">
-									<LeagueIcon leaguePoints={user.leaguePoints} showPoints />
-								</div>
-							</TableCell>
+							{leaguesEnabled && (
+								<TableCell className="px-0">
+									<div className="flex flex-col justify-center items-center">
+										<LeagueIcon leaguePoints={user.leaguePoints} showPoints />
+									</div>
+								</TableCell>
+							)}
 							<TableCell>
 								<div className="flex items-center gap-2 font-medium">
 									<Avatar className="size-9">
