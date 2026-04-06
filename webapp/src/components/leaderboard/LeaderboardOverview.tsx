@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { LeaderboardEntry } from "@/api/types.gen";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { getInitials } from "@/lib/avatar";
 import { LeagueInfoDialog } from "./LeagueInfoDialog";
 import { LeagueProgressCard } from "./LeagueProgressCard";
 
@@ -106,7 +107,7 @@ export function LeaderboardOverview({
 										/>
 									) : (
 										<span className="text-sm font-medium">
-											{user.name.slice(0, 2).toUpperCase()}
+											{getInitials(user.name, user.login)}
 										</span>
 									)}
 								</div>
