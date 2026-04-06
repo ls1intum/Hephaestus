@@ -40,8 +40,7 @@ const STEP_META = [
 ] as const;
 
 function GitLabWizardPage() {
-	const { userProfile, linkAccount } = useAuth();
-	const hasGitLabIdentity = Boolean(userProfile?.gitlabId);
+	const { hasGitLabIdentity, linkAccount } = useAuth();
 
 	const {
 		data: providers,
