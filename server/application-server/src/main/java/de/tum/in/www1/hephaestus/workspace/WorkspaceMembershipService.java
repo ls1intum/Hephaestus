@@ -344,6 +344,38 @@ public class WorkspaceMembershipService {
     }
 
     // ══════════════════════════════════════════════════════════════════════════
+    // Hidden member methods
+    // ══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Toggle the hidden flag for a workspace member.
+     *
+     * @param workspaceId Workspace ID
+     * @param userId      User ID
+     * @param hidden      whether the member should be hidden
+     * @return Updated membership
+     */
+    @Transactional
+    public WorkspaceMembership updateMemberVisibility(Long workspaceId, Long userId, boolean hidden) {
+        WorkspaceMembership membership = workspaceMembershipRepository
+            .findByWorkspace_IdAndUser_Id(workspaceId, userId)
+            .orElseThrow(() -> new IllegalArgumentException("Workspace membership not found"));
+        membership.setHidden(hidden);
+        return workspaceMembershipRepository.save(membership);
+    }
+
+    /**
+     * Returns the set of user IDs that are hidden in a workspace.
+     *
+     * @param workspaceId Workspace ID
+     * @return Set of hidden user IDs
+     */
+    @Transactional(readOnly = true)
+    public Set<Long> getHiddenMemberIds(Long workspaceId) {
+        return workspaceMembershipRepository.findHiddenUserIdsByWorkspaceId(workspaceId);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
     // Query methods for controller
     // ══════════════════════════════════════════════════════════════════════════
 

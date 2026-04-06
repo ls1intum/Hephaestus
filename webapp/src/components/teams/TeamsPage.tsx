@@ -114,7 +114,7 @@ export function TeamsPage({ teams, isLoading }: TeamsPageProps) {
 			login: member.login,
 			name: member.name,
 			avatarUrl: member.avatarUrl,
-			htmlUrl: `https://github.com/${member.login}`,
+			htmlUrl: member.htmlUrl,
 		}));
 	};
 

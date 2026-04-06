@@ -420,7 +420,8 @@ public class WorkspaceProvisioningService {
         User.Type userType
     ) {
         String safeName = name != null ? name : login;
-        String safeAvatar = avatarUrl != null ? avatarUrl : "";
+        // GitLab self-hosted instances return relative avatar paths (e.g. /uploads/-/system/user/avatar/123/avatar.png)
+        String safeAvatar = avatarUrl != null ? (avatarUrl.startsWith("/") ? serverUrl + avatarUrl : avatarUrl) : "";
         String safeWebUrl = webUrl != null ? webUrl : "";
 
         GitProvider provider = gitProviderRepository

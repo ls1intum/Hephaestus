@@ -6,6 +6,7 @@ import de.tum.in.www1.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -73,6 +74,9 @@ public interface WorkspaceMembershipRepository extends JpaRepository<WorkspaceMe
 
     long countByWorkspace_IdAndRole(Long workspaceId, WorkspaceRole role);
 
+    @Query("SELECT wm.user.id FROM WorkspaceMembership wm WHERE wm.workspace.id = :workspaceId AND wm.hidden = true")
+    Set<Long> findHiddenUserIdsByWorkspaceId(@Param("workspaceId") Long workspaceId);
+
     /**
      * Atomically inserts a membership if absent (race-condition safe).
      */
@@ -80,8 +84,8 @@ public interface WorkspaceMembershipRepository extends JpaRepository<WorkspaceMe
     @Transactional
     @Query(
         value = """
-        INSERT INTO workspace_membership (workspace_id, user_id, role, league_points, created_at)
-        VALUES (:workspaceId, :userId, :role, :leaguePoints, CURRENT_TIMESTAMP)
+        INSERT INTO workspace_membership (workspace_id, user_id, role, league_points, hidden, created_at)
+        VALUES (:workspaceId, :userId, :role, :leaguePoints, false, CURRENT_TIMESTAMP)
         ON CONFLICT (workspace_id, user_id) DO NOTHING
         """,
         nativeQuery = true

@@ -126,6 +126,30 @@ public class WorkspaceMembershipController {
     }
 
     /**
+     * Toggle the hidden flag for a workspace member.
+     * Hidden members are excluded from the leaderboard.
+     *
+     * @param context the workspace context
+     * @param userId User ID
+     * @param hidden whether the member should be hidden
+     * @return Updated membership
+     */
+    @PatchMapping("/{userId}/hidden")
+    @RequireAtLeastWorkspaceAdmin
+    public ResponseEntity<WorkspaceMembershipDTO> updateMemberVisibility(
+        WorkspaceContext context,
+        @PathVariable Long userId,
+        @RequestParam boolean hidden
+    ) {
+        WorkspaceMembership membership = workspaceMembershipService.updateMemberVisibility(
+            context.id(),
+            userId,
+            hidden
+        );
+        return ResponseEntity.ok(WorkspaceMembershipDTO.from(membership));
+    }
+
+    /**
      * Revoke a user's membership (remove them from workspace).
      * OWNER can remove anyone except themselves if they are the last OWNER.
      * ADMIN can remove MEMBER and ADMIN roles.

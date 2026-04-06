@@ -87,6 +87,10 @@ export type WorkspaceMembership = {
      */
     createdAt?: Date;
     /**
+     * Whether the member is hidden from the leaderboard
+     */
+    hidden?: boolean;
+    /**
      * League points earned by the user in this workspace
      */
     leaguePoints?: number;
@@ -274,6 +278,7 @@ export type VoteMessageRequest = {
 
 export type UserTeams = {
     email?: string;
+    hidden?: boolean;
     id: number;
     login: string;
     name: string;
@@ -2635,6 +2640,36 @@ export type GetMemberResponses = {
 };
 
 export type GetMemberResponse = GetMemberResponses[keyof GetMemberResponses];
+
+export type UpdateMemberVisibilityData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        /**
+         * User ID
+         */
+        userId: number;
+    };
+    query: {
+        /**
+         * whether the member should be hidden
+         */
+        hidden: boolean;
+    };
+    url: '/workspaces/{workspaceSlug}/members/{userId}/hidden';
+};
+
+export type UpdateMemberVisibilityResponses = {
+    /**
+     * Updated membership
+     */
+    200: WorkspaceMembership;
+};
+
+export type UpdateMemberVisibilityResponse = UpdateMemberVisibilityResponses[keyof UpdateMemberVisibilityResponses];
 
 export type ListDocumentsData = {
     body?: never;

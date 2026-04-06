@@ -16,6 +16,8 @@ import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabGroupMe
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.graphql.GitLabPageInfo;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.repository.RepositoryRepository;
+import de.tum.in.www1.hephaestus.gitprovider.repository.collaborator.RepositoryCollaborator;
+import de.tum.in.www1.hephaestus.gitprovider.repository.collaborator.RepositoryCollaboratorRepository;
 import de.tum.in.www1.hephaestus.gitprovider.team.Team;
 import de.tum.in.www1.hephaestus.gitprovider.team.TeamRepository;
 import de.tum.in.www1.hephaestus.gitprovider.team.membership.TeamMembership;
@@ -55,6 +57,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  *   <li>C — Sync direct members per team</li>
  *   <li>D — Sync team-repo permissions (repos whose org = subgroup fullPath)</li>
  *   <li>E — Cleanup stale teams (only if sync completed fully)</li>
+ *   <li>F — Add project collaborators as team members (students in repos under subgroup)</li>
  * </ol>
  */
 @Service
@@ -76,6 +79,7 @@ public class GitLabTeamSyncService {
     private final GitLabUserService gitLabUserService;
     private final GitProviderRepository gitProviderRepository;
     private final GitLabProperties gitLabProperties;
+    private final RepositoryCollaboratorRepository collaboratorRepository;
     private final TransactionTemplate transactionTemplate;
 
     public GitLabTeamSyncService(
@@ -88,6 +92,7 @@ public class GitLabTeamSyncService {
         GitLabUserService gitLabUserService,
         GitProviderRepository gitProviderRepository,
         GitLabProperties gitLabProperties,
+        RepositoryCollaboratorRepository collaboratorRepository,
         TransactionTemplate transactionTemplate
     ) {
         this.teamRepository = teamRepository;
@@ -99,6 +104,7 @@ public class GitLabTeamSyncService {
         this.gitLabUserService = gitLabUserService;
         this.gitProviderRepository = gitProviderRepository;
         this.gitLabProperties = gitLabProperties;
+        this.collaboratorRepository = collaboratorRepository;
         this.transactionTemplate = transactionTemplate;
     }
 
@@ -193,16 +199,38 @@ public class GitLabTeamSyncService {
         }
         log.info("Phase D complete: groupPath={}, totalPermissions={}", groupFullPath, totalPermissions);
 
+        // Phase F: Add project collaborators as team members
+        // Students who are direct project members (WRITE/TRIAGE) under a subgroup
+        // should appear as team members of that subgroup.
+        int totalCollaboratorMembers = 0;
+        for (Map.Entry<Long, Team> entry : syncedTeamsByNativeId.entrySet()) {
+            String fullPath = teamFullPathsByNativeId.get(entry.getKey());
+            if (fullPath != null) {
+                try {
+                    int added = addProjectCollaboratorsAsTeamMembers(entry.getValue().getId(), fullPath);
+                    totalCollaboratorMembers += added;
+                } catch (Exception e) {
+                    log.warn(
+                        "Failed to sync collaborator-to-team for: teamSlug={}, error={}",
+                        entry.getValue().getSlug(),
+                        e.getMessage()
+                    );
+                }
+            }
+        }
+        log.info("Phase F complete: groupPath={}, collaboratorMembers={}", groupFullPath, totalCollaboratorMembers);
+
         // Phase E: Cleanup stale teams (only if sync completed normally)
         if (syncCompletedNormally) {
             removeDeletedTeams(groupFullPath, syncedNativeIds, providerId);
         }
 
         log.info(
-            "GitLab team sync complete: groupPath={}, teams={}, members={}, permissions={}",
+            "GitLab team sync complete: groupPath={}, teams={}, directMembers={}, collaboratorMembers={}, permissions={}",
             groupFullPath,
             totalSynced,
             totalMembers,
+            totalCollaboratorMembers,
             totalPermissions
         );
 
@@ -634,6 +662,68 @@ public class GitLabTeamSyncService {
                 team.getRepoPermissions().size()
             );
             return team.getRepoPermissions().size();
+        });
+
+        return result != null ? result : 0;
+    }
+
+    // ========================================================================
+    // Phase F: Add project collaborators as team members
+    // ========================================================================
+
+    /**
+     * Adds project-level collaborators (WRITE/TRIAGE) as members of their parent subgroup team.
+     * <p>
+     * In GitLab iPraktikum, each tutor subgroup contains student repos. Students are direct
+     * project members but not group members. This phase bridges the gap so they appear in the
+     * team on the leaderboard and profile views.
+     */
+    int addProjectCollaboratorsAsTeamMembers(Long teamId, String subgroupFullPath) {
+        Integer result = transactionTemplate.execute(status -> {
+            Team team = teamRepository
+                .findById(teamId)
+                .orElseThrow(() -> new IllegalStateException("Team not found: teamId=" + teamId));
+
+            // Find collaborators with WRITE or TRIAGE permission on repos under this subgroup.
+            // These are direct project members (students), not inherited ADMIN/MAINTAIN (professors/TAs).
+            List<RepositoryCollaborator> collaborators = collaboratorRepository.findByOrgLoginAndPermissions(
+                subgroupFullPath,
+                List.of(RepositoryCollaborator.Permission.WRITE, RepositoryCollaborator.Permission.TRIAGE)
+            );
+
+            log.info(
+                "Phase F: querying collaborators for subgroup: orgLogin={}, found={}",
+                subgroupFullPath,
+                collaborators.size()
+            );
+
+            if (collaborators.isEmpty()) {
+                return 0;
+            }
+
+            // Deduplicate by user (a student may be in multiple repos under the same subgroup)
+            Set<Long> existingMemberIds = team
+                .getMemberships()
+                .stream()
+                .map(m -> m.getUser().getId())
+                .collect(Collectors.toSet());
+
+            int added = 0;
+            Set<Long> seenUserIds = new HashSet<>();
+            for (RepositoryCollaborator collab : collaborators) {
+                Long userId = collab.getUser().getId();
+                if (seenUserIds.add(userId) && !existingMemberIds.contains(userId)) {
+                    TeamMembership membership = new TeamMembership(team, collab.getUser(), TeamMembership.Role.MEMBER);
+                    teamMembershipRepository.save(membership);
+                    added++;
+                }
+            }
+
+            if (added > 0) {
+                log.debug("Added project collaborators to team: teamSlug={}, added={}", team.getSlug(), added);
+            }
+
+            return added;
         });
 
         return result != null ? result : 0;

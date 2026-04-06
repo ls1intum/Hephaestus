@@ -13,6 +13,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { getInitials } from "@/lib/avatar";
 import { getTeamAvatarUrl, type ProviderType } from "@/lib/provider";
 import { cn } from "@/lib/utils";
 import { LeagueIcon } from "./LeagueIcon";
@@ -95,7 +96,7 @@ export function LeaderboardTable({
 												src={getTeamAvatarUrl(providerType, team.id) ?? undefined}
 												alt={`${displayName}'s avatar`}
 											/>
-											<AvatarFallback>{displayName.slice(0, 2).toUpperCase()}</AvatarFallback>
+											<AvatarFallback>{getInitials(displayName)}</AvatarFallback>
 										</Avatar>
 										<span className="text-muted-foreground text-wrap">{displayName}</span>
 									</div>
@@ -144,8 +145,8 @@ export function LeaderboardTable({
 							<TableCell>
 								<div className="flex items-center gap-2 font-medium">
 									<Avatar className="size-9">
-										<AvatarImage src={user.avatarUrl} alt={`${user.name}'s avatar`} />
-										<AvatarFallback>{user.name.slice(0, 2).toUpperCase()}</AvatarFallback>
+										<AvatarImage src={user.avatarUrl || undefined} alt={`${user.name}'s avatar`} />
+										<AvatarFallback>{getInitials(user.name, user.login)}</AvatarFallback>
 									</Avatar>
 									<span className="text-muted-foreground text-wrap">{user.name}</span>
 								</div>

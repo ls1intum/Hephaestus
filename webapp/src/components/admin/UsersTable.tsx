@@ -10,7 +10,7 @@ import {
 	useReactTable,
 	type VisibilityState,
 } from "@tanstack/react-table";
-import { ArrowUpDown, ChevronDown, Filter, Search, Users } from "lucide-react";
+import { ArrowUpDown, ChevronDown, EyeIcon, EyeOffIcon, Filter, Search, Users } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { TeamInfo } from "@/api/types.gen";
 import { Button } from "@/components/ui/button";
@@ -53,9 +53,10 @@ interface UsersTableProps {
 	users: ExtendedUserTeams[];
 	teams: TeamInfo[];
 	isLoading?: boolean;
+	onToggleHidden?: (userId: number, hidden: boolean) => void;
 }
 
-export function UsersTable({ users, teams, isLoading = false }: UsersTableProps) {
+export function UsersTable({ users, teams, isLoading = false, onToggleHidden }: UsersTableProps) {
 	const [sorting, setSorting] = useState<SortingState>([]);
 	const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
 	const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
@@ -98,8 +99,34 @@ export function UsersTable({ users, teams, isLoading = false }: UsersTableProps)
 				},
 				cell: ({ row }) => <div className="text-muted-foreground">{row.original.user.login}</div>,
 			},
+			...(onToggleHidden
+				? [
+						{
+							id: "visibility",
+							header: () => <span className="font-semibold">Visible</span>,
+							cell: ({ row }: { row: { original: ExtendedUserTeams } }) => (
+								<Button
+									variant="ghost"
+									size="icon-xs"
+									onClick={() => onToggleHidden(Number(row.original.user.id), !row.original.hidden)}
+									aria-label={
+										row.original.hidden
+											? `Show ${row.original.user.name}`
+											: `Hide ${row.original.user.name}`
+									}
+								>
+									{row.original.hidden ? (
+										<EyeOffIcon className="size-4 text-muted-foreground" />
+									) : (
+										<EyeIcon className="size-4" />
+									)}
+								</Button>
+							),
+						} satisfies ColumnDef<ExtendedUserTeams>,
+					]
+				: []),
 		],
-		[],
+		[onToggleHidden],
 	);
 
 	// IMPORTANT: TanStack Table requires stable references for data to prevent infinite re-renders

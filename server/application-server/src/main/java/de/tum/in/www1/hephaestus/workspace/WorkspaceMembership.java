@@ -85,6 +85,10 @@ public class WorkspaceMembership {
     @Column(name = "league_points", nullable = false)
     private int leaguePoints = 0;
 
+    /** Whether this member is hidden from the leaderboard */
+    @Column(name = "hidden", nullable = false)
+    private boolean hidden = false;
+
     /** Timestamp when this membership was created */
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();

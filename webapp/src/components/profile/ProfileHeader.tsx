@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { getInitials } from "@/lib/avatar";
 import { cn } from "@/lib/utils.ts";
 import { XpProgress } from "./XpProgress";
 
@@ -56,7 +57,7 @@ export function ProfileHeader({
 						) : (
 							<Avatar className="size-16 border-2 border-background shadow-sm">
 								<AvatarImage src={user?.avatarUrl} alt={`${user?.login}'s avatar`} />
-								<AvatarFallback>{user?.login?.slice(0, 2)?.toUpperCase()}</AvatarFallback>
+								<AvatarFallback>{getInitials(user?.name, user?.login)}</AvatarFallback>
 							</Avatar>
 						)}
 
@@ -100,7 +101,7 @@ export function ProfileHeader({
 									target="_blank"
 									rel="noopener noreferrer"
 								>
-									github.com/{user.login}
+									{user.htmlUrl ? new URL(user.htmlUrl).host : ""}/{user.login}
 								</a>
 								<Button
 									variant="ghost"

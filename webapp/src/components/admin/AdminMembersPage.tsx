@@ -6,9 +6,15 @@ interface AdminMembersPageProps {
 	users: ExtendedUserTeams[];
 	teams: TeamInfo[];
 	isLoading: boolean;
+	onToggleHidden?: (userId: number, hidden: boolean) => void;
 }
 
-export function AdminMembersPage({ users, teams, isLoading }: AdminMembersPageProps) {
+export function AdminMembersPage({
+	users,
+	teams,
+	isLoading,
+	onToggleHidden,
+}: AdminMembersPageProps) {
 	return (
 		<div className="container mx-auto py-6">
 			<div className="flex items-center justify-between mb-6">
@@ -18,7 +24,12 @@ export function AdminMembersPage({ users, teams, isLoading }: AdminMembersPagePr
 				</div>
 			</div>
 
-			<UsersTable users={users} teams={teams} isLoading={isLoading} />
+			<UsersTable
+				users={users}
+				teams={teams}
+				isLoading={isLoading}
+				onToggleHidden={onToggleHidden}
+			/>
 		</div>
 	);
 }
