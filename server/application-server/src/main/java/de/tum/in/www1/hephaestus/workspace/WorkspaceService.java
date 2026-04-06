@@ -64,19 +64,22 @@ public class WorkspaceService {
     private final WorkspaceSettingsService workspaceSettingsService;
     private final LeaguePointsRecalculator leaguePointsRecalculator;
     private final WorkspaceMembershipService workspaceMembershipService;
+    private final GitLabWorkspaceInitializationService gitLabWorkspaceInitializationService;
 
     public WorkspaceService(
         WorkspaceRepository workspaceRepository,
         WorkspaceSlugService workspaceSlugService,
         WorkspaceSettingsService workspaceSettingsService,
         LeaguePointsRecalculator leaguePointsRecalculator,
-        WorkspaceMembershipService workspaceMembershipService
+        WorkspaceMembershipService workspaceMembershipService,
+        GitLabWorkspaceInitializationService gitLabWorkspaceInitializationService
     ) {
         this.workspaceRepository = workspaceRepository;
         this.workspaceSlugService = workspaceSlugService;
         this.workspaceSettingsService = workspaceSettingsService;
         this.leaguePointsRecalculator = leaguePointsRecalculator;
         this.workspaceMembershipService = workspaceMembershipService;
+        this.gitLabWorkspaceInitializationService = gitLabWorkspaceInitializationService;
     }
 
     // ========================================================================
@@ -175,6 +178,38 @@ public class WorkspaceService {
         }
         if (request.serverUrl() != null && !request.serverUrl().isBlank()) {
             workspace.setServerUrl(request.serverUrl().trim());
+        }
+
+        // GitLab PAT workspaces monitor all repositories in the group by default
+        if (request.gitProviderMode() == Workspace.GitProviderMode.GITLAB_PAT) {
+            workspace.setRepositorySelection(RepositorySelection.ALL);
+        }
+
+        // Explicit save required: when called via createWorkspaceWithInitialization(),
+        // self-invocation bypasses @Transactional proxy, so dirty-checking flush won't
+        // happen automatically. The inner createWorkspace(5-args) saved the base entity,
+        // but these additional fields (gitProviderMode, PAT, serverUrl) need a second save.
+        return workspaceRepository.save(workspace);
+    }
+
+    /**
+     * Creates a workspace and triggers async GitLab initialization if applicable.
+     *
+     * <p>This method is intentionally NOT {@code @Transactional} so that the inner
+     * {@link #createWorkspace(CreateWorkspaceRequestDTO)} transaction commits before
+     * the async initialization reads the workspace from the database.
+     *
+     * @param request the workspace creation request
+     * @return the created workspace
+     */
+    public Workspace createWorkspaceWithInitialization(CreateWorkspaceRequestDTO request) {
+        Workspace workspace = createWorkspace(request);
+
+        // Trigger async repository discovery for GitLab PAT workspaces.
+        // The @Transactional createWorkspace() has already committed at this point,
+        // so the async thread will find the workspace in the database.
+        if (workspace.getGitProviderMode() == Workspace.GitProviderMode.GITLAB_PAT) {
+            gitLabWorkspaceInitializationService.initializeAsync(workspace.getId());
         }
 
         return workspace;

@@ -51,7 +51,7 @@ public class WorkspaceRegistryController {
     public ResponseEntity<WorkspaceDTO> createWorkspace(
         @Valid @RequestBody CreateWorkspaceRequestDTO createWorkspaceRequest
     ) {
-        Workspace workspace = workspaceService.createWorkspace(createWorkspaceRequest);
+        Workspace workspace = workspaceService.createWorkspaceWithInitialization(createWorkspaceRequest);
 
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()
             .path("/{workspaceSlug}")

@@ -211,6 +211,7 @@ public class WorkspaceProvisioningService {
 
         workspace.setGitProviderMode(Workspace.GitProviderMode.GITLAB_PAT);
         workspace.setPersonalAccessToken(config.token());
+        workspace.setRepositorySelection(RepositorySelection.ALL);
         if (!isBlank(config.serverUrl())) {
             workspace.setServerUrl(config.serverUrl().trim());
         }
