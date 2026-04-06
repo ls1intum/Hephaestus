@@ -1993,6 +1993,22 @@ export type UnlinkAccountResponses = {
     200: unknown;
 };
 
+export type ClaimIdentityData = {
+    body?: never;
+    path: {
+        providerAlias: string;
+    };
+    query?: never;
+    url: '/user/linked-accounts/{providerAlias}/claim';
+};
+
+export type ClaimIdentityResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
 export type GetUserSettingsData = {
     body?: never;
     path?: never;

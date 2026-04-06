@@ -1,11 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, Navigate, useNavigate } from "@tanstack/react-router";
 import { ArrowLeftIcon, OctagonXIcon } from "lucide-react";
-import { useEffect, useMemo, useReducer, useRef } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
+	claimIdentityMutation,
 	createWorkspaceMutation,
 	getIdentityProvidersOptions,
+	getLinkedAccountsQueryKey,
 	getProvidersOptions,
 	listGitLabGroupsMutation,
 	listWorkspacesQueryKey,
@@ -38,6 +40,96 @@ const STEP_META = [
 	{ title: "Select a Group", description: "Choose the GitLab group to monitor." },
 	{ title: "Configure Workspace", description: "Set a name and URL slug for your workspace." },
 ] as const;
+
+/**
+ * Prompts the user to link their GitLab account. Offers two paths:
+ * 1. "Link GitLab" — standard Keycloak account linking (works when no conflict)
+ * 2. "Claim GitLab Identity" — transfers the identity from an orphan account (handles the
+ *    case where the user previously logged in via GitLab directly, creating a separate account)
+ */
+function GitLabLinkPrompt({
+	gitlabIdpAlias,
+	linkAccount,
+}: {
+	gitlabIdpAlias?: string;
+	linkAccount: (alias: string) => Promise<void>;
+}) {
+	const queryClient = useQueryClient();
+	const [showClaim, setShowClaim] = useState(false);
+
+	const claimMutation = useMutation({
+		...claimIdentityMutation(),
+		onSuccess: () => {
+			toast.success(
+				"GitLab account linked successfully. Please log out and back in for the changes to take effect.",
+			);
+			queryClient.invalidateQueries({ queryKey: getLinkedAccountsQueryKey() });
+		},
+		onError: (error) => {
+			toast.error(`Failed to claim identity: ${(error as Error).message}`);
+		},
+	});
+
+	return (
+		<div className="mx-auto max-w-2xl py-8">
+			<Link
+				to="/workspaces/new"
+				className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-6"
+			>
+				<ArrowLeftIcon className="size-3.5" />
+				Back
+			</Link>
+
+			<div className="space-y-4">
+				<div className="space-y-1.5">
+					<h1 className="text-2xl font-semibold tracking-tight">Link Your GitLab Account</h1>
+					<p className="text-muted-foreground">
+						To create a GitLab workspace, you need to link your GitLab account first.
+					</p>
+				</div>
+
+				<div className="flex flex-col gap-3">
+					{gitlabIdpAlias && (
+						<Button className="w-fit" onClick={() => linkAccount(gitlabIdpAlias)}>
+							Link GitLab Account
+						</Button>
+					)}
+
+					{!showClaim && (
+						<button
+							type="button"
+							className="text-sm text-muted-foreground hover:text-foreground text-left"
+							onClick={() => setShowClaim(true)}
+						>
+							Already logged in with GitLab before? Having trouble linking?
+						</button>
+					)}
+
+					{showClaim && gitlabIdpAlias && (
+						<Alert>
+							<AlertTitle>Previously logged in with GitLab?</AlertTitle>
+							<AlertDescription className="space-y-3">
+								<p>
+									If you previously signed in with GitLab directly, a separate account was created.
+									Click below to merge it with your current account.
+								</p>
+								<Button
+									variant="outline"
+									size="sm"
+									disabled={claimMutation.isPending}
+									onClick={() => claimMutation.mutate({ path: { providerAlias: gitlabIdpAlias } })}
+								>
+									{claimMutation.isPending ? <Spinner className="mr-2" /> : null}
+									Merge GitLab Identity
+								</Button>
+							</AlertDescription>
+						</Alert>
+					)}
+				</div>
+			</div>
+		</div>
+	);
+}
 
 function GitLabWizardPage() {
 	const { hasGitLabIdentity, linkAccount } = useAuth();
@@ -199,45 +291,7 @@ function GitLabWizardPage() {
 	}
 
 	if (!hasGitLabIdentity) {
-		return (
-			<div className="mx-auto max-w-2xl py-8">
-				<Link
-					to="/workspaces/new"
-					className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-6"
-				>
-					<ArrowLeftIcon className="size-3.5" />
-					Back
-				</Link>
-
-				<div className="space-y-4">
-					<div className="space-y-1.5">
-						<h1 className="text-2xl font-semibold tracking-tight">Link Your GitLab Account</h1>
-						<p className="text-muted-foreground">
-							To create a GitLab workspace, you need to link your GitLab account first.
-						</p>
-					</div>
-
-					<Alert>
-						<AlertTitle>GitLab account not linked</AlertTitle>
-						<AlertDescription>
-							Your Hephaestus account is not connected to a GitLab identity. Link your GitLab
-							account in Settings to continue.
-						</AlertDescription>
-					</Alert>
-
-					<div className="flex gap-3">
-						<Link to="/settings">
-							<Button>Go to Settings</Button>
-						</Link>
-						{gitlabIdpAlias && (
-							<Button variant="outline" onClick={() => linkAccount(gitlabIdpAlias)}>
-								Link GitLab Now
-							</Button>
-						)}
-					</div>
-				</div>
-			</div>
-		);
+		return <GitLabLinkPrompt gitlabIdpAlias={gitlabIdpAlias} linkAccount={linkAccount} />;
 	}
 
 	return (

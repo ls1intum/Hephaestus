@@ -175,6 +175,26 @@ public class AccountController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/linked-accounts/{providerAlias}/claim")
+    @Operation(
+        summary = "Claim an identity provider from another user",
+        description = "Transfers a federated identity from another Keycloak user to the current user. " +
+            "Used when a user has accidentally created two accounts by logging in with different IdPs. " +
+            "Deletes the orphan account if it has no remaining identities."
+    )
+    public ResponseEntity<Void> claimIdentity(
+        @PathVariable @jakarta.validation.constraints.Pattern(regexp = "^[a-z0-9-]{1,64}$") String providerAlias,
+        @AuthenticationPrincipal JwtAuthenticationToken auth
+    ) {
+        JwtAuthenticationToken token = resolveAuthentication(auth);
+        if (token == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        String keycloakUserId = token.getToken().getClaimAsString(StandardClaimNames.SUB);
+        accountService.claimIdentity(keycloakUserId, providerAlias);
+        return ResponseEntity.noContent().build();
+    }
+
     private JwtAuthenticationToken resolveAuthentication(JwtAuthenticationToken injectedToken) {
         if (injectedToken != null) {
             return injectedToken;

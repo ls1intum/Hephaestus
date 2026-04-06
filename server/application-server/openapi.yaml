@@ -146,6 +146,26 @@ paths:
       summary: Unlink an identity provider
       tags:
       - Account
+  /user/linked-accounts/{providerAlias}/claim:
+    post:
+      description: Transfers a federated identity from another Keycloak user to the
+        current user. Used when a user has accidentally created two accounts by logging
+        in with different IdPs. Deletes the orphan account if it has no remaining
+        identities.
+      operationId: claimIdentity
+      parameters:
+      - in: path
+        name: providerAlias
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9-]{1,64}$"
+      responses:
+        "200":
+          description: OK
+      summary: Claim an identity provider from another user
+      tags:
+      - Account
   /user/settings:
     get:
       description: "Get the current user's notification, research participation, and\
