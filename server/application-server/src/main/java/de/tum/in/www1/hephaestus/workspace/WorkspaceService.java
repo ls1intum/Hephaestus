@@ -3,6 +3,8 @@ package de.tum.in.www1.hephaestus.workspace;
 import de.tum.in.www1.hephaestus.core.LoggingUtils;
 import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
+import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.in.www1.hephaestus.workspace.dto.CreateWorkspaceRequestDTO;
 import de.tum.in.www1.hephaestus.workspace.dto.UpdateWorkspaceFeaturesRequestDTO;
@@ -58,6 +60,7 @@ public class WorkspaceService {
 
     // Core repositories
     private final WorkspaceRepository workspaceRepository;
+    private final UserRepository userRepository;
 
     // Services
     private final WorkspaceSlugService workspaceSlugService;
@@ -67,12 +70,14 @@ public class WorkspaceService {
 
     public WorkspaceService(
         WorkspaceRepository workspaceRepository,
+        UserRepository userRepository,
         WorkspaceSlugService workspaceSlugService,
         WorkspaceSettingsService workspaceSettingsService,
         LeaguePointsRecalculator leaguePointsRecalculator,
         WorkspaceMembershipService workspaceMembershipService
     ) {
         this.workspaceRepository = workspaceRepository;
+        this.userRepository = userRepository;
         this.workspaceSlugService = workspaceSlugService;
         this.workspaceSettingsService = workspaceSettingsService;
         this.leaguePointsRecalculator = leaguePointsRecalculator;
@@ -159,12 +164,16 @@ public class WorkspaceService {
      */
     @Transactional
     public Workspace createWorkspace(CreateWorkspaceRequestDTO request) {
+        // Always prefer the authenticated user to prevent privilege escalation.
+        // Fall back to the deprecated ownerUserId only when no auth context exists (e.g. tests).
+        Long ownerUserId = userRepository.getCurrentUser().map(User::getId).orElse(request.ownerUserId());
+
         Workspace workspace = createWorkspace(
             request.workspaceSlug(),
             request.displayName(),
             request.accountLogin(),
             request.accountType(),
-            request.ownerUserId()
+            ownerUserId
         );
 
         if (request.gitProviderMode() != null) {
@@ -182,7 +191,12 @@ public class WorkspaceService {
 
     private void createOwnerRole(Workspace workspace, Long ownerUserId) {
         if (ownerUserId == null) {
-            throw new IllegalArgumentException("Owner user id must not be null when creating a workspace.");
+            throw new IllegalStateException(
+                "Cannot create workspace without an owner. " +
+                    "The authenticated user must have a corresponding git provider User entity. " +
+                    "workspaceSlug=" +
+                    workspace.getWorkspaceSlug()
+            );
         }
         workspaceMembershipService.createMembership(workspace, ownerUserId, WorkspaceMembership.WorkspaceRole.OWNER);
     }

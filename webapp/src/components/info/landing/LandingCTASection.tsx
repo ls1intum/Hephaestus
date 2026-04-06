@@ -1,11 +1,11 @@
 import { ArrowRight } from "lucide-react";
-import { GitHubSignInButton } from "@/components/auth/GitHubSignInButton";
+import { SignInButtons } from "@/components/auth/SignInButtons";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/integrations/theme";
 import { cn } from "@/lib/utils";
 
 interface LandingCTASectionProps {
-	onSignIn: () => void;
+	onSignIn: (idpHint: string) => void;
 	onGoToDashboard?: () => void;
 	isSignedIn: boolean;
 }
@@ -36,8 +36,8 @@ export function LandingCTASection({
 								<ArrowRight className="h-4 w-4" />
 							</Button>
 						) : (
-							<GitHubSignInButton
-								onClick={onSignIn}
+							<SignInButtons
+								onSignIn={onSignIn}
 								size="lg"
 								className="w-full justify-center sm:w-auto"
 							/>

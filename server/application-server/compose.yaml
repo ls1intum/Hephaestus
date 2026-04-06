@@ -18,7 +18,7 @@ services:
       - ./postgres-data:/var/lib/postgresql/data
 
   keycloak:
-    image: quay.io/keycloak/keycloak:26.0.0
+    image: quay.io/keycloak/keycloak:26.5
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin
@@ -26,6 +26,12 @@ services:
       KEYCLOAK_GITHUB_CLIENT_ID: '${KEYCLOAK_GITHUB_CLIENT_ID:?Set GitHub OAuth client ID}'
       KEYCLOAK_GITHUB_CLIENT_SECRET: '${KEYCLOAK_GITHUB_CLIENT_SECRET:?Set GitHub OAuth client secret}'
       KEYCLOAK_GITHUB_ADMIN_USERNAME: '${KEYCLOAK_GITHUB_ADMIN_USERNAME:?Set GitHub admin username}'
+      # GitLab OAuth credentials (optional — IdP is disabled by default)
+      KEYCLOAK_GITLAB_ENABLED: '${KEYCLOAK_GITLAB_ENABLED:-false}'
+      KEYCLOAK_GITLAB_CLIENT_ID: '${KEYCLOAK_GITLAB_CLIENT_ID:-unused}'
+      KEYCLOAK_GITLAB_CLIENT_SECRET: '${KEYCLOAK_GITLAB_CLIENT_SECRET:-unused}'
+      KEYCLOAK_GITLAB_BASE_URL: '${KEYCLOAK_GITLAB_BASE_URL:-https://gitlab.example.com}'
+      KEYCLOAK_GITLAB_ADMIN_USERNAME: '${KEYCLOAK_GITLAB_ADMIN_USERNAME:-unused}'
       # Confidential client secret - must match what the application server uses
       # Default: hephaestus-dev-secret (for local development only)
       KEYCLOAK_CONFIDENTIAL_CLIENT_SECRET: '${KEYCLOAK_CLIENT_SECRET:-hephaestus-dev-secret}'

@@ -3,7 +3,7 @@ import type { LeaderboardEntry, PullRequestInfo } from "@/api/types.gen";
 import aliceAvatar from "@/assets/alice_developer.jpg";
 import bobAvatar from "@/assets/bob_builder.jpg";
 import charlieAvatar from "@/assets/charlie_coder.jpg";
-import { GitHubSignInButton } from "@/components/auth/GitHubSignInButton";
+import { SignInButtons } from "@/components/auth/SignInButtons";
 import { LeaderboardTable } from "@/components/leaderboard/LeaderboardTable";
 import { MentorIcon } from "@/components/mentor/MentorIcon";
 import { Button } from "@/components/ui/button";
@@ -98,7 +98,7 @@ const SAMPLE_LEADERBOARD_ENTRIES: LeaderboardEntry[] = [
 ];
 
 interface LandingHeroSectionProps {
-	onSignIn: () => void;
+	onSignIn: (idpHint: string) => void;
 	onGoToDashboard?: () => void;
 	isSignedIn: boolean;
 	onLearnMoreClick: () => void;
@@ -129,8 +129,8 @@ export function LandingHeroSection({
 								Go to Dashboard <ArrowRight className="h-4 w-4" />
 							</Button>
 						) : (
-							<GitHubSignInButton
-								onClick={onSignIn}
+							<SignInButtons
+								onSignIn={onSignIn}
 								size="lg"
 								className="w-full justify-center sm:w-auto"
 							/>

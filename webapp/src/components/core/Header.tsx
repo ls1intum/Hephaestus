@@ -1,7 +1,7 @@
 import { TagIcon } from "@primer/octicons-react";
 import { Link } from "@tanstack/react-router";
 import { Hammer, LogOut, Settings, User } from "lucide-react";
-import { GitHubSignInButton } from "@/components/auth/GitHubSignInButton";
+import { SignInButtons } from "@/components/auth/SignInButtons";
 import { ModeToggle } from "@/components/core/ModeToggle";
 import { SurveyNotificationButton } from "@/components/surveys/survey-notification-button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -30,10 +30,12 @@ export interface HeaderProps {
 	name?: string;
 	/** Username of the authenticated user */
 	username?: string;
+	/** Avatar URL for the authenticated user */
+	avatarUrl?: string;
 	/** Active workspace slug for routing */
 	workspaceSlug?: string;
-	/** Function to call on login button click */
-	onLogin: () => void;
+	/** Function to call on login button click, with optional idpHint */
+	onLogin: (idpHint?: string) => void;
 	/** Function to call on logout button click */
 	onLogout: () => void;
 }
@@ -50,6 +52,7 @@ export default function Header({
 	name,
 	username,
 	workspaceSlug,
+	avatarUrl,
 	onLogin,
 	onLogout,
 }: HeaderProps) {
@@ -105,9 +108,7 @@ export default function Header({
 				<ModeToggle />
 				<div className="flex items-center gap-2">
 					{!isAuthenticated ? (
-						<GitHubSignInButton onClick={onLogin} disabled={isLoading}>
-							{isLoading ? "Signing in..." : "Sign in"}
-						</GitHubSignInButton>
+						<SignInButtons onSignIn={onLogin} disabled={isLoading} header />
 					) : (
 						<div className="flex items-center gap-2">
 							<DropdownMenu>
@@ -116,7 +117,7 @@ export default function Header({
 								>
 									<Avatar className="hover:brightness-90">
 										<AvatarImage
-											src={`https://github.com/${username}.png`}
+											src={avatarUrl || `https://github.com/${username}.png`}
 											alt={`${username}'s avatar`}
 										/>
 										<AvatarFallback>{username?.slice(0, 2)?.toUpperCase() || "?"}</AvatarFallback>

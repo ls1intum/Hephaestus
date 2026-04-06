@@ -109,6 +109,10 @@ public class SecurityConfig {
             requests
                 .requestMatchers("/v3/api-docs/**", "/v3/api-docs.yaml", "/swagger-ui/**", "/swagger-ui.html")
                 .permitAll();
+            // Public auth discovery (identity providers for login UI)
+            requests.requestMatchers(HttpMethod.GET, "/auth/identity-providers").permitAll();
+            // Public workspace provider discovery (workspace creation UI)
+            requests.requestMatchers(HttpMethod.GET, "/workspaces/providers").permitAll();
             // Public read for slugged workspace paths (filter enforces membership/public visibility).
             requests.requestMatchers(HttpMethod.GET, "/workspaces/*/**").permitAll();
             // Registry/listing stays authenticated to avoid leaking tenant directory.

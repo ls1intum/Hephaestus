@@ -45,7 +45,7 @@ public record GitHubProperties(@Valid App app, @Valid Meta meta) {
      */
     public GitHubProperties {
         if (app == null) {
-            app = new App(0, null, null);
+            app = new App(0, null, null, null);
         }
         if (meta == null) {
             meta = new Meta(null);
@@ -67,11 +67,13 @@ public record GitHubProperties(@Valid App app, @Valid Meta meta) {
      * @param id                 the GitHub App ID (0 means disabled, must be non-negative)
      * @param privateKeyLocation resource location of the private key file
      * @param privateKey         PEM-encoded private key as inline string
+     * @param installationUrl    URL where users install the GitHub App (e.g. https://github.com/apps/my-app/installations/new)
      */
     public record App(
         @Min(value = 0, message = "GitHub App ID must be non-negative (0 means disabled)") @DefaultValue("0") long id,
         @Nullable Resource privateKeyLocation,
-        @Nullable String privateKey
+        @Nullable String privateKey,
+        @Nullable String installationUrl
     ) {}
 
     /**
