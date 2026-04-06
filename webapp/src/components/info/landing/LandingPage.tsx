@@ -7,7 +7,7 @@ import { LandingTestimonialSection } from "./LandingTestimonialSection";
 import { LandingWhyChooseSection } from "./LandingWhyChooseSection";
 
 interface LandingPageProps {
-	onSignIn: () => void;
+	onSignIn: (idpHint: string) => void;
 	onGoToDashboard?: () => void;
 	isSignedIn?: boolean;
 }

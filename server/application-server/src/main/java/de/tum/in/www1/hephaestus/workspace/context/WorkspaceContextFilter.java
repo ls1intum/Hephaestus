@@ -89,7 +89,12 @@ public class WorkspaceContextFilter implements Filter {
         String path = httpRequest.getRequestURI();
 
         // Allow workspace registry endpoints that are not slugged
-        if ("/workspaces".equals(path) || "/workspaces/".equals(path)) {
+        if (
+            "/workspaces".equals(path) ||
+            "/workspaces/".equals(path) ||
+            path.startsWith("/workspaces/providers") ||
+            path.startsWith("/workspaces/gitlab/")
+        ) {
             chain.doFilter(request, response);
             return;
         }

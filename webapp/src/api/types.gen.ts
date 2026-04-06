@@ -45,6 +45,40 @@ export type WorkspaceTeamRepositorySettings = {
 };
 
 /**
+ * Available workspace creation providers and their configuration
+ */
+export type WorkspaceProviders = {
+    /**
+     * GitHub workspace provider config, null if not available
+     */
+    github?: GitHubProvider;
+    /**
+     * GitLab workspace provider config, null if not available
+     */
+    gitlab?: GitLabProvider;
+};
+
+/**
+ * GitLab provider configuration
+ */
+export type GitLabProvider = {
+    /**
+     * Default GitLab server URL for this deployment
+     */
+    defaultServerUrl?: string;
+};
+
+/**
+ * GitHub provider configuration
+ */
+export type GitHubProvider = {
+    /**
+     * GitHub App installation URL
+     */
+    appInstallationUrl?: string;
+};
+
+/**
  * A user's membership in a workspace
  */
 export type WorkspaceMembership = {
@@ -1229,6 +1263,28 @@ export type AgentJob = {
 };
 
 /**
+ * An identity provider account that can be linked to the user
+ */
+export type LinkedAccount = {
+    /**
+     * Whether the user has linked this provider
+     */
+    connected: boolean;
+    /**
+     * Username on the external provider, if connected
+     */
+    linkedUsername?: string;
+    /**
+     * Identity provider alias (e.g. 'github', 'gitlab-lrz')
+     */
+    providerAlias: string;
+    /**
+     * Display name of the identity provider
+     */
+    providerName: string;
+};
+
+/**
  * Linear progress with current and target counts
  */
 export type LinearAchievementProgress = Omit<AchievementProgress, 'type'> & {
@@ -1297,6 +1353,24 @@ export type LeaderboardEntry = {
      * User info (populated in INDIVIDUAL mode, null in TEAM mode)
      */
     user?: UserInfo;
+};
+
+/**
+ * An enabled identity provider available for login
+ */
+export type IdentityProvider = {
+    /**
+     * Identity provider alias used as idpHint (e.g. 'github', 'gitlab-lrz')
+     */
+    alias: string;
+    /**
+     * Display name of the identity provider
+     */
+    displayName: string;
+    /**
+     * Provider type (e.g. 'github', 'oidc')
+     */
+    type: string;
 };
 
 /**
@@ -1491,9 +1565,11 @@ export type CreateWorkspaceRequest = {
      */
     gitProviderMode?: 'PAT_ORG' | 'GITHUB_APP_INSTALLATION' | 'GITLAB_PAT';
     /**
-     * User ID of the workspace owner
+     * Deprecated: ignored by the server. The authenticated user always becomes the owner.
+     *
+     * @deprecated
      */
-    ownerUserId: number;
+    ownerUserId?: number;
     /**
      * Personal Access Token for GitLab API access. Required when gitProviderMode is GITLAB_PAT. Stored encrypted at rest.
      */
@@ -1806,6 +1882,22 @@ export type Achievement = {
     unlockedAt: Date;
 };
 
+export type GetIdentityProvidersData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/auth/identity-providers';
+};
+
+export type GetIdentityProvidersResponses = {
+    /**
+     * OK
+     */
+    200: Array<IdentityProvider>;
+};
+
+export type GetIdentityProvidersResponse = GetIdentityProvidersResponses[keyof GetIdentityProvidersResponses];
+
 export type ListGlobalContributorsData = {
     body?: never;
     path?: never;
@@ -1851,6 +1943,38 @@ export type GetUserFeaturesResponses = {
 };
 
 export type GetUserFeaturesResponse = GetUserFeaturesResponses[keyof GetUserFeaturesResponses];
+
+export type GetLinkedAccountsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/user/linked-accounts';
+};
+
+export type GetLinkedAccountsResponses = {
+    /**
+     * OK
+     */
+    200: Array<LinkedAccount>;
+};
+
+export type GetLinkedAccountsResponse = GetLinkedAccountsResponses[keyof GetLinkedAccountsResponses];
+
+export type UnlinkAccountData = {
+    body?: never;
+    path: {
+        providerAlias: string;
+    };
+    query?: never;
+    url: '/user/linked-accounts/{providerAlias}';
+};
+
+export type UnlinkAccountResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
 
 export type GetUserSettingsData = {
     body?: never;
@@ -1947,6 +2071,22 @@ export type GitLabPreflightResponses = {
 };
 
 export type GitLabPreflightResponse2 = GitLabPreflightResponses[keyof GitLabPreflightResponses];
+
+export type GetProvidersData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/workspaces/providers';
+};
+
+export type GetProvidersResponses = {
+    /**
+     * OK
+     */
+    200: WorkspaceProviders;
+};
+
+export type GetProvidersResponse = GetProvidersResponses[keyof GetProvidersResponses];
 
 export type PurgeWorkspaceData = {
     body?: never;

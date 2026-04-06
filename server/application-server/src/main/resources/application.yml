@@ -423,8 +423,10 @@ hephaestus:
     gitlab:
         # Set to true to enable GitLab integration (loads all GitLab beans)
         enabled: ${GITLAB_ENABLED:false}
-        # Default GitLab server URL (used when workspace has no custom serverUrl)
-        default-server-url: ${GITLAB_DEFAULT_SERVER_URL:https://gitlab.com}
+        # Default GitLab server URL (used when workspace has no custom serverUrl).
+        # Falls back to KEYCLOAK_GITLAB_BASE_URL so deployments with GitLab login
+        # automatically use the same instance for workspace creation.
+        default-server-url: ${GITLAB_DEFAULT_SERVER_URL:${KEYCLOAK_GITLAB_BASE_URL:https://gitlab.com}}
         # Timeout for standard GraphQL operations (default: 30s)
         graphql-timeout: ${GITLAB_GRAPHQL_TIMEOUT:30s}
         # Extended timeout for complex operations (default: 60s)
@@ -456,6 +458,8 @@ hephaestus:
             id: ${GH_APP_ID:0}
             privateKeyLocation: ${GH_APP_PRIVATE_KEY_LOCATION:}
             privateKey: ${GH_APP_PRIVATE_KEY:}
+            # URL where users install the GitHub App (shown in workspace creation UI)
+            installation-url: ${GH_APP_INSTALLATION_URL:}
         meta:
             auth-token: ${GH_AUTH_TOKEN:}
 
