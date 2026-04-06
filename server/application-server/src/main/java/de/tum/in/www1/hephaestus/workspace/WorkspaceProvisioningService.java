@@ -255,76 +255,60 @@ public class WorkspaceProvisioningService {
 
     /**
      * Ensures the currently authenticated Keycloak user has a corresponding git provider
-     * {@link User} entity for the given GitLab server. Uses JWT claims ({@code preferred_username},
-     * {@code gitlab_id}) to create or update the user.
+     * {@link User} entity so they can be assigned as workspace owner.
      *
-     * <p>This is needed because first-time GitLab users have no {@code User} entity until
-     * the group sync runs. Without this, workspace creation would fail because there is no
-     * owner to assign.
+     * <p>Reads identity from JWT claims to determine the user's provider:
+     * <ul>
+     *   <li>{@code gitlab_id} → creates a GitLab user (uses the given serverUrl)</li>
+     *   <li>{@code github_id} → creates a GitHub user</li>
+     * </ul>
      *
-     * @param serverUrl the GitLab server URL (resolved to default if blank)
+     * <p>This is needed because first-time users may not have a {@code User} entity yet
+     * (it's normally created during sync). Without this, workspace creation would fail
+     * because there is no owner to assign.
+     *
+     * @param gitLabServerUrl the GitLab server URL for GitLab users (resolved to default if blank)
      */
     @Transactional
-    public void ensureAuthenticatedGitLabUser(String serverUrl) {
+    public void ensureAuthenticatedUserExists(String gitLabServerUrl) {
         String login = SecurityUtils.getCurrentUserLoginOrThrow();
-        String resolvedServerUrl = resolveGitLabServerUrl(serverUrl);
 
-        // Check if user already exists
-        GitProvider provider = gitProviderRepository
-            .findByTypeAndServerUrl(GitProviderType.GITLAB, resolvedServerUrl)
-            .orElse(null);
-        if (provider != null && userRepository.findByLoginAndProviderId(login, provider.getId()).isPresent()) {
-            return; // User already exists, nothing to do
+        // Fast path: if user already exists in ANY provider, we're done
+        if (userRepository.findByLogin(login).isPresent()) {
+            return;
         }
 
-        // Read identity from JWT — try gitlab_id first, then github_id
+        // Read identity from JWT
         Authentication auth =
             org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-        Long gitlabId = null;
-        Long githubId = null;
-        if (auth != null && auth.getPrincipal() instanceof org.springframework.security.oauth2.jwt.Jwt jwt) {
-            gitlabId = jwt.getClaim("gitlab_id");
-            githubId = jwt.getClaim("github_id");
+        if (auth == null || !(auth.getPrincipal() instanceof org.springframework.security.oauth2.jwt.Jwt jwt)) {
+            log.warn("Cannot ensure user exists: reason=noJwt, login={}", LoggingUtils.sanitizeForLog(login));
+            return;
         }
 
+        Long gitlabId = jwt.getClaim("gitlab_id");
+        Long githubId = jwt.getClaim("github_id");
+
         if (gitlabId != null) {
-            // User logged in via GitLab — create GitLab user entity
-            upsertGitLabUser(
-                gitlabId,
-                login,
-                login,
-                "",
-                resolvedServerUrl + "/" + login,
-                resolvedServerUrl,
-                User.Type.USER
-            );
+            String resolvedUrl = resolveGitLabServerUrl(gitLabServerUrl);
+            upsertGitLabUser(gitlabId, login, login, "", resolvedUrl + "/" + login, resolvedUrl, User.Type.USER);
         } else if (githubId != null) {
-            // User logged in via GitHub — create GitHub user entity so they can own the workspace
-            ensureGitHubUserFromJwt(login, githubId);
+            upsertGitHubUser(githubId, login);
         } else {
             log.warn(
-                "Cannot create user for workspace owner: reason=noProviderIdInJwt, login={}",
+                "Cannot ensure user exists: reason=noProviderIdInJwt, login={}",
                 LoggingUtils.sanitizeForLog(login)
             );
         }
     }
 
-    /**
-     * Creates a GitHub user entity from JWT claims when the user logged in via GitHub
-     * but no GitHub User entity exists yet (fresh DB).
-     */
-    private void ensureGitHubUserFromJwt(String login, Long githubId) {
-        String githubServerUrl = "https://github.com";
+    private void upsertGitHubUser(Long githubId, String login) {
+        String serverUrl = GITHUB_API_BASE_URL.replace("/api/v3", "");
         GitProvider provider = gitProviderRepository
-            .findByTypeAndServerUrl(GitProviderType.GITHUB, githubServerUrl)
-            .orElse(null);
-        if (provider != null && userRepository.findByLoginAndProviderId(login, provider.getId()).isPresent()) {
-            return;
-        }
-        if (provider == null) {
-            provider = gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, githubServerUrl));
-        }
+            .findByTypeAndServerUrl(GitProviderType.GITHUB, serverUrl)
+            .orElseGet(() -> gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, serverUrl)));
         Long providerId = provider.getId();
+
         userRepository.acquireLoginLock(login, providerId);
         userRepository.freeLoginConflicts(login, githubId, providerId);
         userRepository.upsertUser(
@@ -339,7 +323,11 @@ public class WorkspaceProvisioningService {
             null,
             null
         );
-        log.info("Created GitHub user from JWT for workspace ownership: login={}, githubId={}", login, githubId);
+        log.info(
+            "Upserted user from JWT for workspace ownership: login={}, provider=GITHUB, nativeId={}",
+            LoggingUtils.sanitizeForLog(login),
+            githubId
+        );
     }
 
     /**
