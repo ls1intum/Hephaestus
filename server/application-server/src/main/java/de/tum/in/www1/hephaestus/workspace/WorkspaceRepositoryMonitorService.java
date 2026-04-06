@@ -147,14 +147,17 @@ public class WorkspaceRepositoryMonitorService {
             throw new RepositoryAlreadyMonitoredException(nameWithOwner);
         }
 
-        // Validate that repository exists in the database
-        var repository = findRepository(nameWithOwner);
-        if (repository.isEmpty()) {
-            log.debug(
-                "Skipped repository monitor addition: reason=repositoryNotFound, nameWithOwner={}",
-                LoggingUtils.sanitizeForLog(nameWithOwner)
-            );
-            throw new EntityNotFoundException("Repository", nameWithOwner);
+        // For GitLab PAT workspaces, the repo may not be synced yet — allow adding by name.
+        // For other modes, validate that the repository exists in the database.
+        if (!Workspace.GitProviderMode.GITLAB_PAT.equals(workspace.getGitProviderMode())) {
+            var repository = findRepository(nameWithOwner);
+            if (repository.isEmpty()) {
+                log.debug(
+                    "Skipped repository monitor addition: reason=repositoryNotFound, nameWithOwner={}",
+                    LoggingUtils.sanitizeForLog(nameWithOwner)
+                );
+                throw new EntityNotFoundException("Repository", nameWithOwner);
+            }
         }
 
         log.info(
