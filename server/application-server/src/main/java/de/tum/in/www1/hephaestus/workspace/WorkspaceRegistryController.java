@@ -2,8 +2,6 @@ package de.tum.in.www1.hephaestus.workspace;
 
 import de.tum.in.www1.hephaestus.feature.FeatureFlag;
 import de.tum.in.www1.hephaestus.feature.FeatureFlagService;
-import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
-import de.tum.in.www1.hephaestus.gitprovider.github.GitHubProperties;
 import de.tum.in.www1.hephaestus.workspace.dto.CreateWorkspaceRequestDTO;
 import de.tum.in.www1.hephaestus.workspace.dto.GitLabGroupDTO;
 import de.tum.in.www1.hephaestus.workspace.dto.GitLabPreflightRequestDTO;
@@ -47,8 +45,6 @@ public class WorkspaceRegistryController {
     private final WorkspaceProvisioningService workspaceProvisioningService;
     private final GitLabPreflightService gitLabPreflightService;
     private final FeatureFlagService featureFlagService;
-    private final GitHubProperties gitHubProperties;
-    private final GitLabProperties gitLabProperties;
 
     @GetMapping("/providers")
     @Operation(
@@ -56,17 +52,9 @@ public class WorkspaceRegistryController {
         description = "Returns available workspace providers with their configuration. Public endpoint — no authentication required."
     )
     @io.swagger.v3.oas.annotations.security.SecurityRequirements
+    @PreAuthorize("permitAll()")
     public ResponseEntity<WorkspaceProvidersDTO> getProviders() {
-        var github =
-            gitHubProperties.app().id() > 0 && gitHubProperties.app().installationUrl() != null
-                ? new WorkspaceProvidersDTO.GitHubProviderDTO(gitHubProperties.app().installationUrl())
-                : null;
-
-        var gitlab = featureFlagService.isEnabled(FeatureFlag.GITLAB_WORKSPACE_CREATION)
-            ? new WorkspaceProvidersDTO.GitLabProviderDTO(gitLabProperties.defaultServerUrl())
-            : null;
-
-        return ResponseEntity.ok(new WorkspaceProvidersDTO(github, gitlab));
+        return ResponseEntity.ok(workspaceQueryService.getAvailableProviders());
     }
 
     @PostMapping

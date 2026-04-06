@@ -1,9 +1,14 @@
 package de.tum.in.www1.hephaestus.workspace;
 
 import de.tum.in.www1.hephaestus.core.WorkspaceAgnostic;
+import de.tum.in.www1.hephaestus.feature.FeatureFlag;
+import de.tum.in.www1.hephaestus.feature.FeatureFlagService;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
+import de.tum.in.www1.hephaestus.gitprovider.github.GitHubProperties;
 import de.tum.in.www1.hephaestus.gitprovider.repository.Repository;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
+import de.tum.in.www1.hephaestus.workspace.dto.WorkspaceProvidersDTO;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Optional;
@@ -31,17 +36,42 @@ public class WorkspaceQueryService {
     private final WorkspaceMembershipRepository workspaceMembershipRepository;
     private final RepositoryToMonitorRepository repositoryToMonitorRepository;
     private final UserRepository userRepository;
+    private final GitHubProperties gitHubProperties;
+    private final GitLabProperties gitLabProperties;
+    private final FeatureFlagService featureFlagService;
 
     public WorkspaceQueryService(
         WorkspaceRepository workspaceRepository,
         WorkspaceMembershipRepository workspaceMembershipRepository,
         RepositoryToMonitorRepository repositoryToMonitorRepository,
-        UserRepository userRepository
+        UserRepository userRepository,
+        GitHubProperties gitHubProperties,
+        GitLabProperties gitLabProperties,
+        FeatureFlagService featureFlagService
     ) {
         this.workspaceRepository = workspaceRepository;
         this.workspaceMembershipRepository = workspaceMembershipRepository;
         this.repositoryToMonitorRepository = repositoryToMonitorRepository;
         this.userRepository = userRepository;
+        this.gitHubProperties = gitHubProperties;
+        this.gitLabProperties = gitLabProperties;
+        this.featureFlagService = featureFlagService;
+    }
+
+    /**
+     * Returns available workspace creation providers based on server configuration.
+     */
+    public WorkspaceProvidersDTO getAvailableProviders() {
+        var github =
+            gitHubProperties.app().id() > 0 && gitHubProperties.app().installationUrl() != null
+                ? new WorkspaceProvidersDTO.GitHubProviderDTO(gitHubProperties.app().installationUrl())
+                : null;
+
+        var gitlab = featureFlagService.isEnabled(FeatureFlag.GITLAB_WORKSPACE_CREATION)
+            ? new WorkspaceProvidersDTO.GitLabProviderDTO(gitLabProperties.defaultServerUrl())
+            : null;
+
+        return new WorkspaceProvidersDTO(github, gitlab);
     }
 
     /**

@@ -284,10 +284,14 @@ public class WorkspaceProvisioningService {
             gitlabId = jwt.getClaim("gitlab_id");
         }
         if (gitlabId == null) {
-            throw new IllegalStateException(
-                "Cannot create GitLab user: gitlab_id claim missing from JWT. " +
-                    "Ensure the user has logged in via GitLab and the gitlab_id mapper is configured in Keycloak."
+            // The user may have logged in via GitHub (no gitlab_id in JWT).
+            // Skip user creation — the workspace will still be created, and the
+            // owner will be resolved from the existing GitHub-linked User entity.
+            log.info(
+                "Skipped GitLab user creation: reason=noGitlabIdInJwt, login={}",
+                LoggingUtils.sanitizeForLog(login)
             );
+            return;
         }
 
         upsertGitLabUser(
