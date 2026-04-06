@@ -1557,7 +1557,7 @@
                 "useJwksUrl": "true",
                 "guiOrder": "2",
                 "clientAuthMethod": "client_secret_post",
-                "allowedClockSkew": "21700"
+                "allowedClockSkew": "300"
             }
         }
     ],

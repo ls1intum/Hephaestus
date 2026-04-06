@@ -277,33 +277,69 @@ public class WorkspaceProvisioningService {
             return; // User already exists, nothing to do
         }
 
-        // Read gitlab_id from JWT
+        // Read identity from JWT — try gitlab_id first, then github_id
         Authentication auth =
             org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
         Long gitlabId = null;
+        Long githubId = null;
         if (auth != null && auth.getPrincipal() instanceof org.springframework.security.oauth2.jwt.Jwt jwt) {
             gitlabId = jwt.getClaim("gitlab_id");
-        }
-        if (gitlabId == null) {
-            // The user may have logged in via GitHub (no gitlab_id in JWT).
-            // Skip user creation — the workspace will still be created, and the
-            // owner will be resolved from the existing GitHub-linked User entity.
-            log.info(
-                "Skipped GitLab user creation: reason=noGitlabIdInJwt, login={}",
-                LoggingUtils.sanitizeForLog(login)
-            );
-            return;
+            githubId = jwt.getClaim("github_id");
         }
 
-        upsertGitLabUser(
-            gitlabId,
+        if (gitlabId != null) {
+            // User logged in via GitLab — create GitLab user entity
+            upsertGitLabUser(
+                gitlabId,
+                login,
+                login,
+                "",
+                resolvedServerUrl + "/" + login,
+                resolvedServerUrl,
+                User.Type.USER
+            );
+        } else if (githubId != null) {
+            // User logged in via GitHub — create GitHub user entity so they can own the workspace
+            ensureGitHubUserFromJwt(login, githubId);
+        } else {
+            log.warn(
+                "Cannot create user for workspace owner: reason=noProviderIdInJwt, login={}",
+                LoggingUtils.sanitizeForLog(login)
+            );
+        }
+    }
+
+    /**
+     * Creates a GitHub user entity from JWT claims when the user logged in via GitHub
+     * but no GitHub User entity exists yet (fresh DB).
+     */
+    private void ensureGitHubUserFromJwt(String login, Long githubId) {
+        String githubServerUrl = "https://github.com";
+        GitProvider provider = gitProviderRepository
+            .findByTypeAndServerUrl(GitProviderType.GITHUB, githubServerUrl)
+            .orElse(null);
+        if (provider != null && userRepository.findByLoginAndProviderId(login, provider.getId()).isPresent()) {
+            return;
+        }
+        if (provider == null) {
+            provider = gitProviderRepository.save(new GitProvider(GitProviderType.GITHUB, githubServerUrl));
+        }
+        Long providerId = provider.getId();
+        userRepository.acquireLoginLock(login, providerId);
+        userRepository.freeLoginConflicts(login, githubId, providerId);
+        userRepository.upsertUser(
+            githubId,
+            providerId,
             login,
-            login, // name defaults to login, will be updated by sync
-            "", // avatarUrl — will be populated by sync
-            resolvedServerUrl + "/" + login,
-            resolvedServerUrl,
-            User.Type.USER
+            login,
+            "https://avatars.githubusercontent.com/u/" + githubId,
+            "https://github.com/" + login,
+            User.Type.USER.name(),
+            null,
+            null,
+            null
         );
+        log.info("Created GitHub user from JWT for workspace ownership: login={}, githubId={}", login, githubId);
     }
 
     /**
