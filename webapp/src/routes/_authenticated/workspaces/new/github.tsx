@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeftIcon, ExternalLinkIcon, GithubIcon } from "lucide-react";
-import { getWorkspaceProvidersOptions } from "@/api/@tanstack/react-query.gen";
+import { getProvidersOptions } from "@/api/@tanstack/react-query.gen";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -12,7 +12,7 @@ export const Route = createFileRoute("/_authenticated/workspaces/new/github")({
 
 function GitHubSetupPage() {
 	const { data: providers, isLoading } = useQuery({
-		...getWorkspaceProvidersOptions(),
+		...getProvidersOptions(),
 		staleTime: 5 * 60 * 1000,
 	});
 

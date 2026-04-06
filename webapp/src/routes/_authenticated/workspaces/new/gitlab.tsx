@@ -5,7 +5,7 @@ import { useEffect, useMemo, useReducer, useRef } from "react";
 import { toast } from "sonner";
 import {
 	createWorkspaceMutation,
-	getWorkspaceProvidersOptions,
+	getProvidersOptions,
 	listGitLabGroupsMutation,
 	listWorkspacesQueryKey,
 } from "@/api/@tanstack/react-query.gen";
@@ -43,7 +43,7 @@ function GitLabWizardPage() {
 		isLoading: providersLoading,
 		isError: providersError,
 	} = useQuery({
-		...getWorkspaceProvidersOptions(),
+		...getProvidersOptions(),
 		staleTime: 5 * 60 * 1000,
 	});
 

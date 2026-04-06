@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import type { LucideIcon } from "lucide-react";
 import { ArrowLeftIcon, GithubIcon, GitlabIcon, OctagonXIcon } from "lucide-react";
-import { getWorkspaceProvidersOptions } from "@/api/@tanstack/react-query.gen";
+import { getProvidersOptions } from "@/api/@tanstack/react-query.gen";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
@@ -25,7 +25,7 @@ function ProviderSelectionPage() {
 		isLoading,
 		isError,
 	} = useQuery({
-		...getWorkspaceProvidersOptions(),
+		...getProvidersOptions(),
 		staleTime: 5 * 60 * 1000,
 	});
 

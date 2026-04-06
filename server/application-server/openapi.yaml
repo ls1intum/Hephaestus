@@ -34,10 +34,10 @@ tags:
   name: workspace-membership-controller
 - description: Workspace-scoped agent job monitoring
   name: Agent Jobs
-- description: "Authentication discovery (public)"
-  name: Auth
 - description: "User account management (settings, deletion)"
   name: Account
+- description: Authentication discovery (public)
+  name: Auth
 - description: Manage practice definitions
   name: Practice Catalog
 - description: Workspace-scoped team settings management
@@ -65,7 +65,6 @@ paths:
                 items:
                   $ref: "#/components/schemas/IdentityProvider"
           description: OK
-      security: []
       summary: List available identity providers
       tags:
       - Auth
@@ -182,22 +181,6 @@ paths:
       summary: Update user settings
       tags:
       - Account
-  /workspaces/providers:
-    get:
-      description: Returns available workspace providers with their configuration.
-        Public endpoint — no authentication required.
-      operationId: getWorkspaceProviders
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/WorkspaceProviders"
-          description: OK
-      security: []
-      summary: List available workspace creation providers
-      tags:
-      - workspace-registry-controller
   /workspaces:
     get:
       operationId: listWorkspaces
@@ -269,6 +252,22 @@ paths:
                 $ref: "#/components/schemas/GitLabPreflightResponse"
           description: Validation result
       summary: Validate a GitLab PAT before workspace creation
+      tags:
+      - workspace-registry
+  /workspaces/providers:
+    get:
+      description: Returns available workspace providers with their configuration.
+        Public endpoint — no authentication required.
+      operationId: getProviders
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceProviders"
+          description: OK
+      security: []
+      summary: List available workspace creation providers
       tags:
       - workspace-registry
   /workspaces/{workspaceSlug}:
@@ -3697,6 +3696,14 @@ components:
       - applied
       - disputed
       - notApplicable
+    GitHubProvider:
+      type: object
+      description: GitHub provider configuration
+      properties:
+        appInstallationUrl:
+          type: string
+          description: GitHub App installation URL
+          example: https://github.com/apps/hephaestus/installations/new
     GitLabGroup:
       type: object
       description: GitLab group accessible to the provided PAT
@@ -3765,6 +3772,31 @@ components:
           description: Whether the token is valid
       required:
       - valid
+    GitLabProvider:
+      type: object
+      description: GitLab provider configuration
+      properties:
+        defaultServerUrl:
+          type: string
+          description: Default GitLab server URL for this deployment
+          example: https://gitlab.lrz.de
+    IdentityProvider:
+      type: object
+      description: An enabled identity provider available for login
+      properties:
+        alias:
+          type: string
+          description: "Identity provider alias used as idpHint (e.g. 'github', 'gitlab-lrz')"
+        displayName:
+          type: string
+          description: Display name of the identity provider
+        type:
+          type: string
+          description: "Provider type (e.g. 'github', 'oidc')"
+      required:
+      - alias
+      - displayName
+      - type
     LabelInfo:
       type: object
       description: Information about a label from a repository
@@ -3878,23 +3910,6 @@ components:
       required:
       - current
       - target
-    IdentityProvider:
-      type: object
-      description: An enabled identity provider available for login
-      properties:
-        alias:
-          type: string
-          description: "Identity provider alias used as idpHint (e.g. 'github', 'gitlab-lrz')"
-        displayName:
-          type: string
-          description: Display name of the identity provider
-        type:
-          type: string
-          description: "Provider type (e.g. 'github', 'oidc')"
-      required:
-      - alias
-      - displayName
-      - type
     LinkedAccount:
       type: object
       description: An identity provider account that can be linked to the user
@@ -5115,36 +5130,6 @@ components:
       - status
       - updatedAt
       - workspaceSlug
-    WorkspaceProviders:
-      type: object
-      description: Available workspace creation providers and their configuration
-      properties:
-        github:
-          $ref: "#/components/schemas/GitHubProvider"
-          description: "GitHub workspace provider config, null if not available"
-        gitlab:
-          $ref: "#/components/schemas/GitLabProvider"
-          description: "GitLab workspace provider config, null if not available"
-    GitHubProvider:
-      type: object
-      description: GitHub provider configuration
-      properties:
-        appInstallationUrl:
-          type: string
-          description: GitHub App installation URL
-          example: "https://github.com/apps/hephaestus/installations/new"
-      required:
-      - appInstallationUrl
-    GitLabProvider:
-      type: object
-      description: GitLab provider configuration
-      properties:
-        defaultServerUrl:
-          type: string
-          description: Default GitLab server URL for this deployment
-          example: "https://gitlab.lrz.de"
-      required:
-      - defaultServerUrl
     WorkspaceListItem:
       type: object
       description: Summary information about a workspace for list views
@@ -5231,6 +5216,16 @@ components:
         userName:
           type: string
           description: Display name of the user
+    WorkspaceProviders:
+      type: object
+      description: Available workspace creation providers and their configuration
+      properties:
+        github:
+          $ref: "#/components/schemas/GitHubProvider"
+          description: "GitHub workspace provider config, null if not available"
+        gitlab:
+          $ref: "#/components/schemas/GitLabProvider"
+          description: "GitLab workspace provider config, null if not available"
     WorkspaceTeamRepositorySettings:
       type: object
       description: Repository contribution visibility settings for a specific team
