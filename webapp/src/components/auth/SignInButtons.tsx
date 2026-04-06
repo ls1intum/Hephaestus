@@ -1,11 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
+import type { ComponentPropsWithoutRef } from "react";
 import { getIdentityProvidersOptions } from "@/api/@tanstack/react-query.gen";
 import type { IdentityProvider } from "@/api/types.gen";
-import { GitHubSignInButton } from "./GitHubSignInButton";
-import { GitLabSignInButton, GitLabMarkIcon } from "./GitLabSignInButton";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import type { ComponentPropsWithoutRef } from "react";
+import { GitHubSignInButton } from "./GitHubSignInButton";
+import { GitLabMarkIcon, GitLabSignInButton } from "./GitLabSignInButton";
 
 type ButtonSize = ComponentPropsWithoutRef<typeof Button>["size"];
 
