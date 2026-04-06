@@ -205,7 +205,15 @@ function GlobalCopilot() {
 
 function HeaderContainer() {
 	const { pathname } = useLocation();
-	const { isAuthenticated, isLoading, username, userProfile, login, logout, getUserProfilePictureUrl } = useAuth();
+	const {
+		isAuthenticated,
+		isLoading,
+		username,
+		userProfile,
+		login,
+		logout,
+		getUserProfilePictureUrl,
+	} = useAuth();
 	const { workspaceSlug } = useActiveWorkspaceSlug();
 
 	return (

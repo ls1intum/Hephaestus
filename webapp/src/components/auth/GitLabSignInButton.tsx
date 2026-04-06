@@ -14,7 +14,10 @@ export const GitLabSignInButton = forwardRef<HTMLButtonElement, GitLabSignInButt
 			<Button
 				ref={ref}
 				size={size}
-				className={cn("bg-[#FC6D26] text-white transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-[#FC6D26]/30 active:scale-[0.98]", className)}
+				className={cn(
+					"bg-[#FC6D26] text-white transition-all hover:scale-[1.02] hover:shadow-lg hover:shadow-[#FC6D26]/30 active:scale-[0.98]",
+					className,
+				)}
 				{...props}
 			>
 				<GitLabMarkIcon />

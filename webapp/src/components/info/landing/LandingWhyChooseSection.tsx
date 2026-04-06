@@ -80,10 +80,7 @@ export function LandingWhyChooseSection({
 									Go to Dashboard <ArrowRight className="h-4 w-4" />
 								</Button>
 							) : (
-								<SignInButtons
-									onSignIn={onSignIn}
-									className="w-full justify-center sm:w-auto"
-								/>
+								<SignInButtons onSignIn={onSignIn} className="w-full justify-center sm:w-auto" />
 							)}
 						</div>
 					</div>

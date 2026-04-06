@@ -50,10 +50,8 @@ function GitLabWizardPage() {
 	const gitlabEnabled = !!providers?.gitlab;
 	const defaultServerUrl = providers?.gitlab?.defaultServerUrl;
 
-	const [state, dispatch] = useReducer(
-		wizardReducer,
-		defaultServerUrl,
-		(url) => createInitialWizardState(url),
+	const [state, dispatch] = useReducer(wizardReducer, defaultServerUrl, (url) =>
+		createInitialWizardState(url),
 	);
 	const queryClient = useQueryClient();
 	const navigate = useNavigate();

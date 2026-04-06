@@ -62,7 +62,9 @@ function HeaderProviderButton({
 			: "";
 
 	const icon = isGitHub ? (
-		<GitHubMark className={`h-5 w-5 shrink-0 ${isGitHub ? "!text-github-white dark:!text-github-black" : ""}`} />
+		<GitHubMark
+			className={`h-5 w-5 shrink-0 ${isGitHub ? "!text-github-white dark:!text-github-black" : ""}`}
+		/>
 	) : isGitLab ? (
 		<GitLabMarkIcon />
 	) : null;
@@ -83,9 +85,7 @@ function HeaderProviderButton({
 					{provider.displayName}
 				</span>
 			</TooltipTrigger>
-			<TooltipContent className="sm:hidden">
-				Sign in with {provider.displayName}
-			</TooltipContent>
+			<TooltipContent className="sm:hidden">Sign in with {provider.displayName}</TooltipContent>
 		</Tooltip>
 	);
 }
@@ -107,13 +107,23 @@ function ProviderButton({
 
 	if (provider.type === "github") {
 		return (
-			<GitHubSignInButton onClick={handleClick} disabled={disabled} size={size} className={className} />
+			<GitHubSignInButton
+				onClick={handleClick}
+				disabled={disabled}
+				size={size}
+				className={className}
+			/>
 		);
 	}
 
 	if (provider.alias.startsWith("gitlab")) {
 		return (
-			<GitLabSignInButton onClick={handleClick} disabled={disabled} size={size} className={className}>
+			<GitLabSignInButton
+				onClick={handleClick}
+				disabled={disabled}
+				size={size}
+				className={className}
+			>
 				Sign in with {provider.displayName}
 			</GitLabSignInButton>
 		);
@@ -154,7 +164,14 @@ export function SignInButtons({ onSignIn, disabled, size, className, header }: S
 				</Button>
 			);
 		}
-		return <GitHubSignInButton onClick={() => onSignIn("github")} disabled={disabled} size={size} className={className} />;
+		return (
+			<GitHubSignInButton
+				onClick={() => onSignIn("github")}
+				disabled={disabled}
+				size={size}
+				className={className}
+			/>
+		);
 	}
 
 	if (header) {
