@@ -90,8 +90,10 @@ public class WorkspaceContextFilter implements Filter {
 
         // Allow workspace registry endpoints that are not slugged
         if (
-            "/workspaces".equals(path) || "/workspaces/".equals(path) ||
-            path.startsWith("/workspaces/providers") || path.startsWith("/workspaces/gitlab/")
+            "/workspaces".equals(path) ||
+            "/workspaces/".equals(path) ||
+            path.startsWith("/workspaces/providers") ||
+            path.startsWith("/workspaces/gitlab/")
         ) {
             chain.doFilter(request, response);
             return;

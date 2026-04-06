@@ -18,10 +18,10 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
-import org.springframework.security.core.Authentication;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -277,16 +277,16 @@ public class WorkspaceProvisioningService {
         }
 
         // Read gitlab_id from JWT
-        Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext()
-            .getAuthentication();
+        Authentication auth =
+            org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
         Long gitlabId = null;
         if (auth != null && auth.getPrincipal() instanceof org.springframework.security.oauth2.jwt.Jwt jwt) {
             gitlabId = jwt.getClaim("gitlab_id");
         }
         if (gitlabId == null) {
             throw new IllegalStateException(
-                "Cannot create GitLab user: gitlab_id claim missing from JWT. "
-                    + "Ensure the user has logged in via GitLab and the gitlab_id mapper is configured in Keycloak."
+                "Cannot create GitLab user: gitlab_id claim missing from JWT. " +
+                    "Ensure the user has logged in via GitLab and the gitlab_id mapper is configured in Keycloak."
             );
         }
 
@@ -294,7 +294,7 @@ public class WorkspaceProvisioningService {
             gitlabId,
             login,
             login, // name defaults to login, will be updated by sync
-            "",    // avatarUrl — will be populated by sync
+            "", // avatarUrl — will be populated by sync
             resolvedServerUrl + "/" + login,
             resolvedServerUrl,
             User.Type.USER

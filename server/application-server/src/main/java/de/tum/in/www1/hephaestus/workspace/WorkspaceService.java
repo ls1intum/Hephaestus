@@ -192,9 +192,10 @@ public class WorkspaceService {
     private void createOwnerRole(Workspace workspace, Long ownerUserId) {
         if (ownerUserId == null) {
             throw new IllegalStateException(
-                "Cannot create workspace without an owner. "
-                    + "The authenticated user must have a corresponding git provider User entity. "
-                    + "workspaceSlug=" + workspace.getWorkspaceSlug()
+                "Cannot create workspace without an owner. " +
+                    "The authenticated user must have a corresponding git provider User entity. " +
+                    "workspaceSlug=" +
+                    workspace.getWorkspaceSlug()
             );
         }
         workspaceMembershipService.createMembership(workspace, ownerUserId, WorkspaceMembership.WorkspaceRole.OWNER);

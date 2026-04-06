@@ -57,9 +57,10 @@ public class WorkspaceRegistryController {
     )
     @io.swagger.v3.oas.annotations.security.SecurityRequirements
     public ResponseEntity<WorkspaceProvidersDTO> getProviders() {
-        var github = gitHubProperties.app().id() > 0 && gitHubProperties.app().installationUrl() != null
-            ? new WorkspaceProvidersDTO.GitHubProviderDTO(gitHubProperties.app().installationUrl())
-            : null;
+        var github =
+            gitHubProperties.app().id() > 0 && gitHubProperties.app().installationUrl() != null
+                ? new WorkspaceProvidersDTO.GitHubProviderDTO(gitHubProperties.app().installationUrl())
+                : null;
 
         var gitlab = featureFlagService.isEnabled(FeatureFlag.GITLAB_WORKSPACE_CREATION)
             ? new WorkspaceProvidersDTO.GitLabProviderDTO(gitLabProperties.defaultServerUrl())
@@ -92,9 +93,7 @@ public class WorkspaceRegistryController {
         // (it's normally created during group sync). Without this, the workspace
         // would have no owner — a security and UX problem.
         if (createWorkspaceRequest.gitProviderMode() == Workspace.GitProviderMode.GITLAB_PAT) {
-            workspaceProvisioningService.ensureAuthenticatedGitLabUser(
-                createWorkspaceRequest.serverUrl()
-            );
+            workspaceProvisioningService.ensureAuthenticatedGitLabUser(createWorkspaceRequest.serverUrl());
         }
 
         Workspace workspace = workspaceService.createWorkspace(createWorkspaceRequest);

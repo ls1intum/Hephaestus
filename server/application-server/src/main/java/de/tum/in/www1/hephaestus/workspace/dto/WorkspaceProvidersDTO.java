@@ -13,8 +13,7 @@ public record WorkspaceProvidersDTO(
         @Schema(
             description = "GitHub App installation URL",
             example = "https://github.com/apps/hephaestus/installations/new"
-        )
-        String appInstallationUrl
+        ) String appInstallationUrl
     ) {}
 
     @Schema(description = "GitLab provider configuration")
@@ -22,7 +21,6 @@ public record WorkspaceProvidersDTO(
         @Schema(
             description = "Default GitLab server URL for this deployment",
             example = "https://gitlab.lrz.de"
-        )
-        String defaultServerUrl
+        ) String defaultServerUrl
     ) {}
 }

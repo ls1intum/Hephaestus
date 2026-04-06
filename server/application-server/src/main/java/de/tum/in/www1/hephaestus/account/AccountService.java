@@ -159,11 +159,13 @@ public class AccountService {
                 .findAll()
                 .stream()
                 .filter(idp -> !Boolean.TRUE.equals(idp.isLinkOnly()) && Boolean.TRUE.equals(idp.isEnabled()))
-                .map(idp -> new IdentityProviderDTO(
-                    idp.getAlias(),
-                    idp.getDisplayName() != null ? idp.getDisplayName() : idp.getAlias(),
-                    idp.getProviderId()
-                ))
+                .map(idp ->
+                    new IdentityProviderDTO(
+                        idp.getAlias(),
+                        idp.getDisplayName() != null ? idp.getDisplayName() : idp.getAlias(),
+                        idp.getProviderId()
+                    )
+                )
                 .toList();
         } catch (Exception e) {
             log.error("Failed to fetch identity providers", e);
