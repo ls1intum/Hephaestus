@@ -655,7 +655,7 @@ export const getRepositoriesToMonitor = <ThrowOnError extends boolean = false>(o
  */
 export const removeRepositoryToMonitor = <ThrowOnError extends boolean = false>(options: Options<RemoveRepositoryToMonitorData, ThrowOnError>) => (options.client ?? client).delete<RemoveRepositoryToMonitorResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/workspaces/{workspaceSlug}/repositories/{owner}/{name}',
+    url: '/workspaces/{workspaceSlug}/repositories/{nameWithOwner}',
     ...options
 });
 
@@ -664,7 +664,7 @@ export const removeRepositoryToMonitor = <ThrowOnError extends boolean = false>(
  */
 export const addRepositoryToMonitor = <ThrowOnError extends boolean = false>(options: Options<AddRepositoryToMonitorData, ThrowOnError>) => (options.client ?? client).post<AddRepositoryToMonitorResponses, unknown, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
-    url: '/workspaces/{workspaceSlug}/repositories/{owner}/{name}',
+    url: '/workspaces/{workspaceSlug}/repositories/{nameWithOwner}',
     ...options
 });
 

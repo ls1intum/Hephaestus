@@ -125,13 +125,8 @@ function AdminSettings() {
 		if (!workspaceSlug) {
 			return;
 		}
-		const [owner, name] = nameWithOwner.split("/");
 		addRepository.mutate({
-			path: {
-				workspaceSlug,
-				owner,
-				name,
-			},
+			path: { workspaceSlug, nameWithOwner },
 		});
 	};
 
@@ -140,13 +135,8 @@ function AdminSettings() {
 		if (!workspaceSlug) {
 			return;
 		}
-		const [owner, name] = nameWithOwner.split("/");
 		removeRepository.mutate({
-			path: {
-				workspaceSlug,
-				owner,
-				name,
-			},
+			path: { workspaceSlug, nameWithOwner },
 		});
 	};
 

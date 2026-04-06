@@ -2198,7 +2198,7 @@ paths:
       summary: List repositories monitored by a workspace
       tags:
       - workspace
-  /workspaces/{workspaceSlug}/repositories/{owner}/{name}:
+  /workspaces/{workspaceSlug}/repositories/{nameWithOwner}:
     delete:
       operationId: removeRepositoryToMonitor
       parameters:
@@ -2210,12 +2210,7 @@ paths:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       - in: path
-        name: owner
-        required: true
-        schema:
-          type: string
-      - in: path
-        name: name
+        name: nameWithOwner
         required: true
         schema:
           type: string
@@ -2236,12 +2231,7 @@ paths:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       - in: path
-        name: owner
-        required: true
-        schema:
-          type: string
-      - in: path
-        name: name
+        name: nameWithOwner
         required: true
         schema:
           type: string

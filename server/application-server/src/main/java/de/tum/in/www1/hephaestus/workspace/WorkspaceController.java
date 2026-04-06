@@ -217,28 +217,29 @@ public class WorkspaceController {
         return ResponseEntity.ok(repositories);
     }
 
-    @PostMapping("/repositories/{owner}/{name}")
+    @PostMapping("/repositories/{*nameWithOwner}")
     @Operation(summary = "Add a repository to a workspace monitor list")
     @RequireAtLeastWorkspaceAdmin
     public ResponseEntity<Void> addRepositoryToMonitor(
         WorkspaceContext workspaceContext,
-        @PathVariable String owner,
-        @PathVariable String name
+        @PathVariable String nameWithOwner
     ) {
-        workspaceRepositoryMonitorService.addRepositoryToMonitor(workspaceContext, owner + '/' + name);
+        // Strip leading slash from Spring's {*path} capture
+        String cleaned = nameWithOwner.startsWith("/") ? nameWithOwner.substring(1) : nameWithOwner;
+        workspaceRepositoryMonitorService.addRepositoryToMonitor(workspaceContext, cleaned);
         URI location = ServletUriComponentsBuilder.fromCurrentRequest().build().toUri();
         return ResponseEntity.created(location).build();
     }
 
-    @DeleteMapping("/repositories/{owner}/{name}")
+    @DeleteMapping("/repositories/{*nameWithOwner}")
     @Operation(summary = "Remove a repository from a workspace monitor list")
     @RequireAtLeastWorkspaceAdmin
     public ResponseEntity<Void> removeRepositoryToMonitor(
         WorkspaceContext workspaceContext,
-        @PathVariable String owner,
-        @PathVariable String name
+        @PathVariable String nameWithOwner
     ) {
-        workspaceRepositoryMonitorService.removeRepositoryFromMonitor(workspaceContext, owner + '/' + name);
+        String cleaned = nameWithOwner.startsWith("/") ? nameWithOwner.substring(1) : nameWithOwner;
+        workspaceRepositoryMonitorService.removeRepositoryFromMonitor(workspaceContext, cleaned);
         return ResponseEntity.noContent().build();
     }
 

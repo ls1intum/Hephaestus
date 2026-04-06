@@ -3602,11 +3602,10 @@ export type RemoveRepositoryToMonitorData = {
          * Workspace slug
          */
         workspaceSlug: string;
-        owner: string;
-        name: string;
+        nameWithOwner: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/repositories/{owner}/{name}';
+    url: '/workspaces/{workspaceSlug}/repositories/{nameWithOwner}';
 };
 
 export type RemoveRepositoryToMonitorResponses = {
@@ -3623,11 +3622,10 @@ export type AddRepositoryToMonitorData = {
          * Workspace slug
          */
         workspaceSlug: string;
-        owner: string;
-        name: string;
+        nameWithOwner: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/repositories/{owner}/{name}';
+    url: '/workspaces/{workspaceSlug}/repositories/{nameWithOwner}';
 };
 
 export type AddRepositoryToMonitorResponses = {
