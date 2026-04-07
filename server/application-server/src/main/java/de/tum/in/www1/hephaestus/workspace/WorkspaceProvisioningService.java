@@ -11,6 +11,7 @@ import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.spi.ProvisioningListener;
+import de.tum.in.www1.hephaestus.gitprovider.user.AuthenticatedGitProviderUserService;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
@@ -21,7 +22,6 @@ import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
-import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -50,6 +50,7 @@ public class WorkspaceProvisioningService {
     private final WorkspaceMembershipService workspaceMembershipService;
     private final WorkspaceScopeFilter workspaceScopeFilter;
     private final GitLabProperties gitLabProperties;
+    private final AuthenticatedGitProviderUserService authenticatedGitProviderUserService;
     private final WebClient webClient;
 
     public WorkspaceProvisioningService(
@@ -65,7 +66,8 @@ public class WorkspaceProvisioningService {
         WorkspaceMembershipRepository workspaceMembershipRepository,
         WorkspaceMembershipService workspaceMembershipService,
         WorkspaceScopeFilter workspaceScopeFilter,
-        GitLabProperties gitLabProperties
+        GitLabProperties gitLabProperties,
+        AuthenticatedGitProviderUserService authenticatedGitProviderUserService
     ) {
         this.workspaceProperties = workspaceProperties;
         this.workspaceRepository = workspaceRepository;
@@ -80,6 +82,7 @@ public class WorkspaceProvisioningService {
         this.workspaceMembershipService = workspaceMembershipService;
         this.workspaceScopeFilter = workspaceScopeFilter;
         this.gitLabProperties = gitLabProperties;
+        this.authenticatedGitProviderUserService = authenticatedGitProviderUserService;
         this.webClient = WebClient.builder()
             .baseUrl(GITHUB_API_BASE_URL)
             .defaultHeader(HttpHeaders.ACCEPT, "application/vnd.github+json")
@@ -282,41 +285,7 @@ public class WorkspaceProvisioningService {
      */
     @Transactional
     public void ensureAuthenticatedUserExists(String gitLabServerUrl) {
-        String login = SecurityUtils.getCurrentUserLoginOrThrow();
-
-        // Fast path: if user already exists in ANY provider, we're done
-        if (userRepository.findByLogin(login).isPresent()) {
-            return;
-        }
-
-        // Read identity from JWT
-        Authentication auth =
-            org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !(auth.getPrincipal() instanceof org.springframework.security.oauth2.jwt.Jwt jwt)) {
-            throw new IllegalStateException("No JWT found for authenticated user");
-        }
-
-        Long gitlabId = jwt.getClaim("gitlab_id");
-        if (gitlabId != null) {
-            String resolvedUrl = resolveGitLabServerUrl(gitLabServerUrl);
-            upsertGitLabUser(gitlabId, login, login, "", resolvedUrl + "/" + login, resolvedUrl, User.Type.USER);
-            return;
-        }
-
-        // No GitLab identity — check if they at least have a GitHub identity
-        Long githubId = jwt.getClaim("github_id");
-        if (githubId != null) {
-            throw new org.springframework.web.server.ResponseStatusException(
-                org.springframework.http.HttpStatus.CONFLICT,
-                "You need to link your GitLab account before creating a GitLab workspace. " +
-                    "Go to Settings → Linked Accounts to connect your GitLab identity."
-            );
-        }
-
-        throw new org.springframework.web.server.ResponseStatusException(
-            org.springframework.http.HttpStatus.CONFLICT,
-            "No GitLab identity found. Please link your GitLab account in Settings → Linked Accounts."
-        );
+        authenticatedGitProviderUserService.ensureCurrentGitLabUserExists(gitLabServerUrl);
     }
 
     /**
