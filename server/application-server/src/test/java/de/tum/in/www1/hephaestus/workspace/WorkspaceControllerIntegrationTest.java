@@ -250,10 +250,9 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
         webTestClient
             .delete()
             .uri(
-                "/workspaces/{workspaceSlug}/repositories/{owner}/{name}",
+                "/workspaces/{workspaceSlug}/repositories?nameWithOwner={nameWithOwner}",
                 workspaceBeta.getWorkspaceSlug(),
-                "acme",
-                "demo-repo"
+                "acme/demo-repo"
             )
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
@@ -263,10 +262,9 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
         webTestClient
             .delete()
             .uri(
-                "/workspaces/{workspaceSlug}/repositories/{owner}/{name}",
+                "/workspaces/{workspaceSlug}/repositories?nameWithOwner={nameWithOwner}",
                 workspaceAlpha.getWorkspaceSlug(),
-                "acme",
-                "demo-repo"
+                "acme/demo-repo"
             )
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
@@ -558,10 +556,9 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
         ProblemDetail problem = webTestClient
             .post()
             .uri(
-                "/workspaces/{workspaceSlug}/repositories/{owner}/{name}",
+                "/workspaces/{workspaceSlug}/repositories?nameWithOwner={nameWithOwner}",
                 workspace.getWorkspaceSlug(),
-                "acme",
-                "test-repo"
+                "acme/test-repo"
             )
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
