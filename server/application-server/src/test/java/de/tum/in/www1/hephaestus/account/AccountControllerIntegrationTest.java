@@ -2,6 +2,7 @@ package de.tum.in.www1.hephaestus.account;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
@@ -21,6 +22,9 @@ class AccountControllerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private GitLabProperties gitLabProperties;
 
     @Test
     @Transactional
@@ -45,6 +49,8 @@ class AccountControllerIntegrationTest extends BaseIntegrationTest {
         assertThat(provisionedUser).isPresent();
         assertThat(provisionedUser.orElseThrow().getNativeId()).isEqualTo(18024L);
         assertThat(provisionedUser.orElseThrow().getProvider().getType()).isEqualTo(GitProviderType.GITLAB);
-        assertThat(provisionedUser.orElseThrow().getProvider().getServerUrl()).isEqualTo("https://gitlab.lrz.de");
+        assertThat(provisionedUser.orElseThrow().getProvider().getServerUrl()).isEqualTo(
+            gitLabProperties.defaultServerUrl()
+        );
     }
 }
