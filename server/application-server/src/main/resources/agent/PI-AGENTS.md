@@ -43,6 +43,24 @@ Write a JSON object to `.output/result.json` using the write tool:
     "reasoning": "What the pattern is with `exact code quotes`. Why it matters. What breaks.",
     "guidance": "The fix with a code block.",
     "suggestedDiffNotes": [{"filePath": "file.swift", "startLine": 42, "endLine": 42, "body": "Fix action."}]
-  }]
+  }],
+  "delivery": {
+    "mrNote": "Your markdown summary (see below)"
+  }
 }
 ```
+
+## delivery.mrNote — The Merge Request Comment
+
+After writing all findings, compose a `delivery.mrNote` string inside the same JSON. This is posted **directly** as the MR comment visible to the student. Write it as natural, conversational prose — not a template.
+
+**Guidelines:**
+- Address the code changes, not the student personally. Use "the code" / "this change", not "you".
+- Open with a one-sentence assessment of the overall quality.
+- For **all-positive reviews**: mention 2–3 specific things the code does well, referencing actual patterns or identifiers you observed. Do not use generic praise — be specific about *what* is good and *why*.
+- For **reviews with issues**: briefly acknowledge what works, then describe each issue naturally. Group related issues. For each issue, state what's wrong and what to do instead. Include short code examples inline using markdown fenced blocks where helpful.
+- Keep it concise — aim for 3–8 sentences for positive reviews, more as needed for issues.
+- Use markdown formatting: `backtick` for identifiers, **bold** for emphasis, fenced code blocks for code examples.
+- Do NOT use bullet lists of practice names. Write flowing paragraphs.
+- Do NOT include headers, horizontal rules, or footer metadata — the server adds those.
+- Do NOT use approval language like "LGTM", "approved", "ship it", or similar phrases.

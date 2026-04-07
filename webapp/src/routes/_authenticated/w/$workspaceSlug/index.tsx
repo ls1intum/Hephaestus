@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, retainSearchParams, useNavigate } from "@tanstack/react-router";
 import { formatISO } from "date-fns";
 import { useEffect } from "react";
-import { toast } from "sonner";
 import { z } from "zod";
 import {
 	computeUserLeagueStatsOptions,
@@ -52,7 +51,7 @@ function LeaderboardContainer() {
 	// Get the current user from auth context
 	const { username } = useAuth();
 	const { workspaceSlug, providerType, isLoading: isWorkspaceLoading } = useActiveWorkspaceSlug();
-	const { leaderboardEnabled, isLoading: featuresLoading } = useWorkspaceFeatures();
+	const { leaderboardEnabled, leaguesEnabled, isLoading: featuresLoading } = useWorkspaceFeatures();
 	const slug = workspaceSlug ?? "";
 	const hasWorkspace = Boolean(workspaceSlug);
 	const showNoWorkspace = !isWorkspaceLoading && !hasWorkspace;
@@ -251,10 +250,9 @@ function LeaderboardContainer() {
 		enabled: hasWorkspace && Boolean(username) && Boolean(parsedAfter) && Boolean(parsedBefore),
 	});
 
-	// Feature guard — redirect to profile when leaderboard is disabled
+	// Feature guard — silently redirect to profile when leaderboard is disabled
 	useEffect(() => {
 		if (!featuresLoading && !leaderboardEnabled && workspaceSlug && username) {
-			toast.error("Leaderboard is not enabled for this workspace");
 			navigate({
 				to: "/w/$workspaceSlug/user/$username",
 				params: { workspaceSlug, username },
@@ -368,6 +366,7 @@ function LeaderboardContainer() {
 			selectedMode={mode}
 			onModeChange={handleModeChange}
 			onTeamClick={handleTeamClick}
+			leaguesEnabled={leaguesEnabled}
 		/>
 	);
 }

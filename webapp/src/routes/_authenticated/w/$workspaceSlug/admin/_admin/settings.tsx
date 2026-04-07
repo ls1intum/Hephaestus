@@ -125,13 +125,9 @@ function AdminSettings() {
 		if (!workspaceSlug) {
 			return;
 		}
-		const [owner, name] = nameWithOwner.split("/");
 		addRepository.mutate({
-			path: {
-				workspaceSlug,
-				owner,
-				name,
-			},
+			path: { workspaceSlug },
+			query: { nameWithOwner },
 		});
 	};
 
@@ -140,13 +136,9 @@ function AdminSettings() {
 		if (!workspaceSlug) {
 			return;
 		}
-		const [owner, name] = nameWithOwner.split("/");
 		removeRepository.mutate({
-			path: {
-				workspaceSlug,
-				owner,
-				name,
-			},
+			path: { workspaceSlug },
+			query: { nameWithOwner },
 		});
 	};
 
@@ -188,6 +180,7 @@ function AdminSettings() {
 			achievementsEnabled={workspaceData?.achievementsEnabled ?? false}
 			leaderboardEnabled={workspaceData?.leaderboardEnabled ?? false}
 			progressionEnabled={workspaceData?.progressionEnabled ?? false}
+			leaguesEnabled={workspaceData?.leaguesEnabled ?? false}
 			isSavingFeatures={updateFeatures.isPending}
 			onToggleFeature={handleToggleFeature}
 		/>

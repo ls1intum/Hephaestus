@@ -28,6 +28,7 @@ import de.tum.in.www1.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.in.www1.hephaestus.agent.sandbox.spi.SandboxManager;
 import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
+import de.tum.in.www1.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
@@ -94,6 +95,7 @@ class AgentJobServiceTest extends BaseUnitTest {
             objectMapper,
             eventPublisher,
             transactionTemplate,
+            new PracticeReviewProperties(false, true, false, "", 15),
             sandboxManager
         );
 

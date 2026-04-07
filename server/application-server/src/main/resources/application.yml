@@ -348,6 +348,12 @@ hephaestus:
         run-for-all-users: false
         # true = skip practice review for draft PRs
         skip-drafts: true
+        # whether to deliver feedback to already-merged PRs
+        deliver-to-merged: false
+        # base URL of the Hephaestus app (for preferences footer link); empty = no link
+        app-base-url: ${PRACTICE_REVIEW_APP_BASE_URL:}
+        # minimum minutes between reviews for the same PR (0 = no cooldown)
+        cooldown-minutes: 15
 
     posthog:
         enabled: ${POSTHOG_ENABLED:false}

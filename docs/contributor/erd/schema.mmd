@@ -711,6 +711,7 @@ erDiagram
         BOOLEAN achievements_enabled "NOT NULL"
         BOOLEAN leaderboard_enabled "NOT NULL"
         BOOLEAN progression_enabled "NOT NULL"
+        BOOLEAN leagues_enabled "NOT NULL"
     }
 
     WorkspaceMembership {
@@ -719,6 +720,7 @@ erDiagram
         VARCHAR(16) role "NOT NULL"
         BIGINT user_id PK,FK
         BIGINT workspace_id PK,FK
+        BOOLEAN hidden "NOT NULL"
     }
 
     WorkspaceSlugHistory {

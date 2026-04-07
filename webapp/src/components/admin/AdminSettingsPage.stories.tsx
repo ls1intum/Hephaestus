@@ -96,6 +96,7 @@ const meta = {
 		achievementsEnabled: false,
 		leaderboardEnabled: false,
 		progressionEnabled: false,
+		leaguesEnabled: false,
 		isSavingFeatures: false,
 		onToggleFeature: fn(),
 	},

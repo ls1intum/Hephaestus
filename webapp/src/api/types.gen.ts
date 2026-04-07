@@ -87,6 +87,10 @@ export type WorkspaceMembership = {
      */
     createdAt?: Date;
     /**
+     * Whether the member is hidden from the leaderboard
+     */
+    hidden?: boolean;
+    /**
      * League points earned by the user in this workspace
      */
     leaguePoints?: number;
@@ -136,6 +140,10 @@ export type WorkspaceListItem = {
      * Whether the leaderboard is enabled
      */
     leaderboardEnabled: boolean;
+    /**
+     * Whether league tiers and rankings are enabled
+     */
+    leaguesEnabled: boolean;
     /**
      * Whether the practice review feature is enabled
      */
@@ -239,6 +247,10 @@ export type Workspace = {
      */
     leaderboardScheduleTime?: string;
     /**
+     * Whether league tiers and rankings are enabled
+     */
+    leaguesEnabled: boolean;
+    /**
      * Whether the practice review feature is enabled
      */
     practicesEnabled: boolean;
@@ -274,6 +286,7 @@ export type VoteMessageRequest = {
 
 export type UserTeams = {
     email?: string;
+    hidden?: boolean;
     id: number;
     login: string;
     name: string;
@@ -455,6 +468,10 @@ export type UpdateWorkspaceFeaturesRequest = {
      * Enable the leaderboard ranking page
      */
     leaderboardEnabled?: boolean;
+    /**
+     * Enable league tiers and rankings
+     */
+    leaguesEnabled?: boolean;
     /**
      * Enable the practice review feature
      */
@@ -1976,6 +1993,22 @@ export type UnlinkAccountResponses = {
     200: unknown;
 };
 
+export type ClaimIdentityData = {
+    body?: never;
+    path: {
+        providerAlias: string;
+    };
+    query?: never;
+    url: '/user/linked-accounts/{providerAlias}/claim';
+};
+
+export type ClaimIdentityResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
 export type GetUserSettingsData = {
     body?: never;
     path?: never;
@@ -2635,6 +2668,36 @@ export type GetMemberResponses = {
 };
 
 export type GetMemberResponse = GetMemberResponses[keyof GetMemberResponses];
+
+export type UpdateMemberVisibilityData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        /**
+         * User ID
+         */
+        userId: number;
+    };
+    query: {
+        /**
+         * whether the member should be hidden
+         */
+        hidden: boolean;
+    };
+    url: '/workspaces/{workspaceSlug}/members/{userId}/hidden';
+};
+
+export type UpdateMemberVisibilityResponses = {
+    /**
+     * Updated membership
+     */
+    200: WorkspaceMembership;
+};
+
+export type UpdateMemberVisibilityResponse = UpdateMemberVisibilityResponses[keyof UpdateMemberVisibilityResponses];
 
 export type ListDocumentsData = {
     body?: never;
@@ -3511,6 +3574,27 @@ export type UpdatePublicVisibilityResponses = {
 
 export type UpdatePublicVisibilityResponse = UpdatePublicVisibilityResponses[keyof UpdatePublicVisibilityResponses];
 
+export type RemoveRepositoryToMonitorData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query: {
+        nameWithOwner: string;
+    };
+    url: '/workspaces/{workspaceSlug}/repositories';
+};
+
+export type RemoveRepositoryToMonitorResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
 export type GetRepositoriesToMonitorData = {
     body?: never;
     path: {
@@ -3532,27 +3616,6 @@ export type GetRepositoriesToMonitorResponses = {
 
 export type GetRepositoriesToMonitorResponse = GetRepositoriesToMonitorResponses[keyof GetRepositoriesToMonitorResponses];
 
-export type RemoveRepositoryToMonitorData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        owner: string;
-        name: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/repositories/{owner}/{name}';
-};
-
-export type RemoveRepositoryToMonitorResponses = {
-    /**
-     * OK
-     */
-    200: unknown;
-};
-
 export type AddRepositoryToMonitorData = {
     body?: never;
     path: {
@@ -3560,11 +3623,11 @@ export type AddRepositoryToMonitorData = {
          * Workspace slug
          */
         workspaceSlug: string;
-        owner: string;
-        name: string;
     };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/repositories/{owner}/{name}';
+    query: {
+        nameWithOwner: string;
+    };
+    url: '/workspaces/{workspaceSlug}/repositories';
 };
 
 export type AddRepositoryToMonitorResponses = {

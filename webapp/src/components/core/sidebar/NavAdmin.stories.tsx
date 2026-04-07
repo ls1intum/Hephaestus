@@ -20,6 +20,7 @@ const meta = {
 	tags: ["autodocs"],
 	args: {
 		workspaceSlug: "aet",
+		achievementsEnabled: true,
 	},
 	argTypes: {
 		workspaceSlug: {

@@ -76,15 +76,13 @@ public class WorkspaceRegistryController {
             );
         }
 
-        // For GitLab PAT workspaces, ensure the authenticated Keycloak user has a
-        // git provider User entity. First-time GitLab users won't have one yet
-        // (it's normally created during group sync). Without this, the workspace
-        // would have no owner — a security and UX problem.
+        // For GitLab PAT workspaces, ensure the user has a linked GitLab identity.
+        // This creates the User entity from JWT claims or returns 409 if no GitLab account is linked.
         if (createWorkspaceRequest.gitProviderMode() == Workspace.GitProviderMode.GITLAB_PAT) {
-            workspaceProvisioningService.ensureAuthenticatedGitLabUser(createWorkspaceRequest.serverUrl());
+            workspaceProvisioningService.ensureAuthenticatedUserExists(createWorkspaceRequest.serverUrl());
         }
 
-        Workspace workspace = workspaceService.createWorkspace(createWorkspaceRequest);
+        Workspace workspace = workspaceService.createWorkspaceWithInitialization(createWorkspaceRequest);
 
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()
             .path("/{workspaceSlug}")

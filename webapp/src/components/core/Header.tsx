@@ -16,6 +16,7 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { getInitials } from "@/lib/avatar";
 
 export interface HeaderProps {
 	/** Sidebar trigger button component */
@@ -116,11 +117,8 @@ export default function Header({
 									render={<Button variant="ghost" size="icon" className="rounded-full" />}
 								>
 									<Avatar className="hover:brightness-90">
-										<AvatarImage
-											src={avatarUrl || `https://github.com/${username}.png`}
-											alt={`${username}'s avatar`}
-										/>
-										<AvatarFallback>{username?.slice(0, 2)?.toUpperCase() || "?"}</AvatarFallback>
+										<AvatarImage src={avatarUrl || undefined} alt={`${username}'s avatar`} />
+										<AvatarFallback>{getInitials(name, username)}</AvatarFallback>
 									</Avatar>
 								</DropdownMenuTrigger>
 								<DropdownMenuContent className="w-56" align="end">

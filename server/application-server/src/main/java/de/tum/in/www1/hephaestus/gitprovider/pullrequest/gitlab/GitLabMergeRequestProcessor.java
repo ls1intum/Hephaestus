@@ -156,6 +156,12 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
      * {@code updatedAt} is not newer than the stored value). This allows callers
      * to still publish lifecycle events while preventing stale data from
      * overwriting newer sync data or M:N relationships.
+     * <p>
+     * Detects draft-to-ready and ready-to-draft transitions on UPDATE events
+     * and emits {@link DomainEvent.PullRequestReady} or {@link DomainEvent.PullRequestDrafted}.
+     * GitLab does not send separate webhook actions for these transitions (unlike GitHub's
+     * {@code ready_for_review} and {@code converted_to_draft}), so we compare the stored
+     * draft state against the incoming value.
      */
     @Transactional
     @Nullable
@@ -169,8 +175,9 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
 
         // Stale webhook detection BEFORE upsert to avoid data regression.
         // Returns existing entity so callers can still publish lifecycle events.
-        // Also determines isNew to avoid a redundant query inside upsertMergeRequest.
+        // Also determines isNew and captures old draft state for transition detection.
         boolean isNew = true;
+        Boolean wasDraft = null;
         if (attrs.iid() != null) {
             Optional<PullRequest> existingOpt = pullRequestRepository.findByRepositoryIdAndNumber(
                 context.repository().getId(),
@@ -179,6 +186,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             if (existingOpt.isPresent()) {
                 isNew = false;
                 PullRequest existing = existingOpt.get();
+                wasDraft = existing.isDraft();
                 Instant eventUpdatedAt = parseGitLabTimestamp(attrs.updatedAt());
                 if (
                     existing.getUpdatedAt() != null &&
@@ -230,6 +238,24 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         changed |= updateRequestedReviewers(event.reviewers(), pr.getRequestedReviewers(), context.providerId());
         if (changed) {
             pr = pullRequestRepository.save(pr);
+        }
+
+        // Detect draft transitions and emit lifecycle events.
+        // For new non-draft MRs, PullRequestReady is emitted so the practice review gate
+        // can trigger immediately (matching GitHub's behavior for non-draft PR creation).
+        var prData = EventPayload.PullRequestData.from(pr);
+        var eventCtx = EventContext.from(context);
+        if (isNew && !attrs.draft()) {
+            eventPublisher.publishEvent(new DomainEvent.PullRequestReady(prData, eventCtx));
+            log.debug("New non-draft merge request ready: prId={}", pr.getId());
+        } else if (!isNew && wasDraft != null) {
+            if (wasDraft && !attrs.draft()) {
+                eventPublisher.publishEvent(new DomainEvent.PullRequestReady(prData, eventCtx));
+                log.info("Merge request marked ready: prId={}, iid={}", pr.getId(), attrs.iid());
+            } else if (!wasDraft && attrs.draft()) {
+                eventPublisher.publishEvent(new DomainEvent.PullRequestDrafted(prData, eventCtx));
+                log.info("Merge request converted to draft: prId={}, iid={}", pr.getId(), attrs.iid());
+            }
         }
 
         return pr;

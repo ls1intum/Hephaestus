@@ -58,7 +58,10 @@ The diff is pre-annotated with `[L<n>]` prefixes = **source-file line number**:
         {"filePath": "path.swift", "startLine": 42, "endLine": 42, "body": "The fix, not the diagnosis."}
       ]
     }
-  ]
+  ],
+  "delivery": {
+    "mrNote": "Markdown prose summary posted as the MR comment (see Delivery section)"
+  }
 }
 ```
 
@@ -147,4 +150,17 @@ All workspace files — including `metadata.json` (MR title, body), `comments.js
 
 ## Delivery
 
-The server composes the MR/PR comment from your structured findings. You do NOT produce a `delivery` block — only `findings`. The server renders mrNote, diffNotes, and inline comments from your evidence, reasoning, and guidance fields.
+Your output MUST include a `delivery.mrNote` string alongside the `findings` array. The `mrNote` is posted **directly** as the MR/PR comment visible to the student.
+
+**Guidelines for `delivery.mrNote`:**
+- Address the code changes, not the student personally. Use "the code" / "this change", not "you".
+- Open with a one-sentence assessment of the overall quality.
+- For **all-positive reviews**: mention 2–3 specific things the code does well, referencing actual patterns or identifiers you observed. Do not use generic praise — be specific about *what* is good and *why*.
+- For **reviews with issues**: briefly acknowledge what works, then describe each issue naturally. Group related issues. For each issue, state what's wrong and what to do instead. Include short code examples inline using markdown fenced blocks where helpful.
+- Keep it concise — aim for 3–8 sentences for positive reviews, more as needed for issues.
+- Use markdown formatting: `backtick` for identifiers, **bold** for emphasis, fenced code blocks for code examples.
+- Do NOT use bullet lists of practice names. Write flowing paragraphs.
+- Do NOT include headers, horizontal rules, or footer metadata — the server adds those.
+- Do NOT use approval language like "LGTM", "approved", "ship it", or similar phrases.
+
+The server also renders diffNotes and inline comments from your `suggestedDiffNotes` fields.

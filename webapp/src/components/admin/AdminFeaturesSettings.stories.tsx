@@ -37,6 +37,7 @@ const meta = {
 		achievementsEnabled: false,
 		leaderboardEnabled: false,
 		progressionEnabled: false,
+		leaguesEnabled: false,
 		isSaving: false,
 		onToggle: fn(),
 	},

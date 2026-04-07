@@ -146,6 +146,26 @@ paths:
       summary: Unlink an identity provider
       tags:
       - Account
+  /user/linked-accounts/{providerAlias}/claim:
+    post:
+      description: Transfers a federated identity from another Keycloak user to the
+        current user. Used when a user has accidentally created two accounts by logging
+        in with different IdPs. Deletes the orphan account if it has no remaining
+        identities.
+      operationId: claimIdentity
+      parameters:
+      - in: path
+        name: providerAlias
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9-]{1,64}$"
+      responses:
+        "200":
+          description: OK
+      summary: Claim an identity provider from another user
+      tags:
+      - Account
   /user/settings:
     get:
       description: "Get the current user's notification, research participation, and\
@@ -905,6 +925,43 @@ paths:
           description: Workspace membership details
       security: []
       summary: Get a specific member's details.
+      tags:
+      - workspace-membership
+  /workspaces/{workspaceSlug}/members/{userId}/hidden:
+    patch:
+      description: |-
+        Toggle the hidden flag for a workspace member.
+         Hidden members are excluded from the leaderboard.
+      operationId: updateMemberVisibility
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - description: User ID
+        in: path
+        name: userId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      - description: whether the member should be hidden
+        in: query
+        name: hidden
+        required: true
+        schema:
+          type: boolean
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceMembership"
+          description: Updated membership
+      summary: Toggle the hidden flag for a workspace member.
       tags:
       - workspace-membership
   /workspaces/{workspaceSlug}/mentor/chat:
@@ -2118,6 +2175,27 @@ paths:
       tags:
       - workspace
   /workspaces/{workspaceSlug}/repositories:
+    delete:
+      operationId: removeRepositoryToMonitor
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: query
+        name: nameWithOwner
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+      summary: Remove a repository from a workspace monitor list
+      tags:
+      - workspace
     get:
       operationId: getRepositoriesToMonitor
       parameters:
@@ -2141,33 +2219,6 @@ paths:
       summary: List repositories monitored by a workspace
       tags:
       - workspace
-  /workspaces/{workspaceSlug}/repositories/{owner}/{name}:
-    delete:
-      operationId: removeRepositoryToMonitor
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: owner
-        required: true
-        schema:
-          type: string
-      - in: path
-        name: name
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          description: OK
-      summary: Remove a repository from a workspace monitor list
-      tags:
-      - workspace
     post:
       operationId: addRepositoryToMonitor
       parameters:
@@ -2178,13 +2229,8 @@ paths:
         schema:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: owner
-        required: true
-        schema:
-          type: string
-      - in: path
-        name: name
+      - in: query
+        name: nameWithOwner
         required: true
         schema:
           type: string
@@ -4848,6 +4894,9 @@ components:
         leaderboardEnabled:
           type: boolean
           description: Enable the leaderboard ranking page
+        leaguesEnabled:
+          type: boolean
+          description: Enable league tiers and rankings
         practicesEnabled:
           type: boolean
           description: Enable the practice review feature
@@ -4985,6 +5034,8 @@ components:
       properties:
         email:
           type: string
+        hidden:
+          type: boolean
         id:
           type: integer
           format: int64
@@ -5083,6 +5134,9 @@ components:
           type: string
           description: Time for leaderboard notifications in HH:mm format
           example: 09:00
+        leaguesEnabled:
+          type: boolean
+          description: Whether league tiers and rankings are enabled
         practicesEnabled:
           type: boolean
           description: Whether the practice review feature is enabled
@@ -5124,6 +5178,7 @@ components:
       - id
       - isPubliclyViewable
       - leaderboardEnabled
+      - leaguesEnabled
       - practicesEnabled
       - progressionEnabled
       - providerType
@@ -5154,6 +5209,9 @@ components:
         leaderboardEnabled:
           type: boolean
           description: Whether the leaderboard is enabled
+        leaguesEnabled:
+          type: boolean
+          description: Whether league tiers and rankings are enabled
         practicesEnabled:
           type: boolean
           description: Whether the practice review feature is enabled
@@ -5181,6 +5239,7 @@ components:
       - displayName
       - id
       - leaderboardEnabled
+      - leaguesEnabled
       - practicesEnabled
       - progressionEnabled
       - providerType
@@ -5194,6 +5253,9 @@ components:
           type: string
           format: date-time
           description: Timestamp when the membership was created
+        hidden:
+          type: boolean
+          description: Whether the member is hidden from the leaderboard
         leaguePoints:
           type: integer
           format: int32

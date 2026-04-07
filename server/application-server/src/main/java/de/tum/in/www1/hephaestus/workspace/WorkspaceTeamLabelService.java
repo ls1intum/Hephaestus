@@ -70,9 +70,12 @@ public class WorkspaceTeamLabelService {
         );
         List<User> users = workspaceMembershipRepository.findHumanUsersWithTeamsByWorkspaceId(workspace.getId());
         Set<Long> hiddenTeamIds = workspaceTeamSettingsService.getHiddenTeamIds(workspace.getId());
+        Set<Long> hiddenMemberIds = workspaceMembershipRepository.findHiddenUserIdsByWorkspaceId(workspace.getId());
         return users
             .stream()
-            .map(user -> UserTeamsDTO.fromUserWithScopeSettings(user, hiddenTeamIds))
+            .map(user ->
+                UserTeamsDTO.fromUserWithScopeSettings(user, hiddenTeamIds, hiddenMemberIds.contains(user.getId()))
+            )
             .toList();
     }
 
@@ -176,8 +179,9 @@ public class WorkspaceTeamLabelService {
         boolean isHidden = workspaceTeamSettingsService.isTeamHidden(workspaceId, team.getId());
         Set<Label> workspaceLabels = workspaceTeamSettingsService.getTeamLabelFilters(workspaceId, team.getId());
         Set<Long> hiddenRepoIds = workspaceTeamSettingsService.getHiddenRepositoryIds(workspaceId);
+        Set<Long> hiddenMemberIds = workspaceMembershipRepository.findHiddenUserIdsByWorkspaceId(workspaceId);
 
-        return TeamInfoDTO.fromTeamWithScopeSettings(team, isHidden, workspaceLabels, hiddenRepoIds);
+        return TeamInfoDTO.fromTeamWithScopeSettings(team, isHidden, workspaceLabels, hiddenRepoIds, hiddenMemberIds);
     }
 
     private Workspace requireWorkspace(String slug) {

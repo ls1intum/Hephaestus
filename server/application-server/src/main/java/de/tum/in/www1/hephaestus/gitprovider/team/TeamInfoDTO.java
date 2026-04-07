@@ -37,13 +37,15 @@ public record TeamInfoDTO(
      * @param isHidden whether the team is hidden in this scope
      * @param scopeLabels labels configured as filters for this team in this scope
      * @param hiddenRepoIds repository IDs hidden from contributions in this scope
+     * @param hiddenMemberIds user IDs hidden from leaderboard/team views in this workspace
      * @return the DTO with scope-specific settings applied
      */
     public static TeamInfoDTO fromTeamWithScopeSettings(
         Team team,
         boolean isHidden,
         Set<Label> scopeLabels,
-        Set<Long> hiddenRepoIds
+        Set<Long> hiddenRepoIds,
+        Set<Long> hiddenMemberIds
     ) {
         return new TeamInfoDTO(
             team.getId(),
@@ -69,7 +71,7 @@ public record TeamInfoDTO(
                 .getMemberships()
                 .stream()
                 .map(m -> m.getUser())
-                .filter(u -> u != null && !User.Type.BOT.equals(u.getType()))
+                .filter(u -> u != null && !User.Type.BOT.equals(u.getType()) && !hiddenMemberIds.contains(u.getId()))
                 .map(UserInfoDTO::fromUser)
                 .toList(),
             team.getMemberships().size(),

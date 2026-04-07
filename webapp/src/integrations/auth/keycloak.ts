@@ -189,6 +189,14 @@ class KeycloakService {
 	}
 
 	/**
+	 * Whether the user has a linked GitLab identity.
+	 * True when gitlab_id is present in the token (set by the Keycloak protocol mapper).
+	 */
+	public hasGitLabIdentity(): boolean {
+		return this.keycloak?.tokenParsed?.gitlab_id != null;
+	}
+
+	/**
 	 * Get user roles from the token
 	 */
 	public getUserRoles(): string[] {

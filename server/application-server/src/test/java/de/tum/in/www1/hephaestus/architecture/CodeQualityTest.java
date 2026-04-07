@@ -480,6 +480,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                 "WorkspaceActivationService",
                 "WorkspaceProvisioningAdapter", // Lazy-loaded to break circular reference with GitHubDataSyncService
                 "WorkspaceRepositoryMonitorService",
+                "GitLabWorkspaceInitializationService", // Optional GitLab beans gated by @ConditionalOnProperty
                 "GitLabWebhookService", // Optional GitLab beans gated by @ConditionalOnProperty
                 "GitLabDataSyncScheduler", // Optional GitLab beans gated by @ConditionalOnProperty
                 "GitLabHistoricalBackfillService", // Optional GitLab beans gated by @ConditionalOnProperty

@@ -1,6 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
-import { toast } from "sonner";
 import { AchievementsView } from "@/components/achievements/AchievementsView";
 import { Spinner } from "@/components/ui/spinner";
 import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
@@ -24,7 +23,7 @@ function AchievementsPage() {
 
 	useEffect(() => {
 		if (!isLoading && !achievementsEnabled && workspaceSlug && username) {
-			toast.error("Achievements are not enabled for this workspace");
+			// Silent redirect — UI elements are already hidden when disabled
 			navigate({
 				to: "/w/$workspaceSlug/user/$username",
 				params: { workspaceSlug, username },

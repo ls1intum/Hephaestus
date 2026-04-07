@@ -305,16 +305,11 @@ public class GitLabDataSyncScheduler {
         GitLabMergeRequestSyncService mrSync = services.getMergeRequestSyncService();
         GitLabCollaboratorSyncService collaboratorSync = services.getCollaboratorSyncService();
         GitLabCommitSyncService commitSync = services.getCommitSyncService();
+        var commitBackfill = services.getCommitBackfillService();
 
-        // Find all repositories monitored by this workspace
-        Long providerId = getGitLabProviderId(session.accountLogin());
-        List<Repository> repos =
-            providerId != null
-                ? repositoryRepository.findAllByOrganization_LoginIgnoreCaseAndProviderId(
-                      session.accountLogin(),
-                      providerId
-                  )
-                : List.of();
+        // Find all repositories monitored by this workspace (via RepositoryToMonitor join,
+        // which correctly includes subgroup repos — not just top-level group repos)
+        List<Repository> repos = repositoryRepository.findAllByWorkspaceMonitors(session.scopeId());
 
         if (repos.isEmpty()) {
             log.debug("No repositories to sync for GitLab workspace: scopeId={}", session.scopeId());
@@ -418,8 +413,21 @@ public class GitLabDataSyncScheduler {
                 }
             }
 
-            // Commits (REST API — uses updatedAfter as since param)
-            if (commitSync != null) {
+            // Commits — prefer JGit backfill (provides diff stats + file changes);
+            // fall back to REST API when git is not enabled
+            if (commitBackfill != null) {
+                try {
+                    SyncResult r = commitBackfill.backfillCommits(session.scopeId(), repo);
+                    totalCommits += r.count();
+                } catch (Exception e) {
+                    log.warn(
+                        "Failed commit backfill: scopeId={}, repo={}",
+                        session.scopeId(),
+                        repo.getNameWithOwner(),
+                        e
+                    );
+                }
+            } else if (commitSync != null) {
                 try {
                     SyncResult r = commitSync.syncCommitsForRepository(session.scopeId(), repo, updatedAfter);
                     totalCommits += r.count();
@@ -454,14 +462,7 @@ public class GitLabDataSyncScheduler {
 
         if (subIssueSync == null && depSync == null) return;
 
-        Long providerId = getGitLabProviderId(session.accountLogin());
-        List<Repository> repos =
-            providerId != null
-                ? repositoryRepository.findAllByOrganization_LoginIgnoreCaseAndProviderId(
-                      session.accountLogin(),
-                      providerId
-                  )
-                : List.of();
+        List<Repository> repos = repositoryRepository.findAllByWorkspaceMonitors(session.scopeId());
 
         int totalSubIssues = 0,
             totalDeps = 0;

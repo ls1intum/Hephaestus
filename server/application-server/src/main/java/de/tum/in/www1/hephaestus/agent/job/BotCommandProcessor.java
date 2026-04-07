@@ -6,13 +6,16 @@ import de.tum.in.www1.hephaestus.agent.AgentJobType;
 import de.tum.in.www1.hephaestus.agent.handler.PullRequestReviewSubmissionRequest;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.BotCommandReceivedEvent;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.EventPayload;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.practices.review.GateDecision;
 import de.tum.in.www1.hephaestus.practices.review.PracticeReviewDetectionGate;
+import java.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.lang.Nullable;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
@@ -27,6 +30,10 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * when a non-system MR comment matches a known command pattern. Runs asynchronously
  * to avoid blocking webhook processing.
  *
+ * <p>On receiving a recognized command, reacts to the comment with an eyes emoji
+ * (via GitLab GraphQL {@code awardEmojiAdd} mutation) to acknowledge receipt,
+ * then processes the command.
+ *
  * <p>The command prefix is {@code /hephaestus} (case-insensitive). Supported commands:
  * <ul>
  *   <li>{@code /hephaestus review} — retrigger a practice review on the MR</li>
@@ -37,22 +44,23 @@ import org.springframework.transaction.event.TransactionalEventListener;
 public class BotCommandProcessor {
 
     private static final Logger log = LoggerFactory.getLogger(BotCommandProcessor.class);
-
-    /** Prefix for bot commands (case-insensitive match). */
-    private static final String COMMAND_PREFIX = "/hephaestus ";
+    private static final Duration GRAPHQL_TIMEOUT = Duration.ofSeconds(10);
 
     private final AgentJobService agentJobService;
     private final PullRequestRepository pullRequestRepository;
     private final PracticeReviewDetectionGate practiceReviewDetectionGate;
+    private final @Nullable GitLabGraphQlClientProvider gitLabGraphQlProvider;
 
     public BotCommandProcessor(
         AgentJobService agentJobService,
         PullRequestRepository pullRequestRepository,
-        PracticeReviewDetectionGate practiceReviewDetectionGate
+        PracticeReviewDetectionGate practiceReviewDetectionGate,
+        @Nullable GitLabGraphQlClientProvider gitLabGraphQlProvider
     ) {
         this.agentJobService = agentJobService;
         this.pullRequestRepository = pullRequestRepository;
         this.practiceReviewDetectionGate = practiceReviewDetectionGate;
+        this.gitLabGraphQlProvider = gitLabGraphQlProvider;
     }
 
     /**
@@ -64,6 +72,9 @@ public class BotCommandProcessor {
     @TransactionalEventListener
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onBotCommandReceived(BotCommandReceivedEvent event) {
+        // React with eyes emoji to acknowledge the command
+        addEyesReaction(event);
+
         processCommand(event.repositoryId(), event.mrNumber(), event.noteBody(), event.noteAuthor());
     }
 
@@ -172,6 +183,45 @@ public class BotCommandProcessor {
                 noteAuthor,
                 e
             );
+        }
+    }
+
+    // ── Emoji reaction ──
+
+    /**
+     * Add an eyes emoji reaction to the bot command note via GitLab GraphQL
+     * ({@code awardEmojiAdd} mutation). Best-effort — failures are logged but never propagated.
+     */
+    private void addEyesReaction(BotCommandReceivedEvent event) {
+        if (event.noteId() == null || event.scopeId() == null) {
+            return;
+        }
+        if (gitLabGraphQlProvider == null) {
+            return;
+        }
+
+        try {
+            String awardableId = "gid://gitlab/Note/" + event.noteId();
+
+            var response = gitLabGraphQlProvider
+                .forScope(event.scopeId())
+                .documentName("AwardEmojiAdd")
+                .variable("awardableId", awardableId)
+                .variable("name", "eyes")
+                .execute()
+                .block(GRAPHQL_TIMEOUT);
+
+            if (response != null && response.isValid()) {
+                log.debug("Added eyes reaction: noteId={}, scopeId={}", event.noteId(), event.scopeId());
+            } else {
+                log.debug(
+                    "Eyes reaction GraphQL response invalid: noteId={}, errors={}",
+                    event.noteId(),
+                    response != null ? response.getErrors() : "null"
+                );
+            }
+        } catch (Exception e) {
+            log.debug("Failed to add eyes reaction (non-fatal): noteId={}, error={}", event.noteId(), e.getMessage());
         }
     }
 }

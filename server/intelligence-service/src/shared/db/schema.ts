@@ -2140,6 +2140,7 @@ export const workspace = pgTable(
 		achievementsEnabled: boolean("achievements_enabled").default(false).notNull(),
 		leaderboardEnabled: boolean("leaderboard_enabled").default(false).notNull(),
 		progressionEnabled: boolean("progression_enabled").default(false).notNull(),
+		leaguesEnabled: boolean("leagues_enabled").default(false).notNull(),
 	},
 	(table) => [
 		foreignKey({
@@ -2166,6 +2167,7 @@ export const workspaceMembership = pgTable(
 		userId: bigint("user_id", { mode: "number" }).notNull(),
 		// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 		workspaceId: bigint("workspace_id", { mode: "number" }).notNull(),
+		hidden: boolean().default(false).notNull(),
 	},
 	(table) => [
 		index("idx_workspace_membership_user_id").using("btree", table.userId.asc().nullsLast()),

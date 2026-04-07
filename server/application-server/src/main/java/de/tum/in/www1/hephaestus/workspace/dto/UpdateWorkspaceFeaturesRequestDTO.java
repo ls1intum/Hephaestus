@@ -11,5 +11,6 @@ public record UpdateWorkspaceFeaturesRequestDTO(
     @Schema(description = "Enable the practice review feature") Boolean practicesEnabled,
     @Schema(description = "Enable the achievements system") Boolean achievementsEnabled,
     @Schema(description = "Enable the leaderboard ranking page") Boolean leaderboardEnabled,
-    @Schema(description = "Enable the league/progression system") Boolean progressionEnabled
+    @Schema(description = "Enable the league/progression system") Boolean progressionEnabled,
+    @Schema(description = "Enable league tiers and rankings") Boolean leaguesEnabled
 ) {}

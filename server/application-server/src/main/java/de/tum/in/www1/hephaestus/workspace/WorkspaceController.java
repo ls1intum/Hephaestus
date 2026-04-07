@@ -27,6 +27,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 @WorkspaceScopedController
@@ -217,28 +218,26 @@ public class WorkspaceController {
         return ResponseEntity.ok(repositories);
     }
 
-    @PostMapping("/repositories/{owner}/{name}")
+    @PostMapping("/repositories")
     @Operation(summary = "Add a repository to a workspace monitor list")
     @RequireAtLeastWorkspaceAdmin
     public ResponseEntity<Void> addRepositoryToMonitor(
         WorkspaceContext workspaceContext,
-        @PathVariable String owner,
-        @PathVariable String name
+        @RequestParam String nameWithOwner
     ) {
-        workspaceRepositoryMonitorService.addRepositoryToMonitor(workspaceContext, owner + '/' + name);
+        workspaceRepositoryMonitorService.addRepositoryToMonitor(workspaceContext, nameWithOwner);
         URI location = ServletUriComponentsBuilder.fromCurrentRequest().build().toUri();
         return ResponseEntity.created(location).build();
     }
 
-    @DeleteMapping("/repositories/{owner}/{name}")
+    @DeleteMapping("/repositories")
     @Operation(summary = "Remove a repository from a workspace monitor list")
     @RequireAtLeastWorkspaceAdmin
     public ResponseEntity<Void> removeRepositoryToMonitor(
         WorkspaceContext workspaceContext,
-        @PathVariable String owner,
-        @PathVariable String name
+        @RequestParam String nameWithOwner
     ) {
-        workspaceRepositoryMonitorService.removeRepositoryFromMonitor(workspaceContext, owner + '/' + name);
+        workspaceRepositoryMonitorService.removeRepositoryFromMonitor(workspaceContext, nameWithOwner);
         return ResponseEntity.noContent().build();
     }
 

@@ -3,6 +3,7 @@ import { createFileRoute, retainSearchParams, useNavigate } from "@tanstack/reac
 import { z } from "zod";
 import { getUserProfileOptions, getWorkspaceOptions } from "@/api/@tanstack/react-query.gen";
 import { ProfilePage } from "@/components/profile/ProfilePage";
+import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
 import { useAuth } from "@/integrations/auth/AuthContext";
 import {
 	DEFAULT_SCHEDULE,
@@ -31,6 +32,7 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/user/$use
 function UserProfile() {
 	const { username, workspaceSlug } = Route.useParams();
 	const { isCurrentUser } = useAuth();
+	const { achievementsEnabled, progressionEnabled, leaguesEnabled } = useWorkspaceFeatures();
 	const { after, before } = Route.useSearch();
 	const navigate = useNavigate({ from: Route.fullPath });
 
@@ -120,6 +122,9 @@ function UserProfile() {
 			before={effectiveDates.before}
 			onTimeframeChange={handleTimeframeChange}
 			schedule={schedule}
+			achievementsEnabled={achievementsEnabled}
+			progressionEnabled={progressionEnabled}
+			leaguesEnabled={leaguesEnabled}
 		/>
 	);
 }

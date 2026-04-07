@@ -213,6 +213,7 @@ public class WorkspaceProvisioningService {
 
         workspace.setGitProviderMode(Workspace.GitProviderMode.GITLAB_PAT);
         workspace.setPersonalAccessToken(config.token());
+        workspace.setRepositorySelection(RepositorySelection.ALL);
         if (!isBlank(config.serverUrl())) {
             workspace.setServerUrl(config.serverUrl().trim());
         }
@@ -254,54 +255,67 @@ public class WorkspaceProvisioningService {
 
     /**
      * Ensures the currently authenticated Keycloak user has a corresponding git provider
-     * {@link User} entity for the given GitLab server. Uses JWT claims ({@code preferred_username},
-     * {@code gitlab_id}) to create or update the user.
+     * {@link User} entity so they can be assigned as workspace owner.
      *
-     * <p>This is needed because first-time GitLab users have no {@code User} entity until
-     * the group sync runs. Without this, workspace creation would fail because there is no
-     * owner to assign.
+     * <p>Reads identity from JWT claims to determine the user's provider:
+     * <ul>
+     *   <li>{@code gitlab_id} → creates a GitLab user (uses the given serverUrl)</li>
+     *   <li>{@code github_id} → creates a GitHub user</li>
+     * </ul>
      *
-     * @param serverUrl the GitLab server URL (resolved to default if blank)
+     * <p>This is needed because first-time users may not have a {@code User} entity yet
+     * (it's normally created during sync). Without this, workspace creation would fail
+     * because there is no owner to assign.
+     *
+     * @param gitLabServerUrl the GitLab server URL for GitLab users (resolved to default if blank)
+     */
+    /**
+     * Ensures the currently authenticated Keycloak user has a corresponding git provider
+     * {@link User} entity so they can be assigned as workspace owner.
+     *
+     * <p>For GitLab workspaces, the user must have a linked GitLab identity ({@code gitlab_id}
+     * in their JWT). If they logged in via GitHub without linking GitLab, this method throws
+     * so the frontend can prompt them to link their account first.
+     *
+     * @param gitLabServerUrl the GitLab server URL (resolved to default if blank)
+     * @throws IllegalStateException if the user has no GitLab identity linked
      */
     @Transactional
-    public void ensureAuthenticatedGitLabUser(String serverUrl) {
+    public void ensureAuthenticatedUserExists(String gitLabServerUrl) {
         String login = SecurityUtils.getCurrentUserLoginOrThrow();
-        String resolvedServerUrl = resolveGitLabServerUrl(serverUrl);
 
-        // Check if user already exists
-        GitProvider provider = gitProviderRepository
-            .findByTypeAndServerUrl(GitProviderType.GITLAB, resolvedServerUrl)
-            .orElse(null);
-        if (provider != null && userRepository.findByLoginAndProviderId(login, provider.getId()).isPresent()) {
-            return; // User already exists, nothing to do
-        }
-
-        // Read gitlab_id from JWT
-        Authentication auth =
-            org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-        Long gitlabId = null;
-        if (auth != null && auth.getPrincipal() instanceof org.springframework.security.oauth2.jwt.Jwt jwt) {
-            gitlabId = jwt.getClaim("gitlab_id");
-        }
-        if (gitlabId == null) {
-            // The user may have logged in via GitHub (no gitlab_id in JWT).
-            // Skip user creation — the workspace will still be created, and the
-            // owner will be resolved from the existing GitHub-linked User entity.
-            log.info(
-                "Skipped GitLab user creation: reason=noGitlabIdInJwt, login={}",
-                LoggingUtils.sanitizeForLog(login)
-            );
+        // Fast path: if user already exists in ANY provider, we're done
+        if (userRepository.findByLogin(login).isPresent()) {
             return;
         }
 
-        upsertGitLabUser(
-            gitlabId,
-            login,
-            login, // name defaults to login, will be updated by sync
-            "", // avatarUrl — will be populated by sync
-            resolvedServerUrl + "/" + login,
-            resolvedServerUrl,
-            User.Type.USER
+        // Read identity from JWT
+        Authentication auth =
+            org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof org.springframework.security.oauth2.jwt.Jwt jwt)) {
+            throw new IllegalStateException("No JWT found for authenticated user");
+        }
+
+        Long gitlabId = jwt.getClaim("gitlab_id");
+        if (gitlabId != null) {
+            String resolvedUrl = resolveGitLabServerUrl(gitLabServerUrl);
+            upsertGitLabUser(gitlabId, login, login, "", resolvedUrl + "/" + login, resolvedUrl, User.Type.USER);
+            return;
+        }
+
+        // No GitLab identity — check if they at least have a GitHub identity
+        Long githubId = jwt.getClaim("github_id");
+        if (githubId != null) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.CONFLICT,
+                "You need to link your GitLab account before creating a GitLab workspace. " +
+                    "Go to Settings → Linked Accounts to connect your GitLab identity."
+            );
+        }
+
+        throw new org.springframework.web.server.ResponseStatusException(
+            org.springframework.http.HttpStatus.CONFLICT,
+            "No GitLab identity found. Please link your GitLab account in Settings → Linked Accounts."
         );
     }
 
@@ -419,7 +433,8 @@ public class WorkspaceProvisioningService {
         User.Type userType
     ) {
         String safeName = name != null ? name : login;
-        String safeAvatar = avatarUrl != null ? avatarUrl : "";
+        // GitLab self-hosted instances return relative avatar paths (e.g. /uploads/-/system/user/avatar/123/avatar.png)
+        String safeAvatar = avatarUrl != null ? (avatarUrl.startsWith("/") ? serverUrl + avatarUrl : avatarUrl) : "";
         String safeWebUrl = webUrl != null ? webUrl : "";
 
         GitProvider provider = gitProviderRepository

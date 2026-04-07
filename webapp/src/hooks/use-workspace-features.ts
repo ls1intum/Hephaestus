@@ -9,6 +9,7 @@ export interface WorkspaceFeatures {
 	achievementsEnabled: boolean;
 	leaderboardEnabled: boolean;
 	progressionEnabled: boolean;
+	leaguesEnabled: boolean;
 }
 
 /**
@@ -45,5 +46,6 @@ export function getWorkspaceFeatures(workspace?: WorkspaceListItem): WorkspaceFe
 		achievementsEnabled: workspace?.achievementsEnabled ?? true,
 		leaderboardEnabled: workspace?.leaderboardEnabled ?? true,
 		progressionEnabled: workspace?.progressionEnabled ?? true,
+		leaguesEnabled: workspace?.leaguesEnabled ?? false,
 	};
 }

@@ -23,6 +23,8 @@ export interface AuthContextType {
 	getGitProviderId: () => string | undefined;
 	getUserProfilePictureUrl: () => string;
 	getUserProfileUrl: () => string;
+	/** Whether the user has a linked GitLab identity (logged in via GitLab or account linked) */
+	hasGitLabIdentity: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -198,6 +200,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
 		return keycloakService.getUserProfileUrl();
 	};
 
+	const hasGitLabIdentity = keycloakService.hasGitLabIdentity();
+
 	const value = {
 		isAuthenticated,
 		isLoading,
@@ -213,6 +217,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 		getGitProviderId,
 		getUserProfilePictureUrl,
 		getUserProfileUrl,
+		hasGitLabIdentity,
 	};
 
 	return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

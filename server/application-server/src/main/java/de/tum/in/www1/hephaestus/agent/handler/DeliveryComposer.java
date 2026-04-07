@@ -99,21 +99,82 @@ class DeliveryComposer {
     }
 
     /**
-     * Compose a short approval note when all findings are positive.
+     * Compose an approval note when all findings are positive. Uses the agent's actual
+     * per-finding reasoning to build a specific, contextual summary rather than a generic template.
      */
     private static String composeAllPositiveNote(List<ValidatedFinding> positives) {
-        var sb = new StringBuilder(256);
+        var sb = new StringBuilder(1024);
         sb.append("\u2705 "); // ✅
-        if (!positives.isEmpty()) {
+
+        if (positives.isEmpty()) {
+            sb.append("No issues found in this review.\n");
+            return sb.toString();
+        }
+
+        // Collect findings that have actual reasoning to build a natural summary
+        List<ValidatedFinding> withReasoning = positives
+            .stream()
+            .filter(f -> f.reasoning() != null && !f.reasoning().isBlank())
+            .toList();
+
+        if (withReasoning.isEmpty()) {
+            // Fallback: no reasoning available, name the practices
             List<String> namedPositives = positives
                 .stream()
                 .limit(MAX_NAMED_POSITIVES)
                 .map(f -> humanizePracticeSlug(f.practiceSlug()))
                 .toList();
-            sb.append("Nice work on the ").append(joinNatural(namedPositives)).append(". ");
+            sb.append("No issues found — the ").append(joinNatural(namedPositives));
+            sb.append(positives.size() == 1 ? " looks good.\n" : " look good.\n");
+            return sb.toString();
         }
-        sb.append("No issues found — looking good!\n");
+
+        // Build a contextual summary using the agent's own observations
+        sb.append("**No issues found.** Here's what stood out:\n\n");
+        int shown = 0;
+        for (ValidatedFinding f : withReasoning) {
+            if (shown >= 4) break; // Cap at 4 to avoid wall of text
+            String label = humanizePracticeSlug(f.practiceSlug());
+            String reasoning = f.reasoning().strip();
+            // Truncate long reasoning to first sentence or 200 chars
+            String summary = truncateToFirstSentence(reasoning, 200);
+            sb.append("- **").append(capitalize(label)).append(":** ").append(summary).append("\n");
+            shown++;
+        }
+        sb.append("\n");
+
         return sb.toString();
+    }
+
+    /** Truncate text to the first sentence or maxLen chars, whichever is shorter. */
+    private static String truncateToFirstSentence(String text, int maxLen) {
+        // Find first sentence-ending punctuation followed by space or end
+        int end = -1;
+        for (int i = 0; i < Math.min(text.length(), maxLen); i++) {
+            char c = text.charAt(i);
+            if ((c == '.' || c == '!' || c == '?') && (i + 1 >= text.length() || text.charAt(i + 1) == ' ')) {
+                end = i + 1;
+                break;
+            }
+        }
+        if (end > 0 && end <= maxLen) {
+            return text.substring(0, end);
+        }
+        if (text.length() <= maxLen) {
+            return text;
+        }
+        // Truncate at word boundary
+        int space = text.lastIndexOf(' ', maxLen);
+        if (space > maxLen / 2) {
+            return text.substring(0, space) + "...";
+        }
+        return text.substring(0, maxLen) + "...";
+    }
+
+    /** Capitalize the first character of a string. */
+    private static String capitalize(String s) {
+        if (s == null || s.isEmpty()) return s;
+        return Character.toUpperCase(s.charAt(0)) + s.substring(1);
     }
 
     /**
@@ -367,6 +428,7 @@ class DeliveryComposer {
 
     /** Join ["a", "b", "c"] as "a, b, and c". */
     private static String joinNatural(List<String> items) {
+        if (items.isEmpty()) return "";
         if (items.size() == 1) return items.get(0);
         if (items.size() == 2) return items.get(0) + " and " + items.get(1);
         return (
