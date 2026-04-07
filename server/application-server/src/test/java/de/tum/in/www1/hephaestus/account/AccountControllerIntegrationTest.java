@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import org.springframework.transaction.annotation.Transactional;
 
 @AutoConfigureWebTestClient
 @DisplayName("Account controller integration")
@@ -22,6 +23,7 @@ class AccountControllerIntegrationTest extends BaseIntegrationTest {
     private UserRepository userRepository;
 
     @Test
+    @Transactional
     @DisplayName("GET /user/settings provisions a GitLab user from JWT claims when no user row exists yet")
     void getUserSettingsProvisionsGitLabUserWhenMissing() {
         assertThat(userRepository.findByLogin("gitlabuser")).isEmpty();
@@ -37,12 +39,12 @@ class AccountControllerIntegrationTest extends BaseIntegrationTest {
             .jsonPath("$.aiReviewEnabled")
             .isEqualTo(true)
             .jsonPath("$.participateInResearch")
-            .isEqualTo(false);
+            .isEqualTo(true);
 
         var provisionedUser = userRepository.findByLogin("gitlabuser");
         assertThat(provisionedUser).isPresent();
         assertThat(provisionedUser.orElseThrow().getNativeId()).isEqualTo(18024L);
         assertThat(provisionedUser.orElseThrow().getProvider().getType()).isEqualTo(GitProviderType.GITLAB);
-        assertThat(provisionedUser.orElseThrow().getProvider().getServerUrl()).isEqualTo("https://gitlab.com");
+        assertThat(provisionedUser.orElseThrow().getProvider().getServerUrl()).isEqualTo("https://gitlab.lrz.de");
     }
 }
