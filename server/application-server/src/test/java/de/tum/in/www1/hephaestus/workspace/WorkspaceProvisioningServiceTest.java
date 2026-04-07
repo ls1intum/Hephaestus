@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderRepository;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.app.GitHubAppTokenService;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
+import de.tum.in.www1.hephaestus.gitprovider.user.AuthenticatedGitProviderUserService;
 import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import java.time.Duration;
@@ -58,6 +59,9 @@ class WorkspaceProvisioningServiceTest {
     @Mock
     private WorkspaceScopeFilter workspaceScopeFilter;
 
+    @Mock
+    private AuthenticatedGitProviderUserService authenticatedGitProviderUserService;
+
     private WorkspaceProvisioningService provisioningService;
 
     private WorkspaceProperties workspaceProperties;
@@ -92,7 +96,8 @@ class WorkspaceProvisioningServiceTest {
             workspaceMembershipRepository,
             workspaceMembershipService,
             workspaceScopeFilter,
-            gitLabProperties
+            gitLabProperties,
+            authenticatedGitProviderUserService
         );
     }
 
