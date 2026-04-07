@@ -16,7 +16,7 @@ The production stack consists of:
 - **Webhook ingest** (Hono/TypeScript → NATS JetStream)
 - **React webapp** (served via nginx)
 - **PostgreSQL 16**
-- **Keycloak** (with GitHub as identity provider)
+- **Keycloak** (with GitHub and optional GitLab identity providers)
 
 ## Environment variables
 
@@ -31,7 +31,8 @@ Set the following secrets before starting the stack:
 | `KC_BOOTSTRAP_ADMIN_USERNAME` | Keycloak bootstrap admin username |
 | `KC_BOOTSTRAP_ADMIN_PASSWORD` | Keycloak bootstrap admin password (`openssl rand -base64 32`) |
 | `KEYCLOAK_HEPHAESTUS_CONFIDENTIAL_CLIENT_SECRET` | Secret used by the app server to call Keycloak |
-| `SLACK_WEBHOOK_URL` | Optional: webhook for weekly leaderboard posts |
+| `SLACK_BOT_TOKEN` | Optional: Slack bot token for notifications |
+| `SLACK_SIGNING_SECRET` | Optional: Slack signing secret for webhook verification |
 
 ### GitHub integration
 
@@ -42,8 +43,85 @@ Hephaestus can connect to GitHub using either a **Personal Access Token (PAT)** 
   - `GH_APP_ID`: Your GitHub App ID
   - `GH_APP_PRIVATE_KEY`: Your GitHub App private key (PEM format)
   - `GH_APP_PRIVATE_KEY_LOCATION`: Alternative path to private key file (optional)
+   - `GH_APP_INSTALLATION_URL`: Install URL shown in the workspace creation wizard
 
 The application works with either approach. If GitHub App credentials are not provided (defaults to `GH_APP_ID=0`), workspaces will use Personal Access Tokens instead.
+
+### GitLab rollout bundle
+
+GitLab login, GitLab workspaces, webhook auto-registration, and practice review are not independent toggles. Treat the following as a rollout bundle and enable them together when rolling out GitLab practice review:
+
+| Variable | Purpose |
+| --- | --- |
+| `KEYCLOAK_GITLAB_ENABLED` | Enables the GitLab identity provider in Keycloak |
+| `KEYCLOAK_GITLAB_CLIENT_ID` | GitLab OAuth application client ID |
+| `KEYCLOAK_GITLAB_CLIENT_SECRET` | GitLab OAuth application client secret |
+| `KEYCLOAK_GITLAB_BASE_URL` | Base URL of the GitLab instance used for login and default workspace server selection |
+| `KEYCLOAK_GITLAB_ADMIN_USERNAME` | Optional GitLab username that should receive Keycloak admin rights on first login |
+| `GITLAB_ENABLED` | Enables server-side GitLab beans in the application server |
+| `GITLAB_WORKSPACE_CREATION` | Enables GitLab workspace creation in the UI and API |
+| `WEBHOOK_SECRET` | Shared secret used for GitLab webhook verification and auto-registration |
+| `WEBHOOK_EXTERNAL_URL` | Public webhook base URL registered on GitLab |
+
+Create the GitLab OAuth application with these settings:
+
+- Redirect URI: `https://<hostname>/keycloak/realms/hephaestus/broker/gitlab-lrz/endpoint`
+- Scopes: `openid`, `profile`, `email`
+- Confidential client: enabled
+
+### Practice review rollout bundle
+
+Practice review is not enabled by a single flag. The following settings must be aligned:
+
+| Variable | Purpose |
+| --- | --- |
+| `PRACTICE_REVIEW_FOR_ALL` | Enables the feature flag and the detection gate for all users |
+| `PRACTICE_REVIEW_SKIP_DRAFTS` | Skips draft PRs and draft merge requests |
+| `PRACTICE_REVIEW_DELIVER_TO_MERGED` | Allows delivery after merge |
+| `PRACTICE_REVIEW_COOLDOWN_MINUTES` | Minimum delay between repeated reviews of the same PR/MR |
+| `PRACTICE_REVIEW_APP_BASE_URL` | Footer link in review comments |
+| `SANDBOX_ENABLED` | Enables the Docker sandbox used by the coding agent |
+| `AGENT_NATS_ENABLED` | Enables the agent job queue and executor |
+| `GIT_CHECKOUT_ENABLED` | Enables local repo checkout and bind-mount into agent containers |
+| `NATS_ENABLED` | Enables webhook-driven sync consumption |
+| `NATS_DURABLE_CONSUMER_NAME` | Durable consumer name for sync processing |
+
+`SANDBOX_ENABLED`, `AGENT_NATS_ENABLED`, and `GIT_CHECKOUT_ENABLED` must be `true` together for practice review. Anything else is a half-configured deployment.
+
+### Rollout tiers
+
+Use the same variables differently across environments:
+
+| Environment | Intended scope |
+| --- | --- |
+| Preview | Limited by default. Keep GitLab login, GitLab workspaces, sandbox, git checkout, and agent job execution disabled unless preview is explicitly being used as rollout validation. |
+| Staging | Uses the production compose files, but should still be a controlled rollout. Start by enabling GitLab login and GitLab workspace creation first. Only enable `SANDBOX_ENABLED`, `AGENT_NATS_ENABLED`, and `GIT_CHECKOUT_ENABLED` when staging is intentionally validating practice review execution. |
+| Production | Full rollout only after staging has validated the exact same bundle. |
+
+Staging and production both use the production compose files. The difference should come from the `.env` values, not from a different compose topology.
+
+### AI model configuration
+
+The intelligence-service model selection and the sandboxed practice-review proxy are two different paths.
+
+For the intelligence-service:
+
+| Variable | Purpose |
+| --- | --- |
+| `MODEL_NAME` | Provider-qualified model name such as `openai:gpt-4o` or `azure:gpt-5.4-mini` |
+| `OPENAI_API_KEY` | Required when `MODEL_NAME` starts with `openai:` |
+| `AZURE_RESOURCE_NAME` | Required when `MODEL_NAME` starts with `azure:` |
+| `AZURE_API_KEY` | Required when `MODEL_NAME` starts with `azure:` |
+
+For Azure-backed practice review in the application server:
+
+| Variable | Purpose |
+| --- | --- |
+| `LLM_PROXY_AZURE_OPENAI_URL` | Azure OpenAI resource URL used by the dedicated Azure proxy route |
+| `LLM_PROXY_AZURE_OPENAI_AUTH_HEADER` | Usually `api-key` |
+| `LLM_PROXY_AZURE_OPENAI_USE_BEARER` | Usually `false` for Azure OpenAI |
+
+The generic `LLM_PROXY_OPENAI_*` settings only affect the OpenAI-compatible proxy route. The sandboxed Pi agent uses the dedicated Azure route when configured for Azure OpenAI.
 
 **Webhook secret:** Set `WEBHOOK_SECRET` to the secret configured on your GitHub and GitLab webhooks. Prefer SHA-256 (`X-Hub-Signature-256`) and generate with `openssl rand -hex 32` (base64 also works).
 
@@ -60,7 +138,7 @@ The sync scheduler fetches recent GitHub activity (issues, PRs, reviews) for mon
 | `MONITORING_BACKFILL_ENABLED` | `true` | Enable historical data backfill |
 | `MONITORING_BACKFILL_BATCH_SIZE` | `50` | Issues/PRs per backfill batch |
 | `MONITORING_BACKFILL_RATE_LIMIT_THRESHOLD` | `500` | Skip backfill if rate limit below this |
-| `MONITORING_BACKFILL_COOLDOWN_MINUTES` | `5` | Gap between backfill batches |
+| `MONITORING_BACKFILL_INTERVAL_SECONDS` | `60` | Interval between backfill batches |
 
 **Backfill behavior:** After recent sync completes, backfill works backwards from the highest issue number, syncing in small batches. It pauses when rate limits drop below the threshold and resumes on the next cycle. Progress is checkpointed per repository.
 
@@ -71,13 +149,15 @@ The sync scheduler fetches recent GitHub activity (issues, PRs, reviews) for mon
    - Import the `keycloak-hephaestus-realm-example-config.json` from the repository.
    - Copy `server/application-server/.env.example` to `server/application-server/.env`, then populate `KEYCLOAK_GITHUB_CLIENT_ID`, `KEYCLOAK_GITHUB_CLIENT_SECRET`, `KEYCLOAK_GITHUB_ADMIN_USERNAME`, and `KEYCLOAK_HEPHAESTUS_CONFIDENTIAL_CLIENT_SECRET` so the realm import can resolve them using [Keycloak's environment variable placeholders](https://www.keycloak.org/server/importExport#_using_environment_variables_within_the_realm_configuration_files).
    - Confirm the GitHub identity provider requests the `user:email` scopes and disable username/password login flows to keep authentication SSO-only.
+   - If rolling out GitLab login, also configure the GitLab identity provider and apply the manual Keycloak adjustments for first broker login, automatic account linking, relaxed name validation, and clock skew tolerance.
 3. **Bootstrap secrets:** Load environment variables into your secret manager or `.env` files consumed by Docker/Kubernetes.
 4. **Deploy services:** Use the provided Compose files (`docker/compose.app.yaml`, `docker/compose.core.yaml`, `docker/compose.proxy.yaml`) or your Kubernetes manifests.
 5. **Run database migrations:** The application server runs Liquibase migrations on startup; monitor logs to confirm success.
 6. **Verify integrations:**
    - Sign in via GitHub with the account configured in `KEYCLOAK_GITHUB_ADMIN_USERNAME` and confirm it lands in Keycloak with both the `admin` realm role and the `realm-management` → `realm-admin` client role automatically applied.
    - Verify that the super admin user can access workspace admin endpoints for workspaces where they have membership (they are automatically elevated to workspace ADMIN level for those workspaces).
-   - Trigger a test webhook from GitHub to validate the ingest pipeline.
+   - Trigger a test webhook from GitHub or GitLab to validate the ingest pipeline.
+   - Verify that `GITLAB_ENABLED`, `GITLAB_WORKSPACE_CREATION`, `SANDBOX_ENABLED`, `AGENT_NATS_ENABLED`, and `GIT_CHECKOUT_ENABLED` are all present in the deployed environment before testing GitLab practice review.
 
 ## Global admin privileges
 
@@ -96,6 +176,7 @@ This allows platform administrators to troubleshoot and manage workspaces where 
 - Monitor services with the central Prometheus/Loki stack; ensure trace IDs appear in logs.
 - Schedule regular backups for PostgreSQL and Keycloak.
 - Review weekly leaderboard Slack posts to ensure the automation is active.
+- Preview deployments do not currently represent the full GitLab practice-review rollout unless they are explicitly wired with the same GitLab IdP, sandbox, git checkout, and agent NATS settings.
 
 ## Support
 
