@@ -183,7 +183,10 @@ public class GitLabNoteMessageHandler extends GitLabMessageHandler<GitLabNoteEve
                 context.repository().getId(),
                 mr.iid(),
                 event.objectAttributes().note(),
-                event.user().username()
+                event.user().username(),
+                event.objectAttributes().id(),
+                event.project().pathWithNamespace(),
+                context.scopeId()
             )
         );
     }

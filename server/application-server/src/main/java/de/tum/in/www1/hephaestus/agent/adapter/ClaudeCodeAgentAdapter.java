@@ -125,7 +125,9 @@ public class ClaudeCodeAgentAdapter implements AgentAdapter {
             "filePath":{"type":"string"},"startLine":{"type":"integer","minimum":1},\
             "endLine":{"type":"integer","minimum":1},"body":{"type":"string"}},\
             "required":["filePath","startLine","body"]}}},\
-            "required":["practiceSlug","title","verdict","severity","confidence"]}}},"required":["findings"]}""";
+            "required":["practiceSlug","title","verdict","severity","confidence"]}},\
+            "delivery":{"type":"object","properties":{\
+            "mrNote":{"type":"string"}}}},"required":["findings"]}""";
         return schema.getBytes(StandardCharsets.UTF_8);
     }
 

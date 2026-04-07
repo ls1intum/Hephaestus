@@ -49,6 +49,24 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
     );
 
     /**
+     * Cooldown check: find the most recently created job whose idempotency key starts with the
+     * given prefix (PR-scoped, config-scoped, but SHA-agnostic) and was created after the cutoff.
+     * Used to enforce a minimum interval between reviews for the same PR.
+     */
+    @Query(
+        "SELECT j FROM AgentJob j WHERE j.workspace.id = :workspaceId" +
+            " AND j.idempotencyKey LIKE :keyPrefix ESCAPE '\\'" +
+            " AND j.createdAt > :cutoff" +
+            " ORDER BY j.createdAt DESC" +
+            " LIMIT 1"
+    )
+    Optional<AgentJob> findRecentJobByKeyPrefix(
+        @Param("workspaceId") Long workspaceId,
+        @Param("keyPrefix") String keyPrefix,
+        @Param("cutoff") Instant cutoff
+    );
+
+    /**
      * Claim a QUEUED job for execution with {@code FOR UPDATE SKIP LOCKED}.
      * Returns empty if the row is already locked (duplicate NATS delivery) or not QUEUED.
      */

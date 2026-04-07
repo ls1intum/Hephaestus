@@ -58,7 +58,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        reviewProperties = new PracticeReviewProperties(false, true, false, APP_BASE_URL);
+        reviewProperties = new PracticeReviewProperties(false, true, false, APP_BASE_URL, 15);
         service = new FeedbackDeliveryService(
             commentPoster,
             diffNotePoster,

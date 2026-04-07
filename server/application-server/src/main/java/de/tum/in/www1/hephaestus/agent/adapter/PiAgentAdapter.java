@@ -397,20 +397,17 @@ public class PiAgentAdapter implements AgentAdapter {
      * the sandbox-injected {@code LLM_PROXY_URL} and {@code LLM_PROXY_TOKEN}. For Azure OpenAI,
      * this also sets the required API version header.
      *
-     * <p>In API_KEY mode, credentials are injected as env vars without shell-level export
-     * (they are passed directly via the container environment map).
+     * <p>In API_KEY mode, credentials are injected via shell-level export (not the container
+     * env map) to avoid triggering the sandbox's blocked-prefix security filter for providers
+     * like Azure whose env var names match blocked prefixes ({@code AZURE_*}).
      */
     String buildAuthSetup(AgentAdapterRequest request, Map<String, String> env) {
         return switch (request.credentialMode()) {
             case PROXY -> buildProxyAuthSetup(request.llmProvider());
-            case API_KEY -> {
-                buildApiKeyAuth(request.llmProvider(), request.credential(), env);
-                yield "";
-            }
+            case API_KEY -> buildApiKeyAuthSetup(request.llmProvider(), request.credential(), env);
             case OAUTH -> {
                 // Pi does not have a dedicated OAuth mode; treat as API key
-                buildApiKeyAuth(request.llmProvider(), request.credential(), env);
-                yield "";
+                yield buildApiKeyAuthSetup(request.llmProvider(), request.credential(), env);
             }
         };
     }
@@ -435,11 +432,30 @@ public class PiAgentAdapter implements AgentAdapter {
         };
     }
 
-    private void buildApiKeyAuth(LlmProvider provider, String credential, Map<String, String> env) {
-        switch (provider) {
-            case AZURE_OPENAI -> env.put("AZURE_OPENAI_API_KEY", credential);
-            case OPENAI -> env.put("OPENAI_API_KEY", credential);
-            case ANTHROPIC -> env.put("ANTHROPIC_API_KEY", credential);
-        }
+    /**
+     * Build shell export commands for API_KEY mode. Uses shell-level export for all providers
+     * so that credentials never enter the container env map (and thus never trigger the
+     * sandbox's blocked-prefix security filter).
+     */
+    private String buildApiKeyAuthSetup(LlmProvider provider, String credential, Map<String, String> env) {
+        return switch (provider) {
+            case AZURE_OPENAI -> "export AZURE_OPENAI_API_KEY=" +
+            shellQuote(credential) +
+            " AZURE_OPENAI_API_VERSION=\"2025-04-01-preview\"" +
+            " && ";
+            case OPENAI -> {
+                env.put("OPENAI_API_KEY", credential);
+                yield "";
+            }
+            case ANTHROPIC -> {
+                env.put("ANTHROPIC_API_KEY", credential);
+                yield "";
+            }
+        };
+    }
+
+    /** Single-quote a value for safe shell interpolation (escapes embedded single quotes). */
+    private static String shellQuote(String value) {
+        return "'" + value.replace("'", "'\\''") + "'";
     }
 }

@@ -1,5 +1,6 @@
 package de.tum.in.www1.hephaestus.practices.review;
 
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
@@ -10,12 +11,13 @@ import org.springframework.validation.annotation.Validated;
  *
  * <p>Binds to the {@code hephaestus.practice-review} prefix in application configuration.
  *
- * @param runForAllUsers  whether to run practice review for all PRs (true) or only for users
- *                        with the {@code run_practice_review} Keycloak role (false)
- * @param skipDrafts      whether to skip practice review for draft PRs
- * @param deliverToMerged whether to deliver feedback to already-merged PRs
- * @param appBaseUrl      base URL of the Hephaestus application (for preferences footer link);
- *                        empty string disables the footer link
+ * @param runForAllUsers      whether to run practice review for all PRs (true) or only for users
+ *                            with the {@code run_practice_review} Keycloak role (false)
+ * @param skipDrafts          whether to skip practice review for draft PRs
+ * @param deliverToMerged     whether to deliver feedback to already-merged PRs
+ * @param appBaseUrl          base URL of the Hephaestus application (for preferences footer link);
+ *                            empty string disables the footer link
+ * @param cooldownMinutes     minimum minutes between reviews for the same PR. 0 disables cooldown.
  */
 @Validated
 @ConfigurationProperties(prefix = "hephaestus.practice-review")
@@ -25,5 +27,6 @@ public record PracticeReviewProperties(
     @DefaultValue("false") boolean deliverToMerged,
     @Pattern(regexp = "^$|^https?://.*", message = "appBaseUrl must be empty or a valid http(s) URL")
     @DefaultValue("")
-    String appBaseUrl
+    String appBaseUrl,
+    @Min(0) @DefaultValue("15") int cooldownMinutes
 ) {}

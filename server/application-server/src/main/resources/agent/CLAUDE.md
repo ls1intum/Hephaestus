@@ -97,6 +97,6 @@ For each NEGATIVE finding, include at least one `suggestedDiffNote`:
 - **Check proportionality**: After drafting all findings, verify that the most impactful issues (MAJOR/CRITICAL) are covered. Would the student reading only the MR summary understand the most important problems?
 ### Phase 5: Final Output
 
-Your final response must be a JSON object with ONLY a `findings` array — matching the schema in orchestrator-protocol.md.
-Do NOT include a `delivery` block. The server composes the MR comment from your structured findings.
+Your final response must be a JSON object with a `findings` array and a `delivery.mrNote` string — matching the schema in orchestrator-protocol.md.
+The `delivery.mrNote` is posted directly as the MR comment. Write it as natural, conversational prose — see the Delivery section in orchestrator-protocol.md for guidelines.
 The `--json-schema` flag applies constrained decoding.

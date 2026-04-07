@@ -61,7 +61,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        PracticeReviewProperties properties = new PracticeReviewProperties(false, true, false, "");
+        PracticeReviewProperties properties = new PracticeReviewProperties(false, true, false, "", 15);
         gate = new PracticeReviewDetectionGate(
             properties,
             userRoleChecker,
@@ -147,7 +147,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         @Test
         @DisplayName("Should continue when PR is draft but skipDrafts=false")
         void continueWhenSkipDraftsDisabled() {
-            PracticeReviewProperties noSkipProps = new PracticeReviewProperties(false, false, false, "");
+            PracticeReviewProperties noSkipProps = new PracticeReviewProperties(false, false, false, "", 15);
             PracticeReviewDetectionGate noSkipGate = new PracticeReviewDetectionGate(
                 noSkipProps,
                 userRoleChecker,
@@ -299,7 +299,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         @Test
         @DisplayName("Should DETECT without role check when runForAllUsers=true")
         void detectWhenRunForAllUsers() {
-            PracticeReviewProperties runForAllProps = new PracticeReviewProperties(true, true, false, "");
+            PracticeReviewProperties runForAllProps = new PracticeReviewProperties(true, true, false, "", 15);
             PracticeReviewDetectionGate runForAllGate = new PracticeReviewDetectionGate(
                 runForAllProps,
                 userRoleChecker,

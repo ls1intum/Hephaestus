@@ -118,6 +118,7 @@ public class DockerSandboxAdapter implements SandboxManager {
      * {@code GIT_CONFIG_*} to prevent callers from overriding git security settings.
      *
      * @see #BLOCKED_ENV_VARS
+     * @see #ALLOWED_PREFIX_EXCEPTIONS
      * @see #isBlockedEnvVar(String)
      */
     static final List<String> BLOCKED_ENV_PREFIXES = List.of(
@@ -129,6 +130,29 @@ public class DockerSandboxAdapter implements SandboxManager {
         "ALIBABA_CLOUD_",
         "GIT_CONFIG_"
     );
+
+    /**
+     * Exact environment variable names that are allowed even though they match a blocked prefix.
+     * These are set by agent adapters for legitimate SDK configuration (e.g. deployment mapping).
+     *
+     * @see #BLOCKED_ENV_PREFIXES
+     */
+    static final Set<String> ALLOWED_PREFIX_EXCEPTIONS;
+
+    static {
+        TreeSet<String> allowed = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        allowed.addAll(
+            List.of(
+                // Pi SDK needs this to map model names to Azure deployment names
+                "AZURE_OPENAI_DEPLOYMENT_NAME_MAP",
+                // Non-secret SDK configuration — API key is injected via shell export,
+                // never through the env map, to prevent accidental credential leakage.
+                "AZURE_OPENAI_BASE_URL",
+                "AZURE_OPENAI_API_VERSION"
+            )
+        );
+        ALLOWED_PREFIX_EXCEPTIONS = allowed;
+    }
 
     /**
      * Git config key-value pairs injected via {@code GIT_CONFIG_COUNT}/{@code GIT_CONFIG_KEY_*}/
@@ -503,6 +527,10 @@ public class DockerSandboxAdapter implements SandboxManager {
     static boolean isBlockedEnvVar(String name) {
         if (BLOCKED_ENV_VARS.contains(name)) {
             return true;
+        }
+        // Allow specific vars that match blocked prefixes but are needed by agent adapters
+        if (ALLOWED_PREFIX_EXCEPTIONS.contains(name)) {
+            return false;
         }
         // Prefix matching uses uppercase comparison — catches case variants
         // like "aws_access_key_id" that some tools/shells might inject

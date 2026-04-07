@@ -113,10 +113,13 @@ class PiAgentAdapterTest extends BaseUnitTest {
     class ApiKeyMode {
 
         @Test
-        @DisplayName("should set AZURE_OPENAI_API_KEY directly for Azure")
-        void shouldSetAzureApiKeyDirectly() {
+        @DisplayName("should export AZURE_OPENAI_API_KEY via shell for Azure")
+        void shouldSetAzureApiKeyViaShellExport() {
             var spec = adapter.buildSandboxSpec(apiKeyRequest(LlmProvider.AZURE_OPENAI));
-            assertThat(spec.environment()).containsEntry("AZURE_OPENAI_API_KEY", "sk-test-key");
+            // Azure API key is now exported via shell command, not env map
+            assertThat(spec.environment()).doesNotContainKey("AZURE_OPENAI_API_KEY");
+            String shellCmd = spec.command().get(spec.command().size() - 1);
+            assertThat(shellCmd).contains("AZURE_OPENAI_API_KEY=");
         }
 
         @Test

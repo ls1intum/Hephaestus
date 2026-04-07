@@ -48,7 +48,7 @@ class BotCommandProcessorTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        processor = new BotCommandProcessor(agentJobService, pullRequestRepository, practiceReviewDetectionGate);
+        processor = new BotCommandProcessor(agentJobService, pullRequestRepository, practiceReviewDetectionGate, null);
     }
 
     @Nested
@@ -223,7 +223,7 @@ class BotCommandProcessorTest extends BaseUnitTest {
     // -- Test helpers --
 
     private BotCommandReceivedEvent event(String noteBody) {
-        return new BotCommandReceivedEvent(REPO_ID, MR_NUMBER, noteBody, AUTHOR);
+        return new BotCommandReceivedEvent(REPO_ID, MR_NUMBER, noteBody, AUTHOR, null, null, null);
     }
 
     private PullRequest createOpenPr() {

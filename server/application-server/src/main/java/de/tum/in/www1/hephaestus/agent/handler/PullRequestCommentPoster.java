@@ -485,7 +485,7 @@ class PullRequestCommentPoster {
         return sb.toString();
     }
 
-    /** Appends the metadata footer (agent name, model, duration) to a comment being built. */
+    /** Appends the metadata footer (agent name, model, duration, disclaimer) to a comment being built. */
     static void appendMetadataFooter(StringBuilder sb, AgentJob job) {
         sb.append("<sub>Hephaestus Agent");
 
@@ -503,6 +503,9 @@ class PullRequestCommentPoster {
         }
 
         sb.append("</sub>\n");
+        sb.append(
+            "<sub>AI-generated feedback can be inaccurate. React with \uD83D\uDC4D or \uD83D\uDC4E to give feedback.</sub>\n"
+        );
     }
 
     static String formatDuration(Duration duration) {

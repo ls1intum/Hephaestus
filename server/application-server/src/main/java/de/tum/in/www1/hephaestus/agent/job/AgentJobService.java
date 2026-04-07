@@ -16,6 +16,7 @@ import de.tum.in.www1.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.EventPayload;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
+import de.tum.in.www1.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
@@ -49,6 +50,7 @@ public class AgentJobService {
     private final ObjectMapper objectMapper;
     private final ApplicationEventPublisher eventPublisher;
     private final TransactionTemplate transactionTemplate;
+    private final PracticeReviewProperties reviewProperties;
     private final @Nullable SandboxManager sandboxManager;
 
     public AgentJobService(
@@ -60,6 +62,7 @@ public class AgentJobService {
         ObjectMapper objectMapper,
         ApplicationEventPublisher eventPublisher,
         TransactionTemplate transactionTemplate,
+        PracticeReviewProperties reviewProperties,
         @Nullable SandboxManager sandboxManager
     ) {
         this.agentJobRepository = agentJobRepository;
@@ -70,6 +73,7 @@ public class AgentJobService {
         this.objectMapper = objectMapper;
         this.eventPublisher = eventPublisher;
         this.transactionTemplate = transactionTemplate;
+        this.reviewProperties = reviewProperties;
         this.sandboxManager = sandboxManager;
     }
 
@@ -201,6 +205,32 @@ public class AgentJobService {
                     configScopedKey
                 );
                 return existing.get();
+            }
+
+            // Cooldown check — prevent rapid re-triggering for the same PR/config.
+            // Strips the commit-SHA segment from the idempotency key to match any SHA.
+            int cooldown = reviewProperties.cooldownMinutes();
+            if (cooldown > 0) {
+                String rawPrefix = extractCooldownKeyPrefix(submission.idempotencyKey());
+                // Escape SQL LIKE wildcards in the prefix to prevent unintended pattern matching
+                String escaped = rawPrefix.replace("%", "\\%").replace("_", "\\_");
+                String cooldownPrefix = escaped + "%:config:" + config.getId();
+                Instant cutoff = Instant.now().minus(java.time.Duration.ofMinutes(cooldown));
+                Optional<AgentJob> recent = agentJobRepository.findRecentJobByKeyPrefix(
+                    workspace.getId(),
+                    cooldownPrefix,
+                    cutoff
+                );
+                if (recent.isPresent()) {
+                    log.info(
+                        "Cooldown active: skipping submission, recentJobId={}, createdAt={}, cooldownMinutes={}, key={}",
+                        recent.get().getId(),
+                        recent.get().getCreatedAt(),
+                        cooldown,
+                        configScopedKey
+                    );
+                    return null;
+                }
             }
 
             AgentJob job = new AgentJob();
@@ -393,5 +423,22 @@ public class AgentJobService {
         return agentJobRepository
             .findByIdAndWorkspaceId(jobId, workspaceId)
             .orElseThrow(() -> new EntityNotFoundException("AgentJob", jobId.toString()));
+    }
+
+    // ── Cooldown helpers ──
+
+    /**
+     * Extract the PR-scoped prefix from an idempotency key by stripping the commit-SHA segment.
+     * Input: {@code "pr_review:owner/repo:42:abc123"} → Output: {@code "pr_review:owner/repo:42:"}
+     * This allows LIKE-matching against any SHA for the same PR.
+     */
+    static String extractCooldownKeyPrefix(String idempotencyKey) {
+        // The key format is "pr_review:{nameWithOwner}:{prNumber}:{sha}"
+        // We want everything up to and including the last ':' before the SHA.
+        int lastColon = idempotencyKey.lastIndexOf(':');
+        if (lastColon > 0) {
+            return idempotencyKey.substring(0, lastColon + 1);
+        }
+        return idempotencyKey;
     }
 }
