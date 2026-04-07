@@ -1,12 +1,15 @@
 package de.tum.in.www1.hephaestus.account;
 
 import de.tum.in.www1.hephaestus.config.KeycloakProperties;
+import de.tum.in.www1.hephaestus.gitprovider.user.AuthenticatedGitProviderUserService;
+import de.tum.in.www1.hephaestus.gitprovider.user.User;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.integrations.posthog.PosthogClientException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.Optional;
 import org.keycloak.admin.client.Keycloak;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,17 +47,20 @@ public class AccountController {
     private final Keycloak keycloak;
     private final UserRepository userRepository;
     private final KeycloakProperties keycloakProperties;
+    private final AuthenticatedGitProviderUserService authenticatedGitProviderUserService;
 
     public AccountController(
         AccountService accountService,
         Keycloak keycloak,
         UserRepository userRepository,
-        KeycloakProperties keycloakProperties
+        KeycloakProperties keycloakProperties,
+        AuthenticatedGitProviderUserService authenticatedGitProviderUserService
     ) {
         this.accountService = accountService;
         this.keycloak = keycloak;
         this.userRepository = userRepository;
         this.keycloakProperties = keycloakProperties;
+        this.authenticatedGitProviderUserService = authenticatedGitProviderUserService;
     }
 
     @DeleteMapping
@@ -96,8 +102,8 @@ public class AccountController {
         summary = "Get user settings",
         description = "Get the current user's notification, research participation, and AI review preferences"
     )
-    public ResponseEntity<UserSettingsDTO> getUserSettings() {
-        var user = userRepository.getCurrentUser();
+    public ResponseEntity<UserSettingsDTO> getUserSettings(@AuthenticationPrincipal JwtAuthenticationToken auth) {
+        var user = resolveOrProvisionCurrentUser(auth);
         if (user.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
@@ -115,7 +121,7 @@ public class AccountController {
         @AuthenticationPrincipal JwtAuthenticationToken auth,
         @Valid @RequestBody UserSettingsDTO userSettings
     ) {
-        var user = userRepository.getCurrentUser();
+        var user = resolveOrProvisionCurrentUser(auth);
         if (user.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
@@ -204,5 +210,13 @@ public class AccountController {
             return jwtAuthenticationToken;
         }
         return null;
+    }
+
+    private Optional<User> resolveOrProvisionCurrentUser(JwtAuthenticationToken auth) {
+        if (resolveAuthentication(auth) == null) {
+            return Optional.empty();
+        }
+
+        return authenticatedGitProviderUserService.resolveOrProvisionCurrentUser(null);
     }
 }

@@ -47,6 +47,10 @@ public class TestSecurityConfig {
                 username = "mentor";
                 userId = "mentor-user-id";
                 roles = new String[] { "mentor_access" };
+            } else if ("mock-jwt-token-for-gitlab-user".equals(token)) {
+                username = "gitlabuser";
+                userId = "gitlab-user-id";
+                roles = new String[] {};
             } else if ("mock-jwt-token-for-admin-user".equals(token)) {
                 username = "admin";
                 userId = "admin-user-id";
@@ -68,6 +72,11 @@ public class TestSecurityConfig {
             claims.put("preferred_username", username);
             claims.put("iss", "https://test-issuer");
             claims.put("aud", "test-audience");
+
+            if ("mock-jwt-token-for-gitlab-user".equals(token)) {
+                claims.put("gitlab_id", 18024L);
+                claims.put("identity_provider", "gitlab-lrz");
+            }
 
             // Add realm_access with roles (same structure as Keycloak)
             if (roles.length > 0) {
