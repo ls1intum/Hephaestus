@@ -345,15 +345,15 @@ hephaestus:
     # The gate decides whether to submit an agent job for a PR event.
     practice-review:
         # true = run for ALL users (bypass Keycloak role check); false = require run_practice_review role
-        run-for-all-users: false
+        run-for-all-users: ${PRACTICE_REVIEW_RUN_FOR_ALL:false}
         # true = skip practice review for draft PRs
-        skip-drafts: true
+        skip-drafts: ${PRACTICE_REVIEW_SKIP_DRAFTS:true}
         # whether to deliver feedback to already-merged PRs
-        deliver-to-merged: false
+        deliver-to-merged: ${PRACTICE_REVIEW_DELIVER_TO_MERGED:false}
         # base URL of the Hephaestus app (for preferences footer link); empty = no link
         app-base-url: ${PRACTICE_REVIEW_APP_BASE_URL:}
         # minimum minutes between reviews for the same PR (0 = no cooldown)
-        cooldown-minutes: 15
+        cooldown-minutes: ${PRACTICE_REVIEW_COOLDOWN_MINUTES:15}
 
     posthog:
         enabled: ${POSTHOG_ENABLED:false}
@@ -381,6 +381,10 @@ hephaestus:
         # For Azure OpenAI, set openai-auth-header=api-key and openai-use-bearer-prefix=false
         openai-auth-header: ${LLM_PROXY_OPENAI_AUTH_HEADER:Authorization}
         openai-use-bearer-prefix: ${LLM_PROXY_OPENAI_USE_BEARER:true}
+        # Dedicated Azure OpenAI route used by the sandboxed Pi agent
+        azure-openai-upstream-url: ${LLM_PROXY_AZURE_OPENAI_URL:}
+        azure-openai-auth-header: ${LLM_PROXY_AZURE_OPENAI_AUTH_HEADER:api-key}
+        azure-openai-use-bearer-prefix: ${LLM_PROXY_AZURE_OPENAI_USE_BEARER:false}
 
     sandbox:
         enabled: ${SANDBOX_ENABLED:false}
@@ -484,7 +488,7 @@ hephaestus:
     # SLACK INTEGRATION
     # ═══════════════════════════════════════════════════════════════════════════
     slack:
-        token: ${SLACK_TOKEN:}
+        token: ${SLACK_BOT_TOKEN:${SLACK_TOKEN:}}
         signing-secret: ${SLACK_SIGNING_SECRET:}
 
     # ═══════════════════════════════════════════════════════════════════════════

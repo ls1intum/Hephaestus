@@ -19,6 +19,11 @@
 #      - keycloak: https://example.com:8080/keycloak
 #      - webhook-ingest: https://example.com:4200/webhooks
 #
+# IMPORTANT: This shared preview infrastructure does not, by itself, prove that
+# GitLab workspace creation or GitLab practice review will work in production.
+# If you want preview to validate that rollout, add the GitLab IdP and the same
+# application-server practice-review wiring used in the production stack.
+#
 # Domain format: https://domain.com:PORT/path
 # The :PORT tells Coolify which container port to proxy to.
 # Strip Prefix removes /keycloak and /webhooks before forwarding.
