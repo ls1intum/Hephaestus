@@ -86,7 +86,7 @@ Practice review is not enabled by a single flag. The following settings must be 
 | `NATS_ENABLED` | Enables webhook-driven sync consumption |
 | `NATS_DURABLE_CONSUMER_NAME` | Durable consumer name for sync processing |
 
-`SANDBOX_ENABLED`, `AGENT_NATS_ENABLED`, and `GIT_CHECKOUT_ENABLED` must be `true` together for practice review. Anything else is a half-configured deployment.
+`SANDBOX_ENABLED`, `AGENT_NATS_ENABLED`, `GIT_CHECKOUT_ENABLED`, and `NATS_ENABLED` must be `true` together for practice review. Anything else is a half-configured deployment.
 
 ### Rollout tiers
 
@@ -95,7 +95,7 @@ Use the same variables differently across environments:
 | Environment | Intended scope |
 | --- | --- |
 | Preview | Limited by default. Keep GitLab login, GitLab workspaces, sandbox, git checkout, and agent job execution disabled unless preview is explicitly being used as rollout validation. |
-| Staging | Uses the production compose files, but should still be a controlled rollout. Start by enabling GitLab login and GitLab workspace creation first. Only enable `SANDBOX_ENABLED`, `AGENT_NATS_ENABLED`, and `GIT_CHECKOUT_ENABLED` when staging is intentionally validating practice review execution. |
+| Staging | Uses the production compose files, but should still be a controlled rollout. Start by enabling GitLab login and GitLab workspace creation first. Only enable `SANDBOX_ENABLED`, `AGENT_NATS_ENABLED`, `GIT_CHECKOUT_ENABLED`, and `NATS_ENABLED` when staging is intentionally validating practice review execution. |
 | Production | Full rollout only after staging has validated the exact same bundle. |
 
 Staging and production both use the production compose files. The difference should come from the `.env` values, not from a different compose topology.
@@ -157,7 +157,7 @@ The sync scheduler fetches recent GitHub activity (issues, PRs, reviews) for mon
    - Sign in via GitHub with the account configured in `KEYCLOAK_GITHUB_ADMIN_USERNAME` and confirm it lands in Keycloak with both the `admin` realm role and the `realm-management` → `realm-admin` client role automatically applied.
    - Verify that the super admin user can access workspace admin endpoints for workspaces where they have membership (they are automatically elevated to workspace ADMIN level for those workspaces).
    - Trigger a test webhook from GitHub or GitLab to validate the ingest pipeline.
-   - Verify that `GITLAB_ENABLED`, `GITLAB_WORKSPACE_CREATION`, `SANDBOX_ENABLED`, `AGENT_NATS_ENABLED`, and `GIT_CHECKOUT_ENABLED` are all present in the deployed environment before testing GitLab practice review.
+   - Verify that `GITLAB_ENABLED`, `GITLAB_WORKSPACE_CREATION`, `SANDBOX_ENABLED`, `AGENT_NATS_ENABLED`, `GIT_CHECKOUT_ENABLED`, and `NATS_ENABLED` are all present in the deployed environment before testing GitLab practice review.
 
 ## Global admin privileges
 
