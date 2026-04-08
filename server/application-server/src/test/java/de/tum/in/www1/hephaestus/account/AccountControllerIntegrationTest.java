@@ -2,8 +2,8 @@ package de.tum.in.www1.hephaestus.account;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.gitprovider.common.GitProviderType;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabProperties;
 import de.tum.in.www1.hephaestus.gitprovider.user.UserRepository;
 import de.tum.in.www1.hephaestus.testconfig.BaseIntegrationTest;
 import org.junit.jupiter.api.DisplayName;
