@@ -165,9 +165,9 @@ public class PullRequestReviewHandler implements JobTypeHandler {
 
         Map<String, byte[]> files = new HashMap<>();
 
-        // Ensure repo is cloned/fetched before volumeMounts() resolves the path
-        String gitToken = job.getWorkspace() != null ? job.getWorkspace().getPersonalAccessToken() : null;
-        ensureRepositoryCloned(metadata, repositoryId, gitToken);
+        // PR review requires a pre-prepared local checkout. The sandbox never clones or fetches
+        // repositories on demand; it only mounts an existing host-side checkout.
+        ensureRepositoryAvailable(repositoryId);
 
         // Load PR entity once — shared by metadata, comments, and contributor history
         PullRequest pullRequest = pullRequestRepository.findByIdWithAllForGate(pullRequestId).orElse(null);
@@ -491,38 +491,21 @@ public class PullRequestReviewHandler implements JobTypeHandler {
     // -------------------------------------------------------------------------
 
     /**
-     * Ensure the repository is cloned/fetched locally. Throws on failure because the bind-mount
-     * approach requires a valid local clone — there is no fallback.
+     * Require a pre-prepared local repository checkout for bind-mounting.
+     *
+     * <p>This review flow never clones or fetches repositories on demand. Repository preparation
+     * must happen ahead of time via the normal sync/bootstrap path so sandbox runs stay offline and
+     * deterministic with respect to repo contents.
      */
-    private void ensureRepositoryCloned(JsonNode metadata, long repositoryId, @Nullable String gitToken) {
+    private void ensureRepositoryAvailable(long repositoryId) {
         if (!gitRepositoryManager.isEnabled()) {
             throw new JobPreparationException(
                 "Git local checkout is disabled but required for bind-mount: repoId=" + repositoryId
             );
         }
-        String repoFullName = requireText(metadata, "repository_full_name");
-
-        // Derive clone URL from PR URL (works for both GitHub and GitLab).
-        // PR URL format: https://<host>/<path>/-/merge_requests/<iid> (GitLab)
-        //                https://<host>/<path>/pull/<number> (GitHub)
-        String prUrl = requireText(metadata, "pr_url");
-        String cloneUrl;
-        int mrIdx = prUrl.indexOf("/-/merge_requests/");
-        int pullIdx = prUrl.indexOf("/pull/");
-        if (mrIdx > 0) {
-            cloneUrl = prUrl.substring(0, mrIdx) + ".git";
-        } else if (pullIdx > 0) {
-            cloneUrl = prUrl.substring(0, pullIdx) + ".git";
-        } else {
-            // Fallback: construct from repo name (GitHub assumed)
-            cloneUrl = "https://github.com/" + repoFullName + ".git";
-        }
-        try {
-            gitRepositoryManager.ensureRepository(repositoryId, cloneUrl, gitToken);
-        } catch (Exception e) {
+        if (!gitRepositoryManager.isRepositoryCloned(repositoryId)) {
             throw new JobPreparationException(
-                "Failed to clone/fetch repository for bind-mount: repoId=" + repositoryId,
-                e
+                "Repository checkout is not available locally for bind-mount: repoId=" + repositoryId
             );
         }
     }
@@ -865,7 +848,12 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             boolean hasInScopeLocation = false;
             for (JsonNode loc : locations) {
                 JsonNode pathNode = loc.get("path");
-                if (pathNode != null && diffFiles.contains(pathNode.asText())) {
+                if (pathNode == null) {
+                    continue;
+                }
+
+                String path = pathNode.asText();
+                if (diffFiles.contains(path) || isInternalContextPath(path)) {
                     hasInScopeLocation = true;
                     break;
                 }
@@ -877,6 +865,10 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             }
         }
         return filtered;
+    }
+
+    private static boolean isInternalContextPath(String path) {
+        return path.startsWith(".context/");
     }
 
     /**
