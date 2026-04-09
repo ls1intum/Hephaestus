@@ -38,7 +38,7 @@ import org.springframework.validation.annotation.Validated;
  * @param containerStopTimeoutSeconds SIGTERM → SIGKILL grace period
  * @param reconciliationIntervalSeconds interval between orphan cleanup sweeps
  * @param containerRuntime OCI runtime (null=runc, "runsc"=gVisor)
- * @param llmProxyPort port on which the LLM proxy listens (inside the app-server container)
+ * @param llmProxyPort optional override for the port on which the LLM proxy listens
  * @param appServerContainerId Docker container ID of the app-server (null=auto-detect from
  *     HOSTNAME)
  * @param maxDirectoryBytes maximum total bytes for directory injection via tar (default 1 GB)
@@ -56,7 +56,7 @@ public record SandboxProperties(
     @DefaultValue("10") @Min(1) int containerStopTimeoutSeconds,
     @DefaultValue("60") @Min(10) int reconciliationIntervalSeconds,
     @Nullable String containerRuntime,
-    @DefaultValue("8080") @Min(1) int llmProxyPort,
+    @Nullable Integer llmProxyPort,
     @Nullable String appServerContainerId,
     @DefaultValue("1073741824") @Min(1) long maxDirectoryBytes, // 1 GB
     @DefaultValue("500000") @Min(1) int maxDirectoryEntries,
@@ -81,6 +81,13 @@ public record SandboxProperties(
             return appServerContainerId;
         }
         return null;
+    }
+
+    public int resolvedLlmProxyPort(int serverPort) {
+        if (llmProxyPort != null && llmProxyPort > 0) {
+            return llmProxyPort;
+        }
+        return serverPort;
     }
 
     /**

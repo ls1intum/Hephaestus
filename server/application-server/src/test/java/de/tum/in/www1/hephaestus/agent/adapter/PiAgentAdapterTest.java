@@ -153,8 +153,8 @@ class PiAgentAdapterTest extends BaseUnitTest {
         @DisplayName("should inject Pi settings.json")
         void shouldInjectSettingsJson() {
             var spec = adapter.buildSandboxSpec(proxyRequest(LlmProvider.AZURE_OPENAI, "gpt-5.4-mini"));
-            assertThat(spec.inputFiles()).containsKey(".pi/settings.json");
-            String settings = new String(spec.inputFiles().get(".pi/settings.json"), StandardCharsets.UTF_8);
+            assertThat(spec.inputFiles()).containsKey(".pi-runtime/settings.json");
+            String settings = new String(spec.inputFiles().get(".pi-runtime/settings.json"), StandardCharsets.UTF_8);
             assertThat(settings).contains("azure-openai-responses");
             assertThat(settings).contains("gpt-5.4-mini");
         }
@@ -175,14 +175,18 @@ class PiAgentAdapterTest extends BaseUnitTest {
             var spec = adapter.buildSandboxSpec(proxyRequest(LlmProvider.AZURE_OPENAI, null));
             assertThat(spec.inputFiles()).containsKey(".run-pi.mjs");
             String script = new String(spec.inputFiles().get(".run-pi.mjs"), StandardCharsets.UTF_8);
-            assertThat(script).contains("spawnSync('pi'");
+            assertThat(script).contains("spawnSync(\"pi\"");
             assertThat(script).contains("--session-dir");
             assertThat(script).contains("--tools");
             assertThat(script).contains("write"); // write tool for file output
-            assertThat(script).contains("readFileSync('/workspace/.prompt'"); // reads prompt from file
+            assertThat(script).contains("readFileSync(\"/workspace/.prompt\"");
             assertThat(script).doesNotContain("--no-session");
-            assertThat(script).contains("'-c'"); // retry via session continuation
-            assertThat(script).contains("checkResult"); // checks write-tool output
+            assertThat(script).contains("runner-debug.json");
+            assertThat(script).contains("recordAttempt");
+            assertThat(script).contains("continuationRetryPrompt");
+            assertThat(script).contains("\"-c\"");
+            assertThat(script).contains("checkResult");
+            assertThat(script).contains("Array.isArray(data?.findings)");
         }
 
         @Test
@@ -212,7 +216,7 @@ class PiAgentAdapterTest extends BaseUnitTest {
         @DisplayName("should set PI_CODING_AGENT_DIR env var")
         void shouldSetPiConfigDir() {
             var spec = adapter.buildSandboxSpec(proxyRequest(LlmProvider.AZURE_OPENAI, null));
-            assertThat(spec.environment()).containsEntry("PI_CODING_AGENT_DIR", "/workspace/.pi");
+            assertThat(spec.environment()).containsEntry("PI_CODING_AGENT_DIR", "/home/agent/.pi");
         }
 
         @Test
@@ -220,6 +224,7 @@ class PiAgentAdapterTest extends BaseUnitTest {
         void shouldRunPrecomputeStep() {
             var spec = adapter.buildSandboxSpec(proxyRequest(LlmProvider.AZURE_OPENAI, null));
             String cmd = spec.command().get(2);
+            assertThat(cmd).contains("cp /workspace/.pi-runtime/settings.json /home/agent/.pi/settings.json");
             assertThat(cmd).contains("node /workspace/.run-pi.mjs");
         }
     }
@@ -365,18 +370,36 @@ class PiAgentAdapterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should return null usage (Pi does not report usage)")
-        void shouldReturnNullUsage() {
+        @DisplayName("should parse Pi usage and runner diagnostics when present")
+        void shouldParseUsageAndRunnerDebug() {
             String json = "{\"findings\":[]}";
+            String usageJson =
+                "{\"model\":\"gpt-5.4-mini\",\"inputTokens\":10,\"outputTokens\":5,\"cacheReadTokens\":20,\"cacheWriteTokens\":0,\"costUsd\":0.12,\"totalCalls\":2}";
+            String runnerDebug =
+                "{\"attempts\":[{\"label\":\"initial\",\"exitCode\":0,\"session\":{\"sessionFile\":\"/tmp/pi-sessions/initial/foo.jsonl\"}}],\"usageTotals\":{\"totalCalls\":2}}";
             var sandboxResult = new SandboxResult(
                 0,
-                Map.of("result.json", json.getBytes()),
+                Map.of(
+                    "result.json",
+                    json.getBytes(),
+                    "usage.json",
+                    usageJson.getBytes(),
+                    "runner-debug.json",
+                    runnerDebug.getBytes()
+                ),
                 "done",
                 false,
                 Duration.ofSeconds(10)
             );
             AgentResult result = adapter.parseResult(sandboxResult);
-            assertThat(result.usage()).isNull();
+            assertThat(result.usage()).isNotNull();
+            assertThat(result.usage().model()).isEqualTo("gpt-5.4-mini");
+            assertThat(result.usage().inputTokens()).isEqualTo(10);
+            assertThat(result.usage().outputTokens()).isEqualTo(5);
+            assertThat(result.usage().cacheReadTokens()).isEqualTo(20);
+            assertThat(result.usage().costUsd()).isEqualTo(0.12);
+            assertThat(result.usage().totalCalls()).isEqualTo(2);
+            assertThat(result.output()).containsKey("runnerDebug");
         }
 
         @Test

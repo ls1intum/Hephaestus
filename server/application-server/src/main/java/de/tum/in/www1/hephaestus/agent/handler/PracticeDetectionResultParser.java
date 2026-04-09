@@ -3,6 +3,8 @@ package de.tum.in.www1.hephaestus.agent.handler;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.tum.in.www1.hephaestus.practices.model.Severity;
 import de.tum.in.www1.hephaestus.practices.model.Verdict;
 import java.nio.charset.StandardCharsets;
@@ -109,8 +111,10 @@ public class PracticeDetectionResultParser {
             return ParseResult.empty("rawOutput parsed to null");
         }
 
-        // Step 3: Extract findings array
-        JsonNode findingsNode = root.get("findings");
+        // Step 3: Extract findings array. Some Pi runs on authentic Swift repos currently
+        // return a top-level `errors` array with negative practice entries instead of the
+        // expected `findings` array; normalize that shape so delivery can still proceed.
+        JsonNode findingsNode = extractFindingsNode(root);
         if (findingsNode == null || !findingsNode.isArray()) {
             return ParseResult.empty("missing or non-array 'findings' field");
         }
@@ -171,6 +175,35 @@ public class PracticeDetectionResultParser {
             Collections.unmodifiableList(discarded),
             delivery
         );
+    }
+
+    private JsonNode extractFindingsNode(JsonNode root) {
+        JsonNode findingsNode = root.get("findings");
+        if (findingsNode != null && findingsNode.isArray()) {
+            return findingsNode;
+        }
+
+        JsonNode errorsNode = root.get("errors");
+        if (errorsNode == null || !errorsNode.isArray()) {
+            return findingsNode;
+        }
+
+        ArrayNode normalized = objectMapper.createArrayNode();
+        for (JsonNode entry : errorsNode) {
+            if (!entry.isObject()) {
+                normalized.add(entry);
+                continue;
+            }
+
+            ObjectNode objectEntry = ((ObjectNode) entry).deepCopy();
+            if (!objectEntry.hasNonNull("verdict")) {
+                objectEntry.put("verdict", Verdict.NEGATIVE.name());
+            }
+            normalized.add(objectEntry);
+        }
+
+        log.info("Normalized top-level 'errors' array into findings array: count={}", normalized.size());
+        return normalized;
     }
 
     // =========================================================================

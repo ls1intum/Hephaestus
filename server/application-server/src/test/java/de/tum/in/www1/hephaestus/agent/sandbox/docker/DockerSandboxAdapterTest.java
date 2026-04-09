@@ -89,7 +89,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
             10,
             60,
             null,
-            8080,
+            null,
             null,
             209_715_200L,
             500_000,
@@ -102,6 +102,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
             containerManager,
             securityPolicy,
             properties,
+            8080,
             meterRegistry
         );
     }
@@ -207,6 +208,61 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
             Map<String, String> env = captor.getValue().environment();
             assertThat(env).containsEntry("LLM_PROXY_URL", "http://172.18.0.2:8080/internal/llm/anthropic");
             assertThat(env).containsEntry("LLM_PROXY_TOKEN", "token-123");
+        }
+
+        @Test
+        @DisplayName("should use active server port when llm proxy override is unset")
+        void shouldUseActiveServerPortWhenProxyPortUnset() {
+            SandboxProperties properties = new SandboxProperties(
+                true,
+                "unix:///var/run/docker.sock",
+                false,
+                null,
+                5,
+                10,
+                60,
+                null,
+                null,
+                null,
+                209_715_200L,
+                500_000,
+                null
+            );
+            sandboxAdapter = new DockerSandboxAdapter(
+                networkManager,
+                workspaceManager,
+                containerManager,
+                securityPolicy,
+                properties,
+                8090,
+                meterRegistry
+            );
+            setupHappyPath();
+
+            SandboxSpec spec = new SandboxSpec(
+                JOB_ID,
+                "alpine:latest",
+                List.of("echo"),
+                Map.of(),
+                new NetworkPolicy(false, null, "token-123", "anthropic"),
+                ResourceLimits.DEFAULT,
+                SecurityProfile.DEFAULT,
+                Map.of(".prompt", "test".getBytes()),
+                "/workspace/.output",
+                null
+            );
+
+            sandboxAdapter.execute(spec);
+
+            ArgumentCaptor<DockerOperations.ContainerSpec> captor = ArgumentCaptor.forClass(
+                DockerOperations.ContainerSpec.class
+            );
+            verify(containerManager).createContainer(captor.capture());
+
+            assertThat(captor.getValue().environment()).containsEntry(
+                "LLM_PROXY_URL",
+                "http://172.18.0.2:8090/internal/llm/anthropic"
+            );
         }
 
         @Test
