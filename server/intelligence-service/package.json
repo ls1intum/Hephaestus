@@ -47,7 +47,7 @@
     "ai": "6.0.3",
     "dotenv": "17.2.3",
     "dotenv-expand": "12.0.3",
-    "drizzle-orm": "0.45.1",
+    "drizzle-orm": "0.45.2",
     "drizzle-zod": "0.8.3",
     "hono": "4.11.7",
     "hono-pino": "0.10.3",
