@@ -185,6 +185,7 @@ public class DockerSandboxAdapter implements SandboxManager {
     private final SandboxContainerManager containerManager;
     private final ContainerSecurityPolicy securityPolicy;
     private final SandboxProperties properties;
+    private final int serverPort;
 
     // Metrics
     private final Counter executionsSuccess;
@@ -206,6 +207,7 @@ public class DockerSandboxAdapter implements SandboxManager {
         SandboxContainerManager containerManager,
         ContainerSecurityPolicy securityPolicy,
         SandboxProperties properties,
+        int serverPort,
         MeterRegistry meterRegistry
     ) {
         this.networkManager = networkManager;
@@ -213,6 +215,7 @@ public class DockerSandboxAdapter implements SandboxManager {
         this.containerManager = containerManager;
         this.securityPolicy = securityPolicy;
         this.properties = properties;
+        this.serverPort = serverPort;
 
         this.executionsSuccess = Counter.builder("sandbox.executions")
             .tag("outcome", "success")
@@ -477,7 +480,8 @@ public class DockerSandboxAdapter implements SandboxManager {
                 env.put("LLM_PROXY_URL", proxyUrl);
             } else if (appServerIp != null) {
                 // Build proxy URL with provider path: http://<ip>:<port>/internal/llm/<provider>
-                String proxyBase = "http://" + appServerIp + ":" + properties.llmProxyPort() + "/internal/llm";
+                String proxyBase =
+                    "http://" + appServerIp + ":" + properties.resolvedLlmProxyPort(serverPort) + "/internal/llm";
                 if (spec.networkPolicy().llmProxyProviderPath() != null) {
                     env.put("LLM_PROXY_URL", proxyBase + "/" + spec.networkPolicy().llmProxyProviderPath());
                 } else {

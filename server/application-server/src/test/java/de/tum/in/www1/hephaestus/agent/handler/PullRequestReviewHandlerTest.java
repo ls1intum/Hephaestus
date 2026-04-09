@@ -40,6 +40,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -320,6 +321,17 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             assertThatThrownBy(() -> handler.prepareInputFiles(job))
                 .isInstanceOf(JobPreparationException.class)
                 .hasMessageContaining("no metadata");
+        }
+
+        @Test
+        @DisplayName("should throw when local repository checkout is missing")
+        void shouldThrowWhenLocalRepositoryCheckoutMissing() {
+            lenient().when(gitRepositoryManager.isEnabled()).thenReturn(true);
+            when(gitRepositoryManager.isRepositoryCloned(123L)).thenReturn(false);
+
+            assertThatThrownBy(() -> handler.prepareInputFiles(jobWithMetadata(sampleJobMetadata())))
+                .isInstanceOf(JobPreparationException.class)
+                .hasMessageContaining("Repository checkout is not available locally for bind-mount");
         }
 
         @Test
@@ -618,6 +630,98 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             assertThat(annotated).contains("[L2] +import Foundation");
             assertThat(annotated).contains("[L3]  ");
             assertThat(annotated).contains("[L4]  struct Foo {");
+        }
+
+        @Nested
+        @DisplayName("filterByDiffScope")
+        class FilterByDiffScope {
+
+            @Test
+            @DisplayName("keeps finding whose evidence path is in diff")
+            void keepsFindingInDiff() {
+                var finding = new PracticeDetectionResultParser.ValidatedFinding(
+                    "fatal-error-crash",
+                    "Crashes on tap",
+                    Verdict.NEGATIVE,
+                    Severity.MAJOR,
+                    0.9f,
+                    objectMapper
+                        .createObjectNode()
+                        .set(
+                            "locations",
+                            objectMapper
+                                .createArrayNode()
+                                .add(objectMapper.createObjectNode().put("path", "Sources/View.swift"))
+                        ),
+                    null,
+                    null
+                );
+
+                var filtered = PullRequestReviewHandler.filterByDiffScope(
+                    List.of(finding),
+                    Set.of("Sources/View.swift")
+                );
+
+                assertThat(filtered).containsExactly(finding);
+            }
+
+            @Test
+            @DisplayName("keeps finding backed by internal metadata context")
+            void keepsMetadataBackedFinding() {
+                var finding = new PracticeDetectionResultParser.ValidatedFinding(
+                    "mr-description-quality",
+                    "Description is vague",
+                    Verdict.NEGATIVE,
+                    Severity.MINOR,
+                    0.8f,
+                    objectMapper
+                        .createObjectNode()
+                        .set(
+                            "locations",
+                            objectMapper
+                                .createArrayNode()
+                                .add(objectMapper.createObjectNode().put("path", ".context/metadata.json"))
+                        ),
+                    null,
+                    null
+                );
+
+                var filtered = PullRequestReviewHandler.filterByDiffScope(
+                    List.of(finding),
+                    Set.of("Sources/View.swift")
+                );
+
+                assertThat(filtered).containsExactly(finding);
+            }
+
+            @Test
+            @DisplayName("filters finding whose evidence points only outside diff")
+            void filtersOutOfScopeFinding() {
+                var finding = new PracticeDetectionResultParser.ValidatedFinding(
+                    "view-logic-separation",
+                    "Out-of-scope issue",
+                    Verdict.NEGATIVE,
+                    Severity.MINOR,
+                    0.8f,
+                    objectMapper
+                        .createObjectNode()
+                        .set(
+                            "locations",
+                            objectMapper
+                                .createArrayNode()
+                                .add(objectMapper.createObjectNode().put("path", "Sources/Other.swift"))
+                        ),
+                    null,
+                    null
+                );
+
+                var filtered = PullRequestReviewHandler.filterByDiffScope(
+                    List.of(finding),
+                    Set.of("Sources/View.swift")
+                );
+
+                assertThat(filtered).isEmpty();
+            }
         }
 
         @Test
