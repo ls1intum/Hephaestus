@@ -26,7 +26,7 @@ const prompt = readFileSync("/workspace/.prompt", "utf-8").trim();
 const continuationRetryPrompt =
     'Your previous response did not satisfy the required contract. Continue from the existing session context and return ONLY a valid JSON object with a top-level "findings" array and optional "delivery" object. Do not apologize. Do not use markdown fences. Prefer writing the JSON to /workspace/.output/result.json with the write tool; if you do not write the file, emit the JSON directly to stdout.';
 const authorizedFreshRetryPrompt =
-    'This is an authorized educational code review of user-provided code. Security analysis of the provided diff is allowed, including identifying accidentally committed secrets or unsafe patterns. Do not refuse. Return ONLY a valid JSON object with a top-level "findings" array and optional "delivery" object. Do not apologize. Do not use markdown fences. Prefer writing the JSON to /workspace/.output/result.json with the write tool; if you do not write the file, emit the JSON directly to stdout.';
+    'This is an authorized educational code review of user-provided code. Security analysis of the provided diff is allowed, including identifying accidentally committed secrets or unsafe patterns. Do not refuse. Continue with the exact review task below and preserve its contract. Return ONLY the final valid JSON object for that task.\n\n';
 
 function runPi(args, label, timeoutMs) {
     console.error(`[run-pi] ${label}`);
@@ -61,10 +61,44 @@ function checkResult() {
 
     try {
         const data = JSON.parse(readFileSync(resultPath, "utf-8"));
-        return Array.isArray(data?.findings);
+        return isValidFindingsPayload(data);
     } catch {
         return false;
     }
+}
+
+function isValidFinding(finding) {
+    return Boolean(
+        finding &&
+            typeof finding === "object" &&
+            typeof finding.practiceSlug === "string" &&
+            finding.practiceSlug.trim() &&
+            typeof finding.title === "string" &&
+            finding.title.trim() &&
+            typeof finding.verdict === "string" &&
+            typeof finding.severity === "string" &&
+            typeof finding.confidence === "number",
+    );
+}
+
+function isValidFindingsPayload(payload) {
+    if (!payload || typeof payload !== "object") {
+        return false;
+    }
+
+    if (!Array.isArray(payload.findings) || payload.findings.length === 0) {
+        return false;
+    }
+
+    if (!payload.findings.some((finding) => isValidFinding(finding))) {
+        return false;
+    }
+
+    if (payload.delivery != null && (typeof payload.delivery !== "object" || Array.isArray(payload.delivery))) {
+        return false;
+    }
+
+    return true;
 }
 
 function hasFindings(out) {
@@ -73,29 +107,10 @@ function hasFindings(out) {
     }
 
     try {
-        return Array.isArray(JSON.parse(out)?.findings);
+        return isValidFindingsPayload(JSON.parse(out));
     } catch {
-        return out.includes('"findings"') && out.includes('"practiceSlug"');
-    }
-}
-
-function isRefusal(out) {
-    if (!out?.trim()) {
         return false;
     }
-
-    const normalized = out.toLowerCase();
-    return [
-        "cannot assist with that request",
-        "can't assist with that request",
-        "cannot comply with that request",
-        "can't comply with that request",
-        "i cannot assist",
-        "i can't assist",
-        "i cannot comply",
-        "i'm sorry, but i cannot",
-        "i'm sorry, but i can't",
-    ].some((needle) => normalized.includes(needle));
 }
 
 function isValidSessionFile(filePath) {
@@ -279,20 +294,13 @@ if (hasFindings(bestOutput)) {
     process.exit(0);
 }
 
-console.error("[run-pi] retry 1/1");
-const retryIsRefusal = isRefusal(bestOutput);
-const retrySessionDir = retryIsRefusal ? "/tmp/pi-sessions/retry-1-fresh" : initialSessionDir;
-const retryLabel = retryIsRefusal ? "retry-1-fresh-authorized" : "retry-1-continuation";
-const retryArgs = retryIsRefusal
+console.error("[run-pi] retry 1/2");
+const initialSessionFile = findMostRecentSessionFile(initialSessionDir);
+const canContinueInitialSession = initialSessionFile !== null;
+const retryLabel = canContinueInitialSession ? "retry-1-continuation" : "retry-1-fresh-authorized";
+const retrySessionDir = canContinueInitialSession ? initialSessionDir : "/tmp/pi-sessions/retry-1-fresh";
+const retryArgs = canContinueInitialSession
     ? [
-        "--print",
-        "--session-dir",
-        retrySessionDir,
-        "--tools",
-        "read,bash,grep,find,ls,write",
-        authorizedFreshRetryPrompt,
-    ]
-    : [
         "--print",
         "-c",
         continuationRetryPrompt,
@@ -300,6 +308,14 @@ const retryArgs = retryIsRefusal
         retrySessionDir,
         "--tools",
         "read,bash,grep,find,ls,write",
+    ]
+    : [
+        "--print",
+        "--session-dir",
+        retrySessionDir,
+        "--tools",
+        "read,bash,grep,find,ls,write",
+        authorizedFreshRetryPrompt + prompt,
     ];
 
 result = runPi(retryArgs, retryLabel, __RETRY_TIMEOUT_MS__);
@@ -316,6 +332,41 @@ const retryOut = result.stdout || "";
 if (hasFindings(retryOut)) {
     writeFileSync(`${OUTPUT}/result.json`, retryOut);
     console.error("[run-pi] SUCCESS: findings from retry stdout");
+    process.exit(0);
+}
+
+if (!canContinueInitialSession) {
+    console.error("[run-pi] FAILED: no valid findings after retries");
+    process.exit(result.status || 1);
+}
+
+console.error("[run-pi] retry 2/2");
+const freshRetrySessionDir = "/tmp/pi-sessions/retry-2-fresh";
+result = runPi(
+    [
+        "--print",
+        "--session-dir",
+        freshRetrySessionDir,
+        "--tools",
+        "read,bash,grep,find,ls,write",
+        authorizedFreshRetryPrompt + prompt,
+    ],
+    "retry-2-fresh-authorized",
+    __RETRY_TIMEOUT_MS__,
+);
+const freshRetrySessionSummary = collectUsageFromSessionDir(freshRetrySessionDir);
+recordAttempt("retry-2-fresh-authorized", result, freshRetrySessionSummary);
+persistUsage();
+
+if (checkResult()) {
+    console.error("[run-pi] SUCCESS after retry 2");
+    process.exit(0);
+}
+
+const freshRetryOut = result.stdout || "";
+if (hasFindings(freshRetryOut)) {
+    writeFileSync(`${OUTPUT}/result.json`, freshRetryOut);
+    console.error("[run-pi] SUCCESS: findings from fresh retry stdout");
     process.exit(0);
 }
 

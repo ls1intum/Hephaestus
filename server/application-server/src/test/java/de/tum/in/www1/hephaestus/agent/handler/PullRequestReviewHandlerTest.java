@@ -695,6 +695,35 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             }
 
             @Test
+            @DisplayName("filters finding backed only by non-whitelisted internal context")
+            void filtersNonWhitelistedInternalContextFinding() {
+                var finding = new PracticeDetectionResultParser.ValidatedFinding(
+                    "review-noise",
+                    "Only references comments context",
+                    Verdict.NEGATIVE,
+                    Severity.MINOR,
+                    0.8f,
+                    objectMapper
+                        .createObjectNode()
+                        .set(
+                            "locations",
+                            objectMapper
+                                .createArrayNode()
+                                .add(objectMapper.createObjectNode().put("path", ".context/comments.json"))
+                        ),
+                    null,
+                    null
+                );
+
+                var filtered = PullRequestReviewHandler.filterByDiffScope(
+                    List.of(finding),
+                    Set.of("Sources/View.swift")
+                );
+
+                assertThat(filtered).isEmpty();
+            }
+
+            @Test
             @DisplayName("filters finding whose evidence points only outside diff")
             void filtersOutOfScopeFinding() {
                 var finding = new PracticeDetectionResultParser.ValidatedFinding(
@@ -721,6 +750,34 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                 );
 
                 assertThat(filtered).isEmpty();
+            }
+        }
+
+        @Nested
+        @DisplayName("parseDiffNameOnlyPaths")
+        class ParseDiffNameOnlyPaths {
+
+            @Test
+            @DisplayName("extracts simple file paths")
+            void extractsSimplePaths() {
+                String output = "src/Main.swift\nViews/ContentView.swift\nREADME.md\n";
+                var paths = PullRequestReviewHandler.parseDiffNameOnlyPaths(output);
+                assertThat(paths).containsExactlyInAnyOrder("src/Main.swift", "Views/ContentView.swift", "README.md");
+            }
+
+            @Test
+            @DisplayName("handles deeply nested paths without truncation")
+            void handlesDeepPaths() {
+                String output = "TimelineMaster/Presentational/DebugTimelineInspectorView.swift\n";
+                var paths = PullRequestReviewHandler.parseDiffNameOnlyPaths(output);
+                assertThat(paths).containsExactly("TimelineMaster/Presentational/DebugTimelineInspectorView.swift");
+            }
+
+            @Test
+            @DisplayName("returns empty set for blank output")
+            void returnsEmptyForBlank() {
+                assertThat(PullRequestReviewHandler.parseDiffNameOnlyPaths("")).isEmpty();
+                assertThat(PullRequestReviewHandler.parseDiffNameOnlyPaths("  \n  ")).isEmpty();
             }
         }
 

@@ -70,6 +70,8 @@ import org.springframework.lang.Nullable;
  */
 public class PullRequestReviewHandler implements JobTypeHandler {
 
+    private static final Set<String> ALLOWED_INTERNAL_CONTEXT_PATHS = Set.of(".context/metadata.json");
+
     private static final Logger log = LoggerFactory.getLogger(PullRequestReviewHandler.class);
 
     /** Maximum number of review comments included in context. Most recent are kept on truncation. */
@@ -426,13 +428,14 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             );
         }
         if (scopedFindings.isEmpty()) {
-            log.info(
-                "Skipping delivery because all findings were filtered by diff scope: jobId={}, before={}, diffFiles={}",
-                job.getId(),
-                parsed.validFindings().size(),
-                diffFiles.size()
+            throw new JobDeliveryException(
+                "All findings were filtered by diff scope: jobId=" +
+                    job.getId() +
+                    ", before=" +
+                    parsed.validFindings().size() +
+                    ", diffFiles=" +
+                    diffFiles.size()
             );
-            return;
         }
 
         // 2. Persist findings (hard failure — must succeed)
@@ -788,10 +791,25 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         String[] range = resolveDiffRange(repoPath, targetBranch, sourceBranch, headSha);
         if (range == null) return Set.of();
 
-        String diffStat = runGit(repoPath, "diff", "--stat", range[0] + ".." + range[1]);
-        if (diffStat == null || diffStat.isBlank()) return Set.of();
+        String nameOnly = runGit(repoPath, "diff", "--name-only", range[0] + ".." + range[1]);
+        if (nameOnly == null || nameOnly.isBlank()) return Set.of();
 
-        return parseDiffStatPaths(diffStat);
+        return parseDiffNameOnlyPaths(nameOnly);
+    }
+
+    /**
+     * Parse file paths from {@code git diff --name-only} output.
+     * Each non-blank line is a file path — no truncation or stat formatting.
+     */
+    static Set<String> parseDiffNameOnlyPaths(String nameOnlyOutput) {
+        Set<String> paths = new HashSet<>();
+        for (String line : nameOnlyOutput.split("\n")) {
+            String trimmed = line.trim();
+            if (!trimmed.isEmpty()) {
+                paths.add(trimmed);
+            }
+        }
+        return paths;
     }
 
     /**
@@ -874,7 +892,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
     }
 
     private static boolean isInternalContextPath(String path) {
-        return path.startsWith(".context/");
+        return ALLOWED_INTERNAL_CONTEXT_PATHS.contains(path);
     }
 
     /**

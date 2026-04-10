@@ -359,7 +359,9 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
                     "DOCKER_HOST",
                     "tcp://evil",
                     "GOOGLE_CLOUD_PROJECT",
-                    "stolen"
+                    "stolen",
+                    "HOME",
+                    "/home/agent"
                 ),
                 new NetworkPolicy(false, null, "tok", "anthropic"),
                 ResourceLimits.DEFAULT,
@@ -382,6 +384,7 @@ class DockerSandboxAdapterTest extends BaseUnitTest {
             assertThat(env).doesNotContainKey("AWS_SECRET_ACCESS_KEY");
             assertThat(env).doesNotContainKey("DOCKER_HOST");
             assertThat(env).doesNotContainKey("GOOGLE_CLOUD_PROJECT");
+            assertThat(env).containsEntry("HOME", "/home/agent");
         }
 
         @Test

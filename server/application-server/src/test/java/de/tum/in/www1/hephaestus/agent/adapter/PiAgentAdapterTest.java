@@ -184,9 +184,15 @@ class PiAgentAdapterTest extends BaseUnitTest {
             assertThat(script).contains("runner-debug.json");
             assertThat(script).contains("recordAttempt");
             assertThat(script).contains("continuationRetryPrompt");
+            assertThat(script).contains("authorizedFreshRetryPrompt + prompt");
+            assertThat(script).contains("findMostRecentSessionFile(initialSessionDir)");
+            assertThat(script).contains("canContinueInitialSession");
+            assertThat(script).contains("retry-1-continuation");
+            assertThat(script).contains("retry-1-fresh-authorized");
+            assertThat(script).contains("retry-2-fresh-authorized");
             assertThat(script).contains("\"-c\"");
             assertThat(script).contains("checkResult");
-            assertThat(script).contains("Array.isArray(data?.findings)");
+            assertThat(script).contains("isValidFindingsPayload");
         }
 
         @Test
@@ -372,7 +378,8 @@ class PiAgentAdapterTest extends BaseUnitTest {
         @Test
         @DisplayName("should parse Pi usage and runner diagnostics when present")
         void shouldParseUsageAndRunnerDebug() {
-            String json = "{\"findings\":[]}";
+            String json =
+                "{\"findings\":[{\"practiceSlug\":\"test\",\"title\":\"ok\",\"verdict\":\"POSITIVE\",\"severity\":\"INFO\",\"confidence\":0.9}]}";
             String usageJson =
                 "{\"model\":\"gpt-5.4-mini\",\"inputTokens\":10,\"outputTokens\":5,\"cacheReadTokens\":20,\"cacheWriteTokens\":0,\"costUsd\":0.12,\"totalCalls\":2}";
             String runnerDebug =

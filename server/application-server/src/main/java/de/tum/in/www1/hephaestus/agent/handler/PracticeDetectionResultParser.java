@@ -111,9 +111,7 @@ public class PracticeDetectionResultParser {
             return ParseResult.empty("rawOutput parsed to null");
         }
 
-        // Step 3: Extract findings array. Some Pi runs on authentic Swift repos currently
-        // return a top-level `errors` array with negative practice entries instead of the
-        // expected `findings` array; normalize that shape so delivery can still proceed.
+        // Step 3: Extract findings array using the canonical top-level contract.
         JsonNode findingsNode = extractFindingsNode(root);
         if (findingsNode == null || !findingsNode.isArray()) {
             return ParseResult.empty("missing or non-array 'findings' field");
@@ -178,32 +176,7 @@ public class PracticeDetectionResultParser {
     }
 
     private JsonNode extractFindingsNode(JsonNode root) {
-        JsonNode findingsNode = root.get("findings");
-        if (findingsNode != null && findingsNode.isArray()) {
-            return findingsNode;
-        }
-
-        JsonNode errorsNode = root.get("errors");
-        if (errorsNode == null || !errorsNode.isArray()) {
-            return findingsNode;
-        }
-
-        ArrayNode normalized = objectMapper.createArrayNode();
-        for (JsonNode entry : errorsNode) {
-            if (!entry.isObject()) {
-                normalized.add(entry);
-                continue;
-            }
-
-            ObjectNode objectEntry = ((ObjectNode) entry).deepCopy();
-            if (!objectEntry.hasNonNull("verdict")) {
-                objectEntry.put("verdict", Verdict.NEGATIVE.name());
-            }
-            normalized.add(objectEntry);
-        }
-
-        log.info("Normalized top-level 'errors' array into findings array: count={}", normalized.size());
-        return normalized;
+        return root.get("findings");
     }
 
     // =========================================================================

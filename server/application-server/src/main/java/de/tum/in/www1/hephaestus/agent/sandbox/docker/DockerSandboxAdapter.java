@@ -81,7 +81,6 @@ public class DockerSandboxAdapter implements SandboxManager {
                 "LD_PRELOAD",
                 "LD_LIBRARY_PATH",
                 "PATH",
-                "HOME",
                 "SHELL",
                 "USER",
                 // Proxy hijacking
