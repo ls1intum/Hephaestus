@@ -68,7 +68,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        listener = new AgentJobEventListener(agentJobService, pullRequestRepository, practiceReviewDetectionGate);
+        listener = new AgentJobEventListener(agentJobService, pullRequestRepository, practiceReviewDetectionGate, true);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
@@ -702,7 +702,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
                     practiceRepository,
                     workspaceResolver
                 );
-                var listener = new AgentJobEventListener(agentJobService, pullRequestRepository, realGate);
+                var listener = new AgentJobEventListener(agentJobService, pullRequestRepository, realGate, true);
                 return new CollaborationFixture(
                     listener,
                     userRoleChecker,

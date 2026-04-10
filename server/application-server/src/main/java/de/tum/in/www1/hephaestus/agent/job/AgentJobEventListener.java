@@ -14,6 +14,7 @@ import de.tum.in.www1.hephaestus.practices.review.GateDecision;
 import de.tum.in.www1.hephaestus.practices.review.PracticeReviewDetectionGate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
@@ -54,15 +55,18 @@ public class AgentJobEventListener {
     private final AgentJobService agentJobService;
     private final PullRequestRepository pullRequestRepository;
     private final PracticeReviewDetectionGate practiceReviewDetectionGate;
+    private final boolean autoReviewEnabled;
 
     public AgentJobEventListener(
         AgentJobService agentJobService,
         PullRequestRepository pullRequestRepository,
-        PracticeReviewDetectionGate practiceReviewDetectionGate
+        PracticeReviewDetectionGate practiceReviewDetectionGate,
+        @Value("${hephaestus.practice-review.auto-trigger-enabled:true}") boolean autoReviewEnabled
     ) {
         this.agentJobService = agentJobService;
         this.pullRequestRepository = pullRequestRepository;
         this.practiceReviewDetectionGate = practiceReviewDetectionGate;
+        this.autoReviewEnabled = autoReviewEnabled;
     }
 
     @Async
@@ -100,6 +104,11 @@ public class AgentJobEventListener {
         EventContext context,
         String triggerEventName
     ) {
+        // 0. Skip if auto-review is disabled (use /hephaestus review for manual triggers)
+        if (!autoReviewEnabled) {
+            return;
+        }
+
         // 1. Skip sync events — agent reviews are for real-time activity only
         if (context.isSync()) {
             return;
@@ -148,6 +157,11 @@ public class AgentJobEventListener {
     // ── Review event handling ───────────────────────────────────────────────
 
     private void handleReviewEvent(EventPayload.ReviewData reviewData, EventContext context) {
+        // 0. Skip if auto-review is disabled
+        if (!autoReviewEnabled) {
+            return;
+        }
+
         // 1. Skip sync events
         if (context.isSync()) {
             return;

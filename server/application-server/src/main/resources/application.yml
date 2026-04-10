@@ -344,6 +344,9 @@ hephaestus:
     # Controls the detection gate for the practice-aware PR review agent.
     # The gate decides whether to submit an agent job for a PR event.
     practice-review:
+        # false = disable automatic event-triggered reviews (PR created/ready/sync, review submitted);
+        # /hephaestus review bot command and dev trigger endpoint still work
+        auto-trigger-enabled: ${PRACTICE_REVIEW_AUTO_TRIGGER:true}
         # true = run for ALL users (bypass Keycloak role check); false = require run_practice_review role
         run-for-all-users: ${PRACTICE_REVIEW_RUN_FOR_ALL:false}
         # true = skip practice review for draft PRs
