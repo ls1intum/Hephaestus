@@ -30,16 +30,23 @@ public class JobTypeHandlerConfiguration {
     private final PracticeFindingRepository practiceFindingRepository;
     private final PracticeReviewProperties reviewProperties;
 
+    @Nullable
+    private final de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabTokenService gitLabTokenService;
+
     JobTypeHandlerConfiguration(
         ObjectMapper objectMapper,
         GitRepositoryManager gitRepositoryManager,
         PracticeFindingRepository practiceFindingRepository,
-        PracticeReviewProperties reviewProperties
+        PracticeReviewProperties reviewProperties,
+        @org.springframework.beans.factory.annotation.Autowired(
+            required = false
+        ) @Nullable de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabTokenService gitLabTokenService
     ) {
         this.objectMapper = objectMapper;
         this.gitRepositoryManager = gitRepositoryManager;
         this.practiceFindingRepository = practiceFindingRepository;
         this.reviewProperties = reviewProperties;
+        this.gitLabTokenService = gitLabTokenService;
     }
 
     @Bean
@@ -94,10 +101,7 @@ public class JobTypeHandlerConfiguration {
         PracticeRepository practiceRepository,
         PracticeDetectionResultParser resultParser,
         PracticeDetectionDeliveryService deliveryService,
-        FeedbackDeliveryService feedbackService,
-        @org.springframework.beans.factory.annotation.Autowired(
-            required = false
-        ) @org.springframework.lang.Nullable de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabTokenService gitLabTokenService
+        FeedbackDeliveryService feedbackService
     ) {
         return new PullRequestReviewHandler(
             objectMapper,
