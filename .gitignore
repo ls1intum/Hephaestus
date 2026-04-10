@@ -1,10 +1,6 @@
 .DS_Store
 .context
 
-# Agent test run artifacts
-run-*/
-production-practice-review/
-
 # IDE files
 .project
 .classpath
