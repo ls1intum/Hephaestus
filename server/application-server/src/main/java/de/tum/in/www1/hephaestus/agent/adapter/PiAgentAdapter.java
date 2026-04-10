@@ -113,7 +113,7 @@ public class PiAgentAdapter implements AgentAdapter {
             "cp /workspace/.pi-runtime/settings.json /home/agent/.pi/settings.json && " +
             "cp /workspace/.pi/AGENTS.md /home/agent/.pi/AGENTS.md && " +
             AgentAdapter.buildPrecomputeStep() +
-            "node --input-type=module /workspace/.run-pi.mjs";
+            "node /workspace/.run-pi.mjs";
 
         return new AgentSandboxSpec(
             IMAGE,

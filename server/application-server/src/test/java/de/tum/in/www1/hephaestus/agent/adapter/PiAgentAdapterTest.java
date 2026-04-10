@@ -222,7 +222,7 @@ class PiAgentAdapterTest extends BaseUnitTest {
             String cmd = spec.command().get(2);
             assertThat(cmd).contains("cp /workspace/.pi-runtime/settings.json /home/agent/.pi/settings.json");
             assertThat(cmd).contains("ln -sf /usr/local/lib/node_modules /workspace/node_modules");
-            assertThat(cmd).contains("node --input-type=module /workspace/.run-pi.mjs");
+            assertThat(cmd).contains("node /workspace/.run-pi.mjs");
         }
     }
 
