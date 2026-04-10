@@ -138,7 +138,7 @@ function shouldIncludeDiscoveredFile(path: string): boolean {
  *
  * @param pattern — regex pattern (or fixed string if fixedString=true)
  * @param dir — directory to search
-	* @param opts.glob — path-relative glob filter rooted at dir, including recursive path globs
+ * @param opts.glob — file glob filter; basename-only globs (e.g. "*.swift") are auto-expanded to recursive ("**\/*.swift")
  * @param opts.maxResults — cap results (default 500)
  * @param opts.fixedString — use -F instead of -E (default false)
  */
@@ -155,7 +155,10 @@ export async function grep(
 	const grepArgs = fixedString ? ["grep", "-H", "-n", "-F"] : ["grep", "-H", "-n", "-E"];
 
 	if (glob) {
-		return collectMatchesForGlob(pattern, dir, grepArgs, glob, maxResults);
+		// Basename-only globs (e.g. "*.swift") need recursive matching like grep --include.
+		// Bun.Glob("*.swift") only matches in the root dir; prepend "**/" for recursion.
+		const recursiveGlob = glob.includes("/") ? glob : `**/${glob}`;
+		return collectMatchesForGlob(pattern, dir, grepArgs, recursiveGlob, maxResults);
 	}
 
 	return collectGrepMatches(["grep", "-r", ...grepArgs.slice(1), "--", pattern, dir], dir, maxResults);
@@ -193,7 +196,8 @@ export async function readFileLines(
 			lines.set(i + 1, line);
 		});
 		return lines;
-	} catch {
+	} catch (err) {
+		console.error(`[precompute] readFileLines failed for ${path}: ${err}`);
 		return new Map();
 	}
 }

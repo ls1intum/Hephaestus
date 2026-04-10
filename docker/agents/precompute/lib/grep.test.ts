@@ -66,6 +66,23 @@ describe("grep", () => {
 		expect(matches[0]?.file).toBe("src/nested/match.ts");
 	});
 
+	it("auto-expands basename-only globs to recursive matching", async () => {
+		const dir = await createTempDir();
+		await mkdir(join(dir, "src", "Views"), { recursive: true });
+		await Bun.write(join(dir, "src", "Views", "ContentView.swift"), "print(\"hello\")\n");
+		await Bun.write(join(dir, "RootFile.swift"), "print(\"root\")\n");
+
+		const matches = await grep("print", dir, {
+			fixedString: true,
+			glob: "*.swift",
+		});
+
+		expect(matches).toHaveLength(2);
+		const files = matches.map((m) => m.file).sort();
+		expect(files).toContain("RootFile.swift");
+		expect(files).toContain("src/Views/ContentView.swift");
+	});
+
 	it("finds extension matches without shelling out and skips ignored paths", async () => {
 		const dir = await createTempDir();
 		await mkdir(join(dir, "src", "nested"), { recursive: true });

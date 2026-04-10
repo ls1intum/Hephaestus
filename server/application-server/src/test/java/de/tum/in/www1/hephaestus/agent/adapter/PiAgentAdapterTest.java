@@ -377,7 +377,7 @@ class PiAgentAdapterTest extends BaseUnitTest {
 
         @Test
         @DisplayName("should parse Pi usage and runner diagnostics when present")
-        void shouldParseUsageAndRunnerDebug() {
+        void shouldParseUsageAndRunnerDebugWhenArtifactsArePresent() {
             String json =
                 "{\"findings\":[{\"practiceSlug\":\"test\",\"title\":\"ok\",\"verdict\":\"POSITIVE\",\"severity\":\"INFO\",\"confidence\":0.9}]}";
             String usageJson =

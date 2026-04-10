@@ -872,11 +872,13 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             boolean hasInScopeLocation = false;
             for (JsonNode loc : locations) {
                 JsonNode pathNode = loc.get("path");
-                if (pathNode == null) {
+                if (pathNode == null || pathNode.isNull() || pathNode.isMissingNode()) {
                     continue;
                 }
-
                 String path = pathNode.asText();
+                if (path.isBlank() || "null".equals(path)) {
+                    continue;
+                }
                 if (diffFiles.contains(path) || isInternalContextPath(path)) {
                     hasInScopeLocation = true;
                     break;

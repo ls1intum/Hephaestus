@@ -34,7 +34,7 @@ function runPi(args, label, timeoutMs) {
     const result = spawnSync("pi", args, {
         encoding: "utf-8",
         maxBuffer: __MAX_STDOUT_BUFFER_BYTES__,
-        timeout: timeoutMs || 0,
+        timeout: timeoutMs > 0 ? timeoutMs : 120_000,
         cwd: "/workspace",
         stdio: ["pipe", "pipe", "pipe"],
     });
@@ -46,11 +46,18 @@ function runPi(args, label, timeoutMs) {
     return result;
 }
 
+const SECRET_PATTERN =
+    /(?:OPENAI_API_KEY|ANTHROPIC_API_KEY|AZURE_OPENAI_API_KEY|LLM_PROXY_TOKEN|api[_-]?key|secret|token|password|credential)=\S+/gi;
+
 function clipPreview(text, maxChars = 4000) {
     if (!text) {
         return "";
     }
-    return text.length <= maxChars ? text : text.slice(text.length - maxChars);
+    const clipped = text.length <= maxChars ? text : text.slice(text.length - maxChars);
+    return clipped.replace(SECRET_PATTERN, (match) => {
+        const eqIdx = match.indexOf("=");
+        return eqIdx >= 0 ? match.slice(0, eqIdx + 1) + "[REDACTED]" : match;
+    });
 }
 
 function checkResult() {
@@ -270,6 +277,14 @@ function recordAttempt(label, result, sessionSummary) {
     });
     persistRunnerDebug();
 }
+
+process.on("uncaughtException", (err) => {
+    console.error(`[run-pi] FATAL uncaught exception: ${err.message}`);
+    runnerDebug.fatalError = err.message;
+    persistRunnerDebug();
+    persistUsage();
+    process.exit(2);
+});
 
 const initialSessionDir = "/tmp/pi-sessions/initial";
 let result = runPi(

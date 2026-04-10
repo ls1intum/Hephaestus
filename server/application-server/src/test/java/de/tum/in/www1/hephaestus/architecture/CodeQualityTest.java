@@ -143,7 +143,9 @@ class CodeQualityTest extends HephaestusArchitectureTest {
         void methodsHaveLimitedParameters() {
             // Methods that have command-object overloads but need many params for internal processing
             Set<String> allowedOverloads = Set.of(
-                "ActivityEventService.record" // Has RecordActivityCommand overload for cleaner API
+                "ActivityEventService.record", // Has RecordActivityCommand overload for cleaner API
+                // @Bean factory wiring Spring dependencies — not business logic complexity
+                "DockerSandboxConfiguration.dockerSandboxAdapter"
             );
 
             // Repository native SQL methods require individual @Param annotations and cannot use

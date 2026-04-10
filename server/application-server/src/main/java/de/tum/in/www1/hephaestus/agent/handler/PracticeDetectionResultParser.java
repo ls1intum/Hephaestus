@@ -3,8 +3,6 @@ package de.tum.in.www1.hephaestus.agent.handler;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.tum.in.www1.hephaestus.practices.model.Severity;
 import de.tum.in.www1.hephaestus.practices.model.Verdict;
 import java.nio.charset.StandardCharsets;

@@ -638,7 +638,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
 
             @Test
             @DisplayName("keeps finding whose evidence path is in diff")
-            void keepsFindingInDiff() {
+            void shouldKeepFindingWhenEvidencePathIsInDiff() {
                 var finding = new PracticeDetectionResultParser.ValidatedFinding(
                     "fatal-error-crash",
                     "Crashes on tap",
@@ -667,7 +667,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
 
             @Test
             @DisplayName("keeps finding backed by internal metadata context")
-            void keepsMetadataBackedFinding() {
+            void shouldKeepFindingWhenBackedByInternalMetadataContext() {
                 var finding = new PracticeDetectionResultParser.ValidatedFinding(
                     "mr-description-quality",
                     "Description is vague",
@@ -696,7 +696,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
 
             @Test
             @DisplayName("filters finding backed only by non-whitelisted internal context")
-            void filtersNonWhitelistedInternalContextFinding() {
+            void shouldFilterFindingWhenBackedByNonWhitelistedInternalContext() {
                 var finding = new PracticeDetectionResultParser.ValidatedFinding(
                     "review-noise",
                     "Only references comments context",
@@ -725,7 +725,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
 
             @Test
             @DisplayName("filters finding whose evidence points only outside diff")
-            void filtersOutOfScopeFinding() {
+            void shouldFilterFindingWhenEvidencePathOutsideDiff() {
                 var finding = new PracticeDetectionResultParser.ValidatedFinding(
                     "view-logic-separation",
                     "Out-of-scope issue",
@@ -759,7 +759,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
 
             @Test
             @DisplayName("extracts simple file paths")
-            void extractsSimplePaths() {
+            void shouldExtractSimplePathsFromNameOnlyOutput() {
                 String output = "src/Main.swift\nViews/ContentView.swift\nREADME.md\n";
                 var paths = PullRequestReviewHandler.parseDiffNameOnlyPaths(output);
                 assertThat(paths).containsExactlyInAnyOrder("src/Main.swift", "Views/ContentView.swift", "README.md");
@@ -767,7 +767,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
 
             @Test
             @DisplayName("handles deeply nested paths without truncation")
-            void handlesDeepPaths() {
+            void shouldHandleDeepPathsWithoutTruncation() {
                 String output = "TimelineMaster/Presentational/DebugTimelineInspectorView.swift\n";
                 var paths = PullRequestReviewHandler.parseDiffNameOnlyPaths(output);
                 assertThat(paths).containsExactly("TimelineMaster/Presentational/DebugTimelineInspectorView.swift");
@@ -775,7 +775,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
 
             @Test
             @DisplayName("returns empty set for blank output")
-            void returnsEmptyForBlank() {
+            void shouldReturnEmptySetWhenOutputIsBlank() {
                 assertThat(PullRequestReviewHandler.parseDiffNameOnlyPaths("")).isEmpty();
                 assertThat(PullRequestReviewHandler.parseDiffNameOnlyPaths("  \n  ")).isEmpty();
             }
