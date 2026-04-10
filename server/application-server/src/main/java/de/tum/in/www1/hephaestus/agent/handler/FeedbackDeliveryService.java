@@ -115,7 +115,7 @@ class FeedbackDeliveryService {
             log.debug("Practice note was empty after sanitization, skipping post: jobId={}", job.getId());
             return;
         }
-        String formatted = formatPracticeNote(sanitized, job, reviewProperties.appBaseUrl());
+        String formatted = formatPracticeNote(sanitized, job);
         String commentId = commentPoster.postFormattedBody(job, formatted);
         if (commentId != null) {
             job.setDeliveryCommentId(commentId);
@@ -139,20 +139,16 @@ class FeedbackDeliveryService {
 
     // ── Formatting ──────────────────────────────────────────────────────────
 
-    static String formatPracticeNote(String sanitizedBody, AgentJob job, @Nullable String appBaseUrl) {
+    static String formatPracticeNote(String sanitizedBody, AgentJob job) {
         var sb = new StringBuilder(sanitizedBody.length() + 512);
         sb.append("<!-- hephaestus:practice-review:").append(job.getId()).append(" -->\n");
         sb.append(sanitizedBody).append("\n\n");
-        appendFooter(sb, job, appBaseUrl);
+        appendFooter(sb, job);
         return sb.toString();
     }
 
-    private static void appendFooter(StringBuilder sb, AgentJob job, @Nullable String appBaseUrl) {
+    private static void appendFooter(StringBuilder sb, AgentJob job) {
         sb.append("---\n");
-        if (appBaseUrl != null && !appBaseUrl.isBlank()) {
-            sb.append("*[Hephaestus](").append(appBaseUrl).append(")");
-            sb.append(" · [Configure AI review preferences](").append(appBaseUrl).append("/settings)*\n\n");
-        }
         PullRequestCommentPoster.appendMetadataFooter(sb, job);
     }
 }

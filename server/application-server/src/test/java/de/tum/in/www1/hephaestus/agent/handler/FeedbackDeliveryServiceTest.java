@@ -321,7 +321,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             job.setStartedAt(Instant.parse("2024-01-01T00:00:00Z"));
             job.setCompletedAt(Instant.parse("2024-01-01T00:01:30Z"));
 
-            String result = FeedbackDeliveryService.formatPracticeNote("Test body content", job, null);
+            String result = FeedbackDeliveryService.formatPracticeNote("Test body content", job);
 
             assertThat(result).contains("<!-- hephaestus:practice-review:" + job.getId() + " -->");
             assertThat(result).contains("Test body content");
@@ -331,41 +331,17 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("includes preferences footer when appBaseUrl is set")
-        void includesPreferencesFooter() {
+        @DisplayName("does not include preferences or app link in footer")
+        void noPreferencesLink() {
             AgentJob job = createJob();
             job.setStartedAt(Instant.parse("2024-01-01T00:00:00Z"));
             job.setCompletedAt(Instant.parse("2024-01-01T00:01:30Z"));
 
-            String result = FeedbackDeliveryService.formatPracticeNote("Body", job, "https://hephaestus.example.com");
-
-            assertThat(result).contains("[Hephaestus](https://hephaestus.example.com)");
-            assertThat(result).contains("[Configure AI review preferences](https://hephaestus.example.com/settings)");
-        }
-
-        @Test
-        @DisplayName("omits preferences footer when appBaseUrl is empty")
-        void omitsPreferencesFooterWhenEmpty() {
-            AgentJob job = createJob();
-            job.setStartedAt(Instant.parse("2024-01-01T00:00:00Z"));
-            job.setCompletedAt(Instant.parse("2024-01-01T00:01:30Z"));
-
-            String result = FeedbackDeliveryService.formatPracticeNote("Body", job, "");
+            String result = FeedbackDeliveryService.formatPracticeNote("Body", job);
 
             assertThat(result).doesNotContain("Configure AI review preferences");
+            assertThat(result).doesNotContain("[Hephaestus]");
             assertThat(result).contains("Hephaestus Agent");
-        }
-
-        @Test
-        @DisplayName("omits preferences footer when appBaseUrl is null")
-        void omitsPreferencesFooterWhenNull() {
-            AgentJob job = createJob();
-            job.setStartedAt(Instant.parse("2024-01-01T00:00:00Z"));
-            job.setCompletedAt(Instant.parse("2024-01-01T00:01:30Z"));
-
-            String result = FeedbackDeliveryService.formatPracticeNote("Body", job, null);
-
-            assertThat(result).doesNotContain("Configure AI review preferences");
         }
     }
 }
