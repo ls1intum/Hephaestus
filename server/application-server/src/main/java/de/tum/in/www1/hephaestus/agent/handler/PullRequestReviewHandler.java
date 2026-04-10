@@ -93,6 +93,9 @@ public class PullRequestReviewHandler implements JobTypeHandler {
     private final PracticeDetectionDeliveryService deliveryService;
     private final FeedbackDeliveryService feedbackService;
 
+    @Nullable
+    private final de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabTokenService gitLabTokenService;
+
     PullRequestReviewHandler(
         ObjectMapper objectMapper,
         GitRepositoryManager gitRepositoryManager,
@@ -102,7 +105,10 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         ContributorHistoryProvider contributorHistoryProvider,
         PracticeDetectionResultParser resultParser,
         PracticeDetectionDeliveryService deliveryService,
-        FeedbackDeliveryService feedbackService
+        FeedbackDeliveryService feedbackService,
+        @org.springframework.beans.factory.annotation.Autowired(
+            required = false
+        ) @Nullable de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabTokenService gitLabTokenService
     ) {
         this.objectMapper = objectMapper;
         this.gitRepositoryManager = gitRepositoryManager;
@@ -113,6 +119,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         this.resultParser = resultParser;
         this.deliveryService = deliveryService;
         this.feedbackService = feedbackService;
+        this.gitLabTokenService = gitLabTokenService;
     }
 
     @Override
@@ -167,8 +174,8 @@ public class PullRequestReviewHandler implements JobTypeHandler {
 
         Map<String, byte[]> files = new HashMap<>();
 
-        // PR review requires a pre-prepared local checkout. The sandbox never clones or fetches
-        // repositories on demand; it only mounts an existing host-side checkout.
+        // PR review requires a local checkout (cloned by push webhook).
+        // The diff step will fetch to ensure refs are current before computing.
         ensureRepositoryAvailable(repositoryId);
 
         // Load PR entity once — shared by metadata, comments, and contributor history
@@ -180,7 +187,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
 
         // Pre-compute diff: source branches may be deleted after merge,
         // so we compute the diff from the merge commit graph using SHAs.
-        computeAndStoreDiff(files, repositoryId, metadata);
+        computeAndStoreDiff(files, repositoryId, metadata, job);
 
         // Build a structured per-file diff summary optimized for single-pass AI consumption.
         // This is structural transformation (splitting on "diff --git" boundaries), not judgment.
@@ -500,11 +507,10 @@ public class PullRequestReviewHandler implements JobTypeHandler {
     // -------------------------------------------------------------------------
 
     /**
-     * Require a pre-prepared local repository checkout for bind-mounting.
+     * Require a local repository checkout for bind-mounting.
      *
-     * <p>This review flow never clones or fetches repositories on demand. Repository preparation
-     * must happen ahead of time via the normal sync/bootstrap path so sandbox runs stay offline and
-     * deterministic with respect to repo contents.
+     * <p>The repository must have been cloned by a prior push webhook. The diff computation
+     * step ({@link #fetchBeforeDiff}) may fetch to update refs before computing the diff.
      */
     private void ensureRepositoryAvailable(long repositoryId) {
         if (!gitRepositoryManager.isEnabled()) {
@@ -515,6 +521,63 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         if (!gitRepositoryManager.isRepositoryCloned(repositoryId)) {
             throw new JobPreparationException(
                 "Repository checkout is not available locally for bind-mount: repoId=" + repositoryId
+            );
+        }
+    }
+
+    /**
+     * Fetch latest refs from the remote before computing the diff.
+     * Uses GitLabTokenService for GitLab workspaces to get an authenticated fetch.
+     * Falls back gracefully on failure — the diff computation will still attempt
+     * with whatever refs are locally available.
+     */
+    private void fetchBeforeDiff(long repositoryId, AgentJob job) {
+        try {
+            var workspace = job.getWorkspace();
+            if (workspace == null) {
+                log.debug("No workspace on job, skipping pre-diff fetch: jobId={}", job.getId());
+                return;
+            }
+
+            String serverUrl = null;
+            String token = null;
+            Long scopeId = workspace.getId();
+
+            if (gitLabTokenService != null) {
+                try {
+                    serverUrl = gitLabTokenService.resolveServerUrl(scopeId);
+                    token = gitLabTokenService.getAccessToken(scopeId);
+                } catch (Exception e) {
+                    log.debug("GitLab token not available for fetch: scopeId={}, reason={}", scopeId, e.getMessage());
+                }
+            }
+
+            // For GitHub workspaces or when GitLab token is unavailable, the repo may already
+            // be current (fetched by push webhook). The headSha validation in resolveDiffRange
+            // will catch staleness even without a fetch here.
+            if (serverUrl == null || token == null) {
+                log.debug("No token available for pre-diff fetch, relying on existing clone: repoId={}", repositoryId);
+                return;
+            }
+
+            JsonNode metadata = job.getMetadata();
+            String repoFullName =
+                metadata != null && metadata.has("repository_full_name")
+                    ? metadata.get("repository_full_name").asText()
+                    : null;
+            if (repoFullName == null) {
+                log.debug("No repository_full_name in metadata, skipping pre-diff fetch");
+                return;
+            }
+
+            String cloneUrl = serverUrl + "/" + repoFullName + ".git";
+            gitRepositoryManager.ensureRepository(repositoryId, cloneUrl, token);
+            log.debug("Fetched latest refs before diff computation: repoId={}, scopeId={}", repositoryId, scopeId);
+        } catch (Exception e) {
+            log.warn(
+                "Pre-diff fetch failed (will proceed with existing clone): repoId={}, error={}",
+                repositoryId,
+                e.getMessage()
             );
         }
     }
@@ -596,7 +659,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
      * between merge^1 (target before merge) and merge^2 (MR tip). Falls back to
      * target_branch..head_sha if branch still exists.
      */
-    private void computeAndStoreDiff(Map<String, byte[]> files, long repositoryId, JsonNode metadata) {
+    private void computeAndStoreDiff(Map<String, byte[]> files, long repositoryId, JsonNode metadata, AgentJob job) {
         String headSha = metadata.has("commit_sha") ? metadata.get("commit_sha").asText() : null;
         String targetBranch = requireText(metadata, "target_branch");
         String sourceBranch = requireText(metadata, "source_branch");
@@ -608,13 +671,8 @@ public class PullRequestReviewHandler implements JobTypeHandler {
 
         // Fetch latest refs from remote before computing the diff.
         // Without this, the local clone may have stale branch refs from an earlier push,
-        // causing the diff to be computed against the wrong commit.
-        String fetchResult = runGit(repoPath, "fetch", "origin");
-        if (fetchResult == null) {
-            log.warn("Git fetch failed before diff computation: repoId={}, headSha={}", repositoryId, headSha);
-        } else {
-            log.debug("Fetched latest refs before diff computation: repoId={}", repositoryId);
-        }
+        // causing the diff to be computed against the wrong commit (see: stale-diff incident).
+        fetchBeforeDiff(repositoryId, job);
 
         try {
             String[] range = resolveDiffRange(repoPath, targetBranch, sourceBranch, headSha);
