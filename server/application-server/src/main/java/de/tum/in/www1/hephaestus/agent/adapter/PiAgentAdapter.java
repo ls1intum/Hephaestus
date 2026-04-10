@@ -108,10 +108,12 @@ public class PiAgentAdapter implements AgentAdapter {
             "mkdir -p " +
             OUTPUT_PATH +
             " /home/agent/.pi /home/agent/.config /home/agent/.local/tmp && " +
+            // Symlink global node_modules so ESM imports resolve for the embedded Pi SDK
+            "ln -sf /usr/local/lib/node_modules /workspace/node_modules && " +
             "cp /workspace/.pi-runtime/settings.json /home/agent/.pi/settings.json && " +
             "cp /workspace/.pi/AGENTS.md /home/agent/.pi/AGENTS.md && " +
             AgentAdapter.buildPrecomputeStep() +
-            "node /workspace/.run-pi.mjs";
+            "node --input-type=module /workspace/.run-pi.mjs";
 
         return new AgentSandboxSpec(
             IMAGE,
@@ -170,13 +172,14 @@ public class PiAgentAdapter implements AgentAdapter {
      * @param agentTimeoutMs total time budget for all runs (initial + retries)
      */
     private byte[] buildRunnerScript(long agentTimeoutMs) {
-        long retryTimeoutMs = 60_000;
-        long initialTimeoutMs = Math.max(60_000, agentTimeoutMs - 2 * retryTimeoutMs);
+        // Continuation gets 25% of budget — just needs to write the JSON from in-memory session.
+        // Initial gets the remaining 75%.
+        long continuationTimeoutMs = Math.max(60_000, agentTimeoutMs / 4);
+        long initialTimeoutMs = Math.max(60_000, agentTimeoutMs - continuationTimeoutMs);
         String scriptTemplate = new String(AgentAdapter.loadClasspathResource("pi-runner.mjs"), StandardCharsets.UTF_8);
         String script = scriptTemplate
-            .replace("__MAX_STDOUT_BUFFER_BYTES__", Integer.toString(MAX_STDOUT_BUFFER_BYTES))
             .replace("__INITIAL_TIMEOUT_MS__", Long.toString(initialTimeoutMs))
-            .replace("__RETRY_TIMEOUT_MS__", Long.toString(retryTimeoutMs));
+            .replace("__CONTINUATION_TIMEOUT_MS__", Long.toString(continuationTimeoutMs));
         return script.getBytes(StandardCharsets.UTF_8);
     }
 
