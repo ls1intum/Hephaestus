@@ -13,6 +13,7 @@ import de.tum.in.www1.hephaestus.agent.handler.spi.JobSubmissionRequest;
 import de.tum.in.www1.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.in.www1.hephaestus.agent.job.AgentJob;
 import de.tum.in.www1.hephaestus.gitprovider.common.events.EventPayload;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabTokenService;
 import de.tum.in.www1.hephaestus.gitprovider.git.GitRepositoryManager;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
@@ -37,6 +38,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.lang.Nullable;
 
 /**
@@ -94,7 +96,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
     private final FeedbackDeliveryService feedbackService;
 
     @Nullable
-    private final de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabTokenService gitLabTokenService;
+    private final GitLabTokenService gitLabTokenService;
 
     PullRequestReviewHandler(
         ObjectMapper objectMapper,
@@ -106,9 +108,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         PracticeDetectionResultParser resultParser,
         PracticeDetectionDeliveryService deliveryService,
         FeedbackDeliveryService feedbackService,
-        @org.springframework.beans.factory.annotation.Autowired(
-            required = false
-        ) @Nullable de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabTokenService gitLabTokenService
+        @Autowired(required = false) @Nullable GitLabTokenService gitLabTokenService
     ) {
         this.objectMapper = objectMapper;
         this.gitRepositoryManager = gitRepositoryManager;

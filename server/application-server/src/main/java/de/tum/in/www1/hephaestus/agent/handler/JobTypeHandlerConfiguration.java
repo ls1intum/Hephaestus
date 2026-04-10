@@ -5,6 +5,7 @@ import de.tum.in.www1.hephaestus.account.UserPreferencesRepository;
 import de.tum.in.www1.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.in.www1.hephaestus.gitprovider.common.github.GitHubGraphQlClientProvider;
 import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabGraphQlClientProvider;
+import de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabTokenService;
 import de.tum.in.www1.hephaestus.gitprovider.git.GitRepositoryManager;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullRequestReviewCommentRepository;
@@ -15,6 +16,7 @@ import de.tum.in.www1.hephaestus.practices.finding.PracticeFindingRepository;
 import de.tum.in.www1.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceRepository;
 import java.util.List;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.lang.Nullable;
@@ -31,16 +33,14 @@ public class JobTypeHandlerConfiguration {
     private final PracticeReviewProperties reviewProperties;
 
     @Nullable
-    private final de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabTokenService gitLabTokenService;
+    private final GitLabTokenService gitLabTokenService;
 
     JobTypeHandlerConfiguration(
         ObjectMapper objectMapper,
         GitRepositoryManager gitRepositoryManager,
         PracticeFindingRepository practiceFindingRepository,
         PracticeReviewProperties reviewProperties,
-        @org.springframework.beans.factory.annotation.Autowired(
-            required = false
-        ) @Nullable de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabTokenService gitLabTokenService
+        @Autowired(required = false) @Nullable GitLabTokenService gitLabTokenService
     ) {
         this.objectMapper = objectMapper;
         this.gitRepositoryManager = gitRepositoryManager;
