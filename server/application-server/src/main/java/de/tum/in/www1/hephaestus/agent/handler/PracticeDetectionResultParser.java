@@ -109,8 +109,8 @@ public class PracticeDetectionResultParser {
             return ParseResult.empty("rawOutput parsed to null");
         }
 
-        // Step 3: Extract findings array
-        JsonNode findingsNode = root.get("findings");
+        // Step 3: Extract findings array using the canonical top-level contract.
+        JsonNode findingsNode = extractFindingsNode(root);
         if (findingsNode == null || !findingsNode.isArray()) {
             return ParseResult.empty("missing or non-array 'findings' field");
         }
@@ -171,6 +171,10 @@ public class PracticeDetectionResultParser {
             Collections.unmodifiableList(discarded),
             delivery
         );
+    }
+
+    private JsonNode extractFindingsNode(JsonNode root) {
+        return root.get("findings");
     }
 
     // =========================================================================

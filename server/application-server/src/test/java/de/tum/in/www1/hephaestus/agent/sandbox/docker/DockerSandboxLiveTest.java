@@ -92,6 +92,7 @@ class DockerSandboxLiveTest {
             containerManager,
             securityPolicy,
             properties,
+            8080,
             new SimpleMeterRegistry()
         );
     }

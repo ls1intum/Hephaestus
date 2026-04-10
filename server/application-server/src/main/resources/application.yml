@@ -395,7 +395,7 @@ hephaestus:
         reconciliation-interval-seconds: ${SANDBOX_RECONCILIATION_INTERVAL:60}
         # OCI runtime: null=runc (default), "runsc"=gVisor (recommended for production)
         container-runtime: ${SANDBOX_CONTAINER_RUNTIME:}
-        llm-proxy-port: ${SANDBOX_LLM_PROXY_PORT:8080}
+        llm-proxy-port: ${SANDBOX_LLM_PROXY_PORT:${server.port:8080}}
         max-directory-bytes: ${SANDBOX_MAX_DIRECTORY_BYTES:1073741824}  # 1 GB
         max-directory-entries: ${SANDBOX_MAX_DIRECTORY_ENTRIES:500000}
         default-resource-limits:

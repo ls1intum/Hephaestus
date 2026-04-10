@@ -17,6 +17,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -136,6 +137,7 @@ public class DockerSandboxConfiguration {
         SandboxContainerManager containerManager,
         ContainerSecurityPolicy securityPolicy,
         SandboxProperties properties,
+        @Value("${server.port:8080}") int serverPort,
         MeterRegistry meterRegistry
     ) {
         return new DockerSandboxAdapter(
@@ -144,6 +146,7 @@ public class DockerSandboxConfiguration {
             containerManager,
             securityPolicy,
             properties,
+            serverPort,
             meterRegistry
         );
     }

@@ -21,12 +21,13 @@ import org.slf4j.LoggerFactory;
 /**
  * Adapter for the Pi coding agent CLI (provider-agnostic).
  *
- * <p>CLI: {@code pi -p "prompt" --session-dir /tmp/pi-sessions --tools read,bash,grep,find,ls}
- * (retry: {@code pi -c "correction" --session-dir /tmp/pi-sessions --tools read,bash,grep,find,ls})
+ * <p>CLI: {@code pi -p "prompt" --session-dir /tmp/pi-sessions --tools read,bash,grep,find,ls}.
+ * Retries first continue the initial session with {@code -c} so Pi can reuse tool context, then
+ * fall back to a fresh print-mode retry if the continuation still fails.
  *
- * <p>Pi requires a JSON settings file. This adapter injects the config to
- * {@code /workspace/.pi/settings.json} (via {@code PI_CODING_AGENT_DIR} env var) and an
- * {@code AGENTS.md} orchestrator file to {@code /workspace/.pi/AGENTS.md}.
+ * <p>Pi requires a JSON settings file. This adapter stages the config outside the workspace
+ * project settings path, then copies it into the writable {@code PI_CODING_AGENT_DIR} at runtime.
+ * This avoids Pi trying to create lock files under the read-only workspace mount.
  *
  * <p>Authentication modes:
  * <ul>
@@ -68,8 +69,9 @@ public class PiAgentAdapter implements AgentAdapter {
         Map<String, byte[]> inputFiles = new LinkedHashMap<>();
         String authSetup = buildAuthSetup(request, env);
 
-        // Inject Pi settings.json with provider, model, and compaction config
-        inputFiles.put(".pi/settings.json", buildSettingsJson(request));
+        // Keep settings outside /workspace/.pi so Pi does not try to create project-level lock files
+        // on the read-only workspace mount during session startup.
+        inputFiles.put(".pi-runtime/settings.json", buildSettingsJson(request));
 
         // Pi agent orchestrator file (auto-discovered by Pi CLI via AGENTS.md convention)
         inputFiles.put(".pi/AGENTS.md", AgentAdapter.loadClasspathResource("PI-AGENTS.md"));
@@ -81,12 +83,15 @@ public class PiAgentAdapter implements AgentAdapter {
         long agentTimeoutMs = Math.max(60_000L, (long) (request.timeoutSeconds() - TIMEOUT_BUFFER_SECONDS) * 1000);
         inputFiles.put(".run-pi.mjs", buildRunnerScript(agentTimeoutMs));
 
-        // Redirect TMPDIR to exec-allowed tmpfs. Pi's Node.js runtime may extract native addons
-        // to $TMPDIR; the default /tmp has noexec, causing "failed to map segment" errors.
+        // Redirect writable runtime state away from the read-only /workspace mount.
+        // Pi creates lock files next to settings.json, and its Node.js runtime may also
+        // extract native addons into TMPDIR.
+        env.put("HOME", "/home/agent");
+        env.put("XDG_CONFIG_HOME", "/home/agent/.config");
         env.put("TMPDIR", "/home/agent/.local/tmp");
 
-        // Tell Pi CLI where to find its config directory
-        env.put("PI_CODING_AGENT_DIR", "/workspace/.pi");
+        // Pi needs a writable config directory because it creates settings lock files.
+        env.put("PI_CODING_AGENT_DIR", "/home/agent/.pi");
 
         // Pi's azure-openai-responses provider defaults model to "gpt-5.2" regardless of
         // settings.json. The deployment map ensures both the configured model and Pi's default
@@ -102,7 +107,9 @@ public class PiAgentAdapter implements AgentAdapter {
             authSetup +
             "mkdir -p " +
             OUTPUT_PATH +
-            " /home/agent/.local/tmp && " +
+            " /home/agent/.pi /home/agent/.config /home/agent/.local/tmp && " +
+            "cp /workspace/.pi-runtime/settings.json /home/agent/.pi/settings.json && " +
+            "cp /workspace/.pi/AGENTS.md /home/agent/.pi/AGENTS.md && " +
             AgentAdapter.buildPrecomputeStep() +
             "node /workspace/.run-pi.mjs";
 
@@ -153,106 +160,23 @@ public class PiAgentAdapter implements AgentAdapter {
     }
 
     /**
-     * Build a Node.js runner script that invokes Pi with self-correction.
+     * Build a Node.js runner script that invokes Pi with production diagnostics.
      *
      * <p>The script runs the initial analysis, validates the output for a {@code findings}
-     * array, and if invalid, sends up to 2 correction messages via {@code pi -c} (which
-     * resumes the existing session with full context preserved).
+     * array, and if invalid, executes a session-continuation retry first and then a fresh retry.
+     * It also emits {@code usage.json} and {@code runner-debug.json} so failed runs can be
+     * diagnosed from persisted job output without reproducing the sandbox locally.
      *
      * @param agentTimeoutMs total time budget for all runs (initial + retries)
      */
     private byte[] buildRunnerScript(long agentTimeoutMs) {
         long retryTimeoutMs = 60_000;
         long initialTimeoutMs = Math.max(60_000, agentTimeoutMs - 2 * retryTimeoutMs);
-        String script = """
-            import { spawnSync } from 'child_process';
-            import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
-
-            const OUTPUT = '/workspace/.output';
-            mkdirSync(OUTPUT, { recursive: true });
-
-            const prompt = readFileSync('/workspace/.prompt', 'utf-8').trim();
-
-            function runPi(args, label, timeoutMs) {
-              console.error(`[run-pi] ${label}`);
-              const start = Date.now();
-              const r = spawnSync('pi', args, {
-                encoding: 'utf-8',
-                maxBuffer: %d,
-                timeout: timeoutMs || 0,
-                cwd: '/workspace',
-                stdio: ['pipe', 'pipe', 'pipe']
-              });
-              const sec = ((Date.now() - start) / 1000).toFixed(1);
-              console.error(`[run-pi] ${label}: ${sec}s, exit=${r.status}, stdout=${(r.stdout||'').length}b`);
-              if (r.error) console.error(`[run-pi] ${label}: error=${r.error.message}`);
-              return r;
-            }
-
-            function checkResult() {
-              // Check if agent wrote result.json via write tool
-              const resultPath = `${OUTPUT}/result.json`;
-              if (!existsSync(resultPath)) return false;
-              try {
-                const data = JSON.parse(readFileSync(resultPath, 'utf-8'));
-                return data?.findings?.length > 0;
-              } catch {
-                return false;
-              }
-            }
-
-            function hasFindings(out) {
-              if (!out?.trim()) return false;
-              try { return JSON.parse(out)?.findings?.length > 0; } catch {}
-              return out.includes('"findings"') && out.includes('"practiceSlug"');
-            }
-
-            // Initial run — session persists for -c retries. Agent writes output via write tool.
-            let result = runPi([
-              '-p', prompt,
-              '--session-dir', '/tmp/pi-sessions',
-              '--tools', 'read,bash,grep,find,ls,write'
-            ], 'initial', %d);
-
-            // Check if agent wrote result.json via write tool (preferred path)
-            if (checkResult()) {
-              console.error('[run-pi] SUCCESS: agent wrote result.json via write tool');
-              process.exit(0);
-            }
-
-            // Fallback: check stdout for findings
-            let bestOutput = result.stdout || '';
-            if (hasFindings(bestOutput)) {
-              writeFileSync(`${OUTPUT}/result.json`, bestOutput);
-              console.error('[run-pi] SUCCESS: findings from stdout');
-              process.exit(0);
-            }
-
-            // Retry: ask agent to write findings to file
-            for (let i = 1; i <= 2; i++) {
-              console.error(`[run-pi] retry ${i}/2`);
-              result = runPi([
-                '-c', 'Write the findings JSON to .output/result.json using the write tool. Include all 13 practices.',
-                '--session-dir', '/tmp/pi-sessions',
-                '--tools', 'read,bash,grep,find,ls,write'
-              ], `retry-${i}`, %d);
-
-              if (checkResult()) {
-                console.error(`[run-pi] SUCCESS after retry ${i}`);
-                process.exit(0);
-              }
-
-              const retryOut = result.stdout || '';
-              if (hasFindings(retryOut)) {
-                writeFileSync(`${OUTPUT}/result.json`, retryOut);
-                console.error(`[run-pi] SUCCESS: findings from retry stdout`);
-                process.exit(0);
-              }
-            }
-
-            console.error('[run-pi] FAILED: no valid findings after retries');
-            process.exit(result.status || 1);
-            """.formatted(MAX_STDOUT_BUFFER_BYTES, initialTimeoutMs, retryTimeoutMs);
+        String scriptTemplate = new String(AgentAdapter.loadClasspathResource("pi-runner.mjs"), StandardCharsets.UTF_8);
+        String script = scriptTemplate
+            .replace("__MAX_STDOUT_BUFFER_BYTES__", Integer.toString(MAX_STDOUT_BUFFER_BYTES))
+            .replace("__INITIAL_TIMEOUT_MS__", Long.toString(initialTimeoutMs))
+            .replace("__RETRY_TIMEOUT_MS__", Long.toString(retryTimeoutMs));
         return script.getBytes(StandardCharsets.UTF_8);
     }
 
@@ -272,10 +196,12 @@ public class PiAgentAdapter implements AgentAdapter {
         Map<String, Object> output = new HashMap<>();
         output.put("exitCode", sandboxResult.exitCode());
         output.put("timedOut", sandboxResult.timedOut());
+        AgentResult.LlmUsage usage = parseUsage(sandboxResult.outputFiles().get("usage.json"));
+        addRunnerDebug(output, sandboxResult.outputFiles().get("runner-debug.json"));
 
         byte[] resultFile = sandboxResult.outputFiles().get("result.json");
         if (resultFile == null) {
-            return new AgentResult(success, output);
+            return new AgentResult(success, output, usage);
         }
 
         String rawContent = new String(resultFile, StandardCharsets.UTF_8);
@@ -286,7 +212,7 @@ public class PiAgentAdapter implements AgentAdapter {
         // Try direct JSON parse first (clean JSON response from write tool)
         if (isValidJsonWithFindings(rawContent)) {
             output.put("rawOutput", rawContent);
-            return new AgentResult(success, output);
+            return new AgentResult(success, output, usage);
         }
 
         // Extract JSON from text that may contain markdown or mixed content
@@ -297,7 +223,58 @@ public class PiAgentAdapter implements AgentAdapter {
             output.put("rawOutput", rawContent);
         }
 
-        return new AgentResult(success, output, null);
+        return new AgentResult(success, output, usage);
+    }
+
+    private AgentResult.LlmUsage parseUsage(byte[] usageFile) {
+        if (usageFile == null || usageFile.length == 0) {
+            return null;
+        }
+
+        try {
+            JsonNode usageNode = objectMapper.readTree(usageFile);
+            int totalCalls = usageNode.path("totalCalls").asInt(0);
+            if (totalCalls <= 0) {
+                return null;
+            }
+
+            String model = usageNode.path("model").isTextual() ? usageNode.path("model").asText() : null;
+            Integer inputTokens = usageNode.has("inputTokens") ? usageNode.path("inputTokens").asInt(0) : null;
+            Integer outputTokens = usageNode.has("outputTokens") ? usageNode.path("outputTokens").asInt(0) : null;
+            Integer cacheReadTokens = usageNode.has("cacheReadTokens")
+                ? usageNode.path("cacheReadTokens").asInt(0)
+                : null;
+            Integer cacheWriteTokens = usageNode.has("cacheWriteTokens")
+                ? usageNode.path("cacheWriteTokens").asInt(0)
+                : null;
+            Double costUsd = usageNode.has("costUsd") ? usageNode.path("costUsd").asDouble(0.0) : null;
+
+            return new AgentResult.LlmUsage(
+                model,
+                inputTokens,
+                outputTokens,
+                null,
+                cacheReadTokens,
+                cacheWriteTokens,
+                costUsd,
+                totalCalls
+            );
+        } catch (Exception e) {
+            log.warn("Failed to parse Pi usage output", e);
+            return null;
+        }
+    }
+
+    private void addRunnerDebug(Map<String, Object> output, byte[] runnerDebugFile) {
+        if (runnerDebugFile == null || runnerDebugFile.length == 0) {
+            return;
+        }
+
+        try {
+            output.put("runnerDebug", objectMapper.readValue(runnerDebugFile, Object.class));
+        } catch (Exception e) {
+            log.warn("Failed to parse Pi runner debug output", e);
+        }
     }
 
     /**

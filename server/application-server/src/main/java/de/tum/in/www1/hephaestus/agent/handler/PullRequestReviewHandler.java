@@ -50,7 +50,7 @@ import org.springframework.lang.Nullable;
  * <p>Container workspace layout:
  * <pre>
  * /workspace/
- * ├── repo/                              # Real git repo (read-only bind mount)
+ * ├── repo/                              # Pre-prepared local git repo (read-only bind mount)
  * ├── .context/
  * │   ├── metadata.json                  # Title, body, author, branches, stats
  * │   ├── comments.json                  # Review comments
@@ -69,6 +69,8 @@ import org.springframework.lang.Nullable;
  * </pre>
  */
 public class PullRequestReviewHandler implements JobTypeHandler {
+
+    private static final Set<String> ALLOWED_INTERNAL_CONTEXT_PATHS = Set.of(".context/metadata.json");
 
     private static final Logger log = LoggerFactory.getLogger(PullRequestReviewHandler.class);
 
@@ -165,9 +167,9 @@ public class PullRequestReviewHandler implements JobTypeHandler {
 
         Map<String, byte[]> files = new HashMap<>();
 
-        // Ensure repo is cloned/fetched before volumeMounts() resolves the path
-        String gitToken = job.getWorkspace() != null ? job.getWorkspace().getPersonalAccessToken() : null;
-        ensureRepositoryCloned(metadata, repositoryId, gitToken);
+        // PR review requires a pre-prepared local checkout. The sandbox never clones or fetches
+        // repositories on demand; it only mounts an existing host-side checkout.
+        ensureRepositoryAvailable(repositoryId);
 
         // Load PR entity once — shared by metadata, comments, and contributor history
         PullRequest pullRequest = pullRequestRepository.findByIdWithAllForGate(pullRequestId).orElse(null);
@@ -426,7 +428,14 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             );
         }
         if (scopedFindings.isEmpty()) {
-            throw new JobDeliveryException("All findings filtered by diff scope: jobId=" + job.getId());
+            throw new JobDeliveryException(
+                "All findings were filtered by diff scope: jobId=" +
+                    job.getId() +
+                    ", before=" +
+                    parsed.validFindings().size() +
+                    ", diffFiles=" +
+                    diffFiles.size()
+            );
         }
 
         // 2. Persist findings (hard failure — must succeed)
@@ -491,38 +500,21 @@ public class PullRequestReviewHandler implements JobTypeHandler {
     // -------------------------------------------------------------------------
 
     /**
-     * Ensure the repository is cloned/fetched locally. Throws on failure because the bind-mount
-     * approach requires a valid local clone — there is no fallback.
+     * Require a pre-prepared local repository checkout for bind-mounting.
+     *
+     * <p>This review flow never clones or fetches repositories on demand. Repository preparation
+     * must happen ahead of time via the normal sync/bootstrap path so sandbox runs stay offline and
+     * deterministic with respect to repo contents.
      */
-    private void ensureRepositoryCloned(JsonNode metadata, long repositoryId, @Nullable String gitToken) {
+    private void ensureRepositoryAvailable(long repositoryId) {
         if (!gitRepositoryManager.isEnabled()) {
             throw new JobPreparationException(
                 "Git local checkout is disabled but required for bind-mount: repoId=" + repositoryId
             );
         }
-        String repoFullName = requireText(metadata, "repository_full_name");
-
-        // Derive clone URL from PR URL (works for both GitHub and GitLab).
-        // PR URL format: https://<host>/<path>/-/merge_requests/<iid> (GitLab)
-        //                https://<host>/<path>/pull/<number> (GitHub)
-        String prUrl = requireText(metadata, "pr_url");
-        String cloneUrl;
-        int mrIdx = prUrl.indexOf("/-/merge_requests/");
-        int pullIdx = prUrl.indexOf("/pull/");
-        if (mrIdx > 0) {
-            cloneUrl = prUrl.substring(0, mrIdx) + ".git";
-        } else if (pullIdx > 0) {
-            cloneUrl = prUrl.substring(0, pullIdx) + ".git";
-        } else {
-            // Fallback: construct from repo name (GitHub assumed)
-            cloneUrl = "https://github.com/" + repoFullName + ".git";
-        }
-        try {
-            gitRepositoryManager.ensureRepository(repositoryId, cloneUrl, gitToken);
-        } catch (Exception e) {
+        if (!gitRepositoryManager.isRepositoryCloned(repositoryId)) {
             throw new JobPreparationException(
-                "Failed to clone/fetch repository for bind-mount: repoId=" + repositoryId,
-                e
+                "Repository checkout is not available locally for bind-mount: repoId=" + repositoryId
             );
         }
     }
@@ -799,10 +791,25 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         String[] range = resolveDiffRange(repoPath, targetBranch, sourceBranch, headSha);
         if (range == null) return Set.of();
 
-        String diffStat = runGit(repoPath, "diff", "--stat", range[0] + ".." + range[1]);
-        if (diffStat == null || diffStat.isBlank()) return Set.of();
+        String nameOnly = runGit(repoPath, "diff", "--name-only", range[0] + ".." + range[1]);
+        if (nameOnly == null || nameOnly.isBlank()) return Set.of();
 
-        return parseDiffStatPaths(diffStat);
+        return parseDiffNameOnlyPaths(nameOnly);
+    }
+
+    /**
+     * Parse file paths from {@code git diff --name-only} output.
+     * Each non-blank line is a file path — no truncation or stat formatting.
+     */
+    static Set<String> parseDiffNameOnlyPaths(String nameOnlyOutput) {
+        Set<String> paths = new HashSet<>();
+        for (String line : nameOnlyOutput.split("\n")) {
+            String trimmed = line.trim();
+            if (!trimmed.isEmpty()) {
+                paths.add(trimmed);
+            }
+        }
+        return paths;
     }
 
     /**
@@ -865,7 +872,14 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             boolean hasInScopeLocation = false;
             for (JsonNode loc : locations) {
                 JsonNode pathNode = loc.get("path");
-                if (pathNode != null && diffFiles.contains(pathNode.asText())) {
+                if (pathNode == null || pathNode.isNull() || pathNode.isMissingNode()) {
+                    continue;
+                }
+                String path = pathNode.asText();
+                if (path.isBlank() || "null".equals(path)) {
+                    continue;
+                }
+                if (diffFiles.contains(path) || isInternalContextPath(path)) {
                     hasInScopeLocation = true;
                     break;
                 }
@@ -877,6 +891,10 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             }
         }
         return filtered;
+    }
+
+    private static boolean isInternalContextPath(String path) {
+        return ALLOWED_INTERNAL_CONTEXT_PATHS.contains(path);
     }
 
     /**

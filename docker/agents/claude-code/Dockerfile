@@ -4,7 +4,9 @@
 ARG NODE_TAG=22-slim
 FROM node:${NODE_TAG}
 
-RUN apt-get update -qq && apt-get install -y --no-install-recommends git findutils tree jq curl && \
+ARG TARGETARCH
+
+RUN apt-get update -qq && apt-get install -y --no-install-recommends git findutils tree jq curl ca-certificates unzip && \
     rm -rf /var/lib/apt/lists/*
 
 ARG CLAUDE_CODE_VERSION=2.1.76
@@ -16,14 +18,27 @@ RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION} && \
 
 # Bun runtime for precomputation scripts (static analysis before agent runs)
 ARG BUN_VERSION=1.3.11
-RUN curl -fsSL https://bun.sh/install | BUN_INSTALL=/usr/local bash -s "bun-v${BUN_VERSION}"
+RUN arch="${TARGETARCH:-$(dpkg --print-architecture)}" && \
+    case "${arch}" in \
+        amd64|x86_64) bun_arch="x64"; bun_sha256="8611ba935af886f05a6f38740a15160326c15e5d5d07adef966130b4493607ed" ;; \
+        arm64|aarch64) bun_arch="aarch64"; bun_sha256="d13944da12a53ecc74bf6a720bd1d04c4555c038dfe422365356a7be47691fdf" ;; \
+        *) echo "Unsupported TARGETARCH/architecture: ${arch}" >&2; exit 1 ;; \
+    esac && \
+    curl --fail --show-error --silent --location --retry 3 --retry-delay 2 \
+        "https://github.com/oven-sh/bun/releases/download/bun-v${BUN_VERSION}/bun-linux-${bun_arch}.zip" \
+        -o /tmp/bun.zip && \
+    echo "${bun_sha256}  /tmp/bun.zip" | sha256sum -c - && \
+    unzip -o /tmp/bun.zip -d /tmp && \
+    mv "/tmp/bun-linux-${bun_arch}/bun" /usr/local/bin/bun && \
+    chmod +x /usr/local/bin/bun && \
+    rm -rf /tmp/bun*
 
 # Precompute runner + shared libraries (practice scripts injected at runtime from DB)
 COPY --chown=1000:1000 precompute/runner.ts /opt/precompute/runner.ts
 COPY --chown=1000:1000 precompute/lib/ /opt/precompute/lib/
 
-# Git security: neutralize hooks and external commands from mounted repos.
-# System-level config cannot be overridden by repo-local .git/config.
+# Git security baseline: neutralize common hooks/external-command vectors in the image.
+# Runtime env-based git config in DockerSandboxAdapter provides the hard override layer.
 RUN git config --system core.hooksPath /nonexistent && \
     git config --system core.fsmonitor false && \
     git config --system safe.directory /workspace/repo

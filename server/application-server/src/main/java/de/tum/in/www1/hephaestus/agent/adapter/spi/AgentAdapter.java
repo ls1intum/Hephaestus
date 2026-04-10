@@ -97,7 +97,10 @@ public interface AgentAdapter {
             " --metadata /workspace/.context/metadata.json" +
             " --output /workspace/.precompute-out" +
             " > /tmp/precompute-runner.log 2>&1" +
-            " || echo '[precompute] failed, continuing without hints') && "
+            " || { echo '[precompute] failed, continuing without hints'" +
+            " && cp /tmp/precompute-runner.log /workspace/.precompute-out/precompute-runner.log 2>/dev/null" +
+            " ; tail -200 /tmp/precompute-runner.log 2>/dev/null" +
+            " ; true; }) && "
         );
     }
 
