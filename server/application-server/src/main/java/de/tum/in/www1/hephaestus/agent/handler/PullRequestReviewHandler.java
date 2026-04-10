@@ -946,12 +946,19 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             // Verify the local branch ref matches the expected head commit.
             // If the local clone has a stale ref from an earlier push, skip to SHA-based strategies.
             String branchTip = runGit(repoPath, "rev-parse", branchHead);
-            if (branchTip != null && headSha != null
-                    && branchTip.trim().startsWith(headSha.substring(0, Math.min(headSha.length(), 12)))) {
+            if (
+                branchTip != null &&
+                headSha != null &&
+                branchTip.trim().startsWith(headSha.substring(0, Math.min(headSha.length(), 12)))
+            ) {
                 return new String[] { branchBase, branchHead };
             }
-            log.warn("Stale branch ref detected: branch={}, expected={}, actual={}",
-                    branchHead, headSha, branchTip != null ? branchTip.trim() : "null");
+            log.warn(
+                "Stale branch ref detected: branch={}, expected={}, actual={}",
+                branchHead,
+                headSha,
+                branchTip != null ? branchTip.trim() : "null"
+            );
             // Fall through to SHA-based strategies
         }
 
