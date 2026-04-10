@@ -94,7 +94,10 @@ public class JobTypeHandlerConfiguration {
         PracticeRepository practiceRepository,
         PracticeDetectionResultParser resultParser,
         PracticeDetectionDeliveryService deliveryService,
-        FeedbackDeliveryService feedbackService
+        FeedbackDeliveryService feedbackService,
+        @org.springframework.beans.factory.annotation.Autowired(
+            required = false
+        ) @org.springframework.lang.Nullable de.tum.in.www1.hephaestus.gitprovider.common.gitlab.GitLabTokenService gitLabTokenService
     ) {
         return new PullRequestReviewHandler(
             objectMapper,
@@ -105,7 +108,8 @@ public class JobTypeHandlerConfiguration {
             contributorHistoryProvider(),
             resultParser,
             deliveryService,
-            feedbackService
+            feedbackService,
+            gitLabTokenService
         );
     }
 

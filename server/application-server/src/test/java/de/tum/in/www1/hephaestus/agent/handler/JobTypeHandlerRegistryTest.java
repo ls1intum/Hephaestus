@@ -57,7 +57,8 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
             contributorHistoryProvider,
             parser,
             deliveryService,
-            feedbackService
+            feedbackService,
+            null
         );
     }
 

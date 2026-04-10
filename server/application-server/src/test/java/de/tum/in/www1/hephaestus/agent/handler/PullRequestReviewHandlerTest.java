@@ -91,7 +91,8 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             contributorHistoryProvider,
             resultParser,
             deliveryService,
-            feedbackService
+            feedbackService,
+            null
         );
     }
 
