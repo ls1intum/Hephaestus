@@ -605,6 +605,17 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             return;
         }
         Path repoPath = gitRepositoryManager.getRepositoryPath(repositoryId);
+
+        // Fetch latest refs from remote before computing the diff.
+        // Without this, the local clone may have stale branch refs from an earlier push,
+        // causing the diff to be computed against the wrong commit.
+        String fetchResult = runGit(repoPath, "fetch", "origin");
+        if (fetchResult == null) {
+            log.warn("Git fetch failed before diff computation: repoId={}, headSha={}", repositoryId, headSha);
+        } else {
+            log.debug("Fetched latest refs before diff computation: repoId={}", repositoryId);
+        }
+
         try {
             String[] range = resolveDiffRange(repoPath, targetBranch, sourceBranch, headSha);
             if (range == null) {
@@ -622,11 +633,24 @@ public class PullRequestReviewHandler implements JobTypeHandler {
                 if (diffStat != null) {
                     files.put(".context/diff_stat.txt", diffStat.getBytes(StandardCharsets.UTF_8));
                 }
+
+                // Log diff quality metrics for stale-diff incident detection
+                int addedLines = 0;
+                int removedLines = 0;
+                for (String line : diff.split("\n", -1)) {
+                    if (line.startsWith("+") && !line.startsWith("+++")) addedLines++;
+                    else if (line.startsWith("-") && !line.startsWith("---")) removedLines++;
+                }
+                String strategyUsed = range[1].equals(headSha) ? "SHA-based" : "branch-based";
                 log.info(
-                    "Pre-computed diff: {} bytes (annotated: {} bytes), diffStat={} bytes, headSha={}",
+                    "Pre-computed diff: strategy={}, range={}..{}, +{}/-{} lines, {} bytes (annotated: {} bytes), headSha={}",
+                    strategyUsed,
+                    range[0],
+                    range[1],
+                    addedLines,
+                    removedLines,
                     diff.length(),
                     annotatedDiff.length(),
-                    diffStat != null ? diffStat.length() : 0,
                     headSha
                 );
             } else {
@@ -914,12 +938,21 @@ public class PullRequestReviewHandler implements JobTypeHandler {
      */
     @Nullable
     private String[] resolveDiffRange(Path repoPath, String targetBranch, String sourceBranch, String headSha) {
-        // Strategy 1: Branch-based diff (works if source branch still exists)
+        // Strategy 1: Branch-based diff (works if source branch still exists and is current)
         String branchBase = "origin/" + targetBranch;
         String branchHead = "origin/" + sourceBranch;
         String statCheck = runGit(repoPath, "diff", "--stat", branchBase + ".." + branchHead);
         if (statCheck != null && !statCheck.isBlank()) {
-            return new String[] { branchBase, branchHead };
+            // Verify the local branch ref matches the expected head commit.
+            // If the local clone has a stale ref from an earlier push, skip to SHA-based strategies.
+            String branchTip = runGit(repoPath, "rev-parse", branchHead);
+            if (branchTip != null && headSha != null
+                    && branchTip.trim().startsWith(headSha.substring(0, Math.min(headSha.length(), 12)))) {
+                return new String[] { branchBase, branchHead };
+            }
+            log.warn("Stale branch ref detected: branch={}, expected={}, actual={}",
+                    branchHead, headSha, branchTip != null ? branchTip.trim() : "null");
+            // Fall through to SHA-based strategies
         }
 
         // Strategy 2: Find merge commit that has headSha as second parent
