@@ -13,6 +13,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.Hibernate;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
@@ -324,6 +325,53 @@ public class ExperiencePointCalculator implements ExperiencePointStrategy {
         // Substantive comments (>50 chars) earn full XP, trivial ones earn half
         double base = properties.xpAwards().reviewComment();
         return bodyLength > 50 ? base : base * 0.5;
+    }
+
+    /**
+     * Calculate XP for a standalone review comment (not linked to a review).
+     *
+     * <p>Used for GitLab diff notes which are posted individually without
+     * a parent review entity. Uses the same flat-rate formula as
+     * {@link #calculateReviewCommentExperiencePoints(int)}, awarding a small
+     * fixed XP per comment based on comment length.
+     *
+     * <p><strong>Design rationale:</strong> On GitHub, inline comments are grouped
+     * into a review and their count feeds into the review's
+     * {@code calculateCodeReviewBonus()}. On GitLab, each diff note is standalone.
+     * Using a complexity-weighted harmonic mean per-comment would be unbounded
+     * (N comments × full review-level XP), creating a large platform disparity.
+     * A flat rate keeps GitLab comments as a small bonus, consistent with how
+     * GitHub accounts for them via the code review bonus curve.
+     *
+     * <p><strong>Self-review check only:</strong> This method checks whether the
+     * comment author is the same as the PR author (no XP for self-review). It does
+     * NOT apply the {@code selfReviewAuthorLogins} bot-assignee exclusion because
+     * that check requires assignee data (see {@link #isSelfAssignedReview}) and
+     * would incorrectly penalise all humans reviewing bot-authored PRs.
+     *
+     * @param pullRequest the PR (used for self-review check)
+     * @param commentAuthorId the comment author's ID (for self-review check)
+     * @param bodyLength length of the comment body
+     * @return XP for the standalone review comment
+     */
+    public double calculateStandaloneReviewCommentXp(
+        PullRequest pullRequest,
+        @Nullable Long commentAuthorId,
+        int bodyLength
+    ) {
+        // Self-review check: no XP for commenting on your own PR
+        User prAuthor = pullRequest.getAuthor();
+        if (
+            prAuthor != null &&
+            commentAuthorId != null &&
+            prAuthor.getId() != null &&
+            prAuthor.getId().equals(commentAuthorId)
+        ) {
+            return 0.0;
+        }
+
+        // Flat-rate XP: substantive comments (>50 chars) get full XP, trivial ones get half
+        return calculateReviewCommentExperiencePoints(bodyLength);
     }
 
     /**

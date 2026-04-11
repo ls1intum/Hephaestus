@@ -30,7 +30,9 @@ public record GitLabNoteEventDTO(
         String action,
         String url,
         @JsonProperty("created_at") String createdAt,
-        @JsonProperty("updated_at") String updatedAt
+        @JsonProperty("updated_at") String updatedAt,
+        @Nullable @JsonProperty("discussion_id") String discussionId,
+        @Nullable String type
     ) {}
 
     /** Embedded issue data — enough fields for stub creation if the parent doesn't exist yet. */
@@ -60,7 +62,8 @@ public record GitLabNoteEventDTO(
         @JsonProperty("target_branch") String targetBranch,
         String url,
         @JsonProperty("created_at") String createdAt,
-        @JsonProperty("updated_at") String updatedAt
+        @JsonProperty("updated_at") String updatedAt,
+        @Nullable @JsonProperty("detailed_merge_status") String detailedMergeStatus
     ) {}
 
     public boolean isSystemNote() {
