@@ -170,28 +170,18 @@ class PiAgentAdapterTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("should inject runner script with pi CLI invocation")
+        @DisplayName("should inject runner script with embedded Pi SDK")
         void shouldInjectRunnerScript() {
             var spec = adapter.buildSandboxSpec(proxyRequest(LlmProvider.AZURE_OPENAI, null));
             assertThat(spec.inputFiles()).containsKey(".run-pi.mjs");
             String script = new String(spec.inputFiles().get(".run-pi.mjs"), StandardCharsets.UTF_8);
-            assertThat(script).contains("spawnSync(\"pi\"");
-            assertThat(script).contains("--session-dir");
-            assertThat(script).contains("--tools");
-            assertThat(script).contains("write"); // write tool for file output
+            assertThat(script).contains("createAgentSession"); // embedded SDK, not CLI subprocess
+            assertThat(script).contains("createWriteTool"); // write tool for file output
             assertThat(script).contains("readFileSync(\"/workspace/.prompt\"");
-            assertThat(script).doesNotContain("--no-session");
             assertThat(script).contains("runner-debug.json");
-            assertThat(script).contains("recordAttempt");
-            assertThat(script).contains("continuationRetryPrompt");
-            assertThat(script).contains("authorizedFreshRetryPrompt + prompt");
-            assertThat(script).contains("findMostRecentSessionFile(initialSessionDir)");
-            assertThat(script).contains("canContinueInitialSession");
-            assertThat(script).contains("retry-1-continuation");
-            assertThat(script).contains("retry-1-fresh-authorized");
-            assertThat(script).contains("retry-2-fresh-authorized");
-            assertThat(script).contains("\"-c\"");
-            assertThat(script).contains("checkResult");
+            assertThat(script).contains("session.agent.steer"); // soft timeout steering
+            assertThat(script).contains("session.prompt"); // continuation via in-memory session
+            assertThat(script).contains("checkResultFile");
             assertThat(script).contains("isValidFindingsPayload");
         }
 
@@ -231,6 +221,7 @@ class PiAgentAdapterTest extends BaseUnitTest {
             var spec = adapter.buildSandboxSpec(proxyRequest(LlmProvider.AZURE_OPENAI, null));
             String cmd = spec.command().get(2);
             assertThat(cmd).contains("cp /workspace/.pi-runtime/settings.json /home/agent/.pi/settings.json");
+            assertThat(cmd).contains("ln -sf /usr/local/lib/node_modules /workspace/node_modules");
             assertThat(cmd).contains("node /workspace/.run-pi.mjs");
         }
     }
