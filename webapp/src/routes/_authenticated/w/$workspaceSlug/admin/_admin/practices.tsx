@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Navigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -11,7 +11,7 @@ import {
 	updatePracticeMutation,
 } from "@/api/@tanstack/react-query.gen";
 import type { CreatePracticeRequest, UpdatePracticeRequest } from "@/api/types.gen";
-import { AdminPracticesPage } from "@/components/admin/AdminPracticesPage";
+import { AdminPracticesPage } from "@/components/admin/practices/AdminPracticesPage";
 import { Spinner } from "@/components/ui/spinner";
 import { NoWorkspace } from "@/components/workspace/NoWorkspace";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
@@ -23,7 +23,6 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/_ad
 
 function AdminPracticesContainer() {
 	const queryClient = useQueryClient();
-	const navigate = useNavigate();
 	const {
 		workspaceSlug,
 		isLoading: isWorkspaceLoading,
@@ -60,8 +59,10 @@ function AdminPracticesContainer() {
 			toast.success("Practice created successfully");
 		},
 		onError: (error) => {
-			// 409 = slug already exists
-			const status = (error as { status?: number }).status;
+			const status =
+				typeof error === "object" && error !== null && "status" in error
+					? (error as { status: number }).status
+					: undefined;
 			if (status === 409) {
 				toast.error("A practice with this slug already exists in this workspace");
 			} else {
@@ -112,20 +113,22 @@ function AdminPracticesContainer() {
 		},
 	});
 
-	// Feature guard — redirect to admin settings when practices are disabled
+	// Show error toasts via useEffect (not in render path)
 	useEffect(() => {
-		if (!featuresLoading && !practicesEnabled && workspaceSlug) {
-			toast.error("Practices are not enabled for this workspace");
-			navigate({
-				to: "/w/$workspaceSlug/admin/settings",
-				params: { workspaceSlug },
-				replace: true,
-			});
+		if (workspaceError || practicesError) {
+			const err = workspaceError ?? practicesError;
+			const message = err instanceof Error ? err.message : "Unknown error";
+			toast.error(`Failed to load data: ${message}`);
 		}
-	}, [featuresLoading, practicesEnabled, workspaceSlug, navigate]);
+	}, [workspaceError, practicesError]);
 
 	if (!workspaceSlug && !isWorkspaceLoading) {
 		return <NoWorkspace />;
+	}
+
+	// Feature guard — declarative redirect when practices are disabled
+	if (!featuresLoading && !practicesEnabled && workspaceSlug) {
+		return <Navigate to="/w/$workspaceSlug/admin/settings" params={{ workspaceSlug }} replace />;
 	}
 
 	if (featuresLoading || !practicesEnabled) {
@@ -137,11 +140,6 @@ function AdminPracticesContainer() {
 	}
 
 	const isLoading = isWorkspaceLoading || isPracticesLoading || !workspaceSlug;
-
-	if (workspaceError || practicesError) {
-		const errorMessage = (workspaceError as Error)?.message || (practicesError as Error)?.message;
-		toast.error(`Failed to load data: ${errorMessage}`);
-	}
 
 	const handleCreatePractice = async (data: CreatePracticeRequest) => {
 		if (!workspaceSlug) return;

@@ -3519,6 +3519,12 @@ components:
           example: PR Description Quality
           maxLength: 128
           minLength: 3
+        precomputeScript:
+          type: string
+          description: TypeScript/Bun precompute script for static analysis before
+            AI review
+          maxLength: 100000
+          minLength: 0
         slug:
           type: string
           description: URL-safe identifier unique within the workspace
@@ -4085,6 +4091,10 @@ components:
         name:
           type: string
           description: Human-readable name
+        precomputeScript:
+          type: string
+          description: TypeScript/Bun precompute script for static analysis before
+            AI review
         slug:
           type: string
           description: URL-safe identifier unique within workspace
@@ -4856,6 +4866,12 @@ components:
           maxLength: 128
           minLength: 3
           pattern: .*\S.*
+        precomputeScript:
+          type: string
+          description: TypeScript/Bun precompute script for static analysis before
+            AI review
+          maxLength: 100000
+          minLength: 0
         triggerEvents:
           type: array
           description: Domain events that trigger detection

@@ -13,8 +13,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import { AdminPracticesTable } from "./AdminPracticesTable";
-import { PracticeFormDialog } from "./PracticeFormDialog";
+import { PracticeCardList } from "./PracticeCardList";
+import { PracticeFormSheet } from "./PracticeFormSheet";
 
 interface AdminPracticesPageProps {
 	practices: Practice[];
@@ -41,19 +41,21 @@ export function AdminPracticesPage({
 	onDeletePractice,
 	onSetActive,
 }: AdminPracticesPageProps) {
-	const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+	const [isCreateSheetOpen, setIsCreateSheetOpen] = useState(false);
 	const [editingPractice, setEditingPractice] = useState<Practice | null>(null);
 	const [deletingPractice, setDeletingPractice] = useState<Practice | null>(null);
 
 	const handleCreateSubmit = (data: CreatePracticeRequest) => {
 		onCreatePractice(data)
-			.then(() => setIsCreateDialogOpen(false))
+			.then(() => setIsCreateSheetOpen(false))
+			// Error toasts handled by mutation onError in route container
 			.catch(() => {});
 	};
 
 	const handleEditSubmit = (slug: string, data: UpdatePracticeRequest) => {
 		onUpdatePractice(slug, data)
 			.then(() => setEditingPractice(null))
+			// Error toasts handled by mutation onError in route container
 			.catch(() => {});
 	};
 
@@ -61,47 +63,48 @@ export function AdminPracticesPage({
 		if (deletingPractice) {
 			onDeletePractice(deletingPractice.slug)
 				.then(() => setDeletingPractice(null))
+				// Error toasts handled by mutation onError in route container
 				.catch(() => {});
 		}
 	};
 
 	return (
-		<div className="container mx-auto py-6">
-			<div className="flex items-center justify-between mb-6">
+		<div className="container mx-auto max-w-3xl py-6">
+			<div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
 				<div>
 					<h1 className="text-3xl font-bold tracking-tight">Manage Practices</h1>
 					<p className="text-muted-foreground">
 						Configure practice definitions for evaluating developer contributions.
 					</p>
 				</div>
-				<Button onClick={() => setIsCreateDialogOpen(true)}>
+				<Button onClick={() => setIsCreateSheetOpen(true)}>
 					<Plus className="mr-2 h-4 w-4" />
 					Create Practice
 				</Button>
 			</div>
 
-			<AdminPracticesTable
+			<PracticeCardList
 				practices={practices}
 				isLoading={isLoading}
 				togglingPractices={togglingPractices}
 				onEdit={setEditingPractice}
 				onDelete={setDeletingPractice}
 				onSetActive={onSetActive}
-				onCreateClick={() => setIsCreateDialogOpen(true)}
+				onCreateClick={() => setIsCreateSheetOpen(true)}
 			/>
 
-			{/* Create Dialog */}
-			<PracticeFormDialog
+			{/* Create Sheet */}
+			<PracticeFormSheet
 				mode="create"
-				open={isCreateDialogOpen}
-				onOpenChange={setIsCreateDialogOpen}
+				open={isCreateSheetOpen}
+				onOpenChange={setIsCreateSheetOpen}
 				onSubmit={handleCreateSubmit}
 				isPending={isCreating}
 			/>
 
-			{/* Edit Dialog */}
+			{/* Edit Sheet */}
 			{editingPractice && (
-				<PracticeFormDialog
+				<PracticeFormSheet
 					mode="edit"
 					open
 					onOpenChange={(open) => {

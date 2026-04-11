@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Navigate } from "@tanstack/react-router";
 import { ReactFlowProvider } from "@xyflow/react";
-import { useEffect } from "react";
 import { toast } from "sonner";
 import { getUserProfileOptions, reloadAchievementsMutation } from "@/api/@tanstack/react-query.gen";
 import { AchievementHeader } from "@/components/achievements/AchievementHeader";
@@ -20,7 +19,6 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/ach
 
 function AchievementDesignerPage() {
 	const queryClient = useQueryClient();
-	const navigate = useNavigate();
 	const { userProfile, getUserProfilePictureUrl, username } = useAuth();
 	const selectedSlug = useWorkspaceStore((state) => state.selectedSlug);
 	const { achievementsEnabled, isLoading: featuresLoading } = useWorkspaceFeatures();
@@ -65,17 +63,16 @@ function AchievementDesignerPage() {
 	// Fetch all achievement definitions (Design Mode Data)
 	const allDefinitionsQuery = useAllAchievementDefinitions(selectedSlug || "", username || "");
 
-	// Feature guard — redirect to admin settings when achievements are disabled
-	useEffect(() => {
-		if (!featuresLoading && !achievementsEnabled && selectedSlug) {
-			toast.error("Achievements are not enabled for this workspace");
-			navigate({
-				to: "/w/$workspaceSlug/admin/settings",
-				params: { workspaceSlug: selectedSlug },
-				replace: true,
-			});
-		}
-	}, [featuresLoading, achievementsEnabled, selectedSlug, navigate]);
+	// Feature guard — declarative redirect when achievements are disabled
+	if (!featuresLoading && !achievementsEnabled && selectedSlug) {
+		return (
+			<Navigate
+				to="/w/$workspaceSlug/admin/settings"
+				params={{ workspaceSlug: selectedSlug }}
+				replace
+			/>
+		);
+	}
 
 	if (featuresLoading || !achievementsEnabled) {
 		return (

@@ -12,7 +12,7 @@ export const TRIGGER_EVENT_OPTIONS = [
 
 type TriggerEventValue = (typeof TRIGGER_EVENT_OPTIONS)[number]["value"];
 
-/** Short labels for inline badge display in the table. */
+/** Short labels for inline badge display. */
 export const TRIGGER_EVENT_SHORT_LABELS: Record<TriggerEventValue, string> = {
 	PullRequestCreated: "PR Created",
 	PullRequestReady: "PR Ready",

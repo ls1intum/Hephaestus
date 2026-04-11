@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Navigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { toast } from "sonner";
 import { getUsersWithTeamsOptions } from "@/api/@tanstack/react-query.gen";
@@ -15,7 +15,6 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/_ad
 });
 
 function AdminAchievementsContainer() {
-	const navigate = useNavigate();
 	const {
 		workspaceSlug,
 		isLoading: isWorkspaceLoading,
@@ -35,17 +34,13 @@ function AdminAchievementsContainer() {
 		enabled: Boolean(workspaceSlug) && (usersQueryOptions.enabled ?? true),
 	});
 
-	// Feature guard — redirect to admin settings when achievements are disabled
+	// Show error toasts via useEffect (not in render path)
 	useEffect(() => {
-		if (!featuresLoading && !achievementsEnabled && workspaceSlug) {
-			toast.error("Achievements are not enabled for this workspace");
-			navigate({
-				to: "/w/$workspaceSlug/admin/settings",
-				params: { workspaceSlug },
-				replace: true,
-			});
+		if (workspaceError || usersError) {
+			const errorMessage = (workspaceError as Error)?.message || (usersError as Error)?.message;
+			toast.error(`Failed to load data: ${errorMessage}`);
 		}
-	}, [featuresLoading, achievementsEnabled, workspaceSlug, navigate]);
+	}, [workspaceError, usersError]);
 
 	const users = (usersData?.map(adaptApiUserTeams) || []).sort((a, b) =>
 		a.user.name.localeCompare(b.user.name),
@@ -56,17 +51,17 @@ function AdminAchievementsContainer() {
 		return <NoWorkspace />;
 	}
 
+	// Feature guard — declarative redirect when achievements are disabled
+	if (!featuresLoading && !achievementsEnabled && workspaceSlug) {
+		return <Navigate to="/w/$workspaceSlug/admin/settings" params={{ workspaceSlug }} replace />;
+	}
+
 	if (featuresLoading || !achievementsEnabled) {
 		return (
 			<div className="flex justify-center items-center h-64">
 				<Spinner className="h-8 w-8" />
 			</div>
 		);
-	}
-
-	if (workspaceError || usersError) {
-		const errorMessage = (workspaceError as Error)?.message || (usersError as Error)?.message;
-		toast.error(`Failed to load data: ${errorMessage}`);
 	}
 
 	return (

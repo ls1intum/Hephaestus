@@ -523,6 +523,10 @@ export type UpdatePracticeRequest = {
      */
     name?: string;
     /**
+     * TypeScript/Bun precompute script for static analysis before AI review
+     */
+    precomputeScript?: string;
+    /**
      * Domain events that trigger detection
      */
     triggerEvents?: Array<string>;
@@ -1127,6 +1131,10 @@ export type Practice = {
      */
     name: string;
     /**
+     * TypeScript/Bun precompute script for static analysis before AI review
+     */
+    precomputeScript?: string;
+    /**
      * URL-safe identifier unique within workspace
      */
     slug: string;
@@ -1621,6 +1629,10 @@ export type CreatePracticeRequest = {
      * Human-readable name
      */
     name: string;
+    /**
+     * TypeScript/Bun precompute script for static analysis before AI review
+     */
+    precomputeScript?: string;
     /**
      * URL-safe identifier unique within the workspace
      */

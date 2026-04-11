@@ -31,6 +31,7 @@
     "@ai-sdk/react": "3.0.3",
     "@base-ui/react": "1.1.0",
     "@gitlab/svgs": "^3.157.0",
+    "@monaco-editor/react": "^4.7.0",
     "@primer/octicons-react": "19.21.1",
     "@primer/primitives": "10.7.0",
     "@sentry/react": "9.47.1",
