@@ -192,14 +192,17 @@ public class GitLabNoteMessageHandler extends GitLabMessageHandler<GitLabNoteEve
         if (pullRequest == null) return;
 
         // Self-review guard: skip if reviewer == MR author
-        if (pullRequest.getAuthor() != null &&
+        if (
+            pullRequest.getAuthor() != null &&
             pullRequest.getAuthor().getNativeId() != null &&
-            pullRequest.getAuthor().getNativeId().equals(event.user().id().longValue())) {
+            pullRequest.getAuthor().getNativeId().equals(event.user().id().longValue())
+        ) {
             return;
         }
 
-        User reviewer = userRepository.findByNativeIdAndProviderId(
-            event.user().id(), context.providerId()).orElse(null);
+        User reviewer = userRepository
+            .findByNativeIdAndProviderId(event.user().id(), context.providerId())
+            .orElse(null);
         if (reviewer == null) return;
 
         mergeRequestProcessor.processRequestedChangesFromNote(pullRequest, reviewer, context);

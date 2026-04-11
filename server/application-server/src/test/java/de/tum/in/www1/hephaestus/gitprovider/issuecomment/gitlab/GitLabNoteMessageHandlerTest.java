@@ -399,10 +399,17 @@ class GitLabNoteMessageHandlerTest extends BaseUnitTest {
 
         private EmbeddedMergeRequest createEmbeddedMergeRequestWithStatus(String detailedMergeStatus) {
             return new EmbeddedMergeRequest(
-                334047L, 2, "Test MR", "Description", "opened", false,
-                "feature/test", "main",
+                334047L,
+                2,
+                "Test MR",
+                "Description",
+                "opened",
+                false,
+                "feature/test",
+                "main",
                 "https://gitlab.lrz.de/test/-/merge_requests/2",
-                "2026-01-31 19:03:54 +0100", "2026-01-31 19:03:56 +0100",
+                "2026-01-31 19:03:54 +0100",
+                "2026-01-31 19:03:56 +0100",
                 detailedMergeStatus
             );
         }

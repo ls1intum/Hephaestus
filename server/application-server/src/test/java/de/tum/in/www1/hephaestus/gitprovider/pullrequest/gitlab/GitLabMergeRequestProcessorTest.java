@@ -1073,8 +1073,9 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
             existingReview.setPullRequest(pr);
 
             long approvalNativeId = GitLabMergeRequestProcessor.generateApprovalNativeId(RAW_MR_ID, RAW_USER_ID);
-            when(reviewRepository.findByNativeIdAndProviderId(approvalNativeId, PROVIDER_ID))
-                .thenReturn(Optional.of(existingReview));
+            when(reviewRepository.findByNativeIdAndProviderId(approvalNativeId, PROVIDER_ID)).thenReturn(
+                Optional.of(existingReview)
+            );
 
             processor.processRequestedChangesFromNote(pr, reviewer, createContext());
 
@@ -1096,8 +1097,9 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
             existingReview.setState(PullRequestReview.State.CHANGES_REQUESTED);
 
             long approvalNativeId = GitLabMergeRequestProcessor.generateApprovalNativeId(RAW_MR_ID, RAW_USER_ID);
-            when(reviewRepository.findByNativeIdAndProviderId(approvalNativeId, PROVIDER_ID))
-                .thenReturn(Optional.of(existingReview));
+            when(reviewRepository.findByNativeIdAndProviderId(approvalNativeId, PROVIDER_ID)).thenReturn(
+                Optional.of(existingReview)
+            );
 
             processor.processRequestedChangesFromNote(pr, reviewer, createContext());
 
@@ -1114,8 +1116,9 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
             reviewer.setNativeId(RAW_USER_ID);
 
             long approvalNativeId = GitLabMergeRequestProcessor.generateApprovalNativeId(RAW_MR_ID, RAW_USER_ID);
-            when(reviewRepository.findByNativeIdAndProviderId(approvalNativeId, PROVIDER_ID))
-                .thenReturn(Optional.empty());
+            when(reviewRepository.findByNativeIdAndProviderId(approvalNativeId, PROVIDER_ID)).thenReturn(
+                Optional.empty()
+            );
 
             processor.processRequestedChangesFromNote(pr, reviewer, createContext());
 

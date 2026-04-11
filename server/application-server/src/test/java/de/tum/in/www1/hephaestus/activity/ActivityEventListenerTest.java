@@ -719,29 +719,26 @@ class ActivityEventListenerTest extends BaseUnitTest {
             pullRequest.setAuthor(prAuthor);
 
             when(pullRequestRepository.findById(50L)).thenReturn(Optional.of(pullRequest));
-            when(experiencePointCalculator.calculateStandaloneReviewCommentXp(any(), any(), anyInt()))
-                .thenReturn(0.5);
+            when(experiencePointCalculator.calculateStandaloneReviewCommentXp(any(), any(), anyInt())).thenReturn(0.5);
 
             var commentData = new EventPayload.ReviewCommentData(
-                77L,         // id
-                "This is a substantive review comment with enough length",  // body
+                77L, // id
+                "This is a substantive review comment with enough length", // body
                 "src/Main.java", // path
-                42,          // line
+                42, // line
                 "https://github.com/test/test-repo/pull/1#discussion_r77", // htmlUrl
-                null,        // reviewId - null = standalone
-                100L,        // authorId
+                null, // reviewId - null = standalone
+                100L, // authorId
                 Instant.now(), // createdAt
-                50L,         // pullRequestId
-                200L         // repositoryId
+                50L, // pullRequestId
+                200L // repositoryId
             );
             var event = new DomainEvent.ReviewCommentCreated(commentData, 50L, createContext());
 
             listener.onReviewCommentCreated(event);
 
             verify(pullRequestRepository).findById(50L);
-            verify(experiencePointCalculator).calculateStandaloneReviewCommentXp(
-                eq(pullRequest), eq(100L), anyInt()
-            );
+            verify(experiencePointCalculator).calculateStandaloneReviewCommentXp(eq(pullRequest), eq(100L), anyInt());
             verify(activityEventService).record(
                 eq(42L),
                 eq(ActivityEventType.REVIEW_COMMENT_CREATED),
@@ -758,16 +755,16 @@ class ActivityEventListenerTest extends BaseUnitTest {
         @DisplayName("comment linked to review (reviewId!=null) awards zero XP")
         void onReviewCommentCreated_linkedToReview_awardsZeroXp() {
             var commentData = new EventPayload.ReviewCommentData(
-                78L,         // id
-                "Some comment",  // body
+                78L, // id
+                "Some comment", // body
                 "src/Main.java", // path
-                10,          // line
+                10, // line
                 "https://github.com/test/test-repo/pull/1#discussion_r78", // htmlUrl
-                42L,         // reviewId - linked to review
-                100L,        // authorId
+                42L, // reviewId - linked to review
+                100L, // authorId
                 Instant.now(), // createdAt
-                50L,         // pullRequestId
-                200L         // repositoryId
+                50L, // pullRequestId
+                200L // repositoryId
             );
             var event = new DomainEvent.ReviewCommentCreated(commentData, 50L, createContext());
 
@@ -791,9 +788,16 @@ class ActivityEventListenerTest extends BaseUnitTest {
         @DisplayName("skips recording when scopeId is null")
         void onReviewCommentCreated_nullScopeId_skips() {
             var commentData = new EventPayload.ReviewCommentData(
-                79L, "body", "path.java", 1,
+                79L,
+                "body",
+                "path.java",
+                1,
                 "https://example.com/comment",
-                null, 100L, Instant.now(), 50L, 200L
+                null,
+                100L,
+                Instant.now(),
+                50L,
+                200L
             );
             RepositoryRef repoRef = new RepositoryRef(testRepository.getId(), testRepository.getName(), "test");
             EventContext contextWithNullScope = new EventContext(
@@ -817,11 +821,16 @@ class ActivityEventListenerTest extends BaseUnitTest {
         @DisplayName("skips recording when authorId is null")
         void onReviewCommentCreated_nullAuthorId_skips() {
             var commentData = new EventPayload.ReviewCommentData(
-                80L, "body", "path.java", 1,
+                80L,
+                "body",
+                "path.java",
+                1,
                 "https://example.com/comment",
-                null,  // reviewId
-                null,  // authorId - null
-                Instant.now(), 50L, 200L
+                null, // reviewId
+                null, // authorId - null
+                Instant.now(),
+                50L,
+                200L
             );
             var event = new DomainEvent.ReviewCommentCreated(commentData, 50L, createContext());
 
@@ -841,10 +850,10 @@ class ActivityEventListenerTest extends BaseUnitTest {
                 "src/Main.java",
                 1,
                 "https://example.com/comment",
-                null,  // reviewId - standalone
-                100L,  // authorId
+                null, // reviewId - standalone
+                100L, // authorId
                 Instant.now(),
-                999L,  // pullRequestId - not found
+                999L, // pullRequestId - not found
                 200L
             );
             var event = new DomainEvent.ReviewCommentCreated(commentData, 999L, createContext());
@@ -874,16 +883,15 @@ class ActivityEventListenerTest extends BaseUnitTest {
             pullRequest.setAuthor(prAuthor);
 
             when(pullRequestRepository.findById(50L)).thenReturn(Optional.of(pullRequest));
-            when(experiencePointCalculator.calculateStandaloneReviewCommentXp(any(), any(), eq(0)))
-                .thenReturn(0.25);
+            when(experiencePointCalculator.calculateStandaloneReviewCommentXp(any(), any(), eq(0))).thenReturn(0.25);
 
             var commentData = new EventPayload.ReviewCommentData(
                 82L,
-                null,  // null body
+                null, // null body
                 "src/Main.java",
                 1,
                 "https://example.com/comment",
-                null,  // reviewId - standalone
+                null, // reviewId - standalone
                 100L,
                 Instant.now(),
                 50L,
@@ -894,9 +902,7 @@ class ActivityEventListenerTest extends BaseUnitTest {
             listener.onReviewCommentCreated(event);
 
             // Verify body length 0 was passed to calculator (not NPE)
-            verify(experiencePointCalculator).calculateStandaloneReviewCommentXp(
-                eq(pullRequest), eq(100L), eq(0)
-            );
+            verify(experiencePointCalculator).calculateStandaloneReviewCommentXp(eq(pullRequest), eq(100L), eq(0));
         }
     }
 

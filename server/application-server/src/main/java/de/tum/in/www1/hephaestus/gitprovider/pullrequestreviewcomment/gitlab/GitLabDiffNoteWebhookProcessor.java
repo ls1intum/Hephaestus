@@ -101,7 +101,11 @@ public class GitLabDiffNoteWebhookProcessor extends BaseGitLabProcessor {
         if (pr == null) {
             pr = createMinimalPullRequestWithRetry(embeddedMr, context);
             if (pr == null) {
-                log.warn("Skipped diff note: reason=failedToCreateParent, mrIid={}, noteId={}", embeddedMr.iid(), attrs.id());
+                log.warn(
+                    "Skipped diff note: reason=failedToCreateParent, mrIid={}, noteId={}",
+                    embeddedMr.iid(),
+                    attrs.id()
+                );
                 return null;
             }
         }
@@ -264,9 +268,7 @@ public class GitLabDiffNoteWebhookProcessor extends BaseGitLabProcessor {
         return saved;
     }
 
-    private static de.tum.in.www1.hephaestus.gitprovider.issue.Issue.State convertMrState(
-        @Nullable String state
-    ) {
+    private static de.tum.in.www1.hephaestus.gitprovider.issue.Issue.State convertMrState(@Nullable String state) {
         if (state == null) return de.tum.in.www1.hephaestus.gitprovider.issue.Issue.State.OPEN;
         return switch (state.toLowerCase()) {
             case "opened" -> de.tum.in.www1.hephaestus.gitprovider.issue.Issue.State.OPEN;

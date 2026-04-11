@@ -391,8 +391,11 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             .ifPresent(review -> {
                 // Idempotency: skip if already in CHANGES_REQUESTED state
                 if (review.getState() == PullRequestReview.State.CHANGES_REQUESTED) {
-                    log.debug("Review already CHANGES_REQUESTED, skipping: prId={}, reviewerId={}",
-                        pr.getId(), approver.getLogin());
+                    log.debug(
+                        "Review already CHANGES_REQUESTED, skipping: prId={}, reviewerId={}",
+                        pr.getId(),
+                        approver.getLogin()
+                    );
                     return;
                 }
                 review.setState(PullRequestReview.State.CHANGES_REQUESTED);
@@ -442,15 +445,21 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         if (existingReview.isEmpty()) {
             // No existing review for this reviewer — cannot safely attribute from note signal.
             // The sync path will create the review with correct attribution.
-            log.debug("No existing review to update from note signal, deferring to sync: prId={}, reviewer={}",
-                pr.getId(), reviewer.getLogin());
+            log.debug(
+                "No existing review to update from note signal, deferring to sync: prId={}, reviewer={}",
+                pr.getId(),
+                reviewer.getLogin()
+            );
             return;
         }
 
         PullRequestReview review = existingReview.get();
         if (review.getState() == PullRequestReview.State.CHANGES_REQUESTED) {
-            log.debug("Review already CHANGES_REQUESTED from note signal: prId={}, reviewer={}",
-                pr.getId(), reviewer.getLogin());
+            log.debug(
+                "Review already CHANGES_REQUESTED from note signal: prId={}, reviewer={}",
+                pr.getId(),
+                reviewer.getLogin()
+            );
             return;
         }
         review.setState(PullRequestReview.State.CHANGES_REQUESTED);
@@ -459,11 +468,13 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         reviewRepository.save(review);
 
         EventPayload.ReviewData.from(review).ifPresent(reviewData ->
-            eventPublisher.publishEvent(new DomainEvent.ReviewSubmitted(
-                reviewData, EventContext.from(context)))
+            eventPublisher.publishEvent(new DomainEvent.ReviewSubmitted(reviewData, EventContext.from(context)))
         );
-        log.info("Updated review to CHANGES_REQUESTED (from note signal): prId={}, reviewer={}",
-            pr.getId(), reviewer.getLogin());
+        log.info(
+            "Updated review to CHANGES_REQUESTED (from note signal): prId={}, reviewer={}",
+            pr.getId(),
+            reviewer.getLogin()
+        );
     }
 
     // ========================================================================
@@ -864,11 +875,17 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
                     existingReview.setSubmittedAt(Instant.now());
                     existingReview.setUpdatedAt(Instant.now());
                     reviewRepository.save(existingReview);
-                    log.debug("Updated review to APPROVED from sync: prId={}, reviewerId={}", pr.getId(), user.getLogin());
+                    log.debug(
+                        "Updated review to APPROVED from sync: prId={}, reviewerId={}",
+                        pr.getId(),
+                        user.getLogin()
+                    );
 
                     if (ctx != null) {
                         EventPayload.ReviewData.from(existingReview).ifPresent(reviewData ->
-                            eventPublisher.publishEvent(new DomainEvent.ReviewSubmitted(reviewData, EventContext.from(ctx)))
+                            eventPublisher.publishEvent(
+                                new DomainEvent.ReviewSubmitted(reviewData, EventContext.from(ctx))
+                            )
                         );
                     }
                 }
@@ -902,7 +919,11 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             stale.setSubmittedAt(Instant.now());
             stale.setUpdatedAt(Instant.now());
             reviewRepository.save(stale);
-            log.debug("Updated stale review to CHANGES_REQUESTED from sync: prId={}, nativeId={}", pr.getId(), stale.getNativeId());
+            log.debug(
+                "Updated stale review to CHANGES_REQUESTED from sync: prId={}, nativeId={}",
+                pr.getId(),
+                stale.getNativeId()
+            );
 
             if (ctx != null) {
                 EventPayload.ReviewData.from(stale).ifPresent(reviewData ->
