@@ -323,20 +323,22 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
 
         @Test
         @DisplayName("deletes review on 'unapproved' event")
-        void unapproveMergeRequest_deletesReview() throws Exception {
+        void unapproveMergeRequest_updatesToChangesRequested() throws Exception {
             // Create MR !4 and approve it
             handler.handleEvent(loadPayload("merge_request.approved"));
             eventListener.clear();
 
-            // Unapprove MR !4
+            // Unapprove MR !4 — should update to CHANGES_REQUESTED (not delete)
             handler.handleEvent(loadPayload("merge_request.unapproved"));
 
             transactionTemplate.executeWithoutResult(status -> {
                 long nativeId = GitLabMergeRequestProcessor.generateApprovalNativeId(NATIVE_MR4_ID, NATIVE_APPROVER_ID);
-                assertThat(reviewRepository.findByNativeIdAndProviderId(nativeId, savedProvider.getId())).isEmpty();
+                var review = reviewRepository.findByNativeIdAndProviderId(nativeId, savedProvider.getId());
+                assertThat(review).isPresent();
+                assertThat(review.get().getState()).isEqualTo(PullRequestReview.State.CHANGES_REQUESTED);
             });
 
-            assertThat(eventListener.getReviewDismissedEvents()).hasSize(1);
+            assertThat(eventListener.getReviewSubmittedEvents()).hasSize(1);
         }
     }
 
@@ -420,13 +422,15 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
                 assertThat(reviewRepository.findByNativeIdAndProviderId(nativeId, savedProvider.getId())).isPresent();
             });
 
-            // Unapprove MR !4
+            // Unapprove MR !4 — should update to CHANGES_REQUESTED (not delete)
             handler.handleEvent(loadPayload("merge_request.unapproved"));
-            assertThat(eventListener.getReviewDismissedEvents()).hasSize(1);
+            assertThat(eventListener.getReviewSubmittedEvents()).hasSize(2); // 1 from approve + 1 from unapprove
 
             transactionTemplate.executeWithoutResult(status -> {
                 long nativeId = GitLabMergeRequestProcessor.generateApprovalNativeId(NATIVE_MR4_ID, NATIVE_APPROVER_ID);
-                assertThat(reviewRepository.findByNativeIdAndProviderId(nativeId, savedProvider.getId())).isEmpty();
+                var review = reviewRepository.findByNativeIdAndProviderId(nativeId, savedProvider.getId());
+                assertThat(review).isPresent();
+                assertThat(review.get().getState()).isEqualTo(PullRequestReview.State.CHANGES_REQUESTED);
             });
         }
 
@@ -552,9 +556,9 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
 
             eventListener.clear();
 
-            // Unapprove -> ReviewDismissed
+            // Unapprove -> ReviewSubmitted (CHANGES_REQUESTED)
             handler.handleEvent(loadPayload("merge_request.unapproved"));
-            assertThat(eventListener.getReviewDismissedEvents()).hasSize(1);
+            assertThat(eventListener.getReviewSubmittedEvents()).hasSize(1);
         }
     }
 
