@@ -340,7 +340,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         var existingReview = reviewRepository.findByNativeIdAndProviderId(approvalNativeId, context.providerId());
 
         if (existingReview.isPresent()) {
-            // Re-approval: update existing review (may be CHANGES_REQUESTED from prior unapproval)
+            // Re-approval: update existing review (may be DISMISSED from unapproval or CHANGES_REQUESTED)
             PullRequestReview review = existingReview.get();
             if (review.getState() != PullRequestReview.State.APPROVED) {
                 review.setState(PullRequestReview.State.APPROVED);
@@ -371,10 +371,16 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
     /**
      * Process an unapproval event.
      *
-     * <p>Maps GitLab "unapproval" to CHANGES_REQUESTED state instead of deleting
-     * the review. This bridges the GitLab/GitHub model gap: GitLab's unapproval
-     * semantically means "this needs changes before I approve again", which is the
-     * closest equivalent to GitHub's CHANGES_REQUESTED review state.
+     * <p>Dismisses the existing approval review. Unapproval means "I retract my approval"
+     * — it does NOT mean "I request changes." These are distinct actions in GitLab:
+     * <ul>
+     *   <li><b>Unapproval</b> ({@code unapproved} webhook): revokes an existing approval.
+     *       Fires when the user clicks "Revoke approval" or when the system auto-revokes
+     *       after new commits. The review transitions to DISMISSED.</li>
+     *   <li><b>Request changes</b> (detected via note {@code detailed_merge_status}):
+     *       explicitly blocks the MR. Handled by
+     *       {@link #processRequestedChangesFromNote}.</li>
+     * </ul>
      */
     @Transactional
     @Nullable
@@ -389,28 +395,23 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         reviewRepository
             .findByNativeIdAndProviderId(approvalNativeId, context.providerId())
             .ifPresent(review -> {
-                // Idempotency: skip if already in CHANGES_REQUESTED state
-                if (review.getState() == PullRequestReview.State.CHANGES_REQUESTED) {
+                if (review.getState() == PullRequestReview.State.DISMISSED) {
                     log.debug(
-                        "Review already CHANGES_REQUESTED, skipping: prId={}, reviewerId={}",
+                        "Review already DISMISSED, skipping: prId={}, reviewerId={}",
                         pr.getId(),
                         approver.getLogin()
                     );
                     return;
                 }
-                review.setState(PullRequestReview.State.CHANGES_REQUESTED);
-                review.setSubmittedAt(Instant.now());
+                review.setState(PullRequestReview.State.DISMISSED);
+                review.setDismissed(true);
                 review.setUpdatedAt(Instant.now());
                 reviewRepository.save(review);
 
                 EventPayload.ReviewData.from(review).ifPresent(reviewData ->
-                    eventPublisher.publishEvent(new DomainEvent.ReviewSubmitted(reviewData, EventContext.from(context)))
+                    eventPublisher.publishEvent(new DomainEvent.ReviewDismissed(reviewData, EventContext.from(context)))
                 );
-                log.debug(
-                    "Updated review to CHANGES_REQUESTED (unapproval): prId={}, reviewerId={}",
-                    pr.getId(),
-                    approver.getLogin()
-                );
+                log.debug("Dismissed review (unapproval): prId={}, reviewerId={}", pr.getId(), approver.getLogin());
             });
 
         return pr;
@@ -904,7 +905,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             }
         }
 
-        // Transition stale approval reviews to CHANGES_REQUESTED (user no longer in approvedBy)
+        // Dismiss stale approval reviews (user no longer in approvedBy — approval was revoked)
         // Only target reviews from this provider with APPROVED state
         Set<PullRequestReview> staleReviews = pr
             .getReviews()
@@ -915,19 +916,15 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             .collect(Collectors.toSet());
 
         for (PullRequestReview stale : staleReviews) {
-            stale.setState(PullRequestReview.State.CHANGES_REQUESTED);
-            stale.setSubmittedAt(Instant.now());
+            stale.setState(PullRequestReview.State.DISMISSED);
+            stale.setDismissed(true);
             stale.setUpdatedAt(Instant.now());
             reviewRepository.save(stale);
-            log.debug(
-                "Updated stale review to CHANGES_REQUESTED from sync: prId={}, nativeId={}",
-                pr.getId(),
-                stale.getNativeId()
-            );
+            log.debug("Dismissed stale review from sync: prId={}, nativeId={}", pr.getId(), stale.getNativeId());
 
             if (ctx != null) {
                 EventPayload.ReviewData.from(stale).ifPresent(reviewData ->
-                    eventPublisher.publishEvent(new DomainEvent.ReviewSubmitted(reviewData, EventContext.from(ctx)))
+                    eventPublisher.publishEvent(new DomainEvent.ReviewDismissed(reviewData, EventContext.from(ctx)))
                 );
             }
         }

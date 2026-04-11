@@ -690,8 +690,8 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("processUnapproved() updates review to CHANGES_REQUESTED and publishes ReviewSubmitted")
-        void processUnapprovedUpdatesReview() {
+        @DisplayName("processUnapproved() dismisses review and publishes ReviewDismissed")
+        void processUnapprovedDismissesReview() {
             PullRequest pr = createPullRequestEntity();
             pr.setNativeId(RAW_MR_ID);
             // 2 calls: stale+isNew check (process), post-upsert fetch (upsertMergeRequest)
@@ -727,19 +727,20 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
 
             assertThat(result).isNotNull();
 
-            // Verify the review was updated to CHANGES_REQUESTED and saved
-            assertThat(existingReview.getState()).isEqualTo(PullRequestReview.State.CHANGES_REQUESTED);
+            // Verify the review was dismissed and saved
+            assertThat(existingReview.getState()).isEqualTo(PullRequestReview.State.DISMISSED);
+            assertThat(existingReview.isDismissed()).isTrue();
             verify(reviewRepository).save(existingReview);
 
-            // ReviewSubmitted is published for the state change
+            // ReviewDismissed is published (not ReviewSubmitted)
             ArgumentCaptor<Object> eventCaptor = ArgumentCaptor.forClass(Object.class);
             verify(eventPublisher, atLeastOnce()).publishEvent(eventCaptor.capture());
 
-            boolean hasReviewSubmitted = eventCaptor
+            boolean hasReviewDismissed = eventCaptor
                 .getAllValues()
                 .stream()
-                .anyMatch(e -> e instanceof DomainEvent.ReviewSubmitted);
-            assertThat(hasReviewSubmitted).isTrue();
+                .anyMatch(e -> e instanceof DomainEvent.ReviewDismissed);
+            assertThat(hasReviewDismissed).isTrue();
         }
 
         @Test
@@ -955,8 +956,8 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("processUnapproved() is idempotent when review is already CHANGES_REQUESTED")
-        void processUnapproved_alreadyChangesRequested_isIdempotent() {
+        @DisplayName("processUnapproved() is idempotent when review is already DISMISSED")
+        void processUnapproved_alreadyDismissed_isIdempotent() {
             PullRequest pr = createPullRequestEntity();
             pr.setNativeId(RAW_MR_ID);
             when(pullRequestRepository.findByRepositoryIdAndNumber(REPO_ID, MR_IID))
@@ -972,11 +973,12 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
                 approver
             );
 
-            // Review already in CHANGES_REQUESTED state
+            // Review already in DISMISSED state
             long expectedNativeId = GitLabMergeRequestProcessor.generateApprovalNativeId(RAW_MR_ID, RAW_APPROVER_ID);
             PullRequestReview existingReview = new PullRequestReview();
             existingReview.setNativeId(expectedNativeId);
-            existingReview.setState(PullRequestReview.State.CHANGES_REQUESTED);
+            existingReview.setState(PullRequestReview.State.DISMISSED);
+            existingReview.setDismissed(true);
             existingReview.setHtmlUrl("https://gitlab.com/gitlab-org/gitlab/-/merge_requests/5#approvals");
             existingReview.setSubmittedAt(Instant.now());
             existingReview.setAuthor(approver);
@@ -991,19 +993,9 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
             PullRequest result = processor.processUnapproved(event, createContext());
 
             assertThat(result).isNotNull();
-            // Already CHANGES_REQUESTED — save() should NOT be called for the review
+            // Already DISMISSED — save() should NOT be called
             verify(reviewRepository, never()).save(any(PullRequestReview.class));
-            // State should remain CHANGES_REQUESTED
-            assertThat(existingReview.getState()).isEqualTo(PullRequestReview.State.CHANGES_REQUESTED);
-
-            // No ReviewSubmitted event for idempotent unapproval
-            ArgumentCaptor<Object> eventCaptor = ArgumentCaptor.forClass(Object.class);
-            verify(eventPublisher, atLeastOnce()).publishEvent(eventCaptor.capture());
-            boolean hasReviewSubmitted = eventCaptor
-                .getAllValues()
-                .stream()
-                .anyMatch(e -> e instanceof DomainEvent.ReviewSubmitted);
-            assertThat(hasReviewSubmitted).isFalse();
+            assertThat(existingReview.getState()).isEqualTo(PullRequestReview.State.DISMISSED);
         }
 
         @Test
@@ -1758,11 +1750,11 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
             processor.processFromSync(syncData, testRepo, 1L);
 
             // Verify new approval was created (save called for new review)
-            // and stale review was updated to CHANGES_REQUESTED (save called for stale review)
+            // and stale review was dismissed (save called for stale review)
             verify(reviewRepository, org.mockito.Mockito.atLeast(2)).save(any(PullRequestReview.class));
 
-            // Verify stale approval was transitioned to CHANGES_REQUESTED
-            assertThat(staleReview.getState()).isEqualTo(PullRequestReview.State.CHANGES_REQUESTED);
+            // Verify stale approval was dismissed (not CHANGES_REQUESTED — unapproval is distinct)
+            assertThat(staleReview.getState()).isEqualTo(PullRequestReview.State.DISMISSED);
         }
     }
 
