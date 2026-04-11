@@ -17,6 +17,7 @@ import de.tum.in.www1.hephaestus.gitprovider.issue.IssueRepository;
 import de.tum.in.www1.hephaestus.gitprovider.issuecomment.IssueCommentRepository;
 import de.tum.in.www1.hephaestus.gitprovider.project.ProjectRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequest;
+import de.tum.in.www1.hephaestus.gitprovider.pullrequest.PullRequestRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReview;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreview.PullRequestReviewRepository;
 import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewthread.PullRequestReviewThreadRepository;
@@ -53,6 +54,9 @@ class ActivityEventListenerTest extends BaseUnitTest {
 
     @Mock
     private PullRequestReviewRepository reviewRepository;
+
+    @Mock
+    private PullRequestRepository pullRequestRepository;
 
     @Mock
     private IssueCommentRepository issueCommentRepository;
@@ -98,6 +102,7 @@ class ActivityEventListenerTest extends BaseUnitTest {
             activityEventService,
             experiencePointCalculator,
             reviewRepository,
+            pullRequestRepository,
             issueCommentRepository,
             reviewThreadRepository,
             userRepository,
@@ -695,6 +700,202 @@ class ActivityEventListenerTest extends BaseUnitTest {
                 any(Instant.class),
                 eq(ActivityTargetType.DISCUSSION),
                 eq(36L)
+            );
+        }
+    }
+
+    @Nested
+    @DisplayName("Review Comment Created Event")
+    class ReviewCommentCreatedTests {
+
+        @Test
+        @DisplayName("standalone comment (reviewId=null) awards XP from calculator")
+        void onReviewCommentCreated_standaloneComment_awardsXp() {
+            PullRequest pullRequest = createPullRequest(50L);
+            // Different author so it's not a self-review
+            User prAuthor = new User();
+            prAuthor.setId(999L);
+            prAuthor.setLogin("pr-author");
+            pullRequest.setAuthor(prAuthor);
+
+            when(pullRequestRepository.findById(50L)).thenReturn(Optional.of(pullRequest));
+            when(experiencePointCalculator.calculateStandaloneReviewCommentXp(any(), any(), anyInt()))
+                .thenReturn(0.5);
+
+            var commentData = new EventPayload.ReviewCommentData(
+                77L,         // id
+                "This is a substantive review comment with enough length",  // body
+                "src/Main.java", // path
+                42,          // line
+                "https://github.com/test/test-repo/pull/1#discussion_r77", // htmlUrl
+                null,        // reviewId - null = standalone
+                100L,        // authorId
+                Instant.now(), // createdAt
+                50L,         // pullRequestId
+                200L         // repositoryId
+            );
+            var event = new DomainEvent.ReviewCommentCreated(commentData, 50L, createContext());
+
+            listener.onReviewCommentCreated(event);
+
+            verify(pullRequestRepository).findById(50L);
+            verify(experiencePointCalculator).calculateStandaloneReviewCommentXp(
+                eq(pullRequest), eq(100L), anyInt()
+            );
+            verify(activityEventService).record(
+                eq(42L),
+                eq(ActivityEventType.REVIEW_COMMENT_CREATED),
+                any(Instant.class),
+                eq(testUser),
+                eq(testRepository),
+                eq(ActivityTargetType.REVIEW_COMMENT),
+                eq(77L),
+                eq(0.5)
+            );
+        }
+
+        @Test
+        @DisplayName("comment linked to review (reviewId!=null) awards zero XP")
+        void onReviewCommentCreated_linkedToReview_awardsZeroXp() {
+            var commentData = new EventPayload.ReviewCommentData(
+                78L,         // id
+                "Some comment",  // body
+                "src/Main.java", // path
+                10,          // line
+                "https://github.com/test/test-repo/pull/1#discussion_r78", // htmlUrl
+                42L,         // reviewId - linked to review
+                100L,        // authorId
+                Instant.now(), // createdAt
+                50L,         // pullRequestId
+                200L         // repositoryId
+            );
+            var event = new DomainEvent.ReviewCommentCreated(commentData, 50L, createContext());
+
+            listener.onReviewCommentCreated(event);
+
+            // pullRequestRepository.findById should never be called for linked comments
+            verify(pullRequestRepository, never()).findById(any());
+            verify(activityEventService).record(
+                eq(42L),
+                eq(ActivityEventType.REVIEW_COMMENT_CREATED),
+                any(Instant.class),
+                eq(testUser),
+                eq(testRepository),
+                eq(ActivityTargetType.REVIEW_COMMENT),
+                eq(78L),
+                eq(0.0)
+            );
+        }
+
+        @Test
+        @DisplayName("skips recording when scopeId is null")
+        void onReviewCommentCreated_nullScopeId_skips() {
+            var commentData = new EventPayload.ReviewCommentData(
+                79L, "body", "path.java", 1,
+                "https://example.com/comment",
+                null, 100L, Instant.now(), 50L, 200L
+            );
+            RepositoryRef repoRef = new RepositoryRef(testRepository.getId(), testRepository.getName(), "test");
+            EventContext contextWithNullScope = new EventContext(
+                UUID.randomUUID(),
+                Instant.now(),
+                null, // null scopeId
+                repoRef,
+                DataSource.WEBHOOK,
+                null,
+                UUID.randomUUID().toString(),
+                null
+            );
+            var event = new DomainEvent.ReviewCommentCreated(commentData, 50L, contextWithNullScope);
+
+            listener.onReviewCommentCreated(event);
+
+            verifyNoInteractions(activityEventService);
+        }
+
+        @Test
+        @DisplayName("skips recording when authorId is null")
+        void onReviewCommentCreated_nullAuthorId_skips() {
+            var commentData = new EventPayload.ReviewCommentData(
+                80L, "body", "path.java", 1,
+                "https://example.com/comment",
+                null,  // reviewId
+                null,  // authorId - null
+                Instant.now(), 50L, 200L
+            );
+            var event = new DomainEvent.ReviewCommentCreated(commentData, 50L, createContext());
+
+            listener.onReviewCommentCreated(event);
+
+            verifyNoInteractions(activityEventService);
+        }
+
+        @Test
+        @DisplayName("standalone comment with PR not found records zero XP")
+        void onReviewCommentCreated_prNotFound_recordsZeroXp() {
+            when(pullRequestRepository.findById(999L)).thenReturn(Optional.empty());
+
+            var commentData = new EventPayload.ReviewCommentData(
+                81L,
+                "This comment's PR doesn't exist yet",
+                "src/Main.java",
+                1,
+                "https://example.com/comment",
+                null,  // reviewId - standalone
+                100L,  // authorId
+                Instant.now(),
+                999L,  // pullRequestId - not found
+                200L
+            );
+            var event = new DomainEvent.ReviewCommentCreated(commentData, 999L, createContext());
+
+            listener.onReviewCommentCreated(event);
+
+            verify(pullRequestRepository).findById(999L);
+            verify(activityEventService).record(
+                eq(42L),
+                eq(ActivityEventType.REVIEW_COMMENT_CREATED),
+                any(Instant.class),
+                eq(testUser),
+                eq(testRepository),
+                eq(ActivityTargetType.REVIEW_COMMENT),
+                eq(81L),
+                eq(0.0) // Zero XP because PR not found
+            );
+        }
+
+        @Test
+        @DisplayName("standalone comment with null body passes 0 as body length")
+        void onReviewCommentCreated_nullBody_passesZeroLength() {
+            PullRequest pullRequest = createPullRequest(50L);
+            User prAuthor = new User();
+            prAuthor.setId(999L);
+            prAuthor.setLogin("pr-author");
+            pullRequest.setAuthor(prAuthor);
+
+            when(pullRequestRepository.findById(50L)).thenReturn(Optional.of(pullRequest));
+            when(experiencePointCalculator.calculateStandaloneReviewCommentXp(any(), any(), eq(0)))
+                .thenReturn(0.25);
+
+            var commentData = new EventPayload.ReviewCommentData(
+                82L,
+                null,  // null body
+                "src/Main.java",
+                1,
+                "https://example.com/comment",
+                null,  // reviewId - standalone
+                100L,
+                Instant.now(),
+                50L,
+                200L
+            );
+            var event = new DomainEvent.ReviewCommentCreated(commentData, 50L, createContext());
+
+            listener.onReviewCommentCreated(event);
+
+            // Verify body length 0 was passed to calculator (not NPE)
+            verify(experiencePointCalculator).calculateStandaloneReviewCommentXp(
+                eq(pullRequest), eq(100L), eq(0)
             );
         }
     }

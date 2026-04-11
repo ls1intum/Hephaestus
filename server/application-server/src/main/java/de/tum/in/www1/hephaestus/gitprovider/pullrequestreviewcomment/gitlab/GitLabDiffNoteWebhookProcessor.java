@@ -34,13 +34,13 @@ import org.springframework.transaction.annotation.Transactional;
  * When a diff note webhook arrives, we:
  * <ol>
  *   <li>Find the parent MR (PullRequest) by repository + IID</li>
- *   <li>Create/find a thread using the note ID as nativeId (webhooks don't carry discussion IDs)</li>
+ *   <li>Create/find a thread using the discussion_id from the webhook payload</li>
  *   <li>Create the review comment within that thread</li>
  * </ol>
  * <p>
- * Note: Webhook diff notes don't carry discussion/thread IDs, so we use the note ID
- * itself as the thread native ID for the root note. The full discussion structure is
- * reconciled during GraphQL sync via {@link GitLabDiscussionSyncService}.
+ * Note: GitLab webhook payloads include {@code discussion_id} in {@code object_attributes},
+ * which uniquely identifies the discussion thread. Reply notes to the same discussion share
+ * the same discussion_id, enabling correct thread grouping without waiting for GraphQL sync.
  */
 @Service
 @ConditionalOnProperty(prefix = "hephaestus.gitlab", name = "enabled", havingValue = "true")
@@ -92,14 +92,18 @@ public class GitLabDiffNoteWebhookProcessor extends BaseGitLabProcessor {
             return null;
         }
 
-        // Find parent MR
+        // Find parent MR, creating a minimal stub if it doesn't exist yet
+        // (diff note webhooks can arrive before the MR webhook)
         PullRequest pr = pullRequestRepository
             .findByRepositoryIdAndNumber(context.repository().getId(), embeddedMr.iid())
             .orElse(null);
 
         if (pr == null) {
-            log.warn("Skipped diff note: reason=mrNotFound, mrIid={}, noteId={}", embeddedMr.iid(), attrs.id());
-            return null;
+            pr = createMinimalPullRequestWithRetry(embeddedMr, context);
+            if (pr == null) {
+                log.warn("Skipped diff note: reason=failedToCreateParent, mrIid={}, noteId={}", embeddedMr.iid(), attrs.id());
+                return null;
+            }
         }
 
         GitProvider provider = context.provider();
@@ -134,11 +138,20 @@ public class GitLabDiffNoteWebhookProcessor extends BaseGitLabProcessor {
         Instant createdAt = parseWebhookTimestamp(attrs.createdAt());
         Instant updatedAt = parseWebhookTimestamp(attrs.updatedAt());
 
-        // Create a synthetic thread for this diff note via the thread processor.
-        // Webhooks don't provide the discussion ID, so we use the note ID as the thread nativeId.
-        // The GraphQL discussion sync will reconcile this into the proper discussion later.
+        // Use the discussion_id from the webhook as the thread nativeId.
+        // This correctly groups reply notes into the same thread and matches the
+        // GraphQL sync's discussion-based threads. Falls back to note ID if absent.
+        long threadNativeId;
+        if (attrs.discussionId() != null) {
+            // Build the same GID format as the GraphQL sync uses, then hash with the same algorithm
+            String discussionGid = "gid://gitlab/Discussion/" + attrs.discussionId();
+            threadNativeId = GitLabPullRequestReviewThreadProcessor.deterministicNativeId(discussionGid);
+        } else {
+            log.warn("Diff note webhook missing discussion_id, falling back to note ID: noteId={}", attrs.id());
+            threadNativeId = attrs.id();
+        }
         var webhookThreadData = new GitLabPullRequestReviewThreadProcessor.WebhookThreadData(
-            attrs.id(),
+            threadNativeId,
             threadPath,
             threadLine,
             createdAt,
@@ -189,5 +202,77 @@ public class GitLabDiffNoteWebhookProcessor extends BaseGitLabProcessor {
         // Delegates to BaseGitLabProcessor which handles both webhook format
         // ("2026-01-31 19:03:35 +0100") and ISO-8601 ("2026-01-31T19:03:35Z")
         return parseGitLabTimestamp(value);
+    }
+
+    /**
+     * Creates a minimal stub PullRequest from the embedded MR data in a note webhook,
+     * with retry on concurrent creation (DataIntegrityViolationException).
+     */
+    @Nullable
+    private PullRequest createMinimalPullRequestWithRetry(
+        GitLabNoteEventDTO.EmbeddedMergeRequest dto,
+        ProcessingContext context
+    ) {
+        try {
+            return createMinimalPullRequest(dto, context);
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            log.debug("Concurrent MR creation, looking up: iid={}", dto.iid());
+            return pullRequestRepository
+                .findByRepositoryIdAndNumber(context.repository().getId(), dto.iid())
+                .orElse(null);
+        }
+    }
+
+    @Nullable
+    private PullRequest createMinimalPullRequest(
+        GitLabNoteEventDTO.EmbeddedMergeRequest dto,
+        ProcessingContext context
+    ) {
+        de.tum.in.www1.hephaestus.gitprovider.repository.Repository repository = context.repository();
+        if (repository == null || dto.id() == null) return null;
+
+        de.tum.in.www1.hephaestus.gitprovider.issue.Issue.State mappedState = convertMrState(dto.state());
+
+        PullRequest pr = new PullRequest();
+        pr.setNativeId(dto.id());
+        pr.setProvider(context.provider());
+        pr.setNumber(dto.iid());
+        pr.setTitle(sanitize(dto.title()));
+        pr.setBody(sanitize(dto.description()));
+        pr.setState(mappedState);
+        pr.setHtmlUrl(dto.url());
+        pr.setDraft(dto.draft());
+        pr.setMerged(mappedState == de.tum.in.www1.hephaestus.gitprovider.issue.Issue.State.MERGED);
+        pr.setAdditions(0);
+        pr.setDeletions(0);
+        pr.setChangedFiles(0);
+        pr.setCommits(0);
+        pr.setHeadRefName(dto.sourceBranch());
+        pr.setBaseRefName(dto.targetBranch());
+        pr.setCreatedAt(parseGitLabTimestamp(dto.createdAt()));
+        pr.setUpdatedAt(parseGitLabTimestamp(dto.updatedAt()));
+        pr.setRepository(repository);
+        pr.setLastSyncAt(Instant.now());
+
+        PullRequest saved = pullRequestRepository.save(pr);
+        log.info(
+            "Created stub PullRequest from diff note webhook: prId={}, iid={}, repo={}",
+            saved.getId(),
+            saved.getNumber(),
+            repository.getNameWithOwner()
+        );
+        return saved;
+    }
+
+    private static de.tum.in.www1.hephaestus.gitprovider.issue.Issue.State convertMrState(
+        @Nullable String state
+    ) {
+        if (state == null) return de.tum.in.www1.hephaestus.gitprovider.issue.Issue.State.OPEN;
+        return switch (state.toLowerCase()) {
+            case "opened" -> de.tum.in.www1.hephaestus.gitprovider.issue.Issue.State.OPEN;
+            case "closed" -> de.tum.in.www1.hephaestus.gitprovider.issue.Issue.State.CLOSED;
+            case "merged" -> de.tum.in.www1.hephaestus.gitprovider.issue.Issue.State.MERGED;
+            default -> de.tum.in.www1.hephaestus.gitprovider.issue.Issue.State.OPEN;
+        };
     }
 }

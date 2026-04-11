@@ -29,6 +29,7 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -322,6 +323,9 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
 
     /**
      * Process an approval event.
+     *
+     * <p>Creates a new APPROVED review or updates an existing review (e.g., from
+     * CHANGES_REQUESTED after a previous unapproval) to APPROVED state.
      */
     @Transactional
     @Nullable
@@ -333,7 +337,24 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         if (approver == null) return pr;
 
         long approvalNativeId = generateApprovalNativeId(pr.getNativeId(), approver.getNativeId());
-        if (reviewRepository.findByNativeIdAndProviderId(approvalNativeId, context.providerId()).isEmpty()) {
+        var existingReview = reviewRepository.findByNativeIdAndProviderId(approvalNativeId, context.providerId());
+
+        if (existingReview.isPresent()) {
+            // Re-approval: update existing review (may be CHANGES_REQUESTED from prior unapproval)
+            PullRequestReview review = existingReview.get();
+            if (review.getState() != PullRequestReview.State.APPROVED) {
+                review.setState(PullRequestReview.State.APPROVED);
+                review.setSubmittedAt(Instant.now());
+                review.setUpdatedAt(Instant.now());
+                reviewRepository.save(review);
+
+                EventPayload.ReviewData.from(review).ifPresent(reviewData ->
+                    eventPublisher.publishEvent(new DomainEvent.ReviewSubmitted(reviewData, EventContext.from(context)))
+                );
+                log.debug("Updated review to APPROVED: prId={}, reviewerId={}", pr.getId(), approver.getLogin());
+            }
+        } else {
+            // First approval: create new review
             PullRequestReview review = createApprovalReview(approvalNativeId, pr, approver);
             reviewRepository.save(review);
             pr.addReview(review);
@@ -349,6 +370,11 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
 
     /**
      * Process an unapproval event.
+     *
+     * <p>Maps GitLab "unapproval" to CHANGES_REQUESTED state instead of deleting
+     * the review. This bridges the GitLab/GitHub model gap: GitLab's unapproval
+     * semantically means "this needs changes before I approve again", which is the
+     * closest equivalent to GitHub's CHANGES_REQUESTED review state.
      */
     @Transactional
     @Nullable
@@ -363,17 +389,81 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         reviewRepository
             .findByNativeIdAndProviderId(approvalNativeId, context.providerId())
             .ifPresent(review -> {
-                // Capture event payload BEFORE removeReview() nullifies the PR back-reference
-                var reviewData = EventPayload.ReviewData.from(review);
-                pr.removeReview(review);
-                reviewRepository.delete(review);
-                reviewData.ifPresent(data ->
-                    eventPublisher.publishEvent(new DomainEvent.ReviewDismissed(data, EventContext.from(context)))
+                // Idempotency: skip if already in CHANGES_REQUESTED state
+                if (review.getState() == PullRequestReview.State.CHANGES_REQUESTED) {
+                    log.debug("Review already CHANGES_REQUESTED, skipping: prId={}, reviewerId={}",
+                        pr.getId(), approver.getLogin());
+                    return;
+                }
+                review.setState(PullRequestReview.State.CHANGES_REQUESTED);
+                review.setSubmittedAt(Instant.now());
+                review.setUpdatedAt(Instant.now());
+                reviewRepository.save(review);
+
+                EventPayload.ReviewData.from(review).ifPresent(reviewData ->
+                    eventPublisher.publishEvent(new DomainEvent.ReviewSubmitted(reviewData, EventContext.from(context)))
                 );
-                log.debug("Removed approval review: prId={}, reviewerId={}", pr.getId(), approver.getLogin());
+                log.debug(
+                    "Updated review to CHANGES_REQUESTED (unapproval): prId={}, reviewerId={}",
+                    pr.getId(),
+                    approver.getLogin()
+                );
             });
 
         return pr;
+    }
+
+    /**
+     * Updates an existing review to CHANGES_REQUESTED when detected from a note event.
+     *
+     * <p>GitLab's "Request changes" feature (Premium, GA 17.3) does NOT fire a dedicated
+     * MR webhook. Instead, note events from the batch review carry
+     * {@code merge_request.detailed_merge_status = "requested_changes"}.
+     * This method is called from the note handler when that signal is detected.
+     *
+     * <p><b>Important:</b> This method only UPDATES existing reviews — it does NOT create
+     * new ones. The {@code detailed_merge_status} is an MR-level status that persists on
+     * ALL subsequent note events (not just notes from the reviewer who requested changes).
+     * Creating new reviews from this signal would cause false positives: any commenter on
+     * an MR with active change requests would be falsely attributed. New CHANGES_REQUESTED
+     * reviews without a prior approval are created by the GraphQL sync path instead.
+     *
+     * @param pr the pull request
+     * @param reviewer the user who requested changes (note author)
+     * @param context the processing context
+     */
+    @Transactional
+    public void processRequestedChangesFromNote(PullRequest pr, User reviewer, ProcessingContext context) {
+        if (pr.getNativeId() == null || reviewer.getNativeId() == null) return;
+
+        long approvalNativeId = generateApprovalNativeId(pr.getNativeId(), reviewer.getNativeId());
+        var existingReview = reviewRepository.findByNativeIdAndProviderId(approvalNativeId, context.providerId());
+
+        if (existingReview.isEmpty()) {
+            // No existing review for this reviewer — cannot safely attribute from note signal.
+            // The sync path will create the review with correct attribution.
+            log.debug("No existing review to update from note signal, deferring to sync: prId={}, reviewer={}",
+                pr.getId(), reviewer.getLogin());
+            return;
+        }
+
+        PullRequestReview review = existingReview.get();
+        if (review.getState() == PullRequestReview.State.CHANGES_REQUESTED) {
+            log.debug("Review already CHANGES_REQUESTED from note signal: prId={}, reviewer={}",
+                pr.getId(), reviewer.getLogin());
+            return;
+        }
+        review.setState(PullRequestReview.State.CHANGES_REQUESTED);
+        review.setSubmittedAt(Instant.now());
+        review.setUpdatedAt(Instant.now());
+        reviewRepository.save(review);
+
+        EventPayload.ReviewData.from(review).ifPresent(reviewData ->
+            eventPublisher.publishEvent(new DomainEvent.ReviewSubmitted(
+                reviewData, EventContext.from(context)))
+        );
+        log.info("Updated review to CHANGES_REQUESTED (from note signal): prId={}, reviewer={}",
+            pr.getId(), reviewer.getLogin());
     }
 
     // ========================================================================
@@ -693,7 +783,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             case "broken_status", "ci_must_pass", "ci_still_running" -> "UNSTABLE";
             case "checking" -> "UNKNOWN";
             case "conflict", "need_rebase" -> "DIRTY";
-            case "not_approved", "blocked_status", "policies_denied" -> "BLOCKED";
+            case "not_approved", "blocked_status", "policies_denied", "requested_changes" -> "BLOCKED";
             case "not_open" -> "BEHIND";
             default -> "UNKNOWN";
         };
@@ -743,14 +833,14 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
     ) {
         if (syncApprovers == null) return;
 
-        // Pre-load existing review nativeIds in memory to avoid N+1 lookups
-        Set<Long> existingNativeIds = pr
+        Set<Long> expectedNativeIds = new HashSet<>();
+
+        // Map existing reviews by nativeId for efficient lookup
+        Map<Long, PullRequestReview> existingReviewsByNativeId = pr
             .getReviews()
             .stream()
-            .map(PullRequestReview::getNativeId)
-            .collect(Collectors.toSet());
-
-        Set<Long> expectedNativeIds = new HashSet<>();
+            .filter(r -> r.getProvider() != null && r.getProvider().getId().equals(providerId))
+            .collect(Collectors.toMap(PullRequestReview::getNativeId, r -> r, (a, b) -> a));
 
         for (SyncUserData approver : syncApprovers) {
             User user = findOrCreateUser(
@@ -766,13 +856,29 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             long approvalNativeId = generateApprovalNativeId(pr.getNativeId(), user.getNativeId());
             expectedNativeIds.add(approvalNativeId);
 
-            if (!existingNativeIds.contains(approvalNativeId)) {
+            PullRequestReview existingReview = existingReviewsByNativeId.get(approvalNativeId);
+            if (existingReview != null) {
+                // Review exists - update to APPROVED if it was CHANGES_REQUESTED
+                if (existingReview.getState() != PullRequestReview.State.APPROVED) {
+                    existingReview.setState(PullRequestReview.State.APPROVED);
+                    existingReview.setSubmittedAt(Instant.now());
+                    existingReview.setUpdatedAt(Instant.now());
+                    reviewRepository.save(existingReview);
+                    log.debug("Updated review to APPROVED from sync: prId={}, reviewerId={}", pr.getId(), user.getLogin());
+
+                    if (ctx != null) {
+                        EventPayload.ReviewData.from(existingReview).ifPresent(reviewData ->
+                            eventPublisher.publishEvent(new DomainEvent.ReviewSubmitted(reviewData, EventContext.from(ctx)))
+                        );
+                    }
+                }
+            } else {
+                // No review exists - create new
                 PullRequestReview review = createApprovalReview(approvalNativeId, pr, user);
                 reviewRepository.save(review);
                 pr.addReview(review);
                 log.debug("Created approval review from sync: prId={}, reviewerId={}", pr.getId(), user.getLogin());
 
-                // Emit activity event for the new approval
                 if (ctx != null) {
                     EventPayload.ReviewData.from(review).ifPresent(reviewData ->
                         eventPublisher.publishEvent(new DomainEvent.ReviewSubmitted(reviewData, EventContext.from(ctx)))
@@ -781,7 +887,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             }
         }
 
-        // Remove stale approval reviews (user no longer in approvedBy)
+        // Transition stale approval reviews to CHANGES_REQUESTED (user no longer in approvedBy)
         // Only target reviews from this provider with APPROVED state
         Set<PullRequestReview> staleReviews = pr
             .getReviews()
@@ -792,9 +898,17 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             .collect(Collectors.toSet());
 
         for (PullRequestReview stale : staleReviews) {
-            pr.removeReview(stale);
-            reviewRepository.delete(stale);
-            log.debug("Removed stale approval review from sync: prId={}, nativeId={}", pr.getId(), stale.getNativeId());
+            stale.setState(PullRequestReview.State.CHANGES_REQUESTED);
+            stale.setSubmittedAt(Instant.now());
+            stale.setUpdatedAt(Instant.now());
+            reviewRepository.save(stale);
+            log.debug("Updated stale review to CHANGES_REQUESTED from sync: prId={}, nativeId={}", pr.getId(), stale.getNativeId());
+
+            if (ctx != null) {
+                EventPayload.ReviewData.from(stale).ifPresent(reviewData ->
+                    eventPublisher.publishEvent(new DomainEvent.ReviewSubmitted(reviewData, EventContext.from(ctx)))
+                );
+            }
         }
     }
 
