@@ -26,6 +26,8 @@ export interface AdminSettingsPageProps {
 	leaderboardEnabled: boolean;
 	progressionEnabled: boolean;
 	leaguesEnabled: boolean;
+	practiceReviewAutoTriggerEnabled: boolean;
+	practiceReviewManualTriggerEnabled: boolean;
 	isSavingFeatures: boolean;
 	onToggleFeature: (feature: FeatureKey, enabled: boolean) => void;
 }
@@ -50,6 +52,8 @@ export function AdminSettingsPage({
 	leaderboardEnabled,
 	progressionEnabled,
 	leaguesEnabled,
+	practiceReviewAutoTriggerEnabled,
+	practiceReviewManualTriggerEnabled,
 	isSavingFeatures,
 	onToggleFeature,
 }: AdminSettingsPageProps) {
@@ -65,6 +69,8 @@ export function AdminSettingsPage({
 					leaderboardEnabled={leaderboardEnabled}
 					progressionEnabled={progressionEnabled}
 					leaguesEnabled={leaguesEnabled}
+					practiceReviewAutoTriggerEnabled={practiceReviewAutoTriggerEnabled}
+					practiceReviewManualTriggerEnabled={practiceReviewManualTriggerEnabled}
 					isSaving={isSavingFeatures}
 					onToggle={onToggleFeature}
 				/>

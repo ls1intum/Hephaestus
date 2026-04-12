@@ -115,8 +115,7 @@ services:
       # Git checkout (bind-mount repos into agent containers)
       GIT_CHECKOUT_ENABLED: ${GIT_CHECKOUT_ENABLED:-false}
       GIT_STORAGE_PATH: /data/git-repos
-      # Practice review gate
-      PRACTICE_REVIEW_AUTO_TRIGGER: ${PRACTICE_REVIEW_AUTO_TRIGGER:-true}
+      # Practice review gate (auto-trigger is now a per-workspace setting)
       PRACTICE_REVIEW_RUN_FOR_ALL: ${PRACTICE_REVIEW_FOR_ALL:-false}
       PRACTICE_REVIEW_SKIP_DRAFTS: ${PRACTICE_REVIEW_SKIP_DRAFTS:-true}
       PRACTICE_REVIEW_DELIVER_TO_MERGED: ${PRACTICE_REVIEW_DELIVER_TO_MERGED:-false}

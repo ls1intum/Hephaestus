@@ -782,6 +782,8 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
         assertThat(dto.achievementsEnabled()).isFalse();
         assertThat(dto.leaderboardEnabled()).isFalse();
         assertThat(dto.progressionEnabled()).isFalse();
+        assertThat(dto.practiceReviewAutoTriggerEnabled()).isTrue();
+        assertThat(dto.practiceReviewManualTriggerEnabled()).isTrue();
     }
 
     @Test
@@ -797,7 +799,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             .uri("/workspaces/{workspaceSlug}/features", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(true, true, true, true, true))
+            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(true, true, true, true, true, null, null))
             .exchange()
             .expectStatus()
             .isOk()
@@ -843,7 +845,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             .uri("/workspaces/{workspaceSlug}/features", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(null, null, true, null, null))
+            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(null, null, true, null, null, null, null))
             .exchange()
             .expectStatus()
             .isOk()
@@ -863,7 +865,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             .uri("/workspaces/{workspaceSlug}/features", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(true, null, null, null, null))
+            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(true, null, null, null, null, null, null))
             .exchange()
             .expectStatus()
             .isOk()
@@ -891,7 +893,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             .uri("/workspaces/{workspaceSlug}/features", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(true, true, true, true, true))
+            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(true, true, true, true, true, null, null))
             .exchange()
             .expectStatus()
             .isOk();
@@ -902,7 +904,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             .uri("/workspaces/{workspaceSlug}/features", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(null, false, null, null, null))
+            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(null, false, null, null, null, null, null))
             .exchange()
             .expectStatus()
             .isOk()
@@ -915,6 +917,72 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
         assertThat(afterDisable.achievementsEnabled()).isFalse();
         assertThat(afterDisable.leaderboardEnabled()).isTrue();
         assertThat(afterDisable.progressionEnabled()).isTrue();
+    }
+
+    @Test
+    @WithAdminUser
+    void updateFeaturesTriggerModesRoundTrip() {
+        User owner = persistUser("trigger-roundtrip-owner");
+        Workspace workspace = createWorkspace(
+            "trigger-roundtrip",
+            "Trigger Roundtrip",
+            "trigger-roundtrip",
+            AccountType.ORG,
+            owner
+        );
+        ensureAdminMembership(workspace);
+
+        // Defaults: auto=true, manual=true — disable auto only
+        WorkspaceDTO afterDisableAuto = webTestClient
+            .patch()
+            .uri("/workspaces/{workspaceSlug}/features", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(null, null, null, null, null, false, null))
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody(WorkspaceDTO.class)
+            .returnResult()
+            .getResponseBody();
+
+        assertThat(afterDisableAuto).isNotNull();
+        assertThat(afterDisableAuto.practiceReviewAutoTriggerEnabled()).isFalse();
+        assertThat(afterDisableAuto.practiceReviewManualTriggerEnabled()).isTrue();
+
+        // Disable manual, re-enable auto
+        WorkspaceDTO afterToggle = webTestClient
+            .patch()
+            .uri("/workspaces/{workspaceSlug}/features", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(null, null, null, null, null, true, false))
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody(WorkspaceDTO.class)
+            .returnResult()
+            .getResponseBody();
+
+        assertThat(afterToggle).isNotNull();
+        assertThat(afterToggle.practiceReviewAutoTriggerEnabled()).isTrue();
+        assertThat(afterToggle.practiceReviewManualTriggerEnabled()).isFalse();
+
+        // Verify via GET
+        WorkspaceDTO getResponse = webTestClient
+            .get()
+            .uri("/workspaces/{workspaceSlug}", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody(WorkspaceDTO.class)
+            .returnResult()
+            .getResponseBody();
+
+        assertThat(getResponse).isNotNull();
+        assertThat(getResponse.practiceReviewAutoTriggerEnabled()).isTrue();
+        assertThat(getResponse.practiceReviewManualTriggerEnabled()).isFalse();
     }
 
     @Test
@@ -932,7 +1000,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             .uri("/workspaces/{workspaceSlug}/features", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(true, true, true, true, true))
+            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(true, true, true, true, true, null, null))
             .exchange()
             .expectStatus()
             .isForbidden();
@@ -951,7 +1019,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
             .uri("/workspaces/{workspaceSlug}/features", workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(true, false, true, false, false))
+            .bodyValue(new UpdateWorkspaceFeaturesRequestDTO(true, false, true, false, false, null, null))
             .exchange()
             .expectStatus()
             .isOk();

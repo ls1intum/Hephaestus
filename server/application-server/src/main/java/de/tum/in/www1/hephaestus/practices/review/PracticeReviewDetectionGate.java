@@ -36,6 +36,8 @@ import org.springframework.stereotype.Service;
  * <ol>
  *   <li>Draft PR + {@code skipDrafts} config → SKIP</li>
  *   <li>Workspace resolution → SKIP if not found</li>
+ *   <li>Workspace {@code practicesEnabled} flag → SKIP if disabled (complete block)</li>
+ *   <li>Trigger mode: auto-trigger or manual-trigger workspace setting → SKIP if disabled</li>
  *   <li>No enabled agent config for workspace → SKIP</li>
  *   <li>No active practices match trigger event → SKIP</li>
  *   <li>{@code runForAllUsers} config → DETECT (bypass role check)</li>
@@ -86,7 +88,11 @@ public class PracticeReviewDetectionGate {
      * @param triggerEventName the domain event name (e.g., "PullRequestCreated", "ReviewSubmitted")
      * @return a {@link GateDecision} indicating whether to detect or skip (with reason)
      */
-    public GateDecision evaluate(@NonNull PullRequest pullRequest, @NonNull String triggerEventName) {
+    public GateDecision evaluate(
+        @NonNull PullRequest pullRequest,
+        @NonNull String triggerEventName,
+        @NonNull TriggerMode triggerMode
+    ) {
         // 1. Draft gate
         if (properties.skipDrafts() && pullRequest.isDraft()) {
             log.debug("Practice review gate: SKIP, reason=draftPR, prId={}", pullRequest.getId());
@@ -104,6 +110,36 @@ public class PracticeReviewDetectionGate {
                 nameWithOwner
             );
             return new GateDecision.Skip("no workspace");
+        }
+
+        // 2a. Practices feature must be enabled for the workspace (complete block)
+        if (!Boolean.TRUE.equals(workspace.getFeatures().getPracticesEnabled())) {
+            log.debug(
+                "Practice review gate: SKIP, reason=practicesDisabled, prId={}, workspaceId={}",
+                pullRequest.getId(),
+                workspace.getId()
+            );
+            return new GateDecision.Skip("practices disabled for workspace");
+        }
+
+        // 2b. Trigger-mode-specific workspace setting
+        if (triggerMode == TriggerMode.AUTO
+            && !Boolean.TRUE.equals(workspace.getFeatures().getPracticeReviewAutoTriggerEnabled())) {
+            log.debug(
+                "Practice review gate: SKIP, reason=autoTriggerDisabled, prId={}, workspaceId={}",
+                pullRequest.getId(),
+                workspace.getId()
+            );
+            return new GateDecision.Skip("auto-trigger disabled for workspace");
+        }
+        if (triggerMode == TriggerMode.MANUAL
+            && !Boolean.TRUE.equals(workspace.getFeatures().getPracticeReviewManualTriggerEnabled())) {
+            log.debug(
+                "Practice review gate: SKIP, reason=manualTriggerDisabled, prId={}, workspaceId={}",
+                pullRequest.getId(),
+                workspace.getId()
+            );
+            return new GateDecision.Skip("manual trigger disabled for workspace");
         }
 
         // 3. Agent config gate: at least one enabled agent config must exist

@@ -98,6 +98,7 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
         // Workspace with accountLogin = "org" so WorkspaceResolver heuristic matches "org/repo"
         workspace = WorkspaceTestFactory.activeWorkspace("gate-test");
         workspace.setAccountLogin("org");
+        workspace.getFeatures().setPracticesEnabled(true);
         workspace = workspaceRepository.save(workspace);
 
         // Agent config (enabled)
@@ -199,7 +200,7 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
             createPractice("pr-quality", "PR Quality", List.of("PullRequestCreated"), true);
             PullRequest pr = createPullRequest(false, Set.of(), Set.of(assignee));
 
-            GateDecision decision = gate.evaluate(pr, "PullRequestCreated");
+            GateDecision decision = gate.evaluate(pr, "PullRequestCreated", TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Detect.class);
             var detect = (GateDecision.Detect) decision;
@@ -214,7 +215,7 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
             createPractice("inactive-one", "Inactive", List.of("PullRequestCreated"), false);
             PullRequest pr = createPullRequest(false, Set.of(), Set.of(assignee));
 
-            GateDecision decision = gate.evaluate(pr, "PullRequestCreated");
+            GateDecision decision = gate.evaluate(pr, "PullRequestCreated", TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Detect.class);
             var detect = (GateDecision.Detect) decision;
@@ -228,7 +229,7 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
             createPractice("review-only", "Review Only", List.of("ReviewSubmitted"), true);
             PullRequest pr = createPullRequest(false, Set.of(), Set.of(assignee));
 
-            GateDecision decision = gate.evaluate(pr, "PullRequestCreated");
+            GateDecision decision = gate.evaluate(pr, "PullRequestCreated", TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Skip.class);
         }
@@ -241,7 +242,7 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
             createPractice("practice-c", "Practice C", List.of("ReviewSubmitted"), true);
             PullRequest pr = createPullRequest(false, Set.of(), Set.of(assignee));
 
-            GateDecision decision = gate.evaluate(pr, "PullRequestCreated");
+            GateDecision decision = gate.evaluate(pr, "PullRequestCreated", TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Detect.class);
             var detect = (GateDecision.Detect) decision;
@@ -263,7 +264,7 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
             createPractice("no-config", "No Config", List.of("PullRequestCreated"), true);
             PullRequest pr = createPullRequest(false, Set.of(), Set.of(assignee));
 
-            GateDecision decision = gate.evaluate(pr, "PullRequestCreated");
+            GateDecision decision = gate.evaluate(pr, "PullRequestCreated", TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Skip.class);
             assertThat(((GateDecision.Skip) decision).reason()).contains("agent config");
@@ -275,7 +276,7 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
             createPractice("wrong-event", "Wrong Event", List.of("ReviewSubmitted"), true);
             PullRequest pr = createPullRequest(false, Set.of(), Set.of(assignee));
 
-            GateDecision decision = gate.evaluate(pr, "PullRequestCreated");
+            GateDecision decision = gate.evaluate(pr, "PullRequestCreated", TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Skip.class);
             assertThat(((GateDecision.Skip) decision).reason()).contains("practices");
@@ -287,7 +288,7 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
             createPractice("draft-skip", "Draft Skip", List.of("PullRequestCreated"), true);
             PullRequest pr = createPullRequest(true, Set.of(), Set.of(assignee));
 
-            GateDecision decision = gate.evaluate(pr, "PullRequestCreated");
+            GateDecision decision = gate.evaluate(pr, "PullRequestCreated", TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Skip.class);
             assertThat(((GateDecision.Skip) decision).reason()).contains("draft");
@@ -304,7 +305,7 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
             createPractice("resolved", "Resolved", List.of("PullRequestCreated"), true);
             PullRequest pr = createPullRequest(false, Set.of(), Set.of(assignee));
 
-            GateDecision decision = gate.evaluate(pr, "PullRequestCreated");
+            GateDecision decision = gate.evaluate(pr, "PullRequestCreated", TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Detect.class);
             var detect = (GateDecision.Detect) decision;
@@ -329,7 +330,7 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
             PullRequest pr = createPullRequest(false, Set.of(), Set.of(assignee));
             pr.setRepository(unknownRepo);
 
-            GateDecision decision = gate.evaluate(pr, "PullRequestCreated");
+            GateDecision decision = gate.evaluate(pr, "PullRequestCreated", TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Skip.class);
             assertThat(((GateDecision.Skip) decision).reason()).contains("workspace");

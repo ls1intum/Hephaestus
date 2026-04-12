@@ -20,6 +20,7 @@ import de.tum.in.www1.hephaestus.practices.spi.AgentConfigChecker;
 import de.tum.in.www1.hephaestus.practices.spi.UserRoleChecker;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
 import de.tum.in.www1.hephaestus.workspace.Workspace;
+import de.tum.in.www1.hephaestus.workspace.WorkspaceFeatures;
 import de.tum.in.www1.hephaestus.workspace.WorkspaceResolver;
 import java.util.HashSet;
 import java.util.List;
@@ -103,6 +104,11 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         Workspace workspace = new Workspace();
         workspace.setId(WORKSPACE_ID);
         workspace.setWorkspaceSlug("test-workspace");
+        WorkspaceFeatures features = new WorkspaceFeatures();
+        features.setPracticesEnabled(true);
+        features.setPracticeReviewAutoTriggerEnabled(true);
+        features.setPracticeReviewManualTriggerEnabled(true);
+        workspace.setFeatures(features);
         return workspace;
     }
 
@@ -138,7 +144,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             PullRequest pr = createPullRequest();
             pr.setDraft(true);
 
-            GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT);
+            GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT, TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Skip.class);
             assertThat(((GateDecision.Skip) decision).reason()).isEqualTo("draft PR");
@@ -161,7 +167,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             // Set up enough mocks to progress past draft gate (workspace will fail -> SKIP)
             when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.empty());
 
-            GateDecision decision = noSkipGate.evaluate(pr, TRIGGER_EVENT);
+            GateDecision decision = noSkipGate.evaluate(pr, TRIGGER_EVENT, TriggerMode.AUTO);
 
             // Should NOT be "draft PR" — draft gate was bypassed
             assertThat(decision).isInstanceOf(GateDecision.Skip.class);
@@ -174,7 +180,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             PullRequest pr = createPullRequest();
             pr.setDraft(true);
 
-            gate.evaluate(pr, TRIGGER_EVENT);
+            gate.evaluate(pr, TRIGGER_EVENT, TriggerMode.AUTO);
 
             verifyNoInteractions(workspaceResolver, agentConfigChecker, practiceRepository, userRoleChecker);
         }
@@ -190,7 +196,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             PullRequest pr = createPullRequest();
             when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.empty());
 
-            GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT);
+            GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT, TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Skip.class);
             assertThat(((GateDecision.Skip) decision).reason()).isEqualTo("no workspace");
@@ -203,10 +209,113 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             pr.setRepository(null);
             when(workspaceResolver.resolveForRepository(null)).thenReturn(Optional.empty());
 
-            GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT);
+            GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT, TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Skip.class);
             assertThat(((GateDecision.Skip) decision).reason()).isEqualTo("no workspace");
+        }
+    }
+
+    @Nested
+    @DisplayName("2a. Practices Enabled Gate")
+    class PracticesEnabledTests {
+
+        @Test
+        @DisplayName("Should SKIP when practicesEnabled is false")
+        void skipWhenPracticesDisabled() {
+            PullRequest pr = createPullRequest();
+            Workspace workspace = createWorkspace();
+            workspace.getFeatures().setPracticesEnabled(false);
+            when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
+
+            GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT, TriggerMode.AUTO);
+
+            assertThat(decision).isInstanceOf(GateDecision.Skip.class);
+            assertThat(((GateDecision.Skip) decision).reason()).isEqualTo("practices disabled for workspace");
+            verifyNoInteractions(agentConfigChecker, practiceRepository, userRoleChecker);
+        }
+    }
+
+    @Nested
+    @DisplayName("2b. Trigger Mode Gate")
+    class TriggerModeTests {
+
+        @Test
+        @DisplayName("Should SKIP when auto-trigger is disabled and mode is AUTO")
+        void skipWhenAutoTriggerDisabled() {
+            PullRequest pr = createPullRequest();
+            Workspace workspace = createWorkspace();
+            workspace.getFeatures().setPracticeReviewAutoTriggerEnabled(false);
+            when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
+
+            GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT, TriggerMode.AUTO);
+
+            assertThat(decision).isInstanceOf(GateDecision.Skip.class);
+            assertThat(((GateDecision.Skip) decision).reason()).isEqualTo("auto-trigger disabled for workspace");
+            verifyNoInteractions(agentConfigChecker, practiceRepository, userRoleChecker);
+        }
+
+        @Test
+        @DisplayName("Should SKIP when manual trigger is disabled and mode is MANUAL")
+        void skipWhenManualTriggerDisabled() {
+            PullRequest pr = createPullRequest();
+            Workspace workspace = createWorkspace();
+            workspace.getFeatures().setPracticeReviewManualTriggerEnabled(false);
+            when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
+
+            GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT, TriggerMode.MANUAL);
+
+            assertThat(decision).isInstanceOf(GateDecision.Skip.class);
+            assertThat(((GateDecision.Skip) decision).reason()).isEqualTo("manual trigger disabled for workspace");
+            verifyNoInteractions(agentConfigChecker, practiceRepository, userRoleChecker);
+        }
+
+        @Test
+        @DisplayName("Should SKIP when both triggers are disabled regardless of mode")
+        void skipWhenBothTriggersDisabled() {
+            PullRequest pr = createPullRequest();
+            Workspace workspace = createWorkspace();
+            workspace.getFeatures().setPracticeReviewAutoTriggerEnabled(false);
+            workspace.getFeatures().setPracticeReviewManualTriggerEnabled(false);
+            when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
+
+            GateDecision autoDecision = gate.evaluate(pr, TRIGGER_EVENT, TriggerMode.AUTO);
+            GateDecision manualDecision = gate.evaluate(pr, TRIGGER_EVENT, TriggerMode.MANUAL);
+
+            assertThat(autoDecision).isInstanceOf(GateDecision.Skip.class);
+            assertThat(((GateDecision.Skip) autoDecision).reason()).isEqualTo("auto-trigger disabled for workspace");
+            assertThat(manualDecision).isInstanceOf(GateDecision.Skip.class);
+            assertThat(((GateDecision.Skip) manualDecision).reason()).isEqualTo("manual trigger disabled for workspace");
+        }
+
+        @Test
+        @DisplayName("Should continue when auto-trigger is disabled but mode is MANUAL")
+        void continueWhenAutoTriggerDisabledButModeIsManual() {
+            PullRequest pr = createPullRequest();
+            Workspace workspace = createWorkspace();
+            workspace.getFeatures().setPracticeReviewAutoTriggerEnabled(false);
+            when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
+            when(agentConfigChecker.hasEnabledConfig(WORKSPACE_ID)).thenReturn(false);
+
+            GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT, TriggerMode.MANUAL);
+
+            assertThat(decision).isInstanceOf(GateDecision.Skip.class);
+            assertThat(((GateDecision.Skip) decision).reason()).isEqualTo("no enabled agent config");
+        }
+
+        @Test
+        @DisplayName("Should continue when manual trigger is disabled but mode is AUTO")
+        void continueWhenManualTriggerDisabledButModeIsAuto() {
+            PullRequest pr = createPullRequest();
+            Workspace workspace = createWorkspace();
+            workspace.getFeatures().setPracticeReviewManualTriggerEnabled(false);
+            when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
+            when(agentConfigChecker.hasEnabledConfig(WORKSPACE_ID)).thenReturn(false);
+
+            GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT, TriggerMode.AUTO);
+
+            assertThat(decision).isInstanceOf(GateDecision.Skip.class);
+            assertThat(((GateDecision.Skip) decision).reason()).isEqualTo("no enabled agent config");
         }
     }
 
@@ -222,7 +331,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
             when(agentConfigChecker.hasEnabledConfig(WORKSPACE_ID)).thenReturn(false);
 
-            GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT);
+            GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT, TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Skip.class);
             assertThat(((GateDecision.Skip) decision).reason()).isEqualTo("no enabled agent config");
@@ -240,7 +349,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             Practice practice = createPractice("ReviewSubmitted");
             setupThroughPracticeMatching(pr, practice);
 
-            GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT);
+            GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT, TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Skip.class);
             assertThat(((GateDecision.Skip) decision).reason()).isEqualTo("no matching practices");
@@ -258,7 +367,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             practice.setTriggerEvents(null);
             when(practiceRepository.findByWorkspaceIdAndActiveTrue(WORKSPACE_ID)).thenReturn(List.of(practice));
 
-            GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT);
+            GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT, TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Skip.class);
             assertThat(((GateDecision.Skip) decision).reason()).isEqualTo("no matching practices");
@@ -283,7 +392,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             when(userRoleChecker.isHealthy()).thenReturn(true);
             when(userRoleChecker.hasRole("test-user", PRACTICE_REVIEW_ROLE)).thenReturn(true);
 
-            GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT);
+            GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT, TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Detect.class);
             GateDecision.Detect detect = (GateDecision.Detect) decision;
@@ -312,7 +421,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             Practice practice = createPractice(TRIGGER_EVENT);
             setupThroughPracticeMatching(pr, practice);
 
-            GateDecision decision = runForAllGate.evaluate(pr, TRIGGER_EVENT);
+            GateDecision decision = runForAllGate.evaluate(pr, TRIGGER_EVENT, TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Detect.class);
             GateDecision.Detect detect = (GateDecision.Detect) decision;
@@ -336,7 +445,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             setupThroughPracticeMatching(pr, practice);
             // No assignees set (empty set from createPullRequest)
 
-            GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT);
+            GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT, TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Skip.class);
             assertThat(((GateDecision.Skip) decision).reason()).isEqualTo("no assignee");
@@ -350,7 +459,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             Practice practice = createPractice(TRIGGER_EVENT);
             setupThroughPracticeMatching(pr, practice);
 
-            GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT);
+            GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT, TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Skip.class);
             assertThat(((GateDecision.Skip) decision).reason()).isEqualTo("no assignee");
@@ -373,7 +482,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
 
             when(userRoleChecker.isHealthy()).thenReturn(false);
 
-            GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT);
+            GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT, TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Skip.class);
             assertThat(((GateDecision.Skip) decision).reason()).isEqualTo("keycloak circuit breaker open");
@@ -397,7 +506,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             when(userRoleChecker.isHealthy()).thenReturn(true);
             when(userRoleChecker.hasRole("test-user", PRACTICE_REVIEW_ROLE)).thenReturn(true);
 
-            GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT);
+            GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT, TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Detect.class);
             GateDecision.Detect detect = (GateDecision.Detect) decision;
@@ -417,7 +526,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             when(userRoleChecker.isHealthy()).thenReturn(true);
             when(userRoleChecker.hasRole("test-user", PRACTICE_REVIEW_ROLE)).thenReturn(false);
 
-            GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT);
+            GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT, TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Skip.class);
             assertThat(((GateDecision.Skip) decision).reason()).isEqualTo(
@@ -440,7 +549,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             // Lenient: HashSet iteration order is nondeterministic, so this mock may not be reached
             lenient().when(userRoleChecker.hasRole("user-without-role", PRACTICE_REVIEW_ROLE)).thenReturn(false);
 
-            GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT);
+            GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT, TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Detect.class);
             GateDecision.Detect detect = (GateDecision.Detect) decision;
@@ -462,7 +571,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             when(userRoleChecker.hasRole("user-1", PRACTICE_REVIEW_ROLE)).thenReturn(false);
             when(userRoleChecker.hasRole("user-2", PRACTICE_REVIEW_ROLE)).thenReturn(false);
 
-            GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT);
+            GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT, TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Skip.class);
             assertThat(((GateDecision.Skip) decision).reason()).isEqualTo(
@@ -484,7 +593,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
                 new RuntimeException("Connection refused")
             );
 
-            GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT);
+            GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT, TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Skip.class);
             assertThat(((GateDecision.Skip) decision).reason()).isEqualTo("role check failed");
@@ -508,7 +617,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             when(userRoleChecker.isHealthy()).thenReturn(true);
             when(userRoleChecker.hasRole("test-user", PRACTICE_REVIEW_ROLE)).thenReturn(true);
 
-            GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT);
+            GateDecision decision = gate.evaluate(pr, TRIGGER_EVENT, TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Detect.class);
             GateDecision.Detect detect = (GateDecision.Detect) decision;

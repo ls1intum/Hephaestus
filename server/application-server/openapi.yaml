@@ -4913,6 +4913,12 @@ components:
         leaguesEnabled:
           type: boolean
           description: Enable league tiers and rankings
+        practiceReviewAutoTriggerEnabled:
+          type: boolean
+          description: Enable automatic practice reviews triggered by PR events
+        practiceReviewManualTriggerEnabled:
+          type: boolean
+          description: Enable manual practice reviews triggered via bot command
         practicesEnabled:
           type: boolean
           description: Enable the practice review feature
@@ -5153,6 +5159,14 @@ components:
         leaguesEnabled:
           type: boolean
           description: Whether league tiers and rankings are enabled
+        practiceReviewAutoTriggerEnabled:
+          type: boolean
+          description: Whether automatic practice reviews triggered by PR events are
+            enabled
+        practiceReviewManualTriggerEnabled:
+          type: boolean
+          description: Whether manual practice reviews triggered via bot command are
+            enabled
         practicesEnabled:
           type: boolean
           description: Whether the practice review feature is enabled
@@ -5195,6 +5209,8 @@ components:
       - isPubliclyViewable
       - leaderboardEnabled
       - leaguesEnabled
+      - practiceReviewAutoTriggerEnabled
+      - practiceReviewManualTriggerEnabled
       - practicesEnabled
       - progressionEnabled
       - providerType

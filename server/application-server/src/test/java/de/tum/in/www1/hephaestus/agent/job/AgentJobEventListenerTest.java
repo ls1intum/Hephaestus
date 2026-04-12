@@ -30,6 +30,7 @@ import de.tum.in.www1.hephaestus.practices.model.Practice;
 import de.tum.in.www1.hephaestus.practices.review.GateDecision;
 import de.tum.in.www1.hephaestus.practices.review.PracticeReviewDetectionGate;
 import de.tum.in.www1.hephaestus.practices.review.PracticeReviewProperties;
+import de.tum.in.www1.hephaestus.practices.review.TriggerMode;
 import de.tum.in.www1.hephaestus.practices.spi.AgentConfigChecker;
 import de.tum.in.www1.hephaestus.practices.spi.UserRoleChecker;
 import de.tum.in.www1.hephaestus.testconfig.BaseUnitTest;
@@ -68,7 +69,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        listener = new AgentJobEventListener(agentJobService, pullRequestRepository, practiceReviewDetectionGate, true);
+        listener = new AgentJobEventListener(agentJobService, pullRequestRepository, practiceReviewDetectionGate);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
@@ -150,7 +151,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
         Workspace workspace = new Workspace();
         workspace.setId(WORKSPACE_ID);
         var detect = new GateDecision.Detect(workspace, List.of());
-        when(practiceReviewDetectionGate.evaluate(eq(pr), any())).thenReturn(detect);
+        when(practiceReviewDetectionGate.evaluate(eq(pr), any(), any())).thenReturn(detect);
         when(agentJobService.submit(any(), any(), any())).thenReturn(Optional.empty());
 
         return pr;
@@ -234,7 +235,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
             listener.onPullRequestCreated(event);
 
-            verify(practiceReviewDetectionGate, never()).evaluate(any(), any());
+            verify(practiceReviewDetectionGate, never()).evaluate(any(), any(), any());
             verify(agentJobService, never()).submit(any(), any(), any());
         }
 
@@ -249,7 +250,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
             listener.onPullRequestCreated(event);
 
-            verify(practiceReviewDetectionGate, never()).evaluate(any(), any());
+            verify(practiceReviewDetectionGate, never()).evaluate(any(), any(), any());
             verify(agentJobService, never()).submit(any(), any(), any());
         }
 
@@ -264,7 +265,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
             listener.onPullRequestCreated(event);
 
-            verify(practiceReviewDetectionGate, never()).evaluate(any(), any());
+            verify(practiceReviewDetectionGate, never()).evaluate(any(), any(), any());
             verify(agentJobService, never()).submit(any(), any(), any());
         }
     }
@@ -281,7 +282,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
             PullRequest pr = mockPullRequest("abc123", "feature/test", "main");
             when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
-            when(practiceReviewDetectionGate.evaluate(pr, TriggerEventNames.PULL_REQUEST_CREATED)).thenReturn(
+            when(practiceReviewDetectionGate.evaluate(pr, TriggerEventNames.PULL_REQUEST_CREATED, TriggerMode.AUTO)).thenReturn(
                 new GateDecision.Skip("no matching practices")
             );
 
@@ -320,7 +321,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             Workspace workspace = new Workspace();
             workspace.setId(42L);
             var detect = new GateDecision.Detect(workspace, List.of());
-            when(practiceReviewDetectionGate.evaluate(pr, TriggerEventNames.PULL_REQUEST_CREATED)).thenReturn(detect);
+            when(practiceReviewDetectionGate.evaluate(pr, TriggerEventNames.PULL_REQUEST_CREATED, TriggerMode.AUTO)).thenReturn(detect);
             when(agentJobService.submit(any(), any(), any())).thenReturn(Optional.empty());
 
             listener.onPullRequestCreated(event);
@@ -340,7 +341,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             Workspace workspace = new Workspace();
             workspace.setId(WORKSPACE_ID);
             var detect = new GateDecision.Detect(workspace, List.of());
-            when(practiceReviewDetectionGate.evaluate(eq(pr), any())).thenReturn(detect);
+            when(practiceReviewDetectionGate.evaluate(eq(pr), any(), any())).thenReturn(detect);
             when(agentJobService.submit(any(), any(), any())).thenReturn(Optional.empty());
 
             listener.onPullRequestCreated(event);
@@ -363,14 +364,14 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
             PullRequest pr = mockPullRequest("abc123", "feature/test", "main");
             when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
-            when(practiceReviewDetectionGate.evaluate(pr, TriggerEventNames.PULL_REQUEST_CREATED)).thenReturn(
+            when(practiceReviewDetectionGate.evaluate(pr, TriggerEventNames.PULL_REQUEST_CREATED, TriggerMode.AUTO)).thenReturn(
                 new GateDecision.Skip("draft PR")
             );
 
             listener.onPullRequestCreated(event);
 
             // Gate was called (listener did not short-circuit on draft)
-            verify(practiceReviewDetectionGate).evaluate(pr, TriggerEventNames.PULL_REQUEST_CREATED);
+            verify(practiceReviewDetectionGate).evaluate(pr, TriggerEventNames.PULL_REQUEST_CREATED, TriggerMode.AUTO);
             verify(agentJobService, never()).submit(any(), any(), any());
         }
 
@@ -382,7 +383,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
             listener.onPullRequestCreated(new DomainEvent.PullRequestCreated(prData, webhookContext(1L)));
 
-            verify(practiceReviewDetectionGate).evaluate(pr, TriggerEventNames.PULL_REQUEST_CREATED);
+            verify(practiceReviewDetectionGate).evaluate(pr, TriggerEventNames.PULL_REQUEST_CREATED, TriggerMode.AUTO);
         }
 
         @Test
@@ -393,7 +394,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
             listener.onPullRequestReady(new DomainEvent.PullRequestReady(prData, webhookContext(1L)));
 
-            verify(practiceReviewDetectionGate).evaluate(pr, TriggerEventNames.PULL_REQUEST_READY);
+            verify(practiceReviewDetectionGate).evaluate(pr, TriggerEventNames.PULL_REQUEST_READY, TriggerMode.AUTO);
         }
 
         @Test
@@ -404,7 +405,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
             listener.onPullRequestSynchronized(new DomainEvent.PullRequestSynchronized(prData, webhookContext(1L)));
 
-            verify(practiceReviewDetectionGate).evaluate(pr, TriggerEventNames.PULL_REQUEST_SYNCHRONIZED);
+            verify(practiceReviewDetectionGate).evaluate(pr, TriggerEventNames.PULL_REQUEST_SYNCHRONIZED, TriggerMode.AUTO);
         }
 
         @Test
@@ -418,7 +419,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
             Workspace workspace = new Workspace();
             workspace.setId(WORKSPACE_ID);
-            when(practiceReviewDetectionGate.evaluate(pr, TriggerEventNames.PULL_REQUEST_CREATED)).thenReturn(
+            when(practiceReviewDetectionGate.evaluate(pr, TriggerEventNames.PULL_REQUEST_CREATED, TriggerMode.AUTO)).thenReturn(
                 new GateDecision.Detect(workspace, List.of())
             );
             when(agentJobService.submit(any(), any(), any())).thenThrow(new RuntimeException("DB error"));
@@ -435,7 +436,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
             PullRequest pr = mockPullRequest("abc123", "feature/test", "main");
             when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
-            when(practiceReviewDetectionGate.evaluate(pr, TriggerEventNames.PULL_REQUEST_CREATED)).thenThrow(
+            when(practiceReviewDetectionGate.evaluate(pr, TriggerEventNames.PULL_REQUEST_CREATED, TriggerMode.AUTO)).thenThrow(
                 new RuntimeException("DB connectivity error")
             );
 
@@ -505,7 +506,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             Workspace workspace = new Workspace();
             workspace.setId(WORKSPACE_ID);
             var detect = new GateDecision.Detect(workspace, List.of());
-            when(practiceReviewDetectionGate.evaluate(pr, TriggerEventNames.REVIEW_SUBMITTED)).thenReturn(detect);
+            when(practiceReviewDetectionGate.evaluate(pr, TriggerEventNames.REVIEW_SUBMITTED, TriggerMode.AUTO)).thenReturn(detect);
             when(agentJobService.submit(any(), any(), any())).thenReturn(Optional.empty());
 
             listener.onReviewSubmitted(event);
@@ -553,7 +554,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
             listener.onReviewSubmitted(event);
 
-            verify(practiceReviewDetectionGate, never()).evaluate(any(), any());
+            verify(practiceReviewDetectionGate, never()).evaluate(any(), any(), any());
             verify(agentJobService, never()).submit(any(), any(), any());
         }
 
@@ -571,7 +572,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
             listener.onReviewSubmitted(event);
 
-            verify(practiceReviewDetectionGate, never()).evaluate(any(), any());
+            verify(practiceReviewDetectionGate, never()).evaluate(any(), any(), any());
             verify(agentJobService, never()).submit(any(), any(), any());
         }
 
@@ -588,7 +589,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
             listener.onReviewSubmitted(event);
 
-            verify(practiceReviewDetectionGate, never()).evaluate(any(), any());
+            verify(practiceReviewDetectionGate, never()).evaluate(any(), any(), any());
             verify(agentJobService, never()).submit(any(), any(), any());
         }
 
@@ -603,7 +604,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
             listener.onReviewSubmitted(event);
 
-            verify(practiceReviewDetectionGate, never()).evaluate(any(), any());
+            verify(practiceReviewDetectionGate, never()).evaluate(any(), any(), any());
             verify(agentJobService, never()).submit(any(), any(), any());
         }
 
@@ -615,7 +616,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
             PullRequest pr = mockPullRequest("abc123", "feature/test", "main");
             when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
-            when(practiceReviewDetectionGate.evaluate(pr, TriggerEventNames.REVIEW_SUBMITTED)).thenReturn(
+            when(practiceReviewDetectionGate.evaluate(pr, TriggerEventNames.REVIEW_SUBMITTED, TriggerMode.AUTO)).thenReturn(
                 new GateDecision.Skip("no matching practices")
             );
 
@@ -643,7 +644,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
             Workspace workspace = new Workspace();
             workspace.setId(WORKSPACE_ID);
-            when(practiceReviewDetectionGate.evaluate(pr, TriggerEventNames.REVIEW_SUBMITTED)).thenReturn(
+            when(practiceReviewDetectionGate.evaluate(pr, TriggerEventNames.REVIEW_SUBMITTED, TriggerMode.AUTO)).thenReturn(
                 new GateDecision.Detect(workspace, List.of())
             );
             when(agentJobService.submit(any(), any(), any())).thenThrow(new RuntimeException("NATS error"));
@@ -660,7 +661,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
             PullRequest pr = mockPullRequest("abc123", "feature/test", "main");
             when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
-            when(practiceReviewDetectionGate.evaluate(pr, TriggerEventNames.REVIEW_SUBMITTED)).thenThrow(
+            when(practiceReviewDetectionGate.evaluate(pr, TriggerEventNames.REVIEW_SUBMITTED, TriggerMode.AUTO)).thenThrow(
                 new RuntimeException("unexpected gate error")
             );
 
@@ -702,7 +703,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
                     practiceRepository,
                     workspaceResolver
                 );
-                var listener = new AgentJobEventListener(agentJobService, pullRequestRepository, realGate, true);
+                var listener = new AgentJobEventListener(agentJobService, pullRequestRepository, realGate);
                 return new CollaborationFixture(
                     listener,
                     userRoleChecker,
@@ -742,6 +743,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             Workspace workspace = new Workspace();
             workspace.setId(WORKSPACE_ID);
             workspace.setWorkspaceSlug("test-workspace");
+            workspace.getFeatures().setPracticesEnabled(true);
             when(fixture.workspaceResolver().resolveForRepository("owner/repo")).thenReturn(Optional.of(workspace));
             when(fixture.agentConfigChecker().hasEnabledConfig(WORKSPACE_ID)).thenReturn(true);
 
@@ -775,6 +777,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
             Workspace workspace = new Workspace();
             workspace.setId(WORKSPACE_ID);
+            workspace.getFeatures().setPracticesEnabled(true);
             when(fixture.workspaceResolver().resolveForRepository("owner/repo")).thenReturn(Optional.of(workspace));
             when(fixture.agentConfigChecker().hasEnabledConfig(WORKSPACE_ID)).thenReturn(true);
 
