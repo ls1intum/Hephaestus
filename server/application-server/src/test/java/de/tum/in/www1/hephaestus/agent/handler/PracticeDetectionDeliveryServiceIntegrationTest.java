@@ -274,11 +274,9 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
         @Test
         @DisplayName("caps negatives per practice at configured limit")
         void capsNegatives() {
-            // The idempotency key is practiceSlug:targetType:targetId:jobId, so all
-            // same-slug findings share the same key. The DB ON CONFLICT DO NOTHING
-            // deduplicates them, leaving only the first insert. The in-memory cap
-            // counter still advances, so findings 5 and 6 are discarded over cap,
-            // while findings 1-4 are discarded as duplicates.
+            // Each finding gets a unique idempotency key (includes index), so all
+            // 7 findings are distinct. maxNegativeFindingsPerPractice=5 caps at 5,
+            // discarding the last 2 over cap.
             var findings = new ArrayList<ValidatedFinding>();
             for (int i = 0; i < 7; i++) {
                 findings.add(
@@ -297,11 +295,11 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
 
             var result = deliveryService.deliver(agentJob, findings);
 
-            // Only 1 DB row inserted (same idempotency key), 4 duplicates, 2 over cap
-            assertThat(result.inserted()).isEqualTo(1);
-            assertThat(result.discardedDuplicate()).isEqualTo(4);
+            // 5 inserted (cap), 2 discarded over cap, 0 duplicates
+            assertThat(result.inserted()).isEqualTo(5);
+            assertThat(result.discardedDuplicate()).isEqualTo(0);
             assertThat(result.discardedOverCap()).isEqualTo(2);
-            assertThat(practiceFindingRepository.findAll()).hasSize(1);
+            assertThat(practiceFindingRepository.findAll()).hasSize(5);
         }
     }
 
