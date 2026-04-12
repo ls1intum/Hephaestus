@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { createFileRoute, retainSearchParams, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Navigate, retainSearchParams, useNavigate } from "@tanstack/react-router";
 import { formatISO } from "date-fns";
 import { useEffect } from "react";
 import { z } from "zod";
@@ -250,16 +250,16 @@ function LeaderboardContainer() {
 		enabled: hasWorkspace && Boolean(username) && Boolean(parsedAfter) && Boolean(parsedBefore),
 	});
 
-	// Feature guard — silently redirect to profile when leaderboard is disabled
-	useEffect(() => {
-		if (!featuresLoading && !leaderboardEnabled && workspaceSlug && username) {
-			navigate({
-				to: "/w/$workspaceSlug/user/$username",
-				params: { workspaceSlug, username },
-				replace: true,
-			});
-		}
-	}, [featuresLoading, leaderboardEnabled, workspaceSlug, username, navigate]);
+	// When leaderboard is disabled, show the profile page as the home view
+	if (!featuresLoading && !leaderboardEnabled && workspaceSlug && username) {
+		return (
+			<Navigate
+				to="/w/$workspaceSlug/user/$username"
+				params={{ workspaceSlug, username }}
+				replace
+			/>
+		);
+	}
 
 	if (featuresLoading || !leaderboardEnabled) {
 		return (

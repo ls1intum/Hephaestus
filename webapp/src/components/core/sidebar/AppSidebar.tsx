@@ -115,6 +115,7 @@ export function AppSidebar({
 					<NavAdmin
 						workspaceSlug={activeWorkspace.workspaceSlug}
 						achievementsEnabled={activeWorkspace.achievementsEnabled}
+						practicesEnabled={activeWorkspace.practicesEnabled}
 					/>
 				)}
 			</>

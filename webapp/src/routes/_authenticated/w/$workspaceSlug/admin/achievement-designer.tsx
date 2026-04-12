@@ -1,11 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Navigate } from "@tanstack/react-router";
 import { ReactFlowProvider } from "@xyflow/react";
 import { toast } from "sonner";
 import { getUserProfileOptions, reloadAchievementsMutation } from "@/api/@tanstack/react-query.gen";
 import { AchievementHeader } from "@/components/achievements/AchievementHeader";
 import { SkillTreeDesigner } from "@/components/achievements/SkillTreeDesigner";
+import { Spinner } from "@/components/ui/spinner";
 import { useAllAchievementDefinitions } from "@/hooks/use-all-achievement-definitions";
+import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
 import { useAuth } from "@/integrations/auth/AuthContext";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
@@ -19,6 +21,7 @@ function AchievementDesignerPage() {
 	const queryClient = useQueryClient();
 	const { userProfile, getUserProfilePictureUrl, username } = useAuth();
 	const selectedSlug = useWorkspaceStore((state) => state.selectedSlug);
+	const { achievementsEnabled, isLoading: featuresLoading } = useWorkspaceFeatures();
 
 	const reloadMutation = useMutation({
 		...reloadAchievementsMutation(),
@@ -59,6 +62,25 @@ function AchievementDesignerPage() {
 
 	// Fetch all achievement definitions (Design Mode Data)
 	const allDefinitionsQuery = useAllAchievementDefinitions(selectedSlug || "", username || "");
+
+	// Feature guard — declarative redirect when achievements are disabled
+	if (!featuresLoading && !achievementsEnabled && selectedSlug) {
+		return (
+			<Navigate
+				to="/w/$workspaceSlug/admin/settings"
+				params={{ workspaceSlug: selectedSlug }}
+				replace
+			/>
+		);
+	}
+
+	if (featuresLoading || !achievementsEnabled) {
+		return (
+			<div className="flex justify-center items-center h-64">
+				<Spinner className="h-8 w-8" />
+			</div>
+		);
+	}
 
 	// Derived user data for the skill tree
 	const user = {
