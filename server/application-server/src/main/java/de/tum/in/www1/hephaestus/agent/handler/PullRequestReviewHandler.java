@@ -21,6 +21,7 @@ import de.tum.in.www1.hephaestus.gitprovider.pullrequestreviewcomment.PullReques
 import de.tum.in.www1.hephaestus.practices.PracticeRepository;
 import de.tum.in.www1.hephaestus.practices.finding.ContributorHistoryProvider;
 import de.tum.in.www1.hephaestus.practices.model.Practice;
+import de.tum.in.www1.hephaestus.practices.model.Verdict;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -420,7 +421,29 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             );
         }
 
-        // 1b. Filter findings by diff scope — remove findings whose evidence locations
+        // 1b. Quality gate: reject reviews where every finding is NOT_APPLICABLE AND the diff
+        // had actual content. This catches stale-diff bugs where the agent saw an empty workspace.
+        // Legitimate all-NA reviews (e.g., README-only changes) are allowed through because
+        // their diff_stat will be empty or contain only non-code files.
+        boolean allNotApplicable = parsed
+            .validFindings()
+            .stream()
+            .allMatch(f -> f.verdict() == Verdict.NOT_APPLICABLE);
+        if (allNotApplicable) {
+            Set<String> diffFiles = computeDiffStatFiles(job);
+            boolean hasDiffContent = !diffFiles.isEmpty();
+            if (hasDiffContent) {
+                throw new JobDeliveryException(
+                    "All findings are NOT_APPLICABLE but the diff contains " +
+                        diffFiles.size() +
+                        " files — likely a stale/empty diff was provided to the agent. " +
+                        "Refusing to deliver. jobId=" +
+                        job.getId()
+                );
+            }
+        }
+
+        // 1c. Filter findings by diff scope — remove findings whose evidence locations
         // reference files not in the diff_stat. This is a server-side safety net for
         // LLM scope contamination (flagging pre-existing code in partially-modified files).
         Set<String> diffFiles = computeDiffStatFiles(job);
@@ -526,60 +549,73 @@ public class PullRequestReviewHandler implements JobTypeHandler {
     }
 
     /**
-     * Fetch latest refs from the remote before computing the diff.
-     * Uses GitLabTokenService for GitLab workspaces to get an authenticated fetch.
-     * Falls back gracefully on failure — the diff computation will still attempt
-     * with whatever refs are locally available.
+     * Fetch latest refs from the remote and verify the headSha exists locally.
+     *
+     * <p>Returns {@code true} if the headSha was verified to exist in the local clone.
+     * Throws {@link JobPreparationException} if a fetch succeeded but the headSha
+     * is still not in the local clone (likely force-pushed away).
      */
-    private void fetchBeforeDiff(long repositoryId, AgentJob job) {
+    private boolean fetchAndVerifyHead(long repositoryId, AgentJob job, String headSha) {
+        if (!gitRepositoryManager.isRepositoryCloned(repositoryId)) {
+            log.debug("Repository not cloned locally, skipping fetch/verify: repoId={}", repositoryId);
+            return false;
+        }
+        Path repoPath = gitRepositoryManager.getRepositoryPath(repositoryId);
+
+        // Try fetching from remote to get latest refs
+        boolean fetched = false;
         try {
             var workspace = job.getWorkspace();
-            if (workspace == null) {
-                log.debug("No workspace on job, skipping pre-diff fetch: jobId={}", job.getId());
-                return;
-            }
-
-            String serverUrl = null;
-            String token = null;
-            Long scopeId = workspace.getId();
-
-            if (gitLabTokenService != null) {
-                try {
-                    serverUrl = gitLabTokenService.resolveServerUrl(scopeId);
-                    token = gitLabTokenService.getAccessToken(scopeId);
-                } catch (Exception e) {
-                    log.debug("GitLab token not available for fetch: scopeId={}, reason={}", scopeId, e.getMessage());
+            if (workspace != null && gitLabTokenService != null) {
+                Long scopeId = workspace.getId();
+                String serverUrl = gitLabTokenService.resolveServerUrl(scopeId);
+                String token = gitLabTokenService.getAccessToken(scopeId);
+                JsonNode metadata = job.getMetadata();
+                String repoFullName =
+                    metadata != null && metadata.has("repository_full_name")
+                        ? metadata.get("repository_full_name").asText()
+                        : null;
+                if (serverUrl != null && token != null && repoFullName != null) {
+                    String cloneUrl = serverUrl + "/" + repoFullName + ".git";
+                    gitRepositoryManager.ensureRepository(repositoryId, cloneUrl, token);
+                    fetched = true;
+                    log.debug("Fetched latest refs: repoId={}", repositoryId);
                 }
             }
-
-            // For GitHub workspaces or when GitLab token is unavailable, the repo may already
-            // be current (fetched by push webhook). The headSha validation in resolveDiffRange
-            // will catch staleness even without a fetch here.
-            if (serverUrl == null || token == null) {
-                log.debug("No token available for pre-diff fetch, relying on existing clone: repoId={}", repositoryId);
-                return;
-            }
-
-            JsonNode metadata = job.getMetadata();
-            String repoFullName =
-                metadata != null && metadata.has("repository_full_name")
-                    ? metadata.get("repository_full_name").asText()
-                    : null;
-            if (repoFullName == null) {
-                log.debug("No repository_full_name in metadata, skipping pre-diff fetch");
-                return;
-            }
-
-            String cloneUrl = serverUrl + "/" + repoFullName + ".git";
-            gitRepositoryManager.ensureRepository(repositoryId, cloneUrl, token);
-            log.debug("Fetched latest refs before diff computation: repoId={}, scopeId={}", repositoryId, scopeId);
         } catch (Exception e) {
-            log.warn(
-                "Pre-diff fetch failed (will proceed with existing clone): repoId={}, error={}",
-                repositoryId,
-                e.getMessage()
-            );
+            log.warn("Pre-diff fetch failed: repoId={}, error={}", repositoryId, e.getMessage());
         }
+
+        // Verify headSha exists locally — this is the critical check.
+        // If headSha doesn't exist, ALL diff strategies will fail and the agent gets an empty diff.
+        if (headSha != null && !headSha.isBlank()) {
+            String catFile = runGit(repoPath, "cat-file", "-t", headSha);
+            if (catFile != null && !catFile.trim().equals("commit")) {
+                // cat-file succeeded but returned non-commit type — SHA exists but is wrong type
+                log.warn("Head SHA {} is not a commit (type={}), repoId={}", headSha, catFile.trim(), repositoryId);
+            } else if (catFile == null && fetched) {
+                // Fetch succeeded but SHA still not found — this is a hard failure
+                throw new JobPreparationException(
+                    "Head commit " +
+                        headSha +
+                        " not found in local clone after successful fetch. " +
+                        "The commit may have been force-pushed away. repoId=" +
+                        repositoryId
+                );
+            } else if (catFile == null) {
+                // No fetch happened (token unavailable) and SHA not found
+                log.warn(
+                    "Head commit {} not found locally and fetch was not possible (token unavailable). " +
+                        "Diff computation will likely fail. repoId={}",
+                    headSha,
+                    repositoryId
+                );
+                return false;
+            }
+            // catFile is "commit" — head SHA is verified present
+            return catFile != null && catFile.trim().equals("commit");
+        }
+        return false;
     }
 
     /** Build and store pull request metadata and review comments as context JSON files. */
@@ -669,15 +705,31 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         }
         Path repoPath = gitRepositoryManager.getRepositoryPath(repositoryId);
 
-        // Fetch latest refs from remote before computing the diff.
-        // Without this, the local clone may have stale branch refs from an earlier push,
-        // causing the diff to be computed against the wrong commit (see: stale-diff incident).
-        fetchBeforeDiff(repositoryId, job);
+        // Fetch latest refs and verify headSha exists locally.
+        // Returns true if headSha was verified present in the local clone.
+        boolean headVerified = fetchAndVerifyHead(repositoryId, job, headSha);
 
         try {
             String[] range = resolveDiffRange(repoPath, targetBranch, sourceBranch, headSha);
             if (range == null) {
-                log.warn("Could not compute diff base for headSha={}, targetBranch={}", headSha, targetBranch);
+                if (headVerified) {
+                    // Head commit exists but diff still couldn't be resolved — real bug.
+                    throw new JobPreparationException(
+                        "Cannot compute diff: all resolution strategies failed despite head commit " +
+                            headSha +
+                            " being present. targetBranch=" +
+                            targetBranch +
+                            ", sourceBranch=" +
+                            sourceBranch +
+                            ", repoId=" +
+                            repositoryId
+                    );
+                }
+                log.warn(
+                    "Diff resolution failed (head commit not verified locally), skipping diff: headSha={}, repoId={}",
+                    headSha,
+                    repositoryId
+                );
                 return;
             }
             String rangeSpec = range[0] + ".." + range[1];
