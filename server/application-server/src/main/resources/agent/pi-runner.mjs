@@ -53,9 +53,16 @@ function redact(text) {
 // ── Validation ───────────────────────────────────────────────────
 
 function isValidFinding(f) {
-    return Boolean(f && typeof f === "object" && typeof f.practiceSlug === "string" && f.practiceSlug.trim() &&
-        typeof f.title === "string" && f.title.trim() && typeof f.verdict === "string" &&
-        typeof f.severity === "string" && typeof f.confidence === "number");
+    if (!f || typeof f !== "object") return false;
+    if (typeof f.practiceSlug !== "string" || !f.practiceSlug.trim()) return false;
+    if (typeof f.title !== "string" || !f.title.trim()) return false;
+    if (typeof f.verdict !== "string") return false;
+    if (typeof f.severity !== "string") return false;
+    // Tolerate confidence as string (LLMs sometimes write "0.85" instead of 0.85)
+    // Guard: Number(null)=0 and Number("")=0 would pass isNaN, so reject nullish/empty first.
+    if (f.confidence == null || f.confidence === "") return false;
+    if (Number.isNaN(Number(f.confidence))) return false;
+    return true;
 }
 
 function isValidFindingsPayload(p) {
@@ -66,7 +73,20 @@ function isValidFindingsPayload(p) {
 function checkResultFile() {
     const path = `${OUTPUT}/result.json`;
     if (!existsSync(path)) return false;
-    try { return isValidFindingsPayload(JSON.parse(readFileSync(path, "utf-8"))); } catch { return false; }
+    try {
+        const data = JSON.parse(readFileSync(path, "utf-8"));
+        const valid = isValidFindingsPayload(data);
+        if (!valid) {
+            const hasFindings = Array.isArray(data?.findings);
+            const count = hasFindings ? data.findings.length : 0;
+            const validCount = hasFindings ? data.findings.filter(isValidFinding).length : 0;
+            console.error(`[pi-runner] result.json validation failed: findings=${count}, valid=${validCount}`);
+        }
+        return valid;
+    } catch (e) {
+        console.error(`[pi-runner] result.json parse error: ${e.message}`);
+        return false;
+    }
 }
 
 // ── Session usage extraction ─────────────────────────────────────
