@@ -84,10 +84,9 @@ achievements:
       category: pull_requests
       triggerEvents:
           - PULL_REQUEST_MERGED
-      evaluatorClass: DummyEvaluator
+      evaluatorClass: SpeedsterEvaluator
       requirements:
-          type: LinearAchievementProgress
-          target: 1
+          type: BinaryAchievementProgress
 
     # ========================================================================
     # Commit Achievements
@@ -98,7 +97,8 @@ achievements:
       rarity: common
       isHidden: false
       category: commits
-      triggerEvents: []
+      triggerEvents:
+          - COMMIT_CREATED
       evaluatorClass: StandardCountEvaluator
       requirements:
           type: LinearAchievementProgress
@@ -109,7 +109,8 @@ achievements:
       rarity: common
       isHidden: false
       category: commits
-      triggerEvents: []
+      triggerEvents:
+          - COMMIT_CREATED
       evaluatorClass: StandardCountEvaluator
       requirements:
           type: LinearAchievementProgress
@@ -120,7 +121,8 @@ achievements:
       rarity: uncommon
       isHidden: false
       category: commits
-      triggerEvents: []
+      triggerEvents:
+          - COMMIT_CREATED
       evaluatorClass: StandardCountEvaluator
       requirements:
           type: LinearAchievementProgress
@@ -131,7 +133,8 @@ achievements:
       rarity: uncommon
       isHidden: false
       category: commits
-      triggerEvents: []
+      triggerEvents:
+          - COMMIT_CREATED
       evaluatorClass: StandardCountEvaluator
       requirements:
           type: LinearAchievementProgress
@@ -142,7 +145,8 @@ achievements:
       rarity: rare
       isHidden: false
       category: commits
-      triggerEvents: []
+      triggerEvents:
+          - COMMIT_CREATED
       evaluatorClass: StandardCountEvaluator
       requirements:
           type: LinearAchievementProgress
@@ -153,7 +157,8 @@ achievements:
       rarity: epic
       isHidden: false
       category: commits
-      triggerEvents: []
+      triggerEvents:
+          - COMMIT_CREATED
       evaluatorClass: StandardCountEvaluator
       requirements:
           type: LinearAchievementProgress
@@ -164,7 +169,8 @@ achievements:
       rarity: legendary
       isHidden: false
       category: commits
-      triggerEvents: []
+      triggerEvents:
+          - COMMIT_CREATED
       evaluatorClass: StandardCountEvaluator
       requirements:
           type: LinearAchievementProgress
@@ -175,7 +181,8 @@ achievements:
       rarity: mythic
       isHidden: true
       category: commits
-      triggerEvents: []
+      triggerEvents:
+          - COMMIT_CREATED
       evaluatorClass: StandardCountEvaluator
       requirements:
           type: LinearAchievementProgress
@@ -187,8 +194,9 @@ achievements:
       rarity: uncommon
       isHidden: true
       category: commits
-      triggerEvents: []
-      evaluatorClass: DummyEvaluator
+      triggerEvents:
+          - COMMIT_CREATED
+      evaluatorClass: ItsyBitsyEvaluator
       requirements:
           type: BinaryAchievementProgress
 
@@ -197,8 +205,9 @@ achievements:
       rarity: rare
       isHidden: true
       category: commits
-      triggerEvents: []
-      evaluatorClass: DummyEvaluator
+      triggerEvents:
+          - COMMIT_CREATED
+      evaluatorClass: AtomicChangesEvaluator
       requirements:
           type: BinaryAchievementProgress
 
@@ -207,8 +216,9 @@ achievements:
       rarity: uncommon
       isHidden: true
       category: commits
-      triggerEvents: []
-      evaluatorClass: DummyEvaluator
+      triggerEvents:
+          - COMMIT_CREATED
+      evaluatorClass: BruteForceEvaluator
       requirements:
           type: BinaryAchievementProgress
 
@@ -217,8 +227,9 @@ achievements:
       rarity: rare
       isHidden: false
       category: commits
-      triggerEvents: []
-      evaluatorClass: DummyEvaluator
+      triggerEvents:
+          - COMMIT_CREATED
+      evaluatorClass: CrossBoundaryEvaluator
       requirements:
           type: BinaryAchievementProgress
 
@@ -494,7 +505,7 @@ achievements:
       category: issues
       triggerEvents:
           - ISSUE_CLOSED
-      evaluatorClass: DummyEvaluator
+      evaluatorClass: HiveMindEvaluator
       requirements:
           type: BinaryAchievementProgress
 
@@ -505,7 +516,7 @@ achievements:
       category: issues
       triggerEvents:
           - ISSUE_CLOSED
-      evaluatorClass: DummyEvaluator
+      evaluatorClass: OracleEvaluator
       requirements:
           type: BinaryAchievementProgress
 
@@ -516,7 +527,7 @@ achievements:
       category: issues
       triggerEvents:
           - ISSUE_CLOSED
-      evaluatorClass: DummyEvaluator
+      evaluatorClass: NecromancerEvaluator
       requirements:
           type: BinaryAchievementProgress
 
@@ -527,7 +538,9 @@ achievements:
       category: milestones
       triggerEvents:
           - PULL_REQUEST_OPENED
+          - PULL_REQUEST_MERGED
           - PULL_REQUEST_CLOSED
+          - COMMIT_CREATED
           - ISSUE_CREATED
           - ISSUE_CLOSED
           - REVIEW_APPROVED
@@ -543,8 +556,9 @@ achievements:
       rarity: uncommon
       isHidden: false
       category: milestones
-      triggerEvents: []
-      evaluatorClass: DummyEvaluator
+      triggerEvents:
+          - COMMIT_CREATED
+      evaluatorClass: PolyglotEvaluator
       requirements:
           type: BinaryAchievementProgress
 
@@ -553,8 +567,9 @@ achievements:
       rarity: epic
       isHidden: true
       category: milestones
-      triggerEvents: []
-      evaluatorClass: DummyEvaluator
+      triggerEvents:
+          - COMMIT_CREATED
+      evaluatorClass: NightOwlEvaluator
       requirements:
           type: BinaryAchievementProgress
 
@@ -563,8 +578,12 @@ achievements:
       rarity: epic
       isHidden: true
       category: milestones
-      triggerEvents: []
-      evaluatorClass: DummyEvaluator
+      triggerEvents:
+          - PULL_REQUEST_MERGED
+          - COMMIT_CREATED
+          - ISSUE_CREATED
+          - ISSUE_CLOSED
+      evaluatorClass: LongTimeReturnEvaluator
       requirements:
           type: BinaryAchievementProgress
 
@@ -573,8 +592,15 @@ achievements:
       rarity: epic
       isHidden: true
       category: milestones
-      triggerEvents: []
-      evaluatorClass: DummyEvaluator
+      triggerEvents:
+          - PULL_REQUEST_MERGED
+          - COMMIT_CREATED
+          - ISSUE_CREATED
+          - ISSUE_CLOSED
+          - REVIEW_APPROVED
+          - REVIEW_CHANGES_REQUESTED
+          - REVIEW_COMMENTED
+      evaluatorClass: AllRarityEvaluator
       requirements:
           type: BinaryAchievementProgress
 
@@ -583,8 +609,15 @@ achievements:
       rarity: legendary
       isHidden: true
       category: milestones
-      triggerEvents: []
-      evaluatorClass: DummyEvaluator
+      triggerEvents:
+          - PULL_REQUEST_MERGED
+          - COMMIT_CREATED
+          - ISSUE_CREATED
+          - ISSUE_CLOSED
+          - REVIEW_APPROVED
+          - REVIEW_CHANGES_REQUESTED
+          - REVIEW_COMMENTED
+      evaluatorClass: AllRarityEvaluator
       requirements:
           type: BinaryAchievementProgress
 
@@ -593,7 +626,14 @@ achievements:
       rarity: mythic
       isHidden: true
       category: milestones
-      triggerEvents: []
-      evaluatorClass: DummyEvaluator
+      triggerEvents:
+          - PULL_REQUEST_MERGED
+          - COMMIT_CREATED
+          - ISSUE_CREATED
+          - ISSUE_CLOSED
+          - REVIEW_APPROVED
+          - REVIEW_CHANGES_REQUESTED
+          - REVIEW_COMMENTED
+      evaluatorClass: AllRarityEvaluator
       requirements:
           type: BinaryAchievementProgress
