@@ -64,6 +64,7 @@ public class PracticeService {
         practice.setDescription(request.description());
         practice.setTriggerEvents(TriggerEventsConverter.toJsonNode(request.triggerEvents()));
         practice.setCriteria(request.criteria());
+        practice.setPrecomputeScript(request.precomputeScript());
 
         try {
             practice = practiceRepository.save(practice);
@@ -104,6 +105,10 @@ public class PracticeService {
         }
         if (request.criteria() != null) {
             practice.setCriteria(request.criteria());
+            changed = true;
+        }
+        if (request.precomputeScript() != null) {
+            practice.setPrecomputeScript(request.precomputeScript());
             changed = true;
         }
 
